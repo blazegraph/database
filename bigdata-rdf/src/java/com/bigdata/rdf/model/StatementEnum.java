@@ -56,14 +56,14 @@ package com.bigdata.rdf.model;
 public enum StatementEnum {
 
     /**
-     * Something that is directly entailed by the appropriate model theory.
-     */
-    Axiom((byte)0),
-    /**
      * A statement that was inserted into the database explicitly by the
      * application.
      */
-    Explicit((byte)1),
+    Explicit((byte)0),
+    /**
+     * Something that is directly entailed by the appropriate model theory.
+     */
+    Axiom((byte)1),
     /**
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
@@ -77,12 +77,40 @@ public enum StatementEnum {
     private final byte code;
     
     private StatementEnum(byte code) {
+     
         this.code = code;
+        
     }
 
     public byte code() {
         
         return code;
+        
+    }
+    
+    /**
+     * Max returns the value that is first in the total order
+     * <ul>
+     * <li>Explicit</li>
+     * <li>Axiom</li>
+     * <li>Inferred</li>
+     * <li>Suspended</li>
+     * </ul>
+     * @param a
+     * @param b
+     * @return
+     */
+    static public StatementEnum max(StatementEnum a, StatementEnum b) {
+        
+        if (a.code < b.code) {
+        
+            return a;
+        
+        } else {
+        
+            return b; 
+        
+        }
         
     }
     

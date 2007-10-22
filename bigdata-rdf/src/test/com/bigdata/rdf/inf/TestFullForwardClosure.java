@@ -101,6 +101,8 @@ public class TestFullForwardClosure extends AbstractInferenceEngineTestCase {
      */
     public void testFullForwardClosure01() throws IOException {
 
+        AbstractTripleStore store = getStore();
+        
         /*
          * @todo use a dataset that we can add to CVS for a performance test and
          * hand-crafted data sets to test the rule implementations.
@@ -149,9 +151,13 @@ RuleRdfs13  0   0   0
 //        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "",
 //                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
         
-        inferenceEngine.fullForwardClosure();
+        InferenceEngine inf = new InferenceEngine(store);
+
+        inf.fullForwardClosure();
         
         store.commit();
+        
+        store.closeAndDelete();
         
     }
 
@@ -162,6 +168,8 @@ RuleRdfs13  0   0   0
      */
     public void testFastForwardClosure01() throws IOException {
 
+        AbstractTripleStore store = getStore();
+        
         store.loadData(new File("data/alibaba_v41.rdf"), "", RDFFormat.RDFXML,
                 false/* verifyData */, false/* commit */);
 
@@ -178,10 +186,14 @@ RuleRdfs13  0   0   0
 //        store.loadData(new File("data/wordnet_nouns-20010201.rdf"), "",
 //                RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
         
-        inferenceEngine.fastForwardClosure();
+        InferenceEngine inf = new InferenceEngine(store);
+
+        inf.fastForwardClosure();
         
         store.commit();
 
+        store.closeAndDelete();
+        
     }
 
     /**
@@ -197,37 +209,41 @@ RuleRdfs13  0   0   0
 
         URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
 
-        AbstractTripleStore database = store;
+        AbstractTripleStore store = getStore();
 
 //        store.addRdfsAxioms(database);
         
-        database.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
-        database.addStatement(B, rdfsSubPropertyOf, A);
+        store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
+        store.addStatement(B, rdfsSubPropertyOf, A);
 
-        assertTrue(database.containsStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
-        assertTrue(database.containsStatement(B, rdfsSubPropertyOf, A));
-
-        Set<Long> subProperties = inferenceEngine.getSubProperties(database);
+        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
+        assertTrue(store.containsStatement(B, rdfsSubPropertyOf, A));
         
-        assertTrue(subProperties.contains(database.getTermId(rdfsSubPropertyOf)));
-        assertTrue(subProperties.contains(database.getTermId(A)));
-        assertTrue(subProperties.contains(database.getTermId(B)));
+        InferenceEngine inf = new InferenceEngine(store);
+
+        Set<Long> subProperties = inf.getSubProperties(store);
+        
+        assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
+        assertTrue(subProperties.contains(store.getTermId(A)));
+        assertTrue(subProperties.contains(store.getTermId(B)));
 
         assertEquals(3,subProperties.size());
 
-        database.addStatement(C, A, A);
+        store.addStatement(C, A, A);
         
-        assertTrue(database.containsStatement(C, A, A));
+        assertTrue(store.containsStatement(C, A, A));
 
-        subProperties = inferenceEngine.getSubProperties(database);
+        subProperties = inf.getSubProperties(store);
         
-        assertTrue(subProperties.contains(database.getTermId(rdfsSubPropertyOf)));
-        assertTrue(subProperties.contains(database.getTermId(A)));
-        assertTrue(subProperties.contains(database.getTermId(B)));
-        assertTrue(subProperties.contains(database.getTermId(C)));
+        assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
+        assertTrue(subProperties.contains(store.getTermId(A)));
+        assertTrue(subProperties.contains(store.getTermId(B)));
+        assertTrue(subProperties.contains(store.getTermId(C)));
 
         assertEquals(4,subProperties.size());
 
+        store.closeAndDelete();
+        
     }
     
 }

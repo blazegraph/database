@@ -88,6 +88,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
@@ -100,6 +101,7 @@ import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -205,7 +207,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             DaemonThreadFactory.defaultThreadFactory());
 
     /**
-     * Adds the statements to each index (batch api).
+     * Adds the statements to each index (batch api, concurrent index writes).
      * 
      * @param stmts
      *            An array of statements
@@ -264,7 +266,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 this.keyOrder = keyOrder;
                 
             }
-            
+
+            /**
+             * 
+             * @todo this does not remove duplicate records. in a distribute
+             *       system it is definately worth the cost of compressing the
+             *       _Statement[] by copying down references over duplicate
+             *       records before submitting them to the remote data services.
+             *       Perhaps that can be done when we re-align the data to match
+             *       the API for the RPC?
+             *       <p>
+             *       Note: duplication must be judged in terms of s:p:o and the
+             *       {@link StatementEnum}.  When different values are present 
+             *       for the {@link StatementEnum}, the "max" should be used.
+             */
             public Long call() throws Exception {
 
                 final long beginIndex = System.currentTimeMillis();
@@ -368,7 +383,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /**
-     * Adds the statements to each index (batch api).
+     * Adds the statements to each index (batch api, single-threaded).
      * 
      * @param stmts
      *            An array of statements
@@ -1529,6 +1544,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     /**
      * FIXME rewrite to choose the index given the keyOrder.
+     * 
+     * @todo modify to return an Iterator<SPO>. When we can suck everything
+     *       into RAM, then do so and wrap the SPO[] as a list. Otherwise, wrap
+     *       the IEntryIterator as an Iterator<SPO>. This should give better
+     *       scaling, but we will still need to do distributed joins.
      */
     public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
 
@@ -1558,8 +1578,226 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     /**
      * FIXME write on the indices in parallel.
+     * 
+     * @todo modify to return the #of new statements actually added to the
+     *       database and then use that value, e.g., in
+     *       {@link SPOBuffer#add(SPO)}.
+     * 
+     * @todo modify to accept a filter that can be used to ensure that things
+     *       such as (?x rdf:type rdfs:Resource) do not make it into the store
+     *       when they are {@link StatementEnum#Inferred}.
      */
-    public void addStatements(SPO[] stmts, int n ) {
+    public void addStatements(SPO[] stmts, int numStmts ) {
+     
+        /*
+         * Note: The statements are inserted into each index in parallel. We
+         * clone the statement[] and sort and bulk load each index in parallel
+         * using a thread pool.
+         */
+
+        if( numStmts == 0 ) return;
+
+        long begin = System.currentTimeMillis();
+        final AtomicLong sortTime = new AtomicLong(0); // time to sort terms by assigned byte[] keys.
+        final AtomicLong insertTime = new AtomicLong(0); // time to insert terms into the forward and reverse index.
+
+        /**
+         * Writes on one of the statement indices.
+         * 
+         * @return The elapsed time for the operation.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class IndexWriter implements Callable<Long> {
+
+            private final SPO[] stmts;
+            private final int numStmts; // @todo not needed - always equals stmts.length
+            private final Comparator<SPO> comparator;
+            private final IIndex ndx;
+            private final KeyOrder keyOrder;
+            
+            /*
+             * Private key builder for the SPO, POS, and OSP keys.
+             */
+            private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
+            
+            private final byte[][] keys;
+
+            IndexWriter(SPO[] stmts, int numStmts, Comparator<SPO> comparator, IIndex ndx, KeyOrder keyOrder) {
+                
+                this.stmts = new SPO[numStmts];
+                
+                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+
+                this.numStmts = numStmts;
+                
+                this.comparator = comparator;
+                
+                this.ndx = ndx;
+                
+                this.keys = new byte[numStmts][];
+                
+                this.keyOrder = keyOrder;
+                
+            }
+
+            /**
+             * 
+             * @todo this does not remove duplicate records. in a distribute
+             *       system it is definately worth the cost of compressing the
+             *       _Statement[] by copying down references over duplicate
+             *       records before submitting them to the remote data services.
+             *       Perhaps that can be done when we re-align the data to match
+             *       the API for the RPC?
+             *       <p>
+             *       Note: duplication must be judged in terms of s:p:o and the
+             *       {@link StatementEnum}.  When different values are present 
+             *       for the {@link StatementEnum}, the "max" should be used.
+             */
+            public Long call() throws Exception {
+
+                final long beginIndex = System.currentTimeMillis();
+
+                { // sort
+
+                    long _begin = System.currentTimeMillis();
+
+                    Arrays.sort(stmts, 0, numStmts, comparator);
+
+                    sortTime.addAndGet(System.currentTimeMillis() - _begin);
+
+                }
+                
+                { // load
+
+                    long _begin = System.currentTimeMillis();
+
+                    for (int i = 0; i < numStmts; i++) {
+
+                        final SPO stmt = stmts[i];
+
+                        switch (keyOrder) {
+                        case SPO:
+                            keys[i] = keyBuilder.statement2Key(stmt.s, stmt.p,
+                                    stmt.o);
+                            break;
+                        case OSP:
+                            keys[i] = keyBuilder.statement2Key(stmt.o, stmt.s,
+                                    stmt.p);
+                            break;
+                        case POS:
+                            keys[i] = keyBuilder.statement2Key(stmt.p, stmt.o,
+                                    stmt.s);
+                            break;
+                        default:
+                            throw new UnsupportedOperationException();
+                        }
+
+                    }
+
+                    if(false) {
+
+                        /*
+                         * @todo allow client to send null for the values when
+                         * (a) they are inserting [null] values under the keys;
+                         * and (b) they do not need the old values back.
+                         * 
+                         * FIXME This should be a conditional insert so that we
+                         * do not write on the index when the data would not be
+                         * changed. Perhaps add a conditional insert primitive
+                         * to the IIndex? Verify this is correct for all ways in
+                         * which we write in the indices for the RDF(S)
+                         * database.
+                         * 
+                         * FIXME modify to write the StatementEnum flags.
+                         */
+                        
+                        BatchInsert op = new BatchInsert(numStmts, keys,
+                                new byte[numStmts][]);
+
+                        ndx.insert(op);
+                    
+                    } else {
+
+                        /*
+                         * FIXME This is no good for a distributed system since
+                         * it will make [n] RPCs. Get the batch version above
+                         * working correctly.
+                         */
+                        
+                        for ( int i = 0; i < numStmts; i++ ) {
+
+                            if (!ndx.contains(keys[i])) {
+                             
+                                ndx.insert(keys[i], null);
+                                
+                            }
+                            
+                        }
+
+                    }
+
+                    insertTime.addAndGet(System.currentTimeMillis() - _begin);
+
+                }
+
+                long elapsed = System.currentTimeMillis() - beginIndex;
+
+                return elapsed;
+
+            }
+            
+        }
+
+        List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
+        
+        tasks.add(new IndexWriter(stmts, numStmts,
+                com.bigdata.rdf.spo.SPOComparator.INSTANCE, getSPOIndex(),
+                KeyOrder.SPO));
+        
+        tasks.add(new IndexWriter(stmts, numStmts,
+                com.bigdata.rdf.spo.POSComparator.INSTANCE, getPOSIndex(),
+                KeyOrder.POS));
+
+        tasks.add(new IndexWriter(stmts, numStmts,
+                com.bigdata.rdf.spo.OSPComparator.INSTANCE, getOSPIndex(),
+                KeyOrder.OSP));
+
+        System.err.print("Writing " + numStmts + " statements...");
+        
+        final List<Future<Long>> futures;
+        final long elapsed_SPO;
+        final long elapsed_POS;
+        final long elapsed_OSP;
+        
+        try {
+
+            futures = indexWriteService.invokeAll( tasks );
+
+            elapsed_SPO = futures.get(0).get();
+            elapsed_POS = futures.get(1).get();
+            elapsed_OSP = futures.get(2).get();
+
+        } catch(InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        } catch(ExecutionException ex) {
+        
+            throw new RuntimeException(ex);
+        
+        }
+        
+        long elapsed = System.currentTimeMillis() - begin;
+
+        System.err.println("in " + elapsed + "ms; sort=" + sortTime
+                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
+                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
+
+    }
+
+    public void addStatements_singleThreaded(SPO[] stmts, int n ) {
         
         // deal with the SPO index
         IIndex spo = getSPOIndex();

@@ -87,7 +87,7 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
     
     public void test_restartSafe() throws IOException {
 
-        ITripleStore store = getStore();
+        AbstractTripleStore store = getStore();
         
         /*
          * setup the database.

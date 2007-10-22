@@ -56,12 +56,12 @@ package com.bigdata.rdf.inf;
  */
 public class RuleRdfs05 extends AbstractRuleRdfs_5_11 {
 
-    public RuleRdfs05(InferenceEngine store,Var u, Var v, Var x) {
+    public RuleRdfs05(InferenceEngine inf,Var u, Var v, Var x) {
 
-        super(store, new Triple(u, store.rdfsSubPropertyOf, x), //
+        super(inf, new Triple(u, inf.rdfsSubPropertyOf, x), //
                 new Pred[] { //
-                new Triple(u, store.rdfsSubPropertyOf, v),//
-                new Triple(v, store.rdfsSubPropertyOf, x) //
+                new Triple(u, inf.rdfsSubPropertyOf, v),//
+                new Triple(v, inf.rdfsSubPropertyOf, x) //
                 });
 
     }

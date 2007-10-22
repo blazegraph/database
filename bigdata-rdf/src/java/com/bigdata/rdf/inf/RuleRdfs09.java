@@ -56,12 +56,12 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs09( InferenceEngine store, Var u, Var x, Var v ) {
+    public RuleRdfs09( InferenceEngine inf, Var u, Var x, Var v ) {
 
-        super(store, new Triple(v, store.rdfType, x),
+        super(inf, new Triple(v, inf.rdfType, x),
                 new Pred[] {
-                new Triple(u, store.rdfsSubClassOf, x),
-                new Triple(v, store.rdfType, u)
+                new Triple(u, inf.rdfsSubClassOf, x),
+                new Triple(v, inf.rdfType, u)
                 });
 
     }
@@ -74,10 +74,10 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
      */
     protected SPO[] getStmts2( SPO stmt1 ) {
         
-        byte[] fromKey = db.getKeyBuilder().statement2Key(store.rdfType.id,
+        byte[] fromKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
                 stmt1.s, NULL);
 
-        byte[] toKey = db.getKeyBuilder().statement2Key(store.rdfType.id,
+        byte[] toKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
                 stmt1.s + 1, NULL);
 
         return db.getStatements(db.getPOSIndex(), KeyOrder.POS, fromKey,
@@ -87,7 +87,7 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
     
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
         
-        return new SPO( stmt2.s, store.rdfType.id, stmt1.o );
+        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o );
         
     }
 

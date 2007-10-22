@@ -174,7 +174,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
 
     }
 
-    protected ITripleStore getStore() {
+    protected AbstractTripleStore getStore() {
         
         return new LocalTripleStore( getProperties() );
         
@@ -193,7 +193,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
      *                be re-opened, e.g., from failure to obtain a file lock,
      *                etc.
      */
-    protected ITripleStore reopenStore(ITripleStore store) {
+    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
         
         // close the store.
         store.close();

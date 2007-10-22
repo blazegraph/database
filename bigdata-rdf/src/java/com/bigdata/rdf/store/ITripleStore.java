@@ -290,6 +290,9 @@ public interface ITripleStore {
      * 
      * @param stmts
      *            An array of statements
+     * 
+     * @todo modify to return the #of statements that were actually added to the
+     *       store.
      */
     public void addStatements(_Statement[] stmts, int numStmts);
 

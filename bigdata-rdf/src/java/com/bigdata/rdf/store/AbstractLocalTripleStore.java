@@ -95,7 +95,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         if(val.known) {
             
-            assert val.termId !=0L;
+            assert val.termId != NULL;
             
             return val.termId;
 
@@ -413,7 +413,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                     
                     if (!term.known) {
 
-                        assert term.termId==0L;
+                        assert term.termId==NULL;
                         assert term.key != null;
 
                         // Lookup in the forward index.

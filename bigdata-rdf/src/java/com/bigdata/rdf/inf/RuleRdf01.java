@@ -69,7 +69,7 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
     }
 
-    public Stats apply( final Stats stats, final SPOBuffer buffer ) {
+    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer ) {
         
         final long computeStart = System.currentTimeMillis();
         
@@ -126,7 +126,7 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
                 long p = itr.next();
 
-                buffer.add(new SPO(p, store.rdfType.id, store.rdfProperty.id));
+                buffer.add(new SPO(p, inf.rdfType.id, inf.rdfProperty.id));
 
                 stats.numComputed++;
 

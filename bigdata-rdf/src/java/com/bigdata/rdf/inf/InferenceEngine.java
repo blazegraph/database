@@ -64,13 +64,14 @@ import org.openrdf.vocabulary.RDFS;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.Rule.Stats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -91,7 +92,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * A rule always has the form:
  * 
  * <pre>
- *        pred :- pred*.
+ *         pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -126,17 +127,17 @@ import com.bigdata.rdf.util.KeyOrder;
  * rdfs9 is represented as:
  * 
  * <pre>
- *         triple(?v,rdf:type,?x) :-
- *            triple(?u,rdfs:subClassOf,?x),
- *            triple(?v,rdf:type,?u). 
+ *          triple(?v,rdf:type,?x) :-
+ *             triple(?u,rdfs:subClassOf,?x),
+ *             triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *         triple(?u,rdfs:subClassOf,?x) :-
- *            triple(?u,rdfs:subClassOf,?v),
- *            triple(?v,rdf:subClassOf,?x). 
+ *          triple(?u,rdfs:subClassOf,?x) :-
+ *             triple(?u,rdfs:subClassOf,?v),
+ *             triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -146,6 +147,10 @@ import com.bigdata.rdf.util.KeyOrder;
  *       (the terms are assigned the same term identifier, one of them is
  *       treated as a canonical, and there is no way to retract the sameAs
  *       assertion).
+ * 
+ * @todo add a filter to {@link AbstractTripleStore#addStatements(SPO[], int)}
+ *       to filter out things that the reasoner does not want to let us, such as
+ *       (?x, rdf:type, ?rdfs:Resource).
  * 
  * @todo experiment with use of a bloom filter
  * 
@@ -239,15 +244,24 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     Rule[] rules;
 
     /**
-     * @param properties
-     * @throws IOException
+     * @param database
+     *            The database for which this class will compute entailments.
+     * 
+     * @todo Add options:
+     *       <p>
+     *       Make the ( ?x, rdf:type, rdfs:Resource ) entailments optional.
+     *       <p>
+     *       Make entailments for rdfs:domain and rdfs:range optional.
+     *       <p>
+     *       For the {@link #fullForwardClosure()} we can get by with just
+     *       Rdfs5, Rdfs7, Rdfs9, and Rdfs11.
      */
-    public InferenceEngine(ITripleStore tripleStore) {
+    public InferenceEngine(ITripleStore database) {
 
-        if (tripleStore == null)
+        if (database == null)
             throw new IllegalArgumentException();
 
-        this.database = (AbstractTripleStore) tripleStore;
+        this.database = (AbstractTripleStore) database;
 
         setup();
 
@@ -269,13 +283,58 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * 
      * @see #rdfType and friends which are initialized by this method.
      * 
-     * @todo make this into a batch operation.
-     * 
      * @todo reconcile with {@link #addRdfsAxioms(ITripleStore)} and
      *       {@link #cacheURIs(Set)}.
      */
     protected void setupIds() {
 
+        _Value rdfType = new _URI(RDF.TYPE);
+        _Value rdfProperty = new _URI(RDF.PROPERTY);
+        _Value rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+        _Value rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+        _Value rdfsDomain = new _URI(RDFS.DOMAIN);
+        _Value rdfsRange = new _URI(RDFS.RANGE);
+        _Value rdfsClass = new _URI(RDFS.CLASS);
+        _Value rdfsResource = new _URI(RDFS.RESOURCE);
+        _Value rdfsCMP = new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY);
+        _Value rdfsDatatype = new _URI(RDFS.DATATYPE);
+        _Value rdfsMember = new _URI(RDFS.MEMBER);
+        _Value rdfsLiteral = new _URI(RDFS.LITERAL);
+        
+        _Value[] terms = new _Value[]{
+        
+                rdfType,
+                rdfProperty,
+                rdfsSubClassOf,
+                rdfsSubPropertyOf,
+                rdfsDomain,
+                rdfsRange,
+                rdfsClass,
+                rdfsResource,
+                rdfsCMP,
+                rdfsDatatype,
+                rdfsMember,
+                rdfsLiteral
+                
+        };
+        
+        database.insertTerms(terms, terms.length, false/*haveKeys*/, false/*sorted*/);
+
+        this.rdfType = new Id(rdfType.termId);
+        this.rdfProperty = new Id(rdfProperty.termId);
+        this.rdfsSubClassOf = new Id(rdfsSubClassOf.termId);
+        this.rdfsSubPropertyOf= new Id(rdfsSubPropertyOf.termId);
+        this.rdfsDomain = new Id(rdfsDomain.termId);
+        this.rdfsRange = new Id(rdfsRange.termId);
+        this.rdfsClass = new Id(rdfsClass.termId);
+        this.rdfsResource = new Id(rdfsResource.termId);
+        this.rdfsCMP = new Id(rdfsCMP.termId);
+        this.rdfsDatatype = new Id(rdfsDatatype.termId);
+        this.rdfsMember = new Id(rdfsMember.termId);
+        this.rdfsLiteral = new Id(rdfsLiteral.termId);
+
+        /*
+         * 
         rdfType = new Id(database.addTerm(new _URI(RDF.TYPE)));
 
         rdfProperty = new Id(database.addTerm(new _URI(RDF.PROPERTY)));
@@ -299,7 +358,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         rdfsMember = new Id(database.addTerm(new _URI(RDFS.MEMBER)));
         
         rdfsLiteral = new Id(database.addTerm(new _URI(RDFS.LITERAL)));
-    
+        */
+        
     }
 
     public void setupRules() {
@@ -407,7 +467,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * 
      * @return Some statistics about the fixed point computation.
      */
-    public Stats fixedPoint(AbstractTripleStore database, Rule[] rules) {
+    public RuleStats fixedPoint(AbstractTripleStore database, Rule[] rules) {
         
         /*
          * Entailments are built up in a temporary store and then transferred
@@ -443,7 +503,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          */ 
         final SPOBuffer buffer = new SPOBuffer(tmpStore, BUFFER_SIZE, distinct);
         
-        Stats totalStats = new Stats();
+        RuleStats totalStats = new RuleStats();
 
         final long[] timePerRule = new long[rules.length];
         
@@ -466,7 +526,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
             
             for (int i = 0; i < nrules; i++) {
 
-                Stats ruleStats = new Stats();
+                RuleStats ruleStats = new RuleStats();
                 
                 Rule rule = rules[i];
 
@@ -494,7 +554,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                             + ", entailments=" + nnew + ", #stmts1="
                             + ruleStats.stmts1 + ", #stmts2="
                             + ruleStats.stmts2 + ", #subqueries="
-                            + ruleStats.numSubqueries
+                            + ruleStats.numSubqueries1
                             + ", #stmtsExaminedPerSec=" + stmtsPerSec);
                 }
                 
@@ -509,20 +569,28 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 /*
                  * Show times for each rule so far.
                  */
-                System.err.println("rule    \tms\t#entms\tentms/ms");
+                StringBuilder sb = new StringBuilder();
+                
+                sb.append("\n");
+                
+                sb.append("rule    \tms\t#entms\tentms/ms\n");
                 
                 for(int i=0; i<timePerRule.length; i++) {
                     
-                    System.err.println(rules[i].getClass().getSimpleName()
+                    sb.append(rules[i].getClass().getSimpleName()
                             + "\t"
                             + timePerRule[i]
                             + "\t"
                             + entailmentsPerRule[i]
                             + "\t"
-                            + (timePerRule[i] == 0 ? 0 : entailmentsPerRule[i]
+                            + (timePerRule[i] == 0 ? "N/A" : ""+entailmentsPerRule[i]
                                     / timePerRule[i]));
                     
+                    sb.append("\n");
+                    
                 }
+
+                log.debug(sb.toString());
                 
             }
             
@@ -551,13 +619,13 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
             final long insertTime = System.currentTimeMillis() - insertStart;
 
             if (DEBUG) {
-            StringBuilder debug = new StringBuilder();
-            debug.append( "round #" ).append( round ).append( ": " );
-            debug.append( totalStats.numComputed ).append( " computed in " );
-            debug.append( totalStats.computeTime ).append( " millis, " );
-            debug.append( numInserted ).append( " inserted in " );
-            debug.append( insertTime ).append( " millis " );
-            log.debug( debug.toString() );
+                StringBuilder debug = new StringBuilder();
+                debug.append( "round #" ).append( round ).append( ": " );
+                debug.append( totalStats.numComputed ).append( " computed in " );
+                debug.append( totalStats.computeTime ).append( " millis, " );
+                debug.append( numInserted ).append( " inserted in " );
+                debug.append( insertTime ).append( " millis " );
+                log.debug( debug.toString() );
             }
 
             round++;
@@ -572,8 +640,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         
             final int inferenceCount = lastStatementCount - firstStatementCount;
             
-            log.info("Computed closure of "+rules.length+" rules in "
-                            + round + " rounds and "
+            log.info("\nComputed closure of "+rules.length+" rules in "
+                            + (round+1) + " rounds and "
                             + elapsed
                             + "ms yeilding "
                             + lastStatementCount
@@ -616,9 +684,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      *       then we have to filter out ungrounded justifications during TM. If
      *       not, then great.
      * 
-     * @todo make entailments for rdfs:domain and rdfs:range optional. we can
-     *       get by with just Rdfs5, Rdfs7, Rdfs9, and Rdfs11.
-     * 
      * @todo test on alibaba (entity-link data) as well as on ontology heavy
      *       (nciOncology, cyc).
      * 
@@ -648,7 +713,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * 
      * It would be analogous for equivalentProperty.
      * 
-     * @todo aggregate stats from each rule - write a helper method on Stats for
+     * @todo aggregate stats from each rule - write a helper method on RuleStats for
      *       this.
      */
     public void fastForwardClosure() {
@@ -710,34 +775,47 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         final Set<Long> P = getSubProperties(database);
 
         // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
-        foo(database,buffer,P,rdfsSubPropertyOf.id);
-        
+        System.err.println("step3: "
+                + new RuleFastClosure3(this, nextVar(), nextVar(), P).apply(
+                        new RuleStats(), buffer));
+
         // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
-        fixedPoint(database, new Rule[]{rdfs5});
+        System.err.println("rdfs5: "
+                + fixedPoint(database, new Rule[] { rdfs5 }));
 
         // 4a. Obtain: D,R,C,T.
-        final Set<Long> D = getSubPropertiesOf(database,rdfsDomain.id);
-        final Set<Long> R = getSubPropertiesOf(database,rdfsRange.id);
-        final Set<Long> C = getSubPropertiesOf(database,rdfsSubClassOf.id);
-        final Set<Long> T = getSubPropertiesOf(database,rdfType.id);
+        // @todo refactor into the rules.
+        final Set<Long> D = getSubPropertiesOf(database, rdfsDomain.id);
+        final Set<Long> R = getSubPropertiesOf(database, rdfsRange.id);
+        final Set<Long> C = getSubPropertiesOf(database, rdfsSubClassOf.id);
+        final Set<Long> T = getSubPropertiesOf(database, rdfType.id);
 
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
-        foo(database,buffer,D,rdfsDomain.id);
-        
+        System.err.println("step5: "
+                + new RuleFastClosure5(this, nextVar(), nextVar(), D).apply(
+                        new RuleStats(), buffer));
+
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
-        foo(database,buffer,R,rdfsRange.id);
+        System.err.println("step6: "
+                + new RuleFastClosure6(this, nextVar(), nextVar(), R).apply(
+                        new RuleStats(), buffer));
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
-        foo(database,buffer,C,rdfsSubClassOf.id);
+        System.err.println("step7: "
+                + new RuleFastClosure7(this, nextVar(), nextVar(), C).apply(
+                        new RuleStats(), buffer));
 
         // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
-        fixedPoint(database, new Rule[]{rdfs11});
-        
+        System.err.println("rdfs11: "
+                + fixedPoint(database, new Rule[] { rdfs11 }));
+
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
-        foo(database,buffer,T,rdfType.id);
+        System.err.println("step9: "
+                + new RuleFastClosure9(this, nextVar(), nextVar(), T).apply(
+                        new RuleStats(), buffer));
 
         // 10. RuleRdfs02
-        System.err.println(rdfs2.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs2: "+rdfs2.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         /*
@@ -746,9 +824,13 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
          * (?x, rdf:type, ?b).
          */
+        System.err.println("step11: "+new RuleFastClosure11(this, nextVar(), nextVar(),
+                nextVar(), nextVar(), nextVar()).apply(new RuleStats(), buffer)
+                .toString());
+        buffer.flush();
         
         // 12. RuleRdfs03
-        System.err.println(rdfs3.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs3: "+rdfs3.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         /* 13. special rule w/ 3-part antecedent.
@@ -756,6 +838,10 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b ) ->
          * (?x, rdf:type, ?b )
          */
+        System.err.println("step13: "+new RuleFastClosure13(this, nextVar(), nextVar(),
+                nextVar(), nextVar(), nextVar()).apply(new RuleStats(), buffer)
+                .toString());
+        buffer.flush();
         
         /*
          * 14-15. These steps skipped. They correspond to rdfs4a and rdfs4b and
@@ -763,31 +849,31 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          */
 
         // 16. RuleRdf01
-        System.err.println(rdf1.apply(new Stats(), buffer).toString());
+        System.err.println("rdf1: "+rdf1.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         // 17. RuleRdfs09
-        System.err.println(rdfs9.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs9: "+rdfs9.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         // 18. RuleRdfs10
-        System.err.println(rdfs10.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs10: "+rdfs10.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         // 19. RuleRdfs08.
-        System.err.println(rdfs8.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs8: "+rdfs8.apply(new RuleStats(), buffer).toString());
         buffer.flush();
 
         // 20. RuleRdfs13.
-        System.err.println(rdfs13.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs13: "+rdfs13.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         // 21. RuleRdfs06.
-        System.err.println(rdfs6.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs6: "+rdfs6.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         // 22. RuleRdfs07.
-        System.err.println(rdfs7.apply(new Stats(), buffer).toString());
+        System.err.println("rdfs7: "+rdfs7.apply(new RuleStats(), buffer).toString());
         buffer.flush();
         
         /*
@@ -802,7 +888,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         
         if(INFO) {
 
-            log.info("Computed closure in "
+            log.info("\nComputed closure in "
                             + elapsed
                             + "ms yeilding "
                             + lastStatementCount
@@ -1011,78 +1097,176 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     /**
      * <code>(?x, P, ?y) -> (?x, propertyId, ?y)</code>
      * 
-     * @param database
-     *            The database.
-     * @param buffer
-     *            A buffer used to accumulate entailments. The buffer is flushed
-     *            to the database if this method returns normally.
-     * @param P
-     *            A set of term identifiers.
-     * @param propertyId
-     *            The propertyId to be used in the assertions.
-     * 
-     * @todo verify that we do not need to assert stmts where P is [propertyId]
-     *       itself.
-     * 
-     * @todo mark the statements as {@link StatementEnum#Inferred}
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    protected void foo(AbstractTripleStore database, SPOBuffer buffer,
-            Set<Long> P, long propertyId) {
+    public static abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf {
 
-        /*
-         * The #of assertions placed into the buffer.
-         * 
-         * Note: This is NOT a count of the #of asserted statements that were
-         * added to the database. In order to get that the SPOBuffer would have
-         * to track whether or not statements were pre-existing during overflow.
-         * With that, we could easily return the #of statements that were added
-         * by this method.
-         */
-
-        int counter = 0;
+        protected final Set<Long> P;
+        protected final long propertyId;
         
-        final long[] a = getSortedArray(P);
+        /**
+         * @param inf
+         * @param P
+         * @param propertyId
+         * 
+         * @todo refactor [P] into the rule execution and refactor the unit
+         *       tests as well.
+         */
+        public AbstractRuleFastClosure_3_5_6_7_9(InferenceEngine inf, Var x, Id propertyId, Var y, Set<Long> P) {
 
-        for (long p : a) {
+            super(inf, 
+                    new Triple(x, propertyId, y),
+                    new Pred[] {
+//                    new Triple(x, P, y)
+            });
+            
+            this.P = P;
+            
+            this.propertyId = propertyId.id;
+            
+        }
+     
+        /**
+         * <code>(?x, P, ?y) -> (?x, propertyId, ?y)</code>
+         * 
+         * @param database
+         *            The database.
+         * @param buffer
+         *            A buffer used to accumulate entailments. The buffer is flushed
+         *            to the database if this method returns normally.
+         * @param P
+         *            A set of term identifiers.
+         * @param propertyId
+         *            The propertyId to be used in the assertions.
+         * 
+         * @todo verify that we do not need to assert stmts where P is [propertyId]
+         *       itself.
+         */
+        public RuleStats apply(final RuleStats stats, final SPOBuffer buffer) {
 
-            // if(p==propertyId) continue;
+            final long begin = System.currentTimeMillis();
+            
+            final long[] a = inf.getSortedArray(P);
 
-            byte[] fromKey = database.getKeyBuilder().statement2Key(p, NULL,
-                    NULL);
+            // Note: counting the passed in array as stmts1.
+            stats.stmts1 += a.length;
+            
+            for (long p : a) {
 
-            byte[] toKey = database.getKeyBuilder().statement2Key(p + 1, NULL,
-                    NULL);
+                // if(p==propertyId) continue;
 
-            SPO[] stmts = database.getStatements(database.getPOSIndex(),
-                    KeyOrder.POS, fromKey, toKey);
+                byte[] fromKey = db.getKeyBuilder()
+                        .statement2Key(p, NULL, NULL);
 
-            for (SPO spo : stmts) {
+                byte[] toKey = db.getKeyBuilder().statement2Key(p + 1, NULL,
+                        NULL);
 
-                /*
-                 * Note: since P includes rdfs:subPropertyOf (as well as all of
-                 * the sub properties of rdfs:subPropertyOf) there are going to
-                 * be some axioms in here that we really do not need to reassert
-                 * and generally some explicit statements as well.
-                 */
+                SPO[] stmts = db.getStatements(db.getPOSIndex(), KeyOrder.POS,
+                        fromKey, toKey);
 
-                SPO newSPO = new SPO(spo.s, rdfsSubPropertyOf.id, spo.o); // @todo
-                                                                            // StatementEnum.Inferred));
+                stats.numSubqueries1++;
+                
+                stats.stmts2 += stmts.length;
+                
+                for (SPO spo : stmts) {
 
-                buffer.add(newSPO);
+                    /*
+                     * Note: since P includes rdfs:subPropertyOf (as well as all
+                     * of the sub properties of rdfs:subPropertyOf) there are
+                     * going to be some axioms in here that we really do not
+                     * need to reassert and generally some explicit statements
+                     * as well.
+                     */
 
-                if (DEBUG) {
+                    // @todo StatementEnum.Inferred
+                    SPO newSPO = new SPO(spo.s, inf.rdfsSubPropertyOf.id, spo.o);
 
-                    log.debug("add " + newSPO.toString(database));
+                    buffer.add(newSPO);
+
+                    stats.numComputed++;
 
                 }
 
-                counter++;
-                
             }
 
+            buffer.flush();
+
+            stats.computeTime += System.currentTimeMillis() - begin;
+            
+            return stats;
+            
         }
 
-        buffer.flush();
+    }
+
+    public static class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
+
+        /**
+         * @param inf
+         * @param P
+         */
+        public RuleFastClosure3(InferenceEngine inf, Var x, Var y, Set<Long> P) {
+            
+            super(inf, x, inf.rdfsSubPropertyOf, y, P);
+            
+        }
+        
+    }
+    
+    public static class RuleFastClosure5 extends AbstractRuleFastClosure_3_5_6_7_9 {
+
+        /**
+         * @param inf
+         * @param D
+         */
+        public RuleFastClosure5(InferenceEngine inf, Var x, Var y, Set<Long> D) {
+            
+            super(inf, x, inf.rdfsDomain, y, D);
+            
+        }
+        
+    }
+    
+    public static class RuleFastClosure6 extends AbstractRuleFastClosure_3_5_6_7_9 {
+
+        /**
+         * @param inf
+         * @param R
+         */
+        public RuleFastClosure6(InferenceEngine inf, Var x, Var y, Set<Long> R) {
+            
+            super(inf, x, inf.rdfsRange, y, R);
+            
+        }
+        
+    }
+    
+    public static class RuleFastClosure7 extends AbstractRuleFastClosure_3_5_6_7_9 {
+
+        /**
+         * @param inf
+         * @param C
+         */
+        public RuleFastClosure7(InferenceEngine inf, Var x, Var y, Set<Long> C) {
+            
+            super(inf, x, inf.rdfsSubClassOf, y, C);
+            
+        }
+        
+    }
+    
+    public static class RuleFastClosure9 extends AbstractRuleFastClosure_3_5_6_7_9 {
+
+        /**
+         * @param inf
+         * @param T
+         */
+        public RuleFastClosure9(InferenceEngine inf, Var x, Var y, Set<Long> T) {
+            
+            super(inf, x, inf.rdfType, y, T);
+            
+        }
         
     }
     
@@ -1132,6 +1316,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         // batch insert axoims.
         database.addStatements(stmts, numStmts);
+        
+        log.info("Added "+numStmts+" axioms");
         
     }
     
@@ -1282,6 +1468,290 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         
     };
 
+    /**
+     * Rule for steps 11 and 13 of {@link InferenceEngine#fastForwardClosure()}.
+     * <p>
+     * Note: this rule is not very selective and does not produce new
+     * entailments unless your ontology and your application both rely on
+     * domain/range to confer type information. If you explicitly type your
+     * instances then this will not add information during closure.
+     * <p>
+     * 11.
+     * 
+     * <pre>
+     *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b)
+     *         -&gt; (?x, rdf:type, ?b).
+     * </pre>
+     * 
+     * 13.
+     * 
+     * <pre>
+     *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b )
+     *         -&gt; (?x, rdf:type, ?b )
+     * </pre>
+     * 
+     * @todo Consider whether the head of the rule (?x, rdf:type, ?b) could be
+     *       queried since it is two bound to identify bindings of ?x for which
+     *       the entailment is already known and thereby reduce the amount of
+     *       work, or at least the #of false entailments, that this rule will
+     *       produce.
+     * 
+     * @see TestRuleFastClosure_11_13
+     */
+    static abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
+
+        protected final long propertyId;
+        
+        /**
+         * 
+         * @param inf
+         * @param x
+         * @param y
+         * @param z
+         * @param a
+         * @param b
+         * @param propertyId Use [rdfs:domain] for #11 and [rdfs:range] for #13.
+         */
+        public AbstractRuleFastClosure_11_13(InferenceEngine inf, Var x, Var y, Var z,
+                Var a, Var b, final Id propertyId) {
+
+            super(inf, new Triple(x, inf.rdfType, b),
+                    new Pred[] {
+                    new Triple(x, y, z),
+                    new Triple(y, inf.rdfsSubPropertyOf, a),
+                    new Triple(a, propertyId, b)
+                    });
+
+            this.propertyId = propertyId.id;
+            
+        }
+
+        /**
+         * Do either one-bound sub-query first, depending on the range count for
+         * (?y, rdfs:subPropertyOf, ?a) vs (?a, propertyId, ?b).
+         * <p>
+         * Then do the other term as a two-bound sub-query (joining on ?a). The
+         * join binds ?y and ?b, which we use for the output tuples.
+         * <p>
+         * Finally, for each ?y, do the 1-bound query (?x, ?y, ?z) and generate
+         * (?x, rdf:type, ?b).
+         * 
+         * @todo refactor to choose the evaluation order based on the range
+         *       count for (?y, rdfs:subPropertyOf, ?a) vs (?a, propertyId, ?b).
+         */
+        public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
+            
+            final long computeStart = System.currentTimeMillis();
+            
+            // in SPO order.
+            SPO[] stmts1 = getStmts1();
+            
+            stats.stmts1 += stmts1.length;
+
+            /*
+             * Subquery is two bound: (a, propertyId, ?b). What we want out of
+             * the join is stmt1.s, which is ?y.
+             * 
+             * FIXME update docs and logic from here down.
+             * 
+             * FIXME Should the statements be re-ordered to improve join
+             * performance?
+             * 
+             * Since stmt1.s := stmt2.p, we only execute N distinct subqueries
+             * for N distinct values of stmt1.s. This works because stmts1 is in
+             * SPO order, so the subject values are clustered into an ascending
+             * order.
+             * 
+             * Note: I have observed very little or _possibly_ a slight negative
+             * impact on performance from the attempt to reuse subqueries for
+             * the same subject. Presumably this is because the subjects are
+             * already mostly distinct, so we just pay for the cost of sorting
+             * them and do not normally get a reduction in the #of subqueries.
+             * The alternative is to have getStmts1() return the statements
+             * without sorting them so that they will be in POS order since that
+             * is the index that we are querying. The conditional tests on lastS
+             * here are still Ok, it is just much less likely that we will ever
+             * reuse a subquery.
+             */
+            
+            long lastS = NULL;
+            
+            SPO[] stmts2 = null;
+            
+            for (int i = 0; i < stmts1.length; i++) {
+
+                SPO stmt1 = stmts1[i];
+                
+                if(lastS==NULL || lastS!=stmt1.s) {
+                    
+                    lastS = stmt1.s;
+                
+                    // Subquery on the POS index using stmt2.p := stmt1.s.
+                    stmts2 = getStmts2(stmt1);
+                    
+                    stats.stmts2 += stmts2.length;
+                    
+                    stats.numSubqueries1++;
+                    
+                }
+                
+                for (int j = 0; j < stmts2.length; j++) {
+                
+                    SPO stmt2 = stmts2[j];
+                    
+                    /* join on ?a
+                     * 
+                     * ?y := stmt1.s
+                     * 
+                     * ?b := stmt2.o
+                     */
+                    if(stmt1.o != stmt2.s) continue;
+
+                    SPO[] stmts3 = getStmts3(stmt1);
+                    
+                    stats.stmts3 += stmts3.length;
+                    
+                    stats.numSubqueries2++;
+                    
+                    for(SPO stmt3: stmts3) {
+
+                        // generate (?x, rdf:type, ?b).
+                        
+                        buffer.add(new SPO( stmt3.s, inf.rdfType.id, stmt2.o ));
+                                                
+                        stats.numComputed++;
+                        
+                    }
+                    
+                }
+                
+            }
+            
+            stats.computeTime += System.currentTimeMillis() - computeStart;
+
+            return stats;
+
+        }
+        
+        /**
+         * Use POS index to match (?y, rdfs:subPropertyOf, ?a) with one bound
+         * (the predicate). The statements are buffered and then sorted into SPO
+         * order.
+         */
+        public SPO[] getStmts1() {
+            
+            final long p = inf.rdfsSubPropertyOf.id;
+            
+            byte[] fromKey = db.getKeyBuilder().statement2Key(p, NULL, NULL);
+
+            byte[] toKey = db.getKeyBuilder().statement2Key(p + 1, NULL, NULL);
+
+            SPO[] stmts = db.getStatements(db.getPOSIndex(), KeyOrder.POS,
+                    fromKey, toKey);
+            
+            /*
+             * Sort into SPO order.
+             * 
+             * Note: you can comment this out to compare with POS order.  The JOIN
+             * is still correct, but the logic to reuse subqueries in apply() is
+             * mostly defeated when the statements are not sorted into SPO order.
+             */
+            Arrays.sort(stmts,SPOComparator.INSTANCE);
+            
+            return stmts;
+            
+        }
+        
+        /**
+         * Two bound subquery <code>(?a, propertyId, ?b)</code> using the SPO
+         * index with ?a bound to stmt1.o.
+         * 
+         * @return The data in SPO order.
+         */
+        public SPO[] getStmts2(SPO stmt1) {
+
+            final long a = stmt1.o;
+            
+            byte[] fromKey = db.getKeyBuilder().statement2Key(a, propertyId,
+                    NULL);
+
+            byte[] toKey = db.getKeyBuilder().statement2Key(a, propertyId + 1,
+                    NULL);
+
+            return db.getStatements(db.getSPOIndex(), KeyOrder.SPO, fromKey,
+                    toKey);
+        
+        }
+        
+        /**
+         * One bound subquery <code>(?x, ?y, ?z)</code> using the POS
+         * index with ?y bound to stmt1.s.
+         * 
+         * @return The data in POS order.
+         */
+        public SPO[] getStmts3(SPO stmt1) {
+
+            final long y = stmt1.s;
+            
+            byte[] fromKey = db.getKeyBuilder().statement2Key(y, NULL, NULL);
+
+            byte[] toKey = db.getKeyBuilder().statement2Key(y + 1, NULL, NULL);
+
+            return db.getStatements(db.getPOSIndex(), KeyOrder.POS, fromKey,
+                    toKey);
+        
+        }
+        
+    }
+
+    /**
+     * Rule for step 11 of {@link InferenceEngine#fastForwardClosure()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class RuleFastClosure11 extends AbstractRuleFastClosure_11_13 {
+
+        /**
+         * @param inf
+         * @param x
+         * @param y
+         * @param z
+         * @param a
+         * @param b
+         */
+        public RuleFastClosure11(InferenceEngine inf, Var x, Var y, Var z, Var a, Var b) {
+            
+            super(inf, x, y, z, a, b, inf.rdfsDomain);
+            
+        }
+        
+    }
+    
+    /**
+     * Rule for step 13 of {@link InferenceEngine#fastForwardClosure()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
+
+        /**
+         * @param inf
+         * @param x
+         * @param y
+         * @param z
+         * @param a
+         * @param b
+         */
+        public RuleFastClosure13(InferenceEngine inf, Var x, Var y, Var z, Var a, Var b) {
+            
+            super(inf, x, y, z, a, b, inf.rdfsRange);
+            
+        }
+        
+    }
+    
     /**
      * Accepts a triple pattern and returns the closure over that triple pattern
      * using a magic transform of the RDFS entailment rules.

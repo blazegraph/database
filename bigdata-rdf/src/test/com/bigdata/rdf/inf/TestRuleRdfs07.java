@@ -102,7 +102,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         // apply the rule.
         applyRule(inferenceEngine.rdfs7,1,1);
 
-        assertEquals("#subqueries",1,stats.numSubqueries);
+        assertEquals("#subqueries",1,stats.numSubqueries1);
         
         /*
          * validate the state of the primary store.
@@ -149,7 +149,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         // apply the rule.
         applyRule(inferenceEngine.rdfs7,2,2);
 
-        assertEquals("#subqueries",1,stats.numSubqueries);
+        assertEquals("#subqueries",1,stats.numSubqueries1);
         
         /*
          * validate the state of the primary store.
@@ -202,7 +202,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         applyRule(inferenceEngine.rdfs7,2,2);
 
         // verify that only one subquery is issued.
-        assertEquals("#subqueries",1,stats.numSubqueries);
+        assertEquals("#subqueries",1,stats.numSubqueries1);
         
         /*
          * validate the state of the primary store.

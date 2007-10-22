@@ -55,11 +55,11 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs07( InferenceEngine store, Var a, Var b, Var u, Var y ) {
+    public RuleRdfs07( InferenceEngine inf, Var a, Var b, Var u, Var y ) {
 
-        super(store, new Triple(u, b, y),
+        super(inf, new Triple(u, b, y),
                 new Pred[] {
-                new Triple(a, store.rdfsSubPropertyOf, b),
+                new Triple(a, inf.rdfsSubPropertyOf, b),
                 new Triple(u, a, y)
                 });
 

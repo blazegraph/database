@@ -53,16 +53,16 @@ import com.bigdata.rdf.util.KeyOrder;
 public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
 
     public AbstractRuleRdfs_2_3_7_9
-        ( InferenceEngine store, 
+        ( InferenceEngine inf, 
           Triple head, 
           Pred[] body
           ) {
 
-        super( store, head, body );
+        super( inf, head, body );
 
     }
     
-    public Stats apply( final Stats stats, final SPOBuffer buffer) {
+    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
@@ -112,7 +112,7 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
                 
                 stats.stmts2 += stmts2.length;
                 
-                stats.numSubqueries++;
+                stats.numSubqueries1++;
                 
             }
             

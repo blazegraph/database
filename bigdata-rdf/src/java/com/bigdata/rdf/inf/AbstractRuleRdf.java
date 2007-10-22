@@ -45,9 +45,9 @@ package com.bigdata.rdf.inf;
 
 public abstract class AbstractRuleRdf extends Rule {
     
-    public AbstractRuleRdf(InferenceEngine store, Triple head, Pred[] body) {
+    public AbstractRuleRdf(InferenceEngine inf, Triple head, Pred[] body) {
 
-        super(store, head, body);
+        super(inf, head, body);
 
     }
        
