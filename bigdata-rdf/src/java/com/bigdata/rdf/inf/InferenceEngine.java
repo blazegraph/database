@@ -69,6 +69,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -148,10 +149,6 @@ import com.bigdata.rdf.util.KeyOrder;
  *       treated as a canonical, and there is no way to retract the sameAs
  *       assertion).
  * 
- * @todo add a filter to {@link AbstractTripleStore#addStatements(SPO[], int)}
- *       to filter out things that the reasoner does not want to let us, such as
- *       (?x, rdf:type, ?rdfs:Resource).
- * 
  * @todo experiment with use of a bloom filter
  * 
  * @todo provide fixed point transitive closure for "chain" rules (subClassOf)
@@ -183,6 +180,47 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      */
     final protected AbstractTripleStore database;
     
+    /**
+     * The capacity of the {@link SPOBuffer}.
+     * <p>
+     * Results on a 45k triple data set:
+     * <pre>
+     * 1k    - Computed closure in 4469ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=17966
+     * 10k   - Computed closure in 3250ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=24704
+     * 50k   - Computed closure in 3187ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=25193
+     * 100k  - Computed closure in 3359ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23903
+     * 1000k - Computed closure in 3954ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=20306
+     * </pre>
+     * 
+     * Note that the actual performance will depend on the sustained behavior
+     * of the JVM, including tuning, and the characteristics of the specific
+     * ontology, especially how it influences the #of entailments generated
+     * by each rule.
+     */
+    final int BUFFER_SIZE = 50 * Bytes.kilobyte32;
+    
+    /**
+     * Note: making statements distinct in the {@link SPOBuffer} appears to slow
+     * things down slightly:
+     * 
+     * <pre>
+     * 
+     * fast: distinct := false;
+     * Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
+     * 
+     * fast: distinct := true;
+     * Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
+     * 
+     * full: distinct := false;
+     * Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
+     * 
+     * full: distinct := true
+     * Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
+     * 
+     * </pre>
+     */
+    final boolean distinct = true;
+
 //    /**
 //     * The persistent database (vs the temporary store).
 //     */
@@ -255,6 +293,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      *       <p>
      *       For the {@link #fullForwardClosure()} we can get by with just
      *       Rdfs5, Rdfs7, Rdfs9, and Rdfs11.
+     *       <p>
+     *       The {@link SPOBuffer} capacity.
      */
     public InferenceEngine(ITripleStore database) {
 
@@ -444,51 +484,14 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * @todo support closure of a document against an ontology and then bulk
      *       load the result into the store.
      */
-    public void fullForwardClosure() {
+    public ClosureStats fullForwardClosure() {
 
+        final long begin = System.currentTimeMillis();
+        
+        final int nbefore = database.getStatementCount();
+        
         // add RDF(S) axioms to the database.
         addRdfsAxioms(database);
-
-        // do the full forward closure of the database.
-        fixedPoint(database, rules);
-        
-    }
-    
-    /**
-     * Computes the fixed point for the {@link #database}.
-     * 
-     * @param database
-     *            The database whose entailments will be computed. The
-     *            {@link Rule}s will match against statements in this database
-     *            and the resulting entailments will be added to the database.
-     * 
-     * @param rules
-     *            The rules to be executed.
-     * 
-     * @return Some statistics about the fixed point computation.
-     */
-    public RuleStats fixedPoint(AbstractTripleStore database, Rule[] rules) {
-        
-        /*
-         * Entailments are built up in a temporary store and then transferred
-         * enmass to the database.
-         */
-        TempTripleStore tmpStore = new TempTripleStore(new Properties());
-        
-        /*
-         * @todo configuration paramater.
-         * 
-         * There is a factor of 2 performance difference for a sample data set
-         * from a buffer size of one (unordered inserts) to a buffer size of
-         * 10k.
-         */
-        final int BUFFER_SIZE = 100 * Bytes.kilobyte32;
-        
-        /*
-         * Note: Unlike the parser buffer, making statements distinct appears
-         * to slow things down significantly (2x slower!).
-         */
-        final boolean distinct = false;
 
         /*
          * This is a buffer that is used to hold entailments so that we can
@@ -501,161 +504,22 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          * always flushed after each rule and therefore will have been flushed
          * when this method returns.
          */ 
-        final SPOBuffer buffer = new SPOBuffer(tmpStore, BUFFER_SIZE, distinct);
+        final SPOBuffer buffer = new SPOBuffer(database, new DoNotAddFilter(), BUFFER_SIZE, distinct);
+
+        // do the full forward closure of the database.
+        System.err.println(fixedPoint(rules, buffer).toString());
+       
+        final int nafter = database.getStatementCount();
         
-        RuleStats totalStats = new RuleStats();
-
-        final long[] timePerRule = new long[rules.length];
-        
-        final int[] entailmentsPerRule = new int[rules.length];
-        
-        final int nrules = rules.length;
-
-        final int firstStatementCount = database.getStatementCount();
-
-        final long begin = System.currentTimeMillis();
-
-        log.debug("Closing kb with " + firstStatementCount
-                + " statements");
-
-        int round = 0;
-
-        while (true) {
-
-            final int numEntailmentsBefore = tmpStore.getStatementCount();
-            
-            for (int i = 0; i < nrules; i++) {
-
-                RuleStats ruleStats = new RuleStats();
-                
-                Rule rule = rules[i];
-
-                int nbefore = ruleStats.numComputed;
-                
-                rule.apply( ruleStats, buffer );
-                
-                int nnew = ruleStats.numComputed - nbefore;
-
-                // #of statements examined by the rule.
-                int nstmts = ruleStats.stmts1 + ruleStats.stmts2;
-                
-                long elapsed = ruleStats.computeTime;
-                
-                timePerRule[i] += elapsed;
-                
-                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
-                
-                long stmtsPerSec = (nstmts == 0 || elapsed == 0L ? 0
-                        : ((long) (((double) nstmts) / ((double) elapsed) * 1000d)));
-                                
-                if (DEBUG||true) {
-                    log.debug("round# " + round + ", "
-                            + rule.getClass().getSimpleName()
-                            + ", entailments=" + nnew + ", #stmts1="
-                            + ruleStats.stmts1 + ", #stmts2="
-                            + ruleStats.stmts2 + ", #subqueries="
-                            + ruleStats.numSubqueries1
-                            + ", #stmtsExaminedPerSec=" + stmtsPerSec);
-                }
-                
-                totalStats.numComputed += ruleStats.numComputed;
-                
-                totalStats.computeTime += ruleStats.computeTime;
-                
-            }
-
-            if(true) {
-            
-                /*
-                 * Show times for each rule so far.
-                 */
-                StringBuilder sb = new StringBuilder();
-                
-                sb.append("\n");
-                
-                sb.append("rule    \tms\t#entms\tentms/ms\n");
-                
-                for(int i=0; i<timePerRule.length; i++) {
-                    
-                    sb.append(rules[i].getClass().getSimpleName()
-                            + "\t"
-                            + timePerRule[i]
-                            + "\t"
-                            + entailmentsPerRule[i]
-                            + "\t"
-                            + (timePerRule[i] == 0 ? "N/A" : ""+entailmentsPerRule[i]
-                                    / timePerRule[i]));
-                    
-                    sb.append("\n");
-                    
-                }
-
-                log.debug(sb.toString());
-                
-            }
-            
-            /*
-             * Flush the statements in the buffer to the temporary store. 
-             */
-            buffer.flush();
-
-            final int numEntailmentsAfter = tmpStore.getStatementCount();
-            
-            if ( numEntailmentsBefore == numEntailmentsAfter ) {
-                
-                // This is the fixed point.
-                break;
-                
-            }
-            
-            /*
-             * Transfer the entailments into the primary store so that derived
-             * entailments may be computed.
-             */
-            final long insertStart = System.currentTimeMillis();
-
-            final int numInserted = copyStatements(tmpStore,database);
-
-            final long insertTime = System.currentTimeMillis() - insertStart;
-
-            if (DEBUG) {
-                StringBuilder debug = new StringBuilder();
-                debug.append( "round #" ).append( round ).append( ": " );
-                debug.append( totalStats.numComputed ).append( " computed in " );
-                debug.append( totalStats.computeTime ).append( " millis, " );
-                debug.append( numInserted ).append( " inserted in " );
-                debug.append( insertTime ).append( " millis " );
-                log.debug( debug.toString() );
-            }
-
-            round++;
-            
-        }
-
         final long elapsed = System.currentTimeMillis() - begin;
-
-        final int lastStatementCount = database.getStatementCount();
-
-        if (INFO) {
         
-            final int inferenceCount = lastStatementCount - firstStatementCount;
-            
-            log.info("\nComputed closure of "+rules.length+" rules in "
-                            + (round+1) + " rounds and "
-                            + elapsed
-                            + "ms yeilding "
-                            + lastStatementCount
-                            + " statements total, "
-                            + (inferenceCount)
-                            + " inferences"
-                            + ", entailmentsPerSec="
-                            + ((long) (((double) inferenceCount)
-                                    / ((double) elapsed) * 1000d)));
-
-        }
-
-        return totalStats;
-
+        ClosureStats closureStats = new ClosureStats();
+        
+        closureStats.elapsed = elapsed;
+        closureStats.numComputed = nafter - nbefore;
+        
+        return closureStats;        
+        
     }
 
     /**
@@ -664,11 +528,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
      * Zhang</a>.
      * 
-     * @todo If the head is (x, rdf:type, rdfs:Resource) then do not insert into
-     *       the store (filter at the reasoner level only). This might be done
-     *       with an option to {@link SPOBuffer}.
-     * 
-     * @todo mark axiom vs explicit vs inferred and reserve a bit for suspended
+     * FIXME mark axiom vs explicit vs inferred and reserve a bit for suspended
      *       for each statement. This needs to be driven into the statement
      *       indices and throughout the code. Both {@link _Statement} and
      *       {@link SPO} need to track this information and impose a priority on
@@ -684,15 +544,10 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      *       then we have to filter out ungrounded justifications during TM. If
      *       not, then great.
      * 
-     * @todo test on alibaba (entity-link data) as well as on ontology heavy
-     *       (nciOncology, cyc).
-     * 
-     * @todo run the metrics test suites (it is setup as a proxy test suite
-     *       which makes it hard to run from main()).
+     * @todo rdfs:Resource by backward chaining on query.  This means that we 
+     * need a query wrapper for the store or for the inference engine.
      * 
      * @todo owl:sameAs by backward chaining on query.
-     * 
-     * @todo rdfs:Resource by backward chaining on query.
      * 
      * @todo verify correct closure on various datasets and compare output and
      *       time with {@link #fullForwardClosure()}.  Does W3C now have some
@@ -712,11 +567,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * </pre>
      * 
      * It would be analogous for equivalentProperty.
-     * 
-     * @todo aggregate stats from each rule - write a helper method on RuleStats for
-     *       this.
      */
-    public void fastForwardClosure() {
+    public ClosureStats fastForwardClosure() {
 
         /*
          * Note: The steps below are numbered with regard to the paper cited in
@@ -734,39 +586,9 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 + " statements");
         
         /*
-         * The temporary store used to accumulate the entailments.
-         * 
-         * @todo try w/ and w/o and note when to copyStatements to db. In
-         * particular, this program is a series of steps that build up the
-         * closure in the db, so the buffer needs to be flushed to the db before
-         * each step in order to satisify the pre-conditions. If we flush the
-         * buffer into a temporary store, then the temporary store needs to be
-         * copied into the db -or- we need to read from a fused view of the
-         * temporary store and the db.
-         */
-//        TempTripleStore tmpStore = new TempTripleStore(new Properties()); 
-
-        /*
-         * @todo configuration paramater.
-         * 
-         * There is a factor of 2 performance difference for a sample data set
-         * from a buffer size of one (unordered inserts) to a buffer size of
-         * 10k.
-         */
-        final int BUFFER_SIZE = 100 * Bytes.kilobyte32;
-        
-        /*
-         * Note: Unlike the parser buffer, making statements distinct appears
-         * to slow things down significantly (2x slower!).
-         * 
-         * @todo retest with fastForwardClosure() vs fullForwardClosure.
-         */
-        final boolean distinct = false;
-
-        /*
          * Entailment buffer.
          */
-        final SPOBuffer buffer = new SPOBuffer(database, BUFFER_SIZE, distinct);
+        final SPOBuffer buffer = new SPOBuffer(database, new DoNotAddFilter(), BUFFER_SIZE, distinct);
 
         // 1. add RDF(S) axioms to the database.
         addRdfsAxioms(database); // add to the database.
@@ -778,10 +600,11 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         System.err.println("step3: "
                 + new RuleFastClosure3(this, nextVar(), nextVar(), P).apply(
                         new RuleStats(), buffer));
+        buffer.flush();
 
         // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
         System.err.println("rdfs5: "
-                + fixedPoint(database, new Rule[] { rdfs5 }));
+                + fixedPoint(new Rule[] { rdfs5 },buffer));
 
         // 4a. Obtain: D,R,C,T.
         // @todo refactor into the rules.
@@ -794,25 +617,30 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         System.err.println("step5: "
                 + new RuleFastClosure5(this, nextVar(), nextVar(), D).apply(
                         new RuleStats(), buffer));
+        // Note: deferred buffer.flush() since the next step has no dependency.
 
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
         System.err.println("step6: "
                 + new RuleFastClosure6(this, nextVar(), nextVar(), R).apply(
                         new RuleStats(), buffer));
+        // Note: deferred buffer.flush() since the next step has no dependency.
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
         System.err.println("step7: "
                 + new RuleFastClosure7(this, nextVar(), nextVar(), C).apply(
                         new RuleStats(), buffer));
+        // Note: flush buffer before running rdfs11.
+        buffer.flush();
 
         // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
         System.err.println("rdfs11: "
-                + fixedPoint(database, new Rule[] { rdfs11 }));
+                + fixedPoint(new Rule[] { rdfs11 }, buffer));
 
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
         System.err.println("step9: "
                 + new RuleFastClosure9(this, nextVar(), nextVar(), T).apply(
                         new RuleStats(), buffer));
+        buffer.flush();
 
         // 10. RuleRdfs02
         System.err.println("rdfs2: "+rdfs2.apply(new RuleStats(), buffer).toString());
@@ -901,6 +729,223 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         }
 
+        ClosureStats closureStats = new ClosureStats();
+        
+        closureStats.elapsed = elapsed;
+        closureStats.numComputed = inferenceCount;
+        
+        return closureStats;
+        
+    }
+
+    /**
+     * Computes the fixed point for the {@link #database} using a specified rule
+     * set.
+     * <p>
+     * Note: The buffer will have been flushed when this method returns.
+     * 
+     * @param database
+     *            The database whose entailments will be computed. The
+     *            {@link Rule}s will match against statements in this database.
+     * 
+     * @param rules
+     *            The rules to be executed.
+     * 
+     * @param buffer
+     *            This is a buffer that is used to hold entailments so that we
+     *            can insert them into the indices of the backing database using
+     *            ordered insert operations (much faster than random inserts).
+     * 
+     * @return Some statistics about the fixed point computation.
+     */
+    public RuleStats fixedPoint(Rule[] rules, SPOBuffer buffer) {
+                
+        RuleStats totalStats = new RuleStats();
+
+        final long[] timePerRule = new long[rules.length];
+        
+        final int[] entailmentsPerRule = new int[rules.length];
+        
+        final int nrules = rules.length;
+
+        final int firstStatementCount = database.getStatementCount();
+
+        final long begin = System.currentTimeMillis();
+
+        log.debug("Closing kb with " + firstStatementCount
+                + " statements");
+
+        int round = 0;
+
+        while (true) {
+
+            final int numEntailmentsBefore = buffer.getBackingStore().getStatementCount();
+            
+            for (int i = 0; i < nrules; i++) {
+
+                RuleStats ruleStats = new RuleStats();
+                
+                Rule rule = rules[i];
+
+                int nbefore = ruleStats.numComputed;
+                
+                rule.apply( ruleStats, buffer );
+                
+                int nnew = ruleStats.numComputed - nbefore;
+
+                // #of statements examined by the rule.
+                int nstmts = ruleStats.stmts1 + ruleStats.stmts2;
+                
+                long elapsed = ruleStats.elapsed;
+                
+                timePerRule[i] += elapsed;
+                
+                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
+                
+                long stmtsPerSec = (nstmts == 0 || elapsed == 0L ? 0
+                        : ((long) (((double) nstmts) / ((double) elapsed) * 1000d)));
+                                
+                if (DEBUG||true) {
+                    log.debug("round# " + round + ", "
+                            + rule.getClass().getSimpleName()
+                            + ", entailments=" + nnew + ", #stmts1="
+                            + ruleStats.stmts1 + ", #stmts2="
+                            + ruleStats.stmts2 + ", #subqueries="
+                            + ruleStats.numSubqueries1
+                            + ", #stmtsExaminedPerSec=" + stmtsPerSec);
+                }
+                
+                totalStats.numComputed += ruleStats.numComputed;
+                
+                totalStats.elapsed += ruleStats.elapsed;
+                
+            }
+
+            if(true) {
+            
+                /*
+                 * Show times for each rule so far.
+                 */
+                StringBuilder sb = new StringBuilder();
+                
+                sb.append("\n");
+                
+                sb.append("rule    \tms\t#entms\tentms/ms\n");
+                
+                for(int i=0; i<timePerRule.length; i++) {
+                    
+                    sb.append(rules[i].getClass().getSimpleName()
+                            + "\t"
+                            + timePerRule[i]
+                            + "\t"
+                            + entailmentsPerRule[i]
+                            + "\t"
+                            + (timePerRule[i] == 0 ? "N/A" : ""+entailmentsPerRule[i]
+                                    / timePerRule[i]));
+                    
+                    sb.append("\n");
+                    
+                }
+
+                log.debug(sb.toString());
+                
+            }
+            
+            /*
+             * Flush the statements in the buffer to the temporary store. 
+             */
+            buffer.flush();
+
+            final int numEntailmentsAfter = buffer.getBackingStore().getStatementCount();
+            
+            if ( numEntailmentsBefore == numEntailmentsAfter ) {
+                
+                // This is the fixed point.
+                break;
+                
+            }
+            
+            /*
+             * Transfer the entailments into the primary store so that derived
+             * entailments may be computed.
+             */
+            final long insertStart = System.currentTimeMillis();
+
+            final int numInserted = numEntailmentsAfter - numEntailmentsBefore;
+            
+//            final int numInserted = copyStatements(tmpStore,database);
+
+            final long insertTime = System.currentTimeMillis() - insertStart;
+
+            if (DEBUG) {
+                StringBuilder debug = new StringBuilder();
+                debug.append( "round #" ).append( round ).append( ": " );
+                debug.append( totalStats.numComputed ).append( " computed in " );
+                debug.append( totalStats.elapsed ).append( " millis, " );
+                debug.append( numInserted ).append( " inserted in " );
+                debug.append( insertTime ).append( " millis " );
+                log.debug( debug.toString() );
+            }
+
+            round++;
+            
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        final int lastStatementCount = database.getStatementCount();
+
+        if (INFO) {
+        
+            final int inferenceCount = lastStatementCount - firstStatementCount;
+            
+            log.info("\nComputed closure of "+rules.length+" rules in "
+                            + (round+1) + " rounds and "
+                            + elapsed
+                            + "ms yeilding "
+                            + lastStatementCount
+                            + " statements total, "
+                            + (inferenceCount)
+                            + " inferences"
+                            + ", entailmentsPerSec="
+                            + ((long) (((double) inferenceCount)
+                                    / ((double) elapsed) * 1000d)));
+
+        }
+
+        return totalStats;
+
+    }
+
+    /**
+     * Filter keeps matched triple patterns generated OUT of the database.
+     * 
+     * FIXME Modify to accept Explicit statements regardless of their bindings.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class DoNotAddFilter implements ISPOFilter {
+
+        public DoNotAddFilter() {
+        }
+
+        public boolean isMatch(SPO spo) {
+
+            if (spo.p == rdfType.id && spo.o==rdfsResource.id) {
+                
+                // reject (?x, rdf:type, rdfs:Resource ) 
+                
+                return true;
+                
+            }
+            
+            // Accept everything else.
+            
+            return false;
+            
+        }
+        
     }
     
     /**
@@ -1192,7 +1237,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
             buffer.flush();
 
-            stats.computeTime += System.currentTimeMillis() - begin;
+            stats.elapsed += System.currentTimeMillis() - begin;
             
             return stats;
             
@@ -1551,27 +1596,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
             /*
              * Subquery is two bound: (a, propertyId, ?b). What we want out of
              * the join is stmt1.s, which is ?y.
-             * 
-             * FIXME update docs and logic from here down.
-             * 
-             * FIXME Should the statements be re-ordered to improve join
-             * performance?
-             * 
-             * Since stmt1.s := stmt2.p, we only execute N distinct subqueries
-             * for N distinct values of stmt1.s. This works because stmts1 is in
-             * SPO order, so the subject values are clustered into an ascending
-             * order.
-             * 
-             * Note: I have observed very little or _possibly_ a slight negative
-             * impact on performance from the attempt to reuse subqueries for
-             * the same subject. Presumably this is because the subjects are
-             * already mostly distinct, so we just pay for the cost of sorting
-             * them and do not normally get a reduction in the #of subqueries.
-             * The alternative is to have getStmts1() return the statements
-             * without sorting them so that they will be in POS order since that
-             * is the index that we are querying. The conditional tests on lastS
-             * here are still Ok, it is just much less likely that we will ever
-             * reuse a subquery.
              */
             
             long lastS = NULL;
@@ -1586,7 +1610,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                     
                     lastS = stmt1.s;
                 
-                    // Subquery on the POS index using stmt2.p := stmt1.s.
+                    // Subquery on the POS index using ?a := stmt2.p := stmt1.s.
+
                     stmts2 = getStmts2(stmt1);
                     
                     stats.stmts2 += stmts2.length;
@@ -1626,8 +1651,10 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 }
                 
             }
+
+            buffer.flush();
             
-            stats.computeTime += System.currentTimeMillis() - computeStart;
+            stats.elapsed += System.currentTimeMillis() - computeStart;
 
             return stats;
 

@@ -1,6 +1,5 @@
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Statistics about what the Rule did during {@link Rule#apply()}.
@@ -42,16 +41,17 @@ public class RuleStats {
     public int numSubqueries2;
     
     /**
-     * #of entailments computed.
+     * #of entailments computed by the rule (does not consider whether or not
+     * the entailments were pre-existing in the database nor whether or not the
+     * entailments filtered out such that they did not enter the database).
      */
     public int numComputed;
     
     /**
-     * Time to compute the entailments and store them within the
-     * {@link TempTripleStore} in milliseconds.
+     * Time to compute the entailments (ms).
      */
-    long computeTime;
-    
+    public long elapsed;
+
     public String toString() {
 
         return "#stmts1=" + stmts1 //
@@ -60,7 +60,7 @@ public class RuleStats {
                 + ", #subqueries1=" + numSubqueries1 //
                 + ", #subqueries2=" + numSubqueries2 //
                 + ", #computed=" + numComputed//
-                + ", computeTime=" + computeTime//
+                + ", elapsed=" + elapsed//
         ;
 
     }

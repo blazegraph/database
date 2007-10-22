@@ -50,7 +50,8 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
- * 
+ * A rule.
+ *  
  * @todo Since a variable is just a negative long integer, it is possible to
  *       encode a predicate just like we do a statement with an added flag
  *       either before or after the s:p:o keys indicating whether the
@@ -130,6 +131,10 @@ abstract public class Rule {
      *            Used to buffer entailments so that we can perform batch btree
      *            operations. Entailments are batch inserted into the backing
      *            store (for the buffer) when the buffer overflows.
+     *            <p>
+     *            Note: In general, a single buffer object is reused by a series
+     *            of rules. When the buffer overflows, entailments are
+     *            transfered enmass into the backing store.
      * 
      * @return The statistics object.
      * 
@@ -137,6 +142,13 @@ abstract public class Rule {
      *       do a lookup/insert combination.
      * 
      * @todo store proofs.
+     * 
+     * FIXME review all implementation for reliance on the buffer to count the
+     * #of entailments generated. I think that things are much safer if the
+     * rules do NOT explicitly flush the buffer. This way we can always do batch
+     * operations up to the size of the buffer (or the total #of entailments,
+     * whichever is less), which is more efficient.  There is also less room for
+     * error when writing the rules.
      */
     public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
 

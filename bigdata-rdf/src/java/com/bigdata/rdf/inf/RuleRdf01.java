@@ -134,7 +134,7 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
 //        }
         
-        stats.computeTime += System.currentTimeMillis() - computeStart;
+        stats.elapsed += System.currentTimeMillis() - computeStart;
         
         return stats;
         

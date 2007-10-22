@@ -9,9 +9,9 @@ package com.bigdata.rdf.rio;
 public class LoadStats {
 
     public long toldTriples;
-    public long totalTime;
     public long loadTime;
     public long commitTime;
+    public long totalTime;
     
     public long triplesPerSecond() {
         

@@ -102,6 +102,15 @@ public class SPOBuffer {
     }
     
     /**
+     * True iff there are no statements in the buffer.
+     */
+    public boolean isEmpty() {
+        
+        return numStmts == 0;
+        
+    }
+    
+    /**
      * The {@link SPO} at the given index.
      * @param i
      * @return
@@ -125,6 +134,22 @@ public class SPOBuffer {
      * overflows.
      */
     protected final AbstractTripleStore store;
+    
+    /**
+     * The backing store into which the statements are added when the buffer
+     * overflows.
+     */
+    public AbstractTripleStore getBackingStore() {
+        
+        return store;
+        
+    }
+    
+    /**
+     * An optional filter. When present, statements matched by the filter are
+     * NOT retained by the {@link SPOBuffer} and are NOT added to the database.
+     */
+    protected final ISPOFilter filter;
     
     /**
      * The buffer capacity -or- <code>-1</code> if the {@link Buffer} object
@@ -152,11 +177,36 @@ public class SPOBuffer {
      *            buffer.
      */
     public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
+     
+        this(store,null,capacity,distinct);
+        
+    }
+
+    /**
+     * Create a buffer.
+     * 
+     * @param store
+     *            The database into which the terms and statements will be
+     *            inserted.
+     * @param filter
+     *            Option filter. When present statements matched by the filter
+     *            are NOT retained by the {@link SPOBuffer} and are NOT added to
+     *            the <i>store</i>.
+     * @param capacity
+     *            The maximum #of Statements, URIs, Literals, or BNodes that the
+     *            buffer can hold.
+     * @param distinct
+     *            When true only distinct terms and statements are stored in the
+     *            buffer.
+     */
+    public SPOBuffer(AbstractTripleStore store, ISPOFilter filter, int capacity, boolean distinct) {
     
         assert store != null;
         assert capacity > 0;
         
         this.store = store;
+
+        this.filter = filter;
         
         this.capacity = capacity;
 
@@ -272,18 +322,13 @@ public class SPOBuffer {
      */
     public void add( SPO stmt ) {
 
-        if (DEBUG) {
-       
-            /*
-             * @todo If [store] is a TempTripleStore then this probably will NOT
-             * be able to resolve the terms from the ids (since the lexicon is
-             * only in the database).  In that case we should just write out the
-             * term identifiers.
-             */
-            log.debug("add " + stmt.toString(store));
+        if(filter!=null && filter.isMatch(stmt)) {
         
+            // Do not store statements matched by the filter.
+            return;
+            
         }
-
+        
         if(nearCapacity()) {
 
             flush();
@@ -304,6 +349,18 @@ public class SPOBuffer {
 
             stmts[numStmts++] = stmt;
 
+        }
+
+        if (DEBUG) {
+            
+            /*
+             * @todo If [store] is a TempTripleStore then this probably will NOT
+             * be able to resolve the terms from the ids (since the lexicon is
+             * only in the database).  In that case we should just write out the
+             * term identifiers.
+             */
+            log.debug("add " + stmt.toString(store));
+        
         }
 
     }

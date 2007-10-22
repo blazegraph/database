@@ -48,6 +48,7 @@ package com.bigdata.rdf.metrics;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -56,12 +57,12 @@ import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 
+import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 
 /**
  * @todo update javadoc.
- * @todo run with and without inference.
- * @todo try with the bulk loader as well as the presort loader.
  * @todo write some useful summary data into a file.
  * 
  * <p>
@@ -104,14 +105,25 @@ import com.bigdata.rdf.rio.LoadStats;
  * 
  * @author thompsonbry
  */
-
 public class TaskATest
    extends AbstractMetricsTestCase
 {
 
-    
     final FileAndBaseURI[] _sources;
 
+    /** ctor used by junit. */
+    public TaskATest() {
+        super();
+        _sources = null;
+    }
+
+    /** ctor used by junit. */
+    public TaskATest(String name) {
+        super(name);
+        _sources = null;
+    }
+
+    /** ctor used to run a particular datasource. */
     public TaskATest( String name, String sources, File outDir )
     {
         
@@ -133,7 +145,7 @@ public class TaskATest
      * Verify that each of the RDF source files exists.
      */
 
-    public void testFilesExist()
+    public void assertFilesExist()
         throws IOException
     {
 
@@ -178,16 +190,6 @@ public class TaskATest
 
         // After shutdown.
         writeStatistics();
-        
-    }
-
-    public void testOntology() throws Exception
-    {
-
-        /*
-         * Load the data. Sets some instance variables from various counters.
-         */
-        loadData();
         
     }
 
@@ -264,9 +266,12 @@ public class TaskATest
     /**
      * Load each RDF source in turn.
      * 
+     * @param computeEntailments
+     *            When true, the RDF(S) closure of the store will be computed.
+     * 
      * @return The elasped time to load the data and perform closure.
      */
-    public long loadData() throws IOException, UpdateException {
+    public long loadData(boolean computeEntailments) throws IOException, UpdateException {
 
         long begin = System.currentTimeMillis();
 
@@ -277,13 +282,46 @@ public class TaskATest
          
             loadStats = store
                     .loadData(new File(filename[i]), baseURI[i],
-                            RDFFormat.RDFXML, false/* verifyData */, true/* commit */);
+                            RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
+                        
+            long elapsedLoadTime = System.currentTimeMillis() - begin;
+            
+            System.err.println("*** Elapsed load time: " + (elapsedLoadTime/ 1000) + "s\n");
+
+            if(computeEntailments) {
+                
+                long beginInfTime = System.currentTimeMillis();
+                
+                closureStats = new InferenceEngine(store).fastForwardClosure();
+            
+                long elapsedInfTime = System.currentTimeMillis() - beginInfTime;
+
+                System.err.println("*** Elapsed inf. time: " + (elapsedInfTime/ 1000) + "s\n");
+
+            } else {
+                
+                closureStats = null;
+                
+            }
+            
+            // commit now so that it is always after the load and the optional closure.
+            
+            long beginCommitTime = System.currentTimeMillis();
+            
+            store.commit();
+            
+            long elapsedCommitTime = System.currentTimeMillis() - beginCommitTime;
+
+            System.err.println("*** Elapsed commit time: " + elapsedCommitTime + "ms\n");
+
+            // and overwrite the field 
+            loadStats.commitTime = elapsedCommitTime;
             
         }
 
         long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("\n*** Elapsed time: " + (elapsed / 1000) + "s\n");
+        System.err.println("*** Elapsed total time: " + (elapsed/ 1000) + "s\n");
 
         return elapsed;
 
@@ -294,6 +332,11 @@ public class TaskATest
      */
     protected LoadStats loadStats;
 
+    /**
+     * Set by {@link #loadData(boolean)}.
+     */
+    protected ClosureStats closureStats;
+    
     /**
      * Datasets to load - in order by size. Each dataset described by three (3)
      * values.
@@ -395,10 +438,10 @@ public class TaskATest
             
     };
 
-    public static void main( String[] args )
-        throws Exception
-    {
+    public void test() throws FileNotFoundException {
   
+        final boolean computeEntailments = true;
+        
         int nok = 0;
         int nruns = all_sources.length / 3;
         
@@ -423,6 +466,8 @@ public class TaskATest
         }
 
         LoadStats[] loadStats = new LoadStats[ all_sources.length ];
+        
+        ClosureStats[] closureStats = new ClosureStats[ all_sources.length ];
 
         for( int i=0, run=0; i<all_sources.length; i+=3, run++ ) {
             
@@ -439,9 +484,10 @@ public class TaskATest
             try {
                 test.setUp();
                 try {
-                    test.testFilesExist();
-                    test.testOntology();
+                    test.assertFilesExist();
+                    test.loadData(computeEntailments);
                     loadStats[run] = test.loadStats;
+                    closureStats[run] = test.closureStats;
 //                    test.testReadPerformance();
                     w.println( "SUCCESS" );
                     nok++;
@@ -469,21 +515,55 @@ public class TaskATest
 
         System.out.println( "\n\n\n"+nok+" out of "+nruns+" Ok.");
         
-        System.out.println("name, status, triplesPerSecond, loadTime(s), commitTime(ms)");
+        System.out
+                .println("name, status"+
+                        ", toldTriples, loadTime(s), toldTriplesPerSecond"+
+                        ", entailments, closureTime(s), entailmentsPerSecond"+
+                        ", commitTime(ms)"+
+                        ", totalTriplesPerSecond"
+                        );
         
         for( int run=0; run<nruns; run++ ) {
             
+            // Explicit + (Entailments = Axioms + Inferred)
+            final long totalTriples = loadStats[run].toldTriples
+                    + (computeEntailments ? closureStats[run].numComputed : 0);
+
+            // loadTime + closureTime + commitTime.
+            final long totalTime = loadStats[run].loadTime
+                    + (computeEntailments ? closureStats[run].elapsed : 0)
+                    + loadStats[run].commitTime;
+            
             System.out.println( all_sources[ run * 3 ]+ ", " +
                     ( errors[ run ] == null
-                      ? "Ok, "
-                            + loadStats[run].triplesPerSecond() + ", "
-                            + loadStats[run].loadTime / 1000 + ", "
-                            + loadStats[run].commitTime
+                      ? "Ok"
+                            +", "+loadStats[run].toldTriples
+                            +", "+loadStats[run].loadTime/1000
+                            +", "+tps(loadStats[run].toldTriples,loadStats[run].loadTime)
+                            +", "+(computeEntailments?closureStats[run].numComputed:"")
+                            +", "+(computeEntailments?closureStats[run].elapsed/1000:"")
+                            +", "+(computeEntailments?tps(closureStats[run].numComputed,closureStats[run].elapsed):"")
+                            +", "+loadStats[run].commitTime
+                            +", "+tps(totalTriples,totalTime)
+
                       : errors[ run ].getMessage()
                       )
                     );
             
         }
+        
+    }
+    
+    /**
+     * Returns triples/second.
+     * 
+     * @param ntriples
+     * @param elapsed
+     * @return
+     */
+    private long tps(long ntriples, long elapsed) {
+        
+        return ((long)( ((double)ntriples) / ((double)elapsed) * 1000d ));
         
     }
     

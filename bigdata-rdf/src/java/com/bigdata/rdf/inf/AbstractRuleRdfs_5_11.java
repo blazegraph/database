@@ -161,7 +161,7 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
 
         }
         
-        stats.computeTime += System.currentTimeMillis() - computeStart;
+        stats.elapsed += System.currentTimeMillis() - computeStart;
 
         return stats;
         
