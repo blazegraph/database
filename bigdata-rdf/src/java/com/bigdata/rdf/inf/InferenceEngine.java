@@ -204,20 +204,25 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * things down slightly:
      * 
      * <pre>
-     * 
-     * fast: distinct := false;
-     * Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
-     * 
-     * fast: distinct := true;
-     * Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
-     * 
-     * full: distinct := false;
-     * Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
-     * 
-     * full: distinct := true
-     * Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
-     * 
+     *  
+     *  fast: distinct := false;
+     *  Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
+     *  
+     *  fast: distinct := true;
+     *  Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
+     *  
+     *  full: distinct := false;
+     *  Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
+     *  
+     *  full: distinct := true
+     *  Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
      * </pre>
+     * 
+     * FIXME The numbers above were based on the default
+     * {@link Object#hashCode()}, which is clearly wrong for this application.
+     * I tried to uncomment {@link SPO#hashCode()}, but it slowed things down
+     * by 2x. Research the correct way to compute the hash code of three longs
+     * and then try this out again!
      */
     final boolean distinct = true;
 
@@ -1235,8 +1240,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
             }
 
-            buffer.flush();
-
             stats.elapsed += System.currentTimeMillis() - begin;
             
             return stats;
@@ -1651,8 +1654,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 }
                 
             }
-
-            buffer.flush();
             
             stats.elapsed += System.currentTimeMillis() - computeStart;
 

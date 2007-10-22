@@ -354,10 +354,9 @@ public class SPOBuffer {
         if (DEBUG) {
             
             /*
-             * @todo If [store] is a TempTripleStore then this probably will NOT
-             * be able to resolve the terms from the ids (since the lexicon is
-             * only in the database).  In that case we should just write out the
-             * term identifiers.
+             * Note: If [store] is a TempTripleStore then this will NOT be able
+             * to resolve the terms from the ids (since the lexicon is only in
+             * the database).
              */
             log.debug("add " + stmt.toString(store));
         

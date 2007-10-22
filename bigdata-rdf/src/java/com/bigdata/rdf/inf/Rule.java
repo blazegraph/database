@@ -138,17 +138,7 @@ abstract public class Rule {
      * 
      * @return The statistics object.
      * 
-     * @todo support conditional insert in the btree so that we do not have to
-     *       do a lookup/insert combination.
-     * 
-     * @todo store proofs.
-     * 
-     * FIXME review all implementation for reliance on the buffer to count the
-     * #of entailments generated. I think that things are much safer if the
-     * rules do NOT explicitly flush the buffer. This way we can always do batch
-     * operations up to the size of the buffer (or the total #of entailments,
-     * whichever is less), which is more efficient.  There is also less room for
-     * error when writing the rules.
+     * FIXME store proofs.
      */
     public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
 

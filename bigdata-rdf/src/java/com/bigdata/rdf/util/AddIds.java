@@ -124,8 +124,10 @@ public class AddIds implements IProcedure, Externalizable {
 
             /*
              * Note: Validation SHOULD be disabled except for testing.
+             * 
+             * FIXME turn off validation for release or performance testing.
              */
-            final boolean validate = false; // FIXME turn off validation.
+            final boolean validate = true; 
             
             if (validate) {
 

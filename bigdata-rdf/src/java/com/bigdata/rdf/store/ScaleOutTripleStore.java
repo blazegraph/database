@@ -373,7 +373,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * Sort terms by their assigned sort key. This places them into the
              * natural order for the term:id index.
              * 
-             * FIXME "known" terms should be filtered out of this operation. A
+             * @todo "known" terms should be filtered out of this operation. A
              * term is marked as "known" within a client if it was successfully
              * asserted against both the terms and ids index (or if it was
              * discovered on lookup against the ids index).
