@@ -43,7 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
@@ -67,35 +68,62 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
         
         final RdfKeyBuilder keyBuilder = db.getKeyBuilder();
         
-        byte[] startKey = keyBuilder.statement2Key
+        byte[] fromKey = keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id, NULL
               );
             
-        byte[] endKey = keyBuilder.statement2Key
+        byte[] toKey = keyBuilder.statement2Key
             ( body[0].p.id, body[0].o.id+1, NULL
               );
         
-        IEntryIterator it = db.getPOSIndex().rangeIterator(startKey, endKey); 
-        
-        while ( it.hasNext() ) {
-            
-            it.next();
-            
-            stats.stmts1++;
+//        IEntryIterator it = db.getPOSIndex().rangeIterator(fromKey, toKey); 
+//        
+//        while ( it.hasNext() ) {
+//            
+//            it.next();
+//            
+//            stats.stmts1++;
+//
+//            SPO stmt = new SPO(KeyOrder.POS, keyBuilder, it.getKey());
+//            
+//            long _s = head.s.isVar() ? stmt.s : head.s.id;
+//            long _p = head.p.isVar() ? stmt.s : head.p.id;
+//            long _o = head.o.isVar() ? stmt.s : head.o.id;
+//        
+//            buffer.add( new SPO(_s, _p, _o) );
+//
+//            stats.numComputed++;
+//            
+//        }
 
-            SPO stmt = new SPO(KeyOrder.POS, keyBuilder, it.getKey());
+        SPO[] stmts1 = db.getStatements(KeyOrder.POS, fromKey, toKey);
+        
+        stats.stmts1 += stmts1.length;
+        
+        for (SPO stmt1 : stmts1) {
             
             // @todo review -- should this be substituting stmt.s in each case?
-            long _s = head.s.isVar() ? stmt.s : head.s.id;
-            long _p = head.p.isVar() ? stmt.s : head.p.id;
-            long _o = head.o.isVar() ? stmt.s : head.o.id;
-        
-            buffer.add( new SPO(_s, _p, _o) );
 
-            stats.numComputed++;
+            long s = head.s.isVar() ? stmt1.s : head.s.id;
+            long p = head.p.isVar() ? stmt1.s : head.p.id;
+            long o = head.o.isVar() ? stmt1.s : head.o.id;
+      
+            SPO newSPO = new SPO(s, p, o, StatementEnum.Inferred);
             
+            Justification jst = null;
+            
+            if(justify) {
+                
+                jst = new Justification(this, newSPO, new SPO[] { stmt1 });
+                
+            }
+            
+            buffer.add( newSPO, jst );
+
         }
-        
+
+        stats.numComputed += stmts1.length;
+
         stats.elapsed += System.currentTimeMillis() - computeStart;
         
         return stats;

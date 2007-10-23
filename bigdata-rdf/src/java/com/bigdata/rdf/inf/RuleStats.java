@@ -49,6 +49,8 @@ public class RuleStats {
     
     /**
      * Time to compute the entailments (ms).
+     * 
+     * @todo convert this to nano seconds?
      */
     public long elapsed;
 

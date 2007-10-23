@@ -61,6 +61,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.spo.JustificationSerializer;
 import com.bigdata.scaleup.MasterJournal;
 
 /**
@@ -199,6 +200,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     private IIndex ndx_spo;
     private IIndex ndx_pos;
     private IIndex ndx_osp;
+    private IIndex ndx_just;
     
     /*
      * Note: At this time is is valid to hold onto a reference during a given
@@ -320,6 +322,35 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     }
 
+    final public IIndex getJustificationIndex() {
+
+        if (ndx_just != null)
+            return ndx_just;
+
+        IIndex ndx = store.getIndex(name_just);
+
+        if (ndx == null) {
+
+            if (isolatableIndices) {
+
+                ndx_just = ndx = store.registerIndex(name_just);
+
+            } else {
+
+                ndx_just = ndx = store
+                        .registerIndex(name_just, new BTree(store,
+                                BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                                        .randomUUID(),
+                                JustificationSerializer.INSTANCE));
+
+            }
+
+        }
+
+        return ndx;
+
+    }
+
     /**
      * The backing embedded database.
      */
@@ -362,6 +393,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         store.dropIndex(name_spo); ndx_spo = null;
         store.dropIndex(name_pos); ndx_pos = null;
         store.dropIndex(name_osp); ndx_osp = null;
+        
+        store.dropIndex(name_just); ndx_just = null;
         
     }
     

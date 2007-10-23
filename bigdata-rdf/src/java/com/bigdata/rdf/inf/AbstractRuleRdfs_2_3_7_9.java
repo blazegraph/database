@@ -45,6 +45,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
+import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -118,7 +119,20 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
             
             for (int j = 0; j < stmts2.length; j++) {
             
-                buffer.add(buildStmt3(stmt1, stmts2[j]));
+                SPO stmt2 = stmts2[j];
+                
+                SPO newSPO = buildStmt3(stmt1, stmt2);
+                
+                Justification jst = null;
+                
+                if(justify) {
+                    
+                    jst = new Justification(this, newSPO,//
+                            new SPO[] { stmt1, stmt2 });
+                    
+                }
+                
+                buffer.add( newSPO, jst );
                 
                 stats.numComputed++;
                 
@@ -148,8 +162,7 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
         byte[] toKey = db.getKeyBuilder().statement2Key(body[0].p.id + 1, NULL,
                 NULL);
 
-        SPO[] stmts = db.getStatements(db.getPOSIndex(), KeyOrder.POS, fromKey,
-                toKey);
+        SPO[] stmts = db.getStatements(KeyOrder.POS, fromKey, toKey);
         
         /*
          * Sort into SPO order.
@@ -158,6 +171,7 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
          * is still correct, but the logic to reuse subqueries in apply() is
          * mostly defeated when the statements are not sorted into SPO order.
          */
+        
         Arrays.sort(stmts,SPOComparator.INSTANCE);
         
         return stmts;
@@ -181,8 +195,7 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
 
         byte[] toKey = db.getKeyBuilder().statement2Key(stmt1.s + 1, NULL, NULL);
 
-        return db.getStatements(db.getPOSIndex(), KeyOrder.POS, fromKey,
-                toKey);
+        return db.getStatements(KeyOrder.POS, fromKey, toKey);
     
     }
     

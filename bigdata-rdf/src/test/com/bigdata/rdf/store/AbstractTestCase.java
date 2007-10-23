@@ -47,13 +47,24 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.io.IOException;
+import java.util.Iterator;
 import java.util.Properties;
+
+import org.openrdf.model.Value;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.SPO;
 
 /**
@@ -213,6 +224,127 @@ abstract public class AbstractTestCase
             
         }
         
+    }
+    
+    /**
+     * Dumps the lexicon in a variety of ways.
+     * 
+     * @param store
+     * 
+     * @todo ClientIndexView does not disclose whether or not the index is
+     *       isolatable so this will not work for a bigadata federation.
+     */
+    void dumpTerms(ITripleStore store) {
+
+        // Same #of terms in the forward and reverse indices.
+        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
+                store.getTermIdIndex().rangeCount(null, null));
+        
+        /**
+         * Dumps the forward mapping.
+         */
+        {
+
+            System.err.println("terms index (forward mapping).");
+
+            IIndex ndx = store.getTermIdIndex();
+
+            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+            IEntryIterator itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                // the term identifier.
+                Object val = itr.next();
+
+                /*
+                 * The sort key for the term. This is not readily decodable. See
+                 * RdfKeyBuilder for specifics.
+                 */
+                byte[] key = itr.getKey();
+
+                /*
+                 * deserialize the term identifier (packed long integer).
+                 */
+                final long id;
+                try {
+
+                    id = (isolatableIndex ? new DataInputBuffer((byte[]) val)
+                            .unpackLong() : (Long) val);
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                System.err.println(BytesUtil.toString(key) + ":" + id);
+
+            }
+
+        }
+
+        /**
+         * Dumps the reverse mapping.
+         */
+        {
+
+            System.err.println("ids index (reverse mapping).");
+
+            IIndex ndx = store.getIdTermIndex();
+
+            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+
+            IEntryIterator itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                // the serialized term.
+                Object val = itr.next();
+
+                // the sort key for the term identifier.
+                byte[] key = itr.getKey();
+
+                // decode the term identifier from the sort key.
+                final long id = KeyBuilder.decodeLong(key, 0);
+
+                _Value term = (isolatableIndex ? _Value
+                        .deserialize((byte[]) val) : (_Value) val);
+
+                System.err.println(id + ":" + term);
+
+            }
+
+        }
+        
+        /**
+         * Dumps the term:id index.
+         */
+        for( Iterator<Long> itr = ((AbstractTripleStore)store).termIdIndexScan(); itr.hasNext(); ) {
+            
+            System.err.println("term->id : "+itr.next());
+            
+        }
+
+        /**
+         * Dumps the id:term index.
+         */
+        for( Iterator<Value> itr = ((AbstractTripleStore)store).idTermIndexScan(); itr.hasNext(); ) {
+            
+            System.err.println("id->term : "+itr.next());
+            
+        }
+
+        /**
+         * Dumps the terms in term order.
+         */
+        for( Iterator<Value> itr = ((AbstractTripleStore)store).termIterator(); itr.hasNext(); ) {
+            
+            System.err.println("termOrder : "+itr.next());
+            
+        }
+
     }
     
 }

@@ -66,26 +66,6 @@ import com.bigdata.rdf.store.ITripleStore;
  */
 public class TestRioIntegration extends AbstractTripleStoreTestCase {
 
-//    /**
-//     * 200M
-//     */
-//    protected long getInitialExtent() {
-//        
-//        return Bytes.megabyte*200;
-////        return Options.DEFAULT_INITIAL_EXTENT;
-//        
-//    }
-//    
-//    protected BufferMode getBufferMode() {
-//        
-//        return BufferMode.Disk;
-//        
-////        return BufferMode.Transient;
-//        
-////        return BufferMode.Direct;
-//        
-//    }
-
     /**
      * 
      */

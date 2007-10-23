@@ -94,14 +94,15 @@ import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -138,6 +139,16 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * execute queries. In turn, that should probably be built over a read-only
  * {@link ITripleStore} reading from the last commit record on the store at the
  * time that the view is created.
+ * <p>
+ * Note: This also requires that queries are executed against a distinct a
+ * read-only view of the {@link RdfRepository}. The write {@link #buffer} is
+ * always flushed before a read to ensure read consistency within a transaction.
+ * If queries are concurrently executing against the same {@link RdfRepository}
+ * instance then read operations executed by those queries will cause the write
+ * buffer to be flushed. This will cause concurrent query to concurrently flush
+ * the write buffer. This will on the one hand limit the utility of the write
+ * buffer and, on the other hand, since the write buffer is NOT thread safe,
+ * this will also lead to execution errors.
  * 
  * FIXME Support a better truth maintanence strategy
  * <p>
@@ -146,6 +157,9 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * maintenance and you must re-compute the entire closure if you add more data
  * to the store) - use of this method will let you run high level queries using
  * the SAIL with entailments.
+ * <p>
+ * Removing statements need to collect up a batch and apply truth maintenance in
+ * {@link #flushBuffer()}.
  * 
  * @todo The namespace management methods have not been implemented.
  * 
@@ -188,6 +202,17 @@ public class BigdataRdfRepository implements RdfRepository {
         return rdfsClosure;
         
     }
+    
+    /**
+     * Used to buffer statements that are being written onto the database so as
+     * to maximize the opportunity for batch writes.
+     * <p>
+     * Note: When non-empty, the buffer MUST be flushed (a) if it is not empty
+     * and a transaction completes (otherwise writes will not be stored on the
+     * database); or (b) if there is a read against the database during a
+     * transaction (otherwise reads will not see the unflushed statements).
+     */
+    protected StatementBuffer buffer;
     
     /**
      * When true, a SAIL "transaction" is running.
@@ -313,9 +338,8 @@ public class BigdataRdfRepository implements RdfRepository {
 
         o = (Value) valueFactory.toNativeValue(o);
         
-        database.addStatement(s, p, o);
-        
-        m_stmtAdded = true;
+        // buffer the write (handles overflow).
+        buffer.add(s, p, o);
         
     }
 
@@ -331,6 +355,11 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     public NamespaceIterator getNamespaces() {
+
+        /*
+         * Note: You do NOT need to flush the buffer since this does not read
+         * statements.
+         */
         
         // TODO Auto-generated method stub
 
@@ -346,12 +375,10 @@ public class BigdataRdfRepository implements RdfRepository {
 
         assertTransactionStarted();
 
-//        ((BTree)database.getTermIdIndex()).removeAll();
-//        ((BTree)database.getIdTermIndex()).removeAll();
-//        ((BTree)database.getSPOIndex()).removeAll();
-//        ((BTree)database.getPOSIndex()).removeAll();
-//        ((BTree)database.getOSPIndex()).removeAll();
-
+        // discard any pending writes.
+        buffer.clear();
+        
+        // clear the database.
         database.clear();
         
         m_stmtRemoved = true;
@@ -362,6 +389,15 @@ public class BigdataRdfRepository implements RdfRepository {
      * Materializes the set of statements matching the triple pattern and then
      * deletes those statements from each index using an ordered batch delete
      * operation.
+     * 
+     * FIXME This MUST invoke a truth maintenance strategy when the RDF(S)
+     * closure is being maintained.
+     * 
+     * FIXME When the RDF(S) closure is NOT being maintained, then we should
+     * buffer the deletes. When buffering deletes, we MUST first remove the
+     * statement from the write {@link #buffer} if it exists otherwise the
+     * sequence of insert/delete operations on statements will appear to have
+     * been violated.
      */
     public int removeStatements(Resource s, URI p, Value o)
             throws SailUpdateException {
@@ -426,12 +462,23 @@ public class BigdataRdfRepository implements RdfRepository {
         }
 
         /*
+         * Flush any pending writes.
+         * 
+         * Note: This must be done before you compute the closure so that the
+         * pending writes will be read by the inference engine when it computes
+         * the closure.
+         */
+        
+        flushBuffer();
+        
+        /*
          * Optionally compute the full forward closure over the store.
          * 
          * @todo In order to handle closure properly we should delete the
          * closure if any statements are removed from the store (the entailments
          * are not explicitly marked so this SAIL does not do this).
          */
+        
         if (rdfsClosure) {
 
             inferenceEngine.fullForwardClosure();
@@ -448,6 +495,34 @@ public class BigdataRdfRepository implements RdfRepository {
 
     }
 
+    /**
+     * Flush any pending writes to the database using an efficient batch
+     * operation.
+     * <p>
+     * Note: This tests whether or not a transaction has been started. It MUST
+     * be invoked within any method that will read on the database to ensure
+     * that any pending writes have been flushed (otherwise the read operation
+     * will not be able to see the pending writes).
+     */
+    protected void flushBuffer() {
+        
+        if(transactionStarted && buffer != null && buffer.size() > 0 ) {
+
+            buffer.flush();
+            
+            m_stmtAdded = true;
+            
+            /*
+             * FIXME Collect deletes just like we do writes.
+             * 
+             * FIXME If there are pending deletes, the apply those here by
+             * invoking the truth maintenance strategy for the store.
+             */
+            
+        }
+        
+    }
+    
     protected void assertTransactionStarted() {
 
         if (!transactionStarted) {
@@ -460,6 +535,8 @@ public class BigdataRdfRepository implements RdfRepository {
     
     public StatementIterator getStatements(Resource s, URI p, Value o) {
 
+        flushBuffer();
+        
         /*
          * convert other Value object types to our object types.
          */
@@ -537,7 +614,7 @@ public class BigdataRdfRepository implements RdfRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class MyStatementIterator implements StatementIterator {
+    private class MyStatementIterator implements StatementIterator {
 
         private final KeyOrder keyOrder;
         private final IEntryIterator src;
@@ -566,15 +643,17 @@ public class BigdataRdfRepository implements RdfRepository {
         public Statement next() {
             
             // visit the next entry.
-            src.next();
+            byte[] val = (byte[])src.next();
 
             // unpacks the term identifiers from the key.
-            SPO spo = new SPO(keyOrder, keyBuilder, src.getKey());
+            SPO spo = new SPO(keyOrder, keyBuilder, src.getKey(), val);
+
+            StatementEnum type = StatementEnum.deserialize(val);
             
-            // resolves the term identifiers to the terms.
+            // resolve the term identifiers to the terms.
             return new _Statement((_Resource) database.getTerm(spo.s),
                     (_URI) database.getTerm(spo.p), (_Value) database
-                            .getTerm(spo.o));
+                            .getTerm(spo.o), type);
             
         }
         
@@ -592,6 +671,8 @@ public class BigdataRdfRepository implements RdfRepository {
 
     public boolean hasStatement(Resource s, URI p, Value o) {
 
+        flushBuffer();
+        
         if (s != null)
             s = (Resource) valueFactory.toNativeValue(s);
 
@@ -609,6 +690,8 @@ public class BigdataRdfRepository implements RdfRepository {
      * 
      */
     public Query optimizeQuery(Query query) {
+        
+        flushBuffer();
         
         /*
          * This static method is provided by the Sesame framework and performs a
@@ -865,6 +948,9 @@ public class BigdataRdfRepository implements RdfRepository {
 
     /**
      * Estimate the #of results for a triple pattern.
+     * <p>
+     * Note: This MAY over-estimate since deleted entries that have not been
+     * purged will be counted if an index supports isolation.
      * 
      * @param pe
      * @param rangeCounts
@@ -1117,7 +1203,7 @@ public class BigdataRdfRepository implements RdfRepository {
             log.info(Options.RDFS_CLOSURE + "=" + rdfsClosure);
         }
         
-        valueFactory = new OptimizedValueFactory();
+        valueFactory = OptimizedValueFactory.INSTANCE;
 
         // storeClass
         {
@@ -1152,8 +1238,13 @@ public class BigdataRdfRepository implements RdfRepository {
                 
             }
             
+            // the database.
             this.database = database;
             
+            // buffer used to optimized writes.
+            this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
+            
+            // inference engine used to maintain RDF(S) closure.
             this.inferenceEngine = new InferenceEngine( database );
             
         }
@@ -1180,6 +1271,8 @@ public class BigdataRdfRepository implements RdfRepository {
      * "transaction" mechanisms.
      */
     public void fullForwardClosure() {
+        
+        flushBuffer();
         
         inferenceEngine.fullForwardClosure();
         

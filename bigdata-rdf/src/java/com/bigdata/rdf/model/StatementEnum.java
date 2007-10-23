@@ -114,4 +114,24 @@ public enum StatementEnum {
         
     }
     
+    static public StatementEnum deserialize(byte[] val) {
+        if(val.length!=1) {
+            throw new RuntimeException("Expecting one byte, not "+val.length);
+        }
+        switch(val[0]) {
+        case 0: return Explicit;
+        case 1: return Axiom;
+        case 2: return Inferred;
+        case 3: return Suspended;
+        default: throw new RuntimeException("Unexpected byte: "+val[0]);
+        }
+        
+    }
+
+    public byte[] serialize() {
+
+        return new byte[]{code};
+        
+    }
+    
 }

@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * @see RuleRdfs07
@@ -85,6 +86,10 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
      */
     public void test_rdfs07_01() {
 
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
+        
         URI A = new _URI("http://www.foo.org/A");
         URI B = new _URI("http://www.foo.org/B");
         URI U = new _URI("http://www.foo.org/U");
@@ -100,7 +105,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(U, B, Y));
 
         // apply the rule.
-        applyRule(inferenceEngine.rdfs7,1,1);
+        RuleStats stats = applyRule(inf.rdfs7,1);
 
         assertEquals("#subqueries",1,stats.numSubqueries1);
         
@@ -111,6 +116,8 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(U, A, Y));
         assertTrue(store.containsStatement(U, B, Y));
 
+        store.closeAndDelete();
+        
     }
     
     /**
@@ -127,6 +134,10 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
      */
     public void test_rdfs07_02() {
 
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
+        
         URI A = new _URI("http://www.foo.org/A");
         URI B = new _URI("http://www.foo.org/B");
         URI U1 = new _URI("http://www.foo.org/U1");
@@ -147,7 +158,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(U2, B, Y2));
 
         // apply the rule.
-        applyRule(inferenceEngine.rdfs7,2,2);
+        RuleStats stats = applyRule(inf.rdfs7,2);
 
         assertEquals("#subqueries",1,stats.numSubqueries1);
         
@@ -159,6 +170,8 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(U2, A, Y2));
         assertTrue(store.containsStatement(U1, B, Y1));
         assertTrue(store.containsStatement(U2, B, Y2));
+        
+        store.closeAndDelete();
 
     }
     
@@ -180,6 +193,10 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
      */
     public void test_rdfs07_03() {
 
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
+        
         URI A = new _URI("http://www.foo.org/A");
         URI B1 = new _URI("http://www.foo.org/B1");
         URI B2 = new _URI("http://www.foo.org/B2");
@@ -199,7 +216,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(U, B2, Y));
 
         // apply the rule.
-        applyRule(inferenceEngine.rdfs7,2,2);
+        RuleStats stats = applyRule(inf.rdfs7,2);
 
         // verify that only one subquery is issued.
         assertEquals("#subqueries",1,stats.numSubqueries1);
@@ -213,6 +230,8 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(U, B1, Y));
         assertTrue(store.containsStatement(U, B2, Y));
 
+        store.closeAndDelete();
+        
     }
     
 }

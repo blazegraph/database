@@ -50,6 +50,7 @@ package com.bigdata.rdf.inf;
 import com.bigdata.rdf.inf.InferenceEngine.AbstractRuleFastClosure_11_13;
 import com.bigdata.rdf.inf.InferenceEngine.RuleFastClosure11;
 import com.bigdata.rdf.inf.InferenceEngine.RuleFastClosure13;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
@@ -96,9 +97,18 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
         InferenceEngine inf = new InferenceEngine(store);
 
         // told:
-        store.addStatement(x, y, z);
-        store.addStatement(y, inf.rdfsSubPropertyOf.id, a);
-        store.addStatement(a, inf.rdfsDomain.id, b);
+        {
+            
+            SPO[] told = new SPO[] {
+                    new SPO(x, y, z, StatementEnum.Explicit),
+                    new SPO(y, inf.rdfsSubPropertyOf.id, a, StatementEnum.Explicit),
+                    new SPO(a, inf.rdfsDomain.id, b, StatementEnum.Explicit)
+            };
+
+            store.addStatements(told, told.length);
+            
+        }
+        
         // entails:
         // store.addStatement(x, inf.rdfType.id, b);
         
@@ -117,30 +127,41 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
         /*
          * Match: (?y, rdfs:subPropertyOf, ?a)
          */
+        
         SPO[] stmts1 = rule.getStmts1();
+        
         assertEquals(1,stmts1.length);
-        assertEquals(new SPO(y, inf.rdfsSubPropertyOf.id, a),stmts1[0]);
+        
+        SPO stmt1 = new SPO(y, inf.rdfsSubPropertyOf.id, a,
+                StatementEnum.Explicit);
+        
+        assertEquals(stmt1, stmts1[0]);
         
         /*
          * Match: (?a, propertyId, ?b) where ?a is stmt1.o and propertyId is the
          * value specified to the rule ctor (rdfs:Domain).
          */
-        SPO[] stmts2 = rule.getStmts2(new SPO(y, inf.rdfsSubPropertyOf.id, a));
-        assertEquals(1,stmts2.length);
-        assertEquals(new SPO(a, inf.rdfsDomain.id, b),stmts2[0]);
+        
+        SPO[] stmts2 = rule.getStmts2(stmt1);
+        
+        assertEquals(1, stmts2.length);
+        
+        assertEquals(new SPO(a, inf.rdfsDomain.id, b, StatementEnum.Explicit),
+                stmts2[0]);
         
         /*
          * Match: (?x, ?y, ?z) with ?y bound to stmt1.s.
          */
-        SPO[] stmts3 = rule.getStmts3(new SPO(y, inf.rdfsSubPropertyOf.id, a));
+        SPO[] stmts3 = rule.getStmts3(stmt1);
         assertEquals(1,stmts3.length);
-        assertEquals(new SPO(x, y, z),stmts3[0]);
+        assertEquals(new SPO(x, y, z, StatementEnum.Explicit),stmts3[0]);
         
         /*
          * Test run the rule.
          */
         
-        SPOBuffer buffer = new SPOBuffer(store,100,false);
+        SPOBuffer buffer = new SPOBuffer(store, null/*filter*/,
+                100/* capacity */, false/* distinct */, true/* justifications */);
         
         RuleStats stats = rule.apply(new RuleStats(), buffer);
 
@@ -150,7 +171,8 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
 
         System.err.println("entailment: "+buffer.get(0).toString(store));
 
-        assertEquals(new SPO(x, inf.rdfType.id, b),buffer.get(0));
+        assertEquals(new SPO(x, inf.rdfType.id, b, StatementEnum.Inferred),
+                buffer.get(0));
         
         buffer.flush();
         

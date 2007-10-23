@@ -46,7 +46,7 @@ package com.bigdata.rdf.spo;
 import java.util.Comparator;
 
 /**
- * Imposes p:o:s ordering based on termIds.
+ * Imposes p:o:s ordering based on termIds only.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

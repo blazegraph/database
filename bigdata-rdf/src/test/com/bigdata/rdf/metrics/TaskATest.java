@@ -428,13 +428,16 @@ public class TaskATest
             "-rdf data/Thesaurus.owl",
 
         /*
-         * CTC ran out of heap space with default heap - [status ] : Processed
-         * 818,938 statements in 10800 seconds; processing continues
+         * @todo I have seen what appears to be a tight loop emerge during
+         * closure when this is run along with all of the others above, but I
+         * have also seen it run to completion just fine when run by itself.
+         * Perhaps there is a fence post somewhere in the closure logic that
+         * occasionally results in non-terminating loops?
          */
          // Very large data set with large ontology.
-          "Uniprot Protein Sequence Taxonomy",
-          "taxonomy",
-          "-rdf data/taxonomy.rdf" // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
+//          "Uniprot Protein Sequence Taxonomy",
+//          "taxonomy",
+//          "-rdf data/taxonomy.rdf" // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
             
     };
 

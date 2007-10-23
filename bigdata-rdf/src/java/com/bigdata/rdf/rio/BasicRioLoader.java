@@ -137,15 +137,19 @@ public class BasicRioLoader implements IRioLoader {
         
         parser.setVerifyData( false );
         
-        BasicStatementHandler stmtHandler = new BasicStatementHandler();
-        
-        parser.setStatementHandler( stmtHandler );
+        parser.setStatementHandler( newStatementHandler() );
     
         insertStart = System.currentTimeMillis();
         
         parser.parse( reader, baseURI );
         
         insertTime += System.currentTimeMillis() - insertStart;
+        
+    }
+    
+    public StatementHandler newStatementHandler() {
+        
+        return new BasicStatementHandler();
         
     }
     

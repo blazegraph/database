@@ -80,7 +80,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * @see BulkRioLoader
  */
-public class BulkLoaderBuffer extends Buffer {
+public class BulkLoaderBuffer extends StatementBuffer {
 
     /**
      * #of URIs, literals, and bnodes that have been determined to already be in

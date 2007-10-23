@@ -58,6 +58,7 @@ import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -102,7 +103,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     protected final ITripleStore store;
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
      * object is signaling that no more buffers will be placed onto the
      * queue by the producer and that the consumer should therefore
      * terminate.
@@ -126,10 +127,10 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     final int queueCapacity = 10;
     
     /**
-     * A queue of {@link Buffer} objects that have been populated by the RIO
+     * A queue of {@link StatementBuffer} objects that have been populated by the RIO
      * parser and are awaiting further processing.
      */
-    final BlockingQueue<Buffer> bufferQueue = new ArrayBlockingQueue<Buffer>(
+    final BlockingQueue<StatementBuffer> bufferQueue = new ArrayBlockingQueue<StatementBuffer>(
             queueCapacity); 
     
     ConsumerThread consumer;
@@ -149,7 +150,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      * Used to bufferQueue RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
-    Buffer buffer;
+    StatementBuffer buffer;
     
     public MultiThreadedPresortRioLoader( ITripleStore store ) {
     
@@ -169,7 +170,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         
         this.distinct = distinct;
         
-        this.buffer = new Buffer(store, capacity, distinct );
+        this.buffer = new StatementBuffer(store, capacity, distinct );
        
         this.keyBuilder = store.getKeyBuilder();
         
@@ -254,7 +255,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
 
     public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
-        OptimizedValueFactory valueFac = new OptimizedValueFactory();
+        OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
         
         Parser parser = new RdfXmlParser( valueFac );
         
@@ -272,7 +273,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         // Allocate the initial bufferQueue for parsed data.
         if(buffer==null) {
 
-            buffer = new Buffer(store, capacity, distinct);
+            buffer = new StatementBuffer(store, capacity, distinct);
             
         }
 
@@ -306,7 +307,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
              * shutdown once it has processed everything on the queue. 
              */
 
-            buffer = new Buffer(store,-1,false);
+            buffer = new StatementBuffer(store,-1,false);
             
             putBufferOnQueue();
             
@@ -426,7 +427,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     }
     
     /**
-     * Consumers populated {@link Buffer}s placed on a {@link BlockingQueue}
+     * Consumers populated {@link StatementBuffer}s placed on a {@link BlockingQueue}
      * and causes their data to be inserted into the store.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -434,13 +435,13 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      */
     public static class ConsumerThread extends Thread {
         
-        final BlockingQueue<Buffer> bufferQueue;
+        final BlockingQueue<StatementBuffer> bufferQueue;
         
         boolean shutdown = false;
         
         volatile Throwable error = null;
         
-        public ConsumerThread(BlockingQueue<Buffer> bufferQueue) {
+        public ConsumerThread(BlockingQueue<StatementBuffer> bufferQueue) {
             
             assert bufferQueue != null;
             
@@ -452,7 +453,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
          
             log.info("Starting consumer.");
             
-            Buffer buffer = null;
+            StatementBuffer buffer = null;
             
             while(!shutdown) {
 
@@ -494,7 +495,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
                 
                 try {
 
-                    buffer.insert();
+                    buffer.flush();
                     
                 } catch(RuntimeException ex) {
                     
@@ -556,14 +557,14 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
             putBufferOnQueue();
             
             // allocate a new bufferQueue.
-            buffer = new Buffer(store,capacity,distinct);
+            buffer = new StatementBuffer(store,capacity,distinct);
             
             // fall through.
             
         }
         
         // add the terms and statement to the bufferQueue.
-        buffer.handleStatement(s,p,o);
+        buffer.handleStatement(s,p,o,StatementEnum.Explicit);
         
         stmtsAdded++;
         

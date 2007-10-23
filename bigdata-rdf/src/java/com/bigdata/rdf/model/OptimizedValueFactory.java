@@ -70,11 +70,18 @@ import org.openrdf.sesame.sail.StatementIterator;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 public class OptimizedValueFactory implements ValueFactory {
 
+    public static final OptimizedValueFactory INSTANCE = new OptimizedValueFactory();
+    
+    private OptimizedValueFactory() {
+        
+    }
+    
     /**
      * Converts a {@link Value} for a different {@link ValueFactory} into a
      * {@link _Value}.
@@ -83,11 +90,10 @@ public class OptimizedValueFactory implements ValueFactory {
      *            The value.
      * 
      * @return The value iff it is a {@link _Value} and otherwise a
-     *         {@link _Value} with the same data.
+     *         {@link _Value} with the same data. If the value is
+     *         <code>null</code> then <code>null</code> is returned.
      */
-    public Value toNativeValue( Value v ) {
-        
-        if( v == null ) throw new IllegalArgumentException();
+    final public Value toNativeValue( Value v ) {
         
         if( v instanceof URI && ! ( v instanceof _URI) ) {
             
@@ -155,9 +161,13 @@ public class OptimizedValueFactory implements ValueFactory {
 
     }
 
+    /**
+     * Create an explicit {@link _Statement}.
+     */
     public Statement createStatement(Resource s, URI p, Value o) {
 
-        return new _Statement((_Resource) s, (_URI) p, (_Value) o);
+        return new _Statement((_Resource) s, (_URI) p, (_Value) o,
+                StatementEnum.Explicit);
 
     }
 
@@ -1157,7 +1167,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
         /**
          * The #of times this statement is encountered within a
-         * {@link com.bigdata.rdf.rio.Buffer}.
+         * {@link com.bigdata.rdf.rio.StatementBuffer}.
          */
         public int count = 0;
         
@@ -1172,27 +1182,37 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public StatementEnum type;
         
+//        /**
+//         * Create a {@link StatementEnum#Explicit} statement.
+//         * 
+//         * @param s
+//         * @param p
+//         * @param o
+//         */
+//        public _Statement(_Resource s, _URI p, _Value o) {
+//
+//            this.s = s;
+//
+//            this.p = p;
+//
+//            this.o = o;
+//            
+//            this.type = StatementEnum.Explicit;
+//
+//        }
+
         /**
-         * Create a {@link StatementEnum#Explicit} statement.
+         * Create a statement with the specified {@link StatementEnum}.
          * 
          * @param s
          * @param p
          * @param o
+         * @param type
          */
-        public _Statement(_Resource s, _URI p, _Value o) {
-
-            this.s = s;
-
-            this.p = p;
-
-            this.o = o;
-            
-            this.type = StatementEnum.Explicit;
-
-        }
-
         public _Statement(_Resource s, _URI p, _Value o, StatementEnum type) {
 
+            assert type != null;
+            
             this.s = s;
 
             this.p = p;
@@ -1221,16 +1241,24 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        /**
+         * Note: {@link StatementBuffer} relies on this method returning true
+         * iff the term identifiers and the {@link #type} are all equals in
+         * order to judge when whether or not two statements are the same or
+         * "distinct".
+         */
         public boolean equals(_Statement stmt) {
             
             return (s.termId == stmt.s.termId) && //
                    (p.termId == stmt.p.termId) && //
-                   (o.termId == stmt.o.termId);
+                   (o.termId == stmt.o.termId) && //
+                   (type == stmt.type) //
+                   ;
             
         }
         
         /**
-         * Imposes s:p:o ordering based on termIds.
+         * Imposes s:p:o ordering based on termIds only.
          */
         public int compareTo(Object other) {
 

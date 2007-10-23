@@ -52,36 +52,37 @@ import java.util.Iterator;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.Buffer.StatementIterator;
-import com.bigdata.rdf.rio.Buffer.TermClassIterator;
-import com.bigdata.rdf.rio.Buffer.TermIterator;
-import com.bigdata.rdf.rio.Buffer.UnknownStatementIterator;
-import com.bigdata.rdf.rio.Buffer.UnknownTermIterator;
+import com.bigdata.rdf.rio.StatementBuffer.StatementIterator;
+import com.bigdata.rdf.rio.StatementBuffer.TermClassIterator;
+import com.bigdata.rdf.rio.StatementBuffer.TermIterator;
+import com.bigdata.rdf.rio.StatementBuffer.UnknownStatementIterator;
+import com.bigdata.rdf.rio.StatementBuffer.UnknownTermIterator;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * Test suite for {@link Buffer}.
+ * Test suite for {@link StatementBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBuffer extends AbstractTripleStoreTestCase {
+public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
     /**
      * 
      */
-    public TestBuffer() {
+    public TestStatementBuffer() {
     }
 
     /**
      * @param name
      */
-    public TestBuffer(String name) {
+    public TestStatementBuffer(String name) {
         super(name);
     }
 
@@ -91,7 +92,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         
         ITripleStore store = getStore();
         
-        Buffer buffer = new Buffer(store,capacity,false);
+        StatementBuffer buffer = new StatementBuffer(store,capacity,false);
         
         assertEquals(store,buffer.store);
         assertFalse(buffer.distinct);
@@ -115,7 +116,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         
         ITripleStore store = getStore();
         
-        Buffer buffer = new Buffer(store,capacity,false);
+        StatementBuffer buffer = new StatementBuffer(store,capacity,false);
         
         /*
          * add a statement.
@@ -125,7 +126,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         _URI p1 = new _URI( RDF.TYPE);
         _URI o1 =  new _URI(RDFS.RESOURCE);
 
-        buffer.handleStatement(s1, p1, o1 );
+        buffer.handleStatement(s1, p1, o1, StatementEnum.Explicit );
         
         assertEquals(3,buffer.numURIs);
         assertEquals(0,buffer.numLiterals);
@@ -164,7 +165,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         _URI p2 = new _URI( RDFS.LABEL);
         _Literal o2 =  new _Literal("test uri.");
         
-        buffer.handleStatement(s2, p2, o2 );
+        buffer.handleStatement(s2, p2, o2, StatementEnum.Explicit );
         
         assertEquals(5,buffer.numURIs);
         assertEquals(1,buffer.numLiterals);
@@ -263,7 +264,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
 
         ITripleStore store = getStore();
         
-        Buffer buffer = new Buffer(store,capacity,true);
+        StatementBuffer buffer = new StatementBuffer(store,capacity,true);
         
         assertTrue(buffer.distinct);
         
@@ -275,7 +276,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         _URI p1 = new _URI( RDF.TYPE);
         _URI o1 =  new _URI(RDFS.RESOURCE);
 
-        buffer.handleStatement(s1, p1, o1 );
+        buffer.handleStatement(s1, p1, o1, StatementEnum.Explicit );
         
         assertEquals(3,buffer.numURIs);
         assertEquals(0,buffer.numLiterals);
@@ -318,7 +319,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         _URI p2 = new _URI( RDFS.LABEL);
         _Literal o2 =  new _Literal("test uri.");
         
-        buffer.handleStatement(s2, p2, o2 );
+        buffer.handleStatement(s2, p2, o2, StatementEnum.Explicit );
 
         assertEquals(4,buffer.numURIs); // only 4 since one is a duplicate.
         assertEquals(1,buffer.numLiterals);
@@ -364,7 +365,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
         _URI p3 = new _URI( RDFS.LABEL);
         _Literal o3 =  new _Literal("test uri.");
         
-        buffer.handleStatement(s3, p3, o3 );
+        buffer.handleStatement(s3, p3, o3, StatementEnum.Explicit );
 
         assertEquals(4,buffer.numURIs);
         assertEquals(1,buffer.numLiterals);
@@ -385,7 +386,7 @@ public class TestBuffer extends AbstractTripleStoreTestCase {
          * add a duplicate statement using the _same_ term objects.
          */
         
-        buffer.handleStatement(s3, p3, o3 );
+        buffer.handleStatement(s3, p3, o3, StatementEnum.Explicit );
 
         assertEquals(4,buffer.numURIs);
         assertEquals(1,buffer.numLiterals);

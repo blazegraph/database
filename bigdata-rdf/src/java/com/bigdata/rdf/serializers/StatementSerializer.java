@@ -48,11 +48,16 @@ import java.io.IOException;
 
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rdf.model.StatementEnum;
 
 /**
- * Note: There is no additional data serialized with a statement at this time so
- * the value serializer is essentially a nop. All the information is in the
- * keys.
+ * Serializer for values in the statement indices.
+ * <p>
+ * Note: The {@link StatementEnum} is the sole value associated with a key in
+ * the statement indices. It is always serialized as a byte[] since it can be
+ * expressed as a byte[] of length ONE (1).
+ * 
+ * FIXME write serializer tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -68,12 +73,36 @@ public class StatementSerializer implements IValueSerializer {
 
     public void getValues(DataInput is, Object[] values, int n)
             throws IOException {
-        return;
+        
+        for(int i=0; i<n; i++) {
+            
+            values[i] = new byte[] { is.readByte() };
+            
+        }
+        
     }
 
+    /**
+     * This serializer just casts the Object[] to a byte[][] on serialization
+     * and writes out those bytes.
+     */
     public void putValues(DataOutputBuffer os, Object[] values, int n)
             throws IOException {
-        return;
+        
+//        byte[][] serialized = (byte[][])values;
+        
+        os.ensureCapacity(n);
+        
+        for(int i=0; i<n; i++) {
+            
+            byte[] val = (byte[])values[i];
+            
+            assert val.length == 1;
+
+            os.writeByte(val[0]);
+            
+        }
+        
     }
 
 }

@@ -63,18 +63,42 @@ import org.openrdf.sesame.constants.RDFFormat;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.Justification;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Interface for a triple store.
+ * <p>
+ * Note: This API does NOT implement a Truth Maintenance (TM) strategy and by
+ * itself only supports "explicit" triples. If the knowledge base is NOT to
+ * store any entailments then the application MAY directly use this API to read
+ * and write explicit statements on the knowledge base. However, if the
+ * knowledge base is to directly store any entailments, then the application
+ * MUST NOT invoke operations on this API that add statements to, or remove
+ * statements from, the knowledge base as the entailments will not be updated
+ * properly.
+ * <p>
+ * When entailments are stored in the knowledge base, a TM strategy MUST be used
+ * to made those entailments based on the explicit triples asserted or retracted
+ * by the application. When an application requests that statements are added to
+ * a knowledge base that maintains entailments, the TM strategy MAY need to add
+ * additional entailments to the knowledge base. When an application requests
+ * that statement(s) are removed from the knowledge base, the TM strategy needs
+ * to consider the state of the knowledge base. In general, a statement should
+ * be removed IFF it was {@link StatementEnum#Explicit} AND the statement is no
+ * longer entailed by the model theory and the remaining statements in the
+ * knowledge base.
  * 
  * @todo lucene integration.
  * 
- * @todo write quad store (Sesame 2.x).
+ * @todo write quad store (Sesame 2.x). inference across contexts?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -95,12 +119,29 @@ public interface ITripleStore {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
+    /**
+     * The name of the index mapping terms to term identifiers.
+     */
     static final public String name_termId = "terms";
+    
+    /**
+     * The name of the index mapping term identifiers to terms.
+     */
     static final public String name_idTerm = "ids";
 
+    /*
+     * The names of the various statement indices. 
+     */
+    
     static final public String name_spo = KeyOrder.SPO.name;
     static final public String name_pos = KeyOrder.POS.name;
     static final public String name_osp = KeyOrder.OSP.name;
+    
+    /**
+     * The name of the optional index in which {@link Justification}s are
+     * stored.
+     */
+    static final public String name_just = "just";
 
     /*
      * Note: access to the indices through these methods is required to support
@@ -174,14 +215,17 @@ public interface ITripleStore {
      * object will be compatible with the Unicode preferences that are in effect
      * for the {@link ITripleStore}.
      * <p>
-     * Note: This object is NOT thread-safe. When multiple threads are used,
-     * each thread should be a different client.
+     * Note: This object is NOT thread-safe.
      */
     public RdfKeyBuilder getKeyBuilder();
     
     /**
-     * Add a single statement by lookup and/or insert into the various indices
-     * (non-batch api).
+     * Add a single {@link StatementEnum#Explicit} statement by lookup and/or
+     * insert into the various indices (non-batch api).
+     * <p>
+     * Note: The non-batch API is horridly inefficient. Whenever possible use
+     * the batch API either directly or by means of {@link StatementBuffer} or
+     * {@link SPOBuffer}.
      */
     public void addStatement(Resource s, URI p, Value o);
 
@@ -202,6 +246,8 @@ public interface ITripleStore {
 
     /**
      * Return true if the statement exists in the store (non-batch API).
+     * <p>
+     * Note: This does not verify whether or not the statement is explicit.
      * 
      * @param s
      *            Optional subject.
@@ -250,7 +296,8 @@ public interface ITripleStore {
     public int rangeCount(long s, long p, long o);
 
     /**
-     * Removes statements matching the triple pattern.
+     * Unconditionally removes statement(s) matching the triple pattern (NO
+     * truth maintenance).
      * 
      * @param s
      * @param p
@@ -261,7 +308,8 @@ public interface ITripleStore {
     public int removeStatements(Resource s, URI p, Value o);
 
     /**
-     * Remove statements matching the triple pattern.
+     * Unconditionally removes statement(s) matching the triple pattern (NO
+     * truth maintenance).
      * 
      * @param _s
      * @param _p
@@ -273,26 +321,19 @@ public interface ITripleStore {
 
     /**
      * Value used for a "NULL" term identifier.
-     * 
-     * @todo use this throughout rather than "0" since the value should really
-     *       be an <em>unsigned long</em>).
      */
     public static final long NULL = 0L;
 
     /**
-     * Adds the statements to each index (batch api).
+     * Adds the statements to each index (batch api, NO truth maintenance).
      * <p>
-     * Note: this is not sorting by the generated keys so the sort order may not
-     * perfectly reflect the natural order of the index. however, i suspect that
-     * it simply creates a few partitions out of the natural index order based
-     * on the difference between signed and unsigned interpretations of the
-     * termIds when logically combined into a statement identifier.
+     * Pre-conditions: The term identifiers for each {@link _Statement} are
+     * defined.
      * 
      * @param stmts
      *            An array of statements
      * 
-     * @todo modify to return the #of statements that were actually added to the
-     *       store.
+     * @see #insertTerms(_Value[], int, boolean, boolean)
      */
     public void addStatements(_Statement[] stmts, int numStmts);
 
@@ -363,7 +404,7 @@ public interface ITripleStore {
     public long getTermId(Value value);
 
     /**
-     * Load data into the triple store.
+     * Load data into the triple store (NO truth maintenance).
      * 
      * @param file
      *            The file.
