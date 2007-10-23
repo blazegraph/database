@@ -179,6 +179,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
          fed.registerIndex(name_spo);
          fed.registerIndex(name_pos);
          fed.registerIndex(name_osp);
+         
+         fed.registerIndex(name_just);
 
     }
     
@@ -192,6 +194,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         fed.dropIndex(name_pos); pos = null;
         fed.dropIndex(name_osp); osp = null;
     
+        fed.dropIndex(name_just); just = null;
+        
         createIndices();
         
     }
@@ -210,6 +214,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      * The statement indices for a triple store.
      */
     private ClientIndexView spo, pos, osp;
+    
+    private ClientIndexView just;
     
     final public IIndex getTermIdIndex() {
         
@@ -262,17 +268,30 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         return pos;
         
     }
-    
+
     final public IIndex getOSPIndex() {
 
-        if(osp!=null) {
-            
+        if (osp != null) {
+
             osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
                     name_osp);
 
         }
-        
+
         return osp;
+
+    }
+
+    final public IIndex getJustificationIndex() {
+
+        if (just != null) {
+
+            just = (ClientIndexView) fed.getIndex(
+                    IBigdataFederation.UNISOLATED, name_just);
+
+        }
+        
+        return just;
         
     }
 
@@ -520,7 +539,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
             // for each split.
             Iterator<Split> itr = splits.iterator();
 
-            // Buffer is reused for each serialized term.
+            // StatementBuffer is reused for each serialized term.
             DataOutputBuffer out = new DataOutputBuffer();
             
             while(itr.hasNext()) {
@@ -604,11 +623,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     }
 
     /**
-     * Disconnects from the {@link IBigdataFederation}.
-     * 
-     * @todo drop the federation?
+     * Drops the indices used by the {@link ScaleOutTripleStore} and disconnects
+     * from the {@link IBigdataFederation}.
      */
     final public void closeAndDelete() {
+        
+        clear();
         
         fed.disconnect();
         

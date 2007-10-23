@@ -65,6 +65,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.scaleup.MasterJournal;
 
@@ -117,7 +118,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     protected final ITripleStore store;
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
      * object is signaling that no more buffers will be placed onto the
      * queue by the producer and that the consumer should therefore
      * terminate.
@@ -247,7 +248,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      */
     public void loadRdf( Reader reader, String baseURI ) throws Exception {
         
-        OptimizedValueFactory valueFac = new OptimizedValueFactory();
+        OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
         
         Parser parser = new RdfXmlParser( valueFac );
         
@@ -328,7 +329,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         }
         
         // add the terms and statement to the buffer.
-        buffer.handleStatement(s,p,o);
+        buffer.handleStatement(s,p,o,StatementEnum.Explicit);
         
         stmtsAdded++;
         

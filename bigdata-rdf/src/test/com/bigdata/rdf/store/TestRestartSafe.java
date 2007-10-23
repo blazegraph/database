@@ -202,11 +202,15 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
 
         }
 
+        store.dumpStore();
+        
         store.commit();
 
         if (store.isStable()) {
 
             store = reopenStore(store);
+
+            store.dumpStore();
 
             assertEquals(x_id, store.getTermId(x));
             assertEquals(y_id, store.getTermId(y));

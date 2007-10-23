@@ -48,8 +48,6 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.spo.SPOBuffer;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -57,45 +55,45 @@ import com.bigdata.rdf.store.TempTripleStore;
  */
 abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCase {
 
-    protected TempTripleStore tmpStore;
-    
-    final protected RuleStats stats = new RuleStats();
-    
-    final protected int capacity = 10;
-    
-    final protected boolean distinct = false;
-
-    protected SPOBuffer buffer;
-
-    protected AbstractTripleStore store;
-
-    protected InferenceEngine inferenceEngine;
-
-    public void setUp() throws Exception {
-
-        super.setUp();
-
-        store = getStore();
-      
-        inferenceEngine = new InferenceEngine(store);
-
-        tmpStore = new TempTripleStore(store.getProperties());
-    
-        buffer = new SPOBuffer(tmpStore,capacity,distinct);
-        
-    }
-    
-    public void tearDown() throws Exception {
-
-        if(this.store!=null) {
-            
-            this.store.closeAndDelete();
-            
-        }
-        
-        super.tearDown();
-        
-    }
+//    protected TempTripleStore tmpStore;
+//    
+//    final protected RuleStats stats = new RuleStats();
+//    
+//    final protected int capacity = 10;
+//    
+//    final protected boolean distinct = false;
+//
+//    protected SPOBuffer buffer;
+//
+//    protected AbstractTripleStore store;
+//
+//    protected InferenceEngine inferenceEngine;
+//
+//    public void setUp() throws Exception {
+//
+//        super.setUp();
+//
+//        store = getStore();
+//      
+//        inferenceEngine = new InferenceEngine(store);
+//
+//        tmpStore = new TempTripleStore(store.getProperties());
+//    
+//        buffer = new SPOBuffer(tmpStore,capacity,distinct);
+//        
+//    }
+//    
+//    public void tearDown() throws Exception {
+//
+//        if(this.store!=null) {
+//            
+//            this.store.closeAndDelete();
+//            
+//        }
+//        
+//        super.tearDown();
+//        
+//    }
     
     /**
      * 
@@ -124,18 +122,19 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * 
      * @param expectedComputed
      *            The #of entailments that should be computed by the rule.
-     * 
-     * @param expectedCopied
-     *            The #of entailments that should be distinct from the
-     *            statements already in the store (the new inferences).
      */
-    protected void applyRule(Rule rule, int expectedComputed, int expectedCopied) {
+    protected RuleStats applyRule(Rule rule, int expectedComputed) {
+        
+        RuleStats stats = new RuleStats();
+        
+        SPOBuffer buffer = new SPOBuffer(rule.db, null/* filter */,
+                1000/* capacity */, false/* distinct */, true/*justified*/);
         
         // apply the rule.
         rule.apply(stats, buffer);
         
         // dump entailments on the console.
-        buffer.dump(store);
+        buffer.dump(rule.db);
 
         // flush entailments into the temporary store.
         buffer.flush();
@@ -145,15 +144,17 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
          */
         assertEquals("numComputed",expectedComputed,stats.numComputed);
         
-        /*
-         * transfer the entailments from the temporary store to the primary
-         * store.
-         */
-        final int actualCopied = InferenceEngine.copyStatements(tmpStore,
-                store);
-        
-        assertEquals("#copied",expectedCopied,actualCopied);
+//        /*
+//         * transfer the entailments from the temporary store to the primary
+//         * store.
+//         */
+//        final int actualCopied = InferenceEngine.copyStatements(tmpStore,
+//                store);
+//        
+//        assertEquals("#copied",expectedCopied,actualCopied);
 
+        return stats;
+        
     }
     
 }

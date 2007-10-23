@@ -79,7 +79,6 @@ import org.openrdf.vocabulary.RDFS;
 import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
@@ -88,19 +87,18 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.Buffer;
 import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
@@ -138,6 +136,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * wrap them up so that people can not easily mess with the initial
          * properties.
          */
+
         return new Properties(properties);
         
     }
@@ -158,6 +157,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    /**
+     * @todo Consider making this a {@link ThreadLocal} to avoid hassels with
+     *       access by multiple threads. Note however that only the term:id
+     *       index requires Unicode support.
+     */
     final public RdfKeyBuilder getKeyBuilder() {
         
         return keyBuilder;
@@ -207,349 +211,365 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     public ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
             DaemonThreadFactory.defaultThreadFactory());
 
-    /**
-     * Adds the statements to each index (batch api, concurrent index writes).
-     * 
-     * @param stmts
-     *            An array of statements
-     */
-    final public void addStatements(_Statement[] stmts, int numStmts) {
-        
-        /*
-         * Note: The statements are inserted into each index in parallel. We
-         * clone the statement[] and sort and bulk load each index in parallel
-         * using a thread pool.
-         */
-
-        if( numStmts == 0 ) return;
-
-        long begin = System.currentTimeMillis();
-        final AtomicLong sortTime = new AtomicLong(0); // time to sort terms by assigned byte[] keys.
-        final AtomicLong insertTime = new AtomicLong(0); // time to insert terms into the forward and reverse index.
-
-        /**
-         * Writes on one of the statement indices.
-         * 
-         * @return The elapsed time for the operation.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        class IndexWriter implements Callable<Long> {
-
-            private final _Statement[] stmts;
-            private final int numStmts; // @todo not needed - always equals stmts.length
-            private final Comparator<_Statement> comparator;
-            private final IIndex ndx;
-            private final KeyOrder keyOrder;
-            
-            /*
-             * Private key builder for the SPO, POS, and OSP keys.
-             */
-            private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
-            
-            private final byte[][] keys;
-
-            IndexWriter(_Statement[] stmts, int numStmts, Comparator<_Statement> comparator, IIndex ndx, KeyOrder keyOrder) {
-                
-                this.stmts = new _Statement[numStmts];
-                
-                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
-
-                this.numStmts = numStmts;
-                
-                this.comparator = comparator;
-                
-                this.ndx = ndx;
-                
-                this.keys = new byte[numStmts][];
-                
-                this.keyOrder = keyOrder;
-                
-            }
-
-            /**
-             * 
-             * @todo this does not remove duplicate records. in a distribute
-             *       system it is definately worth the cost of compressing the
-             *       _Statement[] by copying down references over duplicate
-             *       records before submitting them to the remote data services.
-             *       Perhaps that can be done when we re-align the data to match
-             *       the API for the RPC?
-             *       <p>
-             *       Note: duplication must be judged in terms of s:p:o and the
-             *       {@link StatementEnum}.  When different values are present 
-             *       for the {@link StatementEnum}, the "max" should be used.
-             */
-            public Long call() throws Exception {
-
-                final long beginIndex = System.currentTimeMillis();
-
-                { // sort
-
-                    long _begin = System.currentTimeMillis();
-
-                    Arrays.sort(stmts, 0, numStmts, comparator);
-
-                    sortTime.addAndGet(System.currentTimeMillis() - _begin);
-
-                }
-
-                { // load
-
-                    long _begin = System.currentTimeMillis();
-
-                    for (int i = 0; i < numStmts; i++) {
-
-                        final _Statement stmt = stmts[i];
-
-                        switch (keyOrder) {
-                        case SPO:
-                            keys[i] = keyBuilder.statement2Key(stmt.s.termId,
-                                    stmt.p.termId, stmt.o.termId);
-                            break;
-                        case OSP:
-                            keys[i] = keyBuilder.statement2Key(stmt.o.termId,
-                                    stmt.s.termId, stmt.p.termId);
-                            break;
-                        case POS:
-                            keys[i] = keyBuilder.statement2Key(stmt.p.termId,
-                                    stmt.o.termId, stmt.s.termId);
-                            break;
-                        default:
-                            throw new UnsupportedOperationException();
-                        }
-
-                    }
-
-                    /*
-                     * @todo allow client to send null for the values when (a)
-                     * they are inserting [null] values under the keys; and (b)
-                     * they do not need the old values back.
-                     */
-                    BatchInsert op = new BatchInsert(numStmts, keys,
-                            new byte[numStmts][]);
-
-                    ndx.insert(op);
-
-                    insertTime.addAndGet(System.currentTimeMillis() - _begin);
-
-                }
-
-                long elapsed = System.currentTimeMillis() - beginIndex;
-
-                return elapsed;
-
-            }
-            
-        }
-
-        List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
-        
-        tasks.add(new IndexWriter(stmts,numStmts,SPOComparator.INSTANCE,getSPOIndex(),KeyOrder.SPO));
-        tasks.add(new IndexWriter(stmts,numStmts,POSComparator.INSTANCE,getPOSIndex(),KeyOrder.POS));
-        tasks.add(new IndexWriter(stmts,numStmts,OSPComparator.INSTANCE,getOSPIndex(),KeyOrder.OSP));
-
-        System.err.print("Writing " + numStmts + " statements...");
-        
-        final List<Future<Long>> futures;
-        final long elapsed_SPO;
-        final long elapsed_POS;
-        final long elapsed_OSP;
-        
-        try {
-
-            futures = indexWriteService.invokeAll( tasks );
-
-            elapsed_SPO = futures.get(0).get();
-            elapsed_POS = futures.get(1).get();
-            elapsed_OSP = futures.get(2).get();
-
-        } catch(InterruptedException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        } catch(ExecutionException ex) {
-        
-            throw new RuntimeException(ex);
-        
-        }
-        
-        long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("in " + elapsed + "ms; sort=" + sortTime
-                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
-                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
-        
-    }
-
-    /**
-     * Adds the statements to each index (batch api, single-threaded).
-     * 
-     * @param stmts
-     *            An array of statements
-     */
-    final public void addStatements_singleThread(_Statement[] stmts, int numStmts) {
-
-        if( numStmts == 0 ) return;
-
-        long begin = System.currentTimeMillis();
-//        long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
-        long sortTime = 0; // time to sort terms by assigned byte[] keys.
-        long insertTime = 0; // time to insert terms into the forward and reverse index.
-        
-        final long elapsed_SPO;
-        final long elapsed_POS;
-        final long elapsed_OSP;
-
-        final byte[][] keys = new byte[numStmts][];
-        
-        System.err.print("Writing " + numStmts + " statements...");
-        
-        { // SPO
-
-            final long beginIndex = System.currentTimeMillis();
-
-            IIndex ndx_spo = getSPOIndex();
-
-            { // sort
-
-                long _begin = System.currentTimeMillis();
-                
-                Arrays.sort(stmts, 0, numStmts, SPOComparator.INSTANCE);
-                
-                sortTime += System.currentTimeMillis() - _begin;
-                
-            }
-            
-            { // load
-
-                long _begin = System.currentTimeMillis();
-
-                for (int i = 0; i < numStmts; i++) {
-
-                    final _Statement stmt = stmts[i];
-
-                    keys[i] = keyBuilder.statement2Key(stmt.s.termId,
-                            stmt.p.termId, stmt.o.termId);
-
-                }
-
-                /*
-                 * @todo allow client to send null for the values when (a) they
-                 * are inserting [null] values under the keys; and (b) they do
-                 * not need the old values back.
-                 */
-                BatchInsert op = new BatchInsert(numStmts, keys,
-                        new byte[numStmts][]);
-                
-                ndx_spo.insert( op );
-                
-                insertTime += System.currentTimeMillis() - _begin;
-
-            }
-
-            elapsed_SPO = System.currentTimeMillis() - beginIndex;
-            
-        }
-
-        { // POS
-
-            final long beginIndex = System.currentTimeMillis();
-            
-            IIndex ndx_pos = getPOSIndex();
-
-            { // sort
-
-                long _begin = System.currentTimeMillis();
-
-                Arrays.sort(stmts, 0, numStmts, POSComparator.INSTANCE);
-
-                sortTime += System.currentTimeMillis() - _begin;
-
-            }
-
-            { // load
-
-                long _begin = System.currentTimeMillis();
-                
-                for (int i = 0; i < numStmts; i++) {
-
-                    final _Statement stmt = stmts[i];
-                    
-                    keys[i] = keyBuilder.statement2Key(stmt.p.termId,
-                            stmt.o.termId, stmt.s.termId);
-
-//                    ndx_pos.insert(keyBuilder.statement2Key(stmt.p.termId,
-//                            stmt.o.termId, stmt.s.termId), null);
-
-                }
-
-                BatchInsert op = new BatchInsert(numStmts, keys,
-                        new byte[numStmts][]);
-
-                ndx_pos.insert(op);
-                
-                insertTime += System.currentTimeMillis() - _begin;
-                
-            }
-
-            elapsed_POS = System.currentTimeMillis() - beginIndex;
-
-        }
-
-        { // OSP
-
-            final long beginIndex = System.currentTimeMillis();
-            
-            IIndex ndx_osp = getOSPIndex();
-
-            { // sort
-
-                long _begin = System.currentTimeMillis();
-
-                Arrays.sort(stmts, 0, numStmts, OSPComparator.INSTANCE);
-             
-                sortTime += System.currentTimeMillis() - _begin;
-
-            }
-
-            { // load
-
-                long _begin = System.currentTimeMillis();
-                
-                for (int i = 0; i < numStmts; i++) {
-
-                    final _Statement stmt = stmts[i];
-
-                    keys[i] = keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
-                            stmt.p.termId);
-                    
-//                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
-//                            stmt.p.termId), null);
-
-                }
-                
-                BatchInsert op = new BatchInsert(numStmts, keys,
-                        new byte[numStmts][]);
-                
-                ndx_osp.insert( op );
-                
-                insertTime += System.currentTimeMillis() - _begin;
-
-            }
-
-            elapsed_OSP = System.currentTimeMillis() - beginIndex;
-
-        }
-
-        long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("in " + elapsed + "ms; sort=" + sortTime
-                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
-                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
-        
-    }
+//    /**
+//     * @todo modify to return the #of statements that were actually added to the
+//     *       store?
+//     * 
+//     * FIXME rewrite to delegate to
+//     * {@link #addStatements(SPO[], int, ISPOFilter)}.  Assuming that we have
+//     * already defined the termIds, then we just need to wrap the statements
+//     * as an SPO[].
+//     */
+//    final public void addStatements(_Statement[] stmts, int numStmts) {
+//        
+//        /*
+//         * Note: The statements are inserted into each index in parallel. We
+//         * clone the statement[] and sort and bulk load each index in parallel
+//         * using a thread pool.
+//         */
+//
+//        if( numStmts == 0 ) return;
+//
+//        long begin = System.currentTimeMillis();
+//        final AtomicLong sortTime = new AtomicLong(0); // time to sort terms by assigned byte[] keys.
+//        final AtomicLong insertTime = new AtomicLong(0); // time to insert terms into the forward and reverse index.
+//
+//        /**
+//         * Writes on one of the statement indices.
+//         * 
+//         * @return The elapsed time for the operation.
+//         * 
+//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//         * @version $Id$
+//         */
+//        class IndexWriter implements Callable<Long> {
+//
+//            private final _Statement[] stmts;
+//            private final int numStmts; // @todo not needed - always equals stmts.length
+//            private final Comparator<_Statement> comparator;
+//            private final IIndex ndx;
+//            private final KeyOrder keyOrder;
+//            
+//            /*
+//             * Private key builder for the SPO, POS, or OSP keys (one instance
+//             * per thread).
+//             */
+//            private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
+//            
+//            private final byte[][] keys;
+//
+//            IndexWriter(_Statement[] stmts, int numStmts, Comparator<_Statement> comparator, IIndex ndx, KeyOrder keyOrder) {
+//                
+//                this.stmts = new _Statement[numStmts];
+//                
+//                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+//
+//                this.numStmts = numStmts;
+//                
+//                this.comparator = comparator;
+//                
+//                this.ndx = ndx;
+//                
+//                this.keys = new byte[numStmts][];
+//                
+//                this.keyOrder = keyOrder;
+//                
+//            }
+//
+//            /**
+//             * 
+//             * @todo this does not remove duplicate records. in a distribute
+//             *       system it is definately worth the cost of compressing the
+//             *       _Statement[] by copying down references over duplicate
+//             *       records before submitting them to the remote data services.
+//             *       Perhaps that can be done when we re-align the data to match
+//             *       the API for the RPC?
+//             *       <p>
+//             *       Note: duplication must be judged in terms of s:p:o and the
+//             *       {@link StatementEnum}.  When different values are present 
+//             *       for the {@link StatementEnum}, the "max" should be used.
+//             */
+//            public Long call() throws Exception {
+//
+//                final long beginIndex = System.currentTimeMillis();
+//
+//                { // sort
+//
+//                    long _begin = System.currentTimeMillis();
+//
+//                    Arrays.sort(stmts, 0, numStmts, comparator);
+//
+//                    sortTime.addAndGet(System.currentTimeMillis() - _begin);
+//
+//                }
+//
+//                { // load
+//
+//                    long _begin = System.currentTimeMillis();
+//
+//                    byte[][] vals = new byte[numStmts][];
+//                    
+//                    for (int i = 0; i < numStmts; i++) {
+//
+//                        final _Statement stmt = stmts[i];
+//
+//                        switch (keyOrder) {
+//                        case SPO:
+//                            keys[i] = keyBuilder.statement2Key(stmt.s.termId,
+//                                    stmt.p.termId, stmt.o.termId);
+//                            break;
+//                        case OSP:
+//                            keys[i] = keyBuilder.statement2Key(stmt.o.termId,
+//                                    stmt.s.termId, stmt.p.termId);
+//                            break;
+//                        case POS:
+//                            keys[i] = keyBuilder.statement2Key(stmt.p.termId,
+//                                    stmt.o.termId, stmt.s.termId);
+//                            break;
+//                        default:
+//                            throw new UnsupportedOperationException();
+//                        }
+//
+//                        vals[i] = stmt.type.serialize();
+//                        
+//                    }
+//
+//                    /*
+//                     * FIXME This needs to be a custom operation so that we can
+//                     * correctly update the existing StatementEnum when the
+//                     * statement is pre-existing.
+//                     * 
+//                     * @todo use efficient compression for that operation for
+//                     * the federation version (the statements are in sorted
+//                     * order and each key is formed from a constant #of long
+//                     * integers).
+//                     * 
+//                     * @todo allow client to indicate that they do not need the
+//                     * old values back.
+//                     */
+//                    
+//                    BatchInsert op = new BatchInsert(numStmts, keys, vals);
+//
+//                    ndx.insert(op);
+//
+//                    insertTime.addAndGet(System.currentTimeMillis() - _begin);
+//
+//                }
+//
+//                long elapsed = System.currentTimeMillis() - beginIndex;
+//
+//                return elapsed;
+//
+//            }
+//            
+//        }
+//
+//        List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
+//        
+//        tasks.add(new IndexWriter(stmts,numStmts,SPOComparator.INSTANCE,getSPOIndex(),KeyOrder.SPO));
+//        tasks.add(new IndexWriter(stmts,numStmts,POSComparator.INSTANCE,getPOSIndex(),KeyOrder.POS));
+//        tasks.add(new IndexWriter(stmts,numStmts,OSPComparator.INSTANCE,getOSPIndex(),KeyOrder.OSP));
+//
+//        System.err.print("Writing " + numStmts + " statements...");
+//        
+//        final List<Future<Long>> futures;
+//        final long elapsed_SPO;
+//        final long elapsed_POS;
+//        final long elapsed_OSP;
+//        
+//        try {
+//
+//            futures = indexWriteService.invokeAll( tasks );
+//
+//            elapsed_SPO = futures.get(0).get();
+//            elapsed_POS = futures.get(1).get();
+//            elapsed_OSP = futures.get(2).get();
+//
+//        } catch(InterruptedException ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        } catch(ExecutionException ex) {
+//        
+//            throw new RuntimeException(ex);
+//        
+//        }
+//        
+//        long elapsed = System.currentTimeMillis() - begin;
+//
+//        System.err.println("in " + elapsed + "ms; sort=" + sortTime
+//                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
+//                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
+//        
+//    }
+
+//    /**
+//     * Adds the statements to each index (batch api, single-threaded).
+//     * 
+//     * @param stmts
+//     *            An array of statements
+//     */
+//    final public void addStatements_singleThread(_Statement[] stmts, int numStmts) {
+//
+//        if( numStmts == 0 ) return;
+//
+//        long begin = System.currentTimeMillis();
+////        long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
+//        long sortTime = 0; // time to sort terms by assigned byte[] keys.
+//        long insertTime = 0; // time to insert terms into the forward and reverse index.
+//        
+//        final long elapsed_SPO;
+//        final long elapsed_POS;
+//        final long elapsed_OSP;
+//
+//        final byte[][] keys = new byte[numStmts][];
+//        
+//        System.err.print("Writing " + numStmts + " statements...");
+//        
+//        { // SPO
+//
+//            final long beginIndex = System.currentTimeMillis();
+//
+//            IIndex ndx_spo = getSPOIndex();
+//
+//            { // sort
+//
+//                long _begin = System.currentTimeMillis();
+//                
+//                Arrays.sort(stmts, 0, numStmts, SPOComparator.INSTANCE);
+//                
+//                sortTime += System.currentTimeMillis() - _begin;
+//                
+//            }
+//            
+//            { // load
+//
+//                long _begin = System.currentTimeMillis();
+//
+//                for (int i = 0; i < numStmts; i++) {
+//
+//                    final _Statement stmt = stmts[i];
+//
+//                    keys[i] = keyBuilder.statement2Key(stmt.s.termId,
+//                            stmt.p.termId, stmt.o.termId);
+//
+//                }
+//
+//                /*
+//                 * @todo allow client to send null for the values when (a) they
+//                 * are inserting [null] values under the keys; and (b) they do
+//                 * not need the old values back.
+//                 */
+//                BatchInsert op = new BatchInsert(numStmts, keys,
+//                        new byte[numStmts][]);
+//                
+//                ndx_spo.insert( op );
+//                
+//                insertTime += System.currentTimeMillis() - _begin;
+//
+//            }
+//
+//            elapsed_SPO = System.currentTimeMillis() - beginIndex;
+//            
+//        }
+//
+//        { // POS
+//
+//            final long beginIndex = System.currentTimeMillis();
+//            
+//            IIndex ndx_pos = getPOSIndex();
+//
+//            { // sort
+//
+//                long _begin = System.currentTimeMillis();
+//
+//                Arrays.sort(stmts, 0, numStmts, POSComparator.INSTANCE);
+//
+//                sortTime += System.currentTimeMillis() - _begin;
+//
+//            }
+//
+//            { // load
+//
+//                long _begin = System.currentTimeMillis();
+//                
+//                for (int i = 0; i < numStmts; i++) {
+//
+//                    final _Statement stmt = stmts[i];
+//                    
+//                    keys[i] = keyBuilder.statement2Key(stmt.p.termId,
+//                            stmt.o.termId, stmt.s.termId);
+//
+////                    ndx_pos.insert(keyBuilder.statement2Key(stmt.p.termId,
+////                            stmt.o.termId, stmt.s.termId), null);
+//
+//                }
+//
+//                BatchInsert op = new BatchInsert(numStmts, keys,
+//                        new byte[numStmts][]);
+//
+//                ndx_pos.insert(op);
+//                
+//                insertTime += System.currentTimeMillis() - _begin;
+//                
+//            }
+//
+//            elapsed_POS = System.currentTimeMillis() - beginIndex;
+//
+//        }
+//
+//        { // OSP
+//
+//            final long beginIndex = System.currentTimeMillis();
+//            
+//            IIndex ndx_osp = getOSPIndex();
+//
+//            { // sort
+//
+//                long _begin = System.currentTimeMillis();
+//
+//                Arrays.sort(stmts, 0, numStmts, OSPComparator.INSTANCE);
+//             
+//                sortTime += System.currentTimeMillis() - _begin;
+//
+//            }
+//
+//            { // load
+//
+//                long _begin = System.currentTimeMillis();
+//                
+//                for (int i = 0; i < numStmts; i++) {
+//
+//                    final _Statement stmt = stmts[i];
+//
+//                    keys[i] = keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+//                            stmt.p.termId);
+//                    
+////                    ndx_osp.insert(keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+////                            stmt.p.termId), null);
+//
+//                }
+//                
+//                BatchInsert op = new BatchInsert(numStmts, keys,
+//                        new byte[numStmts][]);
+//                
+//                ndx_osp.insert( op );
+//                
+//                insertTime += System.currentTimeMillis() - _begin;
+//
+//            }
+//
+//            elapsed_OSP = System.currentTimeMillis() - beginIndex;
+//
+//        }
+//
+//        long elapsed = System.currentTimeMillis() - begin;
+//
+//        System.err.println("in " + elapsed + "ms; sort=" + sortTime
+//                + "ms, keyGen+insert=" + insertTime + "ms; spo=" + elapsed_SPO
+//                + "ms, pos=" + elapsed_POS + "ms, osp=" + elapsed_OSP + "ms");
+//        
+//    }
 
     /**
      * Performs an efficient scan of a statement index returning the distinct
@@ -714,9 +734,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     /**
-     * The capacity (in triples or terms, which ever comes first) of the
-     * {@link Buffer} used when reading RDF data. The default (1M) is good for
-     * the {@link LocalTripleStore}.
+     * The capacity of the {@link StatementBuffer} used when reading RDF data.
+     * The default (1M) is good for the {@link LocalTripleStore}.
      * 
      * @return The buffer capacity.
      */
@@ -821,75 +840,81 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    /**
-     * Add a single statement by lookup and/or insert into the various indices
-     * (non-batch api). The terms are inserted into the database iff they are
-     * not already defined. The statement is inserted into the database iff it
-     * is not already defined.
-     * 
-     * @todo rewrite to use batch lookup on the N>1 terms, where N is the #of
-     *       terms that do not have their termId fields already set.
-     */
-    final public void addStatement(Resource s, URI p, Value o) {
+    final public void addStatements(_Statement[] stmts, int numStmts) {
         
-        // assume until disproven.
-        boolean termsExist = true;
+        SPO[] tmp = new SPO[numStmts];
         
-        long _s = getTermId(s);
-        
-        long _p = getTermId(p);
-        
-        long _o = getTermId(o);
-        
-        if( _s == NULL ) {
+        for(int i=0; i<tmp.length; i++) {
             
-            _s = addTerm(s);
+            _Statement stmt = stmts[i];
             
-            termsExist = false;
+            tmp[i] = new SPO(stmt.s.termId, stmt.p.termId, stmt.o.termId,
+                    stmt.type);
             
         }
         
-        if( _p == NULL ) {
-            
-            _p = addTerm(p);
-            
-            termsExist = false;
-            
-        }
-        
-        if( _o == NULL ) {
-            
-            _o = addTerm(o);
-            
-            termsExist = false;
-            
-        }
-        
-        if (!termsExist || !containsStatement(_s, _p, _o)) {
+        addStatements(tmp, numStmts);
 
-            addStatement(_s, _p, _o);
-
-        }
-        
     }
+    
+    final public void addStatement(Resource s, URI p, Value o) {
 
-    /**
-     * Add a single statement by lookup and/or insert into the various indices
-     * (non-batch api). This does NOT test for existence so it will cause IO if
-     * the statement is already present in the database.
-     */
-    final public void addStatement(long s, long p, long o) {
-
-        getSPOIndex().insert(keyBuilder.statement2Key(s, p, o), null);
-
-        getPOSIndex().insert(keyBuilder.statement2Key(p, o, s), null);
-
-        getOSPIndex().insert(keyBuilder.statement2Key(o, s, p), null);
-
+        /*
+         * Note: This uses the batch API.
+         */
+        
+        StatementBuffer buffer = new StatementBuffer(this,3,false);
+        
+        buffer.add(s, p, o);
+        
+        buffer.flush();
+        
+//        // assume until disproven.
+//        boolean termsExist = true;
+//        
+//        long _s = getTermId(s);
+//        
+//        long _p = getTermId(p);
+//        
+//        long _o = getTermId(o);
+//        
+//        if( _s == NULL ) {
+//            
+//            _s = addTerm(s);
+//            
+//            termsExist = false;
+//            
+//        }
+//        
+//        if( _p == NULL ) {
+//            
+//            _p = addTerm(p);
+//            
+//            termsExist = false;
+//            
+//        }
+//        
+//        if( _o == NULL ) {
+//            
+//            _o = addTerm(o);
+//            
+//            termsExist = false;
+//            
+//        }
+//
+//        if (!termsExist || !containsStatement(_s, _p, _o)) {
+//
+//            addStatement(_s, _p, _o);
+//
+//        }
+        
     }
 
     /**
      * Return true if the statement exists in the store (non-batch API).
+     * <p>
+     * Note: This method does not verify whether or not the statement is
+     * explicit.
      * 
      * @param s
      *            The term identifier for the subject and not
@@ -912,6 +937,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     final public boolean containsStatement(Resource s, URI p, Value o) {
+
+        s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
+        p = (URI) OptimizedValueFactory.INSTANCE.toNativeValue(p);
+        o = OptimizedValueFactory.INSTANCE.toNativeValue(o);
 
         /*
          * Resolve each term to its term identifier.
@@ -952,6 +981,22 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     /**
      * @todo write tests.
+     * 
+     * FIXME Modify to return Iterator<SPO> to be consistent with
+     * {@link #getStatements(KeyOrder, byte[], byte[])}. Consider adding the
+     * rangeCount to an SPOIterator class and also adding an option to
+     * materialize either at construction or afterwards the statements such that
+     * the iterator encapsulates an SPO[] and wraps it using Arrays.toList().
+     * Also offer toArray() to materialize and return the backing array.
+     * 
+     * @todo accept an optional "pull limit" so that this can be used to easily
+     *       test for the existence of a triple pattern match. In order to be
+     *       useful for checking existance of a match, the "pull limit" would
+     *       have to pull that many non-delete entries when the index is
+     *       isolatable (that is how it would behave anyway, but that is also
+     *       why you can not just rangeCount an isolated index to decide whether
+     *       or not there is a match - deleted entries show up in the range
+     *       count).
      */
     final public IEntryIterator rangeQuery(long s, long p, long o) {
 
@@ -1150,7 +1195,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       simple rangeCount will only tell us the upper bound on the #of
      *       matching statements when using an {@link UnisolatedBTree}.
      * 
-     * FIXME Use the batch btree api.
+     * @todo Use the batch btree api?
      * 
      * @todo write tests.
      */
@@ -1195,15 +1240,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         // materialize the matching statements.
         final int nremoved;
         {
+
             IEntryIterator itr1 = rangeQuery(_s, _p, _o);
 
             int i = 0;
 
             while (itr1.hasNext()) {
 
-                itr1.next();
+                Object val = itr1.next();
 
-                stmts[i++] = new SPO(keyOrder, keyBuilder, itr1.getKey());
+                stmts[i++] = new SPO(keyOrder, keyBuilder, itr1.getKey(), val);
 
             }
 
@@ -1213,6 +1259,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         /*
          * Remove the statements from each of the access paths.
+         * 
+         * FIXME Make this operation can be concurrent against statement
+         * indices.
          */
         {
 
@@ -1275,7 +1324,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /*
-     * @todo move this serialization stuff into a utility class.
+     * @todo move this statement serialization stuff into a utility class.
      */
     
     // namespace to prefix.
@@ -1311,7 +1360,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         return (v instanceof URI ? abbrev((URI) v) : v.toString());
         
     }
-    private final String TERM_NOT_FOUND = "<NOT_FOUND>";
+//    private final String TERM_NOT_FOUND = "<NOT_FOUND>";
     
     /**
      * Substitutes in well know namespaces (rdf, rdfs, etc).
@@ -1350,13 +1399,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         while (itr.hasNext()) {
 
-            itr.next();
+            Object val = itr.next();
             
             i++;
             
-            SPO spo = new SPO(KeyOrder.SPO,keyBuilder,itr.getKey());
+            SPO spo = new SPO(KeyOrder.SPO,keyBuilder,itr.getKey(), val);
 
-            System.err.println("#" + i + "\t" + toString(spo.s, spo.p, spo.o));
+            System.err.println("#" + i + "\t" + spo.toString(this));
             
         }
         
@@ -1491,12 +1540,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public void usage() {
 
-        usage("termId", getTermIdIndex());
-        usage("idTerm", getIdTermIndex());
-        usage("spo", getSPOIndex());
-        usage("pos", getPOSIndex());
-        usage("osp", getOSPIndex());
-        
+        usage(name_termId, getTermIdIndex());
+        usage(name_idTerm, getIdTermIndex());
+        usage(name_spo, getSPOIndex());
+        usage(name_pos, getPOSIndex());
+        usage(name_osp, getOSPIndex());
+        usage(name_just, getJustificationIndex());
+         
     }
 
     /**
@@ -1544,16 +1594,32 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     
     /**
-     * FIXME rewrite to choose the index given the keyOrder.
-     * 
-     * @todo modify to return an Iterator<SPO>. When we can suck everything
+     * @todo Modify to return an Iterator<SPO>. When we can suck everything
      *       into RAM, then do so and wrap the SPO[] as a list. Otherwise, wrap
      *       the IEntryIterator as an Iterator<SPO>. This should give better
      *       scaling, but we will still need to do distributed joins.
+     *       <p>
+     *       Note: the closure operations basically assume that they can
+     *       traversal of the index with concurrent modification of the index.
+     *       This is NOT true of the underlying {@link BTree}. However, there
+     *       are several ways to accomplish this ranging from: (a) the data
+     *       service, which issues a series of range queries in order to
+     *       incrementally cover a range and which would support interleaving of
+     *       range query and update operations; (b) a specialization akin to
+     *       isolation in which writes are absorbed onto an isolated index while
+     *       reads traverse the primary index (or writes are absorbed onto the
+     *       live index while reads traverse a historical version, which does
+     *       not cause double buffering but means that your writes are not
+     *       visible to the reader until you commit); and (c) modifying the
+     *       {@link BTree} to support traversal with concurrent modification,
+     *       which could be as simple as restarting the iterator from the
+     *       successor of the last visited key if the tree has been modified.
      */
-    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
+    public SPO[] getStatements(KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
 
         final RdfKeyBuilder keyBuilder = getKeyBuilder();
+        
+        final IIndex ndx = getStatementIndex(keyOrder);
         
         final int n = ndx.rangeCount(fromKey, toKey);
 
@@ -1566,8 +1632,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         while (itr1.hasNext()) {
 
-            itr1.next();
-            ids[i++] = new SPO(keyOrder,keyBuilder,itr1.getKey());
+            Object val = itr1.next();
+            
+            ids[i++] = new SPO(keyOrder,keyBuilder,itr1.getKey(),val);
 
         }
 
@@ -1608,10 +1675,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @todo modify to return the #of new statements actually added to the
      *       database and then use that value, e.g., in
      *       {@link SPOBuffer#add(SPO)}.
-     * 
-     * @todo modify to accept a filter that can be used to ensure that things
-     *       such as (?x rdf:type rdfs:Resource) do not make it into the store
-     *       when they are {@link StatementEnum#Inferred}.
      */
     public void addStatements(SPO[] stmts, int numStmts, ISPOFilter filter ) {
      
@@ -1645,18 +1708,45 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             private final ISPOFilter filter;
             
             /*
-             * Private key builder for the SPO, POS, and OSP keys.
+             * Private key builder for the SPO, POS, or OSP keys (one instance
+             * per thread).
              */
             private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
             
             private final byte[][] keys;
+            
+//            private final byte[][] vals;
 
-            IndexWriter(SPO[] stmts, int numStmts, Comparator<SPO> comparator,
-                    IIndex ndx, KeyOrder keyOrder, ISPOFilter filter) {
+            /**
+             * 
+             * @param stmts
+             * @param numStmts
+             * @param clone
+             *            When true the statements are cloned. One of the
+             *            {@link IndexWriter}s gets to use the caller's array.
+             *            The others MUST be instructed to clone the caller's
+             *            array so that they can impose their distinct sort
+             *            orders.
+             * @param comparator
+             * @param ndx
+             * @param keyOrder
+             * @param filter
+             */
+            IndexWriter(SPO[] stmts, int numStmts, boolean clone,
+                    Comparator<SPO> comparator, IIndex ndx, KeyOrder keyOrder,
+                    ISPOFilter filter) {
                 
-                this.stmts = new SPO[numStmts];
+                if(clone) {
+
+                    this.stmts = new SPO[numStmts];
                 
-                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+                    System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+                    
+                } else {
+                    
+                    this.stmts = stmts;
+                    
+                }
 
                 this.numStmts = numStmts;
                 
@@ -1665,6 +1755,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 this.ndx = ndx;
                 
                 this.keys = new byte[numStmts][];
+
+//                this.vals = new byte[numStmts][];
                 
                 this.keyOrder = keyOrder;
             
@@ -1674,16 +1766,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             /**
              * 
-             * @todo this does not remove duplicate records. in a distribute
-             *       system it is definately worth the cost of compressing the
-             *       _Statement[] by copying down references over duplicate
-             *       records before submitting them to the remote data services.
-             *       Perhaps that can be done when we re-align the data to match
-             *       the API for the RPC?
-             *       <p>
-             *       Note: duplication must be judged in terms of s:p:o and the
-             *       {@link StatementEnum}.  When different values are present 
-             *       for the {@link StatementEnum}, the "max" should be used.
+             * Note: Changes here MUST also be made to the IndexWriter class for
+             * Sesame model Statements.
              */
             public Long call() throws Exception {
 
@@ -1704,32 +1788,40 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     long _begin = System.currentTimeMillis();
 
                     int numToAdd = 0;
+
+                    SPO last = null;
                     
                     for (int i = 0; i < numStmts; i++) {
 
                         final SPO stmt = stmts[i];
 
+                        // skip statements that match the filter.
                         if(filter!=null && filter.isMatch(stmt)) continue;
                         
-                        numToAdd++;
+                        // skip duplicate records.
+                        if(last!=null && last.equals(stmt)) continue;
                         
                         switch (keyOrder) {
                         case SPO:
-                            keys[i] = keyBuilder.statement2Key(stmt.s, stmt.p,
+                            keys[numToAdd] = keyBuilder.statement2Key(stmt.s, stmt.p,
                                     stmt.o);
                             break;
                         case OSP:
-                            keys[i] = keyBuilder.statement2Key(stmt.o, stmt.s,
+                            keys[numToAdd] = keyBuilder.statement2Key(stmt.o, stmt.s,
                                     stmt.p);
                             break;
                         case POS:
-                            keys[i] = keyBuilder.statement2Key(stmt.p, stmt.o,
+                            keys[numToAdd] = keyBuilder.statement2Key(stmt.p, stmt.o,
                                     stmt.s);
                             break;
                         default:
                             throw new UnsupportedOperationException();
                         }
-
+                        
+                        last = stmt;
+                        
+                        numToAdd++;
+                        
                     }
 
                     if(false) {
@@ -1746,13 +1838,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                          * which we write in the indices for the RDF(S)
                          * database.
                          * 
-                         * FIXME modify to write the StatementEnum flags.
+                         * FIXME modify to write the StatementEnum flags, which
+                         * need to be upgraded to the max of the old and new
+                         * values when the statement is pre-existing, e.g., a
+                         * custom batch operation.
+                         * 
+                         * FIXME Update removeStatement() which needs to
+                         * downgrade the StatementEnum flag, or perhaps just not
+                         * be used at all since TM is required if the statement
+                         * is Explicit.
                          */
                         
-                        BatchInsert op = new BatchInsert(numToAdd, keys,
-                                new byte[numToAdd][]);
-
-                        ndx.insert(op);
+//                        BatchInsert op = new BatchInsert(numToAdd, keys, vals);
+//
+//                        ndx.insert(op);
                     
                     } else {
 
@@ -1764,10 +1863,38 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         
                         for ( int i = 0; i < numToAdd; i++ ) {
 
-                            if (!ndx.contains(keys[i])) {
-                             
-                                ndx.insert(keys[i], null);
+                            byte[] oldval = (byte[]) ndx.lookup(keys[i]);
+
+                            if (oldval == null) {
                                 
+                                // Statement is NOT pre-existing.
+                                
+                                ndx.insert(keys[i], stmts[i].type.serialize());
+                                
+                            } else {
+                             
+                                // old statement type.
+                                StatementEnum oldType = StatementEnum
+                                        .deserialize(oldval);
+
+                                // proposed statement type.
+                                StatementEnum newType = stmts[i].type;
+
+                                // choose the max of the old and the proposed.
+                                StatementEnum maxType = StatementEnum.max(oldType,
+                                        newType);
+                                
+                                if (oldType != maxType) {
+                                    
+                                    /*
+                                     * write on the index iff the type was
+                                     * actually changed.
+                                     */
+
+                                    ndx.insert(keys[i], maxType.serialize());
+
+                                }
+
                             }
                             
                         }
@@ -1788,15 +1915,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
         
-        tasks.add(new IndexWriter(stmts, numStmts,
+        /*
+         * @todo figure out which index is the most expensive and have it use
+         * the original data without cloning.
+         */
+        
+        tasks.add(new IndexWriter(stmts, numStmts,true/*clone*/,
                 com.bigdata.rdf.spo.SPOComparator.INSTANCE, getSPOIndex(),
                 KeyOrder.SPO, filter));
         
-        tasks.add(new IndexWriter(stmts, numStmts,
+        tasks.add(new IndexWriter(stmts, numStmts,true/*clone*/,
                 com.bigdata.rdf.spo.POSComparator.INSTANCE, getPOSIndex(),
                 KeyOrder.POS, filter));
 
-        tasks.add(new IndexWriter(stmts, numStmts,
+        tasks.add(new IndexWriter(stmts, numStmts,true/*clone*/,
                 com.bigdata.rdf.spo.OSPComparator.INSTANCE, getOSPIndex(),
                 KeyOrder.OSP, filter));
 
@@ -1833,50 +1965,107 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    public void addStatements_singleThreaded(SPO[] stmts, int n, ISPOFilter filter ) {
+//    public void addStatements_singleThreaded(SPO[] stmts, int n, ISPOFilter filter ) {
+//        
+//        // deal with the SPO index
+//        IIndex spo = getSPOIndex();
+//        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.SPOComparator.INSTANCE);
+//        for ( int i = 0; i < n; i++ ) {
+//            SPO stmt = stmts[i];
+//            if(filter!=null && filter.isMatch(stmt)) continue;
+//            byte[] key = keyBuilder.statement2Key
+//                ( stmt.s, stmt.p, stmt.o
+//                  );
+//            if ( !spo.contains(key) ) {
+//                spo.insert(key, null);
+//            }
+//        }
+//
+//        // deal with the POS index
+//        IIndex pos = getPOSIndex();
+//        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.POSComparator.INSTANCE);
+//        for ( int i = 0; i < n; i++ ) {
+//            SPO stmt = stmts[i];
+//            if(filter!=null && filter.isMatch(stmt)) continue;
+//            byte[] key = keyBuilder.statement2Key
+//                ( stmt.p, stmt.o, stmt.s
+//                  );
+//            if ( !pos.contains(key) ) {
+//                pos.insert(key, null);
+//            }
+//        }
+//
+//        // deal with the OSP index
+//        IIndex osp = getOSPIndex();
+//        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.OSPComparator.INSTANCE);
+//        for ( int i = 0; i < n; i++ ) {
+//            SPO stmt = stmts[i];
+//            if(filter!=null && filter.isMatch(stmt)) continue;
+//            byte[] key = keyBuilder.statement2Key
+//                ( stmt.o, stmt.s, stmt.p
+//                  );
+//            if ( !osp.contains(key) ) {
+//                osp.insert(key, null);
+//            }
+//        }
+//        
+//    }
+    
+    /**
+     * Adds justifications to the store.
+     * 
+     * @param a
+     *            The justifications.
+     * @param n
+     *            The #of elements in the array that are valid.
+     * 
+     * FIXME Should {@link #removeStatements(long, long, long)} also remove the
+     * justifications for those statements or does the TM stategy invoke
+     * {@link #removeStatements(long, long, long)} IFF the statements are no
+     * longer justified?
+     */
+    public void addJustifications(Justification[] a, int n) {
         
-        // deal with the SPO index
-        IIndex spo = getSPOIndex();
-        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.SPOComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            SPO stmt = stmts[i];
-            if(filter!=null && filter.isMatch(stmt)) continue;
-            byte[] key = keyBuilder.statement2Key
-                ( stmt.s, stmt.p, stmt.o
-                  );
-            if ( !spo.contains(key) ) {
-                spo.insert(key, null);
-            }
-        }
+        if (n == 0)
+            return;
 
-        // deal with the POS index
-        IIndex pos = getPOSIndex();
-        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.POSComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            SPO stmt = stmts[i];
-            if(filter!=null && filter.isMatch(stmt)) continue;
-            byte[] key = keyBuilder.statement2Key
-                ( stmt.p, stmt.o, stmt.s
-                  );
-            if ( !pos.contains(key) ) {
-                pos.insert(key, null);
-            }
-        }
+        final long begin = System.currentTimeMillis();
+        
+        IIndex ndx = getJustificationIndex();
 
-        // deal with the OSP index
-        IIndex osp = getOSPIndex();
-        Arrays.sort(stmts,0,n,com.bigdata.rdf.spo.OSPComparator.INSTANCE);
-        for ( int i = 0; i < n; i++ ) {
-            SPO stmt = stmts[i];
-            if(filter!=null && filter.isMatch(stmt)) continue;
-            byte[] key = keyBuilder.statement2Key
-                ( stmt.o, stmt.s, stmt.p
-                  );
-            if ( !osp.contains(key) ) {
-                osp.insert(key, null);
+        Arrays.sort(a, 0, n);
+        
+        /*
+         * Note: This capacity estimate is based on 3 longs per SPO, one head,
+         * and 2-3 SPOs in the tail. The capacity will be extended automatically
+         * if necessary.
+         */
+        
+        KeyBuilder keyBuilder = new KeyBuilder(3 * (1 + 3) * Bytes.SIZEOF_LONG);
+        
+        for (int i = 0; i < n; i++) {
+
+            Justification jst = a[i];
+            
+            byte[] key = jst.getKey(keyBuilder);
+            
+            if (!ndx.contains(key)) {
+                
+                ndx.insert(key, null);
+                
             }
+            
         }
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Wrote "+n+" justifications in "+elapsed+" ms");
         
     }
+
+    /**
+     * The optional index on which {@link Justification}s are stored.
+     */
+    abstract public IIndex getJustificationIndex();
     
 }

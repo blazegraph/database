@@ -67,24 +67,41 @@ public class SPO {
     public final long o;
     public final StatementEnum type;
     
+//    /**
+//     * Construct a triple from term identifiers.
+//     * 
+//     * @param s
+//     * @param p
+//     * @param o
+//     * 
+//     * FIXME review all use of this constructor since it generates an explicit
+//     * statement.
+//     */
+//    public SPO(long s, long p, long o) {
+//        this(s, p, o, StatementEnum.Explicit);
+//    }
+
     /**
-     * Construct a triple from term identifiers.
+     * Construct a statement.
+     * <p>
+     * Note: When the statement is {@link StatementEnum#Inferred} you MUST also
+     * construct the appropriate {@link Justification}.
      * 
      * @param s
      * @param p
      * @param o
-     * 
-     * FIXME review all use of this constructor since it generates an explicit
-     * statement.
+     * @param type
+     *            The statement type.
      */
-    public SPO(long s, long p, long o) {
+    public SPO(long s, long p, long o, StatementEnum type) {
+        assert type != null;
         this.code = RdfKeyBuilder.CODE_STMT;
         this.s = s;
         this.p = p;
         this.o = o;
-        this.type = StatementEnum.Explicit;
+        this.type = type;
     }
-    
+
     /**
      * Construct a triple from the sort key.
      * 
@@ -96,18 +113,19 @@ public class SPO {
      *            Used to decode the key.
      * 
      * @param key
-     *            The key.
+     *            The key from the index entry.
+     * 
+     * @param val
+     *            The value from the index entry.
      * 
      * @see RdfKeyBuilder#key2Statement(byte[], long[])
-     * 
-     * FIXME Review all use of this constructor since it does not take the value
-     * for the key into account and assumes that statements are
-     * {@link StatementEnum#Explicit}.  Consider making the {@link StatementEnum} 
-     * the last byte of the key so that we do not have any values associated with
-     * the index, but note that this complicates index management if we want to
-     * keep only the distinct stmts.
      */
-    public SPO(KeyOrder keyOrder, RdfKeyBuilder keyBuilder, byte[] key) {
+    public SPO(KeyOrder keyOrder, RdfKeyBuilder keyBuilder, byte[] key, Object val) {
+        
+        assert keyOrder != null;
+        assert keyBuilder != null;
+        assert key != null;
+        assert val != null;
         
         long[] ids = new long[3];
         
@@ -140,17 +158,17 @@ public class SPO {
 
         }
 
-        type = StatementEnum.Explicit;
+        type = StatementEnum.deserialize((byte[])val); 
         
     }
 
-    /**
-     * The #of times this SPO is encountered in an {@link SPOBuffer}.
-     * 
-     * @todo drop this field if making {@link SPO}s distinct in the
-     *       {@link SPOBuffer} does not prove cost effective.
-     */
-    int count = 0;
+//    /**
+//     * The #of times this SPO is encountered in an {@link SPOBuffer}.
+//     * 
+//     * @todo drop this field if making {@link SPO}s distinct in the
+//     *       {@link SPOBuffer} does not prove cost effective.
+//     */
+//    int count = 0;
     
 //    private int hashCode = 0;
 //    
@@ -159,6 +177,8 @@ public class SPO {
 //     *       the individual components of the triple (each component uses the
 //     *       same hash code algorithm as {@link Long#hashCode()}).
 //     */
+    
+//    Note: No very good - distinct based on hash is slower (2x).
 //    public int hashCode() {
 //        
 //        if(hashCode==0) {
@@ -171,18 +191,25 @@ public class SPO {
 //        return hashCode;
 //        
 //    }
+
+    // Note: No good - distinct based on hash is slower (>2x).
+//    public int hashCode() {
+//        if(hashCode==0) {
+//        hashCode = 
+//            (int) ( ((s ^ (s >>> 32)) & 0xFF0000)
+//                  | ((p ^ (p >>> 32)) & 0xFF0000)
+//                  | ((o ^ (o >>> 32)) & 0xFF0000)
+//                  )
+//            ;
+//        }
+//        return hashCode;
+//    }
     
     /**
      * Imposes s:p:o ordering based on termIds.
-     * 
-     * @todo This does not differentiate between statements with the different
-     *       {@link StatementEnum} values. Should it? I think that the indices,
-     *       etc. should always ensure that the statements are distinct based on
-     *       the key so there should never be duplicates to be concerned about.
-     *       <p>
-     *       The {@link SPOBuffer}) DOES/CAN allow duplicates in, so there we
-     *       have to be careful an ensure that we always accept the statement
-     *       types in the following priority: Axiom > Explicit > Inferred.
+     * <p>
+     * Note: By design, this does NOT differentiate between statements with the
+     * different {@link StatementEnum} values.
      */
     public int compareTo(Object other) {
 
@@ -227,17 +254,22 @@ public class SPO {
     }
     
     /**
-     * True iff the statements are the same object or if they have the code and
-     * the same same term identifiers assigned for the subject, predicate and
-     * object positions.
+     * True iff the statements are the same object or if they have the code, the
+     * same term identifiers assigned for the subject, predicate and object
+     * positions, and either the same {@link StatementEnum} or <code>null</code>
+     * for the {@link StatementEnum}.
      */
     public boolean equals(SPO stmt2) {
 
         if (stmt2 == this)
             return true;
 
-        return this.code == stmt2.code && this.s == stmt2.s
-                && this.p == stmt2.p && this.o == stmt2.o;
+        return this.code == stmt2.code && //
+                this.s == stmt2.s && //
+                this.p == stmt2.p && //
+                this.o == stmt2.o && //
+                this.type == stmt2.type
+                ;
 
     }
 
@@ -249,7 +281,7 @@ public class SPO {
      */
     public String toString() {
         
-        return (""+s+","+p+","+o);
+        return (""+s+","+p+","+o)+(type==null?"":" : "+type);
         
     }
 
@@ -264,7 +296,7 @@ public class SPO {
      */
     public String toString(ITripleStore store) {
         
-        return store.toString(s,p,o);
+        return store.toString(s,p,o)+(type==null?"":" : "+type);
         
     }
     

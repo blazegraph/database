@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDF;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for {@link RuleRdf01}.
@@ -83,6 +84,10 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
      */
     public void test_rdf01() {
         
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
+        
         URI A = new _URI("http://www.foo.org/A");
         URI B = new _URI("http://www.foo.org/B");
         URI C = new _URI("http://www.foo.org/C");
@@ -95,13 +100,15 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(A, B, C));
         assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
 
-        applyRule(inferenceEngine.rdf1, 1/* numComputed */, 1/* numCopied */);
+        applyRule(inf.rdf1, 1/* numComputed */);
         
         /*
          * validate the state of the primary store.
          */
         assertTrue(store.containsStatement(A, B, C));
         assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
+        
+        store.closeAndDelete();
         
     }
 
@@ -110,6 +117,10 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
      * the distinct predicates (distinct key prefix scan).
      */
     public void test_rdf01_distinctPrefixScan() {
+        
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
         
         URI A = new _URI("http://www.foo.org/A");
         URI B = new _URI("http://www.foo.org/B");
@@ -136,7 +147,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
         assertFalse(store.containsStatement(E, rdfType, rdfProperty ));
 
-        applyRule(inferenceEngine.rdf1, 2/* numComputed */, 2/* numCopied */);
+        applyRule(inf.rdf1, 2/* numComputed */);
         
         /*
          * validate the state of the primary store.
@@ -146,7 +157,9 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(A, E, C));
         assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
         assertTrue(store.containsStatement(E, rdfType, rdfProperty ));
-     
+
+        store.closeAndDelete();
+        
     }
     
 }

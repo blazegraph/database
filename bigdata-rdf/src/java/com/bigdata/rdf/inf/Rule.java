@@ -92,7 +92,22 @@ abstract public class Rule {
      * is empty.
      */
     final protected Pred[] body;
+    
+    /**
+     * The #of terms in the tail of the rule.
+     */
+    public int getTailCount() {
+        
+        return body.length;
+        
+    }
 
+    /**
+     * When true the rule must justify the entailments to
+     * {@link SPOBuffer#add(com.bigdata.rdf.spo.SPO, com.bigdata.rdf.spo.Justification)}
+     */
+    final protected boolean justify;
+    
     /**
      * The 64-bit long integer that represents an unassigned term identifier
      * 
@@ -114,6 +129,8 @@ abstract public class Rule {
         this.head = head;
 
         this.body = body;
+        
+        this.justify = inf.isJustified();
 
     }
     

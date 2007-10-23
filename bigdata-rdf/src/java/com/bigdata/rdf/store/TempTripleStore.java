@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -58,6 +57,7 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.spo.JustificationSerializer;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -80,6 +80,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     private final BTree ndx_pos;
     private final BTree ndx_osp;
 
+    private final BTree ndx_just;
+    
     final private TemporaryStore store;
 
     final public IIndex getSPOIndex() {
@@ -112,6 +114,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
 
+    final public IIndex getJustificationIndex() {
+        
+        return ndx_just;
+        
+    }
+    
     /**
      * NOP.
      */
@@ -133,6 +141,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         ndx_spo.removeAll();
         ndx_pos.removeAll();
         ndx_osp.removeAll();
+        
+        ndx_just.removeAll();
         
     }
     
@@ -184,6 +194,10 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
+        ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
+                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                                    JustificationSerializer.INSTANCE));
+
     }
 
 }

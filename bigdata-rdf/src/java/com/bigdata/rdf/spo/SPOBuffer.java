@@ -47,16 +47,25 @@ Modifications:
 
 package com.bigdata.rdf.spo;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.rio.Buffer;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A buffer for {@link SPO}s that are flushed on overflow into a backing
@@ -87,9 +96,19 @@ public class SPOBuffer {
     final private SPO[] stmts;
     
     /**
-     * The #of statements currently in the buffer.
+     * The array in which the optional {@link Justification}s are stored.
+     */
+    final private Justification[] justifications;
+    
+    /**
+     * The #of statements currently in {@link #stmts}
      */
     private int numStmts;
+
+    /**
+     * The #of justifications currently in {@link #justifications}
+     */
+    private int numJustifications;
 
     /**
      * The #of statements currently in the buffer (if duplicates are not being
@@ -98,6 +117,15 @@ public class SPOBuffer {
     public int size() {
         
         return numStmts;
+        
+    }
+
+    /**
+     * The #of justifications currently in the buffer.
+     */
+    public int getJustificationCount() {
+        
+        return numJustifications;
         
     }
     
@@ -117,8 +145,11 @@ public class SPOBuffer {
      */
     public SPO get(int i) {
         
-        if (i > numStmts)
+        if (i > numStmts) {
+
             throw new IndexOutOfBoundsException();
+            
+        }
         
         return stmts[i];
         
@@ -152,7 +183,7 @@ public class SPOBuffer {
     protected final ISPOFilter filter;
     
     /**
-     * The buffer capacity -or- <code>-1</code> if the {@link Buffer} object
+     * The buffer capacity -or- <code>-1</code> if the {@link StatementBuffer} object
      * is signaling that no more buffers will be placed onto the queue by the
      * producer and that the consumer should therefore terminate.
      */
@@ -164,23 +195,29 @@ public class SPOBuffer {
     protected final boolean distinct;
     
     /**
-     * Create a buffer.
-     * 
-     * @param store
-     *            The database into which the terms and statements will be
-     *            inserted.
-     * @param capacity
-     *            The maximum #of Statements, URIs, Literals, or BNodes that the
-     *            buffer can hold.
-     * @param distinct
-     *            When true only distinct terms and statements are stored in the
-     *            buffer.
+     * true iff the Truth Maintenance strategy requires that we store
+     * {@link Justification}s for entailments.
      */
-    public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
-     
-        this(store,null,capacity,distinct);
-        
-    }
+    protected final boolean justified;
+    
+//    /**
+//     * Create a buffer.
+//     * 
+//     * @param store
+//     *            The database into which the terms and statements will be
+//     *            inserted.
+//     * @param capacity
+//     *            The maximum #of Statements, URIs, Literals, or BNodes that the
+//     *            buffer can hold.
+//     * @param distinct
+//     *            When true only distinct terms and statements are stored in the
+//     *            buffer.
+//     */
+//    public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
+//     
+//        this(store,null,capacity,distinct);
+//        
+//    }
 
     /**
      * Create a buffer.
@@ -198,9 +235,13 @@ public class SPOBuffer {
      * @param distinct
      *            When true only distinct terms and statements are stored in the
      *            buffer.
+     * @param justified
+     *            true iff the Truth Maintenance strategy requires that we store
+     *            {@link Justification}s for entailments.
      */
-    public SPOBuffer(AbstractTripleStore store, ISPOFilter filter, int capacity, boolean distinct) {
-    
+    public SPOBuffer(AbstractTripleStore store, ISPOFilter filter,
+            int capacity, boolean distinct, boolean justified) {
+
         assert store != null;
         assert capacity > 0;
         
@@ -212,8 +253,12 @@ public class SPOBuffer {
 
         this.distinct = distinct;
 
+        this.justified = justified;
+        
         stmts = new SPO[capacity];
 
+        justifications = justified ? new Justification[capacity] : null;
+        
         if (distinct) {
 
             distinctStmtMap = new HashMap<SPO, SPO>(capacity);
@@ -227,7 +272,7 @@ public class SPOBuffer {
     }
         
     /**
-     * Returns true there are no slots remaining in the statements array. Under
+     * Returns true iff there is no more space remaining in the buffer. Under
      * those conditions adding another statement to the buffer could cause an
      * overflow.
      * 
@@ -235,70 +280,149 @@ public class SPOBuffer {
      *         added.
      */
     final private boolean nearCapacity() {
-                
-        if (numStmts + 1 > capacity)
+        
+        if (numStmts + 1 > capacity) {
+
+            // would overflow the statement[].
+            
             return true;
+            
+        }
+        
+        if (numJustifications + 1 > capacity) {
+
+            // would overflow the justification[].
+            
+            return true;
+            
+        }
         
         return false;
         
     }
-    
+     
     /**
      * Uniquify a statement.
+     * <p>
+     * Note: this will treat statements that are inferred vs explicit vs axioms
+     * as distinct since {@link SPO#equals(SPO)} recognizes the
+     * {@link StatementEnum} as a distinction. However, the {@link SPOBuffer} is
+     * generally used to buffer either explicit statements or entailments but
+     * not both at once.
+     * <p>
+     * Note: If we are storing justifications, then we want to store all
+     * justifications so we CAN NOT make them unique. There for uniqueness is
+     * defined solely in terms of the {@link SPO} and we ALWAYS store the
+     * justification. This means that we will flush the buffer as soon as either
+     * array is at capacity.
      * 
      * @param stmt
      * 
-     * @return Either the statement or the pre-existing statement in the buffer
-     *         with the same data.
+     * @return Either the given statement or the pre-existing statement with the
+     *         same data.
      */
     protected SPO getDistinctStatement(SPO stmt) {
 
         assert distinct == true;
-        
+
         SPO existingStmt = distinctStmtMap.get(stmt);
-        
+
         if (existingStmt != null) {
-            
+
             // return the pre-existing statement.
-            
+
             return existingStmt;
-            
+
         } else {
 
             // put the new statement in the map.
-            
-            if (distinctStmtMap.put(stmt, stmt) != null) {
-                
+
+            if (distinctStmtMap.put(stmt,stmt) != null) {
+
                 throw new AssertionError();
-                
+
             }
 
             // return the new statement.
             return stmt;
-            
+
         }
-        
+
     }
     
+    /**
+     * A service used to write statements and justifications at the same time.
+     */
+    private ExecutorService indexWriteService = Executors.newFixedThreadPool(2,
+            DaemonThreadFactory.defaultThreadFactory());
+
     /**
      * Flush any buffer statements to the backing store.
      */
     public void flush() {
 
-        if (numStmts > 0) {
+        if (numStmts > 0 || numJustifications > 0) {
 
-            log.info("numStmts=" + numStmts);
+            log.info("numStmts=" + numStmts+", numJustifications="+numJustifications);
 
-            /*
-             * batch insert statements into the store.
-             */
-            store.addStatements(stmts, numStmts);
+            final long begin = System.currentTimeMillis();
+            
+            if (numJustifications == 0) {
+                
+                // batch insert statements into the store.
+                store.addStatements(stmts, numStmts);
 
+            } else {
+                
+                /*
+                 * Use a thread pool to write out the statement and the
+                 * justifications concurrently. This drammatically reduces the
+                 * latency when also writing justifications.
+                 */
+
+                List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
+                
+                /*
+                 * Note: we reject using the filter before stmts or
+                 * justifications make it into the buffer so we do not need to
+                 * apply the filter again here.
+                 */
+                
+                tasks.add(new StatementWriter());
+                
+                tasks.add(new JustificationWriter());
+                
+                final List<Future<Long>> futures;
+                final long elapsed_SPO;
+                final long elapsed_JST;
+                
+                try {
+
+                    futures = indexWriteService.invokeAll( tasks );
+
+                    elapsed_SPO = futures.get(0).get();
+                    elapsed_JST = futures.get(1).get();
+
+                } catch(InterruptedException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                } catch(ExecutionException ex) {
+                
+                    throw new RuntimeException(ex);
+                
+                }
+
+                System.err.print(" stmts="+elapsed_SPO+"ms");
+                System.err.print(" justs="+elapsed_JST+"ms");
+                
+            }
+            
             /*
              * reset the buffer.
              */
 
-            numStmts = 0;
+            numStmts = numJustifications = 0;
 
             if (distinctStmtMap != null) {
 
@@ -306,25 +430,74 @@ public class SPOBuffer {
 
             }
 
+            long elapsed = System.currentTimeMillis() - begin;
+
+            System.err.println(" elapsed=" + elapsed + "ms");
+
         }
 
     }
     
+    private class StatementWriter implements Callable<Long>{
+
+        public Long call() throws Exception {
+            
+            final long begin = System.currentTimeMillis();
+            
+            store.addStatements(stmts, numStmts);
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            return elapsed;
+
+        }
+        
+    }
+    
+    private class JustificationWriter implements Callable<Long>{
+
+        public Long call() throws Exception {
+            
+            final long begin = System.currentTimeMillis();
+            
+            store.addJustifications(justifications, numJustifications);
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            return elapsed;
+
+        }
+        
+    }
+    
     /**
-     * Adds the statement into the buffer. When the buffer is
-     * {@link #nearCapacity()} the statements in the buffer will be flushed into
-     * the backing store.
+     * Adds an entailment together with its bindings.
+     * <p>
+     * When the buffer is {@link #nearCapacity()} the statements in the buffer
+     * will be flushed into the backing store.
      * 
      * @param stmt
-     *            The statement.
+     *            The entailment.
+     * @param justification
+     *            The justification for that entailment (optional, depending on
+     *            the TM strategy).
      * 
      * @see #nearCapacity()
+     * @see #flush()
      */
-    public void add( SPO stmt ) {
-
-        if(filter!=null && filter.isMatch(stmt)) {
+    public void add( SPO stmt, Justification justification ) {
         
-            // Do not store statements matched by the filter.
+        assert stmt != null;
+        
+        assert !justified || justification != null;
+        
+        if (filter != null && filter.isMatch(stmt)) {
+            
+            /*
+             * Note: Do not store statements (or justifications) matched by the
+             * filter.
+             */
+
             return;
             
         }
@@ -337,20 +510,26 @@ public class SPOBuffer {
         
         if(distinct) {
 
-            SPO tmp = getDistinctStatement(stmt);
+            stmts[numStmts++] = getDistinctStatement(stmt);
 
-            if(tmp.count++ == 0){
-           
-                stmts[numStmts++] = tmp;
+            if(justified) {
 
+                justifications[numJustifications++] = justification;
+                    
             }
           
         } else {
 
             stmts[numStmts++] = stmt;
 
+            if(justified) { 
+                
+                justifications[numJustifications++] = justification;
+                
+            }
+                
         }
-
+        
         if (DEBUG) {
             
             /*
@@ -361,20 +540,24 @@ public class SPOBuffer {
             log.debug("add " + stmt.toString(store));
         
         }
-
+        
     }
-
+    
     /**
      * Dumps the state of the buffer on {@link System#err}.
      * 
      * @param store
      *            The terms in the statements are resolved against this store.
+     * 
+     * @todo also dump the justifications.
      */
     public void dump(ITripleStore store) {
         
         System.err.println("capacity="+capacity);
         
         System.err.println("numStmts="+numStmts);
+
+        System.err.println("numJusts="+numJustifications);
         
         if(distinct) {
             

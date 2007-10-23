@@ -41,34 +41,40 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
+import java.io.DataInput;
+import java.io.IOException;
+
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
- * rdfs7:
- * <pre>
- *       triple(?u,?b,?y) :-
- *          triple(?a,rdfs:subPropertyOf,?b),
- *          triple(?u,?a,?y).
- * </pre>
+ * Note: No data is associated with the keys in the justifications index.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
+public class JustificationSerializer implements IValueSerializer {
 
-    public RuleRdfs07( InferenceEngine inf, Var a, Var b, Var u, Var y ) {
+    private static final long serialVersionUID = -2174985132435709536L;
 
-        super(inf, new Triple(u, b, y),
-                new Pred[] {
-                new Triple(a, inf.rdfsSubPropertyOf, b),
-                new Triple(u, a, y)
-                });
+    public static transient final IValueSerializer INSTANCE = new JustificationSerializer();
 
+    public JustificationSerializer() {
     }
-    
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
 
-        return new SPO( stmt2.s, stmt1.o, stmt2.o, StatementEnum.Inferred );
+    public void getValues(DataInput is, Object[] values, int n)
+            throws IOException {
+        
+    }
+
+    /**
+     * This serializer just casts the Object[] to a byte[][] on serialization
+     * and writes out those bytes.
+     */
+    public void putValues(DataOutputBuffer os, Object[] values, int n)
+            throws IOException {
         
     }
 

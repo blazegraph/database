@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.rio;
 
+import java.beans.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,6 +59,8 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.NoSuccessorException;
+import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -67,6 +70,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -77,12 +81,13 @@ import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * A buffer for absorbing the output of the RIO parser.
+ * A write buffer for absorbing the output of the RIO parser or other
+ * {@link Statement} source.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Buffer {
+public class StatementBuffer {
 
     final _URI[] uris;
     final _Literal[] literals;
@@ -106,7 +111,7 @@ public class Buffer {
     protected final ITripleStore store;
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
      * object is signaling that no more buffers will be placed onto the
      * queue by the producer and that the consumer should therefore
      * terminate.
@@ -123,6 +128,15 @@ public class Buffer {
     boolean sorted = false;
     
     /**
+     * The #of buffered statements.
+     */
+    public int size() {
+        
+        return numStmts;
+        
+    }
+    
+    /**
      * Create a buffer.
      * 
      * @param store
@@ -130,13 +144,20 @@ public class Buffer {
      *            inserted.
      * @param capacity
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
-     *            buffer can hold.
+     *            buffer can hold. The minimum capacity is three (3) since that
+     *            corresponds to a single triple where all terms are URIs.
      * @param distinct
      *            When true only distinct terms and statements are stored in the
      *            buffer.
      */
-    public Buffer(ITripleStore store, int capacity, boolean distinct) {
+    public StatementBuffer(ITripleStore store, int capacity, boolean distinct) {
     
+        if (store == null)
+            throw new IllegalArgumentException();
+
+        if(capacity<3)
+            throw new IllegalArgumentException();
+        
         this.store = store;
         
         this.capacity = capacity;
@@ -186,6 +207,31 @@ public class Buffer {
             
         }
         
+    }
+    
+    /**
+     * Resets the state of the buffer (any pending writes are discarded).
+     */
+    public void clear() {
+        
+        numURIs = numLiterals = numBNodes = numStmts = 0;
+        
+        if(distinctTermMap!=null) {
+            
+            distinctTermMap.clear();
+            
+        }
+        
+        if(distinctStmtMap!=null) {
+            
+            distinctStmtMap.clear();
+            
+        }
+    
+        haveKeys = false;
+        
+        sorted = false;
+
     }
     
     /**
@@ -285,11 +331,16 @@ public class Buffer {
     /**
      * Batch insert buffered data (terms and statements) into the store.
      */
-    public void insert() {
+    public void flush() {
 
         /*
-         * insert terms.
+         * insert terms (batch operation).
+         * 
+         * @todo combine the various term[]s into a single buffer dimensioned to
+         * 3x the size of the statement buffer and update the javadoc on the
+         * ctor.
          */
+        
         store.insertTerms(uris, numURIs, haveKeys, sorted);
 
         store.insertTerms(literals, numLiterals, haveKeys, sorted);
@@ -297,9 +348,16 @@ public class Buffer {
         store.insertTerms(bnodes, numBNodes, haveKeys, sorted);
 
         /*
-         * insert statements.
+         * insert statements (batch operation).
          */
+        
         store.addStatements(stmts, numStmts);
+        
+        /* 
+         * reset the state of the buffer.
+         */
+
+        clear();
 
     }
         
@@ -403,28 +461,24 @@ public class Buffer {
     }
     
     /**
-     * Adds the values and the statement into the bufferQueue.
-     * <p>
-     * Note: the RIO parser can report the same value on multiple invocations of
-     * this handler method. I suspect that this issue goes back to the syntax of
-     * RDF/XML which allows on to make multiple statements about the same
-     * subject without repeating the lexical item for the subject. In a similar
-     * fashion, some of the other RDF interchange languages may permit one to
-     * make multiple statements about the same subject and predicate (I believe
-     * that N3 does this). This is an issue for how we filter the parsed values
-     * for duplicates.
+     * Adds the values and the statement into the buffer.
      * 
      * @param s
      * @param p
      * @param o
+     * @param type
      * 
      * @exception IndexOutOfBoundsException
      *                if the bufferQueue overflows.
      * 
      * @see #nearCapacity()
      */
-    public void handleStatement( Resource s, URI p, Value o ) {
+    public void handleStatement( Resource s, URI p, Value o, StatementEnum type ) {
 
+        s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
+        p = (URI)      OptimizedValueFactory.INSTANCE.toNativeValue(p);
+        o =            OptimizedValueFactory.INSTANCE.toNativeValue(o);
+        
         boolean duplicateS = false;
         boolean duplicateP = false;
         boolean duplicateO = false;
@@ -494,7 +548,8 @@ public class Buffer {
             
         }
 
-        _Statement stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o);
+        _Statement stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o,
+                type);
         
         if(distinct) {
 
@@ -525,6 +580,44 @@ public class Buffer {
         }
 
     }
+
+    /**
+     * Add an "explicit" statement to the buffer (flushes on overflow).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     */
+    public void add(Resource s, URI p, Value o) {
+        
+        add(s, p, o, StatementEnum.Explicit);
+        
+    }
+    
+    /**
+     * Add a statement to the buffer (flushes on overflow).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param type
+     */
+    public void add(Resource s, URI p, Value o, StatementEnum type) {
+        
+        if (nearCapacity()) {
+
+            // bulk insert the buffered data into the store.
+            flush();
+
+            // clear the buffer.
+            clear();
+            
+        }
+        
+        // add to the buffer.
+        handleStatement(s, p, o, type);
+
+    }
     
     /**
      * Visits URIs, Literals, and BNodes marked as {@link _Value#known unknown}
@@ -535,7 +628,7 @@ public class Buffer {
         private final IStriterator src;
         private _Value current = null;
         
-        public UnknownTermIterator(Buffer buffer) {
+        public UnknownTermIterator(StatementBuffer buffer) {
 
             src = new Striterator(new TermIterator(buffer)).addFilter(new Filter(){
 
@@ -601,7 +694,7 @@ public class Buffer {
         
         private _Value current = null;
 
-        public TermIterator(Buffer buffer) {
+        public TermIterator(StatementBuffer buffer) {
             
             src = new Striterator(EmptyIterator.DEFAULT)
                 .append(new TermClassIterator(buffer.uris, buffer.numURIs))
@@ -665,7 +758,7 @@ public class Buffer {
         private int nvisited = 0;
         private _Value current = null;
 
-        public TermIdIterator(Buffer buffer) {
+        public TermIdIterator(StatementBuffer buffer) {
             
             src = new Striterator(EmptyIterator.DEFAULT)
                 .append(new TermClassIterator(buffer.uris, buffer.numURIs))
@@ -819,7 +912,7 @@ public class Buffer {
         private int lastVisited = -1;
         private int index = 0;
 
-        public StatementIterator(KeyOrder keyOrder,Buffer buffer) {
+        public StatementIterator(KeyOrder keyOrder,StatementBuffer buffer) {
             
             this(keyOrder, buffer.store.getKeyBuilder(), buffer.stmts,
                     buffer.numStmts);
@@ -914,7 +1007,7 @@ public class Buffer {
         private final IStriterator src;
         private _Statement current;
         
-        public UnknownStatementIterator(KeyOrder keyOrder, Buffer buffer) {
+        public UnknownStatementIterator(KeyOrder keyOrder, StatementBuffer buffer) {
         
             this.keyOrder = keyOrder;
             

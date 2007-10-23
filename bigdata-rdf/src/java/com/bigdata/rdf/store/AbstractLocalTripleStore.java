@@ -63,6 +63,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
+import com.bigdata.service.ClientIndexView;
 
 /**
  * Abstract base class for both transient and persistent {@link ITripleStore}
@@ -322,8 +323,23 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
     }
 
     /**
-     * FIXME There is a bug when there are duplicates in [terms] that results in
-     * term identifiers not being assigned to all terms.
+     * FIXME I occasionally see a bug that results in term identifiers not being
+     * assigned to all terms.
+     * 
+     * @todo This could use two threads to write on the indices if we divide the
+     *       work into batches. The first thread would write on the term:id
+     *       index, placing a batch on a queue every N terms. The second thread
+     *       would read batches from the queue, re-order them for the id:term
+     *       index, and then write on the id:term index.
+     *       <p>
+     *       Note: For different values of N this might or might not be faster
+     *       since it does not perform sustained ordered writes on both indices
+     *       but it does allow two threads to operation concurrently writing on
+     *       each index and should reduce the total latency of this operation.
+     *       <p>
+     *       The {@link ScaleOutTripleStore} is already required to partition
+     *       its writes, but {@link ClientIndexView} can add transparent
+     *       parallelism in that case.
      */
     final public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
 

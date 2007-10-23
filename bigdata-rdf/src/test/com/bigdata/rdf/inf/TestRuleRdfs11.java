@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * @see RuleRdfs11
@@ -78,6 +79,10 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
      */
     public void test_rdfs11() {
 
+        AbstractTripleStore store = getStore();
+        
+        InferenceEngine inf = new InferenceEngine(store);
+        
         URI A = new _URI("http://www.foo.org/A");
         URI B = new _URI("http://www.foo.org/B");
         URI C = new _URI("http://www.foo.org/C");
@@ -91,7 +96,7 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
         assertFalse(store.containsStatement(A, rdfsSubClassOf, C));
 
-        applyRule(inferenceEngine.rdfs11, 1/* numComputed */, 1/* numCopied */);
+        applyRule(inf.rdfs11, 1/* numComputed */);
         
         /*
          * validate the state of the primary store.
@@ -100,6 +105,8 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
         assertTrue(store.containsStatement(A, rdfsSubClassOf, C));
 
+        store.closeAndDelete();
+        
     }
     
 }

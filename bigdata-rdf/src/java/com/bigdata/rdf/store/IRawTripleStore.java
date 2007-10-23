@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -68,7 +67,7 @@ public interface IRawTripleStore {
      * 
      * @return The statements visited by that iterator.
      */
-    public SPO[] getStatements(IIndex ndx, KeyOrder keyOrder, byte[] fromKey, byte[] toKey);
+    public SPO[] getStatements(KeyOrder keyOrder, byte[] fromKey, byte[] toKey);
     
     /**
      * Add statements from the array into the database.

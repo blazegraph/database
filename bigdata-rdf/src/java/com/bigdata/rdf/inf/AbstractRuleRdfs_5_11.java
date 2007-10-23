@@ -45,6 +45,8 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -107,8 +109,7 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
          */
 
         // in POS order.
-        final SPO[] stmts1 = db.getStatements(db.getPOSIndex(),
-                KeyOrder.POS, pkey, pkey1);
+        final SPO[] stmts1 = db.getStatements(KeyOrder.POS, pkey, pkey1);
 
         stats.stmts1 += stmts1.length;
         
@@ -138,8 +139,13 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
              * there is no match even on the first statement tested) we break
              * out of the inner loop and continue with the outer loop.
              */ 
-            int j = Arrays.binarySearch(stmts1, new SPO(left.o, p,
-                    ITripleStore.NULL), SPOComparator.INSTANCE);
+            
+            // Note: The StatementEnum is ignored by the SPOComparator.
+            SPO key = new SPO(left.o, p, ITripleStore.NULL,
+                    StatementEnum.Explicit);
+            
+            // Fing the index of that key (or the insert position).
+            int j = Arrays.binarySearch(stmts1, key, SPOComparator.INSTANCE);
 
             if (j < 0) {
 
@@ -153,7 +159,20 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
 
                 if (left.o != stmts1[j].s) break;
                 
-                buffer.add(new SPO(left.s, p, stmts1[j].o));
+                SPO stmt2 = stmts1[j];
+                
+                SPO newSPO = new SPO(left.s, p, stmt2.o, StatementEnum.Inferred);
+
+                Justification jst = null;
+                
+                if(justify) {
+                    
+                    jst = new Justification(this, newSPO, new SPO[] { left,
+                            stmt2 });
+                    
+                }
+                
+                buffer.add(newSPO, jst);
 
                 stats.numComputed++;
                 

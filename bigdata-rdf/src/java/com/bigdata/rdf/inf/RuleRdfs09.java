@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -80,14 +81,13 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
         byte[] toKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
                 stmt1.s + 1, NULL);
 
-        return db.getStatements(db.getPOSIndex(), KeyOrder.POS, fromKey,
-                toKey);
+        return db.getStatements(KeyOrder.POS, fromKey, toKey);
     
     }
     
     protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
         
-        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o );
+        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
         
     }
 

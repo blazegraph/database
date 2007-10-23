@@ -46,6 +46,8 @@ package com.bigdata.rdf.inf;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
@@ -126,7 +128,21 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
                 long p = itr.next();
 
-                buffer.add(new SPO(p, inf.rdfType.id, inf.rdfProperty.id));
+                SPO newSPO = new SPO(p, inf.rdfType.id, inf.rdfProperty.id, StatementEnum.Inferred);
+                
+                Justification jst = null;
+                
+                if(justify) {
+
+                    // Note: wildcards for [s] and [o].
+                    
+                    jst = new Justification(this, newSPO, new long[] { //
+                        NULL, p, NULL //
+                        });
+                    
+                }
+                
+                buffer.add(newSPO, jst );
 
                 stats.numComputed++;
 

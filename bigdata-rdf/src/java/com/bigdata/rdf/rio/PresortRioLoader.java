@@ -98,7 +98,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     protected final boolean verifyData;
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link Buffer}
+     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
      * object is signaling that no more buffers will be placed onto the
      * queue by the producer and that the consumer should therefore
      * terminate.
@@ -122,12 +122,12 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
-    Buffer buffer;
+    StatementBuffer buffer;
 
     /**
      * Used as the value factory for the {@link Parser}.
      */
-    OptimizedValueFactory valueFac = new OptimizedValueFactory();
+    OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
     
     /**
      * Sets up parser to load RDF/XML - {@link #verifyData} is NOT enabled.
@@ -194,7 +194,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         
         this.distinct = distinct;
         
-        this.buffer = new Buffer(store, capacity, distinct );
+        this.buffer = new StatementBuffer(store, capacity, distinct );
         
     }
     
@@ -361,7 +361,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         // Allocate the initial buffer for parsed data.
         if(buffer == null) {
             
-            buffer = new Buffer(store,capacity,distinct);
+            buffer = new StatementBuffer(store,capacity,distinct);
             
         }
 
@@ -373,7 +373,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
             // bulk insert the buffered data into the store.
             if(buffer != null) {
                 
-                buffer.insert();
+                buffer.flush();
                 
             }
 
@@ -396,26 +396,9 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     
     public void handleStatement( Resource s, URI p, Value o ) {
 
-        /* 
-         * When the buffer could not accept three of any type of value plus 
-         * one more statement then it is considered to be near capacity and
-         * is flushed to prevent overflow. 
-         */
-        if(buffer.nearCapacity()) {
+        // buffer the write (handles overflow).
+        buffer.add(s, p, o);
 
-            // bulk insert the buffered data into the store.
-            buffer.insert();
-
-            // allocate a new buffer.
-            buffer = new Buffer(store,capacity,distinct);
-            
-            // fall through.
-            
-        }
-        
-        // add the terms and statement to the buffer.
-        buffer.handleStatement(s,p,o);
-        
         stmtsAdded++;
         
         if ( stmtsAdded % 100000 == 0 ) {

@@ -298,7 +298,7 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
 
             final long begin = System.currentTimeMillis();
 
-            final ValueFactory fac = new OptimizedValueFactory();
+            final ValueFactory fac = OptimizedValueFactory.INSTANCE;
             
             log.info( "\nCreating "+nvalues+" values..." );
         
