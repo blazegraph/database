@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.util;
 
-import com.bigdata.rdf.store.ITripleStore;
-
 /**
  * Represents the key order used by an index.
  * 
@@ -57,76 +55,69 @@ import com.bigdata.rdf.store.ITripleStore;
  */
 public enum KeyOrder {
 
-    /**
-     * @todo make the case of the index name and the case of the enums the same
-     *       (either both upper or both lower). Enums naturally convert to
-     *       strings based on their case, so SPO.toString() is "SPO" but
-     *       SPO.name is "spo", which is confusing.
-     */
-    SPO("spo",0),
-    POS("pos",1),
-    OSP("osp",2);
+    SPO(0),
+    POS(1),
+    OSP(2);
 
-    public final String name;
-    
     public final int order;
     
-    private KeyOrder(String name,int order) {
-        this.name = name;
+    private KeyOrder(int order) {
+
         this.order = order;
+        
     }
     
-    private static final long NULL = ITripleStore.NULL;
-    
-    /**
-     * Return the access path that should be used for the triple pattern.
-     * 
-     * @param s
-     *            The optional subject identifier or {@link ITripleStore#NULL}.
-     * @param p
-     *            The optional subject identifier or {@link ITripleStore#NULL}.
-     * @param o
-     *            The optional subject identifier or {@link ITripleStore#NULL}.
-     * 
-     * @return The KeyOrder that identifies the index to use for that triple
-     *         pattern.
-     */
-    public static KeyOrder getKeyOrder(long s, long p, long o) {
-
-        if (s != NULL && p != NULL && o != NULL) {
-
-            return SPO;
-
-        } else if (s != NULL && p != NULL) {
-
-            return SPO;
-
-        } else if (s != NULL && o != NULL) {
-
-            return OSP;
-
-        } else if (p != NULL && o != NULL) {
-
-            return POS;
-
-        } else if (s != NULL) {
-
-            return SPO;
-
-        } else if (p != NULL) {
-
-            return POS;
-
-        } else if (o != NULL) {
-
-            return OSP;
-
-        } else {
-
-            return SPO;
-
-        }
-
-    }
+//    private static final long NULL = ITripleStore.NULL;
+//    
+//    /**
+//     * Return the access path that should be used for the triple pattern.
+//     * 
+//     * @param s
+//     *            The optional subject identifier or {@link ITripleStore#NULL}.
+//     * @param p
+//     *            The optional subject identifier or {@link ITripleStore#NULL}.
+//     * @param o
+//     *            The optional subject identifier or {@link ITripleStore#NULL}.
+//     * 
+//     * @return The KeyOrder that identifies the index to use for that triple
+//     *         pattern.
+//     */
+//    public static KeyOrder getKeyOrder(long s, long p, long o) {
+//
+//        if (s != NULL && p != NULL && o != NULL) {
+//
+//            return SPO;
+//
+//        } else if (s != NULL && p != NULL) {
+//
+//            return SPO;
+//
+//        } else if (s != NULL && o != NULL) {
+//
+//            return OSP;
+//
+//        } else if (p != NULL && o != NULL) {
+//
+//            return POS;
+//
+//        } else if (s != NULL) {
+//
+//            return SPO;
+//
+//        } else if (p != NULL) {
+//
+//            return POS;
+//
+//        } else if (o != NULL) {
+//
+//            return OSP;
+//
+//        } else {
+//
+//            return SPO;
+//
+//        }
+//
+//    }
     
 }

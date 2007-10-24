@@ -60,6 +60,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
@@ -269,7 +270,10 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      */
     final public long getTermId(Value value) {
 
-        _Value val = (_Value) value;
+        if(value==null) return ITripleStore.NULL;
+        
+        _Value val = (_Value) OptimizedValueFactory.INSTANCE
+                .toNativeValue(value);
         
         if (val.termId != ITripleStore.NULL) {
 
@@ -353,8 +357,12 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
         long insertTime = 0; // time to insert terms into the forward and reverse index.
-        
-        System.err.print("Writing "+numTerms+" terms ("+terms.getClass().getSimpleName()+")...");
+
+        if(numTerms>1000) {
+
+            System.err.print("Writing "+numTerms+" terms ("+terms.getClass().getSimpleName()+")...");
+            
+        }
 
         {
 
@@ -587,9 +595,13 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         }
 
         long elapsed = System.currentTimeMillis() - begin;
-        
-        System.err.println("in " + elapsed + "ms; keygen=" + keyGenTime
+
+        if(numTerms>1000) {
+
+            System.err.println("in " + elapsed + "ms; keygen=" + keyGenTime
                 + "ms, sort=" + sortTime + "ms, insert=" + insertTime + "ms");
+            
+        }
         
     }
 

@@ -160,8 +160,8 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
          * Test run the rule.
          */
         
-        SPOBuffer buffer = new SPOBuffer(store, null/*filter*/,
-                100/* capacity */, false/* distinct */, true/* justifications */);
+        SPOBuffer buffer = new SPOBuffer(store, null/* filter */,
+                100/* capacity */, false/* distinct */, inf.isJustified()/* justifications */);
         
         RuleStats stats = rule.apply(new RuleStats(), buffer);
 

@@ -110,9 +110,6 @@ abstract public class Rule {
     
     /**
      * The 64-bit long integer that represents an unassigned term identifier
-     * 
-     * @todo use this throughout rather than "0" since the value should really
-     *       be an <em>unsigned long</em>.
      */
     final protected long NULL = ITripleStore.NULL;
     
@@ -154,8 +151,6 @@ abstract public class Rule {
      *            transfered enmass into the backing store.
      * 
      * @return The statistics object.
-     * 
-     * FIXME store proofs.
      */
     public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
 

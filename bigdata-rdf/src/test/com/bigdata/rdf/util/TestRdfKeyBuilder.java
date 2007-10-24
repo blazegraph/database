@@ -55,7 +55,6 @@ import org.openrdf.vocabulary.XmlSchema;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Test suite for construction of variable length unsigned byte[] keys from RDF
