@@ -815,13 +815,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * entries had been deleted. Old nodes and leaves will be swept from the
      * store eventually when the journal overflows.
      * <p>
-     * Note: This implementation simply replaces the root node with a new root
-     * leaf and does not release storage for nodes and leaves in the B+Tree.
-     * This is because the overall design for bigdata combines an append only
-     * {@link IJournal} with overflow onto read-only {@link IndexSegment}s. Old
-     * journals are simply deleted, thereby reclaiming the storage on the file
-     * system.
-     * <p>
      * Note: This implementation is overriden in the
      * <code>com.btree.isolation</code> package since isolation requires
      * writing explicit delete markers for each entry in the B+Tree.

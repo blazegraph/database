@@ -68,6 +68,7 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.test.ExperimentDriver;
 
 /**
  * <p>
@@ -119,14 +120,12 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @todo Test the impact of an AIO strategy.
  * 
- * @todo Writes on different unisolated indices COULD be concurrent. On a
- *       platform with multiple CPUs this could help raise the performance. A
- *       best outcome would be a multicore platform using the Transient mode and
- *       a write pipeline for durability (vs synch to disk). Durability would
- *       arise through overflow onto index segments rather than stable storage
- *       for the journal. (The journal itself would probably be written onto
- *       stable store on overflow or if the system quieses since we use
- *       historical journals in the metadata index).
+ * FIXME Use the {@link ExperimentDriver} and compare the various buffer modes
+ * and other variables and the write rates for the {@link IRawStore} vs
+ * unisolated indices. Checkout the disk queue under the performance monitor and
+ * make sure that we are driving the disk as hard as possible.
+ * 
+ * @todo Quantify impact of the disk-only mode write cache.
  * 
  * @todo Note that the target performance environment requires multiple journals
  *       and multiple read-optimized databases. Do not over-optimize for a
