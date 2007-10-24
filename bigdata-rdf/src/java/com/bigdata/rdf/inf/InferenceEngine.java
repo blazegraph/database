@@ -269,7 +269,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      */
     public boolean isJustified() {
         
-        return true;
+        return false;
         
     }
     
