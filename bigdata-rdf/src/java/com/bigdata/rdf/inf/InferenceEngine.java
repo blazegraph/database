@@ -69,6 +69,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
@@ -93,7 +94,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * A rule always has the form:
  * 
  * <pre>
- *            pred :- pred*.
+ *                      pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -128,23 +129,56 @@ import com.bigdata.rdf.util.KeyOrder;
  * rdfs9 is represented as:
  * 
  * <pre>
- *             triple(?v,rdf:type,?x) :-
- *                triple(?u,rdfs:subClassOf,?x),
- *                triple(?v,rdf:type,?u). 
+ *                       triple(?v,rdf:type,?x) :-
+ *                          triple(?u,rdfs:subClassOf,?x),
+ *                          triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *             triple(?u,rdfs:subClassOf,?x) :-
- *                triple(?u,rdfs:subClassOf,?v),
- *                triple(?v,rdf:subClassOf,?x). 
+ *                       triple(?u,rdfs:subClassOf,?x) :-
+ *                          triple(?u,rdfs:subClassOf,?v),
+ *                          triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME provide incremental closure of data sets are they are loaded.
+ * FIXME Provide incremental closure of data sets are they are loaded.
+ * <p>
+ * The {@link Rule} class needs to be modified to accept a "new" (statements
+ * being loaded or removed from the database) and "db" (either the database
+ * (during TM for statement removal) or the union of the new and the database
+ * (when adding statements)) parameter and to automatically appy() the rule N
+ * times, where N is the #of terms in the tail. In each pass, tail[i] is
+ * designated as reading from the "new" data and the other terms in the tail
+ * read from the "old" data. This can be done by a variant of apply(). The
+ * results are read as a union over the passes, e.g., as an {@link ISPOIterator}.
+ * On each pass, the rule should do a rangeCount and execute the individual
+ * terms as subqueries where the most selective subquery is run first.
+ * <p>
+ * 
+ * @todo refactor rules to use {@link ISPOIterator}.
+ * 
+ * @todo refactor rules to isolate each subquery so that we can choose the
+ *       execution order dynamically based on the selectivity of the different
+ *       subqueries.
+ *       <p>
+ *       This will also require that we declare the joins, e.g.,
+ *       <code>term[i].s = term[j].p</code> so that we can execute the join
+ *       correctly regardless of the order in which we execute the subqueries.
+ * 
+ * @todo refactor rules to define apply() that maps over the terms collecting
+ *       the union of the results when executing the rule with each term in turn
+ *       reading from the "new" vs the "dbView". Note that the "dbView" is
+ *       either just the db or a fused view of the db and "new".
+ * 
+ * @todo tests of the rule mapping logic and tests of the sub-queries. The rule
+ *       execution is now going to be refactored into some logic for choosing
+ *       the term execution order and unioning the results, so that can get
+ *       tested by itself and then the various rules should work correctly if
+ *       they are using the correct triple patterns and join variables.
  * 
  * FIXME truth maintenance (check the SAIL also).
  * 
@@ -153,9 +187,12 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * FIXME owl:sameAs by backward chaining on query.
  * 
- * @todo verify correct closure on various datasets and compare output and time
- *       with {@link #fullForwardClosure()}. W3C has defined some correctness
- *       tests for RDF(S) entailments.
+ * FIXME verify correct closure on various datasets and compare output and time
+ * with {@link #fullForwardClosure()}. W3C has defined some correctness tests
+ * for RDF(S) entailments. Compare to the Sesame in-memory SAIL. Those tests
+ * should just be in a test suite, closure as computed by bigdata-rdf and as
+ * computed by Sesame. Also do this for incremental data load and for statement
+ * removal so as to exercise TM.
  * 
  * @todo We don’t do owl:equivalentClass and owl:equivalentProperty currently.
  *       You can simulate those by doing a bi-directional subClassOf or
@@ -163,10 +200,10 @@ import com.bigdata.rdf.util.KeyOrder;
  *       going to write rules for those two things this is how you would do it:
  * 
  * <pre>
- *                equivalentClass:
- *                
- *                  add an axiom to the KB: equivalentClass subPropertyOf subClassOf
- *                  add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
+ *                          equivalentClass:
+ *                          
+ *                            add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+ *                            add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
  * </pre>
  * 
  * It would be analogous for equivalentProperty.
@@ -267,9 +304,15 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * True iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
      */
-    public boolean isJustified() {
+    final boolean justify = false;
+    
+    /**
+     * True iff the Truth Maintenance strategy requires that we store
+     * {@link Justification}s for entailments.
+     */
+    final public boolean isJustified() {
         
-        return false;
+        return justify;
         
     }
     
@@ -1451,10 +1494,63 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      *         reports those statements that were not already in the main
      *         store).
      * 
-     * @todo refactor onto AbstractTripleStore or TempTripleStore as
-     *       copyStatementsTo(ITripleStore)?
+     * FIXME rewrite to use an {@link ISPOIterator} to buffer a set of
+     * statements and then transfer the buffer statements to the target state
+     * with {@link AbstractTripleStore#addStatements(SPO[], int, ISPOFilter)}.
+     * This will let us reuse the existing logic, e.g., for handling statement
+     * types.
      */
     static public int copyStatements( final TempTripleStore src, final AbstractTripleStore dst ) {
+
+        /**
+         * Copies statements from one index to another. 
+         */
+        class CopyStatements implements Callable<Long> {
+
+            private final IIndex src;
+            private final IIndex dst;
+            
+            /**
+             * @param src
+             * @param dst
+             */
+            CopyStatements(IIndex src, IIndex dst) {
+                
+                this.src = src;
+                
+                this.dst = dst;
+                
+            }
+            
+            public Long call() throws Exception {
+                
+                long numInserted = 0;
+                
+                IEntryIterator it = src.rangeIterator(null, null);
+                
+                while (it.hasNext()) {
+
+                    it.next();
+                    
+                    byte[] key = it.getKey();
+                    
+                    if (!dst.contains(key)) {
+
+                        if(true) throw new UnsupportedOperationException();
+                        
+                        // FIXME copy the statement type; upgrade as necessary (inferred -> explicit).
+                        dst.insert(key, null);
+                        
+                        numInserted++;
+                        
+                    }
+                    
+                }
+                
+                return numInserted;
+            }
+            
+        };
 
         List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
         
@@ -1490,55 +1586,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
     }
     
-    /**
-     * Copies statements from one index to another. 
-     */
-    static class CopyStatements implements Callable<Long> {
-
-        private final IIndex src;
-        private final IIndex dst;
-        
-        /**
-         * @param src
-         * @param dst
-         */
-        CopyStatements(IIndex src, IIndex dst) {
-            
-            this.src = src;
-            
-            this.dst = dst;
-            
-        }
-        
-        public Long call() throws Exception {
-            
-            long numInserted = 0;
-            
-            IEntryIterator it = src.rangeIterator(null, null);
-            
-            while (it.hasNext()) {
-
-                it.next();
-                
-                byte[] key = it.getKey();
-                
-                if (!dst.contains(key)) {
-
-                    // @todo copy the statement type.
-                    // @todo upgrade the statement type if necessary (inferred -> explicit).
-                    dst.insert(key, null);
-                    
-                    numInserted++;
-                    
-                }
-                
-            }
-            
-            return numInserted;
-        }
-        
-    };
-
     /**
      * Rule for steps 11 and 13 of {@link InferenceEngine#fastForwardClosure()}.
      * <p>

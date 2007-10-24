@@ -94,21 +94,18 @@ import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * A Sesame 1.x SAIL integration.
@@ -343,15 +340,13 @@ public class BigdataRdfRepository implements RdfRepository {
         
     }
 
-    public void changeNamespacePrefix(String arg0, String arg1)
+    public void changeNamespacePrefix(String namespace, String prefix)
             throws SailUpdateException {
 
         assertTransactionStarted();
 
-        // TODO Auto-generated method stub
-
-        throw new UnsupportedOperationException();
-
+        database.addNamespace(namespace,prefix);
+        
     }
 
     public NamespaceIterator getNamespaces() {
@@ -404,17 +399,8 @@ public class BigdataRdfRepository implements RdfRepository {
         
         assertTransactionStarted();
         
-        /*
-         * convert other Value object types to our object types.
-         */
-        if (s != null)
-            s = (Resource) valueFactory.toNativeValue(s);
-
-        if (p != null)
-            p = (URI) valueFactory.toNativeValue(p);
-
-        if (o != null)
-            o = (Value) valueFactory.toNativeValue(o);
+        // flush any pending writes first!
+        flushBuffer();
         
         int n = database.removeStatements(s, p, o);
         
@@ -602,8 +588,8 @@ public class BigdataRdfRepository implements RdfRepository {
          * Choose the access path and encapsulate the resulting range iterator
          * as a sesame statement iterator.
          */
-        return new MyStatementIterator(KeyOrder.getKeyOrder(_s, _p, _o),
-                database.rangeQuery(_s, _p, _o));
+        return new MyStatementIterator(database.getAccessPath(_s, _p, _o)
+                .iterator());
         
     }
     
@@ -616,22 +602,15 @@ public class BigdataRdfRepository implements RdfRepository {
      */
     private class MyStatementIterator implements StatementIterator {
 
-        private final KeyOrder keyOrder;
-        private final IEntryIterator src;
-        private final RdfKeyBuilder keyBuilder;
+        private ISPOIterator src;
         
-        public MyStatementIterator(KeyOrder keyOrder,IEntryIterator src) {
-            
-            if(keyOrder == null) throw new IllegalArgumentException();
+        public MyStatementIterator(ISPOIterator src) {
 
-            if(src == null) throw new IllegalArgumentException();
-            
-            this.keyOrder = keyOrder;
-            
+            if (src == null)
+                throw new IllegalArgumentException();
+
             this.src = src;
 
-            this.keyBuilder = database.getKeyBuilder();
-            
         }
         
         public boolean hasNext() {
@@ -641,24 +620,29 @@ public class BigdataRdfRepository implements RdfRepository {
         }
 
         public Statement next() {
-            
-            // visit the next entry.
-            byte[] val = (byte[])src.next();
 
-            // unpacks the term identifiers from the key.
-            SPO spo = new SPO(keyOrder, keyBuilder, src.getKey(), val);
-
-            StatementEnum type = StatementEnum.deserialize(val);
+            SPO spo = src.next();
             
-            // resolve the term identifiers to the terms.
+            /*
+             * resolve the term identifiers to the terms.
+             * 
+             * FIXME use batch term resolution and cache recently used terms,
+             * especially on the primary index dimension, so that we do less
+             * lookup during traversal.
+             */
+            
             return new _Statement((_Resource) database.getTerm(spo.s),
                     (_URI) database.getTerm(spo.p), (_Value) database
-                            .getTerm(spo.o), type);
+                            .getTerm(spo.o), spo.type);
             
         }
         
         public void close() {
-            // NOP.
+            
+            // Note: Just facilitates GC.
+            
+            src = null;
+            
         }
 
     }
@@ -1050,7 +1034,7 @@ public class BigdataRdfRepository implements RdfRepository {
             
         }
         
-        return database.rangeCount(_s, _p, _o);
+        return database.getAccessPath(_s, _p, _o).rangeCount();
 
     }
     
@@ -1253,7 +1237,10 @@ public class BigdataRdfRepository implements RdfRepository {
     
     public void shutDown() {
 
-        // @todo use polite shutdown() and define on ITripleStore.
+        /*
+         * Note: This is an immediate shutdown.
+         */
+        
         database.close();
         
     }

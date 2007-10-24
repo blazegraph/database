@@ -59,6 +59,7 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.SPO;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -433,6 +434,31 @@ public class RdfKeyBuilder {
         
     }
 
+    /**
+     * Forms the statement key.
+     * 
+     * @param keyOrder
+     *            The key order.
+     * @param spo
+     *            The statement.
+     *            
+     * @return The key.
+     */
+    public byte[] statement2Key(KeyOrder keyOrder, SPO spo) {
+        
+        switch(keyOrder) {
+        case SPO:
+            return statement2Key(spo.s, spo.p, spo.o);
+        case POS:
+            return statement2Key(spo.p, spo.o, spo.s);
+        case OSP:
+            return statement2Key(spo.o, spo.s, spo.p);
+        default:
+            throw new UnsupportedOperationException("keyOrder=" + keyOrder);
+        }
+        
+    }
+    
     /*
      * The problem with this method is that it encourages us to reuse a key
      * buffer but the btree (at least when used as part of a local api) requires
@@ -486,7 +512,7 @@ public class RdfKeyBuilder {
      *         {@link #CODE_STMT statement}, {@link #CODE_PRED predicate}, or
      *         {@link #CODE_RULE} rule.
      */
-    public byte key2Statement(byte[] key, long[] ids) {
+    static public byte key2Statement(byte[] key, long[] ids) {
         
         assert key != null;
         assert ids != null;

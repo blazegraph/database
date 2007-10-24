@@ -73,6 +73,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo can this be refactored along the lines of {@link ISPOIterator} for more
+ *       code sharing?
  */
 public class SPOBuffer {
 
@@ -198,27 +201,8 @@ public class SPOBuffer {
      * true iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
      */
-    protected final boolean justified;
+    protected final boolean justify;
     
-//    /**
-//     * Create a buffer.
-//     * 
-//     * @param store
-//     *            The database into which the terms and statements will be
-//     *            inserted.
-//     * @param capacity
-//     *            The maximum #of Statements, URIs, Literals, or BNodes that the
-//     *            buffer can hold.
-//     * @param distinct
-//     *            When true only distinct terms and statements are stored in the
-//     *            buffer.
-//     */
-//    public SPOBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
-//     
-//        this(store,null,capacity,distinct);
-//        
-//    }
-
     /**
      * Create a buffer.
      * 
@@ -253,7 +237,7 @@ public class SPOBuffer {
 
         this.distinct = distinct;
 
-        this.justified = justified;
+        this.justify = justified;
         
         stmts = new SPO[capacity];
 
@@ -489,7 +473,14 @@ public class SPOBuffer {
         
         assert stmt != null;
         
-        assert !justified || justification != null;
+        /*
+         * When justification is required the rule MUST supply a justification.
+         * 
+         * When it is NOT required then the rule SHOULD NOT supply a
+         * justification.
+         */
+
+        assert justify ? justification != null : justification == null;
         
         if (filter != null && filter.isMatch(stmt)) {
             
@@ -512,7 +503,7 @@ public class SPOBuffer {
 
             stmts[numStmts++] = getDistinctStatement(stmt);
 
-            if(justified) {
+            if(justify) {
 
                 justifications[numJustifications++] = justification;
                     
@@ -522,7 +513,7 @@ public class SPOBuffer {
 
             stmts[numStmts++] = stmt;
 
-            if(justified) { 
+            if(justify) { 
                 
                 justifications[numJustifications++] = justification;
                 

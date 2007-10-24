@@ -67,20 +67,6 @@ public class SPO {
     public final long o;
     public final StatementEnum type;
     
-//    /**
-//     * Construct a triple from term identifiers.
-//     * 
-//     * @param s
-//     * @param p
-//     * @param o
-//     * 
-//     * FIXME review all use of this constructor since it generates an explicit
-//     * statement.
-//     */
-//    public SPO(long s, long p, long o) {
-//        this(s, p, o, StatementEnum.Explicit);
-//    }
-
     /**
      * Construct a statement.
      * <p>
@@ -109,9 +95,6 @@ public class SPO {
      *            Indicates the permutation of the subject, predicate and object
      *            used by the key.
      * 
-     * @param keyBuilder
-     *            Used to decode the key.
-     * 
      * @param key
      *            The key from the index entry.
      * 
@@ -120,16 +103,15 @@ public class SPO {
      * 
      * @see RdfKeyBuilder#key2Statement(byte[], long[])
      */
-    public SPO(KeyOrder keyOrder, RdfKeyBuilder keyBuilder, byte[] key, Object val) {
+    public SPO(KeyOrder keyOrder, byte[] key, Object val) {
         
         assert keyOrder != null;
-        assert keyBuilder != null;
         assert key != null;
         assert val != null;
         
         long[] ids = new long[3];
         
-        code = keyBuilder.key2Statement(key, ids); 
+        code = RdfKeyBuilder.key2Statement(key, ids); 
         
         switch (keyOrder) {
 
@@ -161,7 +143,7 @@ public class SPO {
         type = StatementEnum.deserialize((byte[])val); 
         
     }
-
+    
 //    /**
 //     * The #of times this SPO is encountered in an {@link SPOBuffer}.
 //     * 

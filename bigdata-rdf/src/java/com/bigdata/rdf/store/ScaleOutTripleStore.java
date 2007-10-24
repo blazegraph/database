@@ -63,6 +63,7 @@ import com.bigdata.btree.MutableValueBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
@@ -327,7 +328,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public long getTermId(Value value) {
 
-        _Value val = (_Value) value;
+        if(value==null) return ITripleStore.NULL;
+        
+        _Value val = (_Value) OptimizedValueFactory.INSTANCE
+                .toNativeValue(value);
         
         if( val.termId != ITripleStore.NULL ) return val.termId; 
 

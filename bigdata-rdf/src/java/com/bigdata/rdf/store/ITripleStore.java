@@ -60,7 +60,6 @@ import org.openrdf.model.Value;
 import org.openrdf.rio.Parser;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rdf.model.StatementEnum;
@@ -96,10 +95,6 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * longer entailed by the model theory and the remaining statements in the
  * knowledge base.
  * 
- * @todo lucene integration.
- * 
- * @todo write quad store (Sesame 2.x). inference across contexts?
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -133,9 +128,9 @@ public interface ITripleStore {
      * The names of the various statement indices. 
      */
     
-    static final public String name_spo = KeyOrder.SPO.name;
-    static final public String name_pos = KeyOrder.POS.name;
-    static final public String name_osp = KeyOrder.OSP.name;
+    static final public String name_spo = KeyOrder.SPO.toString();
+    static final public String name_pos = KeyOrder.POS.toString();
+    static final public String name_osp = KeyOrder.OSP.toString();
     
     /**
      * The name of the optional index in which {@link Justification}s are
@@ -259,41 +254,20 @@ public interface ITripleStore {
     public boolean containsStatement(Resource s, URI p, Value o);
 
     /**
-     * Return a range query iterator that will visit the statements matching the
-     * triple pattern using the best access path given the triple pattern.
+     * Chooses and returns the best {@link IAccessPath} for the given triple
+     * pattern.
      * 
      * @param s
-     *            An optional term identifier for the subject role or
-     *            {@link #NULL}.
+     *            The term identifier for the subject -or-
+     *            {@link ITripleStore#NULL}.
      * @param p
-     *            An optional term identifier for the predicate role or
-     *            {@link #NULL}.
+     *            The term identifier for the predicate -or-
+     *            {@link ITripleStore#NULL}.
      * @param o
-     *            An optional term identifier for the object role or
-     *            {@link #NULL}.
-     * 
-     * @return The range query iterator.
+     *            The term identifier for the object -or-
+     *            {@link ITripleStore#NULL}.
      */
-    public IEntryIterator rangeQuery(long s, long p, long o);
-
-    /**
-     * Return the #of statements matching the triple pattern using the best
-     * access path given the triple pattern (the count will be approximate if
-     * partitioned indices are being used).
-     * 
-     * @param s
-     *            An optional term identifier for the subject role or
-     *            {@link #NULL}.
-     * @param p
-     *            An optional term identifier for the predicate role or
-     *            {@link #NULL}.
-     * @param o
-     *            An optional term identifier for the object role or
-     *            {@link #NULL}.
-     * 
-     * @return The range count.
-     */
-    public int rangeCount(long s, long p, long o);
+    public IAccessPath getAccessPath(long s, long p, long o);
 
     /**
      * Unconditionally removes statement(s) matching the triple pattern (NO
@@ -308,22 +282,17 @@ public interface ITripleStore {
     public int removeStatements(Resource s, URI p, Value o);
 
     /**
-     * Unconditionally removes statement(s) matching the triple pattern (NO
-     * truth maintenance).
-     * 
-     * @param _s
-     * @param _p
-     * @param _o
-     * 
-     * @return The #of statements removed.
-     */
-    public int removeStatements(long _s, long _p, long _o);
-
-    /**
      * Value used for a "NULL" term identifier.
      */
     public static final long NULL = 0L;
 
+    /**
+     * The #of terms in a statement (3 is a triple store, 4 is a quad store).
+     * 
+     * @todo use this constant throughout and then change over to a quad store.
+     */
+    public static final int N = 3;
+    
     /**
      * Adds the statements to each index (batch api, NO truth maintenance).
      * <p>
@@ -334,8 +303,14 @@ public interface ITripleStore {
      *            An array of statements
      * 
      * @see #insertTerms(_Value[], int, boolean, boolean)
+     * 
+     * @return The #of statements written on the database.
+     * 
+     * @todo the best way to use this is by creating a {@link StatementBuffer},
+     *       filling it up, and then flushing it to the database. Document that
+     *       and perhaps get this of this method on the public API.
      */
-    public void addStatements(_Statement[] stmts, int numStmts);
+    public int addStatements(_Statement[] stmts, int numStmts);
 
     /**
      * Generate the sort keys for the terms.
@@ -389,6 +364,11 @@ public interface ITripleStore {
      * 
      * @return the RDF value or <code>null</code> if there is no term with
      *         that identifier in the index.
+     * 
+     * FIXME Implementations should use an LRU cache so that we can improve
+     * performance when externalizing statements from an index scan. Also add
+     * getTerm(s,p,o) returning _Value[] to batch each statement lookup so that
+     * we do less RPCs in a distributed system.
      */
     public _Value getTerm(long id);
 
@@ -396,7 +376,7 @@ public interface ITripleStore {
      * Return the pre-assigned termId for the value (non-batch API).
      * 
      * @param value
-     *            The value.
+     *            Any {@link Value} reference (MAY be <code>null</code>).
      * 
      * @return The pre-assigned termId -or- {@link #NULL} iff the term is not
      *         known to the database.
@@ -476,9 +456,6 @@ public interface ITripleStore {
     /**
      * Close the client. If the client uses an embedded database, then close the
      * embedded database as well.
-     * 
-     * @todo change semantics to immediate close/disconnect.  Add shutdown() and
-     * shutdownNow()?
      */
     public void close();
     

@@ -128,7 +128,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         RuleStats stats = new RuleStats();
         
         SPOBuffer buffer = new SPOBuffer(rule.db, null/* filter */,
-                1000/* capacity */, false/* distinct */, true/*justified*/);
+                1000/* capacity */, false/* distinct */, rule.justify);
         
         // apply the rule.
         rule.apply(stats, buffer);

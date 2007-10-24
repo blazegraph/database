@@ -47,8 +47,9 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Low-level API directly using long term identifiers rather than an RDF Value
@@ -58,26 +59,67 @@ import com.bigdata.rdf.util.KeyOrder;
  * @version $Id$
  */
 public interface IRawTripleStore {
-
-    /**
-     * Extracts the statement ids from a key scan.
-     * 
-     * @param itr
-     *            The key scan iterator.
-     * 
-     * @return The statements visited by that iterator.
-     */
-    public SPO[] getStatements(KeyOrder keyOrder, byte[] fromKey, byte[] toKey);
     
     /**
-     * Add statements from the array into the database.
+     * Writes the statements onto the statements indices (batch, parallel, NO
+     * truth maintenance).
      * 
      * @param stmts
-     *            The source statements.
+     *            The statements.
      * 
-     * @param n
-     *            The #of statements in the buffer.
+     * @param numStmts
+     *            The #of entries in <i>stmts</i> that are valid.
+     * 
+     * @return The #of statements that were written on the indices (a statement
+     *         that was previously an axiom or inferred and that is converted to
+     *         an explicit statement by this method will be reported in this
+     *         count as well as any statement that was not pre-existing in the
+     *         database).
      */
-    public void addStatements(SPO[] stmts, int n );
+    public int addStatements(SPO[] stmts, int numStmts );
     
+    /**
+     * Writes the statements onto the statement indices (batch, parallel, NO
+     * truth maintenance).
+     * 
+     * @param stmts
+     *            The statements.
+     * 
+     * @param numStmts
+     *            The #of entries in <i>stmts</i> that are valid.
+     * 
+     * @param filter
+     *            Optional statement filter. Statements matching the filter are
+     *            NOT added to the database.
+     * 
+     * @return The #of statements that were written on the indices (a statement
+     *         that was previously an axiom or inferred and that is converted to
+     *         an explicit statement by this method will be reported in this
+     *         count as well as any statement that was not pre-existing in the
+     *         database).
+     */
+    public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter );
+    
+    /**
+     * Writes the statements onto the statement indices (batch, parallel, NO
+     * truth maintenance).
+     * 
+     * @param stmts
+     *            The statements.
+     * 
+     * @param numStmts
+     *            The #of entries in <i>stmts</i> that are valid.
+     * 
+     * @param filter
+     *            Optional statement filter. Statements matching the filter are
+     *            NOT added to the database.
+     * 
+     * @return The #of statements that were written on the indices (a statement
+     *         that was previously an axiom or inferred and that is converted to
+     *         an explicit statement by this method will be reported in this
+     *         count as well as any statement that was not pre-existing in the
+     *         database).
+     */
+    public int addStatements(ISPOIterator itr, ISPOFilter filter);
+
 }

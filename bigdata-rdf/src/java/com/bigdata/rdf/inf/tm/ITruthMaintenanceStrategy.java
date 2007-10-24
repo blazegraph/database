@@ -41,66 +41,65 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf;
+/*
+ * Created on Oct 24, 2007
+ */
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+package com.bigdata.rdf.inf.tm;
+
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+
+import com.bigdata.rdf.inf.Rule;
+import com.bigdata.rdf.spo.SPO;
 
 /**
- * Aggregates test suites into increasing dependency order.
+ * Interface for a truth maintenance strategy.
+ * 
+ * @todo implement AllProofs (refactor)
+ * @todo implement OneProof (requires magic sets).
+ * @todo implement NoProofs (reclose the store).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public interface ITruthMaintenanceStrategy {
 
     /**
+     * Create a proof.
      * 
+     * @param rule
+     *            The rule that licenses the proof.
+     * @param head
+     *            The entailment.
+     * @param tail
+     *            The bindings for the tail of the rule.
      */
-    public TestAll() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("RDF");
-
-        // test utility classes.
-        suite.addTest( com.bigdata.rdf.util.TestAll.suite() );
-     
-        // test RDF Value and Statement object model (Sesame compliant).
-        suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
-
-        // test low-level statement model using long term identifiers.
-        suite.addTest( com.bigdata.rdf.spo.TestAll.suite() );
-
-        // test various RDF database implementations.
-        suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
-
-        /*
-         * Test scale-out RDF database.
-         * 
-         * Note: This test suite sets up a local bigdata federation for
-         * each test.  See the test suite for more information about 
-         * required Java properties.
-         */
-     
-        suite.addTest( com.bigdata.rdf.scaleout.TestAll.suite() );
-
-        return suite;
-        
-    }
+    public void createProof(Rule rule, SPO head, SPO[] tail);
     
+    /**
+     * Create a proof.
+     * 
+     * @param rule
+     *            The rule that licenses the proof.
+     * @param head
+     *            The entailment.
+     * @param tail
+     *            The bindings for the tail of the rule.
+     */
+    public void createProof(Rule rule, SPO head, long[] tail);
+
+    /**
+     * Removes explicit statement(s) matching the triple pattern. If the TM
+     * strategy stores entailments in the database, then this and any
+     * entailments that are no longer grounded.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @return The #of statements removed.
+     */
+    public int removeStatements(Resource s, URI p, Value o);
+
 }
