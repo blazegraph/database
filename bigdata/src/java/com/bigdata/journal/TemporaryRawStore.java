@@ -77,6 +77,14 @@ import com.bigdata.util.ChecksumUtility;
  *       with a write cache and disable {@link Options#FORCE_ON_COMMIT}. the
  *       performance should be just about the same as the transient mode and we
  *       also have the benefit of full read/write concurrency.
+ *       <p>
+ *       Actually, the one place where it will still be significantly slower is
+ *       when the temporary store is created -- this is nearly instantenous if
+ *       it is in memory but creating a backing store on disk adds significant
+ *       latency. That latency could be significant when starting a new
+ *       transaction and could have an impact when transaction write sets are
+ *       small (we do defer the creation of the backing store for writable
+ *       transactions, so maybe this is Ok).
  * 
  * @todo The {@link TemporaryRawStore} would benefit from any caching or AIO
  *       solutions developed for the {@link DiskOnlyStrategy}.

@@ -290,10 +290,6 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                 
             } catch(ExecutionException ex ) {
                 
-                // @todo allow retry for lock contention.
-                // @todo allow retry if aborted due to an error in a commit group.
-                // @todo examine conditions and handle of interrupts (InterruptedException).
-                
                 if(ex.getCause() instanceof SpuriousException) {
                 
                     nfailed++;
@@ -474,9 +470,6 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      *       operations on lots of indices using Disk and a 2CPUs? 4CPUs? With
      *       larger write operations? With fewer indices?
      * 
-     * @todo How does the size of the thread pool trade off against the queue
-     *       length for a variety of conditions?
-     * 
      * @todo Try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong.
      * 
@@ -514,7 +507,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         properties.setProperty(TestOptions.MAX_LOCKS,"3");
 
-        properties.setProperty(TestOptions.NTRIALS,"10000");
+        properties.setProperty(TestOptions.NTRIALS,"20000");
 
         properties.setProperty(TestOptions.KEYLEN,"4");
 

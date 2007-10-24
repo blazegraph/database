@@ -68,8 +68,8 @@ public class Options {
     public static final String FILE = "file";
 
     /**
-     * <code>bufferMode</code> - One of "Transient", "Direct", "Mapped",
-     * or "Disk". See {@link BufferMode} for more information about each
+     * <code>bufferMode</code> - One of "Transient", "Direct", "Mapped", or
+     * "Disk" (Disk). See {@link BufferMode} for more information about each
      * mode.
      * 
      * @see BufferMode#Transient
@@ -282,7 +282,7 @@ public class Options {
     /**
      * The default for the {@link #BUFFER_MODE}.
      */
-    public final static BufferMode DEFAULT_BUFFER_MODE = BufferMode.Direct;
+    public final static BufferMode DEFAULT_BUFFER_MODE = BufferMode.Disk;
     
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.
