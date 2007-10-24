@@ -414,10 +414,9 @@ public class TaskATest
             "wordnetD+S",
             "-rdf data/wordnet_nouns-20010201.rdf -rdf data/wordnet-20000620.rdfs",
 
-            // Note: CTC runs out of Java heap space when using the default heap.
-            "OpenCyc",
-            "cyc",
-            "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
+//            "OpenCyc",
+//            "cyc",
+//            "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
 
             "NCI Oncology (old)",
             "nciOncology",
