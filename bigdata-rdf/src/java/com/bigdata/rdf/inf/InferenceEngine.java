@@ -97,7 +97,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                      pred :- pred*.
+ *                       pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -132,21 +132,28 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                       triple(?v,rdf:type,?x) :-
- *                          triple(?u,rdfs:subClassOf,?x),
- *                          triple(?v,rdf:type,?u). 
+ *                        triple(?v,rdf:type,?x) :-
+ *                           triple(?u,rdfs:subClassOf,?x),
+ *                           triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                       triple(?u,rdfs:subClassOf,?x) :-
- *                          triple(?u,rdfs:subClassOf,?v),
- *                          triple(?v,rdf:subClassOf,?x). 
+ *                        triple(?u,rdfs:subClassOf,?x) :-
+ *                           triple(?u,rdfs:subClassOf,?v),
+ *                           triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME refactor the rules to make them more flexible, but first collect some
+ * performance targets 1st on a few data sets using fast and full closure
+ * without rdsf4 sot hat I can know how much this hurts or helps. Use TaskATest
+ * and setup the inference engine w/o storing ( x type resource ).  We do need
+ * the proofs, so store those -- but I can also turn that off to get a baseline
+ * for a version with no proofs and magic/SLD.
  * 
  * FIXME Provide incremental closure of data sets are they are loaded.
  * <p>
@@ -190,23 +197,16 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * FIXME owl:sameAs by backward chaining on query.
  * 
- * FIXME verify correct closure on various datasets and compare output and time
- * with {@link #fullForwardClosure()}. W3C has defined some correctness tests
- * for RDF(S) entailments. Compare to the Sesame in-memory SAIL. Those tests
- * should just be in a test suite, closure as computed by bigdata-rdf and as
- * computed by Sesame. Also do this for incremental data load and for statement
- * removal so as to exercise TM.
- * 
  * @todo We don’t do owl:equivalentClass and owl:equivalentProperty currently.
  *       You can simulate those by doing a bi-directional subClassOf or
  *       subPropertyOf, which has always sufficed for our purposes. If you were
  *       going to write rules for those two things this is how you would do it:
  * 
  * <pre>
- *                          equivalentClass:
- *                          
- *                            add an axiom to the KB: equivalentClass subPropertyOf subClassOf
- *                            add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
+ *                           equivalentClass:
+ *                           
+ *                             add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+ *                             add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
  * </pre>
  * 
  * It would be analogous for equivalentProperty.
@@ -306,10 +306,8 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     /**
      * True iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
-     * 
-     * @todo set this based on the {@link ITruthMaintenanceStrategy}.
      */
-    final boolean justify = true;
+    final boolean justify;
     
     /**
      * True iff the Truth Maintenance strategy requires that we store
@@ -401,7 +399,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     /**
      * Options for the {@link InferenceEngine}.
      * 
-     * 
      * @todo Add options:
      *       <p>
      *       Make entailments for rdfs:domain and rdfs:range optional?
@@ -423,6 +420,16 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 //        
 //        public static final String DEFAULT_TRUTH_MAINENANCE_STRATEGY = AllProofs.class.getName();
 
+        /**
+         * Boolean option - when true the proofs for entailments will be generated and stored in
+         * the database.  This option is required by some truth maintenance strategies.
+         * 
+         * @todo one proof, all proofs, no proofs?
+         */
+        public static final String JUSTIFY = "justify"; 
+        
+        public static final String DEFAULT_JUSTIFY = "true"; 
+        
         /**
          * Choice of the forward closure algorithm.
          * 
@@ -528,6 +535,9 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         this.database = (AbstractTripleStore) database;
 
+        this.justify = Boolean.parseBoolean(properties.getProperty(
+                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+        
         this.forwardClosure = ForwardClosureEnum
                 .valueOf(properties.getProperty(Options.FORWARD_CLOSURE,
                         Options.DEFAULT_FORWARD_CLOSURE)); 
