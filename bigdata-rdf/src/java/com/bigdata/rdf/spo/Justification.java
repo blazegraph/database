@@ -253,13 +253,13 @@ public class Justification implements Comparable<Justification> {
         
         for(int i=0; i<len; i++) {
             
-            if(i>ids.length) {
+            if(i>=ids.length) {
                 
                 // shorter with common prefix is ordered first.
                 
                 return -1;
                 
-            } else if(i>o.ids.length) {
+            } else if(i>=o.ids.length) {
                 
                 // shorter with common prefix is ordered first.
                 

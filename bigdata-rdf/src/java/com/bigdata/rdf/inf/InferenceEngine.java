@@ -379,6 +379,26 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     Rule rdfs13;
 
     /**
+     * Choice of the forward closure algorithm.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static enum ForwardClosureEnum {
+        
+        /**
+         * Runs {@link InferenceEngine#fastForwardClosure()}.
+         */
+        Fast(),
+
+        /**
+         * Runs {@link InferenceEngine#fullForwardClosure()}.
+         */
+        Full();
+        
+    }
+    
+    /**
      * Options for the {@link InferenceEngine}.
      * 
      * 
@@ -402,6 +422,15 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 //        public static final String TRUTH_MAINENANCE_STRATEGY = "truthMaintenanceStrategy";
 //        
 //        public static final String DEFAULT_TRUTH_MAINENANCE_STRATEGY = AllProofs.class.getName();
+
+        /**
+         * Choice of the forward closure algorithm.
+         * 
+         * @see ForwardClosureEnum
+         */
+        public static final String FORWARD_CLOSURE = "forwardClosure";
+
+        public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
         
         /**
          * When true <code>(?x rdf:type rdfs:Resource)</code> entailments are
@@ -499,6 +528,10 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         this.database = (AbstractTripleStore) database;
 
+        this.forwardClosure = ForwardClosureEnum
+                .valueOf(properties.getProperty(Options.FORWARD_CLOSURE,
+                        Options.DEFAULT_FORWARD_CLOSURE)); 
+        
         this.storeRdfTypeRdfsResource = Boolean.parseBoolean(properties
                 .getProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
                         Options.DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE));
@@ -506,6 +539,11 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         setup();
 
     }
+    
+    /**
+     * Set based on {@link Options#FORWARD_CLOSURE}. 
+     */
+    final ForwardClosureEnum forwardClosure;
     
     /**
      * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}.
@@ -718,6 +756,28 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      */
     final ExecutorService readService = Executors
             .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+
+    /**
+     * Compute the forward closure using the algorithm selected by
+     * {@link Options#FORWARD_CLOSURE}.
+     * 
+     * @return Statistics about the operation.
+     */
+    public ClosureStats computeClosure() {
+        
+        switch(forwardClosure) {
+
+        case Fast:
+            return fastForwardClosure();
+        
+        case Full:
+            return fullForwardClosure();
+        
+        default: throw new UnsupportedOperationException();
+        
+        }
+        
+    }
     
     /**
      * Compute the complete forward closure of the store using a set-at-a-time
@@ -1162,6 +1222,18 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         public boolean isMatch(SPO spo) {
 
+            if((spo.s & 0x01L) == 1L) {
+                
+                /*
+                 * Note: Explicitly toss out entailments that would place a
+                 * literal into the subject position. These statements can enter
+                 * the database via rdfs3 and rdfs4b.
+                 */
+
+                return true;
+                
+            }
+            
             if (spo.type == StatementEnum.Explicit
                     || spo.type == StatementEnum.Axiom) {
                 
@@ -1170,7 +1242,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 return false;
                 
             }
-            
+
             if (!storeRdfTypeRdfsResource && spo.p == rdfType.id
                     && spo.o == rdfsResource.id) {
                 

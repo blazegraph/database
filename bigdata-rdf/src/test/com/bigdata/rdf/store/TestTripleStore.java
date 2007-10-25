@@ -61,6 +61,9 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 /**
  * Test basic features of the {@link ITripleStore} API.
  * 
+ * FIXME add unit tests to verify that we can detect a term identifer by
+ * examining the low bit and provide a static method to ecapsulate that test.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

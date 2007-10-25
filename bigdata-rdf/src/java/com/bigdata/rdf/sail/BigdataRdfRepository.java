@@ -643,9 +643,11 @@ public class BigdataRdfRepository implements RdfRepository {
              * lookup during traversal.
              */
             
-            return new _Statement((_Resource) database.getTerm(spo.s),
-                    (_URI) database.getTerm(spo.p), (_Value) database
-                            .getTerm(spo.o), spo.type);
+            return new _Statement( //
+                    (_Resource) database.getTerm(spo.s),//
+                    (_URI) database.getTerm(spo.p), //
+                    (_Value) database.getTerm(spo.o), //
+                    spo.type);
             
         }
         

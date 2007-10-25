@@ -123,7 +123,7 @@ abstract public class Rule {
     /**
      * The 64-bit long integer that represents an unassigned term identifier
      */
-    final protected long NULL = ITripleStore.NULL;
+    static final protected long NULL = ITripleStore.NULL;
     
     public Rule(InferenceEngine inf, Pred head, Pred[] body) {
 

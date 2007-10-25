@@ -274,17 +274,6 @@ public class OptimizedValueFactory implements ValueFactory {
          */
         public int count = 0;
         
-//        /**
-//         * Initially <code>false</code>, this field is set <code>true</code>
-//         * if multiple occurrences of the same term are identified during an
-//         * index load operation. Duplicate filtering is required only for bulk
-//         * loads into {@link IndexSegments} since the inputs to that process are
-//         * presumed to be an ordered set of distinct key-value data. While
-//         * duplicate filtering is not always performed, a term is a duplicate if
-//         * this field is set.
-//         */
-//        public boolean duplicate = false;
-        
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
          * if it is determined that a term has already been assigned a term
@@ -373,9 +362,10 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public String toString() {
 
-            return term + " {termId=" + termId + ", haveKey=" + (key != null)
-                    /* + ", dup=" + duplicate + */
-                    + ", known=" + known + "}";
+            return term;
+            
+//            return term + " {termId=" + termId + ", haveKey=" + (key != null)
+//                    + ", known=" + known + "}";
 
         }
 
