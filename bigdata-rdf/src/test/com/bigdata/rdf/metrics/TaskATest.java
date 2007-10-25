@@ -52,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Properties;
 
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
@@ -59,6 +60,8 @@ import org.openrdf.sesame.sail.RdfSchemaRepository;
 
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
+import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.rio.LoadStats;
 
 /**
@@ -292,6 +295,20 @@ public class TaskATest
                 
                 long beginInfTime = System.currentTimeMillis();
                 
+                /*
+                 * Configure the inference engine.
+                 */
+                
+                Properties properties = new Properties(getProperties());
+
+                properties.setProperty(Options.JUSTIFY, "true");
+
+                properties.setProperty(
+                        Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
+
+//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
+                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
+
                 closureStats = new InferenceEngine(store).fastForwardClosure();
             
                 long elapsedInfTime = System.currentTimeMillis() - beginInfTime;
@@ -414,6 +431,7 @@ public class TaskATest
             "wordnetD+S",
             "-rdf data/wordnet_nouns-20010201.rdf -rdf data/wordnet-20000620.rdfs",
 
+            // @todo do closure times for cyc - it has a lot of subClassOf stuff.
 //            "OpenCyc",
 //            "cyc",
 //            "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
