@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.metrics;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.openrdf.sesame.constants.RDFFormat;
@@ -77,7 +76,7 @@ public class TestReferenceLoad extends AbstractMetricsTestCase {
         
         for(int i=0; i<files.length; i++) {
          
-            store.loadData(new File(files[i]), "", RDFFormat.RDFXML,
+            store.loadData(files[i], "", RDFFormat.RDFXML,
                     false/* verifyData */, false/*commit*/);
             
         }

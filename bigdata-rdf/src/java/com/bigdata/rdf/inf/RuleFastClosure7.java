@@ -42,37 +42,23 @@ Modifications:
 
 */
 /*
- * Created on Apr 17, 2007
+ * Created on Oct 25, 2007
  */
 
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.inf.InferenceEngine;
-import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
+import java.util.Set;
 
-/**
- * Additional parameters understood by the Sesame 1.x SAIL implementation.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- */
-public class Options extends com.bigdata.journal.Options {
+public class RuleFastClosure7 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
     /**
-     * This optional boolean property may be used to specify whether or not RDFS
-     * entailments are maintained by eager closure of the knowledge base
-     * (default false).
+     * @param inf
+     * @param C
      */
-    public static final String RDFS_CLOSURE = "rdfsClosure"; 
-
-    /**
-     * The property whose value is the name of the {@link ITripleStore} 
-     * implementation that will be instantiated.  An {@link InferenceEngine} 
-     * will be used to wrap that {@link ITripleStore}.
-     */
-    public static final String STORE_CLASS = "storeClass";
-    
-    public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
+    public RuleFastClosure7(InferenceEngine inf, Var x, Var y, Set<Long> C) {
+        
+        super(inf, x, inf.rdfsSubClassOf, y, C);
+        
+    }
     
 }

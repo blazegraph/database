@@ -59,6 +59,7 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -528,7 +529,11 @@ public class SPOBuffer {
              * to resolve the terms from the ids (since the lexicon is only in
              * the database).
              */
-            log.debug("add " + stmt.toString(store));
+
+            log.debug("add "
+                    + stmt.toString(store)
+                    + (justification == null ? "" : "\n"
+                            + justification.toString(store)));
         
         }
         
@@ -538,30 +543,23 @@ public class SPOBuffer {
      * Dumps the state of the buffer on {@link System#err}.
      * 
      * @param store
-     *            The terms in the statements are resolved against this store.
+     *            Used to resolve the term identifiers to {@link Value}s.
      * 
      * @todo also dump the justifications.
      */
     public void dump(ITripleStore store) {
         
-        System.err.println("capacity="+capacity);
-        
-        System.err.println("numStmts="+numStmts);
-
-        System.err.println("numJusts="+numJustifications);
-        
-        if(distinct) {
-            
-            System.err.println("#distinct="+distinctStmtMap.size());
-            
-        }
-        
+        System.err.println("capacity=" + capacity//
+                + ", numStmts=" + numStmts//
+                + ", numJusts=" + numJustifications//
+                + (distinct ? "#distinct=" + distinctStmtMap.size() : "")//
+        );
+                
         for (int i = 0; i < numStmts; i++) {
 
             SPO stmt = stmts[i];
 
-            System.err.println("#" + i + "\t"
-                    + store.toString(stmt.s, stmt.p, stmt.o));
+            System.err.println("#" + (i+1) + "\t" + stmt.toString(store));
             
         }
         

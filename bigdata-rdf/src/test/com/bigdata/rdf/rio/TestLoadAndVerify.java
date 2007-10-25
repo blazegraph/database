@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.rdf.rio;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,7 +59,6 @@ import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.StatementHandlerException;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
@@ -91,8 +89,8 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         
         AbstractTripleStore store = getStore();
         
-//        File file = new File("data/nciOncology.owl");
-        File file = new File("data/alibaba_v41.rdf");
+//        String file = "data/nciOncology.owl";
+        String file = "data/alibaba_v41.rdf";
     
         // load into the datbase.
         store.loadData(file, "" /* baseURI */, RDFFormat.RDFXML,

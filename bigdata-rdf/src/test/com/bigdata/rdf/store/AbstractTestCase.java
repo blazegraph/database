@@ -51,10 +51,10 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
 
-import org.openrdf.model.Value;
-
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
+
+import org.openrdf.model.Value;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
@@ -347,4 +347,65 @@ abstract public class AbstractTestCase
 
     }
     
+    /**
+     * Method verifies that the <i>actual</i> {@link Iterator}
+     * produces the expected objects in the expected order.  Objects
+     * are compared using {@link Object#equals( Object other )}.  Errors
+     * are reported if too few or too many objects are produced, etc.
+     * 
+     * @todo refactor to {@link TestCase2}.
+     */
+    static public void assertSameItr(Object[] expected, Iterator<?> actual) {
+
+        assertSameIterator("", expected, actual);
+
+    }
+
+//    /**
+//     * Method verifies that the <i>actual</i> {@link Iterator}
+//     * produces the expected objects in the expected order.  Objects
+//     * are compared using {@link Object#equals( Object other )}.  Errors
+//     * are reported if too few or too many objects are produced, etc.
+//     */
+//    static public void assertSameItr(String msg, Object[] expected,
+//            Iterator<?> actual) {
+//
+//        int i = 0;
+//
+//        while (actual.hasNext()) {
+//
+//            if (i >= expected.length) {
+//
+//                fail(msg + ": The iterator is willing to visit more than "
+//                        + expected.length + " objects.");
+//
+//            }
+//
+//            Object g = actual.next();
+//
+//            //        if (!expected[i].equals(g)) {
+//            try {
+//                assertSameValue(expected[i], g);
+//            } catch (AssertionFailedError ex) {
+//                /*
+//                 * Only do message construction if we know that the assert will
+//                 * fail.
+//                 */
+//                fail(msg + ": Different objects at index=" + i + ": expected="
+//                        + expected[i] + ", actual=" + g);
+//            }
+//
+//            i++;
+//
+//        }
+//
+//        if (i < expected.length) {
+//
+//            fail(msg + ": The iterator SHOULD have visited " + expected.length
+//                    + " objects, but only visited " + i + " objects.");
+//
+//        }
+//
+//    }
+
 }

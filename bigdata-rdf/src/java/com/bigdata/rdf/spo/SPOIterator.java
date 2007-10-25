@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.spo;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
@@ -152,6 +153,15 @@ public class SPOIterator implements ISPOIterator {
      * is a network outage.
      */
     final long TIMEOUT = 3000;
+    
+    /**
+     * This is always defined for this class.
+     */
+    public KeyOrder getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
     
     /**
      * Create an {@link SPOIterator} that buffers an iterator reading from one
@@ -423,6 +433,25 @@ public class SPOIterator implements ISPOIterator {
         
     }
 
+    public SPO[] nextChunk(KeyOrder keyOrder) {
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        SPO[] stmts = nextChunk();
+
+        if (keyOrder != this.keyOrder) {
+
+            // sort into the required order.
+
+            Arrays.sort(stmts, 0, stmts.length, keyOrder.getSPOComparator());
+
+        }
+
+        return stmts;
+
+    }
+    
     /**
      * Await some data from the reader (returns immediately if we are not using
      * an asynchronous reader). If there is some data available immediately,

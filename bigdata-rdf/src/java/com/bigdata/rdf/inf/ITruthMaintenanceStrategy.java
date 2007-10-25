@@ -45,13 +45,12 @@ Modifications:
  * Created on Oct 24, 2007
  */
 
-package com.bigdata.rdf.inf.tm;
+package com.bigdata.rdf.inf;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.spo.SPO;
 
 /**

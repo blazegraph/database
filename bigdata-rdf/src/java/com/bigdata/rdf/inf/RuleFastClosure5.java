@@ -41,44 +41,23 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.sail;
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
-
-/**
- * Aggregates test suites into increasing dependency order.
- *
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+/*
+ * Created on Oct 25, 2007
  */
-public class TestAll extends TestCase {
+
+package com.bigdata.rdf.inf;
+
+import java.util.Set;
+
+public class RuleFastClosure5 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
     /**
-     * 
+     * @param inf
+     * @param D
      */
-    public TestAll() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Returns a test that will run test suites in turn.
-     */
-    public static Test suite()
-    {
-
-        TestSuite suite = new TestSuite("SAIL");
-
-        suite.addTestSuite( TestBigdataRdfRepository.class );
-     
-        return suite;
+    public RuleFastClosure5(InferenceEngine inf, Var x, Var y, Set<Long> D) {
+        
+        super(inf, x, inf.rdfsDomain, y, D);
         
     }
     

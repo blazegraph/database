@@ -47,9 +47,7 @@
 
 package com.bigdata.rdf.store;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Properties;
 
 import org.apache.log4j.Level;
@@ -270,6 +268,11 @@ public interface ITripleStore {
     public IAccessPath getAccessPath(long s, long p, long o);
 
     /**
+     * Return the {@link IAccessPath} for the specified {@link KeyOrder}.
+     */
+    public IAccessPath getAccessPath(KeyOrder keyOrder);
+    
+    /**
      * Unconditionally removes statement(s) matching the triple pattern (NO
      * truth maintenance).
      * 
@@ -386,8 +389,13 @@ public interface ITripleStore {
     /**
      * Load data into the triple store (NO truth maintenance).
      * 
-     * @param file
-     *            The file.
+     * @param resource
+     *            The resource -or- file.
+     *            <p>
+     *            Note: To refer to a resource in a package somewhere on the
+     *            CLASSPATH write the name of the resource like this:
+     *            <code>/com/bigdata/rdf/inf/testClosure01.nt</code>. The
+     *            leading slash is important.
      * @param baseURI
      *            The baseURI or <code>""</code> if none is known.
      * @param rdfFormat
@@ -402,26 +410,8 @@ public interface ITripleStore {
      * @throws IOException
      *             if there is a problem when parsing the data.
      */
-    public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat,
+    public LoadStats loadData(String resource, String baseURI, RDFFormat rdfFormat,
             boolean verifyData, boolean commit) throws IOException;
-
-    /**
-     * Performs an efficient scan of a statement index returning the distinct
-     * term identifiers found in the first key component for the named access
-     * path. Depending on which access path you are using, this will be the term
-     * identifiers for the distinct subjects, predicates, or values in the KB.
-     * 
-     * @param keyOrder
-     *            Names the access path. Use {@link KeyOrder#SPO} to get the
-     *            term identifiers for the distinct subjects,
-     *            {@link KeyOrder#POS} to get the term identifiers for the
-     *            distinct predicates, and {@link KeyOrder#OSP} to get the term
-     *            identifiers for the distinct objects
-     * 
-     * @return The distinct term identifiers in the first key slot for the
-     *         triples in that index.
-     */
-    public ArrayList<Long> distinctTermScan(KeyOrder keyOrder);
 
     /**
      * Utility method dumps the statements in the store onto {@link System#err}

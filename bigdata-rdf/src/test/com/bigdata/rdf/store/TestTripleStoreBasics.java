@@ -75,16 +75,22 @@ public class TestTripleStoreBasics extends TestCase2 {
         TestSuite suite = new TestSuite(TestTripleStoreBasics.class.getPackage()
                 .getName());
 
+        // test adding terms and statements.
         suite.addTestSuite(TestTripleStore.class);
 
+        // test adding terms and statements is restart safe.
         suite.addTestSuite(TestRestartSafe.class);
 
+        // test suite for the access path api.
+        suite.addTestSuite(TestAccessPath.class);
+        
+        // somewhat dated test of sustained insert rate on synthetic data.
         suite.addTestSuite(TestInsertRate.class);
 
-        // test the integration with the rio parser for data loading.
+        // test suite for the rio parser and data loading integration.
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
-        // test the inference engine.
+        // test suite for the inference engine.
         suite.addTest(com.bigdata.rdf.inf.TestAll.suite());
 
         return suite;

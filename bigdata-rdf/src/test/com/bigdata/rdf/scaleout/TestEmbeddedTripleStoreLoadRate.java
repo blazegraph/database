@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.scaleout;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.openrdf.sesame.constants.RDFFormat;
@@ -79,7 +78,7 @@ public class TestEmbeddedTripleStoreLoadRate extends
 
     public void test_loadNCIOncology() throws IOException {
 
-        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+        store.loadData("data/nciOncology.owl", "", RDFFormat.RDFXML,
                 false, false /*commit*/);
 
     }

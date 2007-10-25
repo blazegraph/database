@@ -44,16 +44,6 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 /**
- * @todo Should we run this rule or backchain?
- *       <p>
- *       [MikeP] I would say generate, but you can backchain (I think?) as long
- *       as you have the full closure of the type hierarchy, specifically of ?
- *       type Class. If you don't have that (i.e. if you are not calculating the
- *       domain and range inferences), then you'd need to recursively backchain
- *       the tail too. That is why I did not do more backchaining - the
- *       backchain for ? type Resource is super easy because it's never longer
- *       than 1 move back.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

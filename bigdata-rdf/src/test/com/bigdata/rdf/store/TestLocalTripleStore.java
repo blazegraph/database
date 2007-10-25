@@ -147,7 +147,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
 
             properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.ISOLATABLE_INDICES,"false");
 
-            properties.setProperty(com.bigdata.rdf.sail.Options.STORE_CLASS,LocalTripleStore.class.getName());
+            properties.setProperty(com.bigdata.rdf.sail.BigdataRdfRepository.Options.STORE_CLASS,LocalTripleStore.class.getName());
             
             return properties;
             

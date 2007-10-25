@@ -48,68 +48,87 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Note: rdfs 5 and 11 use the same base class.
+ * Note: rdfs 6, 8, 10, 12, and 13 use the same base clase.
  * 
- * @see RuleRdfs05
- * @see RuleRdfs11
+ * @see RuleRdfs06
+ * @see RuleRdfs08
+ * @see RuleRdfs10
+ * @see RuleRdfs12
+ * @see RuleRdfs13
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleRdfs11 extends AbstractRuleTestCase {
+public class TestRuleRdfs10 extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestRuleRdfs11() {
+    public TestRuleRdfs10() {
     }
 
     /**
      * @param name
      */
-    public TestRuleRdfs11(String name) {
+    public TestRuleRdfs10(String name) {
         super(name);
     }
 
     /**
-     * Simple test verifies inference of a subclassof entailment.
+     * Test of {@link RuleRdfs10} where the data satisifies the rule exactly
+     * once.
+     * 
+     * <pre>
+     *         triple(?u,rdfs:subClassOf,?u) :-
+     *            triple(?u,rdf:type,rdfs:Class). 
+     * </pre>
      */
-    public void test_rdfs11() {
+    public void test_rdfs10_01() {
 
         AbstractTripleStore store = getStore();
-        
-        InferenceEngine inf = new InferenceEngine(store);
-        
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
 
-        URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+        try {
 
-        store.addStatement(A, rdfsSubClassOf, B);
-        store.addStatement(B, rdfsSubClassOf, C);
+            URI A = new URIImpl("http://www.foo.org/A");
 
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertFalse(store.containsStatement(A, rdfsSubClassOf, C));
+            StatementBuffer buffer = new StatementBuffer(store,
+                    100/* capacity */, true/* distinct */);
+            
+            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
 
-        applyRule(inf.rdfs11, 1/* numComputed */);
-        
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, C));
+            // write on the store.
+            buffer.flush();
 
-        store.closeAndDelete();
+            // verify statement(s).
+            assertTrue(store.containsStatement(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+
+            InferenceEngine inf = new InferenceEngine(store);
+
+            // apply the rule.
+            RuleStats stats = applyRule(inf.rdfs10, 1/*expectedComputed*/);
+
+            /*
+             * validate the state of the primary store.
+             */
+
+            // told
+            assertTrue(store.containsStatement(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            
+            // entailed
+            assertTrue(store.containsStatement(A, URIImpl.RDFS_SUBCLASSOF, A));
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
         
     }
-    
+        
 }

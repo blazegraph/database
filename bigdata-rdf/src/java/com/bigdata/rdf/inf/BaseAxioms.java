@@ -49,9 +49,9 @@ package com.bigdata.rdf.inf;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 

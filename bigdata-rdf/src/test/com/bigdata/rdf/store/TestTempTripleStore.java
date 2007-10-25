@@ -126,14 +126,16 @@ public class TestTempTripleStore extends AbstractTestCase {
     public static class TestRdfRepository extends TestBigdataRdfRepository {
 
         public TestRdfRepository(String arg0) {
+      
             super(arg0);
+            
         }
 
         public Properties getProperties() {
             
             Properties properties = new Properties();
             
-            properties.setProperty(com.bigdata.rdf.sail.Options.STORE_CLASS,TempTripleStore.class.getName());
+            properties.setProperty(com.bigdata.rdf.sail.BigdataRdfRepository.Options.STORE_CLASS,TempTripleStore.class.getName());
             
             return properties;
             

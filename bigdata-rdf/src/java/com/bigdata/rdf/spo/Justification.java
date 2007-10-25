@@ -4,6 +4,7 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -64,7 +65,12 @@ public class Justification implements Comparable<Justification> {
     /**
      * The #of term identifiers in a statement.
      */
-    public static final transient int N = 3;
+    private static final transient int N = ITripleStore.N;
+    
+    /**
+     * From the ctor, but not persisted.
+     */
+    private final transient Rule rule;
     
     /**
      * Term identifiers for the head and bindings.
@@ -102,9 +108,12 @@ public class Justification implements Comparable<Justification> {
      */
     public Justification(Rule rule, SPO head, SPO[] bindings) {
 
+        assert rule != null;
         assert head != null;
         assert bindings != null;
 
+        this.rule = rule;
+        
         ids = new long[ (1 + bindings.length ) * N];
 
         int i = 0;
@@ -141,8 +150,14 @@ public class Justification implements Comparable<Justification> {
      */
     public Justification(Rule rule, SPO head, long[] bindings) {
 
+        assert rule != null;
+        assert head != null;
+        assert bindings != null;
+        
         // verify enough bindings for one or more triple patterns.
         assert bindings.length % N == 0;
+        
+        this.rule = rule;
         
         // #of triple patterns in the tail.
         final int m = bindings.length / N;
@@ -171,6 +186,8 @@ public class Justification implements Comparable<Justification> {
      *            The key.
      */
     public Justification(byte[] key) {
+        
+        this.rule = null; // Not persisted.
         
         // verify key is even multiple of (N*sizeof(long)).
         assert key.length % (N * Bytes.SIZEOF_LONG) == 0;
@@ -271,5 +288,81 @@ public class Justification implements Comparable<Justification> {
         return 0;
         
     }
-    
+
+    public String toString() {
+        
+        return toString(null);
+        
+    }
+
+    public String toString(ITripleStore db) {
+
+        StringBuilder sb = new StringBuilder();
+
+        if (rule != null) {
+
+            sb.append(rule.getClass().getSimpleName());
+
+            sb.append("\n");
+
+        }
+
+        // tail
+        {
+
+            // #of triple patterns in the tail.
+            final int m = (ids.length / N) - 1;
+
+            for( int i=0; i<m; i++) {
+
+                sb.append("   (");
+
+                for( int j=0; j<N; j++ ) {
+                    
+                    long id = ids[i*N+N+j];
+                    
+                    sb.append((db == null ? "" + id : db.toString(id)));
+
+                    if (j+1 < N)
+                        sb.append(", ");
+
+                }
+
+                sb.append(")");
+
+                if (i + 1 < m) {
+
+                    sb.append(", \n");
+                    
+                }
+                
+            }
+            
+            sb.append("\n   -> ");
+            
+        }
+        
+        // head
+        {
+
+            sb.append("(");
+
+            for (int i = 0; i < N; i++) {
+
+                long id = ids[i];
+                
+                sb.append((db == null ? "" + id : db.toString(id)));
+
+                if (i+1 < N)
+                    sb.append(", ");
+
+            }
+            sb.append(")");
+            
+        }
+
+        return sb.toString();
+
+    }
+
 }

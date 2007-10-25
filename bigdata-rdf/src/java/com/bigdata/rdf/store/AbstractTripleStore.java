@@ -47,10 +47,11 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -82,9 +83,11 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.isolation.IsolatableFusedView;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule;
@@ -101,15 +104,13 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
-import com.bigdata.rdf.spo.OSPComparator;
-import com.bigdata.rdf.spo.POSComparator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOBuffer;
-import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.ClientIndexView;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -217,6 +218,38 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         return collator;
         
     }
+
+//    /**
+//     * Return an object that may be used to buffer {@link Statement}s for batch
+//     * operations.
+//     * <p>
+//     * Note: This is used by the Sesame integration points (RIO parser and SAIL)
+//     * to efficiently translate between the {@link Statement} and {@link Value}
+//     * object models and the term identifiers and {@link SPO} objects used
+//     * internally for operations on the statement indices.
+//     * 
+//     * @param capacity
+//     *            The capacity of the buffer before it will overflow.
+//     * 
+//     * @return A {@link StatementBuffer}.
+//     * 
+//     * @see StatementBuffer
+//     * 
+//     * FIXME {@link StatementBuffer} should support arbitrary chunked batch
+//     * operations on overflow, not just insert into the store.  We may need
+//     * a pipe (writer, consumer) model for this.
+//     */
+//    public StatementBuffer getStatementBuffer(int capacity) {
+//        
+//        if (capacity == 0) {
+//            
+//            capacity = 100 * Bytes.kilobyte32;
+//            
+//        }
+//        
+//        return new StatementBuffer(this,capacity,true/*distinct*/);
+//        
+//    }
     
     /**
      * A service used to write on each of the statement indices in parallel.
@@ -231,88 +264,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     public ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
             DaemonThreadFactory.defaultThreadFactory());
 
-    /**
-     * Performs an efficient scan of a statement index returning the distinct
-     * term identifiers found in the first key component for the named access
-     * path. Depending on which access path you are using, this will be the term
-     * identifiers for the distinct subjects, predicates, or values in the KB.
-     * 
-     * @param keyOrder
-     *            Names the access path. Use {@link KeyOrder#SPO} to get the
-     *            term identifiers for the distinct subjects,
-     *            {@link KeyOrder#POS} to get the term identifiers for the
-     *            distinct predicates, and {@link KeyOrder#OSP} to get the term
-     *            identifiers for the distinct objects
-     * 
-     * @return The distinct term identifiers in the first key slot for the
-     *         triples in that index.
-     * 
-     * @todo This will need to be modified to return an iterator that
-     *       encapsulates the logic so that the distinct term scan may be
-     *       applied when very large #s of terms would be visited. For this case
-     *       it is also possible to parallelize the scan IFF the index partition
-     *       boundaries are choosen such that the entries for a term never cross
-     *       an index partition bounary.
-     */
-    final public ArrayList<Long> distinctTermScan(KeyOrder keyOrder) {
-
-        /*
-         * The implementation uses a key scan to find the first term identifer
-         * for the given index. It then forms a fromKey that starts at the next
-         * possible term identifier and does another scan, thereby obtaining the
-         * 2nd distinct term identifier for that position on that index. This
-         * process is repeated iteratively until the key scan no longer
-         * identifies a match. This approach skips quickly over regions of the
-         * index which have many statements for the same term and makes N+1
-         * queries to identify N distinct terms.  Note that there is no way to
-         * pre-compute the #of distinct terms that will be identified short of
-         * running the queries.
-         */
-        ArrayList<Long> ids = new ArrayList<Long>(1000);
-        
-        byte[] fromKey = null;
-        
-        final byte[] toKey = null;
-        
-        IIndex ndx = getStatementIndex(keyOrder);
-        
-        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
-        
-        long[] tmp = new long[3];
-        
-        while(itr.hasNext()) {
-            
-            itr.next();
-            
-            // extract the term ids from the key. 
-            RdfKeyBuilder.key2Statement(itr.getKey(), tmp); 
-
-            final long id = tmp[0];
-            
-            // append tmp[0] to the output list.
-            ids.add(id);
-
-//            System.err.println(ids.size() + " : " + id + " : "
-//                    + toString(id));
-            
-            // restart scan at the next possible term id.
-
-            final long nextId = id + 1;
-            
-            fromKey = keyBuilder.statement2Key(nextId, NULL, NULL);
-            
-            // new iterator.
-            itr = ndx.rangeIterator(fromKey, toKey);
-            
-        }
-        
-//        System.err.println("Distinct key scan: KeyOrder=" + keyOrder
-//                + ", #terms=" + ids.size());
-        
-        return ids;
-        
-    }
-    
     final public void generateSortKeys(RdfKeyBuilder keyBuilder,
             _Value[] terms, int numTerms) {
         
@@ -345,21 +296,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    final public Comparator<SPO> getSPOComparator(KeyOrder keyOrder) {
-        
-        switch (keyOrder) {
-        case SPO:
-            return SPOComparator.INSTANCE;
-        case POS:
-            return POSComparator.INSTANCE;
-        case OSP:
-            return OSPComparator.INSTANCE;
-        default:
-            throw new IllegalArgumentException("Unknown: " + keyOrder);
-        }
-        
-    }
-    
     final public int getStatementCount() {
         
         return getSPOIndex().rangeCount(null,null);
@@ -420,18 +356,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
-    final public LoadStats loadData(File file, String baseURI, RDFFormat rdfFormat,
-            boolean verifyData, boolean commit) throws IOException {
+    final public LoadStats loadData(String resource, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData, boolean commit) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
         LoadStats stats = new LoadStats();
         
-        log.debug( "loading: " + file.getAbsolutePath() );
+        log.info( "loading: " + resource );
 
         /*
          * Note: distinct := true has substantially better performance.
          */
+        
         IRioLoader loader = new PresortRioLoader(this, rdfFormat, verifyData,
                 getDataLoadBufferCapacity(), true /* distinct */);
 
@@ -456,8 +393,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * InputStream (SAX Source).  Changing this means updating all of
          * the parser implementations, not just the PresortRioLoader.
          */
-        Reader reader = new BufferedReader(new InputStreamReader(
-                new FileInputStream(file)));
+        
+        InputStream rdfStream = getClass().getResourceAsStream(resource);
+
+        if (rdfStream == null) {
+
+            // If we do not find as a Resource then try the file system.
+            rdfStream = new BufferedInputStream(new FileInputStream(resource));
+
+        }
+
+        Reader reader = new BufferedReader(new InputStreamReader(rdfStream));
         
         try {
             
@@ -495,7 +441,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         } catch ( Exception ex ) {
             
-            throw new RuntimeException("While loading: "+file, ex);
+            throw new RuntimeException("While loading: "+resource, ex);
             
         } finally {
             
@@ -621,9 +567,39 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    /**
+     * FIXME define a means to obtain a fused view of the access path selected
+     * by a triple pattern in this database and in another triple store, which
+     * will typically be a {@link TempTripleStore}. This will be used to
+     * support TM so that we can read from a fused view. This can be implemented
+     * using a {@link ReadOnlyFusedView} or an {@link IsolatableFusedView}.
+     * There will have to be a similar mechanism for the {@link ClientIndexView}.
+     */
     final public IAccessPath getAccessPath(long s, long p, long o) {
         
         return new AccessPath(s,p,o);
+        
+    }
+    
+    final public IAccessPath getAccessPath(KeyOrder keyOrder) {
+
+        /*
+         * Note: An arbitrary non-NULL term identifier is used to select the
+         * access path. This means that AccessPath.getTriplePattern() will
+         * return the same arbitrary term identifier when the means is used to
+         * obtain an IAccessPath.
+         */
+        
+        switch (keyOrder) {
+        case SPO:
+            return new AccessPath(1,NULL,NULL);
+        case POS:
+            return new AccessPath(NULL,1,NULL);
+        case OSP:
+            return new AccessPath(NULL,NULL,1);
+        default:
+            throw new AssertionError();
+        }
         
     }
     
@@ -866,7 +842,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     return 1;
                     
                 }
-                    
+                
                 return 0;
                 
             }
@@ -939,7 +915,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                             IIndex ndx = getIndex();
 
                             // Place statements in index order.
-                            Arrays.sort(a, 0, numStmts, getSPOComparator(keyOrder));
+                            Arrays.sort(a, 0, numStmts, keyOrder.getSPOComparator());
 
                             final long beginWrite = System.currentTimeMillis();
                             
@@ -1022,6 +998,86 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         }
 
+        /**
+         * The implementation uses a key scan to find the first term identifer
+         * for the given index. It then forms a fromKey that starts at the next
+         * possible term identifier and does another scan, thereby obtaining the
+         * 2nd distinct term identifier for that position on that index. This
+         * process is repeated iteratively until the key scan no longer
+         * identifies a match. This approach skips quickly over regions of the
+         * index which have many statements for the same term and makes N+1
+         * queries to identify N distinct terms. Note that there is no way to
+         * pre-compute the #of distinct terms that will be identified short of
+         * running the queries.
+         * 
+         * @todo This will need to be modified to return a chunked iterator that
+         *       encapsulates the logic so that the distinct term scan may be
+         *       applied when very large #s of terms would be visited.
+         *       <p>
+         *       If the indices are range partitioned and the iterator only
+         *       guarentee "distinct" (and not also ordered) then those steps be
+         *       parallelized. The only possibility for conflict is when the
+         *       last distinct term identifier is read from one index before the
+         *       right sibling index partition has reported its first distinct
+         *       term identifier.
+         *       <p>
+         *       If the indices are range partitioned and distinct + ordered is
+         *       required, then the operation can not be parallelized, or if it
+         *       is parallelized then a merge sort must be done before returning
+         *       the first result.
+         *       <p>
+         *       Likewise, if the indices are hash partitioned, then we can do
+         *       parallel index scans and a merge sort but the caller will have
+         *       to wait for the merge sort to complete before obtaining the 1st
+         *       result.
+         */
+        public Iterator<Long> distinctTermScan() {
+
+            ArrayList<Long> ids = new ArrayList<Long>(1000);
+            
+            byte[] fromKey = null;
+            
+            final byte[] toKey = null;
+            
+            IIndex ndx = getIndex();
+            
+            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+            
+            long[] tmp = new long[N];
+            
+            while(itr.hasNext()) {
+                
+                itr.next();
+                
+                // extract the term ids from the key. 
+                RdfKeyBuilder.key2Statement(itr.getKey(), tmp); 
+
+                final long id = tmp[0];
+                
+                // append tmp[0] to the output list.
+                ids.add(id);
+
+//                System.err.println(ids.size() + " : " + id + " : "
+//                        + toString(id));
+                
+                // restart scan at the next possible term id.
+
+                final long nextId = id + 1;
+                
+                fromKey = keyBuilder.statement2Key(nextId, NULL, NULL);
+                
+                // new iterator.
+                itr = ndx.rangeIterator(fromKey, toKey);
+                
+            }
+            
+//            System.err.println("Distinct key scan: KeyOrder=" + keyOrder
+//                    + ", #terms=" + ids.size());
+            
+            return ids.iterator();
+            
+        }
+        
     }
     
     final public int removeStatements(Resource s, URI p, Value o) {
@@ -1090,12 +1146,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     final public String toString( long termId ) {
-        
+
+        if (termId == 0)
+            return "0";
+
         _Value v = getTerm(termId);
 
-//        if(v == null) return TERM_NOT_FOUND;
-        if(v == null) return "<NOT_FOUND#"+termId+">";
-        
+        if (v == null)
+            return "<NOT_FOUND#" + termId + ">";
+
         return (v instanceof URI ? abbrev((URI) v) : v.toString());
         
     }
@@ -1127,27 +1186,67 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     final public void dumpStore() {
+    
+        dumpStore(true, true, true);
+        
+    }
+
+    final public void dumpStore(boolean explicit, boolean inferred, boolean axioms) {
 
         final int nstmts = getStatementCount();
-        
-        System.err.println("#statements="+nstmts);
         
         IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
 
         int i = 0;
+
+        int nexplicit = 0;
+        int ninferred = 0;
+        int naxioms = 0;
         
         while (itr.hasNext()) {
 
             Object val = itr.next();
             
-            i++;
-            
             SPO spo = new SPO(KeyOrder.SPO,itr.getKey(), val);
 
-            System.err.println("#" + i + "\t" + spo.toString(this));
+            switch (spo.type) {
+
+            case Explicit:
+                nexplicit++;
+                if (!explicit)
+                    continue;
+                else
+                    break;
+            
+            case Inferred:
+                ninferred++;
+                if (!inferred)
+                    continue;
+                else
+                    break;
+            
+            case Axiom:
+                naxioms++;
+                if (!axioms)
+                    continue;
+                else
+                    break;
+            
+            default:
+                throw new AssertionError();
+            
+            }
+            
+            System.err.println("#" + (i+1) + "\t" + spo.toString(this));
+            
+            i++;
             
         }
-        
+
+        System.err.println("dumpStore: #statements=" + nstmts + ", #explicit="
+                + nexplicit + ", #inferred=" + ninferred + ", #axioms="
+                + naxioms);
+
     }
     
     /**
@@ -1366,8 +1465,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
        
 //        if( numStmts == 0 ) return 0;
 
-        return addStatements(stmts, numStmts, null );
-        
+        return addStatements( new SPOArrayIterator(stmts,numStmts), null /*filter*/);
     }
     
     public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter ) {
@@ -1478,7 +1576,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         }
 
-                        this.comparator = getSPOComparator(keyOrder);
+                        this.comparator = keyOrder.getSPOComparator();
 
                         this.ndx = getStatementIndex(keyOrder);
 

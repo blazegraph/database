@@ -47,6 +47,13 @@ Modifications:
 
 package com.bigdata.rdf.util;
 
+import java.util.Comparator;
+
+import com.bigdata.rdf.spo.OSPComparator;
+import com.bigdata.rdf.spo.POSComparator;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOComparator;
+
 /**
  * Represents the key order used by an index.
  * 
@@ -67,57 +74,19 @@ public enum KeyOrder {
         
     }
     
-//    private static final long NULL = ITripleStore.NULL;
-//    
-//    /**
-//     * Return the access path that should be used for the triple pattern.
-//     * 
-//     * @param s
-//     *            The optional subject identifier or {@link ITripleStore#NULL}.
-//     * @param p
-//     *            The optional subject identifier or {@link ITripleStore#NULL}.
-//     * @param o
-//     *            The optional subject identifier or {@link ITripleStore#NULL}.
-//     * 
-//     * @return The KeyOrder that identifies the index to use for that triple
-//     *         pattern.
-//     */
-//    public static KeyOrder getKeyOrder(long s, long p, long o) {
-//
-//        if (s != NULL && p != NULL && o != NULL) {
-//
-//            return SPO;
-//
-//        } else if (s != NULL && p != NULL) {
-//
-//            return SPO;
-//
-//        } else if (s != NULL && o != NULL) {
-//
-//            return OSP;
-//
-//        } else if (p != NULL && o != NULL) {
-//
-//            return POS;
-//
-//        } else if (s != NULL) {
-//
-//            return SPO;
-//
-//        } else if (p != NULL) {
-//
-//            return POS;
-//
-//        } else if (o != NULL) {
-//
-//            return OSP;
-//
-//        } else {
-//
-//            return SPO;
-//
-//        }
-//
-//    }
+    final public Comparator<SPO> getSPOComparator() {
+        
+        switch (this) {
+        case SPO:
+            return SPOComparator.INSTANCE;
+        case POS:
+            return POSComparator.INSTANCE;
+        case OSP:
+            return OSPComparator.INSTANCE;
+        default:
+            throw new IllegalArgumentException("Unknown: " + this);
+        }
+        
+    }
     
 }

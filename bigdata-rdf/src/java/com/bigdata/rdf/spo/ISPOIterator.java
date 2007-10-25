@@ -49,8 +49,13 @@ package com.bigdata.rdf.spo;
 
 import java.util.Iterator;
 
+import com.bigdata.rdf.util.KeyOrder;
+
 /**
  * Iterator visits {@link SPO}s.
+ * 
+ * @todo verify that all {@link ISPOIterator}s are being closed within a
+ *       <code>finally</code> clause.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -84,16 +89,47 @@ public interface ISPOIterator extends Iterator<SPO> {
     public void close();
 
     /**
-     * Return the next "chunk" of statements from the iterator. The size of the
-     * chunk is up to the implementation.
+     * Return the next "chunk" of statements from the iterator. The statements
+     * will be in the same order that they would be visited by
+     * {@link Iterator#next()}. The size of the chunk is up to the
+     * implementation.
      * <p>
      * This is designed to make it easier to write methods that use the batch
      * APIs but do not require the statements matching some triple pattern to be
      * fully materialized. You can use {@link #nextChunk()} instead of
-     * {@link #nextChunk()} to break down the operation into N chunks, where N
-     * is determined dynamically based on how much data the iterator returns in
-     * each chunk and how much data there is to be read.
+     * {@link Iterator#next()} to break down the operation into N chunks, where
+     * N is determined dynamically based on how much data the iterator returns
+     * in each chunk and how much data there is to be read.
+     * 
+     * @return The next chunk of statements.
+     * 
+     * @see #nextChunk(KeyOrder)
      */
     public SPO[] nextChunk();
+
+    /**
+     * Return the next "chunk" of statements from the iterator. The statements
+     * will be in the specified order. If {@link #getKeyOrder()} would return
+     * non-<code>null</code> and the request order corresponds to the value
+     * that would be returned by {@link #getKeyOrder()} then the statements in
+     * the next chunk are NOT sorted. Otherwise the statements in the next chunk
+     * are sorted before they are returned. The size of the chunk is up to the
+     * implementation.
+     * 
+     * @param keyOrder
+     *            The order for the statements in the chunk.
+     * 
+     * @return The next chunk of statements in the specified order.
+     */
+    public SPO[] nextChunk(KeyOrder keyOrder);
+
+    /**
+     * The {@link KeyOrder} in which statements are being visited and
+     * <code>null</code> if not known.
+     * 
+     * @return The order in which statemetns are being visited -or-
+     *         <code>null</code> if not known.
+     */
+    public KeyOrder getKeyOrder();
     
 }

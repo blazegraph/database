@@ -75,21 +75,44 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("RDFS inference");
+        TestSuite suite = new TestSuite("RDF(S)+ inference and truth maintenance");
 
+        // test suite for rdf1.
         suite.addTestSuite( TestRuleRdf01.class );
 
+        // Note: rdfs 2, 3, 7, and 9 use the same base class.
         suite.addTestSuite( TestRuleRdfs07.class );
-        
-        suite.addTestSuite( TestRuleRdfs11.class );
 
+        // Note: rdfs 6, 8, 10, 12, and 13 use the same base clase.
+        suite.addTestSuite( TestRuleRdfs10.class );
+
+        // Note: rdfs 5 and 11 use the same base class.
+        suite.addTestSuite( TestRuleRdfs11.class );
+        
+        // Note: fast closure rules using the same base class.
         suite.addTestSuite( TestRuleFastClosure_11_13.class );
 
+        // Note: fast closure rules using the same base class.
+        suite.addTestSuite( TestRuleFastClosure_3_5_6_7_9.class );
+
         /*
+         * @todo test suite for mapping a rule over new and (old+new) data.
+         * 
          * @todo write test for fixPoint().
          */
-        suite.addTestSuite( TestFullForwardClosure.class );
+
+        // test suite for RDFS closure correctness.
+        suite.addTestSuite( TestRDFSClosure.class );
         
+        // @todo test suite for backward chaining of (?x rdf:type rdfs:Resource).
+
+        // @todo test suite for RDFS closure correctness with incremental load.
+
+        // @todo test suite for RDFS closure correctness with incremental delete.
+
+        // @todo test suite for backward chaining of (?x owl:sameAs ?y).
+        
+        // test suite for semi-naive evaluation (magic sets / SLD).
         suite.addTestSuite( TestMagicSets.class);
 
         return suite;

@@ -54,7 +54,12 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
+ * Note: rdfs 2, 3, 7, and 9 use the same base class.
+ * 
+ * @see RuleRdfs02
+ * @see RuleRdfs03
  * @see RuleRdfs07
+ * @see RuleRdfs09
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
