@@ -97,7 +97,7 @@ public class TestDistributedTripleStoreLoadRate extends AbstractDistributedTripl
 
     public void test_loadNCIOncology() throws IOException {
 
-        store.loadData(new File("data/nciOncology.owl"), "", RDFFormat.RDFXML,
+        store.loadData("data/nciOncology.owl", "", RDFFormat.RDFXML,
                 false, false /*commit*/);
 
     }

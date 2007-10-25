@@ -46,6 +46,7 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
@@ -89,95 +90,111 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
         
         // the predicate is fixed for all parts of the rule.
         final long p = head.p.id;
-        
-        // the key for that predicate.
-        final byte[] pkey = db.getKeyBuilder().statement2Key(p, NULL, NULL);
-
-        // the successor of that key.
-        final byte[] pkey1 = db.getKeyBuilder().statement2Key(p + 1, NULL,
-                NULL);
 
         /*
          * Query for the 1st part of the rule.
          * 
-         * Note that it does not matter which half of the rule we execute
-         * first since they are both 2-unbound with the same predicate bound
-         * and will therefore have exactly the same results.
+         * Note that it does not matter which half of the rule we execute first
+         * since they are both 2-unbound with the same predicate bound and will
+         * therefore have exactly the same results.
          * 
-         * Further note that we can perform a self-join on the returned
-         * triples without going back to the database.
+         * Further note that we can perform a self-join on the returned triples
+         * without going back to the database.
+         * 
+         * FIXME The self-join requires that we fully buffer the statements. If
+         * they are not fully buffered then the self-join within a chunk can
+         * fail since the statement index is being traversed in POS order but we
+         * are joining stmt1.o := stmt2.s, which requires SPO order.
+         * 
+         * FIXME The requirement here to fully materialize the SPO[] for the POS
+         * index limits scalability for closure to main memory.
          */
 
-        // in POS order.
-        final SPO[] stmts1 = db.getStatements(KeyOrder.POS, pkey, pkey1);
+        ISPOIterator itr = db.getAccessPath(NULL, p, NULL).iterator();
 
-        stats.stmts1 += stmts1.length;
+        int nchunks = 0;
         
-        // in SPO order.
-        Arrays.sort(stmts1,SPOComparator.INSTANCE);
-        
-        // a clone of the answer set
-//        SPO[] stmts2 = stmts1.clone();
-//        final SPO[] stmts2 = stmts1;
-
-//        stats.stmts2 += stmts2.length;
-
-        // self-join using binary search.
-        for (int i = 0; i < stmts1.length; i++) {
-
-            SPO left = stmts1[i];
+        while(itr.hasNext()) {
             
-            // printStatement(stmts1[i]);
-
-            /*
-             * Search for the index of the first statement having left.s as its
-             * subject. Note that the object is NULL, so this should always
-             * return a negative index which we then convert to the insert
-             * position. The insert position is the first index at which a
-             * matching statement would be found. We then scan statements from
-             * that point. As soon as there is no match (and it may be that
-             * there is no match even on the first statement tested) we break
-             * out of the inner loop and continue with the outer loop.
-             */ 
+            // Note: The data will be in POS order, so we resort to SPO order.
             
-            // Note: The StatementEnum is ignored by the SPOComparator.
-            SPO key = new SPO(left.o, p, ITripleStore.NULL,
-                    StatementEnum.Explicit);
+            SPO[] stmts1 = itr.nextChunk(KeyOrder.POS);
             
-            // Fing the index of that key (or the insert position).
-            int j = Arrays.binarySearch(stmts1, key, SPOComparator.INSTANCE);
-
-            if (j < 0) {
-
-                // Convert the position to obtain the insertion point.
-                j = -j - 1;
-                
-            }
+            stats.stmts1 += stmts1.length;
             
-            // process only the stmts with left.s as their subject.
-            for (; j < stmts1.length; j++) {
+            // in SPO order.
+            Arrays.sort(stmts1,SPOComparator.INSTANCE);
+            
+            // self-join using binary search.
+            for (int i = 0; i < stmts1.length; i++) {
 
-                if (left.o != stmts1[j].s) break;
+                SPO left = stmts1[i];
                 
-                SPO stmt2 = stmts1[j];
+                /*
+                 * Search for the index of the first statement having left.s as its
+                 * subject. Note that the object is NULL, so this should always
+                 * return a negative index which we then convert to the insert
+                 * position. The insert position is the first index at which a
+                 * matching statement would be found. We then scan statements from
+                 * that point. As soon as there is no match (and it may be that
+                 * there is no match even on the first statement tested) we break
+                 * out of the inner loop and continue with the outer loop.
+                 */ 
                 
-                SPO newSPO = new SPO(left.s, p, stmt2.o, StatementEnum.Inferred);
+                // Note: The StatementEnum is ignored by the SPOComparator.
+                SPO key = new SPO(left.o, p, ITripleStore.NULL,
+                        StatementEnum.Explicit);
+                
+                // Find the index of that key (or the insert position).
+                int j = Arrays.binarySearch(stmts1, key, SPOComparator.INSTANCE);
 
-                Justification jst = null;
-                
-                if(justify) {
-                    
-                    jst = new Justification(this, newSPO, new SPO[] { left,
-                            stmt2 });
+                if (j < 0) {
+
+                    // Convert the position to obtain the insertion point.
+                    j = -j - 1;
                     
                 }
                 
-                buffer.add(newSPO, jst);
+                // process only the stmts with left.s as their subject.
+                for (; j < stmts1.length; j++) {
 
-                stats.numComputed++;
+                    if (left.o != stmts1[j].s) break;
+                    
+                    SPO stmt2 = stmts1[j];
+                    
+                    SPO newSPO = new SPO(left.s, p, stmt2.o, StatementEnum.Inferred);
+
+                    Justification jst = null;
+                    
+                    if(justify) {
+                        
+                        jst = new Justification(this, newSPO, new SPO[] { left,
+                                stmt2 });
+                        
+                    }
+                    
+                    buffer.add(newSPO, jst);
+
+                    stats.numComputed++;
+                    
+                }
+
+                nchunks++;
                 
             }
 
+            if(nchunks>1) {
+                
+                /*
+                 * The self-join trick above only works if we can fully buffer
+                 * the statements. If we are getting more than one chunk of
+                 * statements then we MUST process this using subqueries.
+                 */
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
         }
         
         stats.elapsed += System.currentTimeMillis() - computeStart;

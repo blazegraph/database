@@ -233,6 +233,18 @@ public class BigdataRdfRepository implements RdfRepository {
     public BigdataRdfRepository() {
     }
 
+    /**
+     * Alternative constructor used to wrap an existing store - you MUST still
+     * invoke {@link #initialize(Map)}.
+     * 
+     * @param store
+     */
+    public BigdataRdfRepository(AbstractTripleStore store) {
+
+        this.database = store;
+        
+    }
+    
     //
     // SailChangedListener support.
     //
@@ -1153,6 +1165,32 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     /**
+     * Additional parameters understood by the Sesame 1.x SAIL implementation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Options extends com.bigdata.journal.Options {
+
+        /**
+         * This optional boolean property may be used to specify whether or not RDFS
+         * entailments are maintained by eager closure of the knowledge base
+         * (default false).
+         */
+        public static final String RDFS_CLOSURE = "rdfsClosure"; 
+
+        /**
+         * The property whose value is the name of the {@link ITripleStore} 
+         * implementation that will be instantiated.  An {@link InferenceEngine} 
+         * will be used to wrap that {@link ITripleStore}.
+         */
+        public static final String STORE_CLASS = "storeClass";
+        
+        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
+        
+    }
+
+    /**
      * @param configParams
      *            See {@link Options} for the persistence store options.
      *            <p>
@@ -1189,8 +1227,11 @@ public class BigdataRdfRepository implements RdfRepository {
         
         valueFactory = OptimizedValueFactory.INSTANCE;
 
-        // storeClass
-        {
+        if(database==null) {
+
+            /*
+             * Create/re-open the database.
+             */
             
             final AbstractTripleStore database;
             
@@ -1225,14 +1266,15 @@ public class BigdataRdfRepository implements RdfRepository {
             // the database.
             this.database = database;
             
-            // buffer used to optimized writes.
-            this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
-            
-            // inference engine used to maintain RDF(S) closure.
-            this.inferenceEngine = new InferenceEngine( database );
-            
         }
+
+        // buffer used to optimize writes.
+        this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
         
+        // inference engine used to maintain RDF(S) closure.
+        this.inferenceEngine = new InferenceEngine(PropertyUtil
+                .convert(configParams), database);
+            
     }
     
     public void shutDown() {

@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.spo;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.IEntryIterator;
@@ -71,6 +72,12 @@ public class SPOArrayIterator implements ISPOIterator {
      * The database (optional).
      */
     private AbstractTripleStore db;
+
+    /**
+     * The {@link KeyOrder} in which statements are being visited and
+     * <code>null</code> if not known.
+     */
+    private final KeyOrder keyOrder;
     
     /** SPO buffer. */
     private SPO[] stmts;
@@ -102,12 +109,20 @@ public class SPOArrayIterator implements ISPOIterator {
         return numStmts;
         
     }
+
+    public KeyOrder getKeyOrder() {
+        
+        return keyOrder;
+        
+    }
     
     /**
-     * An iterator that visits the {@link SPO}s in the given array.
+     * An iterator that visits the {@link SPO}s in the given array whose
+     * {@link KeyOrder} is NOT known.
      * <p>
      * Note: This constructor variant results in an iterator that does NOT
-     * support {@link #remove()}
+     * support {@link #remove()} and whose {@link #getKeyOrder()} method returns
+     * <code>null</code>.
      * 
      * @param stmts
      *            The statements.
@@ -116,7 +131,14 @@ public class SPOArrayIterator implements ISPOIterator {
      */
     public SPOArrayIterator(SPO[] stmts, int numStmts) {
 
-        this(null, stmts, numStmts);
+        this.db = null; // not available (remove is disabled).
+
+        this.keyOrder = null; // not known.
+        
+        this.stmts = stmts;
+        
+        this.numStmts = numStmts;
+
         
     }
 
@@ -127,14 +149,19 @@ public class SPOArrayIterator implements ISPOIterator {
      * @param db
      *            The database - when non-<code>null</code> the iterator will
      *            support {@link #remove()}.
+     * @param keyOrder
+     *            The order of the data in <i>stmts</i> and <code>null</code>
+     *            IFF the order is NOT known.
      * @param stmts
      *            The statements.
      * @param numStmts
      *            The #of entries in <i>stmts</i> that are valid.
      */
-    public SPOArrayIterator(AbstractTripleStore db, SPO[] stmts, int numStmts) {
+    public SPOArrayIterator(AbstractTripleStore db, KeyOrder keyOrder, SPO[] stmts, int numStmts) {
 
-        this.db = db;
+        this.db = db; // MAY be null (remove() will be disabled).
+
+        this.keyOrder = keyOrder; // MAY be null (implies not known).
         
         this.stmts = stmts;
         
@@ -152,7 +179,7 @@ public class SPOArrayIterator implements ISPOIterator {
      */
     public SPOArrayIterator(IAccessPath accessPath) {
         
-        final KeyOrder keyOrder = accessPath.getKeyOrder();
+        keyOrder = accessPath.getKeyOrder();
 
         final int rangeCount = accessPath.rangeCount();
         
@@ -309,6 +336,25 @@ public class SPOArrayIterator implements ISPOIterator {
         
         return ret;
         
+    }
+    
+    public SPO[] nextChunk(KeyOrder keyOrder) {
+
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        SPO[] stmts = nextChunk();
+
+        if (keyOrder != this.keyOrder) {
+
+            // sort into the required order.
+
+            Arrays.sort(stmts, 0, stmts.length, keyOrder.getSPOComparator());
+
+        }
+
+        return stmts;
+
     }
     
     public void close() {

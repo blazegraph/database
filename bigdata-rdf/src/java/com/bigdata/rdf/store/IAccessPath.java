@@ -47,6 +47,8 @@
 
 package com.bigdata.rdf.store;
 
+import java.util.Iterator;
+
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatableIndex;
@@ -128,6 +130,20 @@ public interface IAccessPath {
      *       state here that it will do so.
      */
     public ISPOIterator iterator(int limit, int capacity);
+
+    /**
+     * Performs an efficient scan of a statement index returning the distinct
+     * term identifiers found in the first key component for the
+     * {@link IAccessPath}. Depending on the {@link KeyOrder} for the
+     * {@link IAccessPath}, this will be the term identifiers for the distinct
+     * subjects, predicates, or objects in the KB.
+     * 
+     * @return The distinct term identifiers in the first key component for the
+     *         statement index associated with this {@link IAccessPath}. The
+     *         term identifiers are in ascending order (this is the order in
+     *         which they are read from the index).
+     */
+    public Iterator<Long> distinctTermScan();
 
     /**
      * Remove all statements selected by the triple pattern (batch, parallel,

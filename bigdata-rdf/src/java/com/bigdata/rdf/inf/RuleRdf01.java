@@ -43,7 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 
 import com.bigdata.rdf.model.StatementEnum;
@@ -71,163 +70,49 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
     }
 
-    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer ) {
-        
+    public RuleStats apply(final RuleStats stats, final SPOBuffer buffer) {
+
         final long computeStart = System.currentTimeMillis();
-        
-//        if (false) {
-//            
-//            /*
-//             * Original implementation does a full scan of all statements in the
-//             * KB.
-//             */
-//            
-//            long lastP = NULL;
-//
-//            IEntryIterator it = store.getPOSIndex().rangeIterator(null, null);
-//
-//            while (it.hasNext()) {
-//
-//                it.next();
-//
-//                stats.stmts1++;
-//
-//                SPO stmt = new SPO(KeyOrder.POS, store.keyBuilder, it.getKey());
-//
-//                if (stmt.p != lastP) {
-//
-//                    lastP = stmt.p;
-//
-//                    stats.numComputed++;
-//
-//                    System.err.println("" + stats.numComputed + " : " + lastP
-//                            + " : " + store.toString(lastP));
-//
-//                    buffer.add(new SPO(stmt.p, store.rdfType.id,
-//                            store.rdfProperty.id));
-//
-//                }
-//
-//            }
-//            
-//        } else {
-            
-            /*
-             * Alternative implementation does an efficient scan for only the
-             * distinct predicates in the KB.
-             */
-            
-            // find the distinct predicates in the KB.
-            ArrayList<Long> ids = db.distinctTermScan(KeyOrder.POS);
 
-            Iterator<Long> itr = ids.iterator();
+        /*
+         * Implementation does an efficient scan for only the distinct
+         * predicates in the KB.
+         */
 
-            while (itr.hasNext()) {
+        // find the distinct predicates in the KB.
+        Iterator<Long> itr = db.getAccessPath(KeyOrder.POS).distinctTermScan();
 
-                stats.stmts1++;
+        while (itr.hasNext()) {
 
-                long p = itr.next();
+            stats.stmts1++;
 
-                SPO newSPO = new SPO(p, inf.rdfType.id, inf.rdfProperty.id, StatementEnum.Inferred);
-                
-                Justification jst = null;
-                
-                if(justify) {
+            long p = itr.next();
 
-                    // Note: wildcards for [s] and [o].
-                    
-                    jst = new Justification(this, newSPO, new long[] { //
+            SPO newSPO = new SPO(p, inf.rdfType.id, inf.rdfProperty.id,
+                    StatementEnum.Inferred);
+
+            Justification jst = null;
+
+            if (justify) {
+
+                // Note: wildcards for [s] and [o].
+
+                jst = new Justification(this, newSPO, new long[] { //
                         NULL, p, NULL //
                         });
-                    
-                }
-                
-                buffer.add(newSPO, jst );
-
-                stats.numComputed++;
 
             }
 
-//        }
-        
+            buffer.add(newSPO, jst);
+
+            stats.numComputed++;
+
+        }
+
         stats.elapsed += System.currentTimeMillis() - computeStart;
-        
+
         return stats;
-        
-    }
-/*
-    public long[] collectPredicates2() {
 
-        Vector<Long> predicates = new Vector<Long>();
-        
-        IEntryIterator it = store.ndx_termId.rangeIterator
-            ( store.keyBuilder.uriStartKey(),
-              store.keyBuilder.uriEndKey()
-              );
-        
-        while ( it.hasNext() ) {
-            
-            it.next();
-            
-            long id = (Long)it.getValue();
-            
-            // Value v = (Value) store.ndx_idTerm.lookup(store.keyBuilder.id2key(id));
-            
-            int numStmts = store.ndx_pos.rangeCount
-                (store.keyBuilder.statement2Key(id, 0, 0), 
-                 store.keyBuilder.statement2Key(id+1, 0, 0)
-                 );
-            
-            if ( numStmts > 0 ) {
-                
-                // System.err.println(((URI)v).getURI() + " : " + numStmts );
-            
-                predicates.add( id );
-                
-            }
-            
-        }
-        
-        int i = 0;
-        
-        long[] longs = new long[predicates.size()];
-        
-        for ( Iterator<Long> it2 = predicates.iterator(); it2.hasNext(); ) {
-            
-            longs[i++] = it2.next();
-            
-        }
-        
-        return longs;
-        
     }
-    
-    private void countLiterals() {
-        
-        System.out.println( "number of literals: " + 
-        store.ndx_termId.rangeCount
-            ( store.keyBuilder.litStartKey(),
-              store.keyBuilder.litEndKey()
-              )
-            );
 
-        IEntryIterator it = store.ndx_termId.rangeIterator
-            ( store.keyBuilder.litStartKey(),
-              store.keyBuilder.litEndKey()
-              );
-        
-        while ( it.hasNext() ) {
-            
-            it.next();
-            
-            long id = (Long)it.getValue();
-            
-            Value v = (Value) store.ndx_idTerm.lookup(store.keyBuilder.id2key(id));
-            
-            System.err.println(((Literal)v).getLabel());
-            
-        }
-        
-    }
-*/
 }

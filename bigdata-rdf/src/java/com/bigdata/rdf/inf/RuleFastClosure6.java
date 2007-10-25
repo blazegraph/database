@@ -42,38 +42,22 @@ Modifications:
 
 */
 /*
- * Created on Mar 30, 2005
+ * Created on Oct 25, 2007
  */
+
 package com.bigdata.rdf.inf;
 
 import java.util.Set;
 
-import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
+public class RuleFastClosure6 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
-/**
- * @author personickm
- */
-public interface Axioms {
-    
-    Set<Triple> getAxioms();
-    
-    Set<String> getVocabulary();
-    
-    boolean isAxiom( Statement stmt );
-    
-    boolean isAxiom( URI s, URI p, URI o );
-    
-    boolean isInVocabulary( URI uri );
-
-    
-    public interface Triple {
-
-        URI getS();
+    /**
+     * @param inf
+     * @param R
+     */
+    public RuleFastClosure6(InferenceEngine inf, Var x, Var y, Set<Long> R) {
         
-        URI getP();
-        
-        URI getO();
+        super(inf, x, inf.rdfsRange, y, R);
         
     }
     

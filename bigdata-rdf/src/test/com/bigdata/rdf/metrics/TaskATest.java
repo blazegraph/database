@@ -281,7 +281,7 @@ public class TaskATest
         for(int i=0; i<filename.length; i++) {
          
             loadStats = store
-                    .loadData(new File(filename[i]), baseURI[i],
+                    .loadData(filename[i], baseURI[i],
                             RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
                         
             long elapsedLoadTime = System.currentTimeMillis() - begin;

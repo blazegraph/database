@@ -861,7 +861,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
             try {
                 
                 loadStats = store
-                        .loadData(new File(file), "", RDFFormat.RDFXML,
+                        .loadData(file, "", RDFFormat.RDFXML,
                                 false/* verifyData */, true/* commit */);
                 
 //                InputStream rdfStream = new BufferedInputStream(

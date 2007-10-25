@@ -127,14 +127,27 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         RuleStats stats = new RuleStats();
         
-        SPOBuffer buffer = new SPOBuffer(rule.db, null/* filter */,
-                1000/* capacity */, false/* distinct */, rule.justify);
+        /*
+         * Note: Choose a capacity large enough that all entailments will still
+         * be in the buffer until we explicitly flush them to the store. This
+         * let's us dump the entailments to the console below.
+         */
+        
+        final int capacity = Math.max(expectedComputed, 1000);
+        
+        SPOBuffer buffer = new SPOBuffer(rule.db, null/* filter */, capacity,
+                false/* distinct */, rule.justify);
+        
+        // dump the database on the console.
+        System.err.println("database::");
+        rule.db.dumpStore();
         
         // apply the rule.
         rule.apply(stats, buffer);
         
         // dump entailments on the console.
-        buffer.dump(rule.db);
+        System.err.println("entailments:: (may duplicate statements in the database)");
+        buffer.dump(rule.db/*used to resolve term identifiers*/);
 
         // flush entailments into the temporary store.
         buffer.flush();

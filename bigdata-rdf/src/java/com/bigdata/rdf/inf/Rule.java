@@ -43,29 +43,41 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+
 import com.bigdata.btree.BTree;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * A rule.
- *  
+ * 
  * @todo Since a variable is just a negative long integer, it is possible to
  *       encode a predicate just like we do a statement with an added flag
- *       either before or after the s:p:o keys indicating whether the
- *       predicate is a magic/1 or a triple/3. This means that we can store
- *       predicates directly in the database in a manner that is consistent
- *       with triples. Since we can store predicates directly in the
- *       database we can also store rules simply be adding the body of the
- *       rule as the value associated with the predicate key. This will let
- *       us combine the rule base, the magic predicates, and the answer set
- *       together. We can then use the existing btree operations for access.
- *       The answer set can be extracted by filtering out the rules. (We
- *       should probably partition the keys so that rules are always in a
- *       disjoint part of the key space, e.g., by including a leading byte
- *       that is 0 for a triple and 1 for a rule.)
+ *       either before or after the s:p:o keys indicating whether the predicate
+ *       is a magic/1 or a triple/3. This means that we can store predicates
+ *       directly in the database in a manner that is consistent with triples.
+ *       Since we can store predicates directly in the database we can also
+ *       store rules simply be adding the body of the rule as the value
+ *       associated with the predicate key. This will let us combine the rule
+ *       base, the magic predicates, and the answer set together. We can then
+ *       use the existing btree operations for access. The answer set can be
+ *       extracted by filtering out the rules. (We should probably partition the
+ *       keys so that rules are always in a disjoint part of the key space,
+ *       e.g., by including a leading byte that is 0 for a triple and 1 for a
+ *       rule.)
+ *       <P>
+ *       I don't think that we will be storing rules and magic facts in the
+ *       database so this trick probably does not matter.
+ *       <p>
+ *       Also, variable identifiers are strictly local to a rule, not global to
+ *       the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,7 +85,7 @@ import com.bigdata.rdf.store.TempTripleStore;
 abstract public class Rule {
 
     /**
-     * The database against which queries are performed.
+     * The persistent database.
      */
     final protected AbstractTripleStore db;
     
@@ -154,4 +166,88 @@ abstract public class Rule {
      */
     public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
 
+    /**
+     * Map N executions of rule over the terms in the tail. In each pass term[i]
+     * will read from <i>tmp</i> and the other term(s) will read from a fused
+     * view of <i>tmp</i> and the {@link #db}.
+     * <p>
+     * Within each pass, the decision on the order in which the terms will be
+     * evaluated is made based on the rangeCount() for the {@link IAccessPath}
+     * associated with the triple pattern for that term.
+     * <p>
+     * The N passes themselves are executed concurrently.
+     * 
+     * @param stats
+     *            Statistics on each rule application will be appended to this
+     *            list.
+     * @param tmp
+     *            An {@link AbstractTripleStore} containing data to be added to
+     *            (or removed from) the {@link #db}.
+     * @param buffer
+     *            The rules will write the entailments (and optionally the
+     *            justifications) on the buffer. The caller can read the
+     * 
+     * @return An iterator that may be used to read union of the entailments
+     *         licensed by each pass over the rule.
+     * 
+     * @todo Whether or not to compute the justifications is an apply() time
+     *       parameter, not a constant fixed when the rule is created. We only
+     *       need the justifications when we are adding statements to the
+     *       database. When we are removing statements they should not be
+     *       computed.
+     *       <p>
+     *       In order to get out the justifications the caller should just pass
+     *       in a JustificationBuffer.
+     * 
+     * @todo Make the {@link SPOBuffer} thread-safe so that the N passes may be
+     *       concurrent and they all write onto the same buffer, hence their
+     *       union is automatically visible in the iterator wrapping that
+     *       buffer.
+     * 
+     * @todo In order to use a reader/write (or pipe) model we need special
+     *       {@link ISPOIterator} (and IJustificationIterator) implementations
+     *       that wrap the appropriate buffer, e.g.,
+     * 
+     * <pre>
+     *       SPOBuffer buffer = new SPOBuffer(...);
+     *       
+     *       ISPOIterator itr = new SPOPipeIterator( buffer );
+     *       
+     *       rule.apply(..., buffer );
+     *       
+     *       while(itr.hasNext()) {
+     *       
+     *        SPO[] stmts = itr.nextChunk();
+     *       
+     *       }
+     *       
+     * </pre>
+     * 
+     * before calling apply. The caller then has a handle on the object from
+     * which they can read the entailments and do whatever they like with them.
+     * <P>
+     * Note: The SPOBuffer would require a means to handshake with the iterator
+     * so that it could signal when no more data will be made available to the
+     * iterator.
+     * <p>
+     * For example, you can use
+     * {@link IRawTripleStore#addStatements(ISPOIterator, com.bigdata.rdf.spo.ISPOFilter)}
+     * if you want to jam the results into a database. If you just want to scan
+     * the results, then you can do that directly using the iterator.
+     * <p>
+     * Normally you would want to consume the iterator in chunks, sorting each
+     * chunk into the natural order for some index operation and then doing that
+     * operation on each chunk in turn.
+     * 
+     * @todo We can in fact run the variations of the rule in parallel using an
+     *       {@link ExecutorService}. The {@link InferenceEngine} should
+     *       declare this service. The service will be used for both map
+     *       parallelism and for parallelism of subqueries within rules.
+     */
+    public ISPOIterator apply( List<RuleStats> stats, AbstractTripleStore tmp, SPOBuffer buffer ) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

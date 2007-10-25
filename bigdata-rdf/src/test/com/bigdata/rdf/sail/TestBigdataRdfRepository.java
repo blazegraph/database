@@ -59,6 +59,8 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.vocabulary.XmlSchema;
 
+import com.bigdata.rdf.sail.BigdataRdfRepository.Options;
+
 /**
  * Test suite for {@link BigdataRdfRepository} implementations that verifies
  * the {@link RdfRepository} implementation (no entailments).
