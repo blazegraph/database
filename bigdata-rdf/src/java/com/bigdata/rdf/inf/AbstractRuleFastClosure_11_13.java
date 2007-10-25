@@ -28,14 +28,8 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * <pre>
  *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b )
- *         -&gt; (?x, rdf:type, ?b )
+ *         -&gt; (?z, rdf:type, ?b )
  * </pre>
- * 
- * @todo Consider whether the head of the rule (?x, rdf:type, ?b) could be
- *       queried since it is two bound to identify bindings of ?x for which
- *       the entailment is already known and thereby reduce the amount of
- *       work, or at least the #of false entailments, that this rule will
- *       produce.
  * 
  * @see TestRuleFastClosure_11_13
  */
@@ -84,7 +78,7 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
         
-        // in SPO order.
+        // (?y, rdfs:subPropertyOf, ?a) in SPO order.
         SPO[] stmts1 = getStmts1();
         
         stats.stmts1 += stmts1.length;
@@ -128,6 +122,7 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                  */
                 if(stmt1.o != stmt2.s) continue;
 
+                // One bound subquery <code>(?x, ?y, ?z)</code> using the POS
                 SPO[] stmts3 = getStmts3(stmt1);
                 
                 stats.stmts3 += stmts3.length;
@@ -136,19 +131,23 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                 
                 for(SPO stmt3: stmts3) {
 
-                    // generate (?x, rdf:type, ?b).
+                    // generate (?z , rdf:type, ?b).
                     
-                    SPO newSPO = new SPO(stmt3.s, inf.rdfType.id, stmt2.o,
+                    SPO newSPO = new SPO(getSubjectForHead(stmt3), inf.rdfType.id, stmt2.o,
                             StatementEnum.Inferred);
                     
                     Justification jst = null;
                     
                     if(justify) {
                         
-                        jst = new Justification(this,newSPO,new SPO[]{
+                        jst = new Justification(this, newSPO, new SPO[] {
+                        /*
+                         * Note: this is the order in which the rule was written
+                         * in the paper.
+                         */
+                                stmt3,
                                 stmt1,
                                 stmt2,
-                                stmt3
                         });
                         
                     }
@@ -234,5 +233,13 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
         return db.getStatements(KeyOrder.POS, fromKey, toKey);
     
     }
+
+    /**
+     * The two rules choose different bindings for the subject of the head. This
+     * method makes that selection.
+     * 
+     * @param spo The 1st term.
+     */
+    abstract protected long getSubjectForHead(SPO spo);
     
 }

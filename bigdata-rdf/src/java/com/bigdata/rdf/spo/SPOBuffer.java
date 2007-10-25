@@ -62,6 +62,9 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -365,7 +368,7 @@ public class SPOBuffer {
                  * latency when also writing justifications.
                  */
 
-                List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
+                List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
                 
                 /*
                  * Note: we reject using the filter before stmts or
@@ -493,6 +496,35 @@ public class SPOBuffer {
             return;
             
         }
+        
+//        if(DEBUG) {
+//
+//            /*
+//             * This checks constraints on the RDF data model in case one of the
+//             * rules is using the wrong bindings and trying to emit an
+//             * entailment that is invalid per the data model. E.g., a literal in
+//             * the subject position.
+//             */
+//            
+//            if( ! (store.getTerm(stmt.s) instanceof _Resource) ) {
+//                
+//                throw new AssertionError(stmt.toString(store));
+//                
+//            }
+//            
+//            if( ! (store.getTerm(stmt.p) instanceof _URI) ) {
+//                
+//                throw new AssertionError(stmt.toString(store));
+//                
+//            }
+//            
+//            if( ! (store.getTerm(stmt.o) instanceof _Value) ) {
+//                
+//                throw new AssertionError(stmt.toString(store));
+//                
+//            }
+//            
+//        }
         
         if(nearCapacity()) {
 

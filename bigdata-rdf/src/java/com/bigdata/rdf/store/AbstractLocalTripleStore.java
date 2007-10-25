@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.ICounter;
@@ -445,8 +446,27 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                         
                         if(tmp == null) { // not found.
 
-                            // assign termId.
-                            term.termId = counter.inc();
+                            /*
+                             * Assign the termId.
+                             * 
+                             * Note: We set the low bit iff the term is a
+                             * literals so that we can tell at a glance whether
+                             * a term identifier is a literal or not.
+                             * 
+                             * FIXME back port to the scale-out version as well.
+                             * 
+                             * @todo we could use negative term identifiers
+                             * except that we pack the termId in a manner that
+                             * does not allow negative integers. a different
+                             * pack routine would allow us all bits.
+                             */
+                            term.termId = counter.inc()<<1;
+                            
+                            if(term instanceof Literal) {
+                                
+                                term.termId |= 0x01L;
+                                
+                            }
 
                             /*
                              * Insert into forward mapping from serialized term to packed term

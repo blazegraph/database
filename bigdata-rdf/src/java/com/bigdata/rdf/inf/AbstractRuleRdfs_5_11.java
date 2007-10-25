@@ -179,21 +179,21 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
                     
                 }
 
-                nchunks++;
-                
             }
 
-            if(nchunks>1) {
-                
-                /*
-                 * The self-join trick above only works if we can fully buffer
-                 * the statements. If we are getting more than one chunk of
-                 * statements then we MUST process this using subqueries.
-                 */
-                
-                throw new UnsupportedOperationException();
-                
-            }
+            nchunks++;
+            
+        } // while(itr.hasNext())
+        
+        if(nchunks>1) {
+            
+            /*
+             * The self-join trick above only works if we can fully buffer
+             * the statements. If we are getting more than one chunk of
+             * statements then we MUST process this using subqueries.
+             */
+            
+            throw new UnsupportedOperationException();
             
         }
         
