@@ -44,8 +44,8 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * rdfs9:
@@ -73,15 +73,18 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
      * query is formed from triple(?v,rdf:type,stmt1.s) and expressed in POS
      * order as { rdf:type, stmt1.s, ?v }.
      */
-    protected SPO[] getStmts2( SPO stmt1 ) {
+    protected ISPOIterator getStmts2( SPO stmt1 ) {
         
-        byte[] fromKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
-                stmt1.s, NULL);
+        return db.getAccessPath(NULL/* v */, inf.rdfType.id, stmt1.s/* u */)
+                .iterator();
 
-        byte[] toKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
-                stmt1.s + 1, NULL);
-
-        return db.getStatements(KeyOrder.POS, fromKey, toKey);
+//        byte[] fromKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
+//                stmt1.s, NULL);
+//
+//        byte[] toKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
+//                stmt1.s + 1, NULL);
+//
+//        return db.getStatements(KeyOrder.POS, fromKey, toKey);
     
     }
     

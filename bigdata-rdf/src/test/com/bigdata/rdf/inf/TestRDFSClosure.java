@@ -228,8 +228,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 
             InferenceEngine inf = new InferenceEngine(properties, store);
 
-            inf.fullForwardClosure();
-//            inf.fastForwardClosure();
+            inf.computeClosure();
 
             if (dump) {
                 System.err.println("entailed:");

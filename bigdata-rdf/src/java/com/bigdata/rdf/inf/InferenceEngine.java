@@ -51,10 +51,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -62,24 +60,21 @@ import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -97,7 +92,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                       pred :- pred*.
+ *                         pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -132,28 +127,21 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                        triple(?v,rdf:type,?x) :-
- *                           triple(?u,rdfs:subClassOf,?x),
- *                           triple(?v,rdf:type,?u). 
+ *                          triple(?v,rdf:type,?x) :-
+ *                             triple(?u,rdfs:subClassOf,?x),
+ *                             triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                        triple(?u,rdfs:subClassOf,?x) :-
- *                           triple(?u,rdfs:subClassOf,?v),
- *                           triple(?v,rdf:subClassOf,?x). 
+ *                          triple(?u,rdfs:subClassOf,?x) :-
+ *                             triple(?u,rdfs:subClassOf,?v),
+ *                             triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME refactor the rules to make them more flexible, but first collect some
- * performance targets 1st on a few data sets using fast and full closure
- * without rdsf4 sot hat I can know how much this hurts or helps. Use TaskATest
- * and setup the inference engine w/o storing ( x type resource ).  We do need
- * the proofs, so store those -- but I can also turn that off to get a baseline
- * for a version with no proofs and magic/SLD.
  * 
  * FIXME Provide incremental closure of data sets are they are loaded.
  * <p>
@@ -190,6 +178,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       tested by itself and then the various rules should work correctly if
  *       they are using the correct triple patterns and join variables.
  * 
+ * @todo modify {@link ClosureStats} to report on the details for each rule used
+ *       by the forward chainer. Also modify to support cumulation of results
+ *       across data sets : ClosureStats.add(ClosureStats) or the like. Do this
+ *       for {@link LoadStats} as well.
+ * 
  * FIXME truth maintenance (check the SAIL also).
  * 
  * FIXME rdfs:Resource by backward chaining on query. This means that we need a
@@ -203,10 +196,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       going to write rules for those two things this is how you would do it:
  * 
  * <pre>
- *                           equivalentClass:
- *                           
- *                             add an axiom to the KB: equivalentClass subPropertyOf subClassOf
- *                             add an entailment rule: xxx equivalentClass yyy à yyy equivalentClass xxx
+ *  equivalentClass:
+ *                             
+ *  add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+ * 
+ *  add an entailment rule: xxx equivalentClass yyy -&gt; yyy equivalentClass xxx
  * </pre>
  * 
  * It would be analogous for equivalentProperty.
@@ -229,7 +223,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       indices then get rid of the leading byte used in all keys for the
  *       statement indices.
  */
-public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
+public class InferenceEngine {
 
     final public Logger log = Logger.getLogger(InferenceEngine.class);
 
@@ -441,11 +435,13 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         
         /**
          * When true <code>(?x rdf:type rdfs:Resource)</code> entailments are
-         * computed and stored in the database. When false, rules that produce
-         * those entailments are turned off and the backward chainer will
-         * generate the entailments at query time.
+         * computed AND stored in the database. When false, rules that produce
+         * those entailments are turned off such that they are neither computer
+         * NOR stored and the backward chainer will generate the entailments at
+         * query time.
          * 
-         * @todo implement backward chaining for this and change the default to [false].
+         * @todo implement backward chaining for this and change the default to
+         *       [false].
          */
         public static final String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
 
@@ -546,12 +542,12 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         log.info(Options.FORWARD_CLOSURE+"="+forwardClosure);
 
-        this.storeRdfTypeRdfsResource = Boolean.parseBoolean(properties
+        this.forwardChainRdfTypeRdfsResource = Boolean.parseBoolean(properties
                 .getProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
                         Options.DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE));
 
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
-                + storeRdfTypeRdfsResource);
+                + forwardChainRdfTypeRdfsResource);
 
         setup();
 
@@ -565,7 +561,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     /**
      * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}.
      */
-    final protected boolean storeRdfTypeRdfsResource;
+    final protected boolean forwardChainRdfTypeRdfsResource;
 
     /**
      * Sets up the inference engine.
@@ -701,7 +697,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         
         rules.add(rdfs3);
         
-        if(storeRdfTypeRdfsResource) {
+        if(forwardChainRdfTypeRdfsResource) {
 
             /*
              * Note: skipping rdfs4a (?u ?a ?x) -> (?u rdf:type rdfs:Resource)
@@ -964,7 +960,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 .toString());
         buffer.flush();
         
-        if(storeRdfTypeRdfsResource) {
+        if(forwardChainRdfTypeRdfsResource) {
             
             /*
              * 14-15. These steps correspond to rdfs4a and rdfs4b and generate
@@ -1260,7 +1256,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                 
             }
 
-            if (!storeRdfTypeRdfsResource && spo.p == rdfType.id
+            if (!forwardChainRdfTypeRdfsResource && spo.p == rdfType.id
                     && spo.o == rdfsResource.id) {
                 
                 // reject (?x, rdf:type, rdfs:Resource ) 
@@ -1346,25 +1342,24 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
                 for (Long p : P) {
 
-                    byte[] fromKey = database.getKeyBuilder().statement2Key(p,
-                            NULL, NULL);
+                    ISPOIterator itr = database.getAccessPath(NULL, p, NULL).iterator();
 
-                    byte[] toKey = database.getKeyBuilder().statement2Key(
-                            p + 1, NULL, NULL);
+                    while(itr.hasNext()) {
+                        
+                        SPO[] stmts = itr.nextChunk();
+                            
+                        for(SPO stmt : stmts) {
 
-                    SPO[] stmts = database.getStatements(KeyOrder.POS, fromKey,
-                            toKey);
+                            if (P.contains(stmt.o)) {
 
-                    for (int i = 0; i < stmts.length; i++) {
+                                tmp.add(stmt.s);
 
-                        if (P.contains(stmts[i].o)) {
-
-                            tmp.add(stmts[i].s);
+                            }
 
                         }
 
                     }
-
+                    
                 }
 
                 P.addAll(tmp);
@@ -1428,26 +1423,26 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
          * Note: This query is two-bound on the POS index.
          */
 
-        byte[] fromKey = database.getKeyBuilder().statement2Key(p,
-                rdfsSubPropertyOf.id, NULL);
+        ISPOIterator itr = database.getAccessPath(NULL/*x*/, rdfsSubPropertyOf.id, p).iterator();
 
-        byte[] toKey = database.getKeyBuilder().statement2Key(p,
-                rdfsSubPropertyOf.id+1, NULL);
-
-        SPO[] stmts = database.getStatements(KeyOrder.POS, fromKey, toKey);
-
-        for( SPO spo : stmts ) {
+        while(itr.hasNext()) {
             
-            boolean added = tmp.add(spo.s);
+            SPO[] stmts = itr.nextChunk();
             
-            if(DEBUG) {
+            for( SPO spo : stmts ) {
                 
-                log.debug(spo.toString(database) + ", added subject="+added);
+                boolean added = tmp.add(spo.s);
+                
+                if(DEBUG) {
+                    
+                    log.debug(spo.toString(database) + ", added subject="+added);
+                    
+                }
                 
             }
-            
-        }
 
+        }
+        
         if(DEBUG){
         
             Set<String> terms = new HashSet<String>();
@@ -1501,115 +1496,6 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
         // write on the database.
         buffer.flush();
         
-    }
-    
-    /**
-     * Copies the statements from the temporary store into the main store using
-     * the <strong>same term identifiers</strong>. This method MUST NOT be used
-     * unless it is known in advance that the statements in the source are using
-     * term identifiers that are consistent with those in the destination.
-     * <p>
-     * Note: The statements in the source are NOT removed.
-     * 
-     * @param src
-     *            The temporary store (source).
-     * 
-     * @param dst
-     *            The persistent database (destination).
-     * 
-     * @return The #of statements inserted into the main store (the count only
-     *         reports those statements that were not already in the main
-     *         store).
-     * 
-     * FIXME rewrite to buffer a set of ordered statements and then transfer the
-     * buffered statements in chunks to the target store by wrapping them in an
-     * {@link SPOArrayIterator}. This will let us reuse the existing logic,
-     * e.g., for handling statement types.
-     */
-    static public int copyStatements( final TempTripleStore src, final AbstractTripleStore dst ) {
-
-        /**
-         * Copies statements from one index to another. 
-         */
-        class CopyStatements implements Callable<Long> {
-
-            private final IIndex src;
-            private final IIndex dst;
-            
-            /**
-             * @param src
-             * @param dst
-             */
-            CopyStatements(IIndex src, IIndex dst) {
-                
-                this.src = src;
-                
-                this.dst = dst;
-                
-            }
-            
-            public Long call() throws Exception {
-                
-                long numInserted = 0;
-                
-                IEntryIterator it = src.rangeIterator(null, null);
-                
-                while (it.hasNext()) {
-
-                    it.next();
-                    
-                    byte[] key = it.getKey();
-                    
-                    if (!dst.contains(key)) {
-
-                        if(true) throw new UnsupportedOperationException();
-                        
-                        // FIXME copy the statement type; upgrade as necessary (inferred -> explicit).
-                        dst.insert(key, null);
-                        
-                        numInserted++;
-                        
-                    }
-                    
-                }
-                
-                return numInserted;
-            }
-            
-        };
-
-        List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
-        
-        tasks.add( new CopyStatements(src.getSPOIndex(),dst.getSPOIndex()));
-        tasks.add( new CopyStatements(src.getPOSIndex(),dst.getPOSIndex()));
-        tasks.add( new CopyStatements(src.getOSPIndex(),dst.getOSPIndex()));
-        
-        final long numInserted;
-        
-        try {
-
-            final List<Future<Long>> futures = dst.indexWriteService.invokeAll(tasks);
-
-            final long numInserted1 = futures.get(0).get();
-            
-            final long numInserted2 = futures.get(1).get();
-            
-            final long numInserted3 = futures.get(2).get();
-
-            assert numInserted1 == numInserted2;
-            
-            assert numInserted1 == numInserted3;
-            
-            numInserted = numInserted1;
-        
-        } catch (Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-        return (int) numInserted;
-
     }
     
     /**

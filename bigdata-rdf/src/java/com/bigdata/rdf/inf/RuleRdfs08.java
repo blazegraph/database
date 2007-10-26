@@ -44,6 +44,13 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 /**
+ * rdfs8:
+ * 
+ * <pre>
+ *  (?u rdfs:subClassOf rdfs:Resource) :-
+ *     (?u rdf:type rdfs:Class).
+ * </pre>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -62,9 +62,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -77,9 +74,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo can this be refactored along the lines of {@link ISPOIterator} for more
- *       code sharing?
  */
 public class SPOBuffer {
 
@@ -532,9 +526,23 @@ public class SPOBuffer {
             
         }
         
+        final boolean newStmt;
+        
         if(distinct) {
 
-            stmts[numStmts++] = getDistinctStatement(stmt);
+            SPO tmp = getDistinctStatement(stmt);
+            
+            if(tmp==stmt) {
+                
+                stmts[numStmts++] = stmt;
+                
+                newStmt = true;
+                
+            } else {
+                
+                newStmt = false;
+                
+            }
 
             if(justify) {
 
@@ -546,6 +554,8 @@ public class SPOBuffer {
 
             stmts[numStmts++] = stmt;
 
+            newStmt = true;
+            
             if(justify) { 
                 
                 justifications[numJustifications++] = justification;
@@ -562,7 +572,8 @@ public class SPOBuffer {
              * the database).
              */
 
-            log.debug("add "
+            log.debug((newStmt?" (new)": " (duplicate)")
+                    + "\n"
                     + stmt.toString(store)
                     + (justification == null ? "" : "\n"
                             + justification.toString(store)));

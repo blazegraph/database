@@ -163,7 +163,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(U2, B, Y2));
 
         // apply the rule.
-        RuleStats stats = applyRule(inf.rdfs7,2);
+        RuleStats stats = applyRule(inf.rdfs7,2/*numComputed*/);
 
         assertEquals("#subqueries",1,stats.numSubqueries1);
         
@@ -221,7 +221,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         assertFalse(store.containsStatement(U, B2, Y));
 
         // apply the rule.
-        RuleStats stats = applyRule(inf.rdfs7,2);
+        RuleStats stats = applyRule(inf.rdfs7,2/*expectedComputed*/);
 
         // verify that only one subquery is issued.
         assertEquals("#subqueries",1,stats.numSubqueries1);

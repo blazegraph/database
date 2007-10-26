@@ -43,6 +43,17 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+/**
+ * rdfs12:
+ * 
+ * <pre>
+ *  (?u rdfs:subPropertyOf rdfs:member) :-
+ *     (?u rdf:type rdfs:ContainerMembershipProperty).
+ * </pre>
+ *
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class RuleRdfs12 extends AbstractRuleRdfs_6_8_10_12_13 {
 
     public RuleRdfs12(InferenceEngine store, Var u, Var v, Var x) {

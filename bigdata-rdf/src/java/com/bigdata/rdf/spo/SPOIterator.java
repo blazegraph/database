@@ -92,6 +92,14 @@ public class SPOIterator implements ISPOIterator {
     private final IAccessPath accessPath;
     
     /**
+     * The range count computed for the access path.
+     * <p>
+     * Note: The range count is generally an upper bound rather than an exact
+     * value.
+     */
+    private final int rangeCount;
+    
+    /**
      * The maximum #of statements to read from the index -or- ZERO (0) if all
      * statements will be read.
      */
@@ -177,11 +185,10 @@ public class SPOIterator implements ISPOIterator {
      *            The maximum #of statements that will be buffered. When ZERO
      *            (0) the iterator will range count the access path fully buffer
      *            if there are less than {@link #MAXIMUM_CAPACITY} statements
-     *            selected by the triple pattern.
-     *            <p>
-     *            Note: fully buffering the iterator is extremely important if
-     *            you want to #reset
-     * 
+     *            selected by the triple pattern. When non-zero, the caller's
+     *            value is used - this gives you control when you really, really
+     *            want to have something fully buffered, e.g., for an in-memory
+     *            self-join.
      * @param async
      *            When true, asynchronous read-ahead will be used to refill the
      *            buffer as it becomes depleted. When false, read-ahead will be
@@ -204,27 +211,65 @@ public class SPOIterator implements ISPOIterator {
             
         }
         
+        // Range count the index.
+        rangeCount = accessPath.rangeCount();
+        
         if(capacity == 0) {
 
             /*
-             * Range count the index and fully buffer the statements.
+             * Attempt to fully buffer the statements.
              */
             
-            capacity = accessPath.rangeCount();
+            capacity = rangeCount;
+            
+            if (capacity > MAXIMUM_CAPACITY) {
+
+                /*
+                 * If the capacity would exceed the maximum then we limit
+                 * the capacity to the maximum.
+                 */
+                
+                capacity = MAXIMUM_CAPACITY;
+
+            }
+
+        } else {
+            
+            if (capacity > rangeCount) {
+            
+                /*
+                 * If the caller has over-estimated the actual range count for
+                 * the index then reduce the capacity to the real range count.
+                 * This makes it safe for the caller to request a capacity of 1M
+                 * SPOs and only a "right-sized" buffer will be allocated.
+                 * 
+                 * Note: The range count is generally an upper bound rather than
+                 * an exact value.
+                 */
+                
+                capacity = rangeCount;
+
+                /*
+                 * Note: If the caller is making a best effort attempt to read
+                 * everything into memory AND the data will fit within the
+                 * caller's specified capacity, then we disable asynchronous
+                 * reads so that they will get everything in one chunk.
+                 */
+
+                async = false;
+                
+            }
             
         }
         
-        if (capacity > MAXIMUM_CAPACITY) {
-
-            /*
-             * If the capacity would exceed the maximum then we limit
-             * the capacity to the maximum.
-             */
+        if (Math.min(limit, rangeCount) < 1000) {
             
-            capacity = MAXIMUM_CAPACITY;
-
+            // Disable async reads if we are not reading much data.
+            
+            async = false;
+            
         }
-
+        
         this.capacity = capacity;
         
         this.accessPath = accessPath;

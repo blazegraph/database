@@ -287,10 +287,15 @@ public class TaskATest
 
         String filename[] = FileAndBaseURI.getFileNames(_sources);
         String baseURI[] = FileAndBaseURI.getBaseURIs(_sources);
+
+        // cumulative across each file loaded for a given test.
+        
+        final LoadStats totalLoadStats = new LoadStats();
+        final ClosureStats totalClosureStats = new ClosureStats();
         
         for(int i=0; i<filename.length; i++) {
-         
-            loadStats = store
+
+            final LoadStats loadStats = store
                     .loadData(filename[i], baseURI[i],
                             RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
                         
@@ -298,13 +303,12 @@ public class TaskATest
             
             System.err.println("*** Elapsed load time: " + (elapsedLoadTime/ 1000) + "s\n");
 
+            final ClosureStats closureStats;
             if(computeEntailments) {
                 
                 long beginInfTime = System.currentTimeMillis();
                 
                 /*
-                 * FIXME If we load+close each time then cumulate the results rather than overwriting!!! 
-                 * 
                  * Configure the inference engine.
                  */
                 
@@ -315,8 +319,8 @@ public class TaskATest
                 properties.setProperty(
                         Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
 
-                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
-//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
+//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
+                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
                 closureStats = new InferenceEngine(properties,store).computeClosure();
             
@@ -326,7 +330,7 @@ public class TaskATest
 
             } else {
                 
-                closureStats = null;
+                closureStats = new ClosureStats();
                 
             }
             
@@ -339,11 +343,29 @@ public class TaskATest
             long elapsedCommitTime = System.currentTimeMillis() - beginCommitTime;
 
             System.err.println("*** Elapsed commit time: " + elapsedCommitTime + "ms\n");
-
-            // and overwrite the field 
-            loadStats.commitTime = elapsedCommitTime;
+            
+            // cumulative load stats
+            {
+                
+                totalLoadStats.toldTriples += loadStats.toldTriples;
+                totalLoadStats.loadTime += loadStats.loadTime;
+                totalLoadStats.commitTime += loadStats.commitTime;
+                totalLoadStats.totalTime += loadStats.totalTime;
+                
+            }
+            
+            // cumulative closure stats
+            {
+                
+                totalClosureStats.elapsed += closureStats.elapsed;
+                totalClosureStats.numComputed += closureStats.numComputed;
+                
+            }
             
         }
+
+        this.loadStats = totalLoadStats;
+        this.closureStats = totalClosureStats;
 
         long elapsed = System.currentTimeMillis() - begin;
 

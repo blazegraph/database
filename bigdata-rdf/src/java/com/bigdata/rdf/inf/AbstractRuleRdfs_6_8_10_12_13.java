@@ -44,11 +44,10 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
-import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
 
@@ -66,64 +65,48 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
         
-        final RdfKeyBuilder keyBuilder = db.getKeyBuilder();
-        
-        byte[] fromKey = keyBuilder.statement2Key
-            ( body[0].p.id, body[0].o.id, NULL
-              );
-            
-        byte[] toKey = keyBuilder.statement2Key
-            ( body[0].p.id, body[0].o.id+1, NULL
-              );
-        
-//        IEntryIterator it = db.getPOSIndex().rangeIterator(fromKey, toKey); 
-//        
-//        while ( it.hasNext() ) {
-//            
-//            it.next();
-//            
-//            stats.stmts1++;
-//
-//            SPO stmt = new SPO(KeyOrder.POS, keyBuilder, it.getKey());
-//            
-//            long _s = head.s.isVar() ? stmt.s : head.s.id;
-//            long _p = head.p.isVar() ? stmt.s : head.p.id;
-//            long _o = head.o.isVar() ? stmt.s : head.o.id;
-//        
-//            buffer.add( new SPO(_s, _p, _o) );
-//
-//            stats.numComputed++;
-//            
-//        }
+        /*
+         * For example, rdfs10:
+         * 
+         * triple(?u,rdfs:subClassOf,?u) :- triple(?u,rdf:type,rdfs:Class).
+         */
 
-        SPO[] stmts1 = db.getStatements(KeyOrder.POS, fromKey, toKey);
-        
-        stats.stmts1 += stmts1.length;
-        
-        for (SPO stmt1 : stmts1) {
-            
-            // @todo review -- should this be substituting stmt.s in each case?
+        /*
+         * 2-bound query on POS index.
+         */
+        ISPOIterator itr = db.getAccessPath(NULL, body[0].p.id, body[0].o.id)
+                .iterator();
 
-            long s = head.s.isVar() ? stmt1.s : head.s.id;
-            long p = head.p.isVar() ? stmt1.s : head.p.id;
-            long o = head.o.isVar() ? stmt1.s : head.o.id;
-      
-            SPO newSPO = new SPO(s, p, o, StatementEnum.Inferred);
+        while(itr.hasNext()) {
             
-            Justification jst = null;
+            SPO[] stmts1 = itr.nextChunk();
             
-            if(justify) {
+            stats.stmts1 += stmts1.length;
+            
+            for (SPO stmt1 : stmts1) {
                 
-                jst = new Justification(this, newSPO, new SPO[] { stmt1 });
+                long s = head.s.isVar() ? stmt1.s : head.s.id;
+                long p = head.p.isVar() ? stmt1.s : head.p.id;
+                long o = head.o.isVar() ? stmt1.s : head.o.id;
+          
+                SPO newSPO = new SPO(s, p, o, StatementEnum.Inferred);
                 
+                Justification jst = null;
+                
+                if(justify) {
+                    
+                    jst = new Justification(this, newSPO, new SPO[] { stmt1 });
+                    
+                }
+                
+                buffer.add( newSPO, jst );
+
             }
-            
-            buffer.add( newSPO, jst );
+
+            stats.numComputed += stmts1.length;
 
         }
-
-        stats.numComputed += stmts1.length;
-
+        
         stats.elapsed += System.currentTimeMillis() - computeStart;
         
         return stats;
