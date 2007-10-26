@@ -92,7 +92,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                         pred :- pred*.
+ *                          pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -127,17 +127,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                          triple(?v,rdf:type,?x) :-
- *                             triple(?u,rdfs:subClassOf,?x),
- *                             triple(?v,rdf:type,?u). 
+ *                           triple(?v,rdf:type,?x) :-
+ *                              triple(?u,rdfs:subClassOf,?x),
+ *                              triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                          triple(?u,rdfs:subClassOf,?x) :-
- *                             triple(?u,rdfs:subClassOf,?v),
- *                             triple(?v,rdf:subClassOf,?x). 
+ *                           triple(?u,rdfs:subClassOf,?x) :-
+ *                              triple(?u,rdfs:subClassOf,?v),
+ *                              triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -157,8 +157,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * terms as subqueries where the most selective subquery is run first.
  * <p>
  * 
- * @todo refactor rules to use {@link ISPOIterator}.
- * 
  * @todo refactor rules to isolate each subquery so that we can choose the
  *       execution order dynamically based on the selectivity of the different
  *       subqueries.
@@ -166,6 +164,15 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       This will also require that we declare the joins, e.g.,
  *       <code>term[i].s = term[j].p</code> so that we can execute the join
  *       correctly regardless of the order in which we execute the subqueries.
+ * 
+ * @todo maintain an instance SPO[] in each rule for the bindings. Copy the
+ *       static bindings across when the rule is initialized. Define the joins
+ *       in terms of variables used in the body[] and then map those variables
+ *       into the term[i] index and the {s,p,o} position on the bindings[].
+ * 
+ * @todo the RuleStats should collect data on a per term-in-the-tail basis.
+ * 
+ * @todo support subquery reuse.
  * 
  * @todo refactor rules to define apply() that maps over the terms collecting
  *       the union of the results when executing the rule with each term in turn
@@ -196,11 +203,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       going to write rules for those two things this is how you would do it:
  * 
  * <pre>
- *  equivalentClass:
- *                             
- *  add an axiom to the KB: equivalentClass subPropertyOf subClassOf
- * 
- *  add an entailment rule: xxx equivalentClass yyy -&gt; yyy equivalentClass xxx
+ *   equivalentClass:
+ *                              
+ *   add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+ *  
+ *   add an entailment rule: xxx equivalentClass yyy -&gt; yyy equivalentClass xxx
  * </pre>
  * 
  * It would be analogous for equivalentProperty.

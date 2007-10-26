@@ -126,7 +126,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * Match: (?y, rdfs:subPropertyOf, ?a)
              */
 
-            SPO[] stmts1 = rule.getStmts1();
+            SPO[] stmts1 = rule.getStmts1().nextChunk(); // @todo make sure only 1 chunk.
 
             assertEquals(1, stmts1.length);
 
@@ -140,7 +140,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * the value specified to the rule ctor (rdfs:Domain).
              */
 
-            SPO[] stmts2 = rule.getStmts2(stmt1);
+            SPO[] stmts2 = rule.getStmts2(stmt1).nextChunk(); // @todo make sure only one chunk.
 
             assertEquals(1, stmts2.length);
 
@@ -150,7 +150,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             /*
              * Match: (?x, ?y, ?z) with ?y bound to stmt1.s.
              */
-            SPO[] stmts3 = rule.getStmts3(stmt1);
+            SPO[] stmts3 = rule.getStmts3(stmt1).nextChunk(); // @todo make sure only one chunk.
             assertEquals(1, stmts3.length);
             assertEquals(new SPO(x, y, z, StatementEnum.Explicit), stmts3[0]);
 
@@ -236,7 +236,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * Match: (?y, rdfs:subPropertyOf, ?a)
              */
 
-            SPO[] stmts1 = rule.getStmts1();
+            SPO[] stmts1 = rule.getStmts1().nextChunk(); // @todo make sure only one chunk.
 
             assertEquals(1, stmts1.length);
 
@@ -250,7 +250,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * the value specified to the rule ctor (rdfs:Domain).
              */
 
-            SPO[] stmts2 = rule.getStmts2(stmt1);
+            SPO[] stmts2 = rule.getStmts2(stmt1).nextChunk(); // @todo make sure only one chunk.
 
             assertEquals(1, stmts2.length);
 
@@ -261,7 +261,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             /*
              * Match: (?x, ?y, ?z) with ?y bound to stmt1.s.
              */
-            SPO[] stmts3 = rule.getStmts3(stmt1);
+            SPO[] stmts3 = rule.getStmts3(stmt1).nextChunk(); // @todo make sure only one chunk.
             assertEquals(1, stmts3.length);
             assertEquals(new SPO(x, y, z, StatementEnum.Explicit), stmts3[0]);
 
