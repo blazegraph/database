@@ -65,6 +65,13 @@ import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.rio.LoadStats;
 
 /**
+ * FIXME refactor to use the ExperimentDriver.  This let me collect better
+ * data.  It will also give me better control over which conditions to run
+ * and which data sets to run as part of the condition and make it easier to
+ * analyze the data by condition.  However the TestMetrics class will also
+ * need to collect detailed traces per condition, so it should save the name
+ * of the trace file as part of the condition result.
+ * 
  * @todo update javadoc.
  * @todo write some useful summary data into a file.
  * 
@@ -296,6 +303,8 @@ public class TaskATest
                 long beginInfTime = System.currentTimeMillis();
                 
                 /*
+                 * FIXME If we load+close each time then cumulate the results rather than overwriting!!! 
+                 * 
                  * Configure the inference engine.
                  */
                 
@@ -306,10 +315,10 @@ public class TaskATest
                 properties.setProperty(
                         Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
 
-//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
-                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
+                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
+//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
-                closureStats = new InferenceEngine(store).fastForwardClosure();
+                closureStats = new InferenceEngine(properties,store).computeClosure();
             
                 long elapsedInfTime = System.currentTimeMillis() - beginInfTime;
 

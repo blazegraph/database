@@ -479,7 +479,7 @@ public class BigdataRdfRepository implements RdfRepository {
         
         if (rdfsClosure) {
 
-            inferenceEngine.fullForwardClosure();
+            inferenceEngine.computeClosure();
             
         }
         
@@ -1305,7 +1305,7 @@ public class BigdataRdfRepository implements RdfRepository {
         
         flushBuffer();
         
-        inferenceEngine.fullForwardClosure();
+        inferenceEngine.computeClosure();
         
         database.commit();
                 
