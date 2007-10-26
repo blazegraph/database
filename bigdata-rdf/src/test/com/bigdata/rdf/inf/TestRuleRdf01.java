@@ -80,35 +80,41 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
     }
 
     /**
-     * Basic of rule semantics.
+     * Basic test of rule semantics.
      */
     public void test_rdf01() {
         
         AbstractTripleStore store = getStore();
-        
-        InferenceEngine inf = new InferenceEngine(store);
-        
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
 
-        URI rdfType = new _URI(RDF.TYPE);
-        URI rdfProperty = new _URI(RDF.PROPERTY);
-
-        store.addStatement(A, B, C);
-
-        assertTrue(store.containsStatement(A, B, C));
-        assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
-
-        applyRule(inf.rdf1, 1/* numComputed */);
+        try {
+            
+            InferenceEngine inf = new InferenceEngine(store);
+            
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI C = new _URI("http://www.foo.org/C");
+    
+            URI rdfType = new _URI(RDF.TYPE);
+            URI rdfProperty = new _URI(RDF.PROPERTY);
+    
+            store.addStatement(A, B, C);
+    
+            assertTrue(store.containsStatement(A, B, C));
+            assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
+    
+            applyRule(inf.rdf1, 1/* numComputed */);
+            
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, B, C));
+            assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
         
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, B, C));
-        assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
+        } finally {
         
-        store.closeAndDelete();
+            store.closeAndDelete();
+            
+        }
         
     }
 
@@ -119,46 +125,52 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
     public void test_rdf01_distinctPrefixScan() {
         
         AbstractTripleStore store = getStore();
-        
-        InferenceEngine inf = new InferenceEngine(store);
-        
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
-        URI D = new _URI("http://www.foo.org/D");
-        URI E = new _URI("http://www.foo.org/E");
 
-        URI rdfType = new _URI(RDF.TYPE);
-        URI rdfProperty = new _URI(RDF.PROPERTY);
+        try {
 
-        /*
-         * Three statements that will trigger the rule, but two statements share
-         * the same predicate. When it does the minimum amount of work, the rule
-         * will fire for each distinct predicate in the KB -- for this KB that
-         * is only twice.
-         */
-        store.addStatement(A, B, C);
-        store.addStatement(C, B, D);
-        store.addStatement(A, E, C);
+            InferenceEngine inf = new InferenceEngine(store);
 
-        assertTrue(store.containsStatement(A, B, C));
-        assertTrue(store.containsStatement(C, B, D));
-        assertTrue(store.containsStatement(A, E, C));
-        assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
-        assertFalse(store.containsStatement(E, rdfType, rdfProperty ));
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI C = new _URI("http://www.foo.org/C");
+            URI D = new _URI("http://www.foo.org/D");
+            URI E = new _URI("http://www.foo.org/E");
 
-        applyRule(inf.rdf1, 2/* numComputed */);
-        
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, B, C));
-        assertTrue(store.containsStatement(C, B, D));
-        assertTrue(store.containsStatement(A, E, C));
-        assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
-        assertTrue(store.containsStatement(E, rdfType, rdfProperty ));
+            URI rdfType = new _URI(RDF.TYPE);
+            URI rdfProperty = new _URI(RDF.PROPERTY);
 
-        store.closeAndDelete();
+            /*
+             * Three statements that will trigger the rule, but two statements
+             * share the same predicate. When it does the minimum amount of
+             * work, the rule will fire for each distinct predicate in the KB --
+             * for this KB that is only twice.
+             */
+            store.addStatement(A, B, C);
+            store.addStatement(C, B, D);
+            store.addStatement(A, E, C);
+
+            assertTrue(store.containsStatement(A, B, C));
+            assertTrue(store.containsStatement(C, B, D));
+            assertTrue(store.containsStatement(A, E, C));
+            assertFalse(store.containsStatement(B, rdfType, rdfProperty));
+            assertFalse(store.containsStatement(E, rdfType, rdfProperty));
+
+            applyRule(inf.rdf1, 2/* numComputed */);
+
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, B, C));
+            assertTrue(store.containsStatement(C, B, D));
+            assertTrue(store.containsStatement(A, E, C));
+            assertTrue(store.containsStatement(B, rdfType, rdfProperty));
+            assertTrue(store.containsStatement(E, rdfType, rdfProperty));
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
         
     }
     

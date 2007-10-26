@@ -55,9 +55,9 @@ public class RuleFastClosure9 extends AbstractRuleFastClosure_3_5_6_7_9 {
      * @param inf
      * @param T
      */
-    public RuleFastClosure9(InferenceEngine inf, Var x, Var y, Set<Long> T) {
+    public RuleFastClosure9(InferenceEngine inf, Set<Long> T) {
         
-        super(inf, x, inf.rdfType, y, T);
+        super(inf, inf.rdfType, T);
         
     }
     

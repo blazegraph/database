@@ -45,8 +45,10 @@ package com.bigdata.rdf.spo;
 
 import java.util.Comparator;
 
+import com.bigdata.rdf.model.StatementEnum;
+
 /**
- * Imposes s:p:o ordering based on termIds only.
+ * Imposes s:p:o ordering based on termIds only (ignores {@link StatementEnum}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

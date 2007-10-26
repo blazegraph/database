@@ -45,9 +45,6 @@ package com.bigdata.rdf.inf;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.Justification;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -60,13 +57,18 @@ import com.bigdata.rdf.util.KeyOrder;
  * </pre>
  */
 public class RuleRdf01 extends AbstractRuleRdf {
+    
+    protected final Var v;
+    
+    public RuleRdf01(InferenceEngine inf) {
 
-    public RuleRdf01(InferenceEngine store, Var u, Var v, Var x) {
-
-        super(store, new Triple(v, store.rdfType, store.rdfProperty), //
+        super(inf, //
+                new Triple(var("v"), inf.rdfType, inf.rdfProperty), //
                 new Pred[] { //
-                new Triple(u, v, x)
+                    new Triple(var("u"), var("v"), var("x"))//
                 });
+        
+        this.v = var("v");
 
     }
 
@@ -74,6 +76,8 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
         final long computeStart = System.currentTimeMillis();
 
+        resetBindings();
+        
         /*
          * Implementation does an efficient scan for only the distinct
          * predicates in the KB.
@@ -86,29 +90,23 @@ public class RuleRdf01 extends AbstractRuleRdf {
 
             stats.stmts1++;
 
-            long p = itr.next();
+            /*
+             * bind [v].
+             * 
+             * Note: This rule explicitly leaves [u] and [x] unbound so that the
+             * justifications will be wildcards for those variables.
+             */
 
-            SPO newSPO = new SPO(p, inf.rdfType.id, inf.rdfProperty.id,
-                    StatementEnum.Inferred);
+            set(v,itr.next());
 
-            Justification jst = null;
-
-            if (justify) {
-
-                // Note: wildcards for [s] and [o].
-
-                jst = new Justification(this, newSPO, new long[] { //
-                        NULL, p, NULL //
-                        });
-
-            }
-
-            buffer.add(newSPO, jst);
+            emit(buffer);
 
             stats.numComputed++;
 
         }
 
+        assert checkBindings();
+        
         stats.elapsed += System.currentTimeMillis() - computeStart;
 
         return stats;

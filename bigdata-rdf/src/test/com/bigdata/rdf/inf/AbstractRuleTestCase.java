@@ -135,7 +135,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         final int capacity = Math.max(expectedComputed, 1000);
         
-        SPOBuffer buffer = new SPOBuffer(rule.db, null/* filter */, capacity,
+        SPOBuffer buffer = new SPOBuffer(rule.db,
+                rule.inf.doNotAddFilter/* filter */, capacity,
                 false/* distinct */, rule.justify);
         
         // dump the database on the console.

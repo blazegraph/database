@@ -44,13 +44,20 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.Justification;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
@@ -138,9 +145,220 @@ abstract public class Rule {
     final protected boolean justify;
     
     /**
+     * Instance array of bindings for each term in the tail in the order in
+     * which those terms were declared to the ctor. The constants are copied
+     * into the bindings from the {@link #head} and then {@link #body} when the
+     * rule is constructed and the other bindings are set to {@link #NULL}. The
+     * {@link #head} is always at index ZERO(0). The {@link #body} begins at
+     * index ONE (1).
+     * <p>
+     * An attempt to overwrite a constant can be detected using
+     * {@link #checkBindings()}.
+     */
+    final private long[] bindings;
+
+    protected void emit(SPOBuffer buffer) {
+        
+        SPO stmt = new SPO(get(head.s),get(head.p),get(head.o),StatementEnum.Inferred);
+        
+        Justification jst = null;
+        
+        if(justify) {
+            
+            jst = new Justification(this, stmt, bindings.clone());
+            
+        }
+        
+        buffer.add(stmt, jst);
+        
+    }
+
+    /**
      * The 64-bit long integer that represents an unassigned term identifier
      */
-    static final protected long NULL = ITripleStore.NULL;
+    static final protected transient long NULL = ITripleStore.NULL;
+    
+    /**
+     * The arity of a "triple" pattern.
+     */
+    static final protected transient int N = ITripleStore.N;
+
+    /**
+     * Externalizes the rule.
+     */
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getName());
+        
+        sb.append(" : ");
+        
+        for(int i=0; i<body.length; i++) {
+            
+            sb.append(body[i].toString(db));
+            
+            if(i+1<body.length) {
+                
+                sb.append(", ");
+                
+            }
+            
+        }
+
+        sb.append(" -> ");
+        
+        sb.append(head.toString(db));
+        
+        return sb.toString();
+        
+    }
+
+    /**
+     * By default the simple name of the class.
+     */
+    public String getName() {
+
+        return getClass().getSimpleName();
+
+    }
+    
+    /**
+     * Externalizes the rule.
+     * 
+     * @param asBound
+     *            When true, the current variable bindings will be displayed.
+     */
+    public String toString(boolean asBound) {
+
+        if (!asBound) return toString();
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getName());
+        
+        sb.append(" : ");
+        
+        // write out bindings for the tail.
+        
+        for(int i=0; i<body.length; i++) {
+            
+            Pred pred = body[i];
+            
+            sb.append("(");
+            
+            sb.append( pred.s.isVar()?db.toString(bindings[i*N+0]):pred.s.toString(db) );
+            
+            sb.append(", ");
+
+            sb.append( pred.p.isVar()?db.toString(bindings[i*N+1]):pred.p.toString(db) );
+            
+            sb.append(", ");
+            
+            sb.append( pred.o.isVar()?db.toString(bindings[i*N+2]):pred.o.toString(db) );
+            
+            sb.append(")");
+            
+            if(pred.magic) {
+                
+                sb.append("[magic]");
+                
+            }
+            
+            if(i+1<body.length) {
+                
+                sb.append(", ");
+                
+            }
+            
+        }
+
+        sb.append(" -> ");
+        
+        // write out bindings for the head.
+        {
+            
+            Pred pred = head;
+
+            sb.append("(");
+
+            sb.append(pred.s.isVar() ? db.toString(get((Var)pred.s)) : pred.s
+                    .toString(db));
+
+            sb.append(", ");
+
+            sb.append(pred.p.isVar() ? db.toString(get((Var)pred.p)) : pred.p
+                    .toString(db));
+
+            sb.append(", ");
+
+            sb.append(pred.o.isVar() ? db.toString(get((Var)pred.o)) : pred.o
+                    .toString(db));
+
+            sb.append(")");
+
+            if (pred.magic) {
+
+                sb.append("[magic]");
+
+            }
+            
+        }
+        
+        return sb.toString();
+
+    }
+    
+    /**
+     * Canonicalizing map for {@link Var}s.
+     * 
+     * @todo I do not imagine that a lot of variables will be declared, but if
+     *       there are then make this a weak value map and use an LRU to keep
+     *       recently used variables around?
+     */
+    static private final Map<String,Var> vars = new ConcurrentHashMap<String,Var>();
+    
+    /**
+     * Singleton factory for {@link Var}s.
+     * <p>
+     * Note: While only a single instance of a variable object will be created
+     * for any given variable name, the "scope" of the variable is always
+     * constrained by the rule within which it is used. The purpose of the
+     * singleton factory is to let us test for the same variable using "=="
+     * (reference testing) and also to have a shorthand for variable creation.
+     * 
+     * @param name
+     *            The variable name.
+     * 
+     * @return The singleton variable for that name.
+     */
+    static protected Var var(String name) {
+    
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        if (name.length() == 0)
+            throw new IllegalArgumentException();
+        
+        Var var = vars.get(name);
+        
+        if(var == null) {
+            
+            synchronized(vars) {
+
+                // Only one thread gets to create the variable for that name.
+                
+                var = new Var(name);
+            
+                vars.put(name, var);
+                
+            }
+            
+        }
+        
+        return var;
+        
+    }
     
     public Rule(InferenceEngine inf, Pred head, Pred[] body) {
 
@@ -157,7 +375,239 @@ abstract public class Rule {
         this.body = body;
         
         this.justify = inf.isJustified();
+        
+        /*
+         * Allocate bindings for the tail.
+         */
+        
+        this.bindings = new long[body.length*N];
 
+        resetBindings();
+
+    }
+    
+    /**
+     * Initialize the bindings from the constants and variables in the rule.
+     */
+    void resetBindings() {
+        
+        for (int i = 0; i < body.length; i++) {
+
+            Pred pred = body[i];
+
+            for (int j = 0; j < ITripleStore.N; j++) {
+
+                VarOrId binding = pred.get(j);
+
+                // Note: Will be NULL IFF binding is a variable.
+                bindings[i * N + j] = binding.id;
+
+            }
+
+        }
+            
+    }
+    
+    /**
+     * Asserts that the non-variable bindings have their constant values by
+     * comparing them with the values in {@link #body}.  Use as follows:
+     * <pre>
+     * assert checkBindings();
+     * </pre>
+     * 
+     * @return true iff the bindings are Ok.
+     */
+    public boolean checkBindings() {
+        
+        for(int i=0; i<body.length; i++) {
+
+            final Pred pred = body[i];
+            
+            for(int j=0; j<ITripleStore.N; j++) {
+
+                // you are supposed to overwrite the variables, but not the
+                // constants.
+                if (pred.get(j).isConstant()) {
+                    
+                    // verify constant not overwritten.
+                    if(bindings[i * N + j] != pred.get(j).id) {
+                        
+                        return false;
+                        
+                    }
+                    
+                }
+                
+            }
+            
+        }
+
+        return true;
+        
+    }
+
+    /**
+     * Return the variables in common for two {@link Pred}s.
+     * 
+     * @param a
+     * 
+     * @param b
+     * 
+     * @return The variables in common -or- <code>null</code> iff there are no
+     *         variables in common.
+     */
+    public Set<Var> getSharedVars(Pred a, Pred b) {
+
+        /*
+         * Note: You can safely use new Var("x") to test for "x" in the
+         * returned set.
+         * 
+         * Note: Using a HashSet here does NOT work... no idea why.
+         */
+        Set<Var> vars = new TreeSet<Var>();
+        
+        for(int i=0; i<N; i++ ) {
+            
+            VarOrId avar = a.get(i);
+            
+            if(avar.isConstant()) continue;
+                
+            for (int j = 0; j < N; j++) {
+
+                if(b.get(j).equals(avar)) {
+                    
+                    vars.add((Var)avar);
+                    
+                }
+                
+            }
+
+        }
+        
+        return vars;
+
+    }
+
+    /**
+     * <p>
+     * Return the current binding for the variable or constant.
+     * </p>
+     * 
+     * @param var
+     *            The variable or constant.
+     * 
+     * @return Its binding. The binding will be {@link #NULL} if a variable is
+     *         not currently bound.
+     * 
+     * @throws NullPointerException
+     *             if <i>var</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the variable is not used in the rule.
+     * @throws IllegalArgumentException
+     *             if var is a constant.
+     * 
+     * @see #set(Var, long)
+     */
+    public long get(VarOrId var) {
+        
+        if (var == null)
+            throw new NullPointerException();
+
+        if (var.isConstant()) {
+
+            return var.id;
+            
+        }
+        
+        /*
+         * scan the body for the variable.
+         */
+        
+        for(int i=0; i<body.length; i++) {
+            
+            int indexOf = body[i].indexOf(var);
+            
+            if(indexOf != -1) {
+                
+                final long id = bindings[i * N + indexOf];
+                
+//                // keep looking if the variable is not bound at this position.
+//                if (id == NULL) continue;
+
+                // MAY be NULL.
+                return id;
+                
+            }
+            
+        }
+        
+        throw new IllegalArgumentException("Not used: " + var + ", rule="
+                + this);
+                
+    }
+    
+    /**
+     * Binds the variable in the specified predicate. The variable will be bound
+     * at each position in which it occurs in the rule.
+     * 
+     * @param var
+     *            A variable that appears in that predicate.
+     * @param id
+     *            The value to be bound on the variable.
+     * 
+     * @throws NullPointerException
+     *             if the variable is null.
+     * @throws IndexOutOfBoundsException
+     *             if the predicate index is out of range.
+     * @throws IllegalArgumentException
+     *             if the variable does not appear in the rule.
+     */
+    public void set(Var var, long id) {
+      
+        if (var == null) {
+
+            throw new NullPointerException();
+            
+        }
+        
+        boolean exists = false;
+        
+        for(int i=0; i<body.length; i++) {
+            
+            Pred pred = body[i];
+            
+            if(pred.s == var) {
+
+                bindings[i * N + 0] = id;
+
+                exists = true;
+
+            }
+
+            if (pred.p == var) {
+
+                bindings[i * N + 1] = id;
+
+                exists = true;
+                
+            }
+
+            if(pred.o == var) {
+
+                bindings[i * N + 2] = id;
+
+                exists = true;
+                
+            }
+
+        }
+        
+        if(!exists) {
+            
+            throw new IllegalArgumentException(var.toString());
+            
+        }
+        
     }
     
     /**
@@ -266,5 +716,87 @@ abstract public class Rule {
         throw new UnsupportedOperationException();
         
     }
-    
+
+    /**
+     * A variable.
+     * 
+     * @see Rule#var(String)
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    final static public class Var extends VarOrId {
+
+        public final String name;
+        
+        final public boolean isVar() {
+            
+            return true;
+            
+        }
+        
+        final public boolean isConstant() {
+            
+            return false;
+            
+        }
+        
+        /**
+         * Private constructor - use {@link Rule#var(String)} to obtain an instance.
+         * 
+         * @param name
+         */
+        private Var(String name) {
+            
+            super(NULL);
+            
+            assert name != null;
+            
+            this.name = name;
+            
+        }
+
+        public final boolean equals(VarOrId o) {
+            
+            if(this == o) return true;
+            
+            if(o instanceof Var) {
+                
+                return name.equals(((Var)o).name);
+                
+            }
+            
+            return false;
+            
+        }
+
+        public final int hashCode() {
+            
+            return name.hashCode();
+            
+        }
+        
+        public String toString() {
+            
+            return name;
+            
+        }
+
+        public String toString(AbstractTripleStore db) {
+            
+            return name;
+            
+        }
+
+        public int compareTo(VarOrId arg0) {
+
+            // order vars before ids
+            if(arg0 instanceof Id) return -1;
+            
+            return name.compareTo(((Var)arg0).name);
+            
+        }
+        
+    }
+
 }

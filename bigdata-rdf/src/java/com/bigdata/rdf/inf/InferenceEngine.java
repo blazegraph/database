@@ -61,13 +61,13 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
@@ -331,15 +331,19 @@ public class InferenceEngine {
     
     /**
      * Used to assign unique variable identifiers.
+     * 
+     * @deprecated by {@link Rule#var(String)}
      */
     private long nextVar = -1;
 
     /**
      * Return the next unique variable identifier.
+     * 
+     * @deprecated by {@link Rule#var(String)}
      */
     protected Var nextVar() {
 
-        return new Var(nextVar--);
+        return Rule.var("_"+(-nextVar));
 
     }
 
@@ -377,6 +381,14 @@ public class InferenceEngine {
     Rule rdfs12;
     Rule rdfs13;
 
+    /**
+     * A filter for keeping certain entailments out of the database. It is
+     * configured based on how the {@link InferenceEngine} is configured.
+     * 
+     * @see DoNotAddFilter
+     */
+    public final DoNotAddFilter doNotAddFilter = new DoNotAddFilter(this);
+    
     /**
      * Choice of the forward closure algorithm.
      * 
@@ -637,7 +649,7 @@ public class InferenceEngine {
 
     private void setupRules() {
 
-        rdf1 = new RuleRdf01(this,nextVar(),nextVar(),nextVar());
+        rdf1 = new RuleRdf01(this);
 
         // @todo write and initialize rdf2 (?x rdf:type rdf:XMLLiteral).
 //        
@@ -647,9 +659,9 @@ public class InferenceEngine {
 
         rdfs3 = new RuleRdfs03(this,nextVar(),nextVar(),nextVar(),nextVar());
 
-        rdfs4 = new RuleRdfs04(this,nextVar(),nextVar(),nextVar());
+        rdfs4 = new RuleRdfs04(this);
         
-        rdfs5 = new RuleRdfs05(this,nextVar(),nextVar(),nextVar());
+        rdfs5 = new RuleRdfs05(this);
 
         rdfs6 = new RuleRdfs06(this,nextVar(),nextVar(),nextVar());
 
@@ -661,7 +673,7 @@ public class InferenceEngine {
 
         rdfs10 = new RuleRdfs10(this,nextVar(),nextVar(),nextVar());
 
-        rdfs11 = new RuleRdfs11(this,nextVar(),nextVar(),nextVar());
+        rdfs11 = new RuleRdfs11(this);
 
         rdfs12 = new RuleRdfs12(this,nextVar(),nextVar(),nextVar());
 
@@ -833,7 +845,7 @@ public class InferenceEngine {
          * always flushed after each rule and therefore will have been flushed
          * when this method returns.
          */ 
-        final SPOBuffer buffer = new SPOBuffer(database, new DoNotAddFilter(),
+        final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
                 BUFFER_SIZE, distinct, isJustified());
 
         // do the full forward closure of the database.
@@ -884,7 +896,7 @@ public class InferenceEngine {
         /*
          * Entailment buffer.
          */
-        final SPOBuffer buffer = new SPOBuffer(database, new DoNotAddFilter(),
+        final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
                 BUFFER_SIZE, distinct, isJustified());
 
         // 1. add RDF(S) axioms to the database.
@@ -895,8 +907,7 @@ public class InferenceEngine {
 
         // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
         System.err.println("step3: "
-                + new RuleFastClosure3(this, nextVar(), nextVar(), P).apply(
-                        new RuleStats(), buffer));
+                + new RuleFastClosure3(this, P).apply(new RuleStats(), buffer));
         buffer.flush();
 
         // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
@@ -911,20 +922,17 @@ public class InferenceEngine {
 
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
         System.err.println("step5: "
-                + new RuleFastClosure5(this, nextVar(), nextVar(), D).apply(
-                        new RuleStats(), buffer));
+                + new RuleFastClosure5(this, D).apply(new RuleStats(), buffer));
         // Note: deferred buffer.flush() since the next step has no dependency.
 
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
         System.err.println("step6: "
-                + new RuleFastClosure6(this, nextVar(), nextVar(), R).apply(
-                        new RuleStats(), buffer));
+                + new RuleFastClosure6(this, R).apply(new RuleStats(), buffer));
         // Note: deferred buffer.flush() since the next step has no dependency.
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
         System.err.println("step7: "
-                + new RuleFastClosure7(this, nextVar(), nextVar(), C).apply(
-                        new RuleStats(), buffer));
+                + new RuleFastClosure7(this, C).apply(new RuleStats(), buffer));
         // Note: flush buffer before running rdfs11.
         buffer.flush();
 
@@ -934,8 +942,7 @@ public class InferenceEngine {
 
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
         System.err.println("step9: "
-                + new RuleFastClosure9(this, nextVar(), nextVar(), T).apply(
-                        new RuleStats(), buffer));
+                + new RuleFastClosure9(this, T).apply(new RuleStats(), buffer));
         buffer.flush();
 
         // 10. RuleRdfs02
@@ -1222,64 +1229,6 @@ public class InferenceEngine {
 
     }
 
-    /**
-     * Filter keeps matched triple patterns generated OUT of the database.
-     * <p>
-     * Note: {@link StatementEnum#Explicit} triples are always rejected by this
-     * filter so that explicitly asserted triples will always be stored in the
-     * database.
-     * <p>
-     * Note: {@link StatementEnum#Axiom}s are always rejected by this filter so
-     * that they will be stored in the database.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class DoNotAddFilter implements ISPOFilter {
-
-        public DoNotAddFilter() {
-        }
-
-        public boolean isMatch(SPO spo) {
-
-            if((spo.s & 0x01L) == 1L) {
-                
-                /*
-                 * Note: Explicitly toss out entailments that would place a
-                 * literal into the subject position. These statements can enter
-                 * the database via rdfs3 and rdfs4b.
-                 */
-
-                return true;
-                
-            }
-            
-            if (spo.type == StatementEnum.Explicit
-                    || spo.type == StatementEnum.Axiom) {
-                
-                // Accept all explicit triples or axioms.
-                
-                return false;
-                
-            }
-
-            if (!forwardChainRdfTypeRdfsResource && spo.p == rdfType.id
-                    && spo.o == rdfsResource.id) {
-                
-                // reject (?x, rdf:type, rdfs:Resource ) 
-                
-                return true;
-                
-            }
-            
-            // Accept everything else.
-            
-            return false;
-            
-        }
-        
-    }
-    
     /**
      * Convert a {@link Set} of term identifiers into a sorted array of term
      * identifiers.

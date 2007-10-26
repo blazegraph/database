@@ -3,48 +3,69 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Set;
 
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * <code>(?x, P, ?y) -> (?x, propertyId, ?y)</code>
+ * Rule used in steps 3, 5, 6, 7, and 9 of
+ * {@link InferenceEngine#fastForwardClosure()}.
+ * 
+ * <pre>
+ *    (?x, {P}, ?y) -&gt; (?x, propertyId, ?y)
+ * </pre>
+ * 
+ * where <code>{P}</code> is the closure of the subproperties of one of the
+ * FIVE (5) reserved keywords:
+ * <ul>
+ * <li><code>rdfs:subPropertyOf</code></li>
+ * <li><code>rdfs:subClassOf</code></li>
+ * <li><code>rdfs:domain</code></li>
+ * <li><code>rdfs:range</code></li>
+ * <li><code>rdf:type</code></li>
+ * </ul>
+ * 
+ * The caller MUST provide a current version of "{P}" when they instantiate this
+ * rule.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf {
 
-    protected final Set<Long> P;
+    private final Set<Long> P;
 
-    protected final long propertyId;
+    private final long propertyId;
+    
+    private final Var x, y, SetP;
 
     /**
      * @param inf
-     * @param P
      * @param propertyId
-     * 
-     * @todo refactor [P] into the rule execution and refactor the unit
-     *       tests as well.
+     * @param P
      */
-    public AbstractRuleFastClosure_3_5_6_7_9(InferenceEngine inf, Var x,
-            Id propertyId, Var y, Set<Long> P) {
+    public AbstractRuleFastClosure_3_5_6_7_9(InferenceEngine inf,
+            Id propertyId, Set<Long> P) {
 
-        super(inf, new Triple(x, propertyId, y), new Pred[] {
-        //                    new Triple(x, P, y)
+        super(inf, //
+                new Triple(var("x"), propertyId, var("y")), //
+                new Pred[] {//
+                new Triple(var("x"), var("{P}"), var("y")) //
                 });
 
         this.P = P;
 
         this.propertyId = propertyId.id;
+        
+        this.x = var("x");
+        this.y = var("y");
+        this.SetP = var("{P}");
 
     }
 
     /**
-     * <code>(?x, P, ?y) -> (?x, propertyId, ?y)</code>
+     * <code>(?x, {P}, ?y) -> (?x, propertyId, ?y)</code>
      * 
      * @param database
      *            The database.
@@ -60,6 +81,8 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
         final long begin = System.currentTimeMillis();
 
+        resetBindings();
+        
         final long[] a = inf.getSortedArray(P);
 
         // Note: counting the passed in array as stmts1.
@@ -83,53 +106,57 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
             stats.numSubqueries1++;
 
-            ISPOIterator itr = db.getAccessPath(NULL, p, NULL).iterator();
+            ISPOIterator itr2 = db.getAccessPath(NULL, p, NULL).iterator();
 
-            while (itr.hasNext()) {
+            try {
 
-                SPO[] stmts = itr.nextChunk(KeyOrder.POS);
+                while (itr2.hasNext()) {
 
-                if(DEBUG) {
-                    
-                    log.debug("stmts1: chunk="+stmts.length+"\n"+Arrays.toString(stmts));
-                    
-                }
+                    SPO[] stmts = itr2.nextChunk(KeyOrder.POS);
 
-                stats.stmts2 += stmts.length;
+                    if (DEBUG) {
 
-                for (SPO spo : stmts) {
+                        log.debug("stmts1: chunk=" + stmts.length + "\n"
+                                + Arrays.toString(stmts));
 
-                    /*
-                     * Note: since P includes rdfs:subPropertyOf (as well as
-                     * all of the sub properties of rdfs:subPropertyOf)
-                     * there are going to be some axioms in here that we
-                     * really do not need to reassert and generally some
-                     * explicit statements as well.
-                     */
-
-                    SPO newSPO = new SPO(spo.s, propertyId, spo.o,
-                            StatementEnum.Inferred);
-
-                    Justification jst = null;
-
-                    if (justify) {
-
-                        jst = new Justification(this, newSPO, new long[] {//
-                                NULL, p, NULL,// stmt1
-                                        spo.s, spo.p, spo.o // stmt2
-                                });
                     }
 
-                    buffer.add(newSPO, jst);
+                    stats.stmts2 += stmts.length;
 
-                    stats.numComputed++;
+                    for (SPO spo : stmts) {
 
-                }
+                        /*
+                         * Note: since P includes rdfs:subPropertyOf (as well as
+                         * all of the sub properties of rdfs:subPropertyOf)
+                         * there are going to be some axioms in here that we
+                         * really do not need to reassert and generally some
+                         * explicit statements as well.
+                         */
+
+                        assert spo.p == p;
+
+                        set(x, spo.s);
+                        set(SetP, p);
+                        set(y, spo.o);
+
+                        emit(buffer);
+
+                        stats.numComputed++;
+
+                    } // next stmt
+
+                } // while(itr2)
+
+            } finally {
+
+                itr2.close();
 
             }
 
-        }
+        } // next p in P
 
+        assert checkBindings();
+        
         stats.elapsed += System.currentTimeMillis() - begin;
 
         return stats;

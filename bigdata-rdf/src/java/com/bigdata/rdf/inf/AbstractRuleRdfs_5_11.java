@@ -48,7 +48,6 @@ import java.util.Arrays;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -75,24 +74,32 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
 
-    final long p;
+    final Var u, x, v;
     
-    public AbstractRuleRdfs_5_11
-        ( InferenceEngine inf, 
-          Triple head, 
-          Pred[] body
-          ) {
+    final Id C;
 
-        super( inf, head, body );
+    public AbstractRuleRdfs_5_11(InferenceEngine inf, Id C) {
 
-        // the predicate is fixed for all parts of the rule.
-        p = head.p.id;
+        super( inf, //
+                new Triple(var("u"), C, var("x")), //
+                new Pred[] { //
+                    new Triple(var("u"), C, var("v")),//
+                    new Triple(var("v"), C, var("x")) //
+                });
 
+        this.u = var("u");
+        this.v = var("v");
+        this.x = var("x");
+
+        this.C = C;
+        
     }
     
     public RuleStats apply( final RuleStats stats, SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
+        
+        resetBindings();
         
         /*
          * Query for the 1st part of the rule.
@@ -118,58 +125,65 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
         
         final int capacity = 1 * Bytes.megabyte32;
         
-        ISPOIterator itr = db.getAccessPath(NULL, p, NULL).iterator(
+        ISPOIterator itr = db.getAccessPath(NULL, C.id, NULL).iterator(
                 0/* limit */, capacity);
 
-        int nchunks = 0;
+        try {
         
-        while(itr.hasNext()) {
-            
-            // Note: The data will be in POS order, so we resort to SPO order.
-            
-            SPO[] stmts1 = itr.nextChunk(KeyOrder.POS);
+            int nchunks = 0;
 
-            if(DEBUG) {
-                
-                log.debug("stmts1: chunk="+stmts1.length+"\n"+Arrays.toString(stmts1));
-                
-            }
+            while (itr.hasNext()) {
 
-            stats.stmts1 += stmts1.length;
-            
-            if(nchunks==0 && !itr.hasNext()) {
+                // Note: The data will be in POS order, so we reorder to SPO.
+
+                SPO[] stmts1 = itr.nextChunk(KeyOrder.POS);
+
+                if (DEBUG) {
+
+                    log.debug("stmts1: chunk=" + stmts1.length + "\n"
+                            + Arrays.toString(stmts1));
+
+                }
+
+                stats.stmts1 += stmts1.length;
+
+                if (nchunks == 0 && !itr.hasNext()) {
+
+                    /*
+                     * Apply an in-memory self-join.
+                     * 
+                     * Note: The self-join trick only works if we can fully
+                     * buffer the statements. If we are getting more than one
+                     * chunk of statements then we MUST process this using
+                     * subqueries.
+                     */
+
+                    return fullyBufferedSelfJoin(stats, buffer, stmts1);
+
+                }
 
                 /*
-                 * Apply an in-memory self-join.
-                 * 
-                 * Note: The self-join trick only works if we can fully buffer
-                 * the statements. If we are getting more than one chunk of
-                 * statements then we MUST process this using subqueries.
+                 * FIXME The self-join requires that we fully buffer the
+                 * statements. If they are not fully buffered then the self-join
+                 * within a chunk can fail since the statement index is being
+                 * traversed in POS order but we are joining stmt1.o := stmt2.s,
+                 * which requires SPO order.
                  */
 
-                return fullyBufferedSelfJoin(stats,buffer,stmts1);
-                
-            }
+                if (true)
+                    throw new UnsupportedOperationException();
 
-            /*
-             * FIXME The self-join requires that we fully buffer the statements.
-             * If they are not fully buffered then the self-join within a chunk
-             * can fail since the statement index is being traversed in POS
-             * order but we are joining stmt1.o := stmt2.s, which requires SPO
-             * order.
-             */
+                nchunks++;
 
-            if(true) throw new UnsupportedOperationException();
+            } // while(itr.hasNext())
             
-            nchunks++;
-            
-        } // while(itr.hasNext())
-        
-        if(nchunks>1) {
-            
-            throw new UnsupportedOperationException();
-            
+        } finally {
+
+            itr.close();
+
         }
+        
+        assert checkBindings();
         
         stats.elapsed += System.currentTimeMillis() - computeStart;
 
@@ -207,7 +221,7 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
              */ 
             
             // Note: The StatementEnum is ignored by the SPOComparator.
-            SPO key = new SPO(left.o, p, ITripleStore.NULL,
+            SPO key = new SPO(left.o, C.id, ITripleStore.NULL,
                     StatementEnum.Explicit);
             
             // Find the index of that key (or the insert position).
@@ -223,22 +237,30 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleRdf {
             // process only the stmts with left.s as their subject.
             for (; j < stmts1.length; j++) {
 
-                if (left.o != stmts1[j].s) break;
-                
-                SPO stmt2 = stmts1[j];
-                
-                SPO newSPO = new SPO(left.s, p, stmt2.o, StatementEnum.Inferred);
+                SPO right = stmts1[j];
 
-                Justification jst = null;
+                if (left.o != right.s) break;
+
+                set(u,left.s);
+
+                set(v,left.o);
                 
-                if(justify) {
-                    
-                    jst = new Justification(this, newSPO, new SPO[] { left,
-                            stmt2 });
-                    
-                }
+                set(x,right.o);
                 
-                buffer.add(newSPO, jst);
+                emit(buffer);
+                
+//                SPO newSPO = new SPO(left.s, c.id, right.o, StatementEnum.Inferred);
+//
+//                Justification jst = null;
+//                
+//                if(justify) {
+//                    
+//                    jst = new Justification(this, newSPO, new SPO[] { left,
+//                            right });
+//                    
+//                }
+//                
+//                buffer.add(newSPO, jst);
 
                 stats.numComputed++;
                 

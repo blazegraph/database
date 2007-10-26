@@ -17,14 +17,14 @@ import com.bigdata.rdf.util.KeyOrder;
  * domain/range to confer type information. If you explicitly type your
  * instances then this will not add information during closure.
  * <p>
- * 11.
+ * Step 11.
  * 
  * <pre>
  *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b)
  *         -&gt; (?x, rdf:type, ?b).
  * </pre>
  * 
- * 13.
+ * Step 13.
  * 
  * <pre>
  *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b )
@@ -32,6 +32,8 @@ import com.bigdata.rdf.util.KeyOrder;
  * </pre>
  * 
  * @see TestRuleFastClosure_11_13
+ *
+ * FIXME modify to use {@link Rule#var(String)} and {@link Rule#emit(SPOBuffer)}
  */
 abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
 

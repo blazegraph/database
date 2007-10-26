@@ -77,14 +77,6 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
         
         return db.getAccessPath(NULL/* v */, inf.rdfType.id, stmt1.s/* u */)
                 .iterator();
-
-//        byte[] fromKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
-//                stmt1.s, NULL);
-//
-//        byte[] toKey = db.getKeyBuilder().statement2Key(inf.rdfType.id,
-//                stmt1.s + 1, NULL);
-//
-//        return db.getStatements(KeyOrder.POS, fromKey, toKey);
     
     }
     

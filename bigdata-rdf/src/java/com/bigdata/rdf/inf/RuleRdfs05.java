@@ -43,10 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-
-
 /**
- * rdfs11:
+ * rdfs5:
  * 
  * <pre>
  *       triple(?u,rdfs:subPropertyOf,?x) :-
@@ -56,13 +54,9 @@ package com.bigdata.rdf.inf;
  */
 public class RuleRdfs05 extends AbstractRuleRdfs_5_11 {
 
-    public RuleRdfs05(InferenceEngine inf,Var u, Var v, Var x) {
+    public RuleRdfs05(InferenceEngine inf) {
 
-        super(inf, new Triple(u, inf.rdfsSubPropertyOf, x), //
-                new Pred[] { //
-                new Triple(u, inf.rdfsSubPropertyOf, v),//
-                new Triple(v, inf.rdfsSubPropertyOf, x) //
-                });
+        super(inf, inf.rdfsSubPropertyOf );
 
     }
     
