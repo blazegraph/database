@@ -537,15 +537,22 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
         this.justify = Boolean.parseBoolean(properties.getProperty(
                 Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+       
+        log.info(Options.JUSTIFY+"="+justify);
         
         this.forwardClosure = ForwardClosureEnum
                 .valueOf(properties.getProperty(Options.FORWARD_CLOSURE,
                         Options.DEFAULT_FORWARD_CLOSURE)); 
-        
+
+        log.info(Options.FORWARD_CLOSURE+"="+forwardClosure);
+
         this.storeRdfTypeRdfsResource = Boolean.parseBoolean(properties
                 .getProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
                         Options.DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE));
-        
+
+        log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
+                + storeRdfTypeRdfsResource);
+
         setup();
 
     }
@@ -553,7 +560,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
     /**
      * Set based on {@link Options#FORWARD_CLOSURE}. 
      */
-    final ForwardClosureEnum forwardClosure;
+    final protected ForwardClosureEnum forwardClosure;
     
     /**
      * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}.
@@ -659,18 +666,18 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
 
     }
 
-    /**
-     * The full set of RDFS model theory entailments.
-     */
-    public Rule[] getFullForwardClosureRules() {
-
-        // @todo rdf2
-        // @todo datatype entailments
-        
-        return new Rule[] { rdf1, /*rdf2,*/ rdfs2, rdfs3, rdfs4, rdfs5, rdfs6, rdfs7,
-                rdfs8, rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 /* datatype entailments */};
-
-    }
+//    /**
+//     * The full set of RDFS model theory entailments.
+//     */
+//    public Rule[] getFullForwardClosureRules() {
+//
+//        // @todo rdf2
+//        // @todo datatype entailments
+//        
+//        return new Rule[] { rdf1, /*rdf2,*/ rdfs2, rdfs3, rdfs4, rdfs5, rdfs6, rdfs7,
+//                rdfs8, rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 /* datatype entailments */};
+//
+//    }
     
     /**
      * Return the rule model to be used by {@link #fullForwardClosure()}.
@@ -803,7 +810,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * derived entailments may be computed in a succession of rounds. The
      * process halts when no new entailments are computed in a given round.
      */
-    public ClosureStats fullForwardClosure() {
+    protected ClosureStats fullForwardClosure() {
 
         final long begin = System.currentTimeMillis();
         
@@ -854,7 +861,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      *       need to pass those rules the term identifiers as computed over the
      *       union of the new and old statements.
      */
-    public ClosureStats fastForwardClosure() {
+    protected ClosureStats fastForwardClosure() {
 
         /*
          * Note: The steps below are numbered with regard to the paper cited in
@@ -1054,7 +1061,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
      * @return Some statistics about the fixed point computation.
      */
     public RuleStats fixedPoint(Rule[] rules, SPOBuffer buffer) {
-                
+        
         RuleStats totalStats = new RuleStats();
 
         final long[] timePerRule = new long[rules.length];
@@ -1142,7 +1149,7 @@ public class InferenceEngine { //implements ITripleStore, IRawTripleStore {
                     
                 }
 
-                log.debug(sb.toString());
+                log.info(sb.toString());
                 
             }
             
