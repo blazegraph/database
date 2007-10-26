@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import java.util.Arrays;
+
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
@@ -81,6 +83,12 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
             
             SPO[] stmts1 = itr.nextChunk();
             
+            if(DEBUG) {
+                
+                log.debug("stmts1: chunk="+stmts1.length+"\n"+Arrays.toString(stmts1));
+                
+            }
+
             stats.stmts1 += stmts1.length;
             
             for (SPO stmt1 : stmts1) {

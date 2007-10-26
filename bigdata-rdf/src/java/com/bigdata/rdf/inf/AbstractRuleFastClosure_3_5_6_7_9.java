@@ -1,5 +1,6 @@
 package com.bigdata.rdf.inf;
 
+import java.util.Arrays;
 import java.util.Set;
 
 import com.bigdata.rdf.model.StatementEnum;
@@ -87,6 +88,12 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
             while (itr.hasNext()) {
 
                 SPO[] stmts = itr.nextChunk(KeyOrder.POS);
+
+                if(DEBUG) {
+                    
+                    log.debug("stmts1: chunk="+stmts.length+"\n"+Arrays.toString(stmts));
+                    
+                }
 
                 stats.stmts2 += stmts.length;
 
