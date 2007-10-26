@@ -716,14 +716,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             boolean async = true;
             
-            if(limit<10) {
-               
-                // Disable async reads if we are not reading much data.
-                
-                async = false;
-                
-            }
-            
             return new SPOIterator(this, limit, capacity, async);
 
         }
@@ -1430,40 +1422,50 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     /*
      * IRawTripleStore
      */
-    
+
     /**
-     * @deprecated Use {@link IAccessPath#iterator()} instead.
+     * Copies the statements from <i>this</i> store into the specified store
+     * using the <strong>same</strong> term identifiers (the lexicon is neither
+     * copied to nor asserted on the target).
+     * <p>
+     * Note: This method MUST NOT be used unless it is known in advance that the
+     * statements in <i>this</i> store use term identifiers that are consistent
+     * with (term for term identical to) those in the destination store.
+     * <p>
+     * Note: The statements in <i>this</i> store are NOT removed.
+     * 
+     * @param src
+     *            The temporary store (source).
+     * 
+     * @param dst
+     *            The persistent database (destination).
+     * 
+     * @return The #of statements inserted into the main store (the count only
+     *         reports those statements that were not already in the main
+     *         store).
+     * 
+     * @todo write tests.
      */
-    public SPO[] getStatements(KeyOrder keyOrder, byte[] fromKey, byte[] toKey) {
+    public int copyStatements(final AbstractTripleStore dst,
+            final ISPOFilter filter) {
 
-        final IIndex ndx = getStatementIndex(keyOrder);
+        if (dst == null)
+            throw new IllegalArgumentException();
+        if (dst==this)
+            throw new IllegalArgumentException();
         
-        final int n = ndx.rangeCount(fromKey, toKey);
-
-        // buffer for storing the extracted s:p:o data.
-        SPO[] ids = new SPO[n];
-
-        IEntryIterator itr1 = ndx.rangeIterator(fromKey, toKey);
-
-        int i = 0;
-
-        while (itr1.hasNext()) {
-
-            Object val = itr1.next();
-            
-            ids[i++] = new SPO(keyOrder,itr1.getKey(),val);
-
-        }
-
-        assert i == n;
-
-        return ids;
+        // obtain a chunked iterator reading from any access path.
+        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(0/* limit */,
+                0/* capacity */);
+        
+        // add statements to the target store.
+        return dst.addStatements(itr, filter);
 
     }
-
+    
     public int addStatements(SPO[] stmts, int numStmts ) {
        
-//        if( numStmts == 0 ) return 0;
+        if( numStmts == 0 ) return 0;
 
         return addStatements( new SPOArrayIterator(stmts,numStmts), null /*filter*/);
     }
@@ -1478,6 +1480,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     public int addStatements(ISPOIterator itr, ISPOFilter filter) {
 
+        if(!itr.hasNext()) return 0;
+        
         final AtomicLong numWritten = new AtomicLong(0);
 
         /*

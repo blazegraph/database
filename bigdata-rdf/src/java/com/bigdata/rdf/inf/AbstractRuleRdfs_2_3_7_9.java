@@ -45,12 +45,20 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
-import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.util.KeyOrder;
 
+/**
+ * Abstract base class for rules with two terms in the tail where one term is
+ * one-bound and the other is one bound (or two bound) by virtue of a join
+ * variable.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
 
     public AbstractRuleRdfs_2_3_7_9
@@ -63,83 +71,132 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
 
     }
     
+    /**
+     * Note: The evaluation logic reuses subqueries. This is accomplised by
+     * placing the results for the 1st term into SPO order and then applying the
+     * results of each subquery to the next N tuples for the first term having
+     * the same value for their subject position.
+     */
     public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
         
         final long computeStart = System.currentTimeMillis();
         
-        // in SPO order.
-        SPO[] stmts1 = getStmts1();
+        // this is a one-bound query on the POS index.
+        ISPOIterator itr = getStmts1();
         
-        stats.stmts1 += stmts1.length;
-
- /* For example, rdfs7:
-  * 
-  *       triple(?u,?b,?y) :-
-  *          triple(?a,rdfs:subPropertyOf,?b),
-  *          triple(?u,?a,?y). 
-  */
-        /*
-         * Subquery is one bound: ?u:a:?y.
-         * 
-         * Since stmt1.s := stmt2.p, we only execute N distinct subqueries for N
-         * distinct values of stmt1.s. This works because stmts1 is in SPO
-         * order, so the subject values are clustered into an ascending order.
-         * 
-         * Note: I have observed very little or _possibly_ a slight negative
-         * impact on performance from the attempt to reuse subqueries for the
-         * same subject. Presumably this is because the subjects are already
-         * mostly distinct, so we just pay for the cost of sorting them and do
-         * not normally get a reduction in the #of subqueries. The alternative
-         * is to have getStmts1() return the statements without sorting them so
-         * that they will be in POS order since that is the index that we are
-         * querying. The conditional tests on lastS here are still Ok, it is
-         * just much less likely that we will ever reuse a subquery.
-         */
-        
-        long lastS = NULL;
-        
-        SPO[] stmts2 = null;
-        
-        for (int i = 0; i < stmts1.length; i++) {
-
-            SPO stmt1 = stmts1[i];
+        while(itr.hasNext()) {
             
-            if(lastS==NULL || lastS!=stmt1.s) {
-                
-                lastS = stmt1.s;
+            /*
+             * Sort the chunk into SPO order.
+             * 
+             * Note: If you leave this in POS order then the JOIN is still
+             * correct, but the logic to reuse subqueries in apply() is mostly
+             * defeated since the statements are not grouped by their subjects.
+             * 
+             * @todo measure the cost/benefit of this tweak on some real data
+             * sets. It appears to be of some benefit but I do not have any
+             * clean data collected on this point.
+             */
             
-                // Subquery on the POS index using stmt2.p := stmt1.s.
-                stmts2 = getStmts2(stmt1);
+            SPO[] stmts1 = itr.nextChunk(KeyOrder.SPO);
+//            SPO[] stmts1 = itr.nextChunk(); // Leave in POS order (comparison only).
+            
+            if(DEBUG) {
                 
-                stats.stmts2 += stmts2.length;
-                
-                stats.numSubqueries1++;
+                log.debug("stmts1: chunk="+stmts1.length+"\n"+Arrays.toString(stmts1));
                 
             }
             
-            for (int j = 0; j < stmts2.length; j++) {
+            stats.stmts1 += stmts1.length;
+
+            /*
+             * Subquery is one bound: ?u:a:?y.
+             * 
+             * For example, rdfs7:
+             * 
+             * triple(?u,?b,?y) :- triple(?a,rdfs:subPropertyOf,?b), triple(?u,?a,?y).
+             * 
+             * Since stmt1.s := stmt2.p, we only execute N distinct subqueries
+             * for N distinct values of stmt1.s. This works because stmts1 is in
+             * SPO order, so the subject values are clustered into an ascending
+             * order.
+             */
             
-                SPO stmt2 = stmts2[j];
+            for(int i=0; i<stmts1.length; /*inc below*/) {
+
+                final long lastS = stmts1[i].s;
                 
-                SPO newSPO = buildStmt3(stmt1, stmt2);
+                log.debug("subquery: subject="+lastS);
                 
-                Justification jst = null;
-                
-                if(justify) {
+                // New subquery on the POS index using stmt2.p := stmt1.s.
+                ISPOIterator itr2 = getStmts2(stmts1[i]/*lastS*/);
+
+                stats.numSubqueries1++;
+
+                if(!itr2.hasNext()) {
+
+                    /*
+                     * Nothing matched the subquery so consume all rows of stmt1
+                     * where stmts1[i].s == lastS.
+                     */
                     
-                    jst = new Justification(this, newSPO,//
-                            new SPO[] { stmt1, stmt2 });
+                    while(i<stmts1.length && stmts1[i].s == lastS) {
+                     
+                        i++;
+                        
+                    }
+                    
+                    continue;
                     
                 }
                 
-                buffer.add( newSPO, jst );
-                
-                stats.numComputed++;
+                // Apply the subquery while stmt1.s is unchanged.
+
+                while (itr2.hasNext()) {
+
+                    SPO[] stmts2 = itr2.nextChunk(KeyOrder.POS);
+
+                    if(DEBUG) {
+                        
+                        log.debug("stmts2: chunk="+stmts2.length+"\n"+Arrays.toString(stmts2));
+                        
+                    }
+
+                    stats.stmts2 += stmts2.length;
+
+                    // for each row in stmt1s with the same [s].
+                    for (; i < stmts1.length && stmts1[i].s == lastS; i++) {
+
+                        final SPO stmt1 = stmts1[i];
+
+                        // join to each row of stmt2
+                        for (SPO stmt2 : stmts2) {
+                            
+                            SPO newSPO = buildStmt3(stmt1, stmt2);
+
+                            Justification jst = null;
+
+                            if (justify) {
+
+                                jst = new Justification(this, newSPO,//
+                                        new SPO[] { stmt1, stmt2 });
+
+                            }
+
+                            buffer.add(newSPO, jst);
+
+                            stats.numComputed++;
+
+                        }
+                        
+                    }
+
+                }
                 
             }
-            
+
         }
-        
+
         stats.elapsed += System.currentTimeMillis() - computeStart;
 
         return stats;
@@ -151,30 +208,16 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
      * (the predicate). The statements are buffered and then sorted into SPO
      * order.
      */
-    final protected SPO[] getStmts1() {
-        
-        // use the POS index to look up the matches for body[0], the more
-        // constrained triple
-        
-        byte[] fromKey = db.getKeyBuilder().statement2Key(body[0].p.id, NULL,
-                NULL);
-
-        byte[] toKey = db.getKeyBuilder().statement2Key(body[0].p.id + 1, NULL,
-                NULL);
-
-        SPO[] stmts = db.getStatements(KeyOrder.POS, fromKey, toKey);
+    final protected ISPOIterator getStmts1() {
         
         /*
-         * Sort into SPO order.
+         * For example: rdfs7
          * 
-         * Note: you can comment this out to compare with POS order.  The JOIN
-         * is still correct, but the logic to reuse subqueries in apply() is
-         * mostly defeated when the statements are not sorted into SPO order.
+         * triple(?u,?b,?y) :- triple(?a,rdfs:subPropertyOf,?b), triple(?u,?a,?y).
          */
         
-        Arrays.sort(stmts,SPOComparator.INSTANCE);
-        
-        return stmts;
+        return db.getAccessPath(NULL/* a */, body[0].p.id, NULL/* b */)
+                .iterator();
         
     }
     
@@ -185,18 +228,18 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleRdf {
      * 
      * @see RuleRdfs09#getStmts2(SPO)
      */
-    protected SPO[] getStmts2(SPO stmt1) {
+    protected ISPOIterator getStmts2(SPO stmt1) {
 
         /*
          * The subject from stmt1 is in the predicate position for this query.
+         * 
+         * For example: rdfs7
+         * 
+         * triple(?u,?b,?y) :- triple(?a,rdfs:subPropertyOf,?b), triple(?u,?a,?y).
          */
 
-        byte[] fromKey = db.getKeyBuilder().statement2Key(stmt1.s, NULL, NULL);
-
-        byte[] toKey = db.getKeyBuilder().statement2Key(stmt1.s + 1, NULL, NULL);
-
-        return db.getStatements(KeyOrder.POS, fromKey, toKey);
-    
+        return db.getAccessPath(NULL/*u*/, stmt1.s/*a*/, NULL/*y*/).iterator();
+          
     }
     
     /**

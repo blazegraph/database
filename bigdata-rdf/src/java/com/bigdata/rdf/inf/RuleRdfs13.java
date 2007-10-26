@@ -43,6 +43,17 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+/**
+ * rdfs13:
+ * 
+ * <pre>
+ *  (?u rdfs:subClassOf rdfs:Literal) :-
+ *     (?u rdf:type rdfs:Datatype).
+ * </pre>
+ *
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class RuleRdfs13 extends AbstractRuleRdfs_6_8_10_12_13 {
 
     public RuleRdfs13(InferenceEngine inf, Var u, Var v, Var x) {

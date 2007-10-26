@@ -136,12 +136,14 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
     
     /**
      * Unit test of {@link RuleFastClosure6} where the data allow the rule to
-     * fire exactly twice - once where the predicate is <code>rdfs:Range</code>
-     * and once where the predicate is an
-     * <code>rdfs:subPropertyOf</code> <code>rdfs:Range</code>.
+     * fire exactly, where the predicate is <code>rdfs:Range</code> and once
+     * where the predicate is an
+     * <code>rdfs:subPropertyOf</code> <code>rdfs:Range</code>, and tests
+     * that the rule correctly filters out a possible entailment that would
+     * simply conclude its own support.
      * 
      * <pre>
-     *    (?x, P, ?y) -&gt; (?x, propertyId, ?y)
+     *      (?x, P, ?y) -&gt; (?x, propertyId, ?y)
      * </pre>
      * 
      * where <i>propertyId</i> is rdfs:Range
@@ -199,7 +201,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             Rule rule = new RuleFastClosure6(inf,inf.nextVar(),inf.nextVar(),R);
             
-            applyRule(rule, 2/*expectedComputed*/);
+            applyRule(rule, 1/*numComputed*/);
 
             // told.
             
@@ -210,8 +212,11 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             /*
              * entailed
              * 
-             * Note: The 2nd entailment is (A rdfs:Range B), which is already an
-             * explicit statement in the database.
+             * Note: The 2nd possible entailment is (A rdfs:Range B), which is
+             * already an explicit statement in the database. The rule refuses
+             * to consider triple patterns where the predicate is the same as
+             * the predicate on the entailment since the support would then
+             * entail itself.
              */
 
             assertTrue(store.containsStatement(C, URIImpl.RDFS_RANGE, D));

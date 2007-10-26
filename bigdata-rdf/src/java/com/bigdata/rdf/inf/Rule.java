@@ -46,6 +46,9 @@ package com.bigdata.rdf.inf;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPOBuffer;
@@ -83,6 +86,20 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @version $Id$
  */
 abstract public class Rule {
+
+    final public Logger log = Logger.getLogger(Rule.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The persistent database.
