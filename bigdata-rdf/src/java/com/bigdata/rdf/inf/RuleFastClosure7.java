@@ -55,9 +55,9 @@ public class RuleFastClosure7 extends AbstractRuleFastClosure_3_5_6_7_9 {
      * @param inf
      * @param C
      */
-    public RuleFastClosure7(InferenceEngine inf, Var x, Var y, Set<Long> C) {
+    public RuleFastClosure7(InferenceEngine inf, Set<Long> C) {
         
-        super(inf, x, inf.rdfsSubClassOf, y, C);
+        super(inf, inf.rdfsSubClassOf, C);
         
     }
     

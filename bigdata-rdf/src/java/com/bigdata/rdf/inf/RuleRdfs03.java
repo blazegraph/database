@@ -50,10 +50,15 @@ import com.bigdata.rdf.spo.SPO;
  * rdfs3:
  * 
  * <pre>
- * triple(v rdf:type x) :-
- *    triple(a rdfs:range x),
- *    triple(u a v).
+ *   triple(v rdf:type x) :-
+ *      triple(a rdfs:range x),
+ *      triple(u a v).
  * </pre>
+ * 
+ * Note: Literals can be entailed in the subject position by this rule and MUST
+ * be explicitly filtered out. That task is handled by the
+ * {@link DoNotAddFilter}. {@link RuleRdfs04} is the other way that literals
+ * can be entailed into the subject position.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -210,6 +210,8 @@ abstract public class AbstractTestCase
     // Test helpers.
     //
 
+    protected final long N = ITripleStore.N;
+
     protected final long NULL = ITripleStore.NULL;
     
     abstract protected AbstractTripleStore getStore();

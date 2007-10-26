@@ -54,7 +54,20 @@ import com.bigdata.rdf.util.KeyOrder;
 /**
  * Abstract base class for rules with two terms in the tail where one term is
  * one-bound and the other is one bound (or two bound) by virtue of a join
- * variable.
+ * variable.  The examples are:
+ * 
+ * <pre>
+ * rdfs2: triple(u rdf:type x) :- triple(a rdfs:domain x),        triple(u a y).
+ * 
+ * rdfs3: triple(v rdf:type x) :- triple(a rdfs:range  x),        triple(u a v).
+ * 
+ * rdfs7: triple(u b        y) :- triple(a rdfs:subPropertyOf b), triple(u a y).
+ * 
+ * rdfs9: triple(v rdf:type x) :- triple(u rdfs:subClassOf x),    triple(v rdf:type u).                                                         
+ * </pre>
+ * 
+ * FIXME I need to factor the logic for executing this rule out of the rule instance
+ * so that I can use the same logic with different variable names.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -45,32 +45,39 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
- * A class that models either the identifier for an RDF {@link Value} or a
- * variable. Both value identifier and variables are modeled as a long integer.
- * {@link ITripleStore#addTerm(Value)} assigns positive long integers to values.
- * The inference engine uses negative long integers to denote variables.
+ * A class that models either a constant identifier for an RDF {@link Value} or
+ * an unbound variable.
  */
-public class VarOrId {
+abstract public class VarOrId implements Comparable<VarOrId>{
 
     static protected final transient long NULL = ITripleStore.NULL;
     
-    public long id;
+    /**
+     * The reserved value {@link #NULL} is used to denote variables, otherwise
+     * this is the long integer assigned by {@link ITripleStore#addTerm(Value)}.
+     */
+    public final long id;
 
-    public boolean isVar() {
-        
-        return id < 0;
-        
-    }
+    abstract public boolean isVar();
 
-    public VarOrId(long id) {
- 
-        assert id != NULL;
+    abstract public boolean isConstant();
+    
+    protected VarOrId(long id) {
         
         this.id = id;
         
     }
 
+    abstract public boolean equals(VarOrId o);
+
+    abstract public int hashCode();
+    
+    abstract public String toString();
+    
+    abstract public String toString(AbstractTripleStore db);
+    
 }

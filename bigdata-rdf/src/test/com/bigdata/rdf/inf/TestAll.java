@@ -77,8 +77,17 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF(S)+ inference and truth maintenance");
 
+        // test suite for basic rule mechanisms.
+        suite.addTestSuite( TestRule.class );
+        
         // test suite for rdf1.
         suite.addTestSuite( TestRuleRdf01.class );
+
+        // test that rdfs3 does not let literals into the subject.
+        suite.addTestSuite( TestRuleRdfs03.class );
+        
+        // test suite for rdfs4.
+        suite.addTestSuite( TestRuleRdfs04.class );
 
         // Note: rdfs 2, 3, 7, and 9 use the same base class.
         suite.addTestSuite( TestRuleRdfs07.class );

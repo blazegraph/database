@@ -51,6 +51,12 @@ import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 
+/**
+ * FIXME use {@link Rule#var(String)} and {@link Rule#emit(SPOBuffer)}
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
 
     public AbstractRuleRdfs_6_8_10_12_13

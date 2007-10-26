@@ -4,7 +4,6 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -70,7 +69,7 @@ public class Justification implements Comparable<Justification> {
     /**
      * From the ctor, but not persisted.
      */
-    private final transient Rule rule;
+    public final transient Rule rule;
     
     /**
      * Term identifiers for the head and bindings.

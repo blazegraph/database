@@ -487,6 +487,15 @@ public class SPOBuffer {
              * filter.
              */
 
+            if(DEBUG) {
+                
+                log.debug("(filtered out)"
+                        + "\n"
+                        + (justification == null ? stmt.toString(store)
+                                : justification.toString(store)));
+                
+            }
+            
             return;
             
         }
@@ -572,11 +581,10 @@ public class SPOBuffer {
              * the database).
              */
 
-            log.debug((newStmt?" (new)": " (duplicate)")
+            log.debug((newStmt ? "(new)" : "(duplicate)")
                     + "\n"
-                    + stmt.toString(store)
-                    + (justification == null ? "" : "\n"
-                            + justification.toString(store)));
+                    + (justification == null ? stmt.toString(store)
+                            : justification.toString(store)));
         
         }
         

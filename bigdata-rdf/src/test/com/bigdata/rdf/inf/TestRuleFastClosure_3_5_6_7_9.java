@@ -199,7 +199,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             InferenceEngine inf = new InferenceEngine(store);
             
-            Rule rule = new RuleFastClosure6(inf,inf.nextVar(),inf.nextVar(),R);
+            Rule rule = new RuleFastClosure6(inf,R);
             
             applyRule(rule, 1/*numComputed*/);
 

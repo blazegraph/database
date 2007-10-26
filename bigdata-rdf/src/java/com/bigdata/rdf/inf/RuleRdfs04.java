@@ -49,40 +49,64 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.IAccessPath;
 
 /**
  * Computes both parts of rdfs4
  * 
  * <pre>
- * rdfs4a: (?u ?a ?x) -&gt; (?u rdf:type rdfs:Resource)
- * 
- * rdfs4b: (?u ?a ?v) -&gt; (?v rdf:type rdfs:Resource)
+ *   rdfs4a: (?u ?a ?x) -&gt; (?u rdf:type rdfs:Resource)
+ *   
+ *   rdfs4b: (?u ?a ?v) -&gt; (?v rdf:type rdfs:Resource)
  * </pre>
+ * 
+ * as
+ * 
+ * <pre>
+ *   
+ *   (?u ?a ?v) -&gt; (?u rdf:type rdfs:Resource) AND (?v rdf:type rdfs:Resource)
+ *   
+ * </pre>
+ * 
+ * FIXME rewrite this as two rules using {@link IAccessPath#distinctTermScan()}.
+ * That will do MUCH less work. We can add an argument to filter literals in/out
+ * and then cut down on the work by that much again.
+ * 
+ * Note: Literals can be entailed in the subject position by this rule and MUST
+ * be explicitly filtered out. That task is handled by the
+ * {@link DoNotAddFilter}. {@link RuleRdfs03} is the other way that literals
+ * can be entailed into the subject position.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write unit test.
  */
 public class RuleRdfs04 extends AbstractRuleRdf {
 
+    private final Var u;
+    
     /**
      * @param inf
-     * @param head
-     * @param body
      */
-    public RuleRdfs04(InferenceEngine inf, Var u, Var a, Var x) {
+    public RuleRdfs04(InferenceEngine inf) {
         
-        // Note: This declaration of the rule is not complete since we are
-        // computing two heads in the same rule as an efficiency.
+        /*
+         * Note: This declaration of the rule is not complete since we are
+         * computing two heads in the same rule as an efficiency. In order to
+         * make this work we actually set both the subject and the object on
+         * "u", emitting one entailment for each case for the same tail.  See
+         * the code below.
+         */
         
-        super(inf, new Triple(u, inf.rdfType, inf.rdfsResource),
-                new Pred[] { new Triple(u, a, x) });
+        super(inf,//
+                new Triple(var("u"), inf.rdfType, inf.rdfsResource),//
+                new Pred[] { //
+                    new Triple(var("u"), var("a"), var("v")) //
+                });
+
+        this.u = var("u");
         
     }
 
@@ -90,10 +114,13 @@ public class RuleRdfs04 extends AbstractRuleRdf {
 
         final long computeStart = System.currentTimeMillis();
 
+        resetBindings();
+        
         // Full statement scan (3 unbound).
-
         ISPOIterator itr = db.getAccessPath(NULL, NULL, NULL).iterator();
 
+        try {
+        
         while (itr.hasNext()) {
 
             SPO[] stmts = itr.nextChunk();
@@ -108,50 +135,40 @@ public class RuleRdfs04 extends AbstractRuleRdf {
 
                 stats.stmts1++;
 
-                // rdfs4a: (?u ?a ?x) -&gt; (?u rdf:type rdfs:Resource)
+                // rdfs4a: (?u ?a ?v) -&gt; (?u rdf:type rdfs:Resource)
                 {
 
-                    SPO newSPO = new SPO(stmt1.s, inf.rdfType.id,
-                            inf.rdfsResource.id, StatementEnum.Inferred);
-
-                    Justification jst = null;
-
-                    if (justify) {
-
-                        jst = new Justification(this, newSPO,
-                                new SPO[] { stmt1 });
-
-                    }
-
-                    buffer.add(newSPO, jst);
-
+                    // set u from the subject position.
+                    set(u,stmt1.s);
+                    
+                    emit(buffer);
+                    
                 }
 
                 // rdfs4b: (?u ?a ?v) -&gt; (?v rdf:type rdfs:Resource)
                 {
 
-                    SPO newSPO = new SPO(stmt1.o, inf.rdfType.id,
-                            inf.rdfsResource.id, StatementEnum.Inferred);
-
-                    Justification jst = null;
-
-                    if (justify) {
-
-                        jst = new Justification(this, newSPO,
-                                new SPO[] { stmt1 });
-
-                    }
-
-                    buffer.add(newSPO, jst);
-
+                    // set u from the object position.
+                    set(u,stmt1.o);
+                    
+                    emit(buffer);
+                    
                 }
 
                 stats.numComputed += 2;
                 
-            }
+            } // next stmt
 
+        } // while(itr)
+        
+        } finally {
+            
+            itr.close();
+            
         }
 
+        assert checkBindings();
+        
         stats.elapsed += System.currentTimeMillis() - computeStart;
 
         return stats;
