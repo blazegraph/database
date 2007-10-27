@@ -604,20 +604,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     /**
+     * Basic implementation resolves indices dynamically against the outer
+     * class.
      * 
-     * @todo write tests to verify that the correct access path is choosen and
-     *       that the correct key range is setup.
-     * 
-     * @todo write tests of the {@link ISPOIterator}s returned by the methods
-     *       on this class.
-     * 
-     * @todo refactor the use of the {@link ISPOIterator} interface into the
-     *       {@link AbstractTripleStore} and the {@link Rule}s in order to
-     *       support more scaleable inference. This will also make it possible
-     *       to write behavior such as lazy realization of entailments including (?
-     *       rdf:type rdfs:Resource) or owl:sameAs using iterators (basically a
-     *       pull model).
-     *       
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */

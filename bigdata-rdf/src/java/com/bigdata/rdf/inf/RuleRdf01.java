@@ -77,13 +77,8 @@ public class RuleRdf01 extends AbstractRuleRdf {
         final long computeStart = System.currentTimeMillis();
 
         resetBindings();
-        
-        /*
-         * Implementation does an efficient scan for only the distinct
-         * predicates in the KB.
-         */
 
-        // find the distinct predicates in the KB.
+        // find the distinct predicates in the KB (efficient op).
         Iterator<Long> itr = db.getAccessPath(KeyOrder.POS).distinctTermScan();
 
         while (itr.hasNext()) {

@@ -43,10 +43,10 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
@@ -67,27 +67,6 @@ import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * A rule.
- * 
- * @todo Since a variable is just a negative long integer, it is possible to
- *       encode a predicate just like we do a statement with an added flag
- *       either before or after the s:p:o keys indicating whether the predicate
- *       is a magic/1 or a triple/3. This means that we can store predicates
- *       directly in the database in a manner that is consistent with triples.
- *       Since we can store predicates directly in the database we can also
- *       store rules simply be adding the body of the rule as the value
- *       associated with the predicate key. This will let us combine the rule
- *       base, the magic predicates, and the answer set together. We can then
- *       use the existing btree operations for access. The answer set can be
- *       extracted by filtering out the rules. (We should probably partition the
- *       keys so that rules are always in a disjoint part of the key space,
- *       e.g., by including a leading byte that is 0 for a triple and 1 for a
- *       rule.)
- *       <P>
- *       I don't think that we will be storing rules and magic facts in the
- *       database so this trick probably does not matter.
- *       <p>
- *       Also, variable identifiers are strictly local to a rule, not global to
- *       the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -157,6 +136,26 @@ abstract public class Rule {
      */
     final private long[] bindings;
 
+    /**
+     * The {@link IAccessPath} corresponding to each {@link Pred} in the
+     * {@link #body} of the {@link Rule}.
+     * <p>
+     * Note: The corresponding access path in this array is invalidated by
+     * {@link #set(com.bigdata.rdf.inf.Rule.Var, long)} since binding a variable
+     * (or changing the binding of a variable) will in general change the
+     * selectivity of the access path (it may have a different range count).
+     * <p>
+     * Note: {@link #resetBindings()} clears all elements of this array.
+     */
+    final private IAccessPath[] accessPath;
+    
+    /**
+     * Emits an {@link SPO} entailment based on the current variable bindings
+     * for the {@link #head}, and its {@link Justification} iff required, to
+     * the {@link SPOBuffer}.
+     * 
+     * @param buffer
+     */
     protected void emit(SPOBuffer buffer) {
         
         SPO stmt = new SPO(get(head.s),get(head.p),get(head.o),StatementEnum.Inferred);
@@ -172,7 +171,7 @@ abstract public class Rule {
         buffer.add(stmt, jst);
         
     }
-
+    
     /**
      * The 64-bit long integer that represents an unassigned term identifier
      */
@@ -366,22 +365,28 @@ abstract public class Rule {
         
         assert head != null;
 
+        // the database.
         this.db = inf.database;
-        
+
+        // the inference engine.
         this.inf = inf;
         
+        // the head of the rule.
         this.head = head;
 
+        // the predicate declarations for the body.
         this.body = body;
         
+        // true iff the rule is required to generate justifications for entailments.
         this.justify = inf.isJustified();
         
-        /*
-         * Allocate bindings for the tail.
-         */
-        
+        // Allocate bindings for the tail.
         this.bindings = new long[body.length*N];
 
+        // Allocate access path cache.
+        this.accessPath = new IAccessPath[body.length];
+
+        // initialize the bindings from the predicate declarations.
         resetBindings();
 
     }
@@ -395,6 +400,8 @@ abstract public class Rule {
 
             Pred pred = body[i];
 
+            accessPath[i] = null;
+            
             for (int j = 0; j < ITripleStore.N; j++) {
 
                 VarOrId binding = pred.get(j);
@@ -447,47 +454,49 @@ abstract public class Rule {
     }
 
     /**
-     * Return the variables in common for two {@link Pred}s.
+     * Return true iff the selected predicate is fully bound.
+     * <p>
+     * Note: This may be used as part of a strategy to determine the evaluate
+     * order of the rule against some data. However, once you begin to bind
+     * variables the predicate(s) will remain bound until you
+     * {@link #resetBindings()}. For this reason the bindings for a
+     * {@link Rule} MUST be reset you can select an evaluation strategy for that
+     * {@link Rule}.
      * 
-     * @param a
+     * @param index
+     *            The index of a predicate declared in the {@link #body} of the
+     *            rule.
      * 
-     * @param b
+     * @return True iff it is fully bound (a mixture of constants and/or bound
+     *         variables).
      * 
-     * @return The variables in common -or- <code>null</code> iff there are no
-     *         variables in common.
+     * @throws IndexOutOfBoundsException
+     *             if the index is out of bounds.
      */
-    public Set<Var> getSharedVars(Pred a, Pred b) {
-
-        /*
-         * Note: You can safely use new Var("x") to test for "x" in the
-         * returned set.
-         * 
-         * Note: Using a HashSet here does NOT work... no idea why.
-         */
-        Set<Var> vars = new TreeSet<Var>();
+    public boolean isFullyBound(int index) {
         
-        for(int i=0; i<N; i++ ) {
-            
-            VarOrId avar = a.get(i);
-            
-            if(avar.isConstant()) continue;
-                
-            for (int j = 0; j < N; j++) {
+        Pred pred = body[index];
+        
+        for(int j=0; j<ITripleStore.N; j++) {
 
-                if(b.get(j).equals(avar)) {
+            // check any variables.
+            if (pred.get(j).isVar()) {
+                
+                // if a variable is unbound then return false.
+                if(bindings[index * N + j] == NULL) {
                     
-                    vars.add((Var)avar);
+                    return false;
                     
                 }
                 
             }
-
+            
         }
         
-        return vars;
-
+        return true;
+        
     }
-
+    
     /**
      * <p>
      * Return the current binding for the variable or constant.
@@ -530,9 +539,6 @@ abstract public class Rule {
             if(indexOf != -1) {
                 
                 final long id = bindings[i * N + indexOf];
-                
-//                // keep looking if the variable is not bound at this position.
-//                if (id == NULL) continue;
 
                 // MAY be NULL.
                 return id;
@@ -547,8 +553,11 @@ abstract public class Rule {
     }
     
     /**
-     * Binds the variable in the specified predicate. The variable will be bound
-     * at each position in which it occurs in the rule.
+     * Binds the variable. The variable will be bound at each position in which
+     * it occurs in the rule.
+     * <p>
+     * Note: The cached {@link IAccessPath} for a predicate is cleared if a
+     * variable binding is set on that predicate.
      * 
      * @param var
      *            A variable that appears in that predicate.
@@ -580,6 +589,8 @@ abstract public class Rule {
 
                 bindings[i * N + 0] = id;
 
+                accessPath[i] = null;
+                
                 exists = true;
 
             }
@@ -588,6 +599,8 @@ abstract public class Rule {
 
                 bindings[i * N + 1] = id;
 
+                accessPath[i] = null;
+                
                 exists = true;
                 
             }
@@ -596,6 +609,8 @@ abstract public class Rule {
 
                 bindings[i * N + 2] = id;
 
+                accessPath[i] = null;
+                
                 exists = true;
                 
             }
@@ -608,6 +623,129 @@ abstract public class Rule {
             
         }
         
+    }
+    
+    /**
+     * Return the variables in common for two {@link Pred}s.
+     * 
+     * @param index1
+     *            The index of a predicate in the {@link #body}.
+     * 
+     * @param index2
+     *            The index of a different predicate in the {@link #body}.
+     * 
+     * @return The variables in common -or- <code>null</code> iff there are no
+     *         variables in common.
+     * 
+     * @throws IllegalArgumentException
+     *             if the two predicate indices are the same.
+     * @throws IndexOutOfBoundsException
+     *             if either index is out of bounds.
+     */
+    public Set<Var> getSharedVars(int index1, int index2) {
+
+        if (index1 == index2) {
+
+            throw new IllegalArgumentException();
+            
+        }
+        
+        Set<Var> vars = new HashSet<Var>();
+        
+        for(int i=0; i<N; i++ ) {
+            
+            VarOrId avar = body[index1].get(i);
+            
+            if(avar.isConstant()) continue;
+                
+            for (int j = 0; j < N; j++) {
+
+                if(body[index2].get(j).equals(avar)) {
+                    
+                    vars.add((Var)avar);
+                    
+                }
+                
+            }
+
+        }
+        
+        return vars;
+
+    }
+
+    /**
+     * Return the {@link IAccessPath} that would be used to read from the
+     * selected tail {@link Pred}.
+     * <p>
+     * Note: a cache is maintained by the rule for the access paths. If the
+     * cache does not have an entry for the desired access path the one is
+     * obtained and placed into the cache before being returned to the caller.
+     * The cache is invalidated by {@link #resetBindings()} and (on a selective
+     * basis) by {@link #set(com.bigdata.rdf.inf.Rule.Var, long)}.
+     * 
+     * @param index
+     *            The index into {@link #body}.
+     * 
+     * @return The {@link IAccessPath}.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if index is out of bounds.
+     * 
+     * @todo modify to accept the view (new or new+old) for the access path (it
+     *       needs to be a two-dimensional array).
+     */
+    public IAccessPath getAccessPath(int index) {
+        
+        if(accessPath[index]==null) {
+        
+            Pred pred = body[index];
+        
+            accessPath[index] = db.getAccessPath(//
+                    pred.s.id, pred.p.id, pred.o.id//
+                    );
+            
+        }
+        
+        return accessPath[index];
+        
+    }
+
+    /**
+     * The access path corresponding to the body[] predicate that is more
+     * selective given the data in the store and the current variable bindings.
+     * 
+     * @return The index of the {@link Pred} in {@link #body} that is the most
+     *         selective -or- <code>-1</code> iff no access path would read
+     *         any data.
+     * 
+     * @todo modify to accept the view (new or new+old) for the access path
+     */
+    public int getMostSelectiveAccessPath() {
+
+        int index = -1;
+
+        int minRangeCount = Integer.MAX_VALUE;
+
+        for (int i = 0; i < body.length; i++) {
+
+            // skip over fully bound predicates.
+            if( isFullyBound(i) ) continue;
+            
+            int rangeCount = getAccessPath(i).rangeCount();
+
+            if (rangeCount < minRangeCount) {
+
+                minRangeCount = rangeCount;
+
+                index = i;
+
+            }
+
+        }
+
+        return index;
+
     }
     
     /**

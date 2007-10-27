@@ -63,7 +63,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * rdfs7: triple(u b        y) :- triple(a rdfs:subPropertyOf b), triple(u a y).
  * 
- * rdfs9: triple(v rdf:type x) :- triple(u rdfs:subClassOf x),    triple(v rdf:type u).                                                         
+ * rdfs9: triple(v rdf:type x) :- triple(u rdfs:subClassOf x),    triple(v rdf:type u).
  * </pre>
  * 
  * FIXME I need to factor the logic for executing this rule out of the rule instance
