@@ -955,9 +955,9 @@ public class InferenceEngine {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
          * (?x, rdf:type, ?b).
          */
-        System.err.println("step11: "+new RuleFastClosure11(this, nextVar(), nextVar(),
-                nextVar(), nextVar(), nextVar()).apply(new RuleStats(), buffer)
-                .toString());
+        System.err.println("step11: "
+                + new RuleFastClosure11(this).apply(new RuleStats(), buffer)
+                        .toString());
         buffer.flush();
         
         // 12. RuleRdfs03
@@ -969,9 +969,9 @@ public class InferenceEngine {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b ) ->
          * (?x, rdf:type, ?b )
          */
-        System.err.println("step13: "+new RuleFastClosure13(this, nextVar(), nextVar(),
-                nextVar(), nextVar(), nextVar()).apply(new RuleStats(), buffer)
-                .toString());
+        System.err.println("step13: "
+                + new RuleFastClosure13(this).apply(new RuleStats(), buffer)
+                        .toString());
         buffer.flush();
         
         if(forwardChainRdfTypeRdfsResource) {
