@@ -699,10 +699,12 @@ abstract public class Rule {
         
         if(accessPath[index]==null) {
         
-            Pred pred = body[index];
-        
+            // based on the current bindings.
+            
             accessPath[index] = db.getAccessPath(//
-                    pred.s.id, pred.p.id, pred.o.id//
+                    bindings[index*N+0],//
+                    bindings[index*N+1],//
+                    bindings[index*N+2]//
                     );
             
         }

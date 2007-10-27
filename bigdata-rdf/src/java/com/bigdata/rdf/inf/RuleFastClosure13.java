@@ -1,13 +1,14 @@
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.spo.SPO;
 
 /**
  * Rule for step 13 of {@link InferenceEngine#fastForwardClosure()}.
  * 
  * <pre>
- *       (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b )
- *          -&gt; (?z, rdf:type, ?b )
+ * (?z, rdf:type, ?b ) :-
+ *       (?x, ?y, ?z),
+ *       (?y, rdfs:subPropertyOf, ?a),
+ *       (?a, rdfs:range, ?b ).
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -17,25 +18,17 @@ public class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
 
     /**
      * @param inf
-     * @param x
-     * @param y
-     * @param z
-     * @param a
-     * @param b
      */
-    public RuleFastClosure13(InferenceEngine inf, Var x, Var y, Var z, Var a, Var b) {
+    public RuleFastClosure13(InferenceEngine inf) {
         
-        super(inf, x, y, z, a, b, inf.rdfsRange);
+        super(inf, 
+                new Triple(var("z"), inf.rdfType, var("b")),//
+                new Pred[] {//
+                    new Triple(var("x"), var("y"), var("z")),//
+                    new Triple(var("y"), inf.rdfsSubPropertyOf, var("a")),//
+                    new Triple(var("a"), inf.rdfsRange, var("b"))//
+                });
         
     }
     
-    /**
-     * Chooses "z" from the 1st term.
-     */
-    protected long getSubjectForHead(SPO spo){
-
-        return spo.o;
-        
-    }
-
 }

@@ -2,9 +2,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.util.KeyOrder;
@@ -12,54 +10,72 @@ import com.bigdata.rdf.util.KeyOrder;
 /**
  * Rule for steps 11 and 13 of {@link InferenceEngine#fastForwardClosure()}.
  * <p>
- * Note: this rule is not very selective and does not produce new
- * entailments unless your ontology and your application both rely on
- * domain/range to confer type information. If you explicitly type your
- * instances then this will not add information during closure.
+ * Note: As long as the binding patterns (the positions in which correlated
+ * variables appear) in the tails are the same the rules can have different
+ * binding patterns in the head and use the same logic for their execution.
+ * Differences in which constants are used do not matter.
+ * <p>
+ * Note: this rule is not very selective and does not produce new entailments
+ * unless your ontology and your application both rely on domain/range to confer
+ * type information. If you explicitly type your instances then this will not
+ * add information during closure.
  * <p>
  * Step 11.
  * 
  * <pre>
- *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b)
- *         -&gt; (?x, rdf:type, ?b).
+ * (?x, rdf:type, ?b) :-
+ *     (?x, ?y, ?z),
+ *     (?y, rdfs:subPropertyOf, ?a),
+ *     (?a, rdfs:domain, ?b).
  * </pre>
  * 
  * Step 13.
  * 
  * <pre>
- *      (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b )
- *         -&gt; (?z, rdf:type, ?b )
+ * (?z, rdf:type, ?b ) :-
+ *       (?x, ?y, ?z),
+ *       (?y, rdfs:subPropertyOf, ?a),
+ *       (?a, rdfs:range, ?b ).
  * </pre>
  * 
  * @see TestRuleFastClosure_11_13
- *
- * FIXME modify to use {@link Rule#var(String)} and {@link Rule#emit(SPOBuffer)}
  */
 abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
 
     protected final long propertyId;
     
+    final Var x, y, z, a, b;
+    final Id C1, C2;
+    
     /**
      * 
      * @param inf
-     * @param x
-     * @param y
-     * @param z
-     * @param a
-     * @param b
-     * @param propertyId Use [rdfs:domain] for #11 and [rdfs:range] for #13.
+     * @param head
+     * @param body
      */
-    public AbstractRuleFastClosure_11_13(InferenceEngine inf, Var x, Var y, Var z,
-            Var a, Var b, final Id propertyId) {
+    public AbstractRuleFastClosure_11_13(InferenceEngine inf, Triple head, Pred[] body) {
 
-        super(inf, new Triple(x, inf.rdfType, b),
-                new Pred[] {
-                new Triple(x, y, z),
-                new Triple(y, inf.rdfsSubPropertyOf, a),
-                new Triple(a, propertyId, b)
-                });
+        super(inf, head, body );
 
-        this.propertyId = propertyId.id;
+        // validate the binding pattern for the tail of this rule.
+        assert body.length == 3;
+        
+        // (x,y,z)
+        x = (Var)body[0].s;
+        y = (Var)body[0].p;
+        z = (Var)body[0].o;
+
+        // (y,C1,a)
+        assert y == (Var)body[1].s;
+        C1 = (Id)body[1].p;
+        a = (Var)body[1].o;
+
+        // (a,C2,b)
+        assert a == (Var)body[2].s;
+        C2 = (Id)body[2].p;
+        b = (Var)body[2].o;
+
+        this.propertyId = C2.id;
         
     }
 
@@ -84,9 +100,10 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
         
         final long computeStart = System.currentTimeMillis();
 
+        resetBindings();
+        
         // Query (?y, rdfs:subPropertyOf, ?a).
-
-        ISPOIterator itr1 = getStmts1();
+        ISPOIterator itr1 = getAccessPath(1/*pred*/).iterator();
         
         assert itr1.getKeyOrder() == KeyOrder.POS;
         
@@ -115,16 +132,20 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
             
             for (SPO stmt1 : stmts1) {
                 
+                set(y,stmt1.s);
+                
+                set(a,stmt1.o);
+                
                 // Subquery on the SPO index joining on stmt1.o == stmt2.s (a).
 
-                ISPOIterator itr2 = getStmts2(stmt1);
+                ISPOIterator itr2 = getAccessPath(2/*pred*/).iterator();
                 
                 assert itr2.getKeyOrder() == KeyOrder.SPO;
-                
+
                 while(itr2.hasNext()) {
                     
                     SPO[] stmts2 = itr2.nextChunk();
-                    
+
                     if(DEBUG) {
                         
                         log.debug("stmts2: chunk="+stmts2.length+"\n"+Arrays.toString(stmts2));
@@ -141,20 +162,13 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                          * join was on ?a
                          */
                         
-                        assert stmt1.o == stmt2.s;
+                        assert stmt2.s == get(a);
 
-                        /* ?y := stmt1.s
-                         * 
-                         * ?b := stmt2.o
-                         */
-                        
-                        final long y = stmt1.s;
-                        
-                        final long b = stmt2.o;
+                        set(b,stmt2.o);
                         
                         // One bound subquery <code>(?x, ?y, ?z)</code> using POS
                         
-                        ISPOIterator itr3 = getStmts3(stmt1/*y*/);
+                        ISPOIterator itr3 = getAccessPath(0/*pred*/).iterator();
                         
                         while(itr3.hasNext()) {
                             
@@ -172,30 +186,15 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                             
                             for(SPO stmt3: stmts3) {
 
+                                assert stmt3.p == get(y);
+
+                                set(x,stmt3.s);
+                                
+                                set(z,stmt3.o);
+                                
                                 // generate ([?x|?z] , rdf:type, ?b).
+                                emit(buffer);
                                 
-                                SPO newSPO = new SPO(getSubjectForHead(stmt3),
-                                        inf.rdfType.id, b,
-                                        StatementEnum.Inferred);
-                                
-                                Justification jst = null;
-                                
-                                if(justify) {
-                                    
-                                    jst = new Justification(this, newSPO, new SPO[] {
-                                    /*
-                                     * Note: this is the order in which the rule was written
-                                     * in the paper.
-                                     */
-                                            stmt3,
-                                            stmt1,
-                                            stmt2,
-                                    });
-                                    
-                                }
-                                
-                                buffer.add( newSPO, jst );
-                                                        
                                 stats.numComputed++;
                                 
                             }
@@ -210,208 +209,12 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
 
         }
         
+        assert checkBindings();
+        
         stats.elapsed += System.currentTimeMillis() - computeStart;
 
         return stats;
 
     }
-    
-    /**
-     * Use POS index to match (?y, rdfs:subPropertyOf, ?a) with one bound (the
-     * predicate).
-     */
-    public ISPOIterator getStmts1() {
-        
-        final long p = inf.rdfsSubPropertyOf.id;
-
-        return db.getAccessPath(NULL, p, NULL).iterator();
-        
-    }
-    
-    /**
-     * Two bound subquery <code>(?a, propertyId, ?b)</code> using the SPO
-     * index with ?a bound to stmt1.o.
-     * 
-     * @return The data in SPO order.
-     */
-    public ISPOIterator getStmts2(SPO stmt1) {
-
-        final long a = stmt1.o;
-
-        return db.getAccessPath(a, propertyId, NULL).iterator();
-        
-    }
-    
-    /**
-     * One bound subquery <code>(?x, ?y, ?z)</code> using the POS
-     * index with ?y bound to stmt1.s.
-     * 
-     * @return The data in POS order.
-     */
-    public ISPOIterator getStmts3(SPO stmt1) {
-
-        final long y = stmt1.s;
-
-        return db.getAccessPath(NULL/*x*/, y, NULL/*z*/).iterator();
-    
-    }
-
-//    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
-//        
-//        final long computeStart = System.currentTimeMillis();
-//        
-//        // (?y, rdfs:subPropertyOf, ?a) in SPO order.
-//        SPO[] stmts1 = getStmts1();
-//        
-//        stats.stmts1 += stmts1.length;
-//
-//        /*
-//         * Subquery is two bound: (a, propertyId, ?b). What we want out of
-//         * the join is stmt1.s, which is ?y.
-//         */
-//        
-//        long lastS = NULL;
-//        
-//        SPO[] stmts2 = null;
-//        
-//        for (int i = 0; i < stmts1.length; i++) {
-//
-//            SPO stmt1 = stmts1[i];
-//            
-//            if(lastS==NULL || lastS!=stmt1.s) {
-//                
-//                lastS = stmt1.s;
-//            
-//                // Subquery on the POS index using ?a := stmt2.p := stmt1.s.
-//
-//                stmts2 = getStmts2(stmt1);
-//                
-//                stats.stmts2 += stmts2.length;
-//                
-//                stats.numSubqueries1++;
-//                
-//            }
-//            
-//            for (int j = 0; j < stmts2.length; j++) {
-//            
-//                SPO stmt2 = stmts2[j];
-//                
-//                /* join on ?a
-//                 * 
-//                 * ?y := stmt1.s
-//                 * 
-//                 * ?b := stmt2.o
-//                 */
-//                if(stmt1.o != stmt2.s) continue;
-//
-//                // One bound subquery <code>(?x, ?y, ?z)</code> using the POS
-//                SPO[] stmts3 = getStmts3(stmt1);
-//                
-//                stats.stmts3 += stmts3.length;
-//                
-//                stats.numSubqueries2++;
-//                
-//                for(SPO stmt3: stmts3) {
-//
-//                    // generate (?z , rdf:type, ?b).
-//                    
-//                    SPO newSPO = new SPO(getSubjectForHead(stmt3), inf.rdfType.id, stmt2.o,
-//                            StatementEnum.Inferred);
-//                    
-//                    Justification jst = null;
-//                    
-//                    if(justify) {
-//                        
-//                        jst = new Justification(this, newSPO, new SPO[] {
-//                        /*
-//                         * Note: this is the order in which the rule was written
-//                         * in the paper.
-//                         */
-//                                stmt3,
-//                                stmt1,
-//                                stmt2,
-//                        });
-//                        
-//                    }
-//                    
-//                    buffer.add( newSPO, jst );
-//                                            
-//                    stats.numComputed++;
-//                    
-//                }
-//                
-//            }
-//            
-//        }
-//        
-//        stats.elapsed += System.currentTimeMillis() - computeStart;
-//
-//        return stats;
-//
-//    }
-//
-//    /**
-//     * Use POS index to match (?y, rdfs:subPropertyOf, ?a) with one bound
-//     * (the predicate). The statements are buffered and then sorted into SPO
-//     * order.
-//     */
-//    public SPO[] getStmts1() {
-//        
-//        final long p = inf.rdfsSubPropertyOf.id;
-//
-//        SPO[] stmts = ((SPOArrayIterator)db.getAccessPath(NULL, p, NULL).iterator()).array();
-//        
-//        /*
-//         * Sort into SPO order.
-//         * 
-//         * Note: you can comment this out to compare with POS order.  The JOIN
-//         * is still correct, but the logic to reuse subqueries in apply() is
-//         * mostly defeated when the statements are not sorted into SPO order.
-//         */
-//        Arrays.sort(stmts,SPOComparator.INSTANCE);
-//        
-//        return stmts;
-//        
-//    }
-//    
-//    /**
-//     * Two bound subquery <code>(?a, propertyId, ?b)</code> using the SPO
-//     * index with ?a bound to stmt1.o.
-//     * 
-//     * @return The data in SPO order.
-//     */
-//    public SPO[] getStmts2(SPO stmt1) {
-//
-//        final long a = stmt1.o;
-//
-//        SPO[] stmts = ((SPOArrayIterator)db.getAccessPath(a, propertyId, NULL).iterator()).array();
-//
-//        return stmts;
-//        
-//    }
-//    
-//    /**
-//     * One bound subquery <code>(?x, ?y, ?z)</code> using the POS
-//     * index with ?y bound to stmt1.s.
-//     * 
-//     * @return The data in POS order.
-//     */
-//    public SPO[] getStmts3(SPO stmt1) {
-//
-//        final long y = stmt1.s;
-//
-//        SPO[] stmts = ((SPOArrayIterator)db.getAccessPath(NULL/*x*/, y, NULL/*z*/).iterator()).array();
-//
-//        return stmts;
-//    
-//    }
-
-    /**
-     * The two rules choose different bindings for the subject of the head. This
-     * method makes that selection.
-     * 
-     * @param spo The 1st term.
-     */
-    abstract protected long getSubjectForHead(SPO spo);
     
 }
