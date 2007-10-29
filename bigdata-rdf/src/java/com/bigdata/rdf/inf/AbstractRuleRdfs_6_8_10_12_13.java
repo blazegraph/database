@@ -45,33 +45,56 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * FIXME use {@link Rule#var(String)} and {@link Rule#emit(SPOBuffer)}
+ * Rules having a tail of the general form:
+ * <pre>
+ * ( ?u C1 C2 )
+ * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
+public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleNestedSubquery {
 
+//    final Var u;
+    
     public AbstractRuleRdfs_6_8_10_12_13
-        ( InferenceEngine inf, 
+        ( AbstractTripleStore db, 
           Triple head, 
           Triple body
           ) {
 
-        super(inf, head, new Pred[] { body });
+        super(db, head, new Pred[] { body });
 
+        /*
+         * check the variable binding pattern on the tail.
+         */
+        
+        assert super.body.length == 1;
+        
+        assert super.body[0].s.isVar();
+        assert super.body[0].p.isConstant();
+        assert super.body[0].o.isConstant();
+        
     }
-    
-    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
+   
+    /**
+     * @todo This is actually correct for any single predicate rule. However,
+     *       {@link AbstractRuleDistinctTermScan} is better suited for some
+     *       special cases.
+     */
+    public RuleStats apply( final boolean justify, final SPOBuffer buffer) {
+        
+        if(true) return apply0(justify,buffer);
         
         final long computeStart = System.currentTimeMillis();
+        
+        resetBindings();
         
         /*
          * For example, rdfs10:
@@ -82,44 +105,33 @@ public class AbstractRuleRdfs_6_8_10_12_13 extends AbstractRuleRdf {
         /*
          * 2-bound query on POS index.
          */
-        ISPOIterator itr = db.getAccessPath(NULL, body[0].p.id, body[0].o.id)
-                .iterator();
+        ISPOIterator itr = getAccessPath(0/*pred*/).iterator();
 
         while(itr.hasNext()) {
             
-            SPO[] stmts1 = itr.nextChunk();
+            SPO[] stmts0 = itr.nextChunk();
             
             if(DEBUG) {
                 
-                log.debug("stmts1: chunk="+stmts1.length+"\n"+Arrays.toString(stmts1));
+                log.debug("stmts1: chunk="+stmts0.length+"\n"+Arrays.toString(stmts0));
                 
             }
 
-            stats.stmts1 += stmts1.length;
+            stats.nstmts[0] += stmts0.length;
             
-            for (SPO stmt1 : stmts1) {
+            for (SPO stmt1 : stmts0) {
+
+                bind(0,stmt1);
                 
-                long s = head.s.isVar() ? stmt1.s : head.s.id;
-                long p = head.p.isVar() ? stmt1.s : head.p.id;
-                long o = head.o.isVar() ? stmt1.s : head.o.id;
-          
-                SPO newSPO = new SPO(s, p, o, StatementEnum.Inferred);
-                
-                Justification jst = null;
-                
-                if(justify) {
-                    
-                    jst = new Justification(this, newSPO, new SPO[] { stmt1 });
-                    
-                }
-                
-                buffer.add( newSPO, jst );
+                //set(u,stmt1.s);
+
+                emit(justify,buffer);
 
             }
-
-            stats.numComputed += stmts1.length;
 
         }
+        
+        assert checkBindings();
         
         stats.elapsed += System.currentTimeMillis() - computeStart;
         

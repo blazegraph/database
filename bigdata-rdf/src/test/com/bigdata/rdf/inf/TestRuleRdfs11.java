@@ -99,7 +99,7 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
         assertFalse(store.containsStatement(A, rdfsSubClassOf, C));
 
-        applyRule(inf.rdfs11, 1/* numComputed */);
+        applyRule(inf,inf.rdfs11, 1/* numComputed */);
         
         /*
          * validate the state of the primary store.

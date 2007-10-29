@@ -60,7 +60,7 @@ import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Test suite for {@link RuleRdfs04}.
+ * Test suite for {@link RuleRdfs04a} and {@link RuleRdfs04b}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -99,7 +99,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
     /**
      * Test of the basic semantics.
      */
-    public void test_rdfs4() {
+    public void test_rdfs4a() {
         
         AbstractTripleStore store = getStore();
 
@@ -107,29 +107,74 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
         
             InferenceEngine inf = new InferenceEngine(getProperties(),store);
 
+            URI U = new URIImpl("http://www.foo.org/U");
             URI A = new URIImpl("http://www.foo.org/A");
-            URI B = new URIImpl("http://www.foo.org/B");
-            URI C = new URIImpl("http://www.foo.org/C");
+            URI X = new URIImpl("http://www.foo.org/X");
             URI rdfType = new URIImpl(RDF.TYPE);
             URI rdfsResource = new URIImpl(RDFS.RESOURCE);
 
-            store.addStatement(A, B, C);
+            store.addStatement(U, A, X);
 
-            assertTrue(store.containsStatement(A, B, C));
+            assertTrue(store.containsStatement(U, A, X));
             assertEquals(1,store.getStatementCount());
 
-            applyRule(inf.rdfs4, 2/* numComputed */);
+            applyRule(inf,inf.rdfs4a, 1/* numComputed */);
 
             /*
              * validate the state of the primary store.
              * 
-             * Note: There is no entailment for (B rdf:type rdfsResource) since
+             * Note: There is no entailment for (A rdf:type rdfsResource) since
              * it was not used in either a subject or object position.
              */
-            assertTrue(store.containsStatement(A, B, C));
-            assertTrue(store.containsStatement(A, rdfType, rdfsResource));
-            assertTrue(store.containsStatement(C, rdfType, rdfsResource));
-            assertEquals(3,store.getStatementCount());
+
+            assertTrue(store.containsStatement(U, A, X));
+            assertTrue(store.containsStatement(U, rdfType, rdfsResource));
+            assertFalse(store.containsStatement(X, rdfType, rdfsResource));
+            assertEquals(2,store.getStatementCount());
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+    
+    /**
+     * Test of the basic semantics.
+     */
+    public void test_rdfs4b() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+        
+            InferenceEngine inf = new InferenceEngine(getProperties(),store);
+
+            URI U = new URIImpl("http://www.foo.org/U");
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI V = new URIImpl("http://www.foo.org/V");
+            URI rdfType = new URIImpl(RDF.TYPE);
+            URI rdfsResource = new URIImpl(RDFS.RESOURCE);
+
+            store.addStatement(U, A, V);
+
+            assertTrue(store.containsStatement(U, A, V));
+            assertEquals(1,store.getStatementCount());
+
+            applyRule(inf,inf.rdfs4b, 1/* numComputed */);
+
+            /*
+             * validate the state of the primary store.
+             * 
+             * Note: There is no entailment for (A rdf:type rdfsResource) since
+             * it was not used in either a subject or object position.
+             */
+            
+            assertTrue(store.containsStatement(U, A, V));
+            assertFalse(store.containsStatement(U, rdfType, rdfsResource));
+            assertTrue(store.containsStatement(V, rdfType, rdfsResource));
+            assertEquals(2,store.getStatementCount());
 
         } finally {
 
@@ -146,7 +191,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
      * Note: {@link RuleRdfs03} is the other way that literals can be entailed
      * into the subject position.
      */
-    public void test_rdfs4_filterLiterals() {
+    public void test_rdfs4b_filterLiterals() {
         
         AbstractTripleStore store = getStore();
 
@@ -169,18 +214,17 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * DoNotAddFilter on the InferenceEngine, so it is counted here but
              * does not show in the database.
              */
-            applyRule(inf.rdfs4, 2/* numComputed */);
+            applyRule(inf,inf.rdfs4b, 1/* numComputed */);
 
             /*
-             * validate the state of the primary store.
-             * 
-             * Note: There is no entailment for (C rdf:type rdfsResource) since
-             * C is a Literal and literals are not allowed into the subject
-             * position.
+             * validate the state of the primary store - there is no entailment
+             * for (A rdf:type rdfs:Resource) since that would allow a literal
+             * into the subject position. 
              */
+            
             assertTrue(store.containsStatement(A, rdfType, C));
-            assertTrue(store.containsStatement(A, rdfType, rdfsResource));
-            assertEquals(2,store.getStatementCount());
+            assertFalse(store.containsStatement(A, rdfType, rdfsResource));
+            assertEquals(1,store.getStatementCount());
 
         } finally {
 

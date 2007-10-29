@@ -123,13 +123,13 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         public final Rule rule;
         
         /**
-         * @param store
+         * @param inf
          * @param head
          * @param body
          */
-        public MagicRule(InferenceEngine store, Rule rule) {
+        public MagicRule(InferenceEngine inf, Rule rule) {
             
-            super(store, rule.head, magicRewrite(rule));
+            super(inf.database, rule.head, magicRewrite(rule));
             
             this.rule = rule;
             
@@ -160,11 +160,11 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /**
          * Applies the base rule iff the {@link Magic} is matched.
          */
-        public RuleStats apply( RuleStats stats, SPOBuffer buffer) {
+        public RuleStats apply( boolean justify, SPOBuffer buffer) {
 
             if(match()) { 
             
-                return rule.apply( stats, buffer );
+                return rule.apply( justify, buffer );
             
             }
             
@@ -186,59 +186,65 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
 
         AbstractTripleStore store = getStore();
         
-        /*
-         * setup the database.
-         */
-        URI x = new _URI("http://www.foo.org/x");
-        URI y = new _URI("http://www.foo.org/y");
-        URI z = new _URI("http://www.foo.org/z");
-
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
-
-        URI rdfType = new _URI(RDF.TYPE);
-
-        URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-
-        store.addStatement(x, rdfType, C);
-        store.addStatement(y, rdfType, B);
-        store.addStatement(z, rdfType, A);
-
-        store.addStatement(B, rdfsSubClassOf, A);
-        store.addStatement(C, rdfsSubClassOf, B);
-
-        assertEquals("statementCount", 5, store.getStatementCount());
-        assertTrue(store.containsStatement(x, rdfType, C));
-        assertTrue(store.containsStatement(y, rdfType, B));
-        assertTrue(store.containsStatement(z, rdfType, A));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-        assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+        try {
         
-        /*
-         * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
-         */
-
-        InferenceEngine inf = new InferenceEngine(store);
+            /*
+             * setup the database.
+             */
+            URI x = new _URI("http://www.foo.org/x");
+            URI y = new _URI("http://www.foo.org/y");
+            URI z = new _URI("http://www.foo.org/z");
+    
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI C = new _URI("http://www.foo.org/C");
+    
+            URI rdfType = new _URI(RDF.TYPE);
+    
+            URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+    
+            store.addStatement(x, rdfType, C);
+            store.addStatement(y, rdfType, B);
+            store.addStatement(z, rdfType, A);
+    
+            store.addStatement(B, rdfsSubClassOf, A);
+            store.addStatement(C, rdfsSubClassOf, B);
+    
+            assertEquals("statementCount", 5, store.getStatementCount());
+            assertTrue(store.containsStatement(x, rdfType, C));
+            assertTrue(store.containsStatement(y, rdfType, B));
+            assertTrue(store.containsStatement(z, rdfType, A));
+            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
+            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+            
+            /*
+             * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
+             */
+    
+            InferenceEngine inf = new InferenceEngine(store);
+            
+            // query :- triple(?s,rdf:type,A).
+            Triple query = new Triple(Rule.var("s"),
+                    inf.rdfType, new Id(store.addTerm(new _URI(
+                            "http://www.foo.org/A"))));
+    
+            // Run the query.
+            ITripleStore answerSet = inf.query(query, new Rule[] {
+                    inf.rdfs9, inf.rdfs11 });
+    
+            /*
+             * @todo verify the answer set: ?s := {x,y,z}.
+             */
+            assertEquals("statementCount", 3, answerSet.getStatementCount());
+            assertTrue(answerSet.containsStatement(x, rdfType, A));
+            assertTrue(answerSet.containsStatement(y, rdfType, A));
+            assertTrue(answerSet.containsStatement(z, rdfType, A));
         
-        // query :- triple(?s,rdf:type,A).
-        Triple query = new Triple(inf.nextVar(),
-                inf.rdfType, new Id(store.addTerm(new _URI(
-                        "http://www.foo.org/A"))));
+        } finally {
+            
+            store.closeAndDelete();
 
-        // Run the queryy.
-        ITripleStore answerSet = inf.query(query, new Rule[] {
-                inf.rdfs9, inf.rdfs11 });
-
-        /*
-         * @todo verify the answer set: ?s := {x,y,z}.
-         */
-        assertEquals("statementCount", 3, answerSet.getStatementCount());
-        assertTrue(answerSet.containsStatement(x, rdfType, A));
-        assertTrue(answerSet.containsStatement(y, rdfType, A));
-        assertTrue(answerSet.containsStatement(z, rdfType, A));
-        
-        store.closeAndDelete();
+        }
         
     }
     

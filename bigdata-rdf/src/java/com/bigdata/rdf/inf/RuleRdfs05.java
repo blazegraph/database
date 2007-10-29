@@ -56,7 +56,7 @@ public class RuleRdfs05 extends AbstractRuleRdfs_5_11 {
 
     public RuleRdfs05(InferenceEngine inf) {
 
-        super(inf, inf.rdfsSubPropertyOf );
+        super(inf.database, inf.rdfsSubPropertyOf );
 
     }
     

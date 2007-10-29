@@ -50,6 +50,7 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -85,8 +86,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
      * once.
      * 
      * <pre>
-     *         triple(?u,rdfs:subClassOf,?u) :-
-     *            triple(?u,rdf:type,rdfs:Class). 
+     * (?u,rdfs:subClassOf,?u) :- (?u,rdf:type,rdfs:Class). 
      * </pre>
      */
     public void test_rdfs10_01() {
@@ -95,33 +95,96 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
 
         try {
 
-            URI A = new URIImpl("http://www.foo.org/A");
+            URI U = new URIImpl("http://www.foo.org/U");
 
             StatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */, true/* distinct */);
             
-            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
+            buffer.add(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.containsStatement(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.containsStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertEquals(1,store.getStatementCount());
 
             InferenceEngine inf = new InferenceEngine(store);
 
             // apply the rule.
-            RuleStats stats = applyRule(inf.rdfs10, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(inf,inf.rdfs10, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
              */
 
             // told
-            assertTrue(store.containsStatement(A, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.containsStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             
             // entailed
-            assertTrue(store.containsStatement(A, URIImpl.RDFS_SUBCLASSOF, A));
+            assertTrue(store.containsStatement(U, URIImpl.RDFS_SUBCLASSOF, U));
+
+            // final #of statements in the store.
+            assertEquals(2,store.getStatementCount());
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+        
+    }
+        
+    /**
+     * Test of {@link RuleRdfs10} where the data satisifies the rule exactly
+     * twice.
+     * 
+     * <pre>
+     * (?u,rdfs:subClassOf,?u) :- (?u,rdf:type,rdfs:Class). 
+     * </pre>
+     */
+    public void test_rdfs10_02() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            URI U1 = new URIImpl("http://www.foo.org/U1");
+            URI U2 = new URIImpl("http://www.foo.org/U2");
+
+            StatementBuffer buffer = new StatementBuffer(store,
+                    100/* capacity */, true/* distinct */);
+            
+            buffer.add(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
+            buffer.add(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
+
+            // write on the store.
+            buffer.flush();
+
+            // verify statement(s).
+            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertEquals(2,store.getStatementCount());
+
+            InferenceEngine inf = new InferenceEngine(store);
+
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.rdfs10, 2/*expectedComputed*/);
+
+            /*
+             * validate the state of the primary store.
+             */
+
+            // told
+            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.containsStatement(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            
+            // entailed
+            assertTrue(store.containsStatement(U1, URIImpl.RDFS_SUBCLASSOF, U1));
+            assertTrue(store.containsStatement(U2, URIImpl.RDFS_SUBCLASSOF, U2));
+
+            // final #of statements in the store.
+            assertEquals(4,store.getStatementCount());
 
         } finally {
 

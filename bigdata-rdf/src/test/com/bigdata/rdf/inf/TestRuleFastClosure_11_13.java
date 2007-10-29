@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.spo.SPO;
@@ -160,7 +161,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             SPOBuffer buffer = new SPOBuffer(store, null/* filter */,
                     100/* capacity */, false/* distinct */, inf.isJustified()/* justifications */);
 
-            RuleStats stats = rule.apply(new RuleStats(), buffer);
+            RuleStats stats = rule.apply(inf.isJustified(), buffer);
 
             assertEquals(1, stats.numComputed);
 
@@ -270,7 +271,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             SPOBuffer buffer = new SPOBuffer(store, null/* filter */,
                     100/* capacity */, false/* distinct */, inf.isJustified()/* justifications */);
 
-            RuleStats stats = rule.apply(new RuleStats(), buffer);
+            RuleStats stats = rule.apply(inf.isJustified(), buffer);
 
             assertEquals(1, stats.numComputed);
 

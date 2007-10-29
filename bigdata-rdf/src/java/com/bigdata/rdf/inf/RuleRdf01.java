@@ -43,68 +43,22 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Iterator;
-
-import com.bigdata.rdf.spo.SPOBuffer;
-import com.bigdata.rdf.util.KeyOrder;
-
 /**
- * Rdf1:
+ * rdf1:
  * 
  * <pre>
- *   triple(?v rdf:type rdf:Property) :-
- *      triple( ?u ?v ?x ).
+ * (?v rdf:type rdf:Property) :- ( ?u ?v ?y ).
  * </pre>
  */
-public class RuleRdf01 extends AbstractRuleRdf {
-    
-    protected final Var v;
+public class RuleRdf01 extends AbstractRuleDistinctTermScan {
     
     public RuleRdf01(InferenceEngine inf) {
 
-        super(inf, //
-                new Triple(var("v"), inf.rdfType, inf.rdfProperty), //
+        super(inf.database, //
+                new Triple(var("a"), inf.rdfType, inf.rdfProperty), //
                 new Pred[] { //
-                    new Triple(var("u"), var("v"), var("x"))//
+                    new Triple(var("u"), var("a"), var("y"))//
                 });
-        
-        this.v = var("v");
-
-    }
-
-    public RuleStats apply(final RuleStats stats, final SPOBuffer buffer) {
-
-        final long computeStart = System.currentTimeMillis();
-
-        resetBindings();
-
-        // find the distinct predicates in the KB (efficient op).
-        Iterator<Long> itr = db.getAccessPath(KeyOrder.POS).distinctTermScan();
-
-        while (itr.hasNext()) {
-
-            stats.stmts1++;
-
-            /*
-             * bind [v].
-             * 
-             * Note: This rule explicitly leaves [u] and [x] unbound so that the
-             * justifications will be wildcards for those variables.
-             */
-
-            set(v,itr.next());
-
-            emit(buffer);
-
-            stats.numComputed++;
-
-        }
-
-        assert checkBindings();
-        
-        stats.elapsed += System.currentTimeMillis() - computeStart;
-
-        return stats;
 
     }
 

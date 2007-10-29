@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.spo.SPOBuffer;
 
 /**
@@ -54,46 +55,6 @@ import com.bigdata.rdf.spo.SPOBuffer;
  * @version $Id$
  */
 abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCase {
-
-//    protected TempTripleStore tmpStore;
-//    
-//    final protected RuleStats stats = new RuleStats();
-//    
-//    final protected int capacity = 10;
-//    
-//    final protected boolean distinct = false;
-//
-//    protected SPOBuffer buffer;
-//
-//    protected AbstractTripleStore store;
-//
-//    protected InferenceEngine inferenceEngine;
-//
-//    public void setUp() throws Exception {
-//
-//        super.setUp();
-//
-//        store = getStore();
-//      
-//        inferenceEngine = new InferenceEngine(store);
-//
-//        tmpStore = new TempTripleStore(store.getProperties());
-//    
-//        buffer = new SPOBuffer(tmpStore,capacity,distinct);
-//        
-//    }
-//    
-//    public void tearDown() throws Exception {
-//
-//        if(this.store!=null) {
-//            
-//            this.store.closeAndDelete();
-//            
-//        }
-//        
-//        super.tearDown();
-//        
-//    }
     
     /**
      * 
@@ -123,9 +84,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * @param expectedComputed
      *            The #of entailments that should be computed by the rule.
      */
-    protected RuleStats applyRule(Rule rule, int expectedComputed) {
-        
-        RuleStats stats = new RuleStats();
+    protected RuleStats applyRule(InferenceEngine inf,Rule rule, int expectedComputed) {
         
         /*
          * Note: Choose a capacity large enough that all entailments will still
@@ -136,15 +95,15 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         final int capacity = Math.max(expectedComputed, 1000);
         
         SPOBuffer buffer = new SPOBuffer(rule.db,
-                rule.inf.doNotAddFilter/* filter */, capacity,
-                false/* distinct */, rule.justify);
+                inf.doNotAddFilter/* filter */, capacity,
+                false/* distinct */, inf.justify);
         
         // dump the database on the console.
         System.err.println("database::");
         rule.db.dumpStore();
         
         // apply the rule.
-        rule.apply(stats, buffer);
+        RuleStats stats = rule.apply(inf.justify,buffer);
         
         // dump entailments on the console.
         System.err.println("entailments:: (may duplicate statements in the database)");
@@ -156,17 +115,12 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         /*
          * Verify the #of entailments computed. 
          */
-        assertEquals("numComputed",expectedComputed,stats.numComputed);
-        
-//        /*
-//         * transfer the entailments from the temporary store to the primary
-//         * store.
-//         */
-//        final int actualCopied = InferenceEngine.copyStatements(tmpStore,
-//                store);
-//        
-//        assertEquals("#copied",expectedCopied,actualCopied);
+        if(expectedComputed!=-1) {
 
+            assertEquals("numComputed",expectedComputed,stats.numComputed);
+            
+        }
+        
         return stats;
         
     }

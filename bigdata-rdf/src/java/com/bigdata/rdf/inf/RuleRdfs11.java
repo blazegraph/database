@@ -56,7 +56,7 @@ public class RuleRdfs11 extends AbstractRuleRdfs_5_11 {
 
     public RuleRdfs11(InferenceEngine inf) {
 
-        super(inf, inf.rdfsSubClassOf);
+        super(inf.database, inf.rdfsSubClassOf);
 
     }
     

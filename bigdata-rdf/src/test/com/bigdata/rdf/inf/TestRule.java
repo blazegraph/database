@@ -105,15 +105,15 @@ public class TestRule extends AbstractRuleTestCase {
         
         try {
         
-            InferenceEngine inf = new InferenceEngine(store);
-        
+            RDFSHelper vocab = new RDFSHelper(store);
+            
             Var u = Rule.var("u");
             
-            Triple head = new Triple(u,inf.rdfsSubClassOf,inf.rdfsResource);
+            Triple head = new Triple(u,vocab.rdfsSubClassOf,vocab.rdfsResource);
             
-            Pred[] body = new Pred[] { new Triple(u, inf.rdfType, inf.rdfsClass) };
+            Pred[] body = new Pred[] { new Triple(u, vocab.rdfType, vocab.rdfsClass) };
             
-            Rule r = new MyRule(inf, head, body);
+            Rule r = new MyRule(store, head, body);
 
             // write out the rule on the console.
             System.err.println(r.toString());
@@ -149,16 +149,16 @@ public class TestRule extends AbstractRuleTestCase {
             r.resetBindings(); // clean slate.
             assertEquals(NULL,r.get(u)); // no binding.
             assertEquals(NULL,r.get(Rule.var("u"))); // no binding.
-            r.set(u, inf.rdfsClass.id);
+            r.set(u, vocab.rdfsClass.id);
             assertTrue(r.checkBindings()); // verify we did not overwrite constants.
             // write on the console.
             System.err.println(r.toString(true));
             // verify [u] is now bound.
-            assertEquals(inf.rdfsClass.id,r.get(u));
-            assertEquals(inf.rdfsClass.id,r.get(Rule.var("u")));
+            assertEquals(vocab.rdfsClass.id,r.get(u));
+            assertEquals(vocab.rdfsClass.id,r.get(Rule.var("u")));
             // verify [u] is now bound.
-            assertEquals(inf.rdfsClass.id,r.get(u));
-            assertEquals(inf.rdfsClass.id,r.get(Rule.var("u")));
+            assertEquals(vocab.rdfsClass.id,r.get(u));
+            assertEquals(vocab.rdfsClass.id,r.get(Rule.var("u")));
             
         } finally {
             
@@ -178,9 +178,7 @@ public class TestRule extends AbstractRuleTestCase {
         
         try {
 
-            InferenceEngine inf = new InferenceEngine(store);
-
-            Rule r = new MyRulePattern1(inf);
+            Rule r = new MyRulePattern1(new RDFSHelper(store));
             
             Set<Var> shared = r.getSharedVars(0, 1);
 
@@ -206,9 +204,7 @@ public class TestRule extends AbstractRuleTestCase {
         
         try {
 
-            InferenceEngine inf = new InferenceEngine(store);
-
-            Rule r = new MyRulePattern1(inf);
+            Rule r = new MyRulePattern1(new RDFSHelper(store));
 
             // (u rdfs:subClassOf x)
             assertEquals(KeyOrder.POS,r.getAccessPath(0).getKeyOrder());
@@ -235,7 +231,10 @@ public class TestRule extends AbstractRuleTestCase {
         
         try {
 
-            InferenceEngine inf = new InferenceEngine(store);
+            // define some vocabulary.
+            RDFSHelper vocab = new RDFSHelper(store);
+            
+//            InferenceEngine inf = new InferenceEngine(store);
 
             URI U1 = new URIImpl("http://www.foo.org/U1");
             URI U2 = new URIImpl("http://www.foo.org/U2");
@@ -246,7 +245,7 @@ public class TestRule extends AbstractRuleTestCase {
 
             // body[0]                  body[1]          -> head
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
-            Rule r = new MyRulePattern1(inf);
+            Rule r = new MyRulePattern1(vocab);
 
             /*
              * Obtain the access paths corresponding to each predicate in the
@@ -298,7 +297,7 @@ public class TestRule extends AbstractRuleTestCase {
              */
 
             // (u rdf:subClassOf x)
-            assertEquals(0,r.getMostSelectiveAccessPath());
+            assertEquals(0,r.getMostSelectiveAccessPathByRangeCount());
             
             /*
              * bind variables for (u rdf:subClassOf x) to known values from the
@@ -314,7 +313,7 @@ public class TestRule extends AbstractRuleTestCase {
             assertTrue(r.isFullyBound(0));
             
             // (v rdf:type u)
-            assertEquals(1,r.getMostSelectiveAccessPath());
+            assertEquals(1,r.getMostSelectiveAccessPathByRangeCount());
 
             // bind the last variable.
             assertNotSame(NULL,store.getTermId(V1));
@@ -323,16 +322,19 @@ public class TestRule extends AbstractRuleTestCase {
             assertTrue(r.isFullyBound(1));
 
             // verify no access path is recommended since the rule is fully bound.
-            assertEquals(-1,r.getMostSelectiveAccessPath());
+            assertEquals(-1,r.getMostSelectiveAccessPathByRangeCount());
 
+            // generate justifications for entailments.
+            boolean justify = true;
+            
             SPOBuffer buffer2 = new SPOBuffer(store, null/* filter */,
-                    1/* capacity */, false/* distinct */, true/* justified */);
+                    1/* capacity */, false/* distinct */, justify/* justified */);
             
             // emit the entailment
-            r.emit(buffer2);
+            r.emit(justify,buffer2);
             
             assertEquals(1,buffer2.size());
-            assertEquals(r.justify?1:0,buffer2.getJustificationCount());
+            assertEquals(justify?1:0,buffer2.getJustificationCount());
             
             // verify bindings on the emitted entailment.
             SPO entailment = buffer2.get(0);
@@ -340,7 +342,7 @@ public class TestRule extends AbstractRuleTestCase {
             assertEquals(entailment.p,store.getTermId(URIImpl.RDF_TYPE));
             assertEquals(entailment.o,store.getTermId(X1));
             
-            if(r.justify) {
+            if(justify) {
              
                 // @todo verify the justification
                 
@@ -351,17 +353,18 @@ public class TestRule extends AbstractRuleTestCase {
             store.closeAndDelete();
             
         }
+
     }
     
     private static class MyRule extends Rule {
 
-        public MyRule(InferenceEngine inf, Triple head, Pred[] body) {
+        public MyRule(AbstractTripleStore db, Triple head, Pred[] body) {
 
-            super(inf, head, body);
+            super(db, head, body);
 
         }
 
-        public RuleStats apply(RuleStats stats, SPOBuffer buffer) {
+        public RuleStats apply(boolean justify, SPOBuffer buffer) {
 
             return null;
             
@@ -381,16 +384,16 @@ public class TestRule extends AbstractRuleTestCase {
      */
     private static class MyRulePattern1 extends Rule {
         
-        public MyRulePattern1(InferenceEngine inf) {
-            super(inf,//
-                    new Triple(var("v"), inf.rdfType, var("x")), //
+        public MyRulePattern1(RDFSHelper vocab) {
+            super(vocab.database,//
+                    new Triple(var("v"), vocab.rdfType, var("x")), //
                     new Pred[] {//
-                            new Triple(var("u"), inf.rdfsSubClassOf, var("x")),//
-                            new Triple(var("v"), inf.rdfType, var("u")) //
+                            new Triple(var("u"), vocab.rdfsSubClassOf, var("x")),//
+                            new Triple(var("v"), vocab.rdfType, var("u")) //
                     });
         }
 
-        public RuleStats apply(RuleStats stats, SPOBuffer buffer) {
+        public RuleStats apply(boolean justify, SPOBuffer buffer) {
 
             return null;
             

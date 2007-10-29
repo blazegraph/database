@@ -43,10 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
-
 /**
  * rdfs9:
  * <pre>
@@ -57,33 +53,34 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs09( InferenceEngine inf, Var u, Var x, Var v ) {
+    public RuleRdfs09( InferenceEngine inf) {
 
-        super(inf, new Triple(v, inf.rdfType, x),
-                new Pred[] {
-                new Triple(u, inf.rdfsSubClassOf, x),
-                new Triple(v, inf.rdfType, u)
+        super(inf.database,//
+                new Triple(var("v"), inf.rdfType, var("x")),//
+                new Pred[] {//
+                    new Triple(var("u"), inf.rdfsSubClassOf, var("x")),//
+                    new Triple(var("v"), inf.rdfType, var("u"))//
                 });
 
     }
     
-    /**
-     * Overriden to be two bound (more selective, but also joining stmt1.s to
-     * stmt2.o rather than to stmt2.p) and also returning data in POS order. The
-     * query is formed from triple(?v,rdf:type,stmt1.s) and expressed in POS
-     * order as { rdf:type, stmt1.s, ?v }.
-     */
-    protected ISPOIterator getStmts2( SPO stmt1 ) {
-        
-        return db.getAccessPath(NULL/* v */, inf.rdfType.id, stmt1.s/* u */)
-                .iterator();
-    
-    }
-    
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        
-        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
-        
-    }
+//    /**
+//     * Overriden to be two bound (more selective, but also joining stmt1.s to
+//     * stmt2.o rather than to stmt2.p) and also returning data in POS order. The
+//     * query is formed from triple(?v,rdf:type,stmt1.s) and expressed in POS
+//     * order as { rdf:type, stmt1.s, ?v }.
+//     */
+//    protected ISPOIterator getStmts2( SPO stmt1 ) {
+//        
+//        return db.getAccessPath(NULL/* v */, inf.rdfType.id, stmt1.s/* u */)
+//                .iterator();
+//    
+//    }
+//    
+//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+//        
+//        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
+//        
+//    }
 
 }

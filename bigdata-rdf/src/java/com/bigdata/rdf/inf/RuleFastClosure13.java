@@ -21,7 +21,7 @@ public class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
      */
     public RuleFastClosure13(InferenceEngine inf) {
         
-        super(inf, 
+        super(inf.database, 
                 new Triple(var("z"), inf.rdfType, var("b")),//
                 new Pred[] {//
                     new Triple(var("x"), var("y"), var("z")),//

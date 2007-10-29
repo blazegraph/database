@@ -43,35 +43,31 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
 
 /**
  * rdfs2:
  * <pre>
- * triple( u rdf:type x) :-
- *    triple( a rdfs:domain x),
- *    triple( u a y ).
+ * ( u rdf:type x) :- ( a rdfs:domain x), ( u a y ).
  * </pre>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class RuleRdfs02 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs02( InferenceEngine inf, Var a, Var x, Var u, Var y ) {
+    public RuleRdfs02(InferenceEngine inf) {
 
-        super(inf, new Triple(u, inf.rdfType, x),
+        super(inf.database, new Triple(var("u"), inf.rdfType, var("x")),
                 new Pred[] {
-                new Triple(a, inf.rdfsDomain, x),
-                new Triple(u, a, y)
+                new Triple(var("a"), inf.rdfsDomain, var("x")),
+                new Triple(var("u"), var("a"), var("y"))
                 });
 
     }
     
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-        
-        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
-        
-    }
+//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+//        
+//        return new SPO( stmt2.s, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
+//        
+//    }
 
 }

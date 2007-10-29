@@ -6,6 +6,7 @@ import java.util.Set;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -38,17 +39,17 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
     private final long propertyId;
     
-    private final Var x, y, SetP;
+//    private final Var x, y, SetP;
 
     /**
      * @param inf
      * @param propertyId
      * @param P
      */
-    public AbstractRuleFastClosure_3_5_6_7_9(InferenceEngine inf,
+    public AbstractRuleFastClosure_3_5_6_7_9(AbstractTripleStore db,
             Id propertyId, Set<Long> P) {
 
-        super(inf, //
+        super(db, //
                 new Triple(var("x"), propertyId, var("y")), //
                 new Pred[] {//
                 new Triple(var("x"), var("{P}"), var("y")) //
@@ -58,9 +59,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
         this.propertyId = propertyId.id;
         
-        this.x = var("x");
-        this.y = var("y");
-        this.SetP = var("{P}");
+//        this.x = var("x");
+//        this.y = var("y");
+//        this.SetP = var("{P}");
 
     }
 
@@ -77,18 +78,23 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
      * @param propertyId
      *            The propertyId to be used in the assertions.
      */
-    public RuleStats apply(final RuleStats stats, final SPOBuffer buffer) {
+    public RuleStats apply(final boolean justify, final SPOBuffer buffer) {
 
         final long begin = System.currentTimeMillis();
 
         resetBindings();
         
-        final long[] a = inf.getSortedArray(P);
+        final long[] a = getSortedArray(P);
 
-        // Note: counting the passed in array as stmts1.
-        stats.stmts1 += a.length;
+//        // Note: counting the passed in array as stmts[0].
+//        stats.nstmts[0] += a.length;
 
-        // @todo execute subqueries in parallel using inference engine thread pool.
+        /*
+         * @todo execute subqueries in parallel using inference engine thread
+         * pool, but note that the bindings[] need to be per-thread or thread
+         * local!  SPOBuffer also needs to be thread-safe.
+         */
+
         for (long p : a) {
 
             if (p == propertyId) {
@@ -104,7 +110,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
             }
 
-            stats.numSubqueries1++;
+            stats.nsubqueries[0]++;
 
             ISPOIterator itr2 = db.getAccessPath(NULL, p, NULL).iterator();
 
@@ -112,18 +118,18 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
                 while (itr2.hasNext()) {
 
-                    SPO[] stmts = itr2.nextChunk(KeyOrder.POS);
+                    SPO[] stmts0 = itr2.nextChunk(KeyOrder.POS);
 
                     if (DEBUG) {
 
-                        log.debug("stmts1: chunk=" + stmts.length + "\n"
-                                + Arrays.toString(stmts));
+                        log.debug("stmts1: chunk=" + stmts0.length + "\n"
+                                + Arrays.toString(stmts0));
 
                     }
 
-                    stats.stmts2 += stmts.length;
+                    stats.nstmts[0] += stmts0.length;
 
-                    for (SPO spo : stmts) {
+                    for (SPO spo : stmts0) {
 
                         /*
                          * Note: since P includes rdfs:subPropertyOf (as well as
@@ -135,13 +141,12 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
                         assert spo.p == p;
 
-                        set(x, spo.s);
-                        set(SetP, p);
-                        set(y, spo.o);
+                        bind(0,spo);
+//                        set(x, spo.s);
+//                        set(SetP, p);
+//                        set(y, spo.o);
 
-                        emit(buffer);
-
-                        stats.numComputed++;
+                        emit(justify,buffer);
 
                     } // next stmt
 
@@ -161,6 +166,35 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
         return stats;
 
+    }
+
+    /**
+     * Convert a {@link Set} of term identifiers into a sorted array of term
+     * identifiers.
+     * <P>
+     * Note: When issuing multiple queries against the database, it is generally
+     * faster to issue those queries in key order.
+     * 
+     * @return The sorted term identifiers.
+     */
+    public long[] getSortedArray(Set<Long> ids) {
+        
+        int n = ids.size();
+        
+        long[] a = new long[n];
+        
+        int i = 0;
+        
+        for(Long id : ids) {
+            
+            a[i++] = id;
+            
+        }
+        
+        Arrays.sort(a);
+        
+        return a;
+        
     }
 
 }
