@@ -57,16 +57,11 @@ import java.util.concurrent.Executors;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.Rule.Var;
+import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
@@ -185,11 +180,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       tested by itself and then the various rules should work correctly if
  *       they are using the correct triple patterns and join variables.
  * 
- * @todo modify {@link ClosureStats} to report on the details for each rule used
- *       by the forward chainer. Also modify to support cumulation of results
- *       across data sets : ClosureStats.add(ClosureStats) or the like. Do this
- *       for {@link LoadStats} as well.
- * 
  * FIXME truth maintenance (check the SAIL also).
  * 
  * FIXME rdfs:Resource by backward chaining on query. This means that we need a
@@ -230,7 +220,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       indices then get rid of the leading byte used in all keys for the
  *       statement indices.
  */
-public class InferenceEngine {
+public class InferenceEngine extends RDFSHelper {
 
     final public Logger log = Logger.getLogger(InferenceEngine.class);
 
@@ -251,12 +241,6 @@ public class InferenceEngine {
      */
     public static final long NULL = ITripleStore.NULL;
 
-    /**
-     * The database that is the authority for the defined terms and term
-     * identifiers.
-     */
-    final protected AbstractTripleStore database;
-    
     /**
      * The capacity of the {@link SPOBuffer}.
      * <p>
@@ -328,58 +312,25 @@ public class InferenceEngine {
 //        return database;
 //        
 //    }
-    
-    /**
-     * Used to assign unique variable identifiers.
-     * 
-     * @deprecated by {@link Rule#var(String)}
-     */
-    private long nextVar = -1;
-
-    /**
-     * Return the next unique variable identifier.
-     * 
-     * @deprecated by {@link Rule#var(String)}
-     */
-    protected Var nextVar() {
-
-        return Rule.var("_"+(-nextVar));
-
-    }
-
-    /*
-     * Identifiers for well-known RDF values. 
-     */
-    Id rdfType;
-    Id rdfProperty;
-    Id rdfsSubClassOf;
-    Id rdfsSubPropertyOf;
-    Id rdfsDomain;
-    Id rdfsRange;
-    Id rdfsClass;
-    Id rdfsResource;
-    Id rdfsCMP;
-    Id rdfsDatatype;
-    Id rdfsMember;
-    Id rdfsLiteral;
 
     /*
      * Rules.
      */
-    Rule rdf1;
-    Rule rdf2;
-    Rule rdfs2;
-    Rule rdfs3;
-    Rule rdfs4;
-    Rule rdfs5;
-    Rule rdfs6;
-    Rule rdfs7;
-    Rule rdfs8;
-    Rule rdfs9;
-    Rule rdfs10;
-    Rule rdfs11;
-    Rule rdfs12;
-    Rule rdfs13;
+    RuleRdf01 rdf1;
+    Rule rdf2; // @todo not defined yet.
+    RuleRdfs02  rdfs2;
+    RuleRdfs03  rdfs3;
+    RuleRdfs04a rdfs4a;
+    RuleRdfs04b rdfs4b;
+    RuleRdfs05  rdfs5;
+    RuleRdfs06 rdfs6;
+    RuleRdfs07 rdfs7;
+    RuleRdfs08 rdfs8;
+    RuleRdfs09 rdfs9;
+    RuleRdfs10 rdfs10;
+    RuleRdfs11 rdfs11;
+    RuleRdfs12 rdfs12;
+    RuleRdfs13 rdfs13;
 
     /**
      * A filter for keeping certain entailments out of the database. It is
@@ -545,10 +496,7 @@ public class InferenceEngine {
      */
     public InferenceEngine(Properties properties, ITripleStore database) {
 
-        if (database == null)
-            throw new IllegalArgumentException();
-
-        this.database = (AbstractTripleStore) database;
+        super((AbstractTripleStore) database);
 
         this.justify = Boolean.parseBoolean(properties.getProperty(
                 Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
@@ -568,8 +516,15 @@ public class InferenceEngine {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
-        setup();
+        setupRules();
 
+//        // writes out the base rule model (does not include the "fast" rules).
+//        for(Rule r : getRuleModel() ) {
+//
+//            System.err.println(r.toString());
+//
+//        }
+        
     }
     
     /**
@@ -583,117 +538,44 @@ public class InferenceEngine {
     final protected boolean forwardChainRdfTypeRdfsResource;
 
     /**
-     * Sets up the inference engine.
+     * Sets up the basic rule model for the inference engine.
      */
-    protected void setup() {
-
-        setupIds();
-
-        setupRules();
-
-    }
-
-    /**
-     * Resolves or defines well-known RDF values.
-     * 
-     * @see #rdfType and friends which are initialized by this method.
-     */
-    private void setupIds() {
-
-        _Value rdfType = new _URI(RDF.TYPE);
-        _Value rdfProperty = new _URI(RDF.PROPERTY);
-        _Value rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-        _Value rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
-        _Value rdfsDomain = new _URI(RDFS.DOMAIN);
-        _Value rdfsRange = new _URI(RDFS.RANGE);
-        _Value rdfsClass = new _URI(RDFS.CLASS);
-        _Value rdfsResource = new _URI(RDFS.RESOURCE);
-        _Value rdfsCMP = new _URI(RDFS.CONTAINERMEMBERSHIPPROPERTY);
-        _Value rdfsDatatype = new _URI(RDFS.DATATYPE);
-        _Value rdfsMember = new _URI(RDFS.MEMBER);
-        _Value rdfsLiteral = new _URI(RDFS.LITERAL);
-        
-        _Value[] terms = new _Value[]{
-        
-                rdfType,
-                rdfProperty,
-                rdfsSubClassOf,
-                rdfsSubPropertyOf,
-                rdfsDomain,
-                rdfsRange,
-                rdfsClass,
-                rdfsResource,
-                rdfsCMP,
-                rdfsDatatype,
-                rdfsMember,
-                rdfsLiteral
-                
-        };
-        
-        database.insertTerms(terms, terms.length, false/*haveKeys*/, false/*sorted*/);
-
-        this.rdfType = new Id(rdfType.termId);
-        this.rdfProperty = new Id(rdfProperty.termId);
-        this.rdfsSubClassOf = new Id(rdfsSubClassOf.termId);
-        this.rdfsSubPropertyOf= new Id(rdfsSubPropertyOf.termId);
-        this.rdfsDomain = new Id(rdfsDomain.termId);
-        this.rdfsRange = new Id(rdfsRange.termId);
-        this.rdfsClass = new Id(rdfsClass.termId);
-        this.rdfsResource = new Id(rdfsResource.termId);
-        this.rdfsCMP = new Id(rdfsCMP.termId);
-        this.rdfsDatatype = new Id(rdfsDatatype.termId);
-        this.rdfsMember = new Id(rdfsMember.termId);
-        this.rdfsLiteral = new Id(rdfsLiteral.termId);
-
-    }
-
     private void setupRules() {
 
         rdf1 = new RuleRdf01(this);
 
         // @todo write and initialize rdf2 (?x rdf:type rdf:XMLLiteral).
 //        
-//        rdf2 = new RuleRdf02(this,nextVar(),nextVar(),nextVar());
+//        rdf2 = new RuleRdf02(this);
 
-        rdfs2 = new RuleRdfs02(this,nextVar(),nextVar(),nextVar(),nextVar());
+        rdfs2 = new RuleRdfs02(this);
 
-        rdfs3 = new RuleRdfs03(this,nextVar(),nextVar(),nextVar(),nextVar());
+        rdfs3 = new RuleRdfs03(this);
 
-        rdfs4 = new RuleRdfs04(this);
+        rdfs4a = new RuleRdfs04a(this);
+        
+        rdfs4b = new RuleRdfs04b(this);
         
         rdfs5 = new RuleRdfs05(this);
 
-        rdfs6 = new RuleRdfs06(this,nextVar(),nextVar(),nextVar());
+        rdfs6 = new RuleRdfs06(this);
 
-        rdfs7 = new RuleRdfs07(this,nextVar(),nextVar(),nextVar(),nextVar());
+        rdfs7 = new RuleRdfs07(this);
 
-        rdfs8 = new RuleRdfs08(this,nextVar(),nextVar(),nextVar());
+        rdfs8 = new RuleRdfs08(this);
 
-        rdfs9 = new RuleRdfs09(this,nextVar(),nextVar(),nextVar());
+        rdfs9 = new RuleRdfs09(this);
 
-        rdfs10 = new RuleRdfs10(this,nextVar(),nextVar(),nextVar());
+        rdfs10 = new RuleRdfs10(this);
 
         rdfs11 = new RuleRdfs11(this);
 
-        rdfs12 = new RuleRdfs12(this,nextVar(),nextVar(),nextVar());
+        rdfs12 = new RuleRdfs12(this);
 
-        rdfs13 = new RuleRdfs13(this,nextVar(),nextVar(),nextVar());
-
+        rdfs13 = new RuleRdfs13(this);
+        
     }
 
-//    /**
-//     * The full set of RDFS model theory entailments.
-//     */
-//    public Rule[] getFullForwardClosureRules() {
-//
-//        // @todo rdf2
-//        // @todo datatype entailments
-//        
-//        return new Rule[] { rdf1, /*rdf2,*/ rdfs2, rdfs3, rdfs4, rdfs5, rdfs6, rdfs7,
-//                rdfs8, rdfs9, rdfs10, rdfs11, rdfs12, rdfs13 /* datatype entailments */};
-//
-//    }
-    
     /**
      * Return the rule model to be used by {@link #fullForwardClosure()}.
      * 
@@ -726,7 +608,9 @@ public class InferenceEngine {
              * @todo make sure that they are back-chained.
              */
 
-            rules.add(rdfs4);
+            rules.add(rdfs4a);
+            
+            rules.add(rdfs4b);
             
         }
         
@@ -781,6 +665,8 @@ public class InferenceEngine {
      * 
      * @todo use for parallel execution of sub-queries.
      * 
+     * @todo {@link SPOBuffer} must be thread-safe.  {@link Rule} bindings must be per-thread.
+     * 
      * @todo Note that rules that write entailments on the database statement
      *       MUST coordinate to avoid concurrent modification during traversal
      *       of the statement indices. The chunked iterators go a long way to
@@ -796,6 +682,22 @@ public class InferenceEngine {
      * @return Statistics about the operation.
      */
     public ClosureStats computeClosure() {
+
+        /*
+         * Reset the stats for each rule.
+         * 
+         * Note: If there are pre-initialized rules for the fast forward closure
+         * that are not part of the full closure then they need to be returned
+         * by getRuleModel() in order to have their statistics reset before the
+         * closure is computed. Right now, all of those rules are created
+         * dynamically inside of fastForwardClosure(). However, steps 11 and 13
+         * could be pre-initialized since they do not depend on dynamic data.
+         */
+        for(Rule rule : getRuleModel() ) {
+            
+            rule.stats.reset();
+            
+        }
         
         switch(forwardClosure) {
 
@@ -828,8 +730,10 @@ public class InferenceEngine {
     protected ClosureStats fullForwardClosure() {
 
         final long begin = System.currentTimeMillis();
-        
+       
         final int nbefore = database.getStatementCount();
+        
+        final ClosureStats closureStats = new ClosureStats();
         
         // add RDF(S) axioms to the database.
         addRdfsAxioms(database);
@@ -849,13 +753,11 @@ public class InferenceEngine {
                 BUFFER_SIZE, distinct, isJustified());
 
         // do the full forward closure of the database.
-        System.err.println(fixedPoint(getRuleModel(), buffer).toString());
+        System.err.println(fixedPoint(closureStats,getRuleModel(), buffer).toString());
        
         final int nafter = database.getStatementCount();
         
         final long elapsed = System.currentTimeMillis() - begin;
-        
-        ClosureStats closureStats = new ClosureStats();
         
         closureStats.elapsed = elapsed;
         closureStats.numComputed = nafter - nbefore;
@@ -886,6 +788,11 @@ public class InferenceEngine {
          * the database (vs the temp store).
          */
 
+        final ClosureStats closureStats = new ClosureStats();
+        
+        // add the basic rule model.
+        closureStats.addAll(Arrays.asList(getRuleModel()));
+        
         final int firstStatementCount = database.getStatementCount();
 
         final long begin = System.currentTimeMillis();
@@ -906,13 +813,17 @@ public class InferenceEngine {
         final Set<Long> P = getSubProperties(database);
 
         // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
-        System.err.println("step3: "
-                + new RuleFastClosure3(this, P).apply(new RuleStats(), buffer));
-        buffer.flush();
+        {
+            Rule r = new RuleFastClosure3(this, P);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step3: " + r.stats);
+            buffer.flush();
+        }
 
         // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
         System.err.println("rdfs5: "
-                + fixedPoint(new Rule[] { rdfs5 },buffer));
+                + fixedPoint(closureStats,new Rule[] { rdfs5 },buffer));
 
         // 4a. Obtain: D,R,C,T.
         final Set<Long> D = getSubPropertiesOf(database, rdfsDomain.id);
@@ -921,32 +832,50 @@ public class InferenceEngine {
         final Set<Long> T = getSubPropertiesOf(database, rdfType.id);
 
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
-        System.err.println("step5: "
-                + new RuleFastClosure5(this, D).apply(new RuleStats(), buffer));
-        // Note: deferred buffer.flush() since the next step has no dependency.
+        {
+            Rule r = new RuleFastClosure5(this, D);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step5: " + r.stats);
+            // Note: deferred buffer.flush() since the next step has no
+            // dependency.
+        }
 
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
-        System.err.println("step6: "
-                + new RuleFastClosure6(this, R).apply(new RuleStats(), buffer));
-        // Note: deferred buffer.flush() since the next step has no dependency.
+        {
+            Rule r = new RuleFastClosure6(this, R);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step6: " + r.stats);
+            // Note: deferred buffer.flush() since the next step has no
+            // dependency.
+        }
 
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
-        System.err.println("step7: "
-                + new RuleFastClosure7(this, C).apply(new RuleStats(), buffer));
-        // Note: flush buffer before running rdfs11.
-        buffer.flush();
+        {
+            Rule r = new RuleFastClosure7(this, C);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step7: " + r.stats);
+            // Note: flush buffer before running rdfs11.
+            buffer.flush();
+        }
 
         // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
         System.err.println("rdfs11: "
-                + fixedPoint(new Rule[] { rdfs11 }, buffer));
+                + fixedPoint(closureStats,new Rule[] { rdfs11 }, buffer));
 
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
-        System.err.println("step9: "
-                + new RuleFastClosure9(this, T).apply(new RuleStats(), buffer));
-        buffer.flush();
+        {
+            Rule r = new RuleFastClosure9(this, T);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step9: " + r.stats);
+            buffer.flush();
+        }
 
         // 10. RuleRdfs02
-        System.err.println("rdfs2: "+rdfs2.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs2: "+rdfs2.apply(justify,buffer));
         buffer.flush();
         
         /*
@@ -955,13 +884,16 @@ public class InferenceEngine {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:domain, ?b) ->
          * (?x, rdf:type, ?b).
          */
-        System.err.println("step11: "
-                + new RuleFastClosure11(this).apply(new RuleStats(), buffer)
-                        .toString());
-        buffer.flush();
+        {
+            Rule r = new RuleFastClosure11(this);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step11: " + r.stats);
+            buffer.flush();
+        }
         
         // 12. RuleRdfs03
-        System.err.println("rdfs3: "+rdfs3.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs3: "+rdfs3.apply(justify, buffer));
         buffer.flush();
         
         /* 13. special rule w/ 3-part antecedent.
@@ -969,10 +901,13 @@ public class InferenceEngine {
          * (?x, ?y, ?z), (?y, rdfs:subPropertyOf, ?a), (?a, rdfs:range, ?b ) ->
          * (?x, rdf:type, ?b )
          */
-        System.err.println("step13: "
-                + new RuleFastClosure13(this).apply(new RuleStats(), buffer)
-                        .toString());
-        buffer.flush();
+        {
+            Rule r = new RuleFastClosure13(this);
+            closureStats.add(r);
+            r.apply(justify, buffer);
+            System.err.println("step13: " + r.stats);
+            buffer.flush();
+        }
         
         if(forwardChainRdfTypeRdfsResource) {
             
@@ -983,37 +918,38 @@ public class InferenceEngine {
              */
 
             // 14-15. RuleRdf04
-            System.err.println("rdfs4: "+rdfs4.apply(new RuleStats(), buffer).toString());
+            System.err.println("rdfs4a: "+rdfs4a.apply(justify, buffer));
+            System.err.println("rdfs4b: "+rdfs4b.apply(justify, buffer));
             buffer.flush();
 
         }
 
         // 16. RuleRdf01
-        System.err.println("rdf1: "+rdf1.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdf1: "+rdf1.apply(justify, buffer));
         buffer.flush();
         
         // 17. RuleRdfs09
-        System.err.println("rdfs9: "+rdfs9.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs9: "+rdfs9.apply(justify, buffer));
         buffer.flush();
         
         // 18. RuleRdfs10
-        System.err.println("rdfs10: "+rdfs10.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs10: "+rdfs10.apply(justify, buffer));
         buffer.flush();
         
         // 19. RuleRdfs08.
-        System.err.println("rdfs8: "+rdfs8.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs8: "+rdfs8.apply(justify, buffer));
         buffer.flush();
 
         // 20. RuleRdfs13.
-        System.err.println("rdfs13: "+rdfs13.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs13: "+rdfs13.apply(justify, buffer));
         buffer.flush();
         
         // 21. RuleRdfs06.
-        System.err.println("rdfs6: "+rdfs6.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs6: "+rdfs6.apply(justify, buffer));
         buffer.flush();
         
         // 22. RuleRdfs07.
-        System.err.println("rdfs7: "+rdfs7.apply(new RuleStats(), buffer).toString());
+        System.err.println("rdfs7: "+rdfs7.apply(justify, buffer));
         buffer.flush();
         
         /*
@@ -1041,8 +977,6 @@ public class InferenceEngine {
 
         }
 
-        ClosureStats closureStats = new ClosureStats();
-        
         closureStats.elapsed = elapsed;
         closureStats.numComputed = inferenceCount;
         
@@ -1056,10 +990,6 @@ public class InferenceEngine {
      * <p>
      * Note: The buffer will have been flushed when this method returns.
      * 
-     * @param database
-     *            The database whose entailments will be computed. The
-     *            {@link Rule}s will match against statements in this database.
-     * 
      * @param rules
      *            The rules to be executed.
      * 
@@ -1070,13 +1000,12 @@ public class InferenceEngine {
      * 
      * @return Some statistics about the fixed point computation.
      */
-    public RuleStats fixedPoint(Rule[] rules, SPOBuffer buffer) {
+    public ClosureStats fixedPoint(ClosureStats closureStats, Rule[] rules,
+            SPOBuffer buffer) {
         
-        RuleStats totalStats = new RuleStats();
-
-        final long[] timePerRule = new long[rules.length];
-        
-        final int[] entailmentsPerRule = new int[rules.length];
+//        final long[] timePerRule = new long[rules.length];
+//        
+//        final int[] entailmentsPerRule = new int[rules.length];
         
         final int nrules = rules.length;
 
@@ -1095,77 +1024,42 @@ public class InferenceEngine {
             
             for (int i = 0; i < nrules; i++) {
 
-                RuleStats ruleStats = new RuleStats();
-                
                 Rule rule = rules[i];
 
-                int nbefore = ruleStats.numComputed;
+//                RuleStats ruleStats = rule.stats;
                 
-                rule.apply( ruleStats, buffer );
-                
-                int nnew = ruleStats.numComputed - nbefore;
+//                if(round==0) ruleStats.reset();
 
-                // #of statements examined by the rule.
-                int nstmts = ruleStats.stmts1 + ruleStats.stmts2;
+//                int nbefore = ruleStats.numComputed;
                 
-                long elapsed = ruleStats.elapsed;
+                RuleStats ruleStats = rule.apply( justify, buffer );
                 
-                timePerRule[i] += elapsed;
+                ruleStats.nrounds ++;
                 
-                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
+//                int nnew = ruleStats.numComputed - nbefore;
+//
+//                // #of statements examined by the rule.
+//                int nstmts = ruleStats.getStatementCount();
+//                
+//                long elapsed = ruleStats.elapsed;
                 
-                long stmtsPerSec = (nstmts == 0 || elapsed == 0L ? 0
-                        : ((long) (((double) nstmts) / ((double) elapsed) * 1000d)));
-                                
-                if (DEBUG||true) {
-                    log.debug("round# " + round + ", "
-                            + rule.getClass().getSimpleName()
-                            + ", entailments=" + nnew + ", #stmts1="
-                            + ruleStats.stmts1 + ", #stmts2="
-                            + ruleStats.stmts2 + ", #subqueries="
-                            + ruleStats.numSubqueries1
-                            + ", #stmtsExaminedPerSec=" + stmtsPerSec);
+//                timePerRule[i] += elapsed;
+                
+//                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
+                
+                if (DEBUG || true) {
+
+                    log.debug("round# " + round + ":" + ruleStats);
+                    
                 }
                 
-                totalStats.numComputed += ruleStats.numComputed;
+                closureStats.numComputed += ruleStats.numComputed;
                 
-                totalStats.elapsed += ruleStats.elapsed;
+                closureStats.elapsed += ruleStats.elapsed;
                 
             }
 
-            if(true) {
-            
-                /*
-                 * Show times for each rule so far.
-                 */
-                StringBuilder sb = new StringBuilder();
-                
-                sb.append("\n");
-                
-                sb.append("rule    \tms\t#entms\tentms/ms\n");
-                
-                for(int i=0; i<timePerRule.length; i++) {
-                    
-                    sb.append(rules[i].getClass().getSimpleName()
-                            + "\t"
-                            + timePerRule[i]
-                            + "\t"
-                            + entailmentsPerRule[i]
-                            + "\t"
-                            + (timePerRule[i] == 0 ? "N/A" : ""+entailmentsPerRule[i]
-                                    / timePerRule[i]));
-                    
-                    sb.append("\n");
-                    
-                }
-
-                log.info(sb.toString());
-                
-            }
-            
-            /*
-             * Flush the statements in the buffer to the temporary store. 
-             */
+            // Flush the statements in the buffer 
             buffer.flush();
 
             final int numEntailmentsAfter = buffer.getBackingStore().getStatementCount();
@@ -1177,27 +1071,34 @@ public class InferenceEngine {
                 
             }
             
-            /*
-             * Transfer the entailments into the primary store so that derived
-             * entailments may be computed.
-             */
-            final long insertStart = System.currentTimeMillis();
+//            /*
+//             * Transfer the entailments into the primary store so that derived
+//             * entailments may be computed.
+//             */
+//            final long insertStart = System.currentTimeMillis();
 
-            final int numInserted = numEntailmentsAfter - numEntailmentsBefore;
+//            final int numInserted = numEntailmentsAfter - numEntailmentsBefore;
             
 //            final int numInserted = copyStatements(tmpStore,database);
 
-            final long insertTime = System.currentTimeMillis() - insertStart;
+//            final long insertTime = System.currentTimeMillis() - insertStart;
 
-            if (DEBUG) {
-                StringBuilder debug = new StringBuilder();
-                debug.append( "round #" ).append( round ).append( ": " );
-                debug.append( totalStats.numComputed ).append( " computed in " );
-                debug.append( totalStats.elapsed ).append( " millis, " );
-                debug.append( numInserted ).append( " inserted in " );
-                debug.append( insertTime ).append( " millis " );
-                log.debug( debug.toString() );
+//            debug.append( numInserted ).append( " inserted in " );
+//            debug.append( insertTime ).append( " millis " );
+
+            if(INFO) {
+
+                log.info("round #"+round+"\n"+closureStats.toString());
+                
             }
+            
+//            if (DEBUG) {
+//                StringBuilder sb = new StringBuilder();
+//                sb.append( "round #" ).append( round ).append( ": " );
+//                sb.append( closureStats.numComputed ).append( " computed in " );
+//                sb.append( closureStats.elapsed ).append( " millis, " );
+//                log.debug( sb.toString() );
+//            }
 
             round++;
             
@@ -1225,37 +1126,8 @@ public class InferenceEngine {
 
         }
 
-        return totalStats;
+        return closureStats;
 
-    }
-
-    /**
-     * Convert a {@link Set} of term identifiers into a sorted array of term
-     * identifiers.
-     * <P>
-     * Note: When issuing multiple queries against the database, it is generally
-     * faster to issue those queries in key order.
-     * 
-     * @return The sorted term identifiers.
-     */
-    public long[] getSortedArray(Set<Long> ids) {
-        
-        int n = ids.size();
-        
-        long[] a = new long[n];
-        
-        int i = 0;
-        
-        for(Long id : ids) {
-            
-            a[i++] = id;
-            
-        }
-        
-        Arrays.sort(a);
-        
-        return a;
-        
     }
 
     /**
@@ -1479,7 +1351,7 @@ public class InferenceEngine {
         if (query == null)
             throw new IllegalArgumentException("query is null");
 
-        if (query.isFact())
+        if (query.isConstant())
             throw new IllegalArgumentException("no variables");
 
         if (rules == null)

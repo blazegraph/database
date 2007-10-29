@@ -464,10 +464,13 @@ public class SPOBuffer {
      *            The justification for that entailment (optional, depending on
      *            the TM strategy).
      * 
+     * @return true if the buffer will store the statement. The buffer will
+     *         reject the statement if it matches the {@link #filter}.
+     * 
      * @see #nearCapacity()
      * @see #flush()
      */
-    public void add( SPO stmt, Justification justification ) {
+    public boolean add( SPO stmt, Justification justification ) {
         
         assert stmt != null;
         
@@ -496,7 +499,7 @@ public class SPOBuffer {
                 
             }
             
-            return;
+            return false;
             
         }
         
@@ -587,6 +590,8 @@ public class SPOBuffer {
                             : justification.toString(store)));
         
         }
+
+        return true;
         
     }
     

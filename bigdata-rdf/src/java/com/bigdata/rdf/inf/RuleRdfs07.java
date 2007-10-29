@@ -43,9 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
-
 /**
  * rdfs7:
  * <pre>
@@ -56,20 +53,21 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs07( InferenceEngine inf, Var a, Var b, Var u, Var y ) {
+    public RuleRdfs07( InferenceEngine inf) {
 
-        super(inf, new Triple(u, b, y),
-                new Pred[] {
-                new Triple(a, inf.rdfsSubPropertyOf, b),
-                new Triple(u, a, y)
+        super(inf.database,//
+                new Triple(var("u"), var("b"), var("y")),//
+                new Pred[] {//
+                    new Triple(var("a"), inf.rdfsSubPropertyOf, var("b")),//
+                    new Triple(var("u"), var("a"), var("y"))//
                 });
 
     }
     
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-
-        return new SPO( stmt2.s, stmt1.o, stmt2.o, StatementEnum.Inferred );
-        
-    }
+//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+//
+//        return new SPO( stmt2.s, stmt1.o, stmt2.o, StatementEnum.Inferred );
+//        
+//    }
 
 }

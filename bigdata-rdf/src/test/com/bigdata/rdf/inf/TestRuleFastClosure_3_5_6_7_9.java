@@ -201,7 +201,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             Rule rule = new RuleFastClosure6(inf,R);
             
-            applyRule(rule, 1/*numComputed*/);
+            applyRule(inf, rule, 1/*numComputed*/);
 
             // told.
             

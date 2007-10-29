@@ -82,10 +82,10 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
      * Literals may not appear in the subject position, but an rdfs4b entailment
      * can put them there unless you explicitly filter it out.
      * <P>
-     * Note: {@link RuleRdfs03} is the other way that literals can be entailed
+     * Note: {@link RuleRdfs04b} is the other way that literals can be entailed
      * into the subject position.
      */
-    public void test_rdfs4_filterLiterals() {
+    public void test_rdfs3_filterLiterals() {
         
         AbstractTripleStore store = getStore();
 
@@ -115,7 +115,7 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
              * DoNotAddFilter on the InferenceEngine, so it is counted here but
              * does not show in the database.
              */
-            applyRule(inf.rdfs3, 2/* numComputed */);
+            applyRule(inf,inf.rdfs3, 2/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -125,6 +125,48 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             assertTrue(store.containsStatement(U, A, V2));
             assertTrue(store.containsStatement(V2, rdfType, X));
             assertEquals(4,store.getStatementCount());
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    /**
+     * 
+     */
+    public void test_rdfs3_01() {
+        
+        AbstractTripleStore store = getStore();
+
+        try {
+        
+            InferenceEngine inf = new InferenceEngine(getProperties(),store);
+
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI B = new URIImpl("http://www.foo.org/B");
+            URI rdfsRange = new URIImpl(RDFS.RANGE);
+            URI rdfsClass= new URIImpl(RDFS.CLASS);
+            URI rdfType = new URIImpl(RDF.TYPE);
+
+            store.addStatement(A, rdfType, B);
+            store.addStatement(rdfType, rdfsRange, rdfsClass);
+
+            assertTrue(store.containsStatement(A, rdfType, B));
+            assertTrue(store.containsStatement(rdfType, rdfsRange, rdfsClass));
+            assertEquals(2,store.getStatementCount());
+            
+            applyRule(inf,inf.rdfs3, -1/* numComputed */);
+
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, rdfType, B));
+            assertTrue(store.containsStatement(rdfType, rdfsRange, rdfsClass));
+            assertTrue(store.containsStatement(B, rdfType, rdfsClass));
+            assertEquals(3,store.getStatementCount());
 
         } finally {
 

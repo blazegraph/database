@@ -1,5 +1,11 @@
 package com.bigdata.rdf.inf;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.TreeMap;
+
+import com.bigdata.rdf.inf.Rule.RuleStats;
+
 /**
  * Statistics collected when performing inference.
  * 
@@ -22,4 +28,54 @@ public class ClosureStats {
      */
     public long elapsed;
 
+    /**
+     * The rules that were executed and their statistics.
+     * 
+     * @see Rule#stats
+     * @see RuleStats
+     */
+    private Map<String,Rule> rules = new TreeMap<String,Rule>();
+
+    public void add(Rule rule) {
+        
+        rules.put(rule.getName(),rule);
+        
+    }
+    
+    public void addAll(Collection<Rule> rules) {
+        
+        for(Rule r : rules) {
+            
+            add(r);
+            
+        }
+        
+    }
+    
+    public String toString() {
+
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("rule    \tms\t#entms\tentms/ms\n");
+        
+        for( Map.Entry<String,Rule> entry : rules.entrySet() ) {
+            
+            Rule r = entry.getValue();
+            
+            sb.append(r.getName()
+                    + "\t"
+                    + r.stats.elapsed
+                    + "\t"
+                    + r.stats.numComputed
+                    + "\t"
+                    + r.stats.getEntailmentsPerMillisecond());
+            
+            sb.append("\n");
+            
+        }
+
+        return sb.toString();
+        
+    }
+    
 }

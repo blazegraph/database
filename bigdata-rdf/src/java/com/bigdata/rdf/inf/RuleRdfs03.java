@@ -43,21 +43,21 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
+
 
 /**
  * rdfs3:
  * 
  * <pre>
- *   triple(v rdf:type x) :-
- *      triple(a rdfs:range x),
- *      triple(u a v).
+ *    triple(v rdf:type x) :-
+ *       triple(a rdfs:range x),
+ *       triple(u a v).
  * </pre>
  * 
  * Note: Literals can be entailed in the subject position by this rule and MUST
  * be explicitly filtered out. That task is handled by the
- * {@link DoNotAddFilter}. {@link RuleRdfs04} is the other way that literals
+ * {@link DoNotAddFilter}. {@link RuleRdfs04b} is the other way that literals
  * can be entailed into the subject position.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -65,20 +65,28 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class RuleRdfs03 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs03( InferenceEngine inf, Var a, Var x, Var u, Var v ) {
+    public RuleRdfs03( InferenceEngine inf) {
 
-        super(inf, new Triple(v, inf.rdfType, x),
-                new Pred[] {
-                new Triple(a, inf.rdfsRange, x),
-                new Triple(u, a, v)
+        super(inf.database,//
+                new Triple(var("v"), inf.rdfType, var("x")),//
+                new Pred[] {//
+                    new Triple(var("a"), inf.rdfsRange, var("x")),//
+                    new Triple(var("u"), var("a"), var("v"))//
                 });
 
     }
     
-    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+    // @todo remove - just a debug point.
+    public RuleStats apply(boolean justify, SPOBuffer buffer) {
         
-        return new SPO( stmt2.o, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
+        return super.apply(justify,buffer);
         
     }
+    
+//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
+//        
+//        return new SPO( stmt2.o, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
+//        
+//    }
 
 }

@@ -1,6 +1,5 @@
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.spo.SPO;
 
 /**
  * Rule for step 11 of {@link InferenceEngine#fastForwardClosure()}.
@@ -22,7 +21,7 @@ public class RuleFastClosure11 extends AbstractRuleFastClosure_11_13 {
      */
     public RuleFastClosure11(InferenceEngine inf) {
         
-        super(inf,
+        super(inf.database,
                 new Triple(var("x"), inf.rdfType, var("b")),//
                 new Pred[] {//
                     new Triple(var("x"), var("y"), var("z")),//

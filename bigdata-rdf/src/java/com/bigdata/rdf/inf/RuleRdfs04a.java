@@ -41,24 +41,32 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Oct 29, 2007
+ */
+
 package com.bigdata.rdf.inf;
 
 /**
- * rdfs10:
+ * rdfs4a:
+ * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?u) :-
- *          triple(?u,rdf:type,rdfs:Class). 
+ * (?u ?a ?x) -&gt; (?u rdf:type rdfs:Resource)
  * </pre>
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class RuleRdfs10 extends AbstractRuleRdfs_6_8_10_12_13 {
+public class RuleRdfs04a extends AbstractRuleDistinctTermScan {
 
-    public RuleRdfs10(InferenceEngine inf) {
+    public RuleRdfs04a(InferenceEngine inf) {
 
-        super(inf.database,
-                new Triple(var("u"), inf.rdfsSubClassOf, var("u")),//
-                new Triple(var("u"), inf.rdfType, inf.rdfsClass)//
-                );
+            super(inf.database, //
+                    new Triple(var("u"), inf.rdfType, inf.rdfsResource), //
+                    new Pred[] { //
+                        new Triple(var("u"), var("a"), var("x"))//
+                    });
 
-    }
-    
+        }
+
 }

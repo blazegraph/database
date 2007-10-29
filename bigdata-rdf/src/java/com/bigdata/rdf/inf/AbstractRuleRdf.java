@@ -43,11 +43,13 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 public abstract class AbstractRuleRdf extends Rule {
     
-    public AbstractRuleRdf(InferenceEngine inf, Triple head, Pred[] body) {
+    public AbstractRuleRdf(AbstractTripleStore db, Triple head, Pred[] body) {
 
-        super(inf, head, body);
+        super(db, head, body);
 
     }
        

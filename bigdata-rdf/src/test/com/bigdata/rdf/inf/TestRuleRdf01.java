@@ -102,7 +102,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertTrue(store.containsStatement(A, B, C));
             assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
     
-            applyRule(inf.rdf1, 1/* numComputed */);
+            applyRule(inf, inf.rdf1, 1/* numComputed */);
             
             /*
              * validate the state of the primary store.
@@ -155,7 +155,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertFalse(store.containsStatement(B, rdfType, rdfProperty));
             assertFalse(store.containsStatement(E, rdfType, rdfProperty));
 
-            applyRule(inf.rdf1, 2/* numComputed */);
+            applyRule(inf, inf.rdf1, 2/* numComputed */);
 
             /*
              * validate the state of the primary store.

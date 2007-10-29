@@ -50,6 +50,7 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -93,35 +94,43 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
 
         AbstractTripleStore store = getStore();
         
-        InferenceEngine inf = new InferenceEngine(store);
+        try {
+            
+            InferenceEngine inf = new InferenceEngine(store);
+            
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI U = new _URI("http://www.foo.org/U");
+            URI Y = new _URI("http://www.foo.org/Y");
+    
+            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+    
+            store.addStatement(A, rdfsSubPropertyOf, B);
+            store.addStatement(U, A, Y);
+    
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.containsStatement(U, A, Y));
+            assertFalse(store.containsStatement(U, B, Y));
+            assertEquals(2,store.getStatementCount());
+
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.rdfs7,1);
+    
+            assertEquals("#subqueries",1,stats.nsubqueries[0]);
+            assertEquals("#subqueries",0,stats.nsubqueries[1]);
+            
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.containsStatement(U, A, Y));
+            assertTrue(store.containsStatement(U, B, Y));
         
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI U = new _URI("http://www.foo.org/U");
-        URI Y = new _URI("http://www.foo.org/Y");
-
-        URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
-
-        store.addStatement(A, rdfsSubPropertyOf, B);
-        store.addStatement(U, A, Y);
-
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-        assertTrue(store.containsStatement(U, A, Y));
-        assertFalse(store.containsStatement(U, B, Y));
-
-        // apply the rule.
-        RuleStats stats = applyRule(inf.rdfs7,1);
-
-        assertEquals("#subqueries",1,stats.numSubqueries1);
+        } finally {
         
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-        assertTrue(store.containsStatement(U, A, Y));
-        assertTrue(store.containsStatement(U, B, Y));
-
-        store.closeAndDelete();
+            store.closeAndDelete();
+            
+        }
         
     }
     
@@ -141,42 +150,49 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
 
         AbstractTripleStore store = getStore();
         
-        InferenceEngine inf = new InferenceEngine(store);
+        try {
         
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI U1 = new _URI("http://www.foo.org/U1");
-        URI Y1 = new _URI("http://www.foo.org/Y1");
-        URI U2 = new _URI("http://www.foo.org/U2");
-        URI Y2 = new _URI("http://www.foo.org/Y2");
+            InferenceEngine inf = new InferenceEngine(store);
+            
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI U1 = new _URI("http://www.foo.org/U1");
+            URI Y1 = new _URI("http://www.foo.org/Y1");
+            URI U2 = new _URI("http://www.foo.org/U2");
+            URI Y2 = new _URI("http://www.foo.org/Y2");
+    
+            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+    
+            store.addStatement(A, rdfsSubPropertyOf, B);
+            store.addStatement(U1, A, Y1);
+            store.addStatement(U2, A, Y2);
+    
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.containsStatement(U1, A, Y1));
+            assertTrue(store.containsStatement(U2, A, Y2));
+            assertFalse(store.containsStatement(U1, B, Y1));
+            assertFalse(store.containsStatement(U2, B, Y2));
+    
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.rdfs7,2/*numComputed*/);
+    
+            assertEquals("#subqueries",1,stats.nsubqueries[0]);
+            assertEquals("#subqueries",0,stats.nsubqueries[1]);
 
-        URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
-
-        store.addStatement(A, rdfsSubPropertyOf, B);
-        store.addStatement(U1, A, Y1);
-        store.addStatement(U2, A, Y2);
-
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-        assertTrue(store.containsStatement(U1, A, Y1));
-        assertTrue(store.containsStatement(U2, A, Y2));
-        assertFalse(store.containsStatement(U1, B, Y1));
-        assertFalse(store.containsStatement(U2, B, Y2));
-
-        // apply the rule.
-        RuleStats stats = applyRule(inf.rdfs7,2/*numComputed*/);
-
-        assertEquals("#subqueries",1,stats.numSubqueries1);
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.containsStatement(U1, A, Y1));
+            assertTrue(store.containsStatement(U2, A, Y2));
+            assertTrue(store.containsStatement(U1, B, Y1));
+            assertTrue(store.containsStatement(U2, B, Y2));
         
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-        assertTrue(store.containsStatement(U1, A, Y1));
-        assertTrue(store.containsStatement(U2, A, Y2));
-        assertTrue(store.containsStatement(U1, B, Y1));
-        assertTrue(store.containsStatement(U2, B, Y2));
-        
-        store.closeAndDelete();
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
 
     }
     
@@ -199,43 +215,54 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
     public void test_rdfs07_03() {
 
         AbstractTripleStore store = getStore();
+
+        try {
         
-        InferenceEngine inf = new InferenceEngine(store);
-        
-        URI A = new _URI("http://www.foo.org/A");
-        URI B1 = new _URI("http://www.foo.org/B1");
-        URI B2 = new _URI("http://www.foo.org/B2");
-        URI U = new _URI("http://www.foo.org/U");
-        URI Y = new _URI("http://www.foo.org/Y");
+            InferenceEngine inf = new InferenceEngine(store);
+            
+            URI A = new _URI("http://www.foo.org/A");
+            URI B1 = new _URI("http://www.foo.org/B1");
+            URI B2 = new _URI("http://www.foo.org/B2");
+            URI U = new _URI("http://www.foo.org/U");
+            URI Y = new _URI("http://www.foo.org/Y");
+    
+            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+    
+            store.addStatement(A, rdfsSubPropertyOf, B1);
+            store.addStatement(A, rdfsSubPropertyOf, B2);
+            store.addStatement(U, A, Y);
+    
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
+            assertTrue(store.containsStatement(U, A, Y));
+            assertEquals(3,store.getStatementCount());
+    
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.rdfs7,2/*expectedComputed*/);
+    
+            // FIXME enable tests when working on subquery elimination.
+//            /*
+//             * Verify that only one subquery is issued (iff subquery elimination
+//             * is turned on for the rule).
+//             */
+//            assertEquals("#subqueries",(inf.rdfs7.subqueryElimination)?1:2,stats.nsubqueries[0]);
+//            assertEquals("#subqueries",0,stats.nsubqueries[1]);
+            
+            /*
+             * validate the state of the primary store.
+             */
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
+            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
+            assertTrue(store.containsStatement(U, A, Y));
+            assertTrue(store.containsStatement(U, B1, Y)); // entailed.
+            assertTrue(store.containsStatement(U, B2, Y)); // entailed.
+            assertEquals(5,store.getStatementCount());
 
-        URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+        } finally {
 
-        store.addStatement(A, rdfsSubPropertyOf, B1);
-        store.addStatement(A, rdfsSubPropertyOf, B2);
-        store.addStatement(U, A, Y);
-
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
-        assertTrue(store.containsStatement(U, A, Y));
-        assertFalse(store.containsStatement(U, B1, Y));
-        assertFalse(store.containsStatement(U, B2, Y));
-
-        // apply the rule.
-        RuleStats stats = applyRule(inf.rdfs7,2/*expectedComputed*/);
-
-        // verify that only one subquery is issued.
-        assertEquals("#subqueries",1,stats.numSubqueries1);
-        
-        /*
-         * validate the state of the primary store.
-         */
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
-        assertTrue(store.containsStatement(U, A, Y));
-        assertTrue(store.containsStatement(U, B1, Y));
-        assertTrue(store.containsStatement(U, B2, Y));
-
-        store.closeAndDelete();
+            store.closeAndDelete();
+            
+        }
         
     }
     

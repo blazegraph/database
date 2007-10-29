@@ -119,12 +119,21 @@ abstract public class Pred {
      * Return true iff all arguments of the predicate are bound (vs
      * variables).
      */
-    public boolean isFact() {
+    public boolean isConstant() {
 
         return !s.isVar() && !p.isVar() && !o.isVar();
 
     }
 
+    /**
+     * The #of arguments in the predicate that are variables (vs constants).
+     */
+    public int getVariableCount() {
+        
+        return (s.isVar() ? 1 : 0) + (p.isVar() ? 1 : 0) + (o.isVar() ? 1 : 0);
+        
+    }
+    
     /**
      * Create either a magic/1 or a triple/3 predicate.
      * 

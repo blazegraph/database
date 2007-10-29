@@ -5,6 +5,7 @@ import java.util.Arrays;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -40,7 +41,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * @see TestRuleFastClosure_11_13
  */
-abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
+abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleNestedSubquery {
 
     protected final long propertyId;
     
@@ -49,13 +50,13 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
     
     /**
      * 
-     * @param inf
+     * @param db
      * @param head
      * @param body
      */
-    public AbstractRuleFastClosure_11_13(InferenceEngine inf, Triple head, Pred[] body) {
+    public AbstractRuleFastClosure_11_13(AbstractTripleStore db, Triple head, Pred[] body) {
 
-        super(inf, head, body );
+        super(db, head, body );
 
         // validate the binding pattern for the tail of this rule.
         assert body.length == 3;
@@ -91,12 +92,15 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
      * 
      * @todo refactor to choose the evaluation order based on the range count
      *       for (?y, rdfs:subPropertyOf, ?a) vs (?a, propertyId, ?b).
-     * 
-     * FIXME This needs to preserve the logic to reuse the subquery using
-     * iterators even as it is refactored to be run against (new, new+old). See
-     * {@link AbstractRuleRdfs_2_3_7_9} which does this in for a 2-term tail.
+     *       <p>
+     *       Note:This needs to preserve the logic to reuse the subquery using
+     *       iterators even as it is refactored to be run against (new,
+     *       new+old). See {@link AbstractRuleRdfs_2_3_7_9} which does this in
+     *       for a 2-term tail.
      */
-    public RuleStats apply( final RuleStats stats, final SPOBuffer buffer) {
+    public RuleStats apply( final boolean justify, final SPOBuffer buffer) {
+        
+        if(true) return apply0(justify, buffer);
         
         final long computeStart = System.currentTimeMillis();
 
@@ -123,7 +127,7 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                 
             }
 
-            stats.stmts1 += stmts1.length;
+            stats.nstmts[1] += stmts1.length;
 
             /*
              * Two bound subquery (?a, propertyId, ?b), where ?a := stmt1.o.
@@ -132,9 +136,11 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
             
             for (SPO stmt1 : stmts1) {
                 
-                set(y,stmt1.s);
+                bind(1,stmt1);
                 
-                set(a,stmt1.o);
+//                set(y,stmt1.s);
+//                
+//                set(a,stmt1.o);
                 
                 // Subquery on the SPO index joining on stmt1.o == stmt2.s (a).
 
@@ -142,6 +148,8 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                 
                 assert itr2.getKeyOrder() == KeyOrder.SPO;
 
+                stats.nsubqueries[1]++;
+                
                 while(itr2.hasNext()) {
                     
                     SPO[] stmts2 = itr2.nextChunk();
@@ -152,9 +160,7 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                         
                     }
 
-                    stats.stmts2 += stmts2.length;
-                    
-                    stats.numSubqueries1++;
+                    stats.nstmts[2] += stmts2.length;
                     
                     for (SPO stmt2 : stmts2) {
                         
@@ -164,38 +170,39 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleRdf {
                         
                         assert stmt2.s == get(a);
 
-                        set(b,stmt2.o);
+                        bind(2,stmt2);
+//                        set(b,stmt2.o);
                         
                         // One bound subquery <code>(?x, ?y, ?z)</code> using POS
                         
                         ISPOIterator itr3 = getAccessPath(0/*pred*/).iterator();
                         
+                        stats.nsubqueries[0]++;
+                        
                         while(itr3.hasNext()) {
                             
-                            SPO[] stmts3 = itr3.nextChunk();
+                            SPO[] stmts0 = itr3.nextChunk();
                             
                             if(DEBUG) {
                                 
-                                log.debug("stmts3: chunk="+stmts3.length+"\n"+Arrays.toString(stmts3));
+                                log.debug("stmts3: chunk="+stmts0.length+"\n"+Arrays.toString(stmts0));
                                 
                             }
                             
-                            stats.stmts3 += stmts3.length;
+                            stats.nstmts[0] += stmts0.length;
                             
-                            stats.numSubqueries2++;
-                            
-                            for(SPO stmt3: stmts3) {
+                            for(SPO stmt3: stmts0) {
 
                                 assert stmt3.p == get(y);
 
-                                set(x,stmt3.s);
+                                bind(0,stmt3);
                                 
-                                set(z,stmt3.o);
+//                                set(x,stmt3.s);
+//                                
+//                                set(z,stmt3.o);
                                 
                                 // generate ([?x|?z] , rdf:type, ?b).
-                                emit(buffer);
-                                
-                                stats.numComputed++;
+                                emit(justify,buffer);
                                 
                             }
 

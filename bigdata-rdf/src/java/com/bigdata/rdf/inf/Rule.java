@@ -43,6 +43,8 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -67,9 +69,22 @@ import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * A rule.
+ * <p>
+ * Note: You MUST {@link #resetBindings()} each time you execute a rule. If the
+ * variable binding patterns are not restored (overwriting whatever constants
+ * were last in those positions) then the wrong access path will be selected and
+ * you will NOT get the expected entailments.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo the rule is entirely expressed in terms of a sequence of conjunctive
+ *       predicates. in order to be more general, the expression should be in
+ *       terms of a boolean AND operator, a triple pattern, and rewrites for
+ *       evaluation into a variety of specialized JOIN operations (self-join,
+ *       distinct term scan, and nested subquery). There is also the odd case
+ *       for {@link AbstractRuleFastClosure_3_5_6_7_9} where the rule accepts a
+ *       set of term identifers as on of its inputs.
  */
 abstract public class Rule {
 
@@ -92,10 +107,10 @@ abstract public class Rule {
      */
     final protected AbstractTripleStore db;
     
-    /**
-     * The inference engine.
-     */
-    final protected InferenceEngine inf;
+//    /**
+//     * The inference engine.
+//     */
+//    final protected InferenceEngine inf;
     
     /**
      * The head of the rule.
@@ -117,11 +132,11 @@ abstract public class Rule {
         
     }
 
-    /**
-     * When true the rule must justify the entailments to
-     * {@link SPOBuffer#add(com.bigdata.rdf.spo.SPO, com.bigdata.rdf.spo.Justification)}
-     */
-    final protected boolean justify;
+//    /**
+//     * When true the rule must justify the entailments to
+//     * {@link SPOBuffer#add(com.bigdata.rdf.spo.SPO, com.bigdata.rdf.spo.Justification)}
+//     */
+//    final protected boolean justify;
     
     /**
      * Instance array of bindings for each term in the tail in the order in
@@ -141,6 +156,7 @@ abstract public class Rule {
      * {@link #body} of the {@link Rule}.
      * <p>
      * Note: The corresponding access path in this array is invalidated by
+     * {@link #bind(int, SPO)} and
      * {@link #set(com.bigdata.rdf.inf.Rule.Var, long)} since binding a variable
      * (or changing the binding of a variable) will in general change the
      * selectivity of the access path (it may have a different range count).
@@ -150,13 +166,40 @@ abstract public class Rule {
     final private IAccessPath[] accessPath;
     
     /**
+     * The evaluation order for the predicates in the {@link #body} of the rule.
+     * This is determined when the rule is constructed.
+     * 
+     * FIXME The evaluation order MUST be tweaked when evaluating a rule against
+     * (new+db) since any triple pattern is generally more selective in (new)
+     * rather than in the (db), but it does depend on the actual range counts
+     * for the actual data. {@link #clearDownStreamBindings(int)} also has a
+     * dependency on this data.
+     */
+    final protected int[] order;
+    
+    /**
+     * Map from the variable to the index of the predicate in {@link #body} that
+     * first binds that variable in terms of the evaluation {@link #order}. This
+     * information is used by {@link #clearDownstreamBindings(int)} to decide
+     * which variables should be preserved.  If a variable is listed here with
+     * a lower index than the starting index to be cleared then its binding is
+     * NOT cleared.
+     */
+    final protected Map<Var,Integer> depends;
+    
+    /**
+     * Statistics for the rule evaluation.
+     */
+    final public RuleStats stats;
+    
+    /**
      * Emits an {@link SPO} entailment based on the current variable bindings
      * for the {@link #head}, and its {@link Justification} iff required, to
      * the {@link SPOBuffer}.
      * 
      * @param buffer
      */
-    protected void emit(SPOBuffer buffer) {
+    protected void emit(boolean justify, SPOBuffer buffer) {
         
         SPO stmt = new SPO(get(head.s),get(head.p),get(head.o),StatementEnum.Inferred);
         
@@ -168,8 +211,18 @@ abstract public class Rule {
             
         }
         
-        buffer.add(stmt, jst);
-        
+        if(buffer.add(stmt, jst)) {
+
+            /*
+             * @todo a counter here for the #of entailments that were
+             * accepted by the filter.
+             */
+            
+        }
+
+        // #of entailments computed.
+        stats.numComputed++;
+
     }
     
     /**
@@ -195,8 +248,13 @@ abstract public class Rule {
         
         for(int i=0; i<body.length; i++) {
             
+//            // Note: show in the evaluation order.
+//            sb.append(body[order[i]].toString(db));
             sb.append(body[i].toString(db));
-            
+
+            // displays the evaluation order as an index on the predicate.
+            sb.append("[" + order[i] + "]");
+
             if(i+1<body.length) {
                 
                 sb.append(", ");
@@ -242,6 +300,8 @@ abstract public class Rule {
         
         for(int i=0; i<body.length; i++) {
             
+//            // Note: show in the evaluation order.
+//            Pred pred = body[order[i]];
             Pred pred = body[i];
             
             sb.append("(");
@@ -257,6 +317,14 @@ abstract public class Rule {
             sb.append( pred.o.isVar()?db.toString(bindings[i*N+2]):pred.o.toString(db) );
             
             sb.append(")");
+            
+            if (!asBound) {
+
+                // displays the evaluation order as an index on the predicate.
+
+                sb.append("[" + order[i] + "]");
+                
+            }
             
             if(pred.magic) {
                 
@@ -359,26 +427,23 @@ abstract public class Rule {
         
     }
     
-    public Rule(InferenceEngine inf, Pred head, Pred[] body) {
+    public Rule(AbstractTripleStore db, Pred head, Pred[] body) {
 
-        assert inf != null;
+        assert db != null;
         
         assert head != null;
 
         // the database.
-        this.db = inf.database;
+        this.db = db;
 
-        // the inference engine.
-        this.inf = inf;
-        
         // the head of the rule.
         this.head = head;
 
         // the predicate declarations for the body.
         this.body = body;
         
-        // true iff the rule is required to generate justifications for entailments.
-        this.justify = inf.isJustified();
+        // collects statistics on the rule.
+        this.stats = new RuleStats();
         
         // Allocate bindings for the tail.
         this.bindings = new long[body.length*N];
@@ -386,13 +451,172 @@ abstract public class Rule {
         // Allocate access path cache.
         this.accessPath = new IAccessPath[body.length];
 
+        // The evaluation order.
+        this.order = computeEvaluationOrder();
+
+        // The 1st dependency map for each variable in the tail.
+        this.depends = computeVariableDependencyMap();
+
         // initialize the bindings from the predicate declarations.
         resetBindings();
 
     }
     
     /**
+     * The evaluation {@link #order}[] is determined by analysis of the
+     * propagation of bindings. The most selective predicate is choosen first
+     * and "fake" bindings are propagated to the other predicates in the tail.
+     * This process is repeated until all variables are bound and an evaluation
+     * order has been determined. The evaluation order is written into the
+     * {@link #order}[]. The indices in that array are correlated 1:1 with the
+     * predicates in {@link #body}.
+     * 
+     * @return The evaluation {@link #order}[].
+     * 
+     * @todo If we only considered the #of unbound variables then this could
+     *       computed when the rule is instantiated since the range counts
+     *       against the data are not being considered. However, if we do that
+     *       then we will make the wrong choices when considering (new+db) since
+     *       new will generally have far fewer statements for any triple
+     *       pattern, even when nothing is bound.
+     *       <p>
+     *       When we consider (new+db) during the evaluation of a rule, there is
+     *       always one predicate that is evaluated against new while the other
+     *       predicates are evaluated against db. Therefore we need to "tweak"
+     *       the statically determined order by explicitly considering whether
+     *       the predicate to be evaluated against (new) is more selective in
+     *       the data than the predicate that is first in the evaluate
+     *       {@link #order}[]. If it is (and it generally will be) then we swap
+     *       the indices of the two predicates in a local copy of {@link #order}[].
+     *       <p>
+     *       Note that {@link #depends} MUST also be updated for this case.
+     *       <p>
+     *       Note that both {@link #order} and {@link #depends} MUST be restored
+     *       for normal evaluation, so maybe this should be done when the rule
+     *       is to be evaluated.
+     */
+    private int[] computeEvaluationOrder() {
+     
+        resetBindings();
+
+        int[] order = new int[body.length];
+        boolean[] used = new boolean[body.length];
+        
+        // clear array.  -1 is used to detect logic errors.
+        for( int i=0; i<order.length; i++ ) order[i] = -1;
+        
+        // used to propagate bindings.
+        SPO tmp = new SPO(-1,-1,-1,StatementEnum.Axiom);
+        
+        for(int i=0; i<body.length; i++) {
+
+            int minVarCount = Integer.MAX_VALUE;
+            int index = -1;
+            
+            for( int j=0; j<body.length; j++) {
+                
+                if(used[j]) continue; // already in the evaluation order. 
+                
+                int varCount = body[j].getVariableCount();
+                
+                if(varCount<minVarCount) {
+                    
+                    minVarCount = varCount;
+                    
+                    index = j;
+                    
+                }
+                
+            }
+
+            if(index==-1) throw new AssertionError();
+            
+            if (used[index])
+                throw new AssertionError("Attempting to reuse predicate: index="+i+"\n"+this);
+            
+            order[i] = index;
+            
+            used[index] = true;
+            
+            // propagate bindings.
+            bind(index,tmp);
+            
+        }
+        
+        assert checkBindings();
+       
+        log.info("Evaluation order: "+Arrays.toString(order));
+        
+        return order;
+        
+    }
+    
+    /**
+     * Records the index of the 1st predicate in evaluation {@link #order} where
+     * each variable is mentioned in the tail of the rule. This is the predicate
+     * that will bind the variable during evaluation.
+     * 
+     * @return The map from variable to the 1st predicate in evaluation order
+     *         where it is bound. The values of this map are indices into
+     *         {@link #order}.
+     */
+    private Map<Var,Integer> computeVariableDependencyMap() {
+        
+        Map<Var,Integer> depends = new HashMap<Var,Integer>();
+        
+        for(int i=0; i<body.length; i++) {
+            
+            Pred pred = body[order[i]];
+            
+            if(pred.s.isVar()) {
+                
+                Var var = (Var)pred.s;
+                
+                if(!depends.containsKey(var)) {
+                    
+                    depends.put(var, i);
+                    
+                }
+                
+            }
+            
+            if(pred.p.isVar()) {
+                
+                Var var = (Var)pred.p;
+                
+                if(!depends.containsKey(var)) {
+                    
+                    depends.put(var, i);
+                    
+                }
+                
+            }
+            
+            if(pred.o.isVar()) {
+                
+                Var var = (Var)pred.o;
+                
+                if(!depends.containsKey(var)) {
+                    
+                    depends.put(var, i);
+                    
+                }
+                
+            }
+            
+        }
+        
+        return depends;
+        
+    }
+    
+    /**
      * Initialize the bindings from the constants and variables in the rule.
+     * 
+     * FIXME This should be automatically invoked by whatever logic is used
+     * to execute rules since it is too risky to leave it up to the person
+     * writing the rule to make sure that they are invoking this at the top
+     * of their rule.
      */
     void resetBindings() {
         
@@ -516,6 +740,7 @@ abstract public class Rule {
      *             if var is a constant.
      * 
      * @see #set(Var, long)
+     * @see #bind(int, SPO)
      */
     public long get(VarOrId var) {
         
@@ -570,6 +795,8 @@ abstract public class Rule {
      *             if the predicate index is out of range.
      * @throws IllegalArgumentException
      *             if the variable does not appear in the rule.
+     * 
+     * @see #bind(int, SPO)
      */
     public void set(Var var, long id) {
       
@@ -621,6 +848,130 @@ abstract public class Rule {
             
             throw new IllegalArgumentException(var.toString());
             
+        }
+        
+    }
+
+    /**
+     * Instruct the rule to bind its variables by mapping the specified
+     * statement onto the specified body predicate. For each position in the
+     * predicate that is a variable (as opposed to a constant), the
+     * corresponding value is copied from the statement and will become the new
+     * binding for that variable in each position in which it occurs in the
+     * rule.
+     * 
+     * @param index
+     *            The index of the predicate in the body of the rule.
+     * @param spo
+     *            A statement materialized by the triple pattern that predicate.
+     * 
+     * @throws NullPointerException
+     *             if the statement is <code>null</code>.
+     * @throws IndexOutOfBoundsException
+     *             if the index is out of bounds.
+     * 
+     * @see #clearDownstreamBindings(int index)
+     */
+    public void bind(int index, SPO spo) {
+        
+        // Note: if you are doing nested subqueries and you are not invoking
+        // this method then you have a problem!
+        //
+        // @todo if this proves to be a stubling block for writing rules then
+        // just move the invocation into this method as:
+        //
+//        clearDownstreamBindings(index + 1);
+        
+        Pred pred = body[index];
+        
+        if(pred.s.isVar()) {
+            
+            set((Var)pred.s,spo.s);
+            
+        }
+        
+        if(pred.p.isVar()) {
+            
+            set((Var)pred.p,spo.p);
+            
+        }
+        
+        if(pred.o.isVar()) {
+            
+            set((Var)pred.o,spo.o);
+            
+        }
+        
+    }
+    
+    /**
+     * Clear downstream bindings in the evaluation {@link #order}[]. If a
+     * variable in a downstream predicate was 1st bound by an upstream predicate
+     * as identified by {@link #depends} then its value is NOT cleared.
+     * <p>
+     * Note: You MUST {@link #resetBindings()} before you evaluate a rule.
+     * <p>
+     * Note: You MUST {@link #clearDownstreamBindings(int)} bindings before you
+     * (re-)evaluate a subquery. Failure to do so will leave non-{@link #NULL}
+     * bindings in place which will cause {@link #getAccessPath(int)} to
+     * identify the wrong access path, and hence select the wrong data.
+     * 
+     * @param index
+     *            The index of the predicate whose values you intend to
+     *            {@link #bind(int, SPO)}.
+     *            
+     * FIXME If the evaluation order is being modified for a (new+db) scenario
+     * then the order[] MUST be modified as well for this method to work
+     * correctly!!!
+     */
+    protected void clearDownstreamBindings(int index) {
+
+        for(int i=index; i<body.length; i++) {
+            
+            Pred pred = body[order[index]];
+            
+            if(pred.s.isVar()) {
+                
+                Var var = (Var)pred.s;
+                
+                int j = depends.get(var);
+                
+                if (j >= index) {
+
+                    set(var, NULL);
+
+                }
+                
+            }
+            
+            if(pred.p.isVar()) {
+                
+                Var var = (Var)pred.p;
+                
+                int j = depends.get(var);
+                
+                if (j >= index) {
+
+                    set(var, NULL);
+
+                }
+                
+            }
+            
+            if(pred.o.isVar()) {
+                
+                Var var = (Var)pred.o;
+                
+                int j = depends.get(var);
+                
+                if (j >= index) {
+
+                    set(var, NULL);
+
+                }
+                
+            }
+                        
         }
         
     }
@@ -682,7 +1033,8 @@ abstract public class Rule {
      * cache does not have an entry for the desired access path the one is
      * obtained and placed into the cache before being returned to the caller.
      * The cache is invalidated by {@link #resetBindings()} and (on a selective
-     * basis) by {@link #set(com.bigdata.rdf.inf.Rule.Var, long)}.
+     * basis) by {@link #bind(int, SPO)} and
+     * {@link #set(com.bigdata.rdf.inf.Rule.Var, long)}.
      * 
      * @param index
      *            The index into {@link #body}.
@@ -723,7 +1075,7 @@ abstract public class Rule {
      * 
      * @todo modify to accept the view (new or new+old) for the access path
      */
-    public int getMostSelectiveAccessPath() {
+    public int getMostSelectiveAccessPathByRangeCount() {
 
         int index = -1;
 
@@ -749,7 +1101,7 @@ abstract public class Rule {
         return index;
 
     }
-    
+
     /**
      * Apply the rule, creating entailments that are inserted into a
      * {@link TempTripleStore}.
@@ -770,8 +1122,82 @@ abstract public class Rule {
      *            transfered enmass into the backing store.
      * 
      * @return The statistics object.
+     * 
+     * @todo parameterize with the view (new, new+db, or db). new and new+db are
+     *       used by truth maintenance. db is used for query.
+     * 
+     * @todo parameterize the behavior on overflow. for query, results need to
+     *       be inflated (into the Sesame model) and delivered back to the SAIL.
+     * 
+     * @todo make the RuleStats an instance variable. They are reset on the rule
+     *       before it is evaluated. Provide for cumulative rule stats across
+     *       invocations of the rules as they go to fixed point in the context
+     *       of TM or query evaluation. Rule statistics can also be cumulated
+     *       across the life span of the executable or the database or simply
+     *       logged periodically for later inspection.
      */
-    public abstract RuleStats apply( final RuleStats stats, final SPOBuffer buffer );
+    abstract public RuleStats apply( boolean justify, final SPOBuffer buffer );
+    
+    /**
+     * Evaluate a rule.
+     * <p>
+     * The basic program handles an N predicate conjunction. The predicates are
+     * evaluated in an order which is dynamically determined based on the
+     * selectivitity of the predicates having remaining unbound variables.
+     * <p>
+     * The order is determined in advance by analysis of the propagation of
+     * bindings. The most selective predicate is choosen first and "fake"
+     * bindings are propagated to the other predicates in the tail. This process
+     * is repeated until all variables are bound and an evaluation order has
+     * been determined. The evaluation order is written into an order[] whose
+     * indices are correlated 1:1 with the predicates in the tail.
+     * <p>
+     * Evaluation nests subqueries based on the order[]. Nested subqueries are
+     * issued iff the bindings for the subquery are distinct from those used in
+     * the prior subquery.
+     * 
+     * @param justify
+     *            When true, {@link Justification}s for entailments will be
+     *            written on the <i>buffer</i>.
+     * @param buffer
+     *            The entailments will be written on the buffer.
+     * @param focus
+     *            A secondary data set used to support truth maintenance
+     *            (optional). When given, the index of a focus predicate MUST be
+     *            specified. The identified predicate will read from the "focus"
+     *            data set while the remaining predicates will read from a fused
+     *            view of the "focus" and the {@link #db}.
+     * @param focusPred
+     *            The index of the predicate in the {@link #body} that will read
+     *            from the <i>focus</i>. This is ignore iff <i>focus</i> is
+     *            <code>null</code>.
+     * 
+     * @todo behavior on overflow of the buffer must be caller determined
+     *       (insert, remove, query).
+     * 
+     * @todo special evaluation for a tail consisting of a single predicate
+     *       where the head has only one binding. For this case always do a
+     *       distinct term scan for whatever variable is required by the head.
+     *       <p>
+     *       This can be generalized: any time we require only one binding from
+     *       a triple pattern we can do a distinct term scan rather than the
+     *       standard {@link ISPOIterator}. As the other variables are unused
+     *       they can remain unbound or be set to an arbitrary non-{@value #NULL}
+     *       value so as to appear as if they were bound.
+     * 
+     * @todo Note that we must evaluate a predicate that is a constant in order
+     *       to determine whether or not the predicate can be matched in the
+     *       appropriate data (new, new+db, db).
+     */
+    public RuleStats apply2( final boolean justify, final SPOBuffer buffer ) {
+        
+        resetBindings();
+        
+        assert checkBindings();
+
+        return stats;
+        
+    }
 
     /**
      * Map N executions of rule over the terms in the tail. In each pass term[i]
@@ -935,6 +1361,139 @@ abstract public class Rule {
             
             return name.compareTo(((Var)arg0).name);
             
+        }
+        
+    }
+
+    /**
+     * Statistics about what the Rule did.
+     * 
+     * @author mikep
+     */
+    public class RuleStats {
+
+        private RuleStats() {
+            
+            nstmts = new int[body.length];
+
+            nsubqueries = new int[body.length];
+            
+        }
+
+        /**
+         * The #of rounds that have been executed for this rule.
+         */
+        public int nrounds;
+        
+        /**
+         * The #of statement considered for the each predicate in the body of the
+         * rule (in the order in which they were declared, not the order in which
+         * they were evaluated).
+         */
+        public int[] nstmts;
+
+        /**
+         * The #of subqueries examined for each predicate in the rule. The indices
+         * are correlated 1:1 with the order in which the predicates were declared.
+         * While there are N indices for a rule with N predicates, we only evaluate
+         * a subquery for N-1 predicates so at least one index will always be
+         * zero(0).
+         */
+        public int[] nsubqueries;
+        
+        /**
+         * #of entailments computed by the rule (does not consider whether or not
+         * the entailments were pre-existing in the database nor whether or not the
+         * entailments filtered out such that they did not enter the database).
+         */
+        public int numComputed;
+        
+        /**
+         * Time to compute the entailments (ms).
+         * 
+         * @todo convert this to nano seconds?
+         */
+        public long elapsed;
+
+        /**
+         * The #of statements considered by the rule (total over {@link #nstmts}).
+         */
+        public int getStatementCount() {
+            
+            int n = 0;
+            
+            for(int i=0; i<nstmts.length; i++) {
+                
+                n += nstmts[i];
+                
+            }
+            
+            return n;
+            
+        }
+        
+        public String getEntailmentsPerMillisecond() {
+
+            return (elapsed == 0 ? "N/A" : "" + numComputed / elapsed);
+            
+        }
+        
+        public String toString() {
+
+            int n = getStatementCount();
+            
+            String stmtsPerSec = (n == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
+                    + ((long) (((double) n) / ((double) elapsed) * 1000d))));
+
+            return getName()//
+                 + ", #rounds="+nrounds//
+                 + ", #stmts=" + Arrays.toString(nstmts) //
+                 + ", #subqueries="+Arrays.toString(nsubqueries)//
+                 + ", #computed=" + numComputed//
+                 + ", elapsed=" + elapsed//
+                 + ", stmts/sec="+stmtsPerSec//
+                 ;
+
+        }
+
+        /**
+         * Resets all of the counters.
+         */
+        public void reset() {
+            
+            for(int i=0; i<nstmts.length; i++) {
+
+                nstmts[i] = nsubqueries[i] = 0;
+
+            }
+
+            nrounds = 0;
+            
+            numComputed = 0;
+            
+            elapsed = 0L;
+            
+        }
+
+        /**
+         * Aggregates statistics.
+         * 
+         * @param o Statistics for another rule.
+         */
+        public void add(RuleStats o) {
+            
+            for(int i=0; i<nstmts.length; i++) {
+
+                nstmts[i] += o.nstmts[i];
+                
+                nsubqueries[i] += o.nsubqueries[i];
+
+            }
+            
+            numComputed += o.numComputed;
+        
+            elapsed += o.elapsed;
+        
         }
         
     }

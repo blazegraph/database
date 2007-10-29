@@ -89,6 +89,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @todo run more small tests that focus on specific inferences.
  * 
+ * @todo run tests of a variety of ontologies found "in the wild".
+ * 
  * @todo verify that we correctly distinguish Axioms, Explicit, and Inferred
  *       statements. Axioms are checked against those defined by
  *       {@link RdfsAxioms}. Explicit statements are checked against the
@@ -187,6 +189,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * resource is correct. Correctness is judged against the closure of the
      * same resource as computed by the Sesame platform.
      * 
+     * @param properties Used to configure the {@link InferenceEngine}.
      * @param resource
      *            (MUST be in the same package as this test class).
      * @param baseURL
@@ -195,12 +198,6 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * @throws IOException
      * @throws SailInitializationException
      * @throws UpdateException
-     * 
-     * @todo modify to accept properties for the inference engine / TM which
-     *       will determine how it computes the closure (full vs fast) and
-     *       whether or not some entailments are computed by backward chaining
-     *       rather than eager closure. Perhaps add the concept of a
-     *       "RuleModel"?
      */
     protected void assertCorrectClosure(Properties properties, String resource,
             String baseURL, RDFFormat format) throws IOException,

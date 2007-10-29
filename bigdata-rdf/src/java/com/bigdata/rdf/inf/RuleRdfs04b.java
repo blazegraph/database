@@ -41,24 +41,38 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Oct 29, 2007
+ */
+
 package com.bigdata.rdf.inf;
 
 /**
- * rdfs10:
+ * rdfs4b:
+ * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?u) :-
- *          triple(?u,rdf:type,rdfs:Class). 
+ * (?u ?a ?v) -&gt; (?v rdf:type rdfs:Resource)
  * </pre>
+ * 
+ * Note: Literals can be entailed in the subject position by this rule and MUST
+ * be explicitly filtered out. That task is handled by the
+ * {@link DoNotAddFilter}. {@link RuleRdfs03} is the other way that literals
+ * can be entailed into the subject position.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class RuleRdfs10 extends AbstractRuleRdfs_6_8_10_12_13 {
+public class RuleRdfs04b extends AbstractRuleDistinctTermScan {
 
-    public RuleRdfs10(InferenceEngine inf) {
+    public RuleRdfs04b(InferenceEngine inf) {
 
-        super(inf.database,
-                new Triple(var("u"), inf.rdfsSubClassOf, var("u")),//
-                new Triple(var("u"), inf.rdfType, inf.rdfsClass)//
-                );
+            super(inf.database, //
+                    new Triple(var("v"), inf.rdfType, inf.rdfsResource), //
+                    new Pred[] { //
+                        new Triple(var("u"), var("a"), var("v"))//
+                    });
 
-    }
-    
+        }
+
+
 }
