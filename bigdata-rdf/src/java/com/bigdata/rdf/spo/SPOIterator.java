@@ -500,6 +500,14 @@ public class SPOIterator implements ISPOIterator {
 
         }
         
+        if(readService!=null) {
+            
+            // make sure that we fill the buffer before we deliver a chunk.
+            
+            awaitReader();
+            
+        }
+        
         // there are at least this many in the buffer.
         
         final int n = buffer.size();
@@ -568,7 +576,7 @@ public class SPOIterator implements ISPOIterator {
         
         final int N = capacity < MIN_CHUNK_SIZE ? capacity : MIN_CHUNK_SIZE;
         
-        while(buffer.size()<N && ! readerDone.get()) {
+        while (buffer.size() < N && !readerDone.get()) {
             
             try {
                 

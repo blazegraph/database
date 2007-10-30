@@ -5,7 +5,6 @@ import java.util.Set;
 
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -71,23 +70,23 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
      * @param database
      *            The database.
      * @param buffer
-     *            A buffer used to accumulate entailments. The buffer is
-     *            flushed to the database if this method returns normally.
+     *            A buffer used to accumulate entailments. The buffer is flushed
+     *            to the database if this method returns normally.
      * @param P
      *            A set of term identifiers.
      * @param propertyId
      *            The propertyId to be used in the assertions.
+     * 
+     * FIXME This needs to be carefully constructed and executed when a
+     * focusStore is being used so that we have the union of {P} for the
+     * focusStore and the database and then run the rule on the focusStore only.
+     * Consider moving read for {P} into this method.
      */
-    public RuleStats apply(final boolean justify, final SPOBuffer buffer) {
+    public void apply(State state) {
 
         final long begin = System.currentTimeMillis();
-
-        resetBindings();
         
         final long[] a = getSortedArray(P);
-
-//        // Note: counting the passed in array as stmts[0].
-//        stats.nstmts[0] += a.length;
 
         /*
          * @todo execute subqueries in parallel using inference engine thread
@@ -110,9 +109,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
             }
 
-            stats.nsubqueries[0]++;
+            state.stats.nsubqueries[0]++;
 
-            ISPOIterator itr2 = db.getAccessPath(NULL, p, NULL).iterator();
+            ISPOIterator itr2 = (state.focusStore == null ? state.database
+                    .getAccessPath(NULL, p, NULL).iterator() : state.focusStore
+                    .getAccessPath(NULL, p, NULL).iterator());
 
             try {
 
@@ -127,7 +128,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
                     }
 
-                    stats.nstmts[0] += stmts0.length;
+                    state.stats.nstmts[0] += stmts0.length;
 
                     for (SPO spo : stmts0) {
 
@@ -141,12 +142,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
                         assert spo.p == p;
 
-                        bind(0,spo);
-//                        set(x, spo.s);
-//                        set(SetP, p);
-//                        set(y, spo.o);
+                        state.bind(0,spo);
 
-                        emit(justify,buffer);
+                        state.emit();
 
                     } // next stmt
 
@@ -160,11 +158,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
         } // next p in P
 
-        assert checkBindings();
-        
-        stats.elapsed += System.currentTimeMillis() - begin;
-
-        return stats;
+        state.stats.elapsed += System.currentTimeMillis() - begin;
 
     }
 

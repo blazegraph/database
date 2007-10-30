@@ -63,11 +63,5 @@ public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
                 });
 
     }
-    
-//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-//
-//        return new SPO( stmt2.s, stmt1.o, stmt2.o, StatementEnum.Inferred );
-//        
-//    }
 
 }

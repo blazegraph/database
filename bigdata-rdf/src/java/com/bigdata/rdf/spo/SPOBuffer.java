@@ -65,17 +65,16 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A buffer for {@link SPO}s that are flushed on overflow into a backing
- * {@link TempTripleStore}.
+ * {@link AbstractTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOBuffer {
+public class SPOBuffer implements ISPOBuffer {
 
     final public Logger log = Logger.getLogger(SPOBuffer.class);
 
@@ -111,10 +110,6 @@ public class SPOBuffer {
      */
     private int numJustifications;
 
-    /**
-     * The #of statements currently in the buffer (if duplicates are not being
-     * filtered then this count will include any duplicate statements).
-     */
     public int size() {
         
         return numStmts;
@@ -129,10 +124,7 @@ public class SPOBuffer {
         return numJustifications;
         
     }
-    
-    /**
-     * True iff there are no statements in the buffer.
-     */
+
     public boolean isEmpty() {
         
         return numStmts == 0;
@@ -140,8 +132,10 @@ public class SPOBuffer {
     }
     
     /**
-     * The {@link SPO} at the given index.
+     * The {@link SPO} at the given index (used by some unit tests).
+     * 
      * @param i
+     * 
      * @return
      */
     public SPO get(int i) {
@@ -165,17 +159,17 @@ public class SPOBuffer {
      * The backing store into which the statements are added when the buffer
      * overflows.
      */
-    protected final AbstractTripleStore store;
+    public final AbstractTripleStore store;
     
-    /**
-     * The backing store into which the statements are added when the buffer
-     * overflows.
-     */
-    public AbstractTripleStore getBackingStore() {
-        
-        return store;
-        
-    }
+//    /**
+//     * The backing store into which the statements are added when the buffer
+//     * overflows.
+//     */
+//    public AbstractTripleStore getBackingStore() {
+//        
+//        return store;
+//        
+//    }
     
     /**
      * An optional filter. When present, statements matched by the filter are
@@ -202,6 +196,16 @@ public class SPOBuffer {
     protected final boolean justify;
     
     /**
+     * Convenience constructor - do NOT use for large operations since the
+     * capacity is only 1000 {@link SPO}s.
+     */
+    public SPOBuffer(AbstractTripleStore store, boolean justified) {
+        
+        this(store,null/*filter*/,1000/*capacity*/,false/*distinct*/,justified);
+        
+    }
+    
+    /**
      * Create a buffer.
      * 
      * @param store
@@ -209,8 +213,8 @@ public class SPOBuffer {
      *            inserted.
      * @param filter
      *            Option filter. When present statements matched by the filter
-     *            are NOT retained by the {@link SPOBuffer} and are NOT added to
-     *            the <i>store</i>.
+     *            are NOT retained by the {@link SPOBuffer} and will NOT be
+     *            added to the <i>store</i>.
      * @param capacity
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
      *            buffer can hold.
@@ -303,7 +307,7 @@ public class SPOBuffer {
      * @return Either the given statement or the pre-existing statement with the
      *         same data.
      */
-    protected SPO getDistinctStatement(SPO stmt) {
+    private SPO getDistinctStatement(SPO stmt) {
 
         assert distinct == true;
 
@@ -338,9 +342,6 @@ public class SPOBuffer {
     private ExecutorService indexWriteService = Executors.newFixedThreadPool(2,
             DaemonThreadFactory.defaultThreadFactory());
 
-    /**
-     * Flush any buffer statements to the backing store.
-     */
     public void flush() {
 
         if (numStmts > 0 || numJustifications > 0) {
@@ -453,19 +454,8 @@ public class SPOBuffer {
     }
     
     /**
-     * Adds an entailment together with its bindings.
-     * <p>
      * When the buffer is {@link #nearCapacity()} the statements in the buffer
      * will be flushed into the backing store.
-     * 
-     * @param stmt
-     *            The entailment.
-     * @param justification
-     *            The justification for that entailment (optional, depending on
-     *            the TM strategy).
-     * 
-     * @return true if the buffer will store the statement. The buffer will
-     *         reject the statement if it matches the {@link #filter}.
      * 
      * @see #nearCapacity()
      * @see #flush()

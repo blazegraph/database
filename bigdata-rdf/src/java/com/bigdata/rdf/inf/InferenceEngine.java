@@ -59,7 +59,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -687,36 +686,37 @@ public class InferenceEngine extends RDFSHelper {
             .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
 
     /**
-     * Compute the forward closure using the algorithm selected by
-     * {@link Options#FORWARD_CLOSURE}.
+     * Compute the forward closure of the database using the algorithm selected
+     * by {@link Options#FORWARD_CLOSURE}.
      * 
      * @return Statistics about the operation.
      */
     public ClosureStats computeClosure() {
 
-        /*
-         * Reset the stats for each rule.
-         * 
-         * Note: If there are pre-initialized rules for the fast forward closure
-         * that are not part of the full closure then they need to be returned
-         * by getRuleModel() in order to have their statistics reset before the
-         * closure is computed. Right now, all of those rules are created
-         * dynamically inside of fastForwardClosure(). However, steps 11 and 13
-         * could be pre-initialized since they do not depend on dynamic data.
-         */
-        for(Rule rule : getRuleModel() ) {
-            
-            rule.stats.reset();
-            
-        }
+        return computeClosure(null);
         
+    }
+
+    /**
+     * Compute the forward closure of a focusStore against the database using
+     * the algorithm selected by {@link Options#FORWARD_CLOSURE}.
+     * 
+     * @param focusStore
+     *            The data set that will be closed against the database
+     *            (optional). When <code>null</code> the store will be closed
+     *            against itself.
+     * 
+     * @return Statistics about the operation.
+     */
+    public ClosureStats computeClosure(AbstractTripleStore focusStore) {
+
         switch(forwardClosure) {
 
         case Fast:
-            return fastForwardClosure();
+            return fastForwardClosure(focusStore);
         
         case Full:
-            return fullForwardClosure();
+            return fullForwardClosure(focusStore);
         
         default: throw new UnsupportedOperationException();
         
@@ -729,16 +729,18 @@ public class InferenceEngine extends RDFSHelper {
      * inference strategy.
      * <p>
      * The general approach is a series of rounds in which each rule is applied
-     * to all data in turn. The rules directly embody queries that cause only
-     * the statements which can trigger the rule to be visited. Since most rules
-     * require two antecedents, this typically means that the rules are running
-     * two range queries and performing a join operation in order to identify
-     * the set of rule firings. Entailments computed in each round are fed back
-     * into the source against which the rules can match their preconditions, so
+     * to all data in turn. Entailments computed in each round are fed back into
+     * the source against which the rules can match their preconditions, so
      * derived entailments may be computed in a succession of rounds. The
      * process halts when no new entailments are computed in a given round.
+     * 
+     * @param focusStore
+     *            When non-<code>null</code> , the focusStore will be closed
+     *            against the database with the entailments written into the
+     *            database. When <code>null</code>, the entire database will
+     *            be closed.
      */
-    protected ClosureStats fullForwardClosure() {
+    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore) {
 
         final long begin = System.currentTimeMillis();
        
@@ -763,8 +765,9 @@ public class InferenceEngine extends RDFSHelper {
         final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
                 BUFFER_SIZE, distinct, isJustified());
 
-        // do the full forward closure of the database.
-        System.err.println(fixedPoint(closureStats,getRuleModel(), buffer).toString());
+        // compute the full forward closure.
+        System.err.println(Rule.fixedPoint(closureStats, getRuleModel(),
+                justify, focusStore, database, buffer).toString());
        
         final int nafter = database.getStatementCount();
         
@@ -783,13 +786,19 @@ public class InferenceEngine extends RDFSHelper {
      * Query, Manipulation and Inference on Databases" by Lu, Yu, Tu, Lin, and
      * Zhang</a>.
      * 
-     * @todo When modifying to support incremental TM note that some rules are
-     *       "special". In particular {@link AbstractRuleFastClosure_3_5_6_7_9}
-     *       accept a set of term identifiers that are specially computed. We
-     *       need to pass those rules the term identifiers as computed over the
-     *       union of the new and old statements.
+     * @param focusStore
+     *            When non-<code>null</code> , the focusStore will be closed
+     *            against the database with the entailments written into the
+     *            database. When <code>null</code>, the entire database will
+     *            be closed.
+     * 
+     * FIXME When modifying to support incremental TM note that some rules are
+     * "special". In particular {@link AbstractRuleFastClosure_3_5_6_7_9} accept
+     * a set of term identifiers that are specially computed. We need to pass
+     * those rules the term identifiers as computed over the union of the new
+     * and old statements.
      */
-    protected ClosureStats fastForwardClosure() {
+    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore) {
 
         /*
          * Note: The steps below are numbered with regard to the paper cited in
@@ -801,9 +810,6 @@ public class InferenceEngine extends RDFSHelper {
 
         final ClosureStats closureStats = new ClosureStats();
         
-        // add the basic rule model.
-        closureStats.addAll(Arrays.asList(getRuleModel()));
-        
         final int firstStatementCount = database.getStatementCount();
 
         final long begin = System.currentTimeMillis();
@@ -812,7 +818,7 @@ public class InferenceEngine extends RDFSHelper {
                 + " statements");
         
         /*
-         * Entailment buffer.
+         * Entailment buffer writes on the database.
          */
         final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
                 BUFFER_SIZE, distinct, isJustified());
@@ -826,15 +832,16 @@ public class InferenceEngine extends RDFSHelper {
         // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
         {
             Rule r = new RuleFastClosure3(this, P);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step3: " + r.stats);
+            RuleStats stats = r.apply(justify,focusStore,database,buffer);
+            closureStats.add(stats);
+            System.err.println("step3: " + stats);
             buffer.flush();
         }
 
         // 4. RuleRdfs05 until fix point (rdfs:subPropertyOf closure).
         System.err.println("rdfs5: "
-                + fixedPoint(closureStats,new Rule[] { rdfs5 },buffer));
+                + Rule.fixedPoint(closureStats, new Rule[] { rdfs5 }, justify,
+                        focusStore, database, buffer));
 
         // 4a. Obtain: D,R,C,T.
         final Set<Long> D = getSubPropertiesOf(database, rdfsDomain.id);
@@ -845,9 +852,9 @@ public class InferenceEngine extends RDFSHelper {
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
         {
             Rule r = new RuleFastClosure5(this, D);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step5: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step5: " + stats);
             // Note: deferred buffer.flush() since the next step has no
             // dependency.
         }
@@ -855,9 +862,9 @@ public class InferenceEngine extends RDFSHelper {
         // 6. (?x, R, ?y ) -> (?x, rdfs:range, ?y)
         {
             Rule r = new RuleFastClosure6(this, R);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step6: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step6: " + stats);
             // Note: deferred buffer.flush() since the next step has no
             // dependency.
         }
@@ -865,29 +872,34 @@ public class InferenceEngine extends RDFSHelper {
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
         {
             Rule r = new RuleFastClosure7(this, C);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step7: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step7: " + stats);
             // Note: flush buffer before running rdfs11.
             buffer.flush();
         }
 
         // 8. RuleRdfs11 until fix point (rdfs:subClassOf closure).
         System.err.println("rdfs11: "
-                + fixedPoint(closureStats,new Rule[] { rdfs11 }, buffer));
+                + Rule.fixedPoint(closureStats, new Rule[] { rdfs11 }, justify,
+                        focusStore, database, buffer));
 
         // 9. (?x, T, ?y ) -> (?x, rdf:type, ?y)
         {
             Rule r = new RuleFastClosure9(this, T);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step9: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step9: " + stats);
             buffer.flush();
         }
 
         // 10. RuleRdfs02
-        System.err.println("rdfs2: "+rdfs2.apply(justify,buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs2.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs2: " + stats);
+            buffer.flush();
+        }
         
         /*
          * 11. special rule w/ 3-part antecedent.
@@ -897,15 +909,19 @@ public class InferenceEngine extends RDFSHelper {
          */
         {
             Rule r = new RuleFastClosure11(this);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step11: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step11: " + stats);
             buffer.flush();
         }
         
         // 12. RuleRdfs03
-        System.err.println("rdfs3: "+rdfs3.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs3.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs3: "+stats);
+            buffer.flush();
+        }
         
         /* 13. special rule w/ 3-part antecedent.
          * 
@@ -914,9 +930,9 @@ public class InferenceEngine extends RDFSHelper {
          */
         {
             Rule r = new RuleFastClosure13(this);
-            closureStats.add(r);
-            r.apply(justify, buffer);
-            System.err.println("step13: " + r.stats);
+            RuleStats stats = r.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("step13: " + stats);
             buffer.flush();
         }
         
@@ -929,39 +945,75 @@ public class InferenceEngine extends RDFSHelper {
              */
 
             // 14-15. RuleRdf04
-            System.err.println("rdfs4a: "+rdfs4a.apply(justify, buffer));
-            System.err.println("rdfs4b: "+rdfs4b.apply(justify, buffer));
+            {
+                RuleStats stats = rdfs4a.apply(justify, focusStore, database, buffer);
+                closureStats.add(stats);
+                System.err.println("rdfs4a: "+stats);
+            }
+            {
+                RuleStats stats = rdfs4b.apply(justify, focusStore, database, buffer);
+                closureStats.add(stats);
+                System.err.println("rdfs4b: "+stats);
+            }
             buffer.flush();
 
         }
 
         // 16. RuleRdf01
-        System.err.println("rdf1: "+rdf1.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdf1.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdf1: "+stats);
+            buffer.flush();
+        }
         
         // 17. RuleRdfs09
-        System.err.println("rdfs9: "+rdfs9.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs9.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs9: "+stats);
+            buffer.flush();
+        }
         
         // 18. RuleRdfs10
-        System.err.println("rdfs10: "+rdfs10.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs10.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs10: "+stats);
+            buffer.flush();
+        }
         
         // 19. RuleRdfs08.
-        System.err.println("rdfs8: "+rdfs8.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs8.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs8: "+stats);
+            buffer.flush();
+        }
 
         // 20. RuleRdfs13.
-        System.err.println("rdfs13: "+rdfs13.apply(justify, buffer));
-        buffer.flush();
-        
+        {
+            RuleStats stats = rdfs13.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs13: " + stats);
+            buffer.flush();
+        }
+
         // 21. RuleRdfs06.
-        System.err.println("rdfs6: "+rdfs6.apply(justify, buffer));
-        buffer.flush();
-        
+        {
+            RuleStats stats = rdfs6.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs6: " + stats);
+            buffer.flush();
+        }
+
         // 22. RuleRdfs07.
-        System.err.println("rdfs7: "+rdfs7.apply(justify, buffer));
-        buffer.flush();
+        {
+            RuleStats stats = rdfs7.apply(justify, focusStore, database, buffer);
+            closureStats.add(stats);
+            System.err.println("rdfs7: " + stats);
+            buffer.flush();
+        }
         
         /*
          * Done.
@@ -995,112 +1047,6 @@ public class InferenceEngine extends RDFSHelper {
         
         return closureStats;
         
-    }
-
-    /**
-     * Computes the fixed point for the {@link #database} using a specified rule
-     * set.
-     * <p>
-     * Note: The buffer will have been flushed when this method returns.
-     * 
-     * @param rules
-     *            The rules to be executed.
-     * 
-     * @param buffer
-     *            This is a buffer that is used to hold entailments so that we
-     *            can insert them into the indices of the backing database using
-     *            ordered insert operations (much faster than random inserts).
-     * 
-     * @return Some statistics about the fixed point computation.
-     */
-    public ClosureStats fixedPoint(ClosureStats closureStats, Rule[] rules,
-            SPOBuffer buffer) {
-        
-        final int nrules = rules.length;
-
-        final int firstStatementCount = database.getStatementCount();
-
-        final long begin = System.currentTimeMillis();
-
-        log.debug("Closing kb with " + firstStatementCount
-                + " statements");
-
-        int round = 0;
-
-        while (true) {
-
-            final int numEntailmentsBefore = buffer.getBackingStore().getStatementCount();
-            
-            for (int i = 0; i < nrules; i++) {
-
-                Rule rule = rules[i];
-
-                if(round==0) closureStats.add(rule);
-                
-                RuleStats ruleStats = rule.apply( justify, buffer );
-                
-                ruleStats.nrounds ++;
-                
-                if (DEBUG || true) {
-
-                    log.debug("round# " + round + ":" + ruleStats);
-                    
-                }
-                
-                closureStats.numComputed += ruleStats.numComputed;
-                
-                closureStats.elapsed += ruleStats.elapsed;
-                
-            }
-
-            // Flush the statements in the buffer 
-            buffer.flush();
-
-            final int numEntailmentsAfter = buffer.getBackingStore().getStatementCount();
-            
-            if ( numEntailmentsBefore == numEntailmentsAfter ) {
-                
-                // This is the fixed point.
-                break;
-                
-            }
-
-            if(INFO) {
-
-                log.info("round #"+round+"\n"+closureStats.toString());
-                
-            }
-
-            round++;
-            
-        }
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        final int lastStatementCount = database.getStatementCount();
-
-        if (INFO) {
-
-            log.info("\n"+closureStats.toString());
-
-            final int inferenceCount = lastStatementCount - firstStatementCount;
-            
-            log.info("\nComputed closure of "+rules.length+" rules in "
-                            + (round+1) + " rounds and "
-                            + elapsed
-                            + "ms yeilding "
-                            + lastStatementCount
-                            + " statements total, "
-                            + (inferenceCount)
-                            + " inferences"
-                            + ", entailmentsPerSec="
-                            + ((long) (((double) inferenceCount)
-                                    / ((double) elapsed) * 1000d)));
-
-        }
-
-        return closureStats;
-
     }
 
     /**

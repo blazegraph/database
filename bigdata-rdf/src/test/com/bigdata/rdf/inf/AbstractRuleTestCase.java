@@ -47,8 +47,9 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.inf.Rule.RuleStats;
+import com.bigdata.rdf.inf.Rule.State;
 import com.bigdata.rdf.spo.SPOBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -83,6 +84,9 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * 
      * @param expectedComputed
      *            The #of entailments that should be computed by the rule.
+     * 
+     * @todo setup to write entailments on the database and without using a
+     *       "focusStore".
      */
     protected RuleStats applyRule(InferenceEngine inf,Rule rule, int expectedComputed) {
         
@@ -94,20 +98,24 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         final int capacity = Math.max(expectedComputed, 1000);
         
-        SPOBuffer buffer = new SPOBuffer(rule.db,
+        AbstractTripleStore db = inf.database;
+        
+        SPOBuffer buffer = new SPOBuffer(db,
                 inf.doNotAddFilter/* filter */, capacity,
                 false/* distinct */, inf.justify);
         
         // dump the database on the console.
         System.err.println("database::");
-        rule.db.dumpStore();
+        db.dumpStore();
+        
+        State state = rule.newState(inf.justify, db, buffer);
         
         // apply the rule.
-        RuleStats stats = rule.apply(inf.justify,buffer);
+        rule.apply(state);
         
         // dump entailments on the console.
         System.err.println("entailments:: (may duplicate statements in the database)");
-        buffer.dump(rule.db/*used to resolve term identifiers*/);
+        buffer.dump(db/*used to resolve term identifiers*/);
 
         // flush entailments into the temporary store.
         buffer.flush();
@@ -117,11 +125,11 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
          */
         if(expectedComputed!=-1) {
 
-            assertEquals("numComputed",expectedComputed,stats.numComputed);
+            assertEquals("numComputed",expectedComputed,state.stats.numComputed);
             
         }
         
-        return stats;
+        return state.stats;
         
     }
     

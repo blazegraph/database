@@ -55,7 +55,6 @@ import java.util.Set;
 
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
@@ -100,36 +99,24 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         
     }
 
-    public RuleStats apply(boolean justify, SPOBuffer buffer) {
-        
-        return apply0( justify, buffer );
-        
-    }
-    
     /**
      * Recursively evaluate the subqueries.
      */
-    public RuleStats apply0( boolean justify, SPOBuffer buffer) {
+    final public void apply( State state ) {
         
         final long begin = System.currentTimeMillis();
 
-        resetBindings();
-
         if(subqueryElimination) {
 
-            apply2( 0, justify, buffer, EMPTY_SET);
+            apply2( 0, state, EMPTY_SET);
             
         } else {
             
-            apply1( 0, justify, buffer);
+            apply1( 0, state );
             
         }
-
-        assert checkBindings();
         
-        stats.elapsed += System.currentTimeMillis() - begin;
-        
-        return stats;
+        state.stats.elapsed += System.currentTimeMillis() - begin;
         
     }
     
@@ -145,7 +132,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      * 
      * @todo if(order[index]==focusIndex) {} else {}
      */
-    public void apply1(final int index, final boolean justify, SPOBuffer buffer) {
+    final private void apply1(final int index, State state) {
 
         assert index >= 0;
         assert index < body.length;
@@ -153,7 +140,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         /*
          * Subquery iterator.
          */
-        ISPOIterator itr = getAccessPath(order[index]).iterator();
+        ISPOIterator itr = state.getAccessPath(state.order[index]).iterator();
         
         try {
 
@@ -169,7 +156,8 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                     for (SPO stmt : chunk) {
 
                         if (DEBUG) {
-                            log.debug("Considering: " + stmt.toString(db)
+                            log.debug("Considering: "
+                                    + stmt.toString(state.database)
                                     + ", index=" + index + ", rule="
                                     + getName());
                         }
@@ -178,13 +166,13 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                          * Then bind this statement, which propagates bindings
                          * to the next predicate.
                          */
-                        clearDownstreamBindings(index + 1);
-                        bind(order[index], stmt);
-                        stats.nstmts[order[index]]++;
+                        state.clearDownstreamBindings(index + 1);
+                        state.bind(state.order[index], stmt);
+                        state.stats.nstmts[state.order[index]]++;
 
                         // run the subquery.
-                        apply1(index + 1, justify, buffer);
-                        stats.nsubqueries[order[index]]++;
+                        apply1(index + 1, state);
+                        state.stats.nsubqueries[state.order[index]]++;
 
                     }
 
@@ -195,17 +183,17 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                     for (SPO stmt : chunk) {
 
                         if (DEBUG) {
-                            log.debug("Considering: " + stmt.toString(db)
+                            log.debug("Considering: " + stmt.toString(state.database)
                                     + ", index=" + index + ", rule="
                                     + getName());
                         }
 
                         // bind this statement.
-                        bind(order[index], stmt);
-                        stats.nstmts[order[index]]++;
+                        state.bind(state.order[index], stmt);
+                        state.stats.nstmts[state.order[index]]++;
 
                         // emit entailment.
-                        emit(justify, buffer);
+                        state.emit();
 
                     }
 
@@ -232,7 +220,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      * 
      * @todo if(order[index]==focusIndex) {} else {}
      */
-    public void apply2(final int index, final boolean justify, SPOBuffer buffer, List<SPO> outerSet) {
+    final private void apply2(final int index, State state, List<SPO> outerSet) {
 
         assert index >= 0;
         assert index < body.length;
@@ -240,7 +228,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         // the sort order for chunks for this iterator (iff there is a subquery).
         KeyOrder keyOrder = (index + 1 == body.length //
                 ? null // no subquery
-                : getSortOrder(order[index], order[index + 1]) // subquery
+                : getSortOrder(state, state.order[index], state.order[index + 1]) // subquery
                 );
         
         /*
@@ -250,8 +238,13 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
          * inner subquery MUST match the order into which we sort each chunk of
          * statement delivered by the outer subquery in order for subquery
          * elimination to work.
+         *
+         * FIXME Choose either (new) (aka focalStore), or the database (iff
+         * focalStore is null), or (new+db) as appropriate for the source from
+         * which the subquery will read.
+         *
          */
-        ISPOIterator itr = getAccessPath(order[index]).iterator();
+        ISPOIterator itr = state.getAccessPath(state.order[index]).iterator();
         
         while(itr.hasNext()) {
 
@@ -276,14 +269,14 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                          * across the same subquery.
                          */
                         List<SPO> innerSet = getStatementsBindingSameSubquery(
-                                index, chunk, 0);
+                                state, index, chunk, 0);
                         
                         // the #of statement in that sequence.
                         final int n = innerSet.size();
                         
                         i += n;
                     
-                        stats.nstmts[order[index]] += n;
+                        state.stats.nstmts[state.order[index]] += n;
                         
                         /*
                          * Apply bindings for the 1st stmt (all statements in this
@@ -291,15 +284,15 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                          * subquery so it does not matter which one you use here).
                          */
     
-                        clearDownstreamBindings(index+1);
+                        state.clearDownstreamBindings(index+1);
 
-                        bind(order[index],innerSet.get(0));
+                        state.bind(state.order[index],innerSet.get(0));
                         
                         // run the subquery.
                         
-                        stats.nsubqueries[order[index]]++;
+                        state.stats.nsubqueries[state.order[index]]++;
     
-                        apply2(index+1,justify,buffer,innerSet);
+                        apply2(index+1,state,innerSet);
                         
                     } else {
                     
@@ -311,16 +304,16 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                          * the order[] of evaluation.
                          */
                         
-                        stats.nstmts[order[index]] ++;
+                        state.stats.nstmts[state.order[index]] ++;
                         
                         // Apply bindings for the the current statement.
-                        bind(order[index],chunk[i]);
+                        state.bind(state.order[index],chunk[i]);
                         
                         // run the subquery.
                         
-                        stats.nsubqueries[order[index]]++;
+                        state.stats.nsubqueries[state.order[index]]++;
     
-                        apply2(index+1,justify,buffer,EMPTY_SET);
+                        apply2(index+1,state,EMPTY_SET);
 
                         i++; // next in this chunk.
                         
@@ -335,22 +328,22 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                 for( SPO stmt : chunk ) {
                     
                     // bind this statement.
-                    bind(order[index],stmt);
+                    state.bind(state.order[index],stmt);
 
-                    stats.nstmts[order[index]]++;
+                    state.stats.nstmts[state.order[index]]++;
 
                     if(outerSet.isEmpty()) {
 
-                        emit(justify, buffer);
+                        state.emit();
 
                     } else {
 
                         for (SPO ostmt : outerSet) {
 
                             // bind the statement from the _outer_ query.
-                            bind(order[index-1],ostmt);
+                            state.bind(state.order[index-1],ostmt);
                         
-                            emit(justify, buffer);
+                            state.emit();
                         
                         }
 
@@ -383,7 +376,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      * @throws IndexOutOfBoundsException
      *             if either index is out of bounds.
      */
-    private KeyOrder getSortOrder(int outerIndex, int innerIndex) {
+    private KeyOrder getSortOrder(State state,int outerIndex, int innerIndex) {
     
         Set<Var> sharedVars = getSharedVars(outerIndex, innerIndex);
         
@@ -421,11 +414,17 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         // a fake constant.
         final long c = -1; 
         
-        long s = sharedVars.contains(body[innerIndex].s)?c:get(body[innerIndex].s);
-        long p = sharedVars.contains(body[innerIndex].p)?c:get(body[innerIndex].p);
-        long o = sharedVars.contains(body[innerIndex].o)?c:get(body[innerIndex].o);
+        long s = sharedVars.contains(body[innerIndex].s)?c:state.get(body[innerIndex].s);
+        long p = sharedVars.contains(body[innerIndex].p)?c:state.get(body[innerIndex].p);
+        long o = sharedVars.contains(body[innerIndex].o)?c:state.get(body[innerIndex].o);
 
-        IAccessPath accessPath = db.getAccessPath(s, p, o);
+        /*
+         * FIXME Choose either (new) (aka focalStore), or the database (iff
+         * focalStore is null), or (new+db) as appropriate for the source from
+         * which the subquery will read.
+         */
+        
+        IAccessPath accessPath = state.database.getAccessPath(s, p, o);
         
         KeyOrder keyOrder = accessPath.getKeyOrder(); 
         
@@ -447,10 +446,12 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      * @return The set of sequentially occurring {@link SPO}s in <i>chunk</i>
      *         that will impose the same bindings on the subquery.
      */
-    private List<SPO> getStatementsBindingSameSubquery(int index, SPO[] chunk,int i) {
+    private List<SPO> getStatementsBindingSameSubquery(State state, int index,
+            SPO[] chunk, int i) {
 
         // variables shared between the current predicate and the subquery.
-        Set<Var> sharedVars = getSharedVars(order[index], order[index+1]);
+        Set<Var> sharedVars = getSharedVars(state.order[index],
+                state.order[index + 1]);
 
         if(sharedVars.isEmpty()) {
             
@@ -464,7 +465,7 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         }
 
         // consider the inner predicate.
-        Pred inner = body[order[index+1]];
+        Pred inner = body[state.order[index+1]];
 
         // set of statements that result in the same subquery.
         List<SPO> ret = new LinkedList<SPO>();

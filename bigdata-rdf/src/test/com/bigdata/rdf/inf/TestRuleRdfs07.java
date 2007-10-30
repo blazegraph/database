@@ -50,7 +50,6 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.Rule.RuleStats;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 

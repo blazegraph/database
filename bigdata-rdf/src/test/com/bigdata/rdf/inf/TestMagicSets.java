@@ -54,7 +54,6 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 
@@ -160,15 +159,13 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         /**
          * Applies the base rule iff the {@link Magic} is matched.
          */
-        public RuleStats apply( boolean justify, SPOBuffer buffer) {
+        final public void apply( State state ) {
 
             if(match()) { 
             
-                return rule.apply( justify, buffer );
+                rule.apply( state );
             
             }
-            
-            return null;
             
         }
         
