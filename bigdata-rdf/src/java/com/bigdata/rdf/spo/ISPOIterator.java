@@ -48,7 +48,9 @@
 package com.bigdata.rdf.spo;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -62,32 +64,28 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public interface ISPOIterator extends Iterator<SPO> {
 
-//    /**
-//     * Reset the iterator. You can re-read the same statements after the
-//     * iterator has been reset.
-//     * 
-//     * @todo the purpose of this is to make the iterator reusable, especially
-//     *       when it is fully buffered. if we have rules that reuse the same
-//     *       iterator then reset() can drammatically reduce the cost of the
-//     *       rule. If we don't do this, then reset() is not worth the candle.
-//     *       <p>
-//     *       Note: if you reset() an iterator that is not fully buffered then
-//     *       this does not help performance particularly.
-//     * 
-//     * @todo If we guarentee that statements that have been deleted
-//     *       {@link Iterator#remove()} are NOT be present in a revisit then the
-//     *       iterator will be forced to hold a hash set of the deleted SPOs or
-//     *       set a flag on the SPO object.  In any case, this will limit scaling
-//     *       when 
-//     */
-//    public void reset();
+    public final long NULL = ITripleStore.NULL;
+    public final long N = ITripleStore.N;
     
     /**
      * Closes the iterator, releasing any associated resources. This method MAY
      * be invoked safely if the iterator is already closed.
+     * <p>
+     * Note: Implementations MUST NOT eagerly close the iterator when it is
+     * exhausted since that would make it impossible to remove the last visited
+     * statement. Instead they MUST wait for an explicit {@link #close()} by the
+     * application.
      */
     public void close();
 
+    /**
+     * The next {@link SPO} available from the iterator.
+     * 
+     * @throws NoSuchElementException
+     *             if the iterator is exhausted.
+     */
+    public SPO next();
+    
     /**
      * Return the next "chunk" of statements from the iterator. The statements
      * will be in the same order that they would be visited by
@@ -104,6 +102,9 @@ public interface ISPOIterator extends Iterator<SPO> {
      * @return The next chunk of statements.
      * 
      * @see #nextChunk(KeyOrder)
+     * 
+     * @throws NoSuchElementException
+     *             if the iterator is exhausted.
      */
     public SPO[] nextChunk();
 
@@ -120,6 +121,9 @@ public interface ISPOIterator extends Iterator<SPO> {
      *            The order for the statements in the chunk.
      * 
      * @return The next chunk of statements in the specified order.
+     * 
+     * @throws NoSuchElementException
+     *             if the iterator is exhausted.
      */
     public SPO[] nextChunk(KeyOrder keyOrder);
 

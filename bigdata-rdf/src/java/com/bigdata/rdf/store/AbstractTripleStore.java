@@ -85,6 +85,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IsolatableFusedView;
@@ -343,7 +344,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         return getTermIdIndex().rangeCount(fromKey,toKey);
         
     }
-    
+
     /**
      * The capacity of the {@link StatementBuffer} used when reading RDF data.
      * The default (1M) is good for the {@link LocalTripleStore}.
@@ -696,8 +697,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
 
         /**
-         * Note: Return an iterator that will use transparent read-ahead when
-         * the limit is non-zero.
+         * Note: Return an iterator that will use transparent read-ahead when no
+         * limit is specified (limit is zero) or the limit is "small".
          * 
          * @see SPOIterator
          */
@@ -1444,8 +1445,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             throw new IllegalArgumentException();
         
         // obtain a chunked iterator reading from any access path.
-        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(0/* limit */,
-                0/* capacity */);
+        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator();
         
         // add statements to the target store.
         return dst.addStatements(itr, filter);

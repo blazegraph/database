@@ -316,6 +316,8 @@ public class TaskATest
 
                 properties.setProperty(Options.JUSTIFY, "true");
 
+//                properties.setProperty(
+//                        Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "true");
                 properties.setProperty(
                         Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
 

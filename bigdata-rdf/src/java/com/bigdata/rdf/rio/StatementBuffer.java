@@ -70,7 +70,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -135,7 +134,24 @@ public class StatementBuffer {
         return numStmts;
         
     }
-    
+
+    /**
+     * Create a buffer that maintains only the distinct {@link Value}s and {@link Statement}s.
+     * 
+     * @param store
+     *            The database into which the terma and statements will be
+     *            inserted.
+     * @param capacity
+     *            The maximum #of Statements, URIs, Literals, or BNodes that the
+     *            buffer can hold. The minimum capacity is three (3) since that
+     *            corresponds to a single triple where all terms are URIs.
+     */
+    public StatementBuffer(ITripleStore store, int capacity) {
+        
+        this(store,capacity,true/*distinct*/);
+        
+    }
+
     /**
      * Create a buffer.
      * 

@@ -408,14 +408,11 @@ public class InferenceEngine extends RDFSHelper {
          * computed AND stored in the database. When false, rules that produce
          * those entailments are turned off such that they are neither computer
          * NOR stored and the backward chainer will generate the entailments at
-         * query time.
-         * 
-         * @todo implement backward chaining for this and change the default to
-         *       [false].
+         * query time. Default is <code>false</code>.
          */
         public static final String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
 
-        public static final String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "true";
+        public static final String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
 
         /**
          * @todo document and implement. if we only support this by backward
@@ -537,6 +534,20 @@ public class InferenceEngine extends RDFSHelper {
      */
     final protected boolean forwardChainRdfTypeRdfsResource;
 
+    /**
+     * Return true iff the {@link InferenceEngine} is configured to forward
+     * chain and store entailments of the form (x rdf:type rdfs:Resource). When
+     * this returns false, those entailments are not computed and are not
+     * stored.
+     * 
+     * @see Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE
+     */
+    public boolean getForwardChainRdfTypeRdfsResource() {
+        
+        return forwardChainRdfTypeRdfsResource;
+        
+    }
+    
     /**
      * Sets up the basic rule model for the inference engine.
      */
@@ -963,6 +974,8 @@ public class InferenceEngine extends RDFSHelper {
         final int inferenceCount = lastStatementCount - firstStatementCount;
         
         if(INFO) {
+                        
+            log.info("\n"+closureStats.toString());
 
             log.info("\nComputed closure in "
                             + elapsed
@@ -1003,10 +1016,6 @@ public class InferenceEngine extends RDFSHelper {
     public ClosureStats fixedPoint(ClosureStats closureStats, Rule[] rules,
             SPOBuffer buffer) {
         
-//        final long[] timePerRule = new long[rules.length];
-//        
-//        final int[] entailmentsPerRule = new int[rules.length];
-        
         final int nrules = rules.length;
 
         final int firstStatementCount = database.getStatementCount();
@@ -1026,26 +1035,11 @@ public class InferenceEngine extends RDFSHelper {
 
                 Rule rule = rules[i];
 
-//                RuleStats ruleStats = rule.stats;
-                
-//                if(round==0) ruleStats.reset();
-
-//                int nbefore = ruleStats.numComputed;
+                if(round==0) closureStats.add(rule);
                 
                 RuleStats ruleStats = rule.apply( justify, buffer );
                 
                 ruleStats.nrounds ++;
-                
-//                int nnew = ruleStats.numComputed - nbefore;
-//
-//                // #of statements examined by the rule.
-//                int nstmts = ruleStats.getStatementCount();
-//                
-//                long elapsed = ruleStats.elapsed;
-                
-//                timePerRule[i] += elapsed;
-                
-//                entailmentsPerRule[i] = ruleStats.numComputed; // Note: already a running sum.
                 
                 if (DEBUG || true) {
 
@@ -1070,35 +1064,12 @@ public class InferenceEngine extends RDFSHelper {
                 break;
                 
             }
-            
-//            /*
-//             * Transfer the entailments into the primary store so that derived
-//             * entailments may be computed.
-//             */
-//            final long insertStart = System.currentTimeMillis();
-
-//            final int numInserted = numEntailmentsAfter - numEntailmentsBefore;
-            
-//            final int numInserted = copyStatements(tmpStore,database);
-
-//            final long insertTime = System.currentTimeMillis() - insertStart;
-
-//            debug.append( numInserted ).append( " inserted in " );
-//            debug.append( insertTime ).append( " millis " );
 
             if(INFO) {
 
                 log.info("round #"+round+"\n"+closureStats.toString());
                 
             }
-            
-//            if (DEBUG) {
-//                StringBuilder sb = new StringBuilder();
-//                sb.append( "round #" ).append( round ).append( ": " );
-//                sb.append( closureStats.numComputed ).append( " computed in " );
-//                sb.append( closureStats.elapsed ).append( " millis, " );
-//                log.debug( sb.toString() );
-//            }
 
             round++;
             
@@ -1109,7 +1080,9 @@ public class InferenceEngine extends RDFSHelper {
         final int lastStatementCount = database.getStatementCount();
 
         if (INFO) {
-        
+
+            log.info("\n"+closureStats.toString());
+
             final int inferenceCount = lastStatementCount - firstStatementCount;
             
             log.info("\nComputed closure of "+rules.length+" rules in "

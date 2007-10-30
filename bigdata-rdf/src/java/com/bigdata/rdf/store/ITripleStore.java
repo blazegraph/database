@@ -368,10 +368,8 @@ public interface ITripleStore {
      * @return the RDF value or <code>null</code> if there is no term with
      *         that identifier in the index.
      * 
-     * FIXME Implementations should use an LRU cache so that we can improve
-     * performance when externalizing statements from an index scan. Also add
-     * getTerm(s,p,o) returning _Value[] to batch each statement lookup so that
-     * we do less RPCs in a distributed system.
+     * @todo Add getTerm(s,p,o) returning _Value[] to batch each statement
+     *       lookup so that we do less RPCs in a distributed system.
      */
     public _Value getTerm(long id);
 

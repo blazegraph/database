@@ -92,14 +92,6 @@ public class SPOIterator implements ISPOIterator {
     private final IAccessPath accessPath;
     
     /**
-     * The range count computed for the access path.
-     * <p>
-     * Note: The range count is generally an upper bound rather than an exact
-     * value.
-     */
-    private final int rangeCount;
-    
-    /**
      * The maximum #of statements to read from the index -or- ZERO (0) if all
      * statements will be read.
      */
@@ -142,7 +134,7 @@ public class SPOIterator implements ISPOIterator {
      * The executor service for the {@link Reader} (iff the {@link Reader} runs
      * asynchronously).
      */
-    private ExecutorService readService;
+    private final ExecutorService readService;
     
     /**
      * Set to true iff an asynchronous {@link Reader} is used AND there is
@@ -211,8 +203,14 @@ public class SPOIterator implements ISPOIterator {
             
         }
         
-        // Range count the index.
-        rangeCount = accessPath.rangeCount();
+        /*
+         * The range count computed for the access path.
+         * 
+         * Note: The range count is generally an upper bound rather than an
+         * exact value.
+         */
+
+        final int rangeCount = accessPath.rangeCount();
         
         if(capacity == 0) {
 
@@ -302,13 +300,18 @@ public class SPOIterator implements ISPOIterator {
     }
 
     /**
-     * Reads from the statement index, filling the buffer.
+     * Reads from the statement index, filling the {@link SPOIterator#buffer}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     private class Reader implements Callable<Object> {
 
+        /**
+         * Runs the {@link Reader}.
+         * 
+         * @return <code>null</code>.
+         */
         public Object call() throws Exception {
        
             while (src.hasNext()) {
@@ -352,7 +355,7 @@ public class SPOIterator implements ISPOIterator {
             return null;
             
         }
-               
+        
     }
     
     /**
@@ -362,6 +365,16 @@ public class SPOIterator implements ISPOIterator {
      * @return false if the buffer is still empty.
      */
     private boolean fillBuffer() {
+
+        assertOpen();
+        
+        if(readService!=null) {
+            
+            // This method MUST NOT be invoked when using the async reader.
+            
+            throw new AssertionError();
+            
+        }
         
         log.info("(Re-)filling buffer: remainingCapacity="
                 + buffer.remainingCapacity());
@@ -408,21 +421,46 @@ public class SPOIterator implements ISPOIterator {
     public boolean hasNext() {
         
         if(!open) return false;
-        
-        if (buffer.isEmpty() && !fillBuffer()) {
 
-            return false;
+        if(buffer.isEmpty()) {
+
+            /*
+             * The buffer is empty, but there may be more data available from
+             * the underlying iterator.
+             */
+            
+            if (readService != null) {
+            
+                // async reader - so wait on it.
+                
+                awaitReader();
+            
+            } else {
+                
+                // sync reader - so fill the buffer in this thread.
+                
+                fillBuffer();
+                
+            }
+        
+            if (buffer.isEmpty()) {
+
+                // the buffer is still empty, so the iterator is exhausted.
+                
+                return false;
+                
+            }
             
         }
 
+        // at least one SPO in the buffer.
+        
         return true;
         
     }
 
     public SPO next() {
 
-        assertOpen();
-        
         if (!hasNext()) {
 
             throw new NoSuchElementException();
@@ -455,10 +493,12 @@ public class SPOIterator implements ISPOIterator {
      * with this one.
      */
     public SPO[] nextChunk() {
-        
-        assertOpen();
 
-        awaitReader();
+        if (!hasNext()) {
+
+            throw new NoSuchElementException();
+
+        }
         
         // there are at least this many in the buffer.
         
@@ -498,21 +538,25 @@ public class SPOIterator implements ISPOIterator {
     }
     
     /**
-     * Await some data from the reader (returns immediately if we are not using
-     * an asynchronous reader). If there is some data available immediately,
-     * this will continue to wait until at least {@link #MIN_CHUNK_SIZE}
-     * statements are available from the {@link Reader} -or- until the reader
-     * signals that it is {@link #readerDone done}. This helps to keep up the
-     * chunk size and hence the efficiency of batch operations when we might
-     * otherwise get into a race with the {@link Reader}.
+     * Await some data from the {@link Reader}.
+     * <p>
+     * Note: If there is some data available this will continue to wait until at
+     * least {@link #MIN_CHUNK_SIZE} statements are available from the
+     * {@link Reader} -or- until the reader signals that it is
+     * {@link #readerDone done}. This helps to keep up the chunk size and hence
+     * the efficiency of batch operations when we might otherwise get into a
+     * race with the {@link Reader}.
      */
     private void awaitReader() {
         
         if( readService == null) {
             
-            // We are not using an asynchronous reader.
+            /*
+             * This method MUST NOT be invoked unless you are using the async
+             * reader.
+             */
             
-            return;
+            throw new AssertionError();
             
         }
 
@@ -563,6 +607,7 @@ public class SPOIterator implements ISPOIterator {
      * <p>
      * The one simple case is removal of the current statement, especially when
      * that statement has already been buffered.
+     * <p>
      * 
      * @throws UnsupportedOperationException
      */
@@ -591,7 +636,6 @@ public class SPOIterator implements ISPOIterator {
         if(readService!=null) {
             
             // immediate shutdown.
-            
             readService.shutdownNow();
             
             try {
@@ -603,8 +647,6 @@ public class SPOIterator implements ISPOIterator {
                 log.warn("Read service did not terminate: "+e);
                 
             }
-            
-            readService = null;
             
         }
         

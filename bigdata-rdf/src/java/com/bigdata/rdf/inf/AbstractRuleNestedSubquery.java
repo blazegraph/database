@@ -100,10 +100,18 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         
     }
 
+    public RuleStats apply(boolean justify, SPOBuffer buffer) {
+        
+        return apply0( justify, buffer );
+        
+    }
+    
     /**
      * Recursively evaluate the subqueries.
      */
     public RuleStats apply0( boolean justify, SPOBuffer buffer) {
+        
+        final long begin = System.currentTimeMillis();
 
         resetBindings();
 
@@ -118,6 +126,8 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         }
 
         assert checkBindings();
+        
+        stats.elapsed += System.currentTimeMillis() - begin;
         
         return stats;
         
@@ -145,58 +155,68 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
          */
         ISPOIterator itr = getAccessPath(order[index]).iterator();
         
-        while(itr.hasNext()) {
+        try {
 
-            // next chunk of statements.
-            SPO[] chunk = itr.nextChunk();
+            while (itr.hasNext()) {
 
-            if( index+1 < body.length ) {
-                
-                // nexted subquery.
+                // next chunk of statements.
+                SPO[] chunk = itr.nextChunk();
 
-                for(SPO stmt : chunk) {
+                if (index + 1 < body.length) {
 
-                    if (DEBUG) {
-                        log.debug("Considering: " + stmt.toString(db)
-                                + ", index=" + index + ", rule=" + getName());
+                    // nexted subquery.
+
+                    for (SPO stmt : chunk) {
+
+                        if (DEBUG) {
+                            log.debug("Considering: " + stmt.toString(db)
+                                    + ", index=" + index + ", rule="
+                                    + getName());
+                        }
+
+                        /*
+                         * Then bind this statement, which propagates bindings
+                         * to the next predicate.
+                         */
+                        clearDownstreamBindings(index + 1);
+                        bind(order[index], stmt);
+                        stats.nstmts[order[index]]++;
+
+                        // run the subquery.
+                        apply1(index + 1, justify, buffer);
+                        stats.nsubqueries[order[index]]++;
+
                     }
 
-                    /*
-                     * Then bind this statement, which propagates bindings to
-                     * the next predicate. 
-                     */
-                    clearDownstreamBindings(index+1);
-                    bind(order[index],stmt);
-                    stats.nstmts[order[index]] ++;                    
-                    
-                    // run the subquery.
-                    apply1(index+1,justify,buffer);
-                    stats.nsubqueries[order[index]]++;
+                } else {
 
-                }
-                
-            } else {
-                
-                // bottomed out.
-                
-                for( SPO stmt : chunk ) {
-                    
-                    if (DEBUG) {
-                        log.debug("Considering: " + stmt.toString(db)
-                                + ", index=" + index + ", rule=" + getName());
+                    // bottomed out.
+
+                    for (SPO stmt : chunk) {
+
+                        if (DEBUG) {
+                            log.debug("Considering: " + stmt.toString(db)
+                                    + ", index=" + index + ", rule="
+                                    + getName());
+                        }
+
+                        // bind this statement.
+                        bind(order[index], stmt);
+                        stats.nstmts[order[index]]++;
+
+                        // emit entailment.
+                        emit(justify, buffer);
+
                     }
 
-                    // bind this statement.
-                    bind(order[index],stmt);
-                    stats.nstmts[order[index]]++;
-
-                    // emit entailment.
-                    emit(justify, buffer);
-
                 }
-                
-            }
-            
+
+            } // while
+
+        } finally {
+
+            itr.close();
+
         }
 
     }
