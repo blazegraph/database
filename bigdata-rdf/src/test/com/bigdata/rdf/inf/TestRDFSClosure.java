@@ -135,6 +135,9 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         
         Properties properties = new Properties(getProperties());
 
+//        properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+        properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"false");
+        
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
         
@@ -145,6 +148,9 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
     public void testClosure01_fast() throws SailInitializationException, IOException, UpdateException {
         
         Properties properties = new Properties(getProperties());
+
+//      properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+        properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"false");
 
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
@@ -164,6 +170,9 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 
         Properties properties = new Properties(getProperties());
 
+//      properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+        properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"false");
+
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
@@ -175,6 +184,9 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
     public void testAlibaba_v41_fast() throws SailInitializationException, IOException, UpdateException {
 
         Properties properties = new Properties(getProperties());
+
+//      properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+        properties.setProperty(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"false");
 
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
@@ -234,7 +246,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 
             store.commit();
 
-            assertTrue(modelsEqual(groundTruth, store));
+            assertTrue(modelsEqual(groundTruth, inf));
             
         } finally {
             
@@ -270,84 +282,6 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         return repo;
         
     }
-    
-//    /**
-//     * Test of full forward closure.
-//     * 
-//     * @throws IOException
-//     * @throws UpdateException
-//     * @throws SailInitializationException
-//     * 
-//     * @todo make sure that all entailments are either being computed (including
-//     *       rdf:type rdfs:Resource) or handled by back-chaining.
-//     */
-//    public void testFullForwardClosure01() throws IOException, SailInitializationException, UpdateException {
-//
-//        AbstractTripleStore store = getStore();
-//
-//        try {
-//
-//            // @todo modify to load data into a temp store and then compute the
-//            // incremental closure.
-//
-//            store.loadData(resource, baseURL, RDFFormat.RDFXML,
-//                    true/* verifyData */, false/* commit */);
-//
-//            InferenceEngine inf = new InferenceEngine(store);
-//    
-//            inf.fullForwardClosure();
-//            
-//            store.commit();
-//
-//            assertTrue(modelsEqual(getGroundTruth(resource, baseURL,
-//                    RDFFormat.RDFXML), store));
-//            
-//        } finally {
-//        
-//            store.closeAndDelete();
-//            
-//        }
-//        
-//    }
-//
-//    /**
-//     * Test of fast forward closure.
-//     * 
-//     * @throws IOException
-//     * @throws UpdateException
-//     * @throws SailInitializationException
-//     * 
-//     * @todo make sure that all entailments are either being computed (including
-//     *       rdf:type rdfs:Resource) or handled by back-chaining.
-//     */
-//    public void testFastForwardClosure01() throws IOException, SailInitializationException, UpdateException {
-//
-//        AbstractTripleStore store = getStore();
-//        
-//        try {
-//            
-//            // @todo modify to load data into a temp store and then compute the
-//            // incremental closure.
-//            
-//            store.loadData(resource, baseURL, RDFFormat.RDFXML,
-//                    true/* verifyData */, false/* commit */);
-//
-//            InferenceEngine inf = new InferenceEngine(store);
-//    
-//            inf.fastForwardClosure();
-//            
-//            store.commit();
-//
-//            assertTrue(modelsEqual(getGroundTruth(resource, baseURL,
-//                    RDFFormat.RDFXML), store));
-//
-//        } finally {
-//        
-//            store.closeAndDelete();
-//            
-//        }
-//        
-//    }
 
     /**
      * Uploads an file into an {@link RdfRepository}.
@@ -395,10 +329,10 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * facilitate using {@link #modelsEqual(RdfRepository, RdfRepository)} for
      * ground truth testing.
      */
-    public boolean modelsEqual(RdfRepository expected,
-            AbstractTripleStore actual) throws SailInitializationException {
+    public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
+            throws SailInitializationException {
 
-        RdfRepository repo = new BigdataRdfRepository(actual);
+        RdfRepository repo = new BigdataRdfRepository(inf);
         
         Properties properties = new Properties(getProperties());
         

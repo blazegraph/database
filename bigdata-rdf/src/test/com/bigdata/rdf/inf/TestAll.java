@@ -106,18 +106,17 @@ public class TestAll extends TestCase {
 
         /*
          * @todo test suite for mapping a rule over new and (old+new) data.
-         * 
-         * @todo write test for fixPoint().
          */
 
+        // test suite for backward chaining of (?x rdf:type rdfs:Resource).
+        suite.addTestSuite( TestBackchainTypeResourceIterator.class );
+        
         // test suite for RDFS closure correctness.
         suite.addTestSuite( TestRDFSClosure.class );
-        
-        // @todo test suite for backward chaining of (?x rdf:type rdfs:Resource).
 
-        // @todo test suite for RDFS closure correctness with incremental load.
+        // @todo test suite for RDFS closure correctness with incremental load (TM)
 
-        // @todo test suite for RDFS closure correctness with incremental delete.
+        // @todo test suite for RDFS closure correctness with incremental delete (TM).
 
         // @todo test suite for backward chaining of (?x owl:sameAs ?y).
         

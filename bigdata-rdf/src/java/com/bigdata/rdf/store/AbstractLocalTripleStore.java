@@ -57,6 +57,7 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
@@ -254,6 +255,17 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      */
     final public _Value getTerm(long id) {
 
+        _Value value = null;
+        
+        value = termCache.get(id);
+        
+        if(value!=null) {
+//            System.err.print(".");
+            return value;
+        } else {
+//            System.err.print("x");
+        }
+        
         IIndex ndx = getIdTermIndex();
         
         final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
@@ -266,7 +278,9 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             
         }
 
-        _Value value = (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
+        value = (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
+        
+        termCache.put(id, value, false/*dirty*/);
         
         // @todo modify unit test to verify that these fields are being set.
 
@@ -277,7 +291,15 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         return value;
 
     }
-
+    
+    /**
+     * Recently resolved term identifers are cached to improve performance when
+     * externalizing statements.
+     * 
+     * FIXME backport to scale-out version.
+     */
+    protected LRUCache<Long, _Value> termCache = new LRUCache<Long, _Value>(10000);
+       
     /**
      * Note: Handles both unisolatable and isolatable indices.
      * <p>

@@ -1,10 +1,44 @@
-1. fast closure.
+x. Done. full closure.
+
+x. Done. fast closure (~ 2x faster, but depends on the data set).
+
+x. Done. Validation of the RDFS rules.
+
+x. rule refactor to support (new, new+old).
+
+   - collected baseline data on the workstation.
+
+   - refactored to use chunked ISPOIterator (rdfs5 and 11 rely on
+     materializing the subClassOf and subPropertyOf tuples
+     respectively for an in-memory self-join).
+
+   - refactored to use variable bindings declaratively.
+
+   - refactored to isolated the kinds of rules (nested subquery,
+     chained self-join, distinct term scan, special rules for fast
+     closure).
+
+   - fixed bug requiring the clearing of variables in downstream
+     predicates iff they were not bound by an upstream predicate.
+
+x. backward chain (x rdf:type rdfs:Resource)
+
+x. backward chain owl:sameAs entailments.
+
+   - also owl:equivilentProperty
+
+   - also owl:equivilentClass
 
 x. incremental closure of loaded documents w/o re-closing the entire store.
+
+   x support focus (new, new+db, db) - requires ITripleStore impl. that is a view.
 
    - run the metrics task for this.
 
 2. truth maintanence.  if ungrounded justification chains then filter during TM.
+
+x. revisit subquery elimination, but watch out for the variable
+   bindings and whether or not they need to be cleared.
 
 3. concurrent query against last committed state of store.
 
@@ -18,7 +52,15 @@ x. large scale tests (1+B triples, 2T+ data).
 	
 	- TM in the sail.
 
+X. Map/reduce demonstration for harvest/extract or re-extract using
+   local writes.  Consider chunking the partitions on the map server,
+   sorting each chunk in memory, and then doing a merge sort across
+   the chunks (or just a merge read) on the reduce server.
+
 Deferred:
+
+ - parallel subquery execution in rules (requires thread-safety for
+   SPOBuffer and the rule bindings).
 
  - lucene integration -or- free text search in bigdata.
 
@@ -26,12 +68,61 @@ Deferred:
  
    - inference does NOT cross graphs.
 
+   - sesame 2 integration.  will we need to evaluate joins in the
+     object model or can we evaluate them against the internal data
+     model (long[4]).
+
  - concurrent data load
+
+     x. metrics task; try variant without UUIDs to see the cost of
+     UUIDs in randomized index access.
  
  - full transaction support
+
+   x. modified group commit strategy for individual task abort.
+
+   x. may also require modified strategy to reopen the channel on interrupt.
+
+   x. transaction server for distributed transaction support.
  
  - Sesame 2.x integration.
   
  - scale-out version (recent changes broke some features).
  
    - distributed joins.
+
+ - refactor rule execution to an operator tree?  The rules only
+   support a limited data model, but they should be fine for SLD-magic
+   since that is only forward chaining.
+
+
+Note: justifications take longer than statements to write with 3
+statement indices.  We may get the next 3 statement indices nearly for
+free in terms of the latency of a write of statements + justifications
+on the store.
+
+Note: Rule parallelism in subqueries may significantly improve rule
+evaluation performance.
+
+Note: Some rules use non-scalable techniques (pulling all SPOs into
+core for a self-join) and will have to be rewritten in terms of
+subqueries.
+
+Note: When the parser is running we are single threaded.
+
+Note: When we run out of heap on the Thesaurus we are running the
+parser.  A smaller buffer might let this run to completion.
+
+@todo verify hyperthreading is off on dpp workstation and dpp servers.
+
+Note: I have seen the laptop thrash (pages/sec in perfmon > 100 and
+statement throughput drops to the floor).  The configuration was
+-server with JRockit 26.4 running TaskATest.  I am seeing a similar
+behavior (not quite as bad) on the workstation running the same thing
+with Sun JVM 1.5.0_07 -server -Mmx1G.  I am now re-running both with
+max memory of 500M (I also switch to the Sun JVM on the laptop) to see
+if Java using more memory than the system can provide without swap and
+thus entering into contention with the OS, e.g., for the disk cache.
+
+??? TaskATest is failing to load both wordnet files on the two orders.
+Check into this.

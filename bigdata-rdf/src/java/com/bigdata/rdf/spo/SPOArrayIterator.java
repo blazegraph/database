@@ -220,8 +220,6 @@ public class SPOArrayIterator implements ISPOIterator {
 
     public SPO next() {
         
-        assertOpen();
-
         if (!hasNext()) {
 
             throw new NoSuchElementException();
@@ -291,8 +289,7 @@ public class SPOArrayIterator implements ISPOIterator {
     }
 
     /**
-     * Returns the remaining statements and {@link #close() closes} the
-     * iterator.
+     * Returns the remaining statements.
      * 
      * @throws NoSuchElementException
      *             if {@link #hasNext()} returns false.
@@ -332,7 +329,9 @@ public class SPOArrayIterator implements ISPOIterator {
             
         }
         
-        close();
+        // indicate that all statements have been consumed.
+        
+        i = numStmts;
         
         return ret;
         
@@ -357,6 +356,10 @@ public class SPOArrayIterator implements ISPOIterator {
 
     }
     
+    /*
+     * Note: Do NOT eagerly close the iterator since the makes it impossible to
+     * implement {@link #remove()}.
+     */
     public void close() {
 
         if (!open) {

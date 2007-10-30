@@ -66,7 +66,7 @@ public class RDFSHelper {
      * The database that is the authority for the defined terms and term
      * identifiers.
      */
-    final protected AbstractTripleStore database;
+    final public AbstractTripleStore database;
     
     /*
      * Identifiers for well-known RDF values. 

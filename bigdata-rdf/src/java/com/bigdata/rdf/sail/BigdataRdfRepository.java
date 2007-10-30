@@ -69,6 +69,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.NamespaceIterator;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailChangedEvent;
@@ -94,6 +95,7 @@ import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
+import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
@@ -168,9 +170,34 @@ public class BigdataRdfRepository implements RdfRepository {
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger
-    ( BigdataRdfRepository.class
-      );
+    public static final Logger log = Logger
+            .getLogger(BigdataRdfRepository.class);
+
+    /**
+     * Additional parameters understood by the Sesame 1.x SAIL implementation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class Options extends com.bigdata.journal.Options {
+
+        /**
+         * This optional boolean property may be used to specify whether or not RDFS
+         * entailments are maintained by eager closure of the knowledge base
+         * (default false).
+         */
+        public static final String RDFS_CLOSURE = "rdfsClosure"; 
+
+        /**
+         * The property whose value is the name of the {@link ITripleStore} 
+         * implementation that will be instantiated.  An {@link InferenceEngine} 
+         * will be used to wrap that {@link ITripleStore}.
+         */
+        public static final String STORE_CLASS = "storeClass";
+        
+        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
+        
+    }
 
     /**
      * The equivilent of a null identifier for an internal RDF Value.
@@ -179,7 +206,7 @@ public class BigdataRdfRepository implements RdfRepository {
     
     protected OptimizedValueFactory valueFactory;
 
-    protected InferenceEngine inferenceEngine;
+    protected InferenceEngine inf;
     
     protected AbstractTripleStore database;
     
@@ -234,17 +261,117 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     /**
-     * Alternative constructor used to wrap an existing store - you MUST still
-     * invoke {@link #initialize(Map)}.
+     * Alternative constructor used to wrap an existing store and a
+     * pre-configured {@link InferenceEngine} - you MUST still invoke
+     * {@link #initialize(Map)}.
      * 
      * @param store
      */
-    public BigdataRdfRepository(AbstractTripleStore store) {
+    public BigdataRdfRepository(InferenceEngine inf) {
 
-        this.database = store;
+        this.database = inf.database;
+        
+        this.inf = inf;
         
     }
     
+    /**
+     * @param configParams
+     *            See {@link Options} for the persistence store options.
+     *            <p>
+     *            The optional boolean option "eagerClosure" may be used to turn
+     *            on a simple inference engine that will compute the eager
+     *            closure of data loaded into the store via either the SAIL
+     *            transaction mechanism or the batch load mechanism. The
+     *            selection of this option is NOT restart safe (it is not saved
+     *            in the store).
+     */
+    public void initialize(Map configParams) throws SailInitializationException {
+
+        properties = PropertyUtil.flatCopy(PropertyUtil.convert(configParams));
+
+        String val;
+
+        // rdfsClosure
+        {
+            val = properties.getProperty(Options.RDFS_CLOSURE);
+
+            if (val != null) {
+
+                rdfsClosure = Boolean.parseBoolean(val);
+
+            } else {
+
+                // No closure by default.
+                rdfsClosure = false;
+
+            }
+
+            log.info(Options.RDFS_CLOSURE + "=" + rdfsClosure);
+        }
+        
+        valueFactory = OptimizedValueFactory.INSTANCE;
+
+        if(database==null) {
+
+            /*
+             * Create/re-open the database.
+             */
+            
+            final AbstractTripleStore database;
+            
+            val = properties.getProperty(Options.STORE_CLASS,Options.DEFAULT_STORE_CLASS);
+
+            try {
+
+                Class storeClass = Class.forName(val);
+
+                if(!ITripleStore.class.isAssignableFrom(storeClass)) {
+                    
+                    throw new SailInitializationException("Must extend "
+                            + ITripleStore.class.getName() + " : "
+                            + storeClass.getName()); 
+                    
+                }
+                
+                Constructor ctor = storeClass.getConstructor(new Class[]{Properties.class});
+                
+                database = (AbstractTripleStore) ctor.newInstance(new Object[]{properties});
+
+            } catch(SailInitializationException ex) {
+                
+                throw ex;
+                
+            } catch(Throwable t) {
+                
+                throw new SailInitializationException(t);
+                
+            }
+            
+            // the database.
+            this.database = database;
+            
+            // inference engine used to maintain RDF(S) closure.
+            this.inf = new InferenceEngine(PropertyUtil
+                    .convert(configParams), database);
+                
+        }
+
+        // buffer used to optimize writes.
+        this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
+        
+    }
+    
+    public void shutDown() {
+
+        /*
+         * Note: This is an immediate shutdown.
+         */
+        
+        database.close();
+        
+    }
+
     //
     // SailChangedListener support.
     //
@@ -479,7 +606,7 @@ public class BigdataRdfRepository implements RdfRepository {
         
         if (rdfsClosure) {
 
-            inferenceEngine.computeClosure();
+            inf.computeClosure();
             
         }
         
@@ -590,7 +717,30 @@ public class BigdataRdfRepository implements RdfRepository {
                 
             } else {
                 
-                return new EmptyStatementIterator();
+                if (!inf.getForwardChainRdfTypeRdfsResource()) {
+
+                    /*
+                     * If the entailments for (x type resource) are not being
+                     * computed and stored then test to see if that is what the
+                     * caller is asking for.
+                     */
+                    
+                    if(p.equals(URIImpl.RDF_TYPE) && o.equals(URIImpl.RDFS_RESOURCE)) {
+                        
+                        return new SingleStatementIterator(s, URIImpl.RDF_TYPE,
+                                URIImpl.RDFS_RESOURCE);
+                        
+                    }
+                    
+                } else {
+                
+                    /*
+                     * Otherwise the statement is not in the database.
+                     */
+                    
+                    return new EmptyStatementIterator();
+                    
+                }
                 
             }
             
@@ -600,8 +750,27 @@ public class BigdataRdfRepository implements RdfRepository {
          * Choose the access path and encapsulate the resulting range iterator
          * as a sesame statement iterator.
          */
-        return new MyStatementIterator(database.getAccessPath(_s, _p, _o)
-                .iterator());
+        
+        ISPOIterator src = database.getAccessPath(_s, _p, _o).iterator();
+        
+        if(!inf.getForwardChainRdfTypeRdfsResource()) {
+            
+            /*
+             * Since the inference engine is not computing and storing (x type
+             * resource) we need to backchain it now.
+             */
+            
+            src = new BackchainTypeResourceIterator(
+                    src,// the source iterator.
+                    _s, _p, _o, // the triple pattern.
+                    database,// the database
+                    inf.rdfType.id,//
+                    inf.rdfsResource.id//
+                    );
+            
+        }
+        
+        return new MyStatementIterator(src);
         
     }
     
@@ -637,10 +806,6 @@ public class BigdataRdfRepository implements RdfRepository {
             
             /*
              * resolve the term identifiers to the terms.
-             * 
-             * FIXME use batch term resolution and cache recently used terms,
-             * especially on the primary index dimension, so that we do less
-             * lookup during traversal.
              */
             
             return new _Statement( //
@@ -653,14 +818,12 @@ public class BigdataRdfRepository implements RdfRepository {
         
         public void close() {
             
-            // Note: Just facilitates GC.
-            
-            src = null;
+            src.close();
             
         }
 
     }
-
+    
     public ValueFactory getValueFactory() {
         
         return valueFactory;
@@ -1167,129 +1330,6 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     /**
-     * Additional parameters understood by the Sesame 1.x SAIL implementation.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class Options extends com.bigdata.journal.Options {
-
-        /**
-         * This optional boolean property may be used to specify whether or not RDFS
-         * entailments are maintained by eager closure of the knowledge base
-         * (default false).
-         */
-        public static final String RDFS_CLOSURE = "rdfsClosure"; 
-
-        /**
-         * The property whose value is the name of the {@link ITripleStore} 
-         * implementation that will be instantiated.  An {@link InferenceEngine} 
-         * will be used to wrap that {@link ITripleStore}.
-         */
-        public static final String STORE_CLASS = "storeClass";
-        
-        public static final String DEFAULT_STORE_CLASS = LocalTripleStore.class.getName();
-        
-    }
-
-    /**
-     * @param configParams
-     *            See {@link Options} for the persistence store options.
-     *            <p>
-     *            The optional boolean option "eagerClosure" may be used to turn
-     *            on a simple inference engine that will compute the eager
-     *            closure of data loaded into the store via either the SAIL
-     *            transaction mechanism or the batch load mechanism. The
-     *            selection of this option is NOT restart safe (it is not saved
-     *            in the store).
-     */
-    public void initialize(Map configParams) throws SailInitializationException {
-
-        properties = PropertyUtil.flatCopy(PropertyUtil.convert(configParams));
-
-        String val;
-
-        // rdfsClosure
-        {
-            val = properties.getProperty(Options.RDFS_CLOSURE);
-
-            if (val != null) {
-
-                rdfsClosure = Boolean.parseBoolean(val);
-
-            } else {
-
-                // No closure by default.
-                rdfsClosure = false;
-
-            }
-
-            log.info(Options.RDFS_CLOSURE + "=" + rdfsClosure);
-        }
-        
-        valueFactory = OptimizedValueFactory.INSTANCE;
-
-        if(database==null) {
-
-            /*
-             * Create/re-open the database.
-             */
-            
-            final AbstractTripleStore database;
-            
-            val = properties.getProperty(Options.STORE_CLASS,Options.DEFAULT_STORE_CLASS);
-
-            try {
-
-                Class storeClass = Class.forName(val);
-
-                if(!ITripleStore.class.isAssignableFrom(storeClass)) {
-                    
-                    throw new SailInitializationException("Must extend "
-                            + ITripleStore.class.getName() + " : "
-                            + storeClass.getName()); 
-                    
-                }
-                
-                Constructor ctor = storeClass.getConstructor(new Class[]{Properties.class});
-                
-                database = (AbstractTripleStore) ctor.newInstance(new Object[]{properties});
-
-            } catch(SailInitializationException ex) {
-                
-                throw ex;
-                
-            } catch(Throwable t) {
-                
-                throw new SailInitializationException(t);
-                
-            }
-            
-            // the database.
-            this.database = database;
-            
-        }
-
-        // buffer used to optimize writes.
-        this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
-        
-        // inference engine used to maintain RDF(S) closure.
-        this.inferenceEngine = new InferenceEngine(PropertyUtil
-                .convert(configParams), database);
-            
-    }
-    
-    public void shutDown() {
-
-        /*
-         * Note: This is an immediate shutdown.
-         */
-        
-        database.close();
-        
-    }
-
-    /**
      * Computes the closure of the triple store for RDFS entailments.
      * <p>
      * This computes the full forward closure of the store and then commits the
@@ -1305,7 +1345,7 @@ public class BigdataRdfRepository implements RdfRepository {
         
         flushBuffer();
         
-        inferenceEngine.computeClosure();
+        inf.computeClosure();
         
         database.commit();
                 
