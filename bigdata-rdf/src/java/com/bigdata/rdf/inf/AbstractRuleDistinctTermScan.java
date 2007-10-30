@@ -49,7 +49,6 @@ package com.bigdata.rdf.inf;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
@@ -138,23 +137,27 @@ abstract public class AbstractRuleDistinctTermScan extends AbstractRuleRdf {
 
     }
 
-    public RuleStats apply(final boolean justify, final SPOBuffer buffer) {
+    final public void apply(State state) {
 
         final long computeStart = System.currentTimeMillis();
 
-        resetBindings();
-
         /*
          * find the distinct predicates in the KB (efficient op).
+         * 
+         * FIXME verify that this only runs against the focusGroup when the
+         * focusGroup is specified rather than against the datbase or the fused
+         * view of the focusGroup and the database.
          */
         
-        IAccessPath accessPath = db.getAccessPath(keyOrder);
+        IAccessPath accessPath = state.focusStore == null ? state.database
+                .getAccessPath(keyOrder) : state.focusStore
+                .getAccessPath(keyOrder);
         
         Iterator<Long> itr = accessPath.distinctTermScan();
 
         while (itr.hasNext()) {
 
-            stats.nstmts[0]++;
+            state.stats.nstmts[0]++;
 
             // a distinct term identifier for the selected access path.
             final long id = itr.next();
@@ -167,17 +170,13 @@ abstract public class AbstractRuleDistinctTermScan extends AbstractRuleRdf {
              * variables.
              */
 
-            set(h, id );
+            state.set(h, id );
 
-            emit(justify,buffer);
+            state.emit();
 
         }
-
-        assert checkBindings();
         
-        stats.elapsed += System.currentTimeMillis() - computeStart;
-
-        return stats;
+        state.stats.elapsed += System.currentTimeMillis() - computeStart;
 
     }
 

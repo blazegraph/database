@@ -43,7 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.spo.SPOBuffer;
 
 
 /**
@@ -76,17 +75,4 @@ public class RuleRdfs03 extends AbstractRuleRdfs_2_3_7_9 {
 
     }
     
-    // @todo remove - just a debug point.
-    public RuleStats apply(boolean justify, SPOBuffer buffer) {
-        
-        return super.apply(justify,buffer);
-        
-    }
-    
-//    protected SPO buildStmt3( SPO stmt1, SPO stmt2 ) {
-//        
-//        return new SPO( stmt2.o, inf.rdfType.id, stmt1.o, StatementEnum.Inferred );
-//        
-//    }
-
 }

@@ -52,6 +52,7 @@ import java.util.Set;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.inf.Rule.State;
 import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
@@ -115,50 +116,53 @@ public class TestRule extends AbstractRuleTestCase {
             
             Rule r = new MyRule(store, head, body);
 
+            State s = r.newState(false/* justify */, store, new SPOBuffer(
+                    store, false/* justify */));
+            
             // write out the rule on the console.
             System.err.println(r.toString());
 
             // check bindings -- should be Ok.
-            assertTrue(r.checkBindings());
+            assertTrue(s.checkBindings());
             
             // verify body[0] is not fully bound.
-            assertFalse(r.isFullyBound(0));
+            assertFalse(s.isFullyBound(0));
             
             // verify you can overwrite a variable in the tail.
-            r.set(u, 1);
-            assertTrue(r.checkBindings()); // no complaints.
-            assertTrue(r.isFullyBound(0)); // is fully bound.
-            r.resetBindings(); // restore the bindings.
-            assertTrue(r.checkBindings()); // verify no complaints.
-            assertFalse(r.isFullyBound(0)); // no longer fully bound.
+            s.set(u, 1);
+            assertTrue(s.checkBindings()); // no complaints.
+            assertTrue(s.isFullyBound(0)); // is fully bound.
+            s.resetBindings(); // restore the bindings.
+            assertTrue(s.checkBindings()); // verify no complaints.
+            assertFalse(s.isFullyBound(0)); // no longer fully bound.
 
             /*
              * verify no binding for u.
              */
-            assertEquals(NULL,r.get(u));
-            assertEquals(NULL,r.get(Rule.var("u")));
+            assertEquals(NULL,s.get(u));
+            assertEquals(NULL,s.get(Rule.var("u")));
             
             try {
-                r.get(Rule.var("v"));
+                s.get(Rule.var("v"));
                 fail("Expecting: "+IllegalArgumentException.class);
             } catch(IllegalArgumentException ex) {
                 log.info("Ignoring expected exception: "+ex);
             }
             
             // set a binding and check things out.
-            r.resetBindings(); // clean slate.
-            assertEquals(NULL,r.get(u)); // no binding.
-            assertEquals(NULL,r.get(Rule.var("u"))); // no binding.
-            r.set(u, vocab.rdfsClass.id);
-            assertTrue(r.checkBindings()); // verify we did not overwrite constants.
+            s.resetBindings(); // clean slate.
+            assertEquals(NULL,s.get(u)); // no binding.
+            assertEquals(NULL,s.get(Rule.var("u"))); // no binding.
+            s.set(u, vocab.rdfsClass.id);
+            assertTrue(s.checkBindings()); // verify we did not overwrite constants.
             // write on the console.
-            System.err.println(r.toString(true));
+            System.err.println(s.toString(true));
             // verify [u] is now bound.
-            assertEquals(vocab.rdfsClass.id,r.get(u));
-            assertEquals(vocab.rdfsClass.id,r.get(Rule.var("u")));
+            assertEquals(vocab.rdfsClass.id,s.get(u));
+            assertEquals(vocab.rdfsClass.id,s.get(Rule.var("u")));
             // verify [u] is now bound.
-            assertEquals(vocab.rdfsClass.id,r.get(u));
-            assertEquals(vocab.rdfsClass.id,r.get(Rule.var("u")));
+            assertEquals(vocab.rdfsClass.id,s.get(u));
+            assertEquals(vocab.rdfsClass.id,s.get(Rule.var("u")));
             
         } finally {
             
@@ -206,11 +210,13 @@ public class TestRule extends AbstractRuleTestCase {
 
             Rule r = new MyRulePattern1(new RDFSHelper(store));
 
+            State s = r.newState(false/*justify*/, store, new SPOBuffer(store,false/*justify*/));
+            
             // (u rdfs:subClassOf x)
-            assertEquals(KeyOrder.POS,r.getAccessPath(0).getKeyOrder());
+            assertEquals(KeyOrder.POS,s.getAccessPath(0).getKeyOrder());
 
             // (v rdfs:subClassOf u)
-            assertEquals(KeyOrder.POS,r.getAccessPath(1).getKeyOrder());
+            assertEquals(KeyOrder.POS,s.getAccessPath(1).getKeyOrder());
             
         } finally {
             
@@ -247,6 +253,11 @@ public class TestRule extends AbstractRuleTestCase {
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
             Rule r = new MyRulePattern1(vocab);
 
+            // generate justifications for entailments.
+            final boolean justify = true;
+            
+            State s = r.newState(justify, store, new SPOBuffer(store,justify));
+           
             /*
              * Obtain the access paths corresponding to each predicate in the
              * body of the rule. Each access path is parameterized by the triple
@@ -262,7 +273,7 @@ public class TestRule extends AbstractRuleTestCase {
              */
             for (int i = 0; i < r.body.length; i++) {
 
-                assertEquals(0, r.getAccessPath(i).rangeCount());
+                assertEquals(0, s.getAccessPath(i).rangeCount());
 
             }
             
@@ -286,10 +297,10 @@ public class TestRule extends AbstractRuleTestCase {
             assertEquals(3,store.getStatementCount());
             
             // (u rdf:subClassOf x)
-            assertEquals(1,r.getAccessPath(0).rangeCount());
+            assertEquals(1,s.getAccessPath(0).rangeCount());
 
             // (v rdf:type u)
-            assertEquals(2,r.getAccessPath(1).rangeCount());
+            assertEquals(2,s.getAccessPath(1).rangeCount());
 
             /*
              * Now use the more selective of the two 1-bound triple patterns to
@@ -297,7 +308,7 @@ public class TestRule extends AbstractRuleTestCase {
              */
 
             // (u rdf:subClassOf x)
-            assertEquals(0,r.getMostSelectiveAccessPathByRangeCount());
+            assertEquals(0,s.getMostSelectiveAccessPathByRangeCount());
             
             /*
              * bind variables for (u rdf:subClassOf x) to known values from the
@@ -305,39 +316,33 @@ public class TestRule extends AbstractRuleTestCase {
              */
             
             assertNotSame(NULL,store.getTermId(U1));
-            r.set(Rule.var("u"), store.getTermId(U1));
+            s.set(Rule.var("u"), store.getTermId(U1));
             
             assertNotSame(NULL,store.getTermId(X1));
-            r.set(Rule.var("x"), store.getTermId(X1));
+            s.set(Rule.var("x"), store.getTermId(X1));
             
-            assertTrue(r.isFullyBound(0));
+            assertTrue(s.isFullyBound(0));
             
             // (v rdf:type u)
-            assertEquals(1,r.getMostSelectiveAccessPathByRangeCount());
+            assertEquals(1,s.getMostSelectiveAccessPathByRangeCount());
 
             // bind the last variable.
             assertNotSame(NULL,store.getTermId(V1));
-            r.set(Rule.var("v"), store.getTermId(V1));
+            s.set(Rule.var("v"), store.getTermId(V1));
 
-            assertTrue(r.isFullyBound(1));
+            assertTrue(s.isFullyBound(1));
 
             // verify no access path is recommended since the rule is fully bound.
-            assertEquals(-1,r.getMostSelectiveAccessPathByRangeCount());
+            assertEquals(-1,s.getMostSelectiveAccessPathByRangeCount());
 
-            // generate justifications for entailments.
-            boolean justify = true;
-            
-            SPOBuffer buffer2 = new SPOBuffer(store, null/* filter */,
-                    1/* capacity */, false/* distinct */, justify/* justified */);
-            
             // emit the entailment
-            r.emit(justify,buffer2);
+            s.emit();
             
-            assertEquals(1,buffer2.size());
-            assertEquals(justify?1:0,buffer2.getJustificationCount());
+            assertEquals(1,s.buffer.size());
+            assertEquals(justify?1:0,s.buffer.getJustificationCount());
             
             // verify bindings on the emitted entailment.
-            SPO entailment = buffer2.get(0);
+            SPO entailment = s.buffer.get(0);
             assertEquals(entailment.s,store.getTermId(V1));
             assertEquals(entailment.p,store.getTermId(URIImpl.RDF_TYPE));
             assertEquals(entailment.o,store.getTermId(X1));
@@ -364,9 +369,7 @@ public class TestRule extends AbstractRuleTestCase {
 
         }
 
-        public RuleStats apply(boolean justify, SPOBuffer buffer) {
-
-            return null;
+        public void apply(State state) {
             
         }
 
@@ -393,10 +396,10 @@ public class TestRule extends AbstractRuleTestCase {
                     });
         }
 
-        public RuleStats apply(boolean justify, SPOBuffer buffer) {
-
-            return null;
+        public void apply(State state) {
             
         }
+
     }
+
 }

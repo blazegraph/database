@@ -43,11 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.util.Arrays;
-
-import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**

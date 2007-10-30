@@ -54,7 +54,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -125,11 +124,14 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
 
     }
 
-    public RuleStats apply( final boolean justify, SPOBuffer buffer) {
+    /**
+     * FIXME This needs to run as a nested query in order to work with a
+     * focusStore. We can only use the self join when we are just closing the
+     * database by itself.
+     */
+    final public void apply( State state ) {
         
         final long computeStart = System.currentTimeMillis();
-        
-        resetBindings();
         
         /*
          * Query for the 1st part of the rule.
@@ -155,7 +157,7 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
         
         final int capacity = 1 * Bytes.megabyte32;
         
-        ISPOIterator itr = db.getAccessPath(NULL, C.id, NULL).iterator(
+        ISPOIterator itr = state.database.getAccessPath(NULL, C.id, NULL).iterator(
                 0/* limit */, capacity);
 
         try {
@@ -175,7 +177,7 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
 
                 }
 
-                stats.nstmts[0] += stmts1.length;
+                state.stats.nstmts[0] += stmts1.length;
 
                 if (nchunks == 0 && !itr.hasNext()) {
 
@@ -188,7 +190,9 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
                      * subqueries.
                      */
 
-                    return fullyBufferedSelfJoin(justify, buffer, stmts1);
+                    fullyBufferedSelfJoin(state, stmts1);
+                    
+                    return;
 
                 }
 
@@ -213,12 +217,10 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
 
         }
         
-        assert checkBindings();
+        assert state.checkBindings();
         
-        stats.elapsed += System.currentTimeMillis() - computeStart;
+        state.stats.elapsed += System.currentTimeMillis() - computeStart;
 
-        return stats;
-        
     }
 
     /**
@@ -229,7 +231,7 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
      * @param stmts1
      * @return
      */
-    private RuleStats fullyBufferedSelfJoin(boolean justify, SPOBuffer buffer, SPO[] stmts1) {
+    private void fullyBufferedSelfJoin(State state, SPO[] stmts1) {
         
         // in SPO order.
         Arrays.sort(stmts1,SPOComparator.INSTANCE);
@@ -271,19 +273,17 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
 
                 if (left.o != right.s) break;
 
-                set(u,left.s);
+                state.set(u,left.s);
 
-                set(v,left.o);
+                state.set(v,left.o);
                 
-                set(x,right.o);
+                state.set(x,right.o);
                 
-                emit(justify,buffer);
+                state.emit();
                 
             }
 
         }
-
-        return stats;
         
     }
 
