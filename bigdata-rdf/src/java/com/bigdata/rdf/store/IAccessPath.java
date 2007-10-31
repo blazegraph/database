@@ -69,14 +69,14 @@ public interface IAccessPath {
     /**
      * The triple pattern (s, p, o).
      * <p>
-     * Note: A value of {@link ITripleStore#NULL} indicates a wildcard.
+     * Note: A value of {@link IRawTripleStore#NULL} indicates a wildcard.
      */
     public long[] getTriplePattern();
     
     /**
      * The index that is the most efficient for the triple pattern.
      */
-    public IIndex getIndex();
+    public IIndex getStatementIndex();
 
     /**
      * Identifies the statement index that was choosen and hence the natural
@@ -84,6 +84,14 @@ public interface IAccessPath {
      */
     public KeyOrder getKeyOrder();
 
+    /**
+     * True iff the access path is empty (there are no matches for the triple
+     * pattern). This is more conclusive than {@link #rangeCount()} since you
+     * MAY have a non-zero range count when the key range is in fact empty
+     * (there may be "deleted" index entries within the key range).
+     */
+    public boolean isEmpty();
+    
     /**
      * The maximum #of statements that could be returned for the specified
      * triple pattern.

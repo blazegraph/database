@@ -65,11 +65,9 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.NamespaceIterator;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailChangedEvent;
@@ -93,21 +91,19 @@ import org.openrdf.sesame.sail.query.ValueExpr;
 import org.openrdf.sesame.sail.query.Var;
 import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
-import org.openrdf.sesame.sail.util.SingleStatementIterator;
 
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
-import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 
 /**
  * A Sesame 1.x SAIL integration.
@@ -202,7 +198,7 @@ public class BigdataRdfRepository implements RdfRepository {
     /**
      * The equivilent of a null identifier for an internal RDF Value.
      */
-    protected static final long NULL = ITripleStore.NULL;
+    protected static final long NULL = IRawTripleStore.NULL;
     
     protected OptimizedValueFactory valueFactory;
 
@@ -661,108 +657,29 @@ public class BigdataRdfRepository implements RdfRepository {
     public StatementIterator getStatements(Resource s, URI p, Value o) {
 
         flushBuffer();
-        
-        /*
-         * convert other Value object types to our object types.
-         */
-        if (s != null)
-            s = (Resource) valueFactory.toNativeValue(s);
 
-        if (p != null)
-            p = (URI) valueFactory.toNativeValue(p);
+        IAccessPath accessPath = database.getAccessPath(s, p, o);
 
-        if (o != null)
-            o = (Value) valueFactory.toNativeValue(o);
-        
-        /*
-         * convert our object types to internal identifiers.
-         */
-        long _s, _p, _o;
-
-        _s = (s == null ? NULL : database.getTermId(s));
-        _p = (p == null ? NULL : database.getTermId(p));
-        _o = (o == null ? NULL : database.getTermId(o));
-
-        /*
-         * If a value was specified and it is not in the terms index then the
-         * statement can not exist in the KB.
-         */
-        if (_s == NULL && s != null) {
-
-            return new EmptyStatementIterator();
-            
-        }
-        
-        if (_p == NULL && p != null) {
-        
-            return new EmptyStatementIterator();
-            
-        }
-        
-        if (_o == NULL && o != null) {
+        if(accessPath instanceof EmptyAccessPath) {
             
             return new EmptyStatementIterator();
             
         }
         
-        /*
-         * if all bound, then a slight optimization.
-         */
-        if (_s != NULL && _p != NULL && _o != NULL) {
-
-            if (database.getSPOIndex().contains(
-                    database.getKeyBuilder().statement2Key(_s, _p, _o))) {
-                
-                return new SingleStatementIterator(s,p,o);
-                
-            } else {
-                
-                if (!inf.getForwardChainRdfTypeRdfsResource()) {
-
-                    /*
-                     * If the entailments for (x type resource) are not being
-                     * computed and stored then test to see if that is what the
-                     * caller is asking for.
-                     */
-                    
-                    if(p.equals(URIImpl.RDF_TYPE) && o.equals(URIImpl.RDFS_RESOURCE)) {
-                        
-                        return new SingleStatementIterator(s, URIImpl.RDF_TYPE,
-                                URIImpl.RDFS_RESOURCE);
-                        
-                    }
-                    
-                } else {
-                
-                    /*
-                     * Otherwise the statement is not in the database.
-                     */
-                    
-                    return new EmptyStatementIterator();
-                    
-                }
-                
-            }
-            
-        }
+        ISPOIterator src = accessPath.iterator();
         
-        /*
-         * Choose the access path and encapsulate the resulting range iterator
-         * as a sesame statement iterator.
-         */
-        
-        ISPOIterator src = database.getAccessPath(_s, _p, _o).iterator();
-        
-        if(!inf.getForwardChainRdfTypeRdfsResource()) {
+        if(isRdfsClosure() && !inf.getForwardChainRdfTypeRdfsResource()) {
             
             /*
              * Since the inference engine is not computing and storing (x type
              * resource) we need to backchain it now.
              */
             
+            long[] ids = accessPath.getTriplePattern();
+            
             src = new BackchainTypeResourceIterator(
                     src,// the source iterator.
-                    _s, _p, _o, // the triple pattern.
+                    ids[0], ids[1], ids[2], // the triple pattern.
                     database,// the database
                     inf.rdfType.id,//
                     inf.rdfsResource.id//
@@ -770,60 +687,10 @@ public class BigdataRdfRepository implements RdfRepository {
             
         }
         
-        return new MyStatementIterator(src);
+        return database.asStatementIterator(src);
         
     }
-    
-    /**
-     * Wraps the raw iterator that traverses a statement index and exposes each
-     * visited statement as a {@link Statement} object.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class MyStatementIterator implements StatementIterator {
-
-        private ISPOIterator src;
         
-        public MyStatementIterator(ISPOIterator src) {
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            this.src = src;
-
-        }
-        
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        public Statement next() {
-
-            SPO spo = src.next();
-            
-            /*
-             * resolve the term identifiers to the terms.
-             */
-            
-            return new _Statement( //
-                    (_Resource) database.getTerm(spo.s),//
-                    (_URI) database.getTerm(spo.p), //
-                    (_Value) database.getTerm(spo.o), //
-                    spo.type);
-            
-        }
-        
-        public void close() {
-            
-            src.close();
-            
-        }
-
-    }
-    
     public ValueFactory getValueFactory() {
         
         return valueFactory;
@@ -834,16 +701,7 @@ public class BigdataRdfRepository implements RdfRepository {
 
         flushBuffer();
         
-        if (s != null)
-            s = (Resource) valueFactory.toNativeValue(s);
-
-        if (p != null)
-            p = (URI) valueFactory.toNativeValue(p);
-
-        if (o != null)
-            o = (Value) valueFactory.toNativeValue(o);
-        
-        return database.containsStatement(s, p, o);
+        return database.hasStatement(s, p, o);
         
     }
 
@@ -1340,6 +1198,8 @@ public class BigdataRdfRepository implements RdfRepository {
      * <p>
      * This method lies outside of the SAIL and does not rely on the SAIL
      * "transaction" mechanisms.
+     * 
+     * @deprecated by support for incremental closure.
      */
     public void fullForwardClosure() {
         

@@ -119,7 +119,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                         public void handleStatement(Resource s, URI p,
                                 Value o) throws StatementHandlerException {
                             
-                            if(!db.containsStatement(s, p, o)) {
+                            if(!db.hasStatement(s, p, o)) {
                                 
                                 System.err.println("Could not find: ("+s+", "+p+", "+o+")");
                                 

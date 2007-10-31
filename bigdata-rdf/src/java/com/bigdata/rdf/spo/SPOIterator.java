@@ -268,6 +268,19 @@ public class SPOIterator implements ISPOIterator {
             
         }
         
+        if(capacity==0) {
+            
+            /*
+             * Note: The ArrayBlockingQueue has a minimum capacity of ONE (1).
+             * 
+             * Note: You SHOULD use the SPOArrayIterator when the limit is small
+             * as it is lighter weight to instantiate.
+             */
+            
+            capacity = 1;
+            
+        }
+        
         this.capacity = capacity;
         
         this.accessPath = accessPath;
@@ -537,7 +550,7 @@ public class SPOIterator implements ISPOIterator {
 
             // sort into the required order.
 
-            Arrays.sort(stmts, 0, stmts.length, keyOrder.getSPOComparator());
+            Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());
 
         }
 

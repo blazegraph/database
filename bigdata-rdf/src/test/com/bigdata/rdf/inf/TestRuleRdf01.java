@@ -99,16 +99,16 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
     
             store.addStatement(A, B, C);
     
-            assertTrue(store.containsStatement(A, B, C));
-            assertFalse(store.containsStatement(B, rdfType, rdfProperty ));
+            assertTrue(store.hasStatement(A, B, C));
+            assertFalse(store.hasStatement(B, rdfType, rdfProperty ));
     
             applyRule(inf, inf.rdf1, 1/* numComputed */);
             
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, B, C));
-            assertTrue(store.containsStatement(B, rdfType, rdfProperty ));
+            assertTrue(store.hasStatement(A, B, C));
+            assertTrue(store.hasStatement(B, rdfType, rdfProperty ));
         
         } finally {
         
@@ -149,22 +149,22 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             store.addStatement(C, B, D);
             store.addStatement(A, E, C);
 
-            assertTrue(store.containsStatement(A, B, C));
-            assertTrue(store.containsStatement(C, B, D));
-            assertTrue(store.containsStatement(A, E, C));
-            assertFalse(store.containsStatement(B, rdfType, rdfProperty));
-            assertFalse(store.containsStatement(E, rdfType, rdfProperty));
+            assertTrue(store.hasStatement(A, B, C));
+            assertTrue(store.hasStatement(C, B, D));
+            assertTrue(store.hasStatement(A, E, C));
+            assertFalse(store.hasStatement(B, rdfType, rdfProperty));
+            assertFalse(store.hasStatement(E, rdfType, rdfProperty));
 
             applyRule(inf, inf.rdf1, 2/* numComputed */);
 
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, B, C));
-            assertTrue(store.containsStatement(C, B, D));
-            assertTrue(store.containsStatement(A, E, C));
-            assertTrue(store.containsStatement(B, rdfType, rdfProperty));
-            assertTrue(store.containsStatement(E, rdfType, rdfProperty));
+            assertTrue(store.hasStatement(A, B, C));
+            assertTrue(store.hasStatement(C, B, D));
+            assertTrue(store.hasStatement(A, E, C));
+            assertTrue(store.hasStatement(B, rdfType, rdfProperty));
+            assertTrue(store.hasStatement(E, rdfType, rdfProperty));
 
         } finally {
 

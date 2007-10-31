@@ -65,6 +65,7 @@ import com.bigdata.rdf.rio.BulkRioLoader.Indices;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -130,7 +131,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
      * @param store
      * @param capacity
      */
-    public BulkLoaderBuffer(ITripleStore store, int capacity) {
+    public BulkLoaderBuffer(AbstractTripleStore store, int capacity) {
         
         super(store, capacity, true);
         

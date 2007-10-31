@@ -104,8 +104,8 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
         store.addStatement(B, rdfsSubPropertyOf, A);
 
-        assertTrue(store.containsStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
-        assertTrue(store.containsStatement(B, rdfsSubPropertyOf, A));
+        assertTrue(store.hasStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
+        assertTrue(store.hasStatement(B, rdfsSubPropertyOf, A));
         
         InferenceEngine inf = new InferenceEngine(store);
 
@@ -119,7 +119,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
         store.addStatement(C, A, A);
         
-        assertTrue(store.containsStatement(C, A, A));
+        assertTrue(store.hasStatement(C, A, A));
 
         subProperties = inf.getSubProperties(store);
         
@@ -172,9 +172,9 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             // verify the database.
             
-            assertTrue(store.containsStatement(A,URIImpl.RDFS_RANGE,B));
+            assertTrue(store.hasStatement(A,URIImpl.RDFS_RANGE,B));
             
-            assertTrue(store.containsStatement(C,MyRange,D));
+            assertTrue(store.hasStatement(C,MyRange,D));
 
             assertEquals(2,store.getStatementCount());
             
@@ -205,9 +205,9 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
             // told.
             
-            assertTrue(store.containsStatement(A, URIImpl.RDFS_RANGE, B));
+            assertTrue(store.hasStatement(A, URIImpl.RDFS_RANGE, B));
 
-            assertTrue(store.containsStatement(C, MyRange, D));
+            assertTrue(store.hasStatement(C, MyRange, D));
 
             /*
              * entailed
@@ -219,7 +219,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
              * entail itself.
              */
 
-            assertTrue(store.containsStatement(C, URIImpl.RDFS_RANGE, D));
+            assertTrue(store.hasStatement(C, URIImpl.RDFS_RANGE, D));
             
         } finally {
             

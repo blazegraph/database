@@ -328,17 +328,17 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public long getTermId(Value value) {
 
-        if(value==null) return ITripleStore.NULL;
+        if(value==null) return IRawTripleStore.NULL;
         
         _Value val = (_Value) OptimizedValueFactory.INSTANCE
                 .toNativeValue(value);
         
-        if( val.termId != ITripleStore.NULL ) return val.termId; 
+        if( val.termId != IRawTripleStore.NULL ) return val.termId; 
 
         Object tmp = getTermIdIndex().lookup(keyBuilder.value2Key(value));
         
         if (tmp == null)
-            return ITripleStore.NULL;
+            return IRawTripleStore.NULL;
 
         try {
 

@@ -95,18 +95,18 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         store.addStatement(A, rdfsSubClassOf, B);
         store.addStatement(B, rdfsSubClassOf, C);
 
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertFalse(store.containsStatement(A, rdfsSubClassOf, C));
+        assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
+        assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
+        assertFalse(store.hasStatement(A, rdfsSubClassOf, C));
 
         applyRule(inf,inf.rdfs11, 1/* numComputed */);
         
         /*
          * validate the state of the primary store.
          */
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, B));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, C));
-        assertTrue(store.containsStatement(A, rdfsSubClassOf, C));
+        assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
+        assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
+        assertTrue(store.hasStatement(A, rdfsSubClassOf, C));
 
         store.closeAndDelete();
         

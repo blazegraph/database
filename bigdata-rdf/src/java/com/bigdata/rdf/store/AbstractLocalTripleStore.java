@@ -99,7 +99,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         if(val.known) {
             
-            assert val.termId != NULL;
+            assert val.termId != IRawTripleStore.NULL;
             
             return val.termId;
 
@@ -127,7 +127,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
             final ICounter counter = terms.getCounter();
             
-            if(counter.get()==NULL) {
+            if(counter.get()==IRawTripleStore.NULL) {
                 
                 // Never assign NULL as a term identifier!
                 counter.inc();
@@ -312,12 +312,12 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      */
     final public long getTermId(Value value) {
 
-        if(value==null) return ITripleStore.NULL;
+        if(value==null) return IRawTripleStore.NULL;
         
         _Value val = (_Value) OptimizedValueFactory.INSTANCE
                 .toNativeValue(value);
         
-        if (val.termId != ITripleStore.NULL) {
+        if (val.termId != IRawTripleStore.NULL) {
 
             return val.termId;
             
@@ -339,7 +339,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         if (tmp == null) {
 
-            return ITripleStore.NULL;
+            return IRawTripleStore.NULL;
             
         }
         
@@ -456,7 +456,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                 
                 ICounter counter = termId.getCounter();
                 
-                if(counter.get()==NULL) {
+                if(counter.get()==IRawTripleStore.NULL) {
                     
                     // Never assign NULL as a term identifier!
                     counter.inc();
@@ -467,7 +467,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                     _Value term = terms[i];
 
-                    if (term.termId!=NULL) {
+                    if (term.termId!=IRawTripleStore.NULL) {
                         /*
                          * The termId is already assigned.
                          * 
@@ -479,7 +479,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                     
                     if (!term.known) {
 
-                        assert term.termId==NULL;
+                        assert term.termId==IRawTripleStore.NULL;
                         assert term.key != null;
 
                         // Lookup in the forward index.
@@ -570,7 +570,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                         
                         }
                         
-                    } else assert term.termId != NULL;
+                    } else assert term.termId != IRawTripleStore.NULL;
                     
                 }
 
@@ -621,7 +621,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                 _Value term = terms[i];
                 
-                assert term.termId != NULL;
+                assert term.termId != IRawTripleStore.NULL;
                 
                 if (!term.known) {
                     

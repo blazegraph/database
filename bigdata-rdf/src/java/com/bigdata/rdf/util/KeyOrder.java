@@ -62,19 +62,19 @@ import com.bigdata.rdf.spo.SPOComparator;
  */
 public enum KeyOrder {
 
-    SPO(0),
-    POS(1),
-    OSP(2);
+    SPO,
+    POS,
+    OSP;
 
-    public final int order;
-    
-    private KeyOrder(int order) {
-
-        this.order = order;
+    private KeyOrder() {
         
     }
     
-    final public Comparator<SPO> getSPOComparator() {
+    /**
+     * Return the comparator that places {@link SPO}s into the natural order
+     * for the associated index.
+     */
+    final public Comparator<SPO> getComparator() {
         
         switch (this) {
         case SPO:

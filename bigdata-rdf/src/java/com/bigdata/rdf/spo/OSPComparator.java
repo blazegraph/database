@@ -55,6 +55,10 @@ public class OSPComparator implements Comparator<SPO> {
 
     public static final transient Comparator<SPO> INSTANCE = new OSPComparator();
 
+    private OSPComparator() {
+        
+    }
+
     public int compare(SPO stmt1, SPO stmt2) {
 
         /*

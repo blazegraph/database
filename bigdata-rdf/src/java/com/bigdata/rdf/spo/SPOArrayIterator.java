@@ -173,24 +173,50 @@ public class SPOArrayIterator implements ISPOIterator {
      * Fully buffers all statements selected by the {@link IAccessPath}.
      * <p>
      * Note: This constructor variant supports {@link #remove()}.
+     * <p>
+     * Note: This constructor is much lighter weight than the
+     * {@link SPOIterator} when you are trying to do an existance test (limit of
+     * 1) or read only a few 100 {@link SPO}s.
+     * 
+     * @param db
+     *            The database (MAY be null, but then {@link #remove()} is not
+     *            supported).
      * 
      * @param accessPath
      *            The access path (including the triple pattern).
+     * 
+     * @param limit
+     *            When non-zero, this is the maximum #of {@link SPO}s that will
+     *            be read. When zero, all {@link SPO}s for that access path
+     *            will be read and buffered.
      */
-    public SPOArrayIterator(IAccessPath accessPath) {
+    public SPOArrayIterator(AbstractTripleStore db, IAccessPath accessPath, int limit) {
         
-        keyOrder = accessPath.getKeyOrder();
+        if (accessPath == null)
+            throw new IllegalArgumentException();
+
+        if (limit < 0)
+            throw new IllegalArgumentException();
+        
+        this.db = db; // MAY be null.
+        
+        this.keyOrder = accessPath.getKeyOrder();
 
         final int rangeCount = accessPath.rangeCount();
-        
-        this.stmts = new SPO[rangeCount];
 
-        // materialize the matching statements.
+        final int n = limit > 0 ? Math.min(rangeCount, limit) : rangeCount;
+        
+        this.stmts = new SPO[ n ];
+
+        /*
+         * Materialize the matching statements.
+         */
+        
         IEntryIterator itr = accessPath.rangeQuery();
 
         int i = 0;
 
-        while (itr.hasNext()) {
+        while (itr.hasNext() && i < n) {
 
             Object val = itr.next();
 
@@ -348,7 +374,7 @@ public class SPOArrayIterator implements ISPOIterator {
 
             // sort into the required order.
 
-            Arrays.sort(stmts, 0, stmts.length, keyOrder.getSPOComparator());
+            Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());
 
         }
 

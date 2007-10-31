@@ -50,7 +50,7 @@ package com.bigdata.rdf.spo;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -64,8 +64,8 @@ import com.bigdata.rdf.util.KeyOrder;
  */
 public interface ISPOIterator extends Iterator<SPO> {
 
-    public final long NULL = ITripleStore.NULL;
-    public final long N = ITripleStore.N;
+    public final long NULL = IRawTripleStore.NULL;
+    public final long N = IRawTripleStore.N;
     
     /**
      * Closes the iterator, releasing any associated resources. This method MAY

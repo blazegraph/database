@@ -4,7 +4,8 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * <p>
@@ -26,7 +27,7 @@ import com.bigdata.rdf.store.ITripleStore;
  * </pre>
  * 
  * <p>
- * where 0 reprents a {@link ITripleStore#NULL} term identifier.
+ * where 0 reprents a {@link IRawTripleStore#NULL} term identifier.
  * </p>
  * <p>
  * So a justification chain for <code>rdf1</code> would be:
@@ -64,7 +65,7 @@ public class Justification implements Comparable<Justification> {
     /**
      * The #of term identifiers in a statement.
      */
-    private static final transient int N = ITripleStore.N;
+    private static final transient int N = IRawTripleStore.N;
     
     /**
      * From the ctor, but not persisted.
@@ -78,7 +79,7 @@ public class Justification implements Comparable<Justification> {
      * find the #of bindings for the tail. The first N entries are the head. The
      * rest are the tail.
      * <p>
-     * Note: A term identifier MAY be {@link ITripleStore#NULL} to indicate a
+     * Note: A term identifier MAY be {@link IRawTripleStore#NULL} to indicate a
      * wildcard.
      */
     private final long[] ids;
@@ -144,7 +145,7 @@ public class Justification implements Comparable<Justification> {
      * @param bindings
      *            The term identifiers for the bindings under which the rule
      *            justified the entailments. A binding MAY be
-     *            {@link ITripleStore#NULL} in which case it MUST be interpreted
+     *            {@link IRawTripleStore#NULL} in which case it MUST be interpreted
      *            as a wildcard.
      */
     public Justification(Rule rule, SPO head, long[] bindings) {
@@ -294,7 +295,7 @@ public class Justification implements Comparable<Justification> {
         
     }
 
-    public String toString(ITripleStore db) {
+    public String toString(AbstractTripleStore db) {
 
         StringBuilder sb = new StringBuilder();
 

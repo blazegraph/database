@@ -105,9 +105,9 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             store.addStatement(U, A, V1);
             store.addStatement(U, A, V2);
 
-            assertTrue(store.containsStatement(A, rdfRange, X));
-            assertTrue(store.containsStatement(U, A, V1));
-            assertTrue(store.containsStatement(U, A, V2));
+            assertTrue(store.hasStatement(A, rdfRange, X));
+            assertTrue(store.hasStatement(U, A, V1));
+            assertTrue(store.hasStatement(U, A, V2));
             assertEquals(3,store.getStatementCount());
 
             /*
@@ -120,10 +120,10 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, rdfRange, X));
-            assertTrue(store.containsStatement(U, A, V1));
-            assertTrue(store.containsStatement(U, A, V2));
-            assertTrue(store.containsStatement(V2, rdfType, X));
+            assertTrue(store.hasStatement(A, rdfRange, X));
+            assertTrue(store.hasStatement(U, A, V1));
+            assertTrue(store.hasStatement(U, A, V2));
+            assertTrue(store.hasStatement(V2, rdfType, X));
             assertEquals(4,store.getStatementCount());
 
         } finally {
@@ -154,8 +154,8 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             store.addStatement(A, rdfType, B);
             store.addStatement(rdfType, rdfsRange, rdfsClass);
 
-            assertTrue(store.containsStatement(A, rdfType, B));
-            assertTrue(store.containsStatement(rdfType, rdfsRange, rdfsClass));
+            assertTrue(store.hasStatement(A, rdfType, B));
+            assertTrue(store.hasStatement(rdfType, rdfsRange, rdfsClass));
             assertEquals(2,store.getStatementCount());
             
             applyRule(inf,inf.rdfs3, -1/* numComputed */);
@@ -163,9 +163,9 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, rdfType, B));
-            assertTrue(store.containsStatement(rdfType, rdfsRange, rdfsClass));
-            assertTrue(store.containsStatement(B, rdfType, rdfsClass));
+            assertTrue(store.hasStatement(A, rdfType, B));
+            assertTrue(store.hasStatement(rdfType, rdfsRange, rdfsClass));
+            assertTrue(store.hasStatement(B, rdfType, rdfsClass));
             assertEquals(3,store.getStatementCount());
 
         } finally {

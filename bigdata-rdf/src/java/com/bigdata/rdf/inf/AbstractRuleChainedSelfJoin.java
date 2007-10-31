@@ -56,7 +56,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -253,7 +253,7 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
              */ 
             
             // Note: The StatementEnum is ignored by the SPOComparator.
-            SPO key = new SPO(left.o, C.id, ITripleStore.NULL,
+            SPO key = new SPO(left.o, C.id, IRawTripleStore.NULL,
                     StatementEnum.Explicit);
             
             // Find the index of that key (or the insert position).

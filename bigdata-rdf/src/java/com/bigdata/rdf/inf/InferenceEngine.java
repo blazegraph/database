@@ -43,10 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -56,19 +53,15 @@ import java.util.concurrent.Executors;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.TestMagicSets.MagicRule;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -151,38 +144,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * terms as subqueries where the most selective subquery is run first.
  * <p>
  * 
- * @todo refactor rules to isolate each subquery so that we can choose the
- *       execution order dynamically based on the selectivity of the different
- *       subqueries.
- *       <p>
- *       This will also require that we declare the joins, e.g.,
- *       <code>term[i].s = term[j].p</code> so that we can execute the join
- *       correctly regardless of the order in which we execute the subqueries.
- * 
- * @todo maintain an instance SPO[] in each rule for the bindings. Copy the
- *       static bindings across when the rule is initialized. Define the joins
- *       in terms of variables used in the body[] and then map those variables
- *       into the term[i] index and the {s,p,o} position on the bindings[].
- * 
- * @todo the RuleStats should collect data on a per term-in-the-tail basis.
- * 
- * @todo support subquery reuse.
- * 
- * @todo refactor rules to define apply() that maps over the terms collecting
- *       the union of the results when executing the rule with each term in turn
- *       reading from the "new" vs the "dbView". Note that the "dbView" is
- *       either just the db or a fused view of the db and "new".
- * 
- * @todo tests of the rule mapping logic and tests of the sub-queries. The rule
- *       execution is now going to be refactored into some logic for choosing
- *       the term execution order and unioning the results, so that can get
- *       tested by itself and then the various rules should work correctly if
- *       they are using the correct triple patterns and join variables.
- * 
  * FIXME truth maintenance (check the SAIL also).
- * 
- * FIXME rdfs:Resource by backward chaining on query. This means that we need a
- * query wrapper for the store or for the inference engine.
  * 
  * FIXME owl:sameAs by backward chaining on query.
  * 
@@ -213,8 +175,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo experiment with use of a bloom filter
  * 
- * @todo provide fixed point transitive closure for "chain" rules (subClassOf)
- * 
  * @todo if we are not storing rules or magic facts in the main statement
  *       indices then get rid of the leading byte used in all keys for the
  *       statement indices.
@@ -238,7 +198,7 @@ public class InferenceEngine extends RDFSHelper {
     /**
      * Value used for a "NULL" term identifier.
      */
-    public static final long NULL = ITripleStore.NULL;
+    public static final long NULL = IRawTripleStore.NULL;
 
     /**
      * The capacity of the {@link SPOBuffer}.
@@ -364,12 +324,6 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @todo Add options:
      *       <p>
-     *       Make entailments for rdfs:domain and rdfs:range optional?
-     *       <p>
-     *       For the {@link #fullForwardClosure()} we can get by with just
-     *       Rdfs5, Rdfs7, Rdfs9, and Rdfs11.  Allow the caller to specify
-     *       the rule model?
-     *       <p>
      *       The {@link SPOBuffer} capacity.
      *       <p>
      *       The {@link InferenceEngine#readService} capacity?
@@ -378,10 +332,6 @@ public class InferenceEngine extends RDFSHelper {
      * @version $Id$
      */
     public static class Options {
-        
-//        public static final String TRUTH_MAINENANCE_STRATEGY = "truthMaintenanceStrategy";
-//        
-//        public static final String DEFAULT_TRUTH_MAINENANCE_STRATEGY = AllProofs.class.getName();
 
         /**
          * Boolean option - when true the proofs for entailments will be generated and stored in
@@ -424,55 +374,8 @@ public class InferenceEngine extends RDFSHelper {
 
         public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS = "true";
         
-//        public static final String FORWARD_CHAINER = "forwardChainer";
-//
-//        public static final String BACKWARD_CHAINER = "backwardChainer";
-        
     }
 
-//    /**
-//     * Forward closure is performed when data are loaded into the store and all
-//     * proofs are stored.
-//     * 
-//     * @todo must also determine which rules are forward chained and which are
-//     * backward chained.
-//     * 
-//     * @todo update javadoc. Statement removal for a statement that is no longer
-//     *       explicitly asserted simply examines the proofs for that statement.
-//     *       If the statement is no longer proven then it is removed and
-//     *       dependent statements are tested to see if they are no longer
-//     *       provable. This option is the slowest when statements are inserted
-//     *       into the store since a large number of proofs objects are
-//     *       generated, but it is the fastest for truth maintenance and can pay
-//     *       off when statement removal is a common operation for the kb.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class AllProofs implements ITruthMaintenanceStrategy {
-//
-//        public void createProof(Rule rule, SPO head, SPO[] tail) {
-//            // TODO Auto-generated method stub
-//            
-//        }
-//
-//        public void createProof(Rule rule, SPO head, long[] tail) {
-//            // TODO Auto-generated method stub
-//            
-//        }
-//
-//        public int addStatements(ISPOIterator stmts) {
-//            // TODO Auto-generated method stub
-//            return 0;
-//        }
-//        
-//        public int removeStatements(Resource s, URI p, Value o) {
-//            // TODO Auto-generated method stub
-//            return 0;
-//        }
-//        
-//    }
-    
     /**
      * Configure {@link InferenceEngine} using default {@link Options}.
      * 
@@ -554,7 +457,7 @@ public class InferenceEngine extends RDFSHelper {
 
         rdf1 = new RuleRdf01(this);
 
-        // @todo write and initialize rdf2 (?x rdf:type rdf:XMLLiteral).
+        // @todo rdf2 (?x rdf:type rdf:XMLLiteral).
 //        
 //        rdf2 = new RuleRdf02(this);
 
@@ -614,8 +517,6 @@ public class InferenceEngine extends RDFSHelper {
              * Note: skipping rdfs4a (?u ?a ?x) -> (?u rdf:type rdfs:Resource)
              * 
              * Note: skipping rdfs4b (?u ?a ?v) -> (?v rdf:type rdfs:Resource)
-             * 
-             * @todo make sure that they are back-chained.
              */
 
             rules.add(rdfs4a);
@@ -690,6 +591,9 @@ public class InferenceEngine extends RDFSHelper {
      * by {@link Options#FORWARD_CLOSURE}.
      * 
      * @return Statistics about the operation.
+     * 
+     * @deprecated by {@link #computeClosure(AbstractTripleStore)} which
+     * supports incremental data loading.
      */
     public ClosureStats computeClosure() {
 
@@ -749,7 +653,7 @@ public class InferenceEngine extends RDFSHelper {
         final ClosureStats closureStats = new ClosureStats();
         
         // add RDF(S) axioms to the database.
-        addRdfsAxioms(database);
+        RdfsAxioms.INSTANCE.addAxioms(database); // add to the database.
 
         /*
          * This is a buffer that is used to hold entailments so that we can
@@ -824,7 +728,7 @@ public class InferenceEngine extends RDFSHelper {
                 BUFFER_SIZE, distinct, isJustified());
 
         // 1. add RDF(S) axioms to the database.
-        addRdfsAxioms(database); // add to the database.
+        RdfsAxioms.INSTANCE.addAxioms(database); // add to the database.
         
         // 2. Compute P (the set of possible sub properties).
         final Set<Long> P = getSubProperties(database);
@@ -1125,7 +1029,7 @@ public class InferenceEngine extends RDFSHelper {
             
             for( Long id : P ) {
                 
-                terms.add(database.getTerm(id).term);
+                terms.add(database.toString(id));
                 
             }
             
@@ -1156,7 +1060,7 @@ public class InferenceEngine extends RDFSHelper {
 
         if(DEBUG) {
             
-            log.debug("p="+database.getTerm(p).term);
+            log.debug("p="+database.toString(p));
             
         }
         
@@ -1196,7 +1100,7 @@ public class InferenceEngine extends RDFSHelper {
             
             for( Long id : tmp ) {
                 
-                terms.add(database.getTerm(id).term);
+                terms.add(database.toString(id));
                 
             }
             
@@ -1207,149 +1111,5 @@ public class InferenceEngine extends RDFSHelper {
         return tmp;
 
     }
-
-    /**
-     * Add the axiomatic RDF(S) triples to the store.
-     * <p>
-     * Note: The termIds are defined with respect to the backing triple store
-     * since the axioms will be copied into the store when the closure is
-     * complete.
-     * 
-     * @param database
-     *            The store to which the axioms will be added.
-     */
-    public void addRdfsAxioms(ITripleStore database) {
-        
-        Axioms axiomModel = RdfsAxioms.INSTANCE;
-
-        StatementBuffer buffer = new StatementBuffer(database, axiomModel
-                .getAxioms().size(), true/*distinct*/);
-        
-        for (Iterator<Axioms.Triple> itr = axiomModel.getAxioms().iterator(); itr
-                .hasNext();) {
-
-            Axioms.Triple triple = itr.next();
-            
-            URI s = triple.getS();
-            
-            URI p = triple.getP();
-            
-            URI o = triple.getO();
-            
-            buffer.add( s, p, o, StatementEnum.Axiom );
-            
-        }
-
-        // write on the database.
-        buffer.flush();
-        
-    }
     
-    /**
-     * Accepts a triple pattern and returns the closure over that triple pattern
-     * using a magic transform of the RDFS entailment rules.
-     * 
-     * @param query
-     *            The triple pattern.
-     * 
-     * @param rules
-     *            The rules to be applied.
-     * 
-     * @return The answer set.
-     * 
-     * @exception IllegalArgumentException
-     *                if query is null.
-     * @exception IllegalArgumentException
-     *                if query is a fact (no variables).
-     * 
-     * FIXME Magic sets has NOT been implemented -- this method does NOT
-     * function.
-     */
-    public ITripleStore query(Triple query, Rule[] rules) throws IOException {
-
-        if (query == null)
-            throw new IllegalArgumentException("query is null");
-
-        if (query.isConstant())
-            throw new IllegalArgumentException("no variables");
-
-        if (rules == null)
-            throw new IllegalArgumentException("rules is null");
-
-        if (rules.length == 0)
-            throw new IllegalArgumentException("no rules");
-        
-        final int nrules = rules.length;
-
-        /*
-         * prepare the magic transform of the provided rules.
-         */
-        
-        Rule[] rules2 = new Rule[nrules];
-        
-        for( int i=0; i<nrules; i++ ) {
-
-            rules2[i] = new MagicRule(this,rules[i]);
-
-        }
-        
-        /*
-         * @todo create the magic seed and insert it into the answer set.
-         */
-        Magic magicSeed = new Magic(query);
-
-        /*
-         * Run the magic transform.
-         */
-        
-        /*
-         * @todo support bufferQueue extension for the transient mode or set the
-         * default capacity to something larger.  if things get too large
-         * then we need to spill over to disk.
-         */
-        
-        ITripleStore answerSet = new TempTripleStore(new Properties());
-        
-        int lastStatementCount = database.getStatementCount();
-
-        final long begin = System.currentTimeMillis();
-
-        System.err.println("Running query: "+query);
-
-        int nadded = 0;
-
-        while (true) {
-
-            for (int i = 0; i < nrules; i++) {
-
-                Rule rule = rules[i];
-
-                // nadded += rule.apply();
-                // rule.apply();
-
-            }
-
-            int statementCount = database.getStatementCount();
-
-            // testing the #of statement is less prone to error.
-            if (lastStatementCount == statementCount) {
-
-                //                if( nadded == 0 ) { // should also work.
-
-                // This is the fixed point.
-                break;
-
-            }
-
-        }
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("Ran query in " + elapsed + "ms; "
-                + lastStatementCount + " statements in answer set.");
-
-        return answerSet;
-        
-    }
-
 }

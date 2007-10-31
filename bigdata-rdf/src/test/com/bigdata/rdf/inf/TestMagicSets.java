@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.io.IOException;
+import java.util.Properties;
 
 import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDF;
@@ -56,6 +57,7 @@ import org.openrdf.vocabulary.RDFS;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for inference engine and the magic sets implementation.
@@ -172,77 +174,184 @@ public class TestMagicSets extends AbstractInferenceEngineTestCase {
         
     }
     
-    /**
-     * Test of query answering using magic sets.
-     * 
-     * @todo work through the magic sets implementation.
-     * 
-     * @throws IOException
-     */
-    public void testQueryAnswering01() throws IOException {
-
-        AbstractTripleStore store = getStore();
-        
-        try {
-        
-            /*
-             * setup the database.
-             */
-            URI x = new _URI("http://www.foo.org/x");
-            URI y = new _URI("http://www.foo.org/y");
-            URI z = new _URI("http://www.foo.org/z");
-    
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI C = new _URI("http://www.foo.org/C");
-    
-            URI rdfType = new _URI(RDF.TYPE);
-    
-            URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-    
-            store.addStatement(x, rdfType, C);
-            store.addStatement(y, rdfType, B);
-            store.addStatement(z, rdfType, A);
-    
-            store.addStatement(B, rdfsSubClassOf, A);
-            store.addStatement(C, rdfsSubClassOf, B);
-    
-            assertEquals("statementCount", 5, store.getStatementCount());
-            assertTrue(store.containsStatement(x, rdfType, C));
-            assertTrue(store.containsStatement(y, rdfType, B));
-            assertTrue(store.containsStatement(z, rdfType, A));
-            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
-            
-            /*
-             * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
-             */
-    
-            InferenceEngine inf = new InferenceEngine(store);
-            
-            // query :- triple(?s,rdf:type,A).
-            Triple query = new Triple(Rule.var("s"),
-                    inf.rdfType, new Id(store.addTerm(new _URI(
-                            "http://www.foo.org/A"))));
-    
-            // Run the query.
-            ITripleStore answerSet = inf.query(query, new Rule[] {
-                    inf.rdfs9, inf.rdfs11 });
-    
-            /*
-             * @todo verify the answer set: ?s := {x,y,z}.
-             */
-            assertEquals("statementCount", 3, answerSet.getStatementCount());
-            assertTrue(answerSet.containsStatement(x, rdfType, A));
-            assertTrue(answerSet.containsStatement(y, rdfType, A));
-            assertTrue(answerSet.containsStatement(z, rdfType, A));
-        
-        } finally {
-            
-            store.closeAndDelete();
-
-        }
-        
-    }
+//    /**
+//     * Accepts a triple pattern and returns the closure over that triple pattern
+//     * using a magic transform of the RDFS entailment rules.
+//     * 
+//     * @param query
+//     *            The triple pattern.
+//     * 
+//     * @param rules
+//     *            The rules to be applied.
+//     * 
+//     * @return The answer set.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if query is null.
+//     * @exception IllegalArgumentException
+//     *                if query is a fact (no variables).
+//     * 
+//     * FIXME Magic sets has NOT been implemented -- this method does NOT
+//     * function.
+//     */
+//    public ITripleStore query(Triple query, Rule[] rules) throws IOException {
+//
+//        if (query == null)
+//            throw new IllegalArgumentException("query is null");
+//
+//        if (query.isConstant())
+//            throw new IllegalArgumentException("no variables");
+//
+//        if (rules == null)
+//            throw new IllegalArgumentException("rules is null");
+//
+//        if (rules.length == 0)
+//            throw new IllegalArgumentException("no rules");
+//        
+//        final int nrules = rules.length;
+//
+//        /*
+//         * prepare the magic transform of the provided rules.
+//         */
+//        
+//        Rule[] rules2 = new Rule[nrules];
+//        
+//        for( int i=0; i<nrules; i++ ) {
+//
+//            rules2[i] = new MagicRule(this,rules[i]);
+//
+//        }
+//        
+//        /*
+//         * @todo create the magic seed and insert it into the answer set.
+//         */
+//        Magic magicSeed = new Magic(query);
+//
+//        /*
+//         * Run the magic transform.
+//         */
+//        
+//        /*
+//         * @todo support bufferQueue extension for the transient mode or set the
+//         * default capacity to something larger.  if things get too large
+//         * then we need to spill over to disk.
+//         */
+//        
+//        ITripleStore answerSet = new TempTripleStore(new Properties());
+//        
+//        int lastStatementCount = database.getStatementCount();
+//
+//        final long begin = System.currentTimeMillis();
+//
+//        System.err.println("Running query: "+query);
+//
+//        int nadded = 0;
+//
+//        while (true) {
+//
+//            for (int i = 0; i < nrules; i++) {
+//
+//                Rule rule = rules[i];
+//
+//                // nadded += rule.apply();
+//                // rule.apply();
+//
+//            }
+//
+//            int statementCount = database.getStatementCount();
+//
+//            // testing the #of statement is less prone to error.
+//            if (lastStatementCount == statementCount) {
+//
+//                //                if( nadded == 0 ) { // should also work.
+//
+//                // This is the fixed point.
+//                break;
+//
+//            }
+//
+//        }
+//
+//        final long elapsed = System.currentTimeMillis() - begin;
+//
+//        System.err.println("Ran query in " + elapsed + "ms; "
+//                + lastStatementCount + " statements in answer set.");
+//
+//        return answerSet;
+//        
+//    }
+//
+//    /**
+//     * Test of query answering using magic sets.
+//     * 
+//     * @todo work through the magic sets implementation.
+//     * 
+//     * @throws IOException
+//     */
+//    public void testQueryAnswering01() throws IOException {
+//
+//        AbstractTripleStore store = getStore();
+//        
+//        try {
+//        
+//            /*
+//             * setup the database.
+//             */
+//            URI x = new _URI("http://www.foo.org/x");
+//            URI y = new _URI("http://www.foo.org/y");
+//            URI z = new _URI("http://www.foo.org/z");
+//    
+//            URI A = new _URI("http://www.foo.org/A");
+//            URI B = new _URI("http://www.foo.org/B");
+//            URI C = new _URI("http://www.foo.org/C");
+//    
+//            URI rdfType = new _URI(RDF.TYPE);
+//    
+//            URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+//    
+//            store.addStatement(x, rdfType, C);
+//            store.addStatement(y, rdfType, B);
+//            store.addStatement(z, rdfType, A);
+//    
+//            store.addStatement(B, rdfsSubClassOf, A);
+//            store.addStatement(C, rdfsSubClassOf, B);
+//    
+//            assertEquals("statementCount", 5, store.getStatementCount());
+//            assertTrue(store.containsStatement(x, rdfType, C));
+//            assertTrue(store.containsStatement(y, rdfType, B));
+//            assertTrue(store.containsStatement(z, rdfType, A));
+//            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
+//            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+//            
+//            /*
+//             * run the query triple(?s,rdfType,A) using only rdfs9 and rdfs11.
+//             */
+//    
+//            InferenceEngine inf = new InferenceEngine(store);
+//            
+//            // query :- triple(?s,rdf:type,A).
+//            Triple query = new Triple(Rule.var("s"),
+//                    inf.rdfType, new Id(store.addTerm(new _URI(
+//                            "http://www.foo.org/A"))));
+//    
+//            // Run the query.
+//            ITripleStore answerSet = query(query, new Rule[] {
+//                    inf.rdfs9, inf.rdfs11 });
+//    
+//            /*
+//             * @todo verify the answer set: ?s := {x,y,z}.
+//             */
+//            assertEquals("statementCount", 3, answerSet.getStatementCount());
+//            assertTrue(answerSet.containsStatement(x, rdfType, A));
+//            assertTrue(answerSet.containsStatement(y, rdfType, A));
+//            assertTrue(answerSet.containsStatement(z, rdfType, A));
+//        
+//        } finally {
+//            
+//            store.closeAndDelete();
+//
+//        }
+//        
+//    }
     
 }

@@ -62,7 +62,6 @@ import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A rule.
@@ -102,12 +101,12 @@ abstract public class Rule {
     /**
      * The 64-bit long integer that represents an unassigned term identifier
      */
-    static final protected transient long NULL = ITripleStore.NULL;
+    static final protected transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The arity of a "triple" pattern.
      */
-    static final protected transient int N = ITripleStore.N;
+    static final protected transient int N = IRawTripleStore.N;
 
     /**
      * Canonicalizing map for {@link Var}s.
@@ -760,7 +759,7 @@ abstract public class Rule {
 
                 accessPath[i] = null;
                 
-                for (int j = 0; j < ITripleStore.N; j++) {
+                for (int j = 0; j < IRawTripleStore.N; j++) {
 
                     VarOrId binding = pred.get(j);
 
@@ -788,7 +787,7 @@ abstract public class Rule {
 
                 final Pred pred = body[i];
                 
-                for(int j=0; j<ITripleStore.N; j++) {
+                for(int j=0; j<IRawTripleStore.N; j++) {
 
                     // you are supposed to overwrite the variables, but not the
                     // constants.
@@ -835,7 +834,7 @@ abstract public class Rule {
             
             Pred pred = body[index];
             
-            for(int j=0; j<ITripleStore.N; j++) {
+            for(int j=0; j<IRawTripleStore.N; j++) {
 
                 // check any variables.
                 if (pred.get(j).isVar()) {
@@ -1053,10 +1052,6 @@ abstract public class Rule {
          * @param index
          *            The index of the predicate whose values you intend to
          *            {@link #bind(int, SPO)}.
-         *            
-         * FIXME If the evaluation order is being modified for a (new+db) scenario
-         * then the order[] MUST be modified as well for this method to work
-         * correctly!!!
          */
         protected void clearDownstreamBindings(int index) {
 
@@ -1131,6 +1126,8 @@ abstract public class Rule {
          * 
          * FIXME modify the cache to accept the view (new or new+old) for the access path
          * (it needs to be a two-dimensional array).
+         * 
+         * FIXME implement TripleStoreFusedView
          */
         public IAccessPath getAccessPath(int index) {
             

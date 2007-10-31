@@ -64,7 +64,6 @@ import org.openrdf.model.Value;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -593,7 +592,7 @@ public class SPOBuffer implements ISPOBuffer {
      * 
      * @todo also dump the justifications.
      */
-    public void dump(ITripleStore store) {
+    public void dump(AbstractTripleStore store) {
         
         System.err.println("capacity=" + capacity//
                 + ", numStmts=" + numStmts//

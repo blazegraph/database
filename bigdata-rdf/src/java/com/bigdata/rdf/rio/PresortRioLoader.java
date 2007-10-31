@@ -60,6 +60,7 @@ import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -85,7 +86,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final ITripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * The RDF syntax to be parsed.
@@ -135,7 +136,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param store
      *            The store into which to insert the loaded statements.
      */
-    public PresortRioLoader(ITripleStore store) {
+    public PresortRioLoader(AbstractTripleStore store) {
         
         this(store, RDFFormat.RDFXML, false /*verifyData*/);
         
@@ -151,10 +152,11 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * @param verifyData
      *            Controls the {@link Parser#setVerifyData(boolean)} option.
      */
-    public PresortRioLoader( ITripleStore store, RDFFormat rdfFormat, boolean verifyData ) {
-    
-        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true/*distinct*/);
-        
+    public PresortRioLoader(AbstractTripleStore store, RDFFormat rdfFormat,
+            boolean verifyData) {
+
+        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true/* distinct */);
+
     }
 
     /**
@@ -175,7 +177,7 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      *            Note: performance is generally substantially better with
      *            <code>distinct := true</code>.
      */
-    public PresortRioLoader(ITripleStore store, RDFFormat rdfFormat,
+    public PresortRioLoader(AbstractTripleStore store, RDFFormat rdfFormat,
             boolean verifyData, int capacity, boolean distinct) {
 
         assert store != null;

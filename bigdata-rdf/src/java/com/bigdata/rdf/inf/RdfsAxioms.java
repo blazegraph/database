@@ -54,7 +54,7 @@ import org.openrdf.vocabulary.RDFS;
  */
 public class RdfsAxioms extends BaseAxioms {
     
-    static public final Axioms INSTANCE = new RdfsAxioms();
+    static public final BaseAxioms INSTANCE = new RdfsAxioms();
     
     protected RdfsAxioms()
     {
