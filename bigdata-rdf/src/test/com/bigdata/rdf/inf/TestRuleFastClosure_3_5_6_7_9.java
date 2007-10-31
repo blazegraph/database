@@ -109,7 +109,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         
         InferenceEngine inf = new InferenceEngine(store);
 
-        Set<Long> subProperties = inf.getSubProperties(store);
+        Set<Long> subProperties = inf.getSubProperties(null/*focusStore*/,store);
         
         assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
         assertTrue(subProperties.contains(store.getTermId(A)));
@@ -121,7 +121,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         
         assertTrue(store.hasStatement(C, A, A));
 
-        subProperties = inf.getSubProperties(store);
+        subProperties = inf.getSubProperties(null/*focusStore*/,store);
         
         assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
         assertTrue(subProperties.contains(store.getTermId(A)));

@@ -471,6 +471,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    /**
+     * FIXME In order to support incremental data load with closure, we need to
+     * load data into a temporary store while the terms identifiers must be
+     * resolved against the database. Refactor to support this use case but also
+     * the use case of loading statements into the database without closure (or
+     * when you are only going to close the database once, after all statements
+     * have been loaded). Consider whether this is best supported using a helper
+     * class. Integrate support for this into the SAIL.
+     */ 
     final public LoadStats loadData(String resource, String baseURI,
             RDFFormat rdfFormat, boolean verifyData, boolean commit) throws IOException {
 
@@ -772,11 +781,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-        public IIndex getStatementIndex() {
-            
-            return AbstractTripleStore.this.getStatementIndex(getKeyOrder());
-            
-        }
+//        public IIndex getStatementIndex() {
+//            
+//            return AbstractTripleStore.this.getStatementIndex(getKeyOrder());
+//            
+//        }
 
         public KeyOrder getKeyOrder() {
             
@@ -915,7 +924,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
         
-        public IIndex getStatementIndex() {
+        private IIndex getStatementIndex() {
             
             return AbstractTripleStore.this.getStatementIndex( keyOrder );
             

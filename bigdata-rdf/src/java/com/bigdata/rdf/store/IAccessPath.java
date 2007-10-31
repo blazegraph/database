@@ -73,10 +73,10 @@ public interface IAccessPath {
      */
     public long[] getTriplePattern();
     
-    /**
-     * The index that is the most efficient for the triple pattern.
-     */
-    public IIndex getStatementIndex();
+//    /**
+//     * The index that is the most efficient for the triple pattern.
+//     */
+//    public IIndex getStatementIndex();
 
     /**
      * Identifies the statement index that was choosen and hence the natural

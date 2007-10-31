@@ -143,10 +143,6 @@ abstract public class AbstractRuleDistinctTermScan extends AbstractRuleRdf {
 
         /*
          * find the distinct predicates in the KB (efficient op).
-         * 
-         * FIXME verify that this only runs against the focusGroup when the
-         * focusGroup is specified rather than against the datbase or the fused
-         * view of the focusGroup and the database.
          */
         
         IAccessPath accessPath = state.focusStore == null ? state.database

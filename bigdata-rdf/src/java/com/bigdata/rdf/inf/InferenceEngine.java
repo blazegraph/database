@@ -60,6 +60,7 @@ import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -615,7 +616,7 @@ public class InferenceEngine extends RDFSHelper {
      * @return Statistics about the operation.
      * 
      * FIXME If the focusStore is given then the entailments will be asserted
-     * against the focusStore and the caller is responsible for copying the
+     * against the focusStore. Either this method or the caller MUST copy the
      * focusStore onto the database using
      * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, com.bigdata.rdf.spo.ISPOFilter)}
      */
@@ -655,32 +656,26 @@ public class InferenceEngine extends RDFSHelper {
 
         final long begin = System.currentTimeMillis();
        
-        final int nbefore = database.getStatementCount();
-        
         final ClosureStats closureStats = new ClosureStats();
+
+        // The store where the entailments are being built up.
+        final AbstractTripleStore closureStore = (focusStore != null ? focusStore
+                : database);
+
+        final int nbefore = closureStore.getStatementCount();
         
         // add RDF(S) axioms to the database.
-        RdfsAxioms.INSTANCE.addAxioms(database); // add to the database.
+        RdfsAxioms.INSTANCE.addAxioms(closureStore); // @todo to the database also?
 
-        /*
-         * This is a buffer that is used to hold entailments so that we can
-         * insert them into the indices of the <i>tmpStore</i> using ordered
-         * insert operations (much faster than random inserts). The buffer is
-         * reused by each rule. The rule assumes that the buffer is empty and
-         * just keeps a local counter of the #of entailments that it has
-         * inserted into the buffer. When the buffer overflows, those
-         * entailments are transfered enmass into the tmp store. The buffer is
-         * always flushed after each rule and therefore will have been flushed
-         * when this method returns.
-         */ 
-        final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
+        // entailment buffer writes on the closureStore.
+        final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
                 BUFFER_SIZE, distinct, isJustified());
 
         // compute the full forward closure.
         System.err.println(Rule.fixedPoint(closureStats, getRuleModel(),
                 justify, focusStore, database, buffer).toString());
        
-        final int nafter = database.getStatementCount();
+        final int nafter = closureStore.getStatementCount();
         
         final long elapsed = System.currentTimeMillis() - begin;
         
@@ -967,15 +962,10 @@ public class InferenceEngine extends RDFSHelper {
      */
     public Set<Long> getSubProperties(AbstractTripleStore focusStore, AbstractTripleStore database) {
 
-        final IAccessPath accessPath = (focusStore == null ? database
-                .getAccessPath(KeyOrder.POS) : new FusedViewAccessPath(
-                focusStore.getAccessPath(KeyOrder.POS), database
-                        .getAccessPath(KeyOrder.POS)));
-
         final Set<Long> P = new HashSet<Long>();
         
         P.add(rdfsSubPropertyOf.id);
-
+        
         /*
          * query := (?x, P, P), adding new members to P until P reaches fix
          * point.
@@ -1000,6 +990,13 @@ public class InferenceEngine extends RDFSHelper {
                  */
 
                 for (Long p : P) {
+
+                    final IAccessPath accessPath = (focusStore == null //
+                            ? database.getAccessPath(NULL, p, NULL)//
+                            : new AccessPathFusedView(focusStore.getAccessPath(
+                                    NULL, p, NULL), //
+                                    database.getAccessPath(NULL, p, NULL)//
+                            ));
 
                     ISPOIterator itr = accessPath.iterator();
 
@@ -1070,7 +1067,7 @@ public class InferenceEngine extends RDFSHelper {
         final IAccessPath accessPath = //
         (focusStore == null //
         ? database.getAccessPath(NULL/* x */, rdfsSubPropertyOf.id, p)//
-                : new FusedViewAccessPath(//
+                : new AccessPathFusedView(//
                         focusStore.getAccessPath(NULL/* x */,
                                 rdfsSubPropertyOf.id, p), //
                         database.getAccessPath(NULL/* x */,
