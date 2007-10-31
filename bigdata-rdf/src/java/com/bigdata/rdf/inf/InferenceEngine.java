@@ -60,8 +60,10 @@ import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -611,6 +613,11 @@ public class InferenceEngine extends RDFSHelper {
      *            against itself.
      * 
      * @return Statistics about the operation.
+     * 
+     * FIXME If the focusStore is given then the entailments will be asserted
+     * against the focusStore and the caller is responsible for copying the
+     * focusStore onto the database using
+     * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, com.bigdata.rdf.spo.ISPOFilter)}
      */
     public ClosureStats computeClosure(AbstractTripleStore focusStore) {
 
@@ -695,12 +702,6 @@ public class InferenceEngine extends RDFSHelper {
      *            against the database with the entailments written into the
      *            database. When <code>null</code>, the entire database will
      *            be closed.
-     * 
-     * FIXME When modifying to support incremental TM note that some rules are
-     * "special". In particular {@link AbstractRuleFastClosure_3_5_6_7_9} accept
-     * a set of term identifiers that are specially computed. We need to pass
-     * those rules the term identifiers as computed over the union of the new
-     * and old statements.
      */
     protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore) {
 
@@ -713,25 +714,27 @@ public class InferenceEngine extends RDFSHelper {
          */
 
         final ClosureStats closureStats = new ClosureStats();
+
+        // The store where the entailments are being built up.
+        final AbstractTripleStore closureStore = (focusStore != null ? focusStore
+                : database);
         
-        final int firstStatementCount = database.getStatementCount();
+        // Entailment buffer writes on the closureStore.
+        final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
+                BUFFER_SIZE, distinct, isJustified());
+        
+        final int firstStatementCount = closureStore.getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
         log.debug("Closing kb with " + firstStatementCount
                 + " statements");
-        
-        /*
-         * Entailment buffer writes on the database.
-         */
-        final SPOBuffer buffer = new SPOBuffer(database, doNotAddFilter,
-                BUFFER_SIZE, distinct, isJustified());
 
-        // 1. add RDF(S) axioms to the database.
-        RdfsAxioms.INSTANCE.addAxioms(database); // add to the database.
+        // 1. add RDF(S) axioms to the closureStore (@todo also the database?)
+        RdfsAxioms.INSTANCE.addAxioms(closureStore);
         
         // 2. Compute P (the set of possible sub properties).
-        final Set<Long> P = getSubProperties(database);
+        final Set<Long> P = getSubProperties(focusStore,database);
 
         // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
         {
@@ -748,10 +751,10 @@ public class InferenceEngine extends RDFSHelper {
                         focusStore, database, buffer));
 
         // 4a. Obtain: D,R,C,T.
-        final Set<Long> D = getSubPropertiesOf(database, rdfsDomain.id);
-        final Set<Long> R = getSubPropertiesOf(database, rdfsRange.id);
-        final Set<Long> C = getSubPropertiesOf(database, rdfsSubClassOf.id);
-        final Set<Long> T = getSubPropertiesOf(database, rdfType.id);
+        final Set<Long> D = getSubPropertiesOf(focusStore,database, rdfsDomain.id);
+        final Set<Long> R = getSubPropertiesOf(focusStore,database, rdfsRange.id);
+        final Set<Long> C = getSubPropertiesOf(focusStore,database, rdfsSubClassOf.id);
+        final Set<Long> T = getSubPropertiesOf(focusStore,database, rdfType.id);
 
         // 5. (?x, D, ?y ) -> (?x, rdfs:domain, ?y)
         {
@@ -925,7 +928,7 @@ public class InferenceEngine extends RDFSHelper {
         
         final long elapsed = System.currentTimeMillis() - begin;
 
-        final int lastStatementCount = database.getStatementCount();
+        final int lastStatementCount = closureStore.getStatementCount();
 
         final int inferenceCount = lastStatementCount - firstStatementCount;
         
@@ -957,12 +960,17 @@ public class InferenceEngine extends RDFSHelper {
      * Computes the set of possible sub properties of rdfs:subPropertyOf (<code>P</code>).
      * This is used by steps 2-4 in {@link #fastForwardClosure()}.
      * 
+     * @param focusStore
      * @param database
-     *            The database to be queried.
      * 
      * @return A set containing the term identifiers for the members of P.
      */
-    public Set<Long> getSubProperties(AbstractTripleStore database) {
+    public Set<Long> getSubProperties(AbstractTripleStore focusStore, AbstractTripleStore database) {
+
+        final IAccessPath accessPath = (focusStore == null ? database
+                .getAccessPath(KeyOrder.POS) : new FusedViewAccessPath(
+                focusStore.getAccessPath(KeyOrder.POS), database
+                        .getAccessPath(KeyOrder.POS)));
 
         final Set<Long> P = new HashSet<Long>();
         
@@ -993,7 +1001,7 @@ public class InferenceEngine extends RDFSHelper {
 
                 for (Long p : P) {
 
-                    ISPOIterator itr = database.getAccessPath(NULL, p, NULL).iterator();
+                    ISPOIterator itr = accessPath.iterator();
 
                     while(itr.hasNext()) {
                         
@@ -1047,16 +1055,27 @@ public class InferenceEngine extends RDFSHelper {
      * Pre-condition: The closure of <code>rdfs:subPropertyOf</code> has been
      * asserted on the database.
      * 
+     * @param focusStore
      * @param database
-     *            The database to be queried.
      * @param p
      *            The term identifier for the property whose sub-properties will
      *            be obtain.
      * 
      * @return A set containing the term identifiers for the sub properties of
-     *         <i>p</i>. 
+     *         <i>p</i>.
      */
-    public Set<Long> getSubPropertiesOf(AbstractTripleStore database, final long p) {
+    public Set<Long> getSubPropertiesOf(AbstractTripleStore focusStore,
+            AbstractTripleStore database, final long p) {
+
+        final IAccessPath accessPath = //
+        (focusStore == null //
+        ? database.getAccessPath(NULL/* x */, rdfsSubPropertyOf.id, p)//
+                : new FusedViewAccessPath(//
+                        focusStore.getAccessPath(NULL/* x */,
+                                rdfsSubPropertyOf.id, p), //
+                        database.getAccessPath(NULL/* x */,
+                                rdfsSubPropertyOf.id, p)//
+                ));
 
         if(DEBUG) {
             
@@ -1074,7 +1093,7 @@ public class InferenceEngine extends RDFSHelper {
          * Note: This query is two-bound on the POS index.
          */
 
-        ISPOIterator itr = database.getAccessPath(NULL/*x*/, rdfsSubPropertyOf.id, p).iterator();
+        ISPOIterator itr = accessPath.iterator();
 
         while(itr.hasNext()) {
             
