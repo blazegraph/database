@@ -54,18 +54,15 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IProcedure;
 
 /**

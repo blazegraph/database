@@ -47,36 +47,18 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Properties;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ValueFactoryImpl;
-import org.openrdf.sesame.admin.RdfAdmin;
-import org.openrdf.sesame.admin.StdOutAdminListener;
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sail.StatementIterator;
 import org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository;
 
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
-import com.bigdata.rdf.sail.BigdataRdfRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**

@@ -47,17 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import java.io.IOException;
-import java.util.Properties;
-
-import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
-
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for inference engine and the magic sets implementation.
