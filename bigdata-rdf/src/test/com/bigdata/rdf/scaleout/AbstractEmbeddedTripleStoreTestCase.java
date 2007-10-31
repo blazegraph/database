@@ -48,7 +48,7 @@ Modifications:
 package com.bigdata.rdf.scaleout;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.service.BigdataClient;
@@ -75,7 +75,7 @@ public class AbstractEmbeddedTripleStoreTestCase extends
         super(arg0);
     }
 
-    protected final long NULL = ITripleStore.NULL;
+    protected final long NULL = IRawTripleStore.NULL;
 
     /**
      * The triple store under test.

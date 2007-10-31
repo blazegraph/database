@@ -65,6 +65,9 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.BNodeImpl;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.btree.BytesUtil;
@@ -95,6 +98,8 @@ public class OptimizedValueFactory implements ValueFactory {
      */
     final public Value toNativeValue( Value v ) {
         
+        if(v == null) return null;
+        
         if( v instanceof URI && ! ( v instanceof _URI) ) {
             
             v = createURI(v.toString());
@@ -124,6 +129,60 @@ public class OptimizedValueFactory implements ValueFactory {
         } else if( v instanceof BNode && ! ( v instanceof _BNode )) {
 
             v = createBNode( ((BNode)v).getID() );
+            
+        }
+        
+        return v;
+        
+    }
+    
+    /**
+     * Converts a {@link _Value} into a {@link Value} using the Sesame object
+     * model implementations.
+     * 
+     * @param v
+     *            The value.
+     * 
+     * @return A {@link Value} with the same data. If the value is
+     *         <code>null</code> then <code>null</code> is returned.
+     */
+    final public Value toSesameObject( Value v ) {
+        
+        if( v == null ) return null;
+        
+        if( v instanceof _URI ) {
+            
+            v = new URIImpl(((_URI) v).term);
+            
+        } else if( v instanceof _Literal ) {
+            
+            String label = ((_Literal)v).term;
+            
+            String language = ((_Literal)v).language;
+            
+            _URI datatype = ((_Literal)v).datatype;
+            
+            if( language != null ) {
+
+                v = new LiteralImpl(label,language);
+                
+            } else if( datatype != null ) {
+                
+                v = new LiteralImpl(label, new URIImpl(datatype.term));
+                
+            } else {
+                
+                v = new LiteralImpl(label);
+                
+            }
+            
+        } else if (v instanceof _BNode) {
+
+            v = new BNodeImpl( ((_BNode)v).term );
+            
+        } else {
+            
+            throw new AssertionError();
             
         }
         

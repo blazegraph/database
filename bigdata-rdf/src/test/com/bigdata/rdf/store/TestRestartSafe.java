@@ -153,11 +153,11 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,null));
         assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(null,null));
         assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(null,null));
-        assertTrue(store.containsStatement(x, rdfType, C));
-        assertTrue(store.containsStatement(y, rdfType, B));
-        assertTrue(store.containsStatement(z, rdfType, A));
-        assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-        assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+        assertTrue(store.hasStatement(x, rdfType, C));
+        assertTrue(store.hasStatement(y, rdfType, B));
+        assertTrue(store.hasStatement(z, rdfType, A));
+        assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
+        assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
         
         assertEquals("#terms",8+3+2,store.getTermCount());
         assertEquals("#uris",8,store.getURICount());
@@ -189,11 +189,11 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
                     null, null));
             assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(
                     null, null));
-            assertTrue(store.containsStatement(x, rdfType, C));
-            assertTrue(store.containsStatement(y, rdfType, B));
-            assertTrue(store.containsStatement(z, rdfType, A));
-            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+            assertTrue(store.hasStatement(x, rdfType, C));
+            assertTrue(store.hasStatement(y, rdfType, B));
+            assertTrue(store.hasStatement(z, rdfType, A));
+            assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
+            assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
 
             assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
             assertEquals("#uris", 8, store.getURICount());
@@ -227,11 +227,11 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
                     null, null));
             assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(
                     null, null));
-            assertTrue(store.containsStatement(x, rdfType, C));
-            assertTrue(store.containsStatement(y, rdfType, B));
-            assertTrue(store.containsStatement(z, rdfType, A));
-            assertTrue(store.containsStatement(B, rdfsSubClassOf, A));
-            assertTrue(store.containsStatement(C, rdfsSubClassOf, B));
+            assertTrue(store.hasStatement(x, rdfType, C));
+            assertTrue(store.hasStatement(y, rdfType, B));
+            assertTrue(store.hasStatement(z, rdfType, A));
+            assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
+            assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
 
             assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
             assertEquals("#uris", 8, store.getURICount());

@@ -56,8 +56,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Vector;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -78,7 +78,7 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    protected ITripleStore store;
+    protected AbstractTripleStore store;
     
     public void setUp() throws Exception
     {

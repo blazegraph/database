@@ -115,7 +115,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
             store.addStatement(U, A, X);
 
-            assertTrue(store.containsStatement(U, A, X));
+            assertTrue(store.hasStatement(U, A, X));
             assertEquals(1,store.getStatementCount());
 
             applyRule(inf,inf.rdfs4a, 1/* numComputed */);
@@ -127,9 +127,9 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * it was not used in either a subject or object position.
              */
 
-            assertTrue(store.containsStatement(U, A, X));
-            assertTrue(store.containsStatement(U, rdfType, rdfsResource));
-            assertFalse(store.containsStatement(X, rdfType, rdfsResource));
+            assertTrue(store.hasStatement(U, A, X));
+            assertTrue(store.hasStatement(U, rdfType, rdfsResource));
+            assertFalse(store.hasStatement(X, rdfType, rdfsResource));
             assertEquals(2,store.getStatementCount());
 
         } finally {
@@ -159,7 +159,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
             store.addStatement(U, A, V);
 
-            assertTrue(store.containsStatement(U, A, V));
+            assertTrue(store.hasStatement(U, A, V));
             assertEquals(1,store.getStatementCount());
 
             applyRule(inf,inf.rdfs4b, 1/* numComputed */);
@@ -171,9 +171,9 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * it was not used in either a subject or object position.
              */
             
-            assertTrue(store.containsStatement(U, A, V));
-            assertFalse(store.containsStatement(U, rdfType, rdfsResource));
-            assertTrue(store.containsStatement(V, rdfType, rdfsResource));
+            assertTrue(store.hasStatement(U, A, V));
+            assertFalse(store.hasStatement(U, rdfType, rdfsResource));
+            assertTrue(store.hasStatement(V, rdfType, rdfsResource));
             assertEquals(2,store.getStatementCount());
 
         } finally {
@@ -206,7 +206,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
             store.addStatement(A, rdfType, C);
 
-            assertTrue(store.containsStatement(A, rdfType, C));
+            assertTrue(store.hasStatement(A, rdfType, C));
             assertEquals(1,store.getStatementCount());
 
             /*
@@ -222,8 +222,8 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * into the subject position. 
              */
             
-            assertTrue(store.containsStatement(A, rdfType, C));
-            assertFalse(store.containsStatement(A, rdfType, rdfsResource));
+            assertTrue(store.hasStatement(A, rdfType, C));
+            assertFalse(store.hasStatement(A, rdfType, rdfsResource));
             assertEquals(1,store.getStatementCount());
 
         } finally {

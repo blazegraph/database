@@ -272,7 +272,7 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
     public void doTest(final int nclass, final int nproperty,
             final int nliteral, final int litsize) throws IOException {
 
-        ITripleStore store = getStore();
+        AbstractTripleStore store = getStore();
         
         final URI[] cspace = new URI[nclass];
         final URI[] pspace = new URI[nproperty];

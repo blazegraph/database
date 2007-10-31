@@ -107,9 +107,9 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             store.addStatement(A, rdfsSubPropertyOf, B);
             store.addStatement(U, A, Y);
     
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-            assertTrue(store.containsStatement(U, A, Y));
-            assertFalse(store.containsStatement(U, B, Y));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.hasStatement(U, A, Y));
+            assertFalse(store.hasStatement(U, B, Y));
             assertEquals(2,store.getStatementCount());
 
             // apply the rule.
@@ -121,9 +121,9 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-            assertTrue(store.containsStatement(U, A, Y));
-            assertTrue(store.containsStatement(U, B, Y));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.hasStatement(U, A, Y));
+            assertTrue(store.hasStatement(U, B, Y));
         
         } finally {
         
@@ -166,11 +166,11 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             store.addStatement(U1, A, Y1);
             store.addStatement(U2, A, Y2);
     
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-            assertTrue(store.containsStatement(U1, A, Y1));
-            assertTrue(store.containsStatement(U2, A, Y2));
-            assertFalse(store.containsStatement(U1, B, Y1));
-            assertFalse(store.containsStatement(U2, B, Y2));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.hasStatement(U1, A, Y1));
+            assertTrue(store.hasStatement(U2, A, Y2));
+            assertFalse(store.hasStatement(U1, B, Y1));
+            assertFalse(store.hasStatement(U2, B, Y2));
     
             // apply the rule.
             RuleStats stats = applyRule(inf,inf.rdfs7,2/*numComputed*/);
@@ -181,11 +181,11 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B));
-            assertTrue(store.containsStatement(U1, A, Y1));
-            assertTrue(store.containsStatement(U2, A, Y2));
-            assertTrue(store.containsStatement(U1, B, Y1));
-            assertTrue(store.containsStatement(U2, B, Y2));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B));
+            assertTrue(store.hasStatement(U1, A, Y1));
+            assertTrue(store.hasStatement(U2, A, Y2));
+            assertTrue(store.hasStatement(U1, B, Y1));
+            assertTrue(store.hasStatement(U2, B, Y2));
         
         } finally {
 
@@ -231,9 +231,9 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             store.addStatement(A, rdfsSubPropertyOf, B2);
             store.addStatement(U, A, Y);
     
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
-            assertTrue(store.containsStatement(U, A, Y));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B1));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B2));
+            assertTrue(store.hasStatement(U, A, Y));
             assertEquals(3,store.getStatementCount());
     
             // apply the rule.
@@ -250,11 +250,11 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B1));
-            assertTrue(store.containsStatement(A, rdfsSubPropertyOf, B2));
-            assertTrue(store.containsStatement(U, A, Y));
-            assertTrue(store.containsStatement(U, B1, Y)); // entailed.
-            assertTrue(store.containsStatement(U, B2, Y)); // entailed.
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B1));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B2));
+            assertTrue(store.hasStatement(U, A, Y));
+            assertTrue(store.hasStatement(U, B1, Y)); // entailed.
+            assertTrue(store.hasStatement(U, B2, Y)); // entailed.
             assertEquals(5,store.getStatementCount());
 
         } finally {

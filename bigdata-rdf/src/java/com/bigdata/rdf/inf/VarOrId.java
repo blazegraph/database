@@ -46,6 +46,7 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 
 /**
@@ -54,7 +55,7 @@ import com.bigdata.rdf.store.ITripleStore;
  */
 abstract public class VarOrId implements Comparable<VarOrId>{
 
-    static protected final transient long NULL = ITripleStore.NULL;
+    static protected final transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The reserved value {@link #NULL} is used to denote variables, otherwise

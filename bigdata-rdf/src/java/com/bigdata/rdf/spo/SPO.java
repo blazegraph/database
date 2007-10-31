@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.rdf.spo;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -276,7 +277,7 @@ public class SPO {
      * 
      * @return The externalized representation of the statement. 
      */
-    public String toString(ITripleStore store) {
+    public String toString(AbstractTripleStore store) {
         
         return store.toString(s,p,o)+(type==null?"":" : "+type);
         

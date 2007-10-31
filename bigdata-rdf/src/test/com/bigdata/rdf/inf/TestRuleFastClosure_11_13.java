@@ -145,7 +145,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             buffer.flush();
 
             // check entailments.
-            assertTrue(store.containsStatement(x, inf.rdfType.id, b));
+            assertTrue(store.hasStatement(x, inf.rdfType.id, b));
 
             store.commit();
 
@@ -224,7 +224,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             buffer.flush();
 
             // check entailments.
-            assertTrue(store.containsStatement(z, inf.rdfType.id, b));
+            assertTrue(store.hasStatement(z, inf.rdfType.id, b));
 
             store.commit();
 

@@ -120,8 +120,8 @@ public class TestAll extends TestCase {
 
         // @todo test suite for backward chaining of (?x owl:sameAs ?y).
         
-        // test suite for semi-naive evaluation (magic sets / SLD).
-        suite.addTestSuite( TestMagicSets.class);
+        // @todo test suite for semi-naive evaluation (magic sets / SLD).
+//        suite.addTestSuite( TestMagicSets.class);
 
         return suite;
         

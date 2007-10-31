@@ -105,7 +105,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.containsStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             assertEquals(1,store.getStatementCount());
 
             InferenceEngine inf = new InferenceEngine(store);
@@ -118,10 +118,10 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.containsStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             
             // entailed
-            assertTrue(store.containsStatement(U, URIImpl.RDFS_SUBCLASSOF, U));
+            assertTrue(store.hasStatement(U, URIImpl.RDFS_SUBCLASSOF, U));
 
             // final #of statements in the store.
             assertEquals(2,store.getStatementCount());
@@ -161,8 +161,8 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
-            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             assertEquals(2,store.getStatementCount());
 
             InferenceEngine inf = new InferenceEngine(store);
@@ -175,12 +175,12 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.containsStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
-            assertTrue(store.containsStatement(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             
             // entailed
-            assertTrue(store.containsStatement(U1, URIImpl.RDFS_SUBCLASSOF, U1));
-            assertTrue(store.containsStatement(U2, URIImpl.RDFS_SUBCLASSOF, U2));
+            assertTrue(store.hasStatement(U1, URIImpl.RDFS_SUBCLASSOF, U1));
+            assertTrue(store.hasStatement(U2, URIImpl.RDFS_SUBCLASSOF, U2));
 
             // final #of statements in the store.
             assertEquals(4,store.getStatementCount());

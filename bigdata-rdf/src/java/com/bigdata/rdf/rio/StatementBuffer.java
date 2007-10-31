@@ -70,7 +70,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -107,7 +108,7 @@ public class StatementBuffer {
      */
     final Map<_Statement,_Statement> distinctStmtMap;
     
-    protected final ITripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
@@ -146,7 +147,7 @@ public class StatementBuffer {
      *            buffer can hold. The minimum capacity is three (3) since that
      *            corresponds to a single triple where all terms are URIs.
      */
-    public StatementBuffer(ITripleStore store, int capacity) {
+    public StatementBuffer(AbstractTripleStore store, int capacity) {
         
         this(store,capacity,true/*distinct*/);
         
@@ -166,7 +167,7 @@ public class StatementBuffer {
      *            When true only distinct terms and statements are stored in the
      *            buffer.
      */
-    public StatementBuffer(ITripleStore store, int capacity, boolean distinct) {
+    public StatementBuffer(AbstractTripleStore store, int capacity, boolean distinct) {
     
         if (store == null)
             throw new IllegalArgumentException();
@@ -824,7 +825,7 @@ public class StatementBuffer {
                 
             }
             
-            assert current.termId != ITripleStore.NULL;
+            assert current.termId != IRawTripleStore.NULL;
             
             return current.termId;
             

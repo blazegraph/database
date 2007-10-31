@@ -56,7 +56,6 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Tx;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
@@ -67,120 +66,7 @@ import com.bigdata.scaleup.MasterJournal;
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @todo define two versions of this - one that uses overflow and one that does
- *       not?
- * 
- * @todo refactor the rdf application to use the client-data service divide and
- *       compare performance with the embedded database (ideally both will
- *       continue to run so that they may be directly compared), support journal
- *       overflow (sync and then async) and view in the data service (assembled
- *       from journal(s) and index segment(s)) so that we can do very large data
- *       loads (refactor out of the scale-up package), tune the forward chainer
- *       to remove more redundency, add flag for entailments vs assertions vs
- *       told triples so that they can be identified in the KB, move to a quad
- *       store model, support scalable joins, test on large lubm data set.
- * 
- * @todo Refactor to support transactions and concurrent load/query and test
- *       same.
- *       <p>
- *       Conflicts arise in the bigdata-RDF store when concurrent transactions
- *       attempt to define the same term. The problem arises because on index is
- *       used to map the term to an unique identifier and another to map the
- *       identifiers back to terms. Further, the statement indices use term
- *       identifiers directly in their keys. Therefore, resolving concurrent
- *       definition of the same term requires that we either do NOT isolate the
- *       writes on the term indices (which is probably an acceptable strategy)
- *       or that we let the application order the pass over the isolated indices
- *       and give the conflict resolver access to the {@link Tx} so that it can
- *       update the dependent indices if a conflict is discovered on the terms
- *       index.
- *       <p>
- *       The simplest approach appears to be NOT isolating the terms and ids
- *       indices. As long as the logic resides at the index, e.g., a lambda
- *       expression/method, to assign the identifier and create the entry in the
- *       ids index we can get buy with less isolation. If concurrent processes
- *       attempt to define the same term, then one or the other will wind up
- *       executing first (writes on indices are single threaded) and the result
- *       will be coherent as long as the write is committed before the ids are
- *       returned to the application. It simply does not matter which process
- *       defines the term since all that we care about is atomic, consistent,
- *       and durable. This is a case where group commit would work well (updates
- *       are blocked together on the server automatically to improve
- *       throughput).
- *       <p>
- *       Concurrent assertions of the same statement cause write-write
- *       conflicts, but they are trivially resolved -- we simply ignore the
- *       write-write conflict since both transactions agree on the statement
- *       data. Unlike the term indices, isolation is important for statements
- *       since we want to guarentee that a set of statements either is or is not
- *       asserted atomically. (With the terms index, we could care less as long
- *       as the indices are coherent.)
- *       <p>
- *       The only concern with the statement indices occurs when one transaction
- *       asserts a statement and a concurrent transaction deletes a statement. I
- *       need to go back and think this one through some more and figure out
- *       whether or not we need to abort a transaction in this case.
- * 
- * @todo bnodes do not need to be store in the terms or ids indices if we
- *       presume that an unknown identifier is a bnode. however, we still need
- *       to ensure that bnode identifiers are distinct or the same when and
- *       where appropriate, so we need to assign identifiers to bnodes in a
- *       restart-safe manner even if we "forget" the term-id mapping. (The
- *       possibility of an incomplete ids index during data load for the
- *       scale-out solution means that we must either read from a historical
- *       known consistent timestamp or record bnodes in the terms index.)
- * 
- * @todo the only added cost for a quad store is the additional statement
- *       indices. There are only three more statement indices in a quad store.
- *       Since statement indices are so cheap, it is probably worth implementing
- *       them now, even if only as a configuration option. (There may be reasons
- *       to maintain both versions.)
- * 
- * @todo verify read after commit (restart safe) for large data sets (multiple
- *       index partitions for scale-out and overflow for scale-out/scale-up).
- * 
- * @todo test re-load rate for a data set and verify that no new statements are
- *       added when re-loading a data set.
- * 
- * @todo add bulk data export (buffering statements and bulk resolving term
- *       identifiers).
- * 
- * @todo possibly save frequently seen terms in each batch for the next batch in
- *       order to reduce unicode conversions.
- * 
- * @todo support metadata about the statement, e.g., whether or not it is an
- *       inference. consider that we may need to move the triple/quad ids into
- *       the value in the statement indices since some key compression schemes
- *       are not reversable (we depend on reversable keys to extract the term
- *       ids for a statement).
- * 
- * @todo Try a variant in which we have metadata linking statements and terms
- *       together. In this case we would have to go back to the terms and update
- *       them to have metadata about the statement. it is a bit circular since
- *       we can not create the statement until we have the terms and we can not
- *       add the metadata to the terms until we have the statement.
- * 
- * @todo examine role for semi joins for a Sesame 2.x integration (quad store
- *       with real query operators). semi-joins (join indices) can be declared
- *       for various predicate combinations and then maintained. The
- *       declarations can be part of the scale-out index metadata. The logic
- *       that handles batch data load can also maintain the join indices. While
- *       triggers could be used for this purpose, there would need to be a means
- *       to aggregate and order the triggered events and then redistribute them
- *       against the partitions of the join indices. If the logic is in the
- *       client, then we need to make sure that newly declared join indices are
- *       fully populated (e.g., clients are notified to start building the join
- *       index and then we start the index build from existing data to remove
- *       any chance that the join index would be incomplete - the index would be
- *       ready as soon as the index build completes and client operations would
- *       be in a maintenance role).
- * 
- * @todo provide option for closing aspects of the entire store vs just a single
- *       context in a quad store vs just a "document" before it is loaded into a
- *       triple store (but with the term identifiers of the triple store). For
- *       example, in an open web and internet scale kb it is unlikely that you
- *       would want to have all harvested ontologies closed against all the
- *       data. however, that might make more sense in a more controlled setting.
+ * @todo remove overflow() support - this will become part of the journal API.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -192,8 +78,11 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     private final boolean isolatableIndices;
     
     /*
-     * Note: You MUST NOT retain hard references to these indices across
-     * operations since they may be discarded and re-loaded.
+     * At this time is is valid to hold onto a reference during a given load or
+     * query operation but not across commits (more accurately, not across
+     * overflow() events). Eventually we will have to put a client api into
+     * place that hides the routing of btree api operations to the journals and
+     * segments for each index partition.
      */
     private IIndex ndx_termId;
     private IIndex ndx_idTerm;
@@ -203,7 +92,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     private IIndex ndx_just;
     
     /*
-     * Note: At this time is is valid to hold onto a reference during a given
+     * Note: At this time it is valid to hold onto a reference during a given
      * load or query operation but not across commits (more accurately, not
      * across overflow() events).
      */
@@ -361,7 +250,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     }
     
     /**
-     * Delegates the opertion to the backing store.
+     * Delegates the operation to the backing store.
      */
     final public void commit() {
      

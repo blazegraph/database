@@ -57,8 +57,8 @@ import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test suite for {@link IAccessPath}.
- * 
- * @todo test the rest of the interface.
+ * <p>
+ * See also {@link TestTripleStore} which tests some of this stuff.
  *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -149,9 +149,9 @@ public class TestAccessPath extends AbstractTripleStoreTestCase {
             // flush statements to the store.
             buffer.flush();
 
-            assertTrue(store.containsStatement(A, B, C));
-            assertTrue(store.containsStatement(C, B, D));
-            assertTrue(store.containsStatement(A, E, C));
+            assertTrue(store.hasStatement(A, B, C));
+            assertTrue(store.hasStatement(C, B, D));
+            assertTrue(store.hasStatement(A, E, C));
 
             // distinct subject term identifiers.
             {
@@ -212,14 +212,4 @@ public class TestAccessPath extends AbstractTripleStoreTestCase {
 
     }
 
-    /**
-     * FIXME write test of the ability to remove all statements matching the
-     * triple pattern specified used to construct the access path.
-     */
-    public void test_removeAll() {
-        
-        fail("write test");
-        
-    }
-    
 }

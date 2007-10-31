@@ -64,7 +64,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IProcedure;
 
@@ -181,7 +181,7 @@ public class AddTerms implements IProcedure, Externalizable {
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
         
-        if (counter.get() == ITripleStore.NULL) {
+        if (counter.get() == IRawTripleStore.NULL) {
             /*
              * Note: we never assign this value as a term identifier.
              */

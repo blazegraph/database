@@ -3,8 +3,6 @@ package com.bigdata.rdf.inf;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.bigdata.rdf.inf.Rule.State;
-
 /**
  * Statistics collected when performing inference.
  * 

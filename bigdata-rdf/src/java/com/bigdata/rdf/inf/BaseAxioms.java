@@ -47,6 +47,7 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 import org.openrdf.model.Resource;
@@ -54,6 +55,10 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * @author personickm
@@ -236,4 +241,39 @@ abstract class BaseAxioms implements Axioms {
               
     }
     
+    /**
+     * Add the axiomatic RDF(S) triples to the store.
+     * <p>
+     * Note: The termIds are defined with respect to the backing triple store
+     * since the axioms will be copied into the store when the closure is
+     * complete.
+     * 
+     * @param database
+     *            The store to which the axioms will be added.
+     */
+    public void addAxioms(AbstractTripleStore database) {
+        
+        StatementBuffer buffer = new StatementBuffer(database, getAxioms()
+                .size(), true/* distinct */);
+
+        for (Iterator<Axioms.Triple> itr = getAxioms().iterator(); itr
+                .hasNext();) {
+
+            Axioms.Triple triple = itr.next();
+            
+            URI s = triple.getS();
+            
+            URI p = triple.getP();
+            
+            URI o = triple.getO();
+            
+            buffer.add( s, p, o, StatementEnum.Axiom );
+            
+        }
+
+        // write on the database.
+        buffer.flush();
+        
+    }
+
 }

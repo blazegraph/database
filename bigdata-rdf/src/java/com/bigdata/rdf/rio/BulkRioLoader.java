@@ -66,7 +66,7 @@ import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.scaleup.MasterJournal;
 
 /**
@@ -115,7 +115,7 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final ITripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
@@ -150,13 +150,13 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      */
     BulkLoaderBuffer buffer;
     
-    public BulkRioLoader( ITripleStore store ) {
+    public BulkRioLoader( AbstractTripleStore store ) {
     
         this(store, DEFAULT_BUFFER_SIZE );
         
     }
     
-    public BulkRioLoader(ITripleStore store, int capacity) {
+    public BulkRioLoader(AbstractTripleStore store, int capacity) {
 
         assert store != null;
         

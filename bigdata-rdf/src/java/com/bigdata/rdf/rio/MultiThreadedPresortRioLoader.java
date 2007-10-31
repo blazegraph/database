@@ -59,6 +59,7 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -100,7 +101,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
     /**
      * Terms and statements are inserted into this store.
      */
-    protected final ITripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
@@ -152,13 +153,13 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      */
     StatementBuffer buffer;
     
-    public MultiThreadedPresortRioLoader( ITripleStore store ) {
+    public MultiThreadedPresortRioLoader( AbstractTripleStore store ) {
     
         this( store, DEFAULT_BUFFER_SIZE, false );
         
     }
     
-    public MultiThreadedPresortRioLoader( ITripleStore store, int capacity, boolean distinct ) {
+    public MultiThreadedPresortRioLoader( AbstractTripleStore store, int capacity, boolean distinct ) {
 
         assert store != null;
         

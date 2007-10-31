@@ -57,6 +57,10 @@ public class SPOComparator implements Comparator<SPO> {
 
     public static final transient Comparator<SPO> INSTANCE = new SPOComparator();
     
+    private SPOComparator() {
+        
+    }
+    
     public int compare(SPO stmt1, SPO stmt2) {
 
         /*

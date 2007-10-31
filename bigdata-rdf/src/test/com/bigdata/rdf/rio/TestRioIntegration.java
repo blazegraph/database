@@ -52,7 +52,6 @@ import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A test of the RIO integration.
@@ -79,7 +78,7 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    protected ITripleStore store;
+    protected AbstractTripleStore store;
     
     public void setUp() throws Exception {
         

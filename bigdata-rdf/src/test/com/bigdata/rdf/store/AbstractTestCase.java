@@ -47,14 +47,34 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.sesame.admin.RdfAdmin;
+import org.openrdf.sesame.admin.StdOutAdminListener;
+import org.openrdf.sesame.admin.UpdateException;
+import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.sesame.sail.RdfRepository;
+import org.openrdf.sesame.sail.SailInitializationException;
+import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
@@ -64,8 +84,12 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.sail.BigdataRdfRepository;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * <p>
@@ -210,9 +234,9 @@ abstract public class AbstractTestCase
     // Test helpers.
     //
 
-    protected final long N = ITripleStore.N;
+    protected final long N = IRawTripleStore.N;
 
-    protected final long NULL = ITripleStore.NULL;
+    protected final long NULL = IRawTripleStore.NULL;
     
     abstract protected AbstractTripleStore getStore();
     
@@ -236,7 +260,7 @@ abstract public class AbstractTestCase
      * @todo ClientIndexView does not disclose whether or not the index is
      *       isolatable so this will not work for a bigadata federation.
      */
-    void dumpTerms(ITripleStore store) {
+    void dumpTerms(AbstractTripleStore store) {
 
         // Same #of terms in the forward and reverse indices.
         assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
@@ -409,5 +433,320 @@ abstract public class AbstractTestCase
 //        }
 //
 //    }
+
+    /**
+     * Uploads an file into an {@link RdfRepository}.
+     *
+     * @see RdfAdmin
+     */
+    protected void upload(RdfRepository repo, String resource, String baseURL,
+            RDFFormat format)
+            throws IOException, UpdateException {
+
+        InputStream rdfStream = getClass().getResourceAsStream(resource);
+
+        if (rdfStream == null) {
+
+            // If we do not find as a Resource then try the file system.
+            rdfStream = new BufferedInputStream(new FileInputStream(resource));
+
+        }
+
+        try {
+
+            RdfAdmin admin = new RdfAdmin(repo);
+
+            final boolean validate = true;
+
+            admin.addRdfModel(rdfStream, baseURL, new StdOutAdminListener(),
+                    format, validate);
+
+        } finally {
+
+            rdfStream.close();
+
+        }
+
+    }
+
+    /*
+     * compares two RDF models for equality.
+     */
+
+    /**
+     * Wraps up the {@link AbstractTripleStore} as an {@link RdfRepository} to
+     * facilitate using {@link #modelsEqual(RdfRepository, RdfRepository)} for
+     * ground truth testing.
+     */
+    public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
+            throws SailInitializationException {
+
+        RdfRepository repo = new BigdataRdfRepository(inf);
+        
+        Properties properties = new Properties(getProperties());
+        
+        properties.setProperty(BigdataRdfRepository.Options.RDFS_CLOSURE,
+                "" + true);
+        
+        repo.initialize( properties );
+        
+        return modelsEqual(expected,repo);
+        
+    }
+    
+    /**
+     * Compares two RDF graphs for equality (same statements) - does NOT handle
+     * bnodes, which much be treated as variables for RDF semantics.
+     * 
+     * @todo Sesame probably bundles this logic in a manner that does handle
+     *       bnodes.
+     * 
+     * @param expected
+     * 
+     * @param actual
+     * 
+     * @return true if all statements in the expected graph are in the actual
+     *         graph and if the actual graph does not contain any statements
+     *         that are not also in the expected graph.
+     */
+    public static boolean modelsEqual(RdfRepository expected,
+            RdfRepository actual) {
+
+        Collection<Statement> testRepoStmts = getStatements(expected);
+
+        Collection<Statement> closureRepoStmts = getStatements(actual);
+
+        return compare(testRepoStmts, closureRepoStmts);
+
+    }
+
+    private static ValueFactory simpleFactory = new ValueFactoryImpl();
+
+    private static Collection<Statement> getStatements(RdfRepository repo) {
+
+        Collection<Statement> c = new HashSet<Statement>();
+
+        StatementIterator statIter = repo.getStatements(null, null, null);
+
+        while (statIter.hasNext()) {
+
+            Statement stmt = statIter.next();
+
+            stmt = makeSimple(stmt);
+
+            c.add(stmt);
+
+        }
+
+        statIter.close();
+
+        return c;
+
+    }
+
+    private static Statement makeSimple(Statement stmt) {
+
+        Resource s = stmt.getSubject();
+        URI p = stmt.getPredicate();
+        Value o = stmt.getObject();
+
+        s = (Resource) makeSimple(s);
+
+        p = (URI) makeSimple(p);
+
+        o = makeSimple(o);
+
+        stmt = simpleFactory.createStatement(s, p, o);
+
+        return stmt;
+
+    }
+
+    private static Value makeSimple(Value v) {
+
+        if (v instanceof URI) {
+
+            v = simpleFactory.createURI(((URI) v).getURI());
+
+        } else if (v instanceof Literal) {
+
+            String label = ((Literal) v).getLabel();
+            String language = ((Literal) v).getLanguage();
+            URI datatype = ((Literal) v).getDatatype();
+
+            if (datatype != null) {
+
+                v = simpleFactory.createLiteral(label, datatype);
+
+            } else if (language != null) {
+
+                v = simpleFactory.createLiteral(label, language);
+
+            } else {
+
+                v = simpleFactory.createLiteral(label);
+
+            }
+
+        } else {
+
+            v = simpleFactory.createBNode(((BNode) v).getID());
+
+        }
+
+        return v;
+
+    }
+
+    private static boolean compare(Collection<Statement> expectedRepo,
+            Collection<Statement> actualRepo) {
+
+        boolean sameStatements = true;
+
+        log("size of 'expected' repository: " + expectedRepo.size());
+        log("size of 'actual'   repository: " + actualRepo.size());
+
+        for (Iterator<Statement> it = actualRepo.iterator(); it.hasNext();) {
+
+            Statement stmt = it.next();
+
+            if (!expectedRepo.contains(stmt)) {
+
+                sameStatements = false;
+
+                log("Not expecting: " + stmt);
+
+            }
+
+        }
+
+        log("all the statements in actual in expected? " + sameStatements);
+
+        for (Iterator<Statement> it = expectedRepo.iterator(); it.hasNext();) {
+
+            Statement stmt = it.next();
+
+            if (!actualRepo.contains(stmt)) {
+
+                sameStatements = false;
+
+                log("    Expecting: " + stmt);
+
+            }
+
+        }
+
+        return expectedRepo.size() == actualRepo.size() && sameStatements;
+
+    }
+
+    private static void log(String s) {
+
+        log.info(s);
+
+    }
+
+    static public void assertSameSPOs(SPO[] expected, ISPOIterator actual) {
+
+        assertSameSPOs("", expected, actual);
+
+    }
+
+    static public void assertSameSPOs(String msg, SPO[] expected, ISPOIterator actual) {
+
+        /*
+         * clone expected[] and put into the same order as the iterator.
+         */
+        
+        expected = expected.clone();
+        
+        KeyOrder keyOrder = actual.getKeyOrder();
+
+        Arrays.sort(expected, keyOrder.getComparator());
+        
+        int i = 0;
+
+        while (actual.hasNext()) {
+
+            if (i >= expected.length) {
+
+                fail(msg + ": The iterator is willing to visit more than "
+                        + expected.length + " objects.");
+
+            }
+
+            SPO g = actual.next();
+            
+            if (!expected[i].equals(g)) {
+                
+                /*
+                 * Only do message construction if we know that the assert will
+                 * fail.
+                 */
+                fail(msg + ": Different objects at index=" + i + ": expected="
+                        + expected[i] + ", actual=" + g);
+            }
+
+            i++;
+
+        }
+
+        if (i < expected.length) {
+
+            fail(msg + ": The iterator SHOULD have visited " + expected.length
+                    + " objects, but only visited " + i + " objects.");
+
+        }
+
+    }
+
+    static public void assertSameStatements(Statement[] expected, StatementIterator actual) {
+
+        assertSameStatements("", expected, actual);
+
+    }
+
+    /**
+     * @todo since there is no way to know the natural order for the statement
+     *       iterator we can not sort expected into the same order. therefore
+     *       this should test for the same statements in any order
+     */
+    static public void assertSameStatements(String msg, Statement[] expected, StatementIterator actual) {
+
+        int i = 0;
+
+        while (actual.hasNext()) {
+
+            if (i >= expected.length) {
+
+                fail(msg + ": The iterator is willing to visit more than "
+                        + expected.length + " objects.");
+
+            }
+
+            Statement g = actual.next();
+            
+            if (!expected[i].equals(g)) {
+                
+                /*
+                 * Only do message construction if we know that the assert will
+                 * fail.
+                 */
+                fail(msg + ": Different objects at index=" + i + ": expected="
+                        + expected[i] + ", actual=" + g);
+            }
+
+            i++;
+
+        }
+
+        if (i < expected.length) {
+
+            fail(msg + ": The iterator SHOULD have visited " + expected.length
+                    + " objects, but only visited " + i + " objects.");
+
+        }
+
+    }
 
 }

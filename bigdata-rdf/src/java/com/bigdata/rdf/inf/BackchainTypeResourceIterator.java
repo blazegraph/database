@@ -104,12 +104,12 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
     
     private boolean open = true;
 
-    private void assertOpen() {
-        
-        if (!open)
-            throw new IllegalStateException();
-        
-    }
+//    private void assertOpen() {
+//        
+//        if (!open)
+//            throw new IllegalStateException();
+//        
+//    }
     
     /**
      * Create an iterator that will visit all statements in the source iterator
@@ -312,7 +312,7 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
 
             // sort into the required order.
 
-            Arrays.sort(stmts, 0, stmts.length, keyOrder.getSPOComparator());
+            Arrays.sort(stmts, 0, stmts.length, keyOrder.getComparator());
 
         }
 
