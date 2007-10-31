@@ -47,14 +47,12 @@ Modifications:
 
 package com.bigdata.rdf.scaleout;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.TestRioIntegration;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 
 /**
