@@ -70,6 +70,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A buffer for {@link SPO}s that are flushed on overflow into a backing
  * {@link AbstractTripleStore}.
  * 
+ * @todo make this thread-safe to support parallel execution of rules writing on
+ *       the same buffer.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

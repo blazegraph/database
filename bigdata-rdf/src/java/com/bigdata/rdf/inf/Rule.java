@@ -55,11 +55,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 
@@ -74,13 +74,19 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo the rule is entirely expressed in terms of a sequence of conjunctive
- *       predicates. in order to be more general, the expression should be in
- *       terms of a boolean AND operator, a triple pattern, and rewrites for
- *       evaluation into a variety of specialized JOIN operations (self-join,
- *       distinct term scan, and nested subquery). There is also the odd case
- *       for {@link AbstractRuleFastClosure_3_5_6_7_9} where the rule accepts a
- *       set of term identifers as on of its inputs.
+ * @todo The {@link Rule} is expressed as a sequence of conjunctive predicates.
+ *       this is clearly sufficient for RDFS entailments and probably can be
+ *       made to serve for a magic sets variant (as an alternative to backward
+ *       chaining during TM).
+ *       <p>
+ *       If there is a requirement to be more general, then this should be
+ *       refactored in terms of a boolean AND operator, a triple pattern, and
+ *       rewrites for evaluation into a variety of specialized JOIN operations
+ *       (self-join, distinct term scan, and nested subquery).
+ *       <p>
+ *       There is also the odd case for
+ *       {@link AbstractRuleFastClosure_3_5_6_7_9} where the rule accepts a set
+ *       of term identifers as on of its inputs.
  */
 abstract public class Rule {
 
@@ -110,10 +116,6 @@ abstract public class Rule {
 
     /**
      * Canonicalizing map for {@link Var}s.
-     * 
-     * @todo I do not imagine that a lot of variables will be declared, but if
-     *       there are then make this a weak value map and use an LRU to keep
-     *       recently used variables around?
      */
     static private final Map<String,Var> vars = new ConcurrentHashMap<String,Var>();
     
@@ -336,6 +338,12 @@ abstract public class Rule {
         public final boolean justify;
         
         /**
+         * The index of the term that will read from the {@link #focusStore}
+         * (ignored when {@link #focusStore} is <code>null</code>).
+         */
+        public final int focusIndex;
+        
+        /**
          * The optional focus store.
          */
         public final AbstractTripleStore focusStore;
@@ -380,13 +388,6 @@ abstract public class Rule {
         
         /**
          * The evaluation order for the predicates in the {@link #body} of the rule.
-         * This is determined when the rule is constructed.
-         * 
-         * FIXME The evaluation order MUST be tweaked when evaluating a rule against
-         * (new+db) since any triple pattern is generally more selective in (new)
-         * rather than in the (db), but it does depend on the actual range counts
-         * for the actual data. {@link #clearDownStreamBindings(int)} also has a
-         * dependency on this data.
          */
         final protected int[] order;
         
@@ -402,7 +403,7 @@ abstract public class Rule {
         
         /**
          * 
-         * @param index
+         * @param focusIndex
          *            The index of the predicate in {@link Rule#body} that will
          *            read from the "focusStore" (ignored if "focusStore" is
          *            <code>null</code>).
@@ -411,19 +412,21 @@ abstract public class Rule {
          *            The persistent database.
          * @param buffer
          */
-        private State(int index, boolean justify,
+        private State(int focusIndex, boolean justify,
                 AbstractTripleStore focusStore,
                 AbstractTripleStore database,
                 SPOBuffer buffer) {
 
-            assert index >= 0;
-            assert index <= body.length;
+            assert focusIndex >= 0;
+            assert focusIndex <= body.length;
             
             assert database != null;
             
             assert buffer != null;
             
             this.justify = justify;
+            
+            this.focusIndex = focusIndex;
             
             // MAY be null.
             this.focusStore = focusStore;
@@ -444,6 +447,28 @@ abstract public class Rule {
 
             // The evaluation order.
             this.order = computeEvaluationOrder();
+            
+            if(focusStore!=null) {
+                
+                /*
+                 * Always evaluate the predicate that will read from the
+                 * focusStore 1st.
+                 * 
+                 * Note: This presumes that any predicate reading from the
+                 * [focusStore] will be more selective than any predicate
+                 * reading from the fused view [focusStore + database]. This
+                 * should be true in all except a few edge cases -- e.g., when
+                 * the database is empty.
+                 */
+
+                int tmp = order[0];
+                
+                order[0] = order[focusIndex];
+                
+                order[focusIndex] = tmp;
+                
+            }
+            
 
             // The 1st dependency map for each variable in the tail.
             this.depends = computeVariableDependencyMap();
@@ -1123,66 +1148,96 @@ abstract public class Rule {
          * 
          * @throws IndexOutOfBoundsException
          *             if index is out of bounds.
-         * 
-         * FIXME modify the cache to accept the view (new or new+old) for the access path
-         * (it needs to be a two-dimensional array).
-         * 
-         * FIXME implement TripleStoreFusedView
          */
         public IAccessPath getAccessPath(int index) {
             
-            if(accessPath[index]==null) {
+            // check the cache.
+            IAccessPath accessPath = this.accessPath[index];
+            
+            if (accessPath == null) {
             
                 // based on the current bindings.
                 
-                accessPath[index] = database.getAccessPath(//
-                        bindings[index*N+0],//
-                        bindings[index*N+1],//
-                        bindings[index*N+2]//
-                        );
-                
-            }
-            
-            return accessPath[index];
-            
-        }
+                final long s = bindings[index * N + 0];
+                final long p = bindings[index * N + 1];
+                final long o = bindings[index * N + 2];
 
-        /**
-         * The access path corresponding to the body[] predicate that is more
-         * selective given the data in the store and the current variable bindings.
-         * 
-         * @return The index of the {@link Pred} in {@link #body} that is the most
-         *         selective -or- <code>-1</code> iff no access path would read
-         *         any data.
-         * 
-         * @todo modify to accept the view (new or new+old) for the access path
-         */
-        public int getMostSelectiveAccessPathByRangeCount() {
+                if (focusStore == null) {
+                 
+                    accessPath = database.getAccessPath(s, p, o);
 
-            int index = -1;
+                } else {
 
-            int minRangeCount = Integer.MAX_VALUE;
+                    if (index == focusIndex) {
 
-            for (int i = 0; i < body.length; i++) {
+                        accessPath = focusStore.getAccessPath(s, p, o);
 
-                // skip over fully bound predicates.
-                if( isFullyBound(i) ) continue;
-                
-                int rangeCount = getAccessPath(i).rangeCount();
+                    } else {
 
-                if (rangeCount < minRangeCount) {
+                        /*
+                         * Return a read-only access path for the fused view
+                         * [focusStore + database].
+                         */
+                        
+                        return new AccessPathFusedView(
+                                focusStore.getAccessPath(s, p, o),
+                                database.getAccessPath(s, p, o)
+                                );
 
-                    minRangeCount = rangeCount;
-
-                    index = i;
+                    }
 
                 }
 
+                // update the cache.
+                this.accessPath[index] = accessPath;
+                
             }
-
-            return index;
-
+            
+            return accessPath;
+            
         }
+
+//        /**
+//         * The index of the {@link Rule#body}[] predicate that is the most
+//         * selective given the data and the current variable bindings.
+//         * 
+//         * @return The index of the {@link Pred} in {@link #body} that is the
+//         *         most selective.
+//         */
+//        public int getMostSelectiveAccessPathByRangeCount() {
+//
+//            int index = -1;
+//
+//            int minRangeCount = Integer.MAX_VALUE;
+//
+//            for (int i = 0; i < body.length; i++) {
+//
+//                final int rangeCount;
+//                
+//                // skip over fully bound predicates.
+//                if( isFullyBound(i) ) {
+//                    
+//                    rangeCount = 1;
+//                    
+//                } else {
+//                
+//                    rangeCount = getAccessPath(i).rangeCount();
+//                    
+//                }
+//
+//                if (rangeCount < minRangeCount) {
+//
+//                    minRangeCount = rangeCount;
+//
+//                    index = i;
+//
+//                }
+//
+//            }
+//
+//            return index;
+//
+//        }
 
     }
     
@@ -1219,7 +1274,7 @@ abstract public class Rule {
      * 
      * @todo We can in fact run the variations of the rule in parallel using an
      *       {@link ExecutorService}. The {@link InferenceEngine} or perhaps
-     *       the database should declare this service. The service will be used
+     *       the database should declare this service. The service could be used
      *       for both map parallelism and for parallelism of subqueries within
      *       rules.
      *       <p>
@@ -1229,57 +1284,61 @@ abstract public class Rule {
      *       buffer.
      *       <p>
      *       The {@link #bindings}, {@link #order}, and {@link #depends} all
-     *       need to be per-thread.
+     *       need to be per-thread (done).
      *       <p>
-     *       The {@link RuleStats} needs to be thread-safe, so probably use
-     *       AtomicLong and friends.
-     * 
-     * @todo In order to use a reader/writer (or pipe) model we need special
-     *       {@link ISPOIterator} (and IJustificationIterator) implementations
-     *       that wrap the appropriate buffer, e.g.,
-     * 
-     * <pre>
-     *            SPOBuffer buffer = new SPOBuffer(...);
-     *            
-     *            ISPOIterator itr = new SPOPipeIterator( buffer );
-     *            
-     *            rule.apply(..., buffer );
-     *            
-     *            while(itr.hasNext()) {
-     *            
-     *             SPO[] stmts = itr.nextChunk();
-     *            
-     *            }
-     *            
-     * </pre>
-     * 
-     * before calling apply. The caller then has a handle on the object from
-     * which they can read the entailments and do whatever they like with them.
-     * <P>
-     * Note: The SPOBuffer would require a means to handshake with the iterator
-     * so that it could signal when no more data will be made available to the
-     * iterator.
-     * <p>
-     * For example, you can use
-     * {@link IRawTripleStore#addStatements(ISPOIterator, com.bigdata.rdf.spo.ISPOFilter)}
-     * if you want to jam the results into a database. If you just want to scan
-     * the results, then you can do that directly using the iterator.
-     * <p>
-     * Normally you would want to consume the iterator in chunks, sorting each
-     * chunk into the natural order for some index operation and then doing that
-     * operation on each chunk in turn.
+     *       The {@link RuleStats} needs to be thread-safe (they are now per-{@link State),
+     *       but {@link RuleStats#add(RuleStats)} also needs to be thread-safe.
      */
     public RuleStats apply(boolean justify, AbstractTripleStore focusStore,
             AbstractTripleStore database, SPOBuffer buffer) { 
     
-        // FIXME Map over terms when focusStore != null.
-        int index = 0;
-        
-        State state = newState(index,justify,focusStore,database,buffer);
-        
-        apply(state);
+        if (focusStore == null) {
 
-        return state.stats;
+            /*
+             * Just close the database.
+             */
+
+            State state = newState(0/*focusIndex*/, justify, focusStore, database, buffer);
+
+            apply(state);
+
+            return state.stats;
+            
+        }
+        
+        /*
+         * When focusStore != null we need to run the rule N times, where N is
+         * the #of predicates in the body. In each pass we choose body[i] as the
+         * focusIndex - the predicate that will read from the [focusStore]. All
+         * other predicates will read from the fused view of the [focusStore]
+         * and the [database].
+         * 
+         * Note: when the rule has a single predicate in the tail, the predicate
+         * is only run against [focusStore] rather than [datbase] or [focusStore +
+         * database].
+         * 
+         * Note: all of these passes write on the same SPOBuffer. This has the
+         * same effect as a UNION over the entailments of the individual passes.
+         * 
+         * @todo run the N passes in parallel.
+         */
+
+        // statistics aggregated across the rule variants that we will run.
+        RuleStats stats = new RuleStats(this);
+
+        State[] state = new State[body.length];
+        
+        for(int i=0; i<body.length; i++) {
+            
+            state[i] = newState(i/*focusIndex*/,justify,focusStore,database,buffer);
+
+            apply(state[i]);
+            
+            stats.add( state[i].stats );
+            
+        }
+        
+        return stats;
         
     }
 
@@ -1327,10 +1386,6 @@ abstract public class Rule {
      *            this method returns. All entailments will be in whichever
      *            store the buffer was configured to write upon.
      * 
-     * FIXME When loading data into a temporary store the terms must be resolved
-     * against the database. Write a class to support this or handle it in
-     * {@link AbstractTripleStore} and then integrate this into the SAIL.
-     * 
      * @return Some statistics about the fixed point computation.
      */
     static public ClosureStats fixedPoint(ClosureStats closureStats,
@@ -1342,6 +1397,7 @@ abstract public class Rule {
         /*
          * We will fix point whichever store the buffer is writing on.
          */
+        
         final AbstractTripleStore fixPointStore = buffer.store;
         
         final int firstStatementCount = fixPointStore.getStatementCount();
@@ -1361,9 +1417,6 @@ abstract public class Rule {
 
                 Rule rule = rules[i];
 
-                // FIXME for each term, map the rule.
-//                State state = rule.newState(index, justify, focusStore, database, buffer);
-                
                 RuleStats stats = rule.apply( justify, focusStore, database, buffer );
                 
                 closureStats.add(stats);
@@ -1383,12 +1436,13 @@ abstract public class Rule {
             /*
              * Flush the statements in the buffer
              * 
-             * @todo between each pass in apply, after apply, or after the
-             * round? Each of these is "correct" but there may be
-             * performance tradeoffs. Deferring the flush can increase batch
-             * size and index write performance. If any rule generates an
-             * entailment, then we are going to do another round anyway so
-             * maybe it is best to defer to the end of the round?
+             * @todo When should we flush the buffer? In between each pass in
+             * apply, after apply, or after the round? Each of these is
+             * "correct" but there may be performance tradeoffs. Deferring the
+             * flush can increase batch size and index write performance. If any
+             * rule generates an entailment, then we are going to do another
+             * round anyway so maybe it is best to defer to the end of the
+             * round?
              */
             buffer.flush();
 

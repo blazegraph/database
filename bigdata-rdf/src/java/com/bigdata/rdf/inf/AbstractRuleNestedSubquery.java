@@ -65,8 +65,6 @@ import com.bigdata.rdf.util.KeyOrder;
  * conjunctive triple patterns. The triple patterns are evaluated in the
  * {@link Rule#order} determined on the selectivity of the triple patterns.
  * 
- * @todo tweak order for (new+db).
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -129,8 +127,6 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      *            Note: You MUST indirect through order, e.g., order[index], to
      *            obtain the index of the corresponding predicate in the
      *            evaluation order.
-     * 
-     * @todo if(order[index]==focusIndex) {} else {}
      */
     final private void apply1(final int index, State state) {
 
@@ -217,8 +213,6 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      *            Note: You MUST indirect through order, e.g., order[index], to
      *            obtain the index of the corresponding predicate in the
      *            evaluation order.
-     * 
-     * @todo if(order[index]==focusIndex) {} else {}
      */
     final private void apply2(final int index, State state, List<SPO> outerSet) {
 
@@ -238,11 +232,6 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
          * inner subquery MUST match the order into which we sort each chunk of
          * statement delivered by the outer subquery in order for subquery
          * elimination to work.
-         *
-         * FIXME Choose either (new) (aka focalStore), or the database (iff
-         * focalStore is null), or (new+db) as appropriate for the source from
-         * which the subquery will read.
-         *
          */
         ISPOIterator itr = state.getAccessPath(state.order[index]).iterator();
         
@@ -417,12 +406,6 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
         long s = sharedVars.contains(body[innerIndex].s)?c:state.get(body[innerIndex].s);
         long p = sharedVars.contains(body[innerIndex].p)?c:state.get(body[innerIndex].p);
         long o = sharedVars.contains(body[innerIndex].o)?c:state.get(body[innerIndex].o);
-
-        /*
-         * FIXME Choose either (new) (aka focalStore), or the database (iff
-         * focalStore is null), or (new+db) as appropriate for the source from
-         * which the subquery will read.
-         */
         
         IAccessPath accessPath = state.database.getAccessPath(s, p, o);
         

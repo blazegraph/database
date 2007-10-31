@@ -76,11 +76,6 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
      *            A set of term identifiers.
      * @param propertyId
      *            The propertyId to be used in the assertions.
-     * 
-     * FIXME This needs to be carefully constructed and executed when a
-     * focusStore is being used so that we have the union of {P} for the
-     * focusStore and the database and then run the rule on the focusStore only.
-     * Consider moving read for {P} into this method.
      */
     public void apply(State state) {
 
@@ -89,9 +84,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
         final long[] a = getSortedArray(P);
 
         /*
-         * @todo execute subqueries in parallel using inference engine thread
-         * pool, but note that the bindings[] need to be per-thread or thread
-         * local!  SPOBuffer also needs to be thread-safe.
+         * @todo execute subqueries in parallel against shared thread pool.
          */
 
         for (long p : a) {
