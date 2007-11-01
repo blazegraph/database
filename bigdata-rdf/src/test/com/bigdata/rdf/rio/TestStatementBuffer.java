@@ -57,12 +57,13 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer.StatementIterator;
-import com.bigdata.rdf.rio.StatementBuffer.TermClassIterator;
+import com.bigdata.rdf.rio.StatementBuffer.TermArrayIterator;
 import com.bigdata.rdf.rio.StatementBuffer.TermIterator;
 import com.bigdata.rdf.rio.StatementBuffer.UnknownStatementIterator;
 import com.bigdata.rdf.rio.StatementBuffer.UnknownTermIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -96,12 +97,12 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             
             StatementBuffer buffer = new StatementBuffer(store,capacity,false);
             
-            assertEquals(store,buffer.store);
+            assertEquals(store,buffer.getDatabase());
             assertFalse(buffer.distinct);
             assertEquals(capacity,buffer.capacity);
-            assertEquals(capacity,buffer.uris.length);
-            assertEquals(capacity,buffer.literals.length);
-            assertEquals(capacity,buffer.bnodes.length);
+            assertEquals(capacity*IRawTripleStore.N,buffer.values.length);
+//            assertEquals(capacity,buffer.literals.length);
+//            assertEquals(capacity,buffer.bnodes.length);
             assertEquals(capacity,buffer.stmts.length);
             assertEquals(0,buffer.numURIs);
             assertEquals(0,buffer.numLiterals);
@@ -144,14 +145,17 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify term class (URI, Literal or BNode) iterators.
              */
-            assertSameIterator(new Object[] { s1, p1, o1 },
-                    new TermClassIterator(buffer.uris, buffer.numURIs));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+            assertSameIterator(new Object[] { /*uris*/s1, p1, o1 },
+                    new TermArrayIterator(buffer.values, buffer.numValues));
+            
+//            assertSameIterator(new Object[] { s1, p1, o1 },
+//                    new TermClassIterator(buffer.uris, buffer.numURIs));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
     
             /*
              * verify all terms iterator.
@@ -183,14 +187,17 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify term class (URI, Literal or BNode) iterators.
              */
-            assertSameIterator(new Object[] { s1, p1, o1, s2, p2 },
-                    new TermClassIterator(buffer.uris, buffer.numURIs));
-    
-            assertSameIterator(new Object[] { o2 },
-                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+            assertSameIterator(new Object[] { /*uris*/s1, p1, o1, s2, p2, /*literals*/o2 },
+                    new TermArrayIterator(buffer.values, buffer.numValues));
+
+//            assertSameIterator(new Object[] { s1, p1, o1, s2, p2 },
+//                    new TermClassIterator(buffer.uris, buffer.numURIs));
+//    
+//            assertSameIterator(new Object[] { o2 },
+//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
     
             /*
              * verify all terms iterator.
@@ -304,14 +311,17 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify term class (URI, Literal or BNode) iterators.
              */
-            assertSameIterator(new Object[] { s1, p1, o1 },
-                    new TermClassIterator(buffer.uris, buffer.numURIs));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+            assertSameIterator(new Object[] { /*uris*/s1, p1, o1 },
+                    new TermArrayIterator(buffer.values, buffer.numValues));
+            
+//            assertSameIterator(new Object[] { s1, p1, o1 },
+//                    new TermClassIterator(buffer.uris, buffer.numURIs));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
     
             /*
              * verify all terms iterator.
@@ -350,14 +360,18 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify term class (URI, Literal or BNode) iterators.
              */
-            assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2 }, // s2 was a duplicate.
-                    new TermClassIterator(buffer.uris, buffer.numURIs));
-    
-            assertSameIterator(new Object[] { o2 },
-                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-    
-            assertSameIterator(new Object[] {},
-                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
+            // Note: s2 was a duplicate.
+            assertSameIterator(new Object[] { /*uris*/s1, p1, o1, /*s2,*/ p2, /*literals*/o2 },
+                    new TermArrayIterator(buffer.values, buffer.numValues));
+
+//            assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2 }, // s2 was a duplicate.
+//                    new TermClassIterator(buffer.uris, buffer.numURIs));
+//    
+//            assertSameIterator(new Object[] { o2 },
+//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
+//    
+//            assertSameIterator(new Object[] {},
+//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
     
             /*
              * verify all terms iterator.

@@ -4,7 +4,7 @@ x. Done. fast closure (~ 2x faster, but depends on the data set).
 
 x. Done. Validation of the RDFS rules.
 
-x. rule refactor to support (new, new+old).
+x. Done. rule refactor to support (new, new+old).
 
    - collected baseline data on the workstation.
 
@@ -21,7 +21,7 @@ x. rule refactor to support (new, new+old).
    - fixed bug requiring the clearing of variables in downstream
      predicates iff they were not bound by an upstream predicate.
 
-x. backward chain (x rdf:type rdfs:Resource)
+x. Done. backward chain (x rdf:type rdfs:Resource)
 
 x. backward chain owl:sameAs entailments.
 

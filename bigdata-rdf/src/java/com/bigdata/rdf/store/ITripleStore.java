@@ -249,7 +249,9 @@ public interface ITripleStore {
      * Commit changes on the database.
      * <p>
      * Note: The semantics of this operation depend on whether the database is
-     * embedded (does a commit), temporary (ignored), or a federation (ignored).
+     * embedded (does a commit), temporary (ignored since the store is not
+     * restart safe), or a federation (ignored since unisolated writes on the
+     * federation are atomic and auto-committed).
      */
     public void commit();
     

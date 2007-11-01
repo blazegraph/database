@@ -98,19 +98,6 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      */
     protected final boolean verifyData;
     
-    /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
-     * object is signaling that no more buffers will be placed onto the
-     * queue by the producer and that the consumer should therefore
-     * terminate.
-     */
-    protected final int capacity;
-
-    /**
-     * When true only distinct terms and statements are stored in the buffer.
-     */
-    protected final boolean distinct;
-
     long stmtsAdded;
     
     long insertTime;
@@ -123,41 +110,12 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
-    StatementBuffer buffer;
+    final StatementBuffer buffer;
 
     /**
      * Used as the value factory for the {@link Parser}.
      */
     OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
-    
-    /**
-     * Sets up parser to load RDF/XML - {@link #verifyData} is NOT enabled.
-     * 
-     * @param store
-     *            The store into which to insert the loaded statements.
-     */
-    public PresortRioLoader(AbstractTripleStore store) {
-        
-        this(store, RDFFormat.RDFXML, false /*verifyData*/);
-        
-    }
-    
-    /**
-     * Sets up parser to load the indicated RDF interchange syntax.
-     * 
-     * @param store
-     *            The store into which to insert the loaded statements.
-     * @param rdfFormat
-     *            The RDF interchange syntax to be parsed.
-     * @param verifyData
-     *            Controls the {@link Parser#setVerifyData(boolean)} option.
-     */
-    public PresortRioLoader(AbstractTripleStore store, RDFFormat rdfFormat,
-            boolean verifyData) {
-
-        this(store, rdfFormat, verifyData, DEFAULT_BUFFER_SIZE, true/* distinct */);
-
-    }
 
     /**
      * Sets up parser to load RDF.
@@ -168,35 +126,24 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
      *            The RDF interchange syntax to be parsed.
      * @param verifyData
      *            Controls the {@link Parser#setVerifyData(boolean)} option.
-     * @param capacity
-     *            The capacity of the buffer.
-     * @param distinct
-     *            Whether or not terms and statements are made distinct in the
-     *            buffer.
-     *            <p>
-     *            Note: performance is generally substantially better with
-     *            <code>distinct := true</code>.
+     * @param buffer
+     *            The buffer used to collect, sort, and write statements onto
+     *            the database.
      */
     public PresortRioLoader(AbstractTripleStore store, RDFFormat rdfFormat,
-            boolean verifyData, int capacity, boolean distinct) {
+            boolean verifyData, StatementBuffer buffer) {
 
         assert store != null;
 
         assert rdfFormat != null;
         
-        assert capacity > 0;
-
         this.store = store;
         
         this.rdfFormat = rdfFormat;
         
         this.verifyData = verifyData;
         
-        this.capacity = capacity;
-        
-        this.distinct = distinct;
-        
-        this.buffer = new StatementBuffer(store, capacity, distinct );
+        this.buffer = buffer;
         
     }
     
@@ -360,13 +307,6 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
         // Note: reset so that rates are correct for each source loaded.
         stmtsAdded = 0;
         
-        // Allocate the initial buffer for parsed data.
-        if(buffer == null) {
-            
-            buffer = new StatementBuffer(store,capacity,distinct);
-            
-        }
-
         try {
 
             // Parse the data.
@@ -387,8 +327,8 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
             
         } finally {
 
-            // clear the old buffer reference.
-            buffer = null;
+            // clear the buffer.
+            buffer.clear();
 
         }
 

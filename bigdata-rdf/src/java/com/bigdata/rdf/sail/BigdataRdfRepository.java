@@ -355,7 +355,7 @@ public class BigdataRdfRepository implements RdfRepository {
 
         // buffer used to optimize writes.
         this.buffer = new StatementBuffer(database, 10000/* capacity */, true/* distinct */);
-        
+
     }
     
     public void shutDown() {

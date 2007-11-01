@@ -114,6 +114,11 @@ public class SPOIterator implements ISPOIterator {
     private int numReadByCaller;
     
     /**
+     * The #of chunks that have been read by the caller.
+     */
+    private int nchunks = 0;
+    
+    /**
      * Identifies the statement index that is being traversed.
      */
     private final KeyOrder keyOrder;
@@ -329,16 +334,6 @@ public class SPOIterator implements ISPOIterator {
        
             while (src.hasNext()) {
 
-                if(limit != 0 && numReadFromSource == limit) {
-                    
-                    // We have read all that we are going to read.
-
-                    readerDone.set(true);
-                    
-                    return false;
-                    
-                }
-
                 Object val = src.next();
 
                 numReadFromSource++;
@@ -359,6 +354,17 @@ public class SPOIterator implements ISPOIterator {
 
                 }
 
+
+                if(limit != 0 && numReadFromSource == limit) {
+                    
+                    // We have read all that we are going to read.
+
+                    log.info("Reached limit="+limit);
+                    
+                    break;
+                    
+                }
+                
             }
 
             // Nothing left to read.
@@ -386,49 +392,55 @@ public class SPOIterator implements ISPOIterator {
             // This method MUST NOT be invoked when using the async reader.
             
             throw new AssertionError();
-            
-        }
-        
-        log.info("(Re-)filling buffer: remainingCapacity="
-                + buffer.remainingCapacity());
-        
-        while (src.hasNext() && buffer.remainingCapacity() > 0) {
-
-            if(limit != 0 && numReadFromSource == limit) {
-                
-                // We have read all that we are going to read.
-
-                log.info("Reached limit="+limit);
-
-                return false;
-                
-            }
-            
-            Object val = src.next();
-
-            numReadFromSource++;
-            
-            SPO spo = new SPO(keyOrder, src.getKey(), val);
-
-            try {
-
-                buffer.put(spo);
-
-            } catch (InterruptedException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
 
         }
 
-        log.info("(Re-)filled buffer: size=" + buffer.size()
-                + ", remainingCapacity=" + buffer.remainingCapacity());
+        try {
+            // log.info("(Re-)filling buffer: remainingCapacity="
+            // + buffer.remainingCapacity());
 
-        // false if the buffer is still empty.
-            
-        return ! buffer.isEmpty();
-        
+            while (src.hasNext() && buffer.remainingCapacity() > 0) {
+
+                if (limit != 0 && numReadFromSource == limit) {
+
+                    // We have read all that we are going to read.
+
+                    log.info("Reached limit=" + limit);
+
+                    return false;
+
+                }
+
+                Object val = src.next();
+
+                numReadFromSource++;
+
+                SPO spo = new SPO(keyOrder, src.getKey(), val);
+
+                try {
+
+                    buffer.put(spo);
+
+                } catch (InterruptedException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            // false if the buffer is still empty.
+
+            return !buffer.isEmpty();
+
+        } finally {
+
+            log.info("(Re-)filled buffer: size=" + buffer.size()
+                    + ", remainingCapacity=" + buffer.remainingCapacity()
+                    + ", done=" + !src.hasNext());
+
+        }
+
     }
     
     public boolean hasNext() {
@@ -534,6 +546,9 @@ public class SPOIterator implements ISPOIterator {
             stmts[ i ] = next();
             
         }
+
+        log.info("chunkSize=" + n + ", nchunks=" + nchunks + ", #read(caller)="
+                + numReadByCaller + ", #read(src)=" + numReadFromSource);
         
         return stmts;
         

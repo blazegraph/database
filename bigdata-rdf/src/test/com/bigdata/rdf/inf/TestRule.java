@@ -62,7 +62,7 @@ import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test suite for basic {@link Rule} mechanisms.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

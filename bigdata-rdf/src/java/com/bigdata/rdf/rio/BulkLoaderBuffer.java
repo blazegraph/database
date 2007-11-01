@@ -70,7 +70,15 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * Implementation specialized to support bulk index load operations.
+ * Implementation specialized to support bulk index load operations (not ready
+ * for use).
+ * 
+ * @todo refactor to support a map/reduce style bulk index generation using hash
+ *       partitioned indices. map tasks are triple sources, e.g., reading
+ *       rdf/xml or reading documents from which they extract rdf/xml. reduce
+ *       tasks generate the indices corresponding to the hash partitions. each
+ *       index (term:id, id:term, and statement indices) is generated as a set
+ *       of index segments.
  * 
  * @todo this needs to be rewritten to support scale-out indices. Also, the bulk
  *       loader should probably attempt to directly generate index segments
@@ -127,13 +135,17 @@ public class BulkLoaderBuffer extends StatementBuffer {
 //    double errorRate = IndexSegmentBuilder.DEFAULT_ERROR_RATE;
     double errorRate = 0d;
     
+    private final AbstractTripleStore database;
+    
     /**
-     * @param store
+     * @param database
      * @param capacity
      */
-    public BulkLoaderBuffer(AbstractTripleStore store, int capacity) {
+    public BulkLoaderBuffer(AbstractTripleStore database, int capacity) {
         
-        super(store, capacity, true);
+        super(database, capacity, true);
+        
+        this.database = database;
         
     }
 
@@ -158,7 +170,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
         
         new IndexSegmentBuilder(outFile, null, numTerms, new TermIdIterator(
                 this), branchingFactor, TermIdSerializer.INSTANCE, useChecksum,
-                recordCompressor, errorRate, store.getTermIdIndex()
+                recordCompressor, errorRate, database.getTermIdIndex()
                         .getIndexUUID());
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -189,7 +201,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
         new IndexSegmentBuilder(outFile, null, numTerms,
                 new TermIterator(this), branchingFactor,
                 RdfValueSerializer.INSTANCE, useChecksum, recordCompressor,
-                errorRate, store.getIdTermIndex().getIndexUUID());
+                errorRate, database.getIdTermIndex().getIndexUUID());
 
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -212,13 +224,13 @@ public class BulkLoaderBuffer extends StatementBuffer {
         final IIndex ndx;
         switch(keyOrder) {
         case SPO:
-            ndx = store.getSPOIndex();
+            ndx = database.getSPOIndex();
             break;
         case POS:
-            ndx = store.getPOSIndex();
+            ndx = database.getPOSIndex();
             break;
         case OSP:
-            ndx = store.getOSPIndex();
+            ndx = database.getOSPIndex();
             break;
         default:
             throw new AssertionError("Unknown keyOrder=" + keyOrder);
@@ -270,7 +282,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
     {
         
         // generate sort keys.
-        generateTermSortKeys(store.getKeyBuilder());
+        generateTermSortKeys(database.getKeyBuilder());
         
         // sort each type of term (URI, Literal, BNode).
         sortTermsBySortKeys();
@@ -287,7 +299,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
          * FIXME verify that bloom filters are enabled and in use for index
          * segments.
          */
-        if(store.getTermIdIndex().rangeCount(null,null)>0 || ! indices.terms.isEmpty()) {
+        if(database.getTermIdIndex().rangeCount(null,null)>0 || ! indices.terms.isEmpty()) {
             
             /*
              * read against the terms index on the journal and each segment of
@@ -345,7 +357,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
             // FIXME Mark known statements by testing the bloom filter and/or
             // indices.
 
-            if (store.getStatementCount() > 0
+            if (database.getStatementCount() > 0
                     || !indices.spo.isEmpty()) {
 
                 throw new UnsupportedOperationException();

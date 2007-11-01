@@ -104,17 +104,14 @@ public class TestAll extends TestCase {
         // Note: fast closure rules using the same base class.
         suite.addTestSuite( TestRuleFastClosure_3_5_6_7_9.class );
 
-        /*
-         * @todo test suite for mapping a rule over new and (old+new) data.
-         */
-
         // test suite for backward chaining of (?x rdf:type rdfs:Resource).
         suite.addTestSuite( TestBackchainTypeResourceIterator.class );
         
         // test suite for RDFS closure correctness.
         suite.addTestSuite( TestRDFSClosure.class );
 
-        // @todo test suite for RDFS closure correctness with incremental load (TM)
+        // test suite for RDFS closure correctness with incremental load (TM).
+        suite.addTestSuite( TestRDFSIncrementalClosure.class );
 
         // @todo test suite for RDFS closure correctness with incremental delete (TM).
 

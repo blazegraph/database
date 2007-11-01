@@ -3,7 +3,4 @@
 #@prefix owl:  <http://www.w3.org/2002/07/owl#> .
 #@prefix : <#> .
 
-<http://www.bigdata.org/a> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.bigdata.org/b>.
 <http://www.bigdata.org/b> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.bigdata.org/c>.
-
-# entails <a rdf:type c> among other things.
