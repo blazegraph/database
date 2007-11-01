@@ -606,6 +606,8 @@ public class DataLoader {
                 
             }
             
+            log.info("Computing closure of the temporary store");
+            
             stats = inferenceEngine.computeClosure(tempStore);
 
             // measure time for these other operations as well.
@@ -616,11 +618,15 @@ public class DataLoader {
              * copy statements from the temporary store to the database.
              */
             
+            log.info("Copying statements from the temporary store to the database");
+            
             tempStore.copyStatements(database, null/*filter*/);
 
             /*
              * clear the temporary store (drops the indices).
              */
+
+            log.info("Clearing the temporary store");
             
             tempStore.clear();
             
@@ -638,9 +644,13 @@ public class DataLoader {
             
             if(backingStore.getBufferStrategy().getNextOffset() > 200 * Bytes.megabyte) {
                 
+                log.info("Closing the temporary store");
+                
+                // delete the backing file.
                 tempStore.close();
 
-                tempStore = new TempTripleStore(database.getProperties());
+                // clear the soft reference.
+                tempStoreRef = null;
                 
             }
             
