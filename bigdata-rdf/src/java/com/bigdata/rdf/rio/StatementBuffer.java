@@ -88,6 +88,26 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class StatementBuffer {
 
+    /*
+     * Note: Converting from a _URI[], _Literal[], and _BNode[] buffer to a
+     * single _Value[] buffer was a 4% performance loss. I guess this change
+     * could be rolled back. I made it primarily to simplify the code since
+     * nothing depends on the partition by RDF Value class.
+     * 
+     * However, turning OFF "distinct" for the _Statement[] buffer was a BIG
+     * performance gain.
+     * 
+     * Presumably there is a LOT of Value duplication in parsed RDF, but little
+     * Statement duplication. Hence we pay an unnecessary overhead if we try to
+     * make the statements distinct in the buffer. This also provides an
+     * explanation for why the SPOBuffer does not do better when "distinct" is
+     * turned on - the "Value" objects in that case are only represented by long
+     * integers and duplication in their values does not impose a burden on
+     * either the heap or the index writers. In contrast, the duplication of
+     * Values in the StatementBuffer imposes a burden on both the heap and the
+     * index writers.
+     */
+    
 //    final _URI[] uris;
 //    final _Literal[] literals;
 //    final _BNode[] bnodes;
