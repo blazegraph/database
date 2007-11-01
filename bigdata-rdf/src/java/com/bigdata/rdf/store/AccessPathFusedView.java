@@ -82,7 +82,7 @@ public class AccessPathFusedView implements IAccessPath {
         if (path2 == null)
             throw new IllegalArgumentException();
         
-        if (path1 == path1)
+        if (path1 == path2)
             throw new IllegalArgumentException();
 
         if(path1.getKeyOrder() != path2.getKeyOrder())
