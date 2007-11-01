@@ -60,12 +60,12 @@ import org.openrdf.rio.rdfxml.RdfXmlParser;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Statement handler for the RIO RDF Parser that a producer-consumer queue to
- * divide the work load.
+ * divide the work load (not ready for use).
  * <p>
  * The producer runs rio fills in buffers, generates keys for terms, and sorts
  * terms by their keys and then places the bufferQueue onto the queue. The
@@ -74,15 +74,11 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * (b) generates the statement keys for each of the statement indices, ordered
  * the statement for each index in turn, and bulk inserts the statements into
  * each index in turn.
- * <p>
- * 
- * FIXME This needs to be refactored to create one {@link ITripleStore} client
- * per worker thread since the individual {@link ITripleStore} clients are NOT
- * thread-safe (the main issue is that {@link RdfKeyBuilder} is not
- * thread-safe).
  * 
  * @todo The consumer lags behind the producer. Explore optimizations for the
- *       btree batch api to improve the insert rate.
+ *       btree batch api to improve the insert rate. This might work better with
+ *       a set of small (1-10k) {@link StatementBuffer} on the
+ *       {@link ScaleOutTripleStore} in order to reduce latency.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -557,7 +553,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
 
             putBufferOnQueue();
             
-            // allocate a new bufferQueue.
+            // allocate a new buffer.
             buffer = new StatementBuffer(store,capacity,distinct);
             
             // fall through.

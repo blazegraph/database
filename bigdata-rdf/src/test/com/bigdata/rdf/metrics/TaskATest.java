@@ -74,6 +74,8 @@ import com.bigdata.rdf.rio.LoadStats;
  * 
  * @todo update javadoc.
  * @todo write some useful summary data into a file.
+ * @todo modify to load or load+close into a single database rather than a distinct
+ * database per source data set?
  * 
  * <p>
  * Class obtains metrics on access path usage and the costs of an ontology for

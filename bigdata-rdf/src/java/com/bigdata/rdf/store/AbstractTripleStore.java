@@ -54,6 +54,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -97,7 +98,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.LoadStats;
@@ -461,13 +461,58 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     /**
      * The capacity of the {@link StatementBuffer} used when reading RDF data.
-     * The default (1M) is good for the {@link LocalTripleStore}.
+     * Values up to 1M are good for the {@link LocalTripleStore} when loading
+     * large data sets, but smaller values should be used for the
+     * {@link ScaleOutTripleStore}. The default is (500k).
      * 
      * @return The buffer capacity.
+     * 
+     * @todo make this a configuration property and use a lower default. examine
+     *       performance over a sequence of loads with a smaller default.
      */
     protected int getDataLoadBufferCapacity() {
         
-        return 1000000;
+        return 500000;
+        
+    }
+
+    /**
+     * Used to retain the {@link StatementBuffer} between runs of the parser
+     * while allowing it to be garbage collected if necessary.
+     */
+    private SoftReference<StatementBuffer> buffer;
+    
+    /**
+     * Returns the {@link StatementBuffer} instance that is used by the data
+     * loader.
+     */
+    public StatementBuffer getStatementBuffer() {
+
+        /*
+         * Note: distinct := true has substantially better performance.
+         */
+        
+        StatementBuffer b = null;
+        
+        if(buffer!=null) {
+            
+            b = buffer.get();
+            
+        }
+        
+        if(b == null) {
+            
+            final int capacity = getDataLoadBufferCapacity();
+            
+            b = new StatementBuffer(this, capacity, true/* distinct */);
+            
+            buffer = new SoftReference<StatementBuffer>(b);
+            
+            log.info("Allocated statement buffer: capacity="+capacity);
+            
+        }
+
+        return b;
         
     }
     
@@ -488,13 +533,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         LoadStats stats = new LoadStats();
         
         log.info( "loading: " + resource );
-
-        /*
-         * Note: distinct := true has substantially better performance.
-         */
         
         IRioLoader loader = new PresortRioLoader(this, rdfFormat, verifyData,
-                getDataLoadBufferCapacity(), true /* distinct */);
+                getStatementBuffer());
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             
@@ -572,50 +613,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             reader.close();
             
         }
-        
-//        long elapsed = System.currentTimeMillis() - begin;
-//
-//        log
-//                .info(total_stmts
-//                        + " stmts added in "
-//                        + ((double) elapsed)
-//                        / 1000d
-//                        + " secs, rate= "
-//                        + ((long) (((double) total_stmts) / ((double) elapsed) * 1000d)));
-
-    }
-
-    /**
-     * Adds the statements to each index (batch api, NO truth maintenance).
-     * <p>
-     * Pre-conditions: The term identifiers for each {@link _Statement} are
-     * defined.
-     * 
-     * @param stmts
-     *            An array of statements
-     * 
-     * @see #insertTerms(_Value[], int, boolean, boolean)
-     * 
-     * @return The #of statements written on the database.
-     * 
-     * @todo the best way to use this is by creating a {@link StatementBuffer},
-     *       filling it up, and then flushing it to the database. Document that
-     *       and perhaps get this of this method on the public API.
-     */
-    final public int addStatements(_Statement[] stmts, int numStmts) {
-        
-        SPO[] tmp = new SPO[numStmts];
-        
-        for(int i=0; i<tmp.length; i++) {
-            
-            _Statement stmt = stmts[i];
-            
-            tmp[i] = new SPO(stmt.s.termId, stmt.p.termId, stmt.o.termId,
-                    stmt.type);
-            
-        }
-        
-        return addStatements(tmp, numStmts);
 
     }
 
@@ -629,7 +626,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * Note: This uses the batch API.
          */
         
-        StatementBuffer buffer = new StatementBuffer(this,3,false);
+        StatementBuffer buffer = new StatementBuffer(this,1,false);
         
         buffer.add(s, p, o);
         

@@ -402,7 +402,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         if(numTerms>1000) {
 
-            System.err.print("Writing "+numTerms+" terms ("+terms.getClass().getSimpleName()+")...");
+            System.err.print("Writing "+numTerms+" terms...");
             
         }
 

@@ -120,9 +120,14 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
         }
         
         TestRioIntegration test = new TestRioIntegration("TestInsertRate");
+        
         test.setUp();
-        test.doTest( new PresortRioLoader(test.store), args );
-//        test.doTest( new BulkRioLoader(test.store), args );
+        
+        test.doTest(new PresortRioLoader(test.store, RDFFormat.RDFXML,
+                false/* verify */, test.store.getStatementBuffer()), args);
+        
+        // test.doTest( new BulkRioLoader(test.store), args );
+        
         test.tearDown();
             
     }
@@ -244,7 +249,8 @@ public class TestRioIntegration extends AbstractTripleStoreTestCase {
     
     public void test_loadFile_presortRioLoader() throws Exception {
 
-        doTest(new PresortRioLoader(store), testData);
+        doTest(new PresortRioLoader(store, RDFFormat.RDFXML, false/* verify */,
+                store.getStatementBuffer()), testData);
 
         assertDataLoaded();
         

@@ -68,6 +68,8 @@ import com.bigdata.rdf.rio.LoadStats;
 /**
  * Test harness for loading randomly generated files into a repository.
  * 
+ * @todo Modidy to permit running as load N then close vs load+close for each of N?
+ * 
  * @todo Support concurrent query against the repository. Concurrent query
  *       should begin after some number of files or triples have been loaded.
  *       The query concurrency should be a parameter so that we can test both

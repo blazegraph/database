@@ -48,14 +48,12 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Properties;
 
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository;
 
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
@@ -178,6 +176,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         
     }
 
+    
     /**
      * Read a local test resource and verify that the RDFS closure of that
      * resource is correct. Correctness is judged against the closure of the
@@ -226,8 +225,6 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
                 store.dumpStore(false, true, false);
             }
 
-            store.commit();
-
             assertTrue(modelsEqual(groundTruth, inf));
             
         } finally {
@@ -236,33 +233,6 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
             
         }
 
-    }
-    
-    /**
-     * Read the resource into an {@link RdfSchemaRepository}. This
-     * automatically computes the closure of the told triples.
-     * <p>
-     * Note: We treat the closure as computed by the {@link RdfSchemaRepository}
-     * as if it were ground truth.
-     * 
-     * @return The {@link RdfSchemaRepository} with the loaded resource.
-     * 
-     * @throws SailInitializationException
-     * @throws IOException
-     * @throws UpdateException
-     */
-    protected RdfRepository getGroundTruth(String resource, String baseURL,
-            RDFFormat format) throws SailInitializationException, IOException,
-            UpdateException {
-
-        RdfRepository repo = new org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository();
-
-        repo.initialize(new HashMap());
-
-        upload(repo, resource, baseURL, format);
-
-        return repo;
-        
     }
 
 }

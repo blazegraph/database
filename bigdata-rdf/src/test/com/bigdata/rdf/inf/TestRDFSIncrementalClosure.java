@@ -1,0 +1,224 @@
+/**
+
+The Notice below must appear in each file of the Source Code of any
+copy you distribute of the Licensed Product.  Contributors to any
+Modifications may add their own copyright notices to identify their
+own contributions.
+
+License:
+
+The contents of this file are subject to the CognitiveWeb Open Source
+License Version 1.1 (the License).  You may not copy or use this file,
+in either source code or executable form, except in compliance with
+the License.  You may obtain a copy of the License from
+
+  http://www.CognitiveWeb.org/legal/license/
+
+Software distributed under the License is distributed on an AS IS
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
+the License for the specific language governing rights and limitations
+under the License.
+
+Copyrights:
+
+Portions created by or assigned to CognitiveWeb are Copyright
+(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
+information for CognitiveWeb is available at
+
+  http://www.CognitiveWeb.org
+
+Portions Copyright (c) 2002-2003 Bryan Thompson.
+
+Acknowledgements:
+
+Special thanks to the developers of the Jabber Open Source License 1.0
+(JOSL), from which this License was derived.  This License contains
+terms that differ from JOSL.
+
+Special thanks to the CognitiveWeb Open Source Contributors for their
+suggestions and support of the Cognitive Web.
+
+Modifications:
+
+*/
+/*
+ * Created on Oct 31, 2007
+ */
+
+package com.bigdata.rdf.inf;
+
+import java.util.Properties;
+
+import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.sesame.sail.RdfRepository;
+
+import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
+
+/**
+ * Test suite for RDFS incremental closure correctness (when you load data in a
+ * series of batches into the store and compute the closure of the batch against
+ * the store rather than re-closing the entire store).
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase {
+
+    /**
+     * 
+     */
+    public TestRDFSIncrementalClosure() {
+        super();
+    }
+
+    /**
+     * @param name
+     */
+    public TestRDFSIncrementalClosure(String name) {
+        super(name);
+    }
+
+    /**
+     * Trivial example - good for debugging.
+     */
+    public void test_testIncrementalClosure01() throws Exception {
+
+        String[] resource = new String[] {
+                "testIncrementalClosure01-part01.nt",
+                "testIncrementalClosure01-part02.nt" };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.NTRIPLES,
+                RDFFormat.NTRIPLES
+                };
+
+        Properties properties = getProperties();
+
+        // @todo set closure options (fast, backchain vs store x type resource, etc).
+        
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Wordnet data + schema order (resources must exist).
+     */
+    public void test_wordnetDataSchema() throws Exception {
+
+        String[] resource = new String[] {
+                "wordnet_nouns-20010201.rdf",
+                "wordnet-20000620.rdfs" };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML
+                };
+
+        Properties properties = getProperties();
+
+        // @todo set closure options (fast, backchain vs store x type resource, etc).
+        
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Wordnet schema + data order (resources must exist).
+     */
+    public void test_wordnetSchemaData() throws Exception {
+
+        String[] resource = new String[] {
+                "wordnet_nouns-20010201.rdf",
+                "wordnet-20000620.rdfs" };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML
+                };
+
+        Properties properties = getProperties();
+
+        // @todo set closure options (fast, backchain vs store x type resource, etc).
+        
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Test helper for RDFS incremental closure correctness.
+     * 
+     * @param properties
+     * @param resource
+     * @param baseURL
+     * @param format
+     * @throws Exception
+     */
+    public void assertCorrectClosure(Properties properties, String[] resource,
+            String[] baseURL, RDFFormat[] format) throws Exception {
+        
+        RdfRepository groundTruth = getGroundTruth(resource, baseURL, format);
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            /*
+             * @todo property for how large the store can get in memory before
+             * it overflows or reuse the same temp store for a series of data
+             * loads and just delete when it gets too large? (Question is how to
+             * minimize the time to create the backing file, which adds
+             * significant latency - plus the temp store is not as concurrency
+             * savvy).
+             */
+
+            InferenceEngine inf = new InferenceEngine(properties,store);
+            
+            for (int i = 0; i < resource.length; i++) {
+                
+                TempTripleStore tmp = new TempTripleStore(properties);
+
+                LoadStats loadStats = tmp
+                        .loadData("/com/bigdata/rdf/inf/"+resource[i], baseURL[i],
+                                format[i], true/* verifyData */, false/* commit */);
+
+                System.err.println(resource[i] + " : " + loadStats.toString());
+                
+            }
+
+            /*
+             * Automatically enabled for dumping small stores. 
+             */
+            final boolean dump = store.getStatementCount() < 200;
+            
+            if (dump) {
+                System.err.println("told triples:");
+                store.dumpStore(true, false, false);
+            }
+
+            if (dump) {
+                System.err.println("entailed:");
+                store.dumpStore(false, true, false);
+            }
+
+            assertTrue("Closure does not agree",modelsEqual(groundTruth, inf));
+
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
+
+    }
+
+}
