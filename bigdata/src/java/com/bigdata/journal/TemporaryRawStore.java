@@ -180,6 +180,21 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
     }
 
+    /**
+     * Closes the store if it gets GCd.
+     */
+    protected void finalize() throws Throwable {
+        
+        try {
+            close();
+        } catch (Throwable t) {
+            t.printStackTrace(System.err);
+        }
+        
+        super.finalize();
+        
+    }
+    
     public File getFile() {
         
         if(!open) throw new IllegalStateException();

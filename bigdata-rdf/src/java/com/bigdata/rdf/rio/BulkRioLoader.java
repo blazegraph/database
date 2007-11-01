@@ -45,26 +45,20 @@ package com.bigdata.rdf.rio;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Vector;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
-import org.openrdf.rio.rdfxml.RdfXmlParser;
 
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.scaleup.MasterJournal;
@@ -90,19 +84,9 @@ import com.bigdata.scaleup.MasterJournal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BulkRioLoader implements IRioLoader, StatementHandler
+public class BulkRioLoader extends BasicRioLoader implements IRioLoader, StatementHandler
 {
 
-    /**
-     * The default buffer size.
-     * <p>
-     * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
-     * value.
-     * 
-     * @todo try 10M or 100M buffer for the bulk loader on very large data sets.
-     */
-    static final int DEFAULT_BUFFER_SIZE = 1000000;
-    
     /**
      * The default branching factor used for the generated {@link IndexSegment}s.
      * 
@@ -118,10 +102,9 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
     protected final AbstractTripleStore store;
     
     /**
-     * The bufferQueue capacity -or- <code>-1</code> if the {@link StatementBuffer}
-     * object is signaling that no more buffers will be placed onto the
-     * queue by the producer and that the consumer should therefore
-     * terminate.
+     * The buffer capacity -or- <code>-1</code> if the {@link StatementBuffer}
+     * object is signaling that no more buffers will be placed onto the queue by
+     * the producer and that the consumer should therefore terminate.
      */
     protected final int capacity;
 
@@ -136,25 +119,11 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
      */
     protected Indices indices = new Indices();
     
-    long stmtsAdded;
-    
-    long insertTime;
-    
-    long insertStart;
-    
-    Vector<RioLoaderListener> listeners;
-    
     /**
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
     BulkLoaderBuffer buffer;
-    
-    public BulkRioLoader( AbstractTripleStore store ) {
-    
-        this(store, DEFAULT_BUFFER_SIZE );
-        
-    }
     
     public BulkRioLoader(AbstractTripleStore store, int capacity) {
 
@@ -170,134 +139,45 @@ public class BulkRioLoader implements IRioLoader, StatementHandler
         
     }
     
-    public long getStatementsAdded() {
+    /** Allocate the initial buffer for parsed data. */
+    protected void before() {
         
-        return stmtsAdded;
-        
-    }
-    
-    public long getInsertTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getTotalTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getInsertRate() {
-        
-        return (long) 
-            ( ((double)stmtsAdded) / ((double)getTotalTime()) * 1000d );
-        
-    }
-    
-    public void addRioLoaderListener( RioLoaderListener l ) {
-        
-        if ( listeners == null ) {
-            
-            listeners = new Vector<RioLoaderListener>();
-            
-        }
-        
-        listeners.add( l );
-        
-    }
-    
-    public void removeRioLoaderListener( RioLoaderListener l ) {
-        
-        listeners.remove( l );
-        
-    }
-    
-    protected void notifyListeners() {
-        
-        RioLoaderEvent e = new RioLoaderEvent
-            ( stmtsAdded,
-              System.currentTimeMillis() - insertStart
-              );
-        
-        for ( Iterator<RioLoaderListener> it = listeners.iterator(); 
-              it.hasNext(); ) {
-            
-            it.next().processingNotification( e );
-            
-        }
-        
-    }
-    
-    /**
-     * We need to collect two (three including bnode) term arrays and one
-     * statement array.  These should be buffers of a settable size.
-     * <p>
-     * Once the term buffers are full (or the data is exhausted), the term 
-     * arrays should be sorted and batch inserted into the LocalTripleStore.
-     * <p>
-     * As each term is inserted, its id should be noted in the Value object,
-     * so that the statement array is sortable based on term id.
-     * <p>
-     * Once the statement buffer is full (or the data is exhausted), the 
-     * statement array should be sorted and batch inserted into the
-     * LocalTripleStore.  Also the term buffers should be flushed first.
-     * 
-     * @param reader
-     *                  the RDF/XML source
-     */
-    public void loadRdf( Reader reader, String baseURI ) throws Exception {
-        
-        OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
-        
-        Parser parser = new RdfXmlParser( valueFac );
-        
-        parser.setVerifyData( false );
-        
-        parser.setStatementHandler( this );
-        
-        // Note: reset to that rates reflect load times not clock times.
-        insertStart = System.currentTimeMillis();
-        insertTime = 0; // clear.
-        
-        // Note: reset so that rates are correct for each source loaded.
-        stmtsAdded = 0;
-        
-        // Allocate the initial buffer for parsed data.
         if(buffer == null) {
             
             buffer = new BulkLoaderBuffer(store,capacity);
             
         }
 
-        try {
+    }
 
-            // Parse the data.
-            parser.parse(reader, baseURI);
+    /**
+     * Flush any data still in the buffer.
+     */
+    protected void success() {
 
-            // bulk load insert the buffered data into the store.
-            if(buffer!=null) {
-                
-                // Bulk load the buffered data into {@link IndexSegment}s.
+        if(buffer!=null) {
+            
+            // Bulk load the buffered data into {@link IndexSegment}s.
+
+            try {
+
                 buffer.bulkLoad(batchId++,branchingFactor,indices);
                 
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
             }
-
-        } catch (RuntimeException ex) {
-
-            log.error("While parsing: " + ex, ex);
-
-            throw ex;
             
-        } finally {
-
-            // clear the old buffer reference.
-            buffer = null;
-
         }
 
-        insertTime += System.currentTimeMillis() - insertStart;
-        
+    }
+
+    /** clear the old buffer reference. */
+    protected void cleanUp() {
+
+        buffer = null;
+
     }
     
     public void handleStatement( Resource s, URI p, Value o ) {

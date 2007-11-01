@@ -58,6 +58,8 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test suite for full forward closure.
@@ -70,15 +72,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @todo run more small tests that focus on specific inferences.
  * 
  * @todo run tests of a variety of ontologies found "in the wild".
- * 
- * @todo verify that we correctly distinguish Axioms, Explicit, and Inferred
- *       statements. Axioms are checked against those defined by
- *       {@link RdfsAxioms}. Explicit statements are checked against the
- *       dataset w/o closure. The rest of the statements should be marked as
- *       Inferred. Note that an Axiom can be marked as Explicit when loading
- *       data, but that TM needs to convert the statement back to an Axiom if it
- *       is deleted. Also note that an inference that concludes a triple that is
- *       an axiom MUST be marked as an Axiom NOT Inferred.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -97,7 +90,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
     public TestRDFSClosure(String name) {
         super(name);
     }
-    
+
     /**
      * The RDF/XML resource that will be used by the unit tests.
      */
@@ -182,7 +175,9 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * resource is correct. Correctness is judged against the closure of the
      * same resource as computed by the Sesame platform.
      * 
-     * @param properties Used to configure the {@link InferenceEngine}.
+     * @param properties
+     *            Used to configure the {@link DataLoader} and the
+     *            {@link InferenceEngine}.
      * @param resource
      *            (MUST be in the same package as this test class).
      * @param baseURL
@@ -203,8 +198,18 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 
         try {
 
-            store.loadData("/com/bigdata/rdf/inf/" + resource, baseURL, format,
-                    true/* verify */, false/* commit */);
+            /**
+             * Note: overrides properties to make sure that entailments are NOT computed
+             * on load since we want to close the database itself not the loaded data
+             * set against the database!
+             */
+              
+            properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
+            
+            DataLoader dataLoader = new DataLoader(properties,store);
+            
+            dataLoader.loadData("/com/bigdata/rdf/inf/" + resource, baseURL,
+                    format);
 
             /*
              * Automatically enabled for dumping small stores. 
@@ -213,12 +218,13 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
             
             if (dump) {
                 System.err.println("told triples:");
-                store.dumpStore();
+                store.dumpStore(true,false,false);
             }
 
             InferenceEngine inf = new InferenceEngine(properties, store);
 
-            inf.computeClosure();
+            // close the database against itself.
+            inf.computeClosure(null);
 
             if (dump) {
                 System.err.println("entailed:");

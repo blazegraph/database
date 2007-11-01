@@ -52,7 +52,6 @@ import java.io.IOException;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 
 /**
@@ -60,20 +59,6 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
  * 
  * @todo try with {@link BufferMode#Disk} when testing on a resource starved
  *       system (e.g., a laptop).
- * 
- * @todo there is no reason for the {@link PresortRioLoader} to do one operation
- *       per type of term (uri, bnode or literal).  That should just fall out of
- *       how we partition the indices.
- * 
- * @todo partition the terms index at least for literals (by type), URIs, and
- *       bnodes.
- * 
- * @todo partition the ids index every 1M ids.
- * 
- * @todo write a test of concurrent load rates using LUBM. This data set is good
- *       since it reuses the same ontology and will let us scale the #of
- *       concurrent clients and the #of files to be loaded to an arbitrary
- *       degree.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -95,16 +80,9 @@ public class TestDistributedTripleStoreLoadRate extends AbstractDistributedTripl
 
     public void test_loadNCIOncology() throws IOException {
 
-        store.loadData("data/nciOncology.owl", "", RDFFormat.RDFXML,
-                false, false /*commit*/);
+        store.getDataLoader().loadData("data/nciOncology.owl", "", RDFFormat.RDFXML);
 
     }
-
-//    protected String[] testData = new String[] {
-//            "data/nciOncology.owl" // nterms := 289844
-////            "data/wordnet_nouns-20010201.rdf"
-////            "data/taxonomy.rdf"
-//            };
 
     /**
      * Runs the test RDF/XML load.

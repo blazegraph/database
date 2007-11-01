@@ -81,8 +81,6 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestStatementBuffer.class);
 
-        suite.addTestSuite( TestRioIntegration.class);
-
         suite.addTestSuite( TestLoadAndVerify.class);
         
         return suite;

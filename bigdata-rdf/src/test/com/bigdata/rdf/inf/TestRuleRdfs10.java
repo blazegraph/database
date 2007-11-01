@@ -97,7 +97,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             URI U = new URIImpl("http://www.foo.org/U");
 
             StatementBuffer buffer = new StatementBuffer(store,
-                    100/* capacity */, true/* distinct */);
+                    100/* capacity */);
             
             buffer.add(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
 
@@ -152,7 +152,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             URI U2 = new URIImpl("http://www.foo.org/U2");
 
             StatementBuffer buffer = new StatementBuffer(store,
-                    100/* capacity */, true/* distinct */);
+                    100/* capacity */);
             
             buffer.add(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
             buffer.add(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);

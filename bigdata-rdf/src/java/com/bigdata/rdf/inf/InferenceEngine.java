@@ -64,7 +64,6 @@ import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -82,7 +81,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                          pred :- pred*.
+ *                              pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -117,17 +116,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                           triple(?v,rdf:type,?x) :-
- *                              triple(?u,rdfs:subClassOf,?x),
- *                              triple(?v,rdf:type,?u). 
+ *                               triple(?v,rdf:type,?x) :-
+ *                                  triple(?u,rdfs:subClassOf,?x),
+ *                                  triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                           triple(?u,rdfs:subClassOf,?x) :-
- *                              triple(?u,rdfs:subClassOf,?v),
- *                              triple(?v,rdf:subClassOf,?x). 
+ *                               triple(?u,rdfs:subClassOf,?x) :-
+ *                                  triple(?u,rdfs:subClassOf,?v),
+ *                                  triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -151,32 +150,47 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * FIXME owl:sameAs by backward chaining on query.
  * 
- * @todo We don’t do owl:equivalentClass and owl:equivalentProperty currently.
- *       You can simulate those by doing a bi-directional subClassOf or
- *       subPropertyOf, which has always sufficed for our purposes. If you were
- *       going to write rules for those two things this is how you would do it:
- * 
  * <pre>
- *   equivalentClass:
- *                              
- *   add an axiom to the KB: equivalentClass subPropertyOf subClassOf
+ *    Here are the axioms:
+ *    
+ *    owl:equivP rdfs:subPropertyOf rdfs:subPropertyOf
+ *    
+ *    owl:equivC rdfs:subPropertyOf rdfs:subClassOf
+ *    
+ *    
+ *    Here are the rules:
+ *    
+ *    eqp: aaa owl:equivP bbb -&gt; bbb owl:equivP aaa
+ *    
+ *    eqc: xxx owl:equivC yyy -&gt; yyy owl:equivC xxx
+ *    
+ *    same1: xxx owl:sameAs yyy -&gt; yyy owl:sameAs xxx
+ *    
+ *    same2: xxx owl:sameAs yyy + xxx aaa zzz -&gt; yyy aaa zzz
+ *    
+ *    same3: xxx owl:sameas yyy + zzz aaa zzz -&gt; zzz aaa yyy
+ *    
+ *    Filter out xxx owl:sameAs xxx for same2, same3.
+ *    
+ *    Best guess for &quot;fast&quot; integration:
  *  
- *   add an entailment rule: xxx equivalentClass yyy -&gt; yyy equivalentClass xxx
+ *  eqp: run to completion before step 2
+ *  
+ *  eqc: run to completion before step 7
+ *  
+ *  fix point the sameAs rules together at the very end.
+ *  
  * </pre>
  * 
- * It would be analogous for equivalentProperty.
- * 
- * @todo Option to turn off range/domain processing.
- * 
  * @todo Improve write efficiency for the proofs - they are slowing things way
- *       down.
+ *       down. Note that using magic sets or a backward chainer will let us
+ *       avoid writing proofs altogether since we can prove whether or not a
+ *       statement is still entailed without recourse to reading proofs chains.
  * 
  * @todo provide option for "owl:sameAs" semantics using destructive merging
  *       (the terms are assigned the same term identifier, one of them is
  *       treated as a canonical, and there is no way to retract the sameAs
  *       assertion).
- * 
- * @todo experiment with use of a bloom filter
  * 
  * @todo if we are not storing rules or magic facts in the main statement
  *       indices then get rid of the leading byte used in all keys for the
@@ -680,7 +694,7 @@ public class InferenceEngine extends RDFSHelper {
         final long elapsed = System.currentTimeMillis() - begin;
         
         closureStats.elapsed = elapsed;
-        closureStats.numComputed = nafter - nbefore;
+        closureStats.nentailments = nafter - nbefore;
         
         return closureStats;        
         
@@ -945,7 +959,7 @@ public class InferenceEngine extends RDFSHelper {
         }
 
         closureStats.elapsed = elapsed;
-        closureStats.numComputed = inferenceCount;
+        closureStats.nentailments = inferenceCount;
         
         return closureStats;
         

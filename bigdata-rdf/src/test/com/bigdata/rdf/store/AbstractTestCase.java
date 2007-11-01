@@ -477,6 +477,9 @@ abstract public class AbstractTestCase
      * Wraps up the {@link AbstractTripleStore} as an {@link RdfRepository} to
      * facilitate using {@link #modelsEqual(RdfRepository, RdfRepository)} for
      * ground truth testing.
+     * 
+     * FIXME This is extremely slow.  Find a faster way to write this!  It is
+     * making some of the unit tests quite painful.
      */
     public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
             throws SailInitializationException {

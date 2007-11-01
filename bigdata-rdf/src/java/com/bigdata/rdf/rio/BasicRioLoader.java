@@ -50,9 +50,16 @@ import java.util.Vector;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
+import org.openrdf.rio.ntriples.NTriplesParser;
 import org.openrdf.rio.rdfxml.RdfXmlParser;
+import org.openrdf.rio.turtle.TurtleParser;
+import org.openrdf.sesame.constants.RDFFormat;
+
+import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.sun.swing.internal.plaf.basic.resources.basic;
 
 /**
  * Parses data but does not load it into the indices.
@@ -78,26 +85,26 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    public long getStatementsAdded() {
+    final public long getStatementsAdded() {
         
         return stmtsAdded;
         
     }
     
-    public long getInsertTime() {
+    final public long getInsertTime() {
         
         return insertTime;
         
     }
     
-    public long getInsertRate() {
+    final public long getInsertRate() {
         
         return (long) 
             ( ((double)stmtsAdded) / ((double)insertTime) * 1000d );
         
     }
 
-    public void addRioLoaderListener( RioLoaderListener l ) {
+    final public void addRioLoaderListener( RioLoaderListener l ) {
         
         if ( listeners == null ) {
             
@@ -109,13 +116,13 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    public void removeRioLoaderListener( RioLoaderListener l ) {
+    final public void removeRioLoaderListener( RioLoaderListener l ) {
         
         listeners.remove( l );
         
     }
     
-    protected void notifyListeners() {
+    final protected void notifyListeners() {
         
         RioLoaderEvent e = new RioLoaderEvent
             ( stmtsAdded,
@@ -131,22 +138,152 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    public void loadRdf( Reader reader, String baseURI ) throws Exception {
+    /**
+     * Choose the parser based on the {@link RDFFormat} specified to the
+     * constructor.
+     * 
+     * @return The parser.
+     * 
+     * @todo reuse parser instances for the same {@link RDFFormat}?
+     */
+    final protected Parser getParser(RDFFormat rdfFormat) {
+
+        final ValueFactory valFactory = OptimizedValueFactory.INSTANCE;
         
-        Parser parser = new RdfXmlParser();
+        final Parser parser;
         
-        parser.setVerifyData( false );
+        if (RDFFormat.RDFXML.equals(rdfFormat)) {
+            
+            parser = new RdfXmlParser(valFactory);
+            
+        } else if (RDFFormat.NTRIPLES.equals(rdfFormat)) {
+            
+            parser = new NTriplesParser(valFactory);
+            
+        } else if (RDFFormat.TURTLE.equals(rdfFormat)) {
+            
+            parser = new TurtleParser(valFactory);
+            
+        } else {
+            
+            throw new IllegalArgumentException("Format not supported: "
+                    + rdfFormat);
+            
+        }
+        
+        return parser;
+
+    }
+    
+//        InputStream rdfStream = getClass().getResourceAsStream(ontology);
+//
+//    if (rdfStream == null) {
+//
+//        /*
+//         * If we do not find as a Resource then try as a URL.
+//         * 
+//         */
+//        try {
+//            
+//            rdfStream = new URL(ontology).openConnection().getInputStream();
+//            
+//        } catch (IOException ex) {
+//            
+//            ex.printStackTrace(System.err);
+//            
+//            return false;
+//            
+//        }
+//        
+//    }
+//
+//    rdfStream = new BufferedInputStream(rdfStream);
+//
+//    ...
+//    
+//    finally {
+//    rdfStream.close();
+//    }
+//    
+
+    final public void loadRdf(Reader reader, String baseURI,
+            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+        
+        log.info("format="+rdfFormat+", verify="+verifyData);
+        
+        Parser parser = getParser(rdfFormat);
+        
+        parser.setVerifyData( verifyData );
         
         parser.setStatementHandler( newStatementHandler() );
     
+        // Note: reset to that rates reflect load times not clock times.
         insertStart = System.currentTimeMillis();
+        insertTime = 0; // clear.
         
-        parser.parse( reader, baseURI );
+        // Note: reset so that rates are correct for each source loaded.
+        stmtsAdded = 0;
+                
+        try {
+
+            before();
+
+            log.info("Starting parse.");
+
+            // Parse the data.
+            parser.parse(reader, baseURI);
+
+            insertTime += System.currentTimeMillis() - insertStart;
+
+            log.info("parse complete: elapsed="
+                    + (System.currentTimeMillis() - insertStart)
+                    + "ms, toldTriples=" + stmtsAdded + ", tps="
+                    + getInsertRate());
+            
+            success();
+
+        } catch (RuntimeException ex) {
+
+            insertTime += System.currentTimeMillis() - insertStart;
+            
+            log.error("While parsing: " + ex, ex);
+
+            throw ex;
+            
+        } finally {
+
+            cleanUp();
+            
+        }
         
-        insertTime += System.currentTimeMillis() - insertStart;
+    }
+
+    /**
+     * NOP.
+     */
+    protected void before() {
         
     }
     
+    /**
+     * NOP.
+     */
+    protected void success() {
+        
+    }
+    
+    /**
+     * NOP.
+     */
+    protected void cleanUp() {
+        
+    }
+    
+    /**
+     * Note: YOU MUST override this method to install a different
+     * {@link StatementHandler}. The default is the
+     * {@link BasicStatementHandler} which does NOTHING.
+     */
     public StatementHandler newStatementHandler() {
         
         return new BasicStatementHandler();
@@ -159,7 +296,10 @@ public class BasicRioLoader implements IRioLoader {
         public BasicStatementHandler() {
             
         }
-        
+
+        /**
+         * Counts the #of statements.
+         */
         public void handleStatement( Resource s, URI p, Value o ) {
             
 //            if ( s instanceof BNode || 

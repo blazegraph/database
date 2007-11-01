@@ -52,9 +52,9 @@ import java.util.Properties;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 
-import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test suite for RDFS incremental closure correctness (when you load data in a
@@ -80,14 +80,16 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
         super(name);
     }
 
+    final private String prefix = "/com/bigdata/rdf/inf/";
+    
     /**
      * Trivial example - good for debugging.
      */
     public void test_testIncrementalClosure01() throws Exception {
 
         String[] resource = new String[] {
-                "testIncrementalClosure01-part01.nt",
-                "testIncrementalClosure01-part02.nt" };
+                prefix+"testIncrementalClosure01-part01.nt",
+                prefix+"testIncrementalClosure01-part02.nt" };
 
         String[] baseURL = new String[] { "", "" 
                 };
@@ -111,8 +113,8 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
     public void test_wordnetDataSchema() throws Exception {
 
         String[] resource = new String[] {
-                "wordnet_nouns-20010201.rdf",
-                "wordnet-20000620.rdfs" };
+                "data/wordnet_nouns-20010201.rdf",
+                "data/wordnet-20000620.rdfs" };
 
         String[] baseURL = new String[] { "", "" 
                 };
@@ -136,8 +138,8 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
     public void test_wordnetSchemaData() throws Exception {
 
         String[] resource = new String[] {
-                "wordnet_nouns-20010201.rdf",
-                "wordnet-20000620.rdfs" };
+                "data/wordnet_nouns-20010201.rdf",
+                "data/wordnet-20000620.rdfs" };
 
         String[] baseURL = new String[] { "", "" 
                 };
@@ -171,31 +173,20 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
 
         AbstractTripleStore store = getStore();
 
+        /*
+         * Note: overrides properties to make sure that entailments are computed
+         * on load (the temporary store against the database).
+         */
+        
+        properties.setProperty(DataLoader.Options.CLOSURE,
+                ClosureEnum.Incremental.toString());
+
+        DataLoader dataLoader = new DataLoader(properties, store);
+        
         try {
 
-            /*
-             * @todo property for how large the store can get in memory before
-             * it overflows or reuse the same temp store for a series of data
-             * loads and just delete when it gets too large? (Question is how to
-             * minimize the time to create the backing file, which adds
-             * significant latency - plus the temp store is not as concurrency
-             * savvy).
-             */
-
-            InferenceEngine inf = new InferenceEngine(properties,store);
+            dataLoader.loadData(resource, baseURL, format);
             
-            for (int i = 0; i < resource.length; i++) {
-                
-                TempTripleStore tmp = new TempTripleStore(properties);
-
-                LoadStats loadStats = tmp
-                        .loadData("/com/bigdata/rdf/inf/"+resource[i], baseURL[i],
-                                format[i], true/* verifyData */, false/* commit */);
-
-                System.err.println(resource[i] + " : " + loadStats.toString());
-                
-            }
-
             /*
              * Automatically enabled for dumping small stores. 
              */
@@ -211,7 +202,7 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
                 store.dumpStore(false, true, false);
             }
 
-            assertTrue("Closure does not agree",modelsEqual(groundTruth, inf));
+            assertTrue("Closure does not agree",modelsEqual(groundTruth, dataLoader.inferenceEngine));
 
         } finally {
 

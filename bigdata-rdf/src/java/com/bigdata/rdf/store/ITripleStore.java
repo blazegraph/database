@@ -47,20 +47,16 @@
 
 package com.bigdata.rdf.store;
 
-import java.io.IOException;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.rio.Parser;
-import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.store.DataLoader.Options;
 
 /**
  * Interface for a triple store.
@@ -219,32 +215,13 @@ public interface ITripleStore {
     public StatementIterator asStatementIterator(ISPOIterator src);
 
     /**
-     * Load data into the triple store (NO truth maintenance).
+     * Return a new {@link DataLoader} provisioned using the properties that
+     * were used to construct the {@link ITripleStore}.
      * 
-     * @param resource
-     *            The resource -or- file.
-     *            <p>
-     *            Note: To refer to a resource in a package somewhere on the
-     *            CLASSPATH write the name of the resource like this:
-     *            <code>/com/bigdata/rdf/inf/testClosure01.nt</code>. The
-     *            leading slash is important.
-     * @param baseURI
-     *            The baseURI or <code>""</code> if none is known.
-     * @param rdfFormat
-     *            The RDF interchange syntax to be parsed.
-     * @param verifyData
-     *            Controls the {@link Parser#setVerifyData(boolean)} option.
-     * @param commit
-     *            A {@link #commit()} will be performed IFF true.
-     * 
-     * @return Statistics about the data load operation.
-     * 
-     * @throws IOException
-     *             if there is a problem when parsing the data.
+     * @see Options
      */
-    public LoadStats loadData(String resource, String baseURI, RDFFormat rdfFormat,
-            boolean verifyData, boolean commit) throws IOException;
-
+    public DataLoader getDataLoader();
+    
     /**
      * Commit changes on the database.
      * <p>

@@ -70,6 +70,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
@@ -81,56 +82,83 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
- * {@link Statement} source.
+ * {@link Statement} source and writing that output onto an
+ * {@link AbstractTripleStore} using the batch API.
+ * <p>
+ * Note: there is a LOT of {@link Value} duplication in parsed RDF and we get a
+ * significant reward for reducing {@link Value}s to only the distinct
+ * {@link Value}s during processing. On the other hand, there is little
+ * {@link Statement} duplication. Hence we pay an unnecessary overhead if we try
+ * to make the statements distinct in the buffer.
+ * <p>
+ * Note: This also provides an explanation for why the {@link SPOBuffer} does
+ * not do better when "distinct" is turned on - the "Value" objects in that case
+ * are only represented by long integers and duplication in their values does
+ * not impose a burden on either the heap or the index writers. In contrast, the
+ * duplication of {@link Value}s in the {@link StatementBuffer} imposes a
+ * burden on both the heap and the index writers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class StatementBuffer {
 
-    /*
-     * Note: Converting from a _URI[], _Literal[], and _BNode[] buffer to a
-     * single _Value[] buffer was a 4% performance loss. I guess this change
-     * could be rolled back. I made it primarily to simplify the code since
-     * nothing depends on the partition by RDF Value class.
-     * 
-     * However, turning OFF "distinct" for the _Statement[] buffer was a BIG
-     * performance gain.
-     * 
-     * Presumably there is a LOT of Value duplication in parsed RDF, but little
-     * Statement duplication. Hence we pay an unnecessary overhead if we try to
-     * make the statements distinct in the buffer. This also provides an
-     * explanation for why the SPOBuffer does not do better when "distinct" is
-     * turned on - the "Value" objects in that case are only represented by long
-     * integers and duplication in their values does not impose a burden on
-     * either the heap or the index writers. In contrast, the duplication of
-     * Values in the StatementBuffer imposes a burden on both the heap and the
-     * index writers.
+    /**
+     * Buffer for parsed RDF {@link Value}s.
      */
+    protected final _Value[] values;
     
-//    final _URI[] uris;
-//    final _Literal[] literals;
-//    final _BNode[] bnodes;
-    final _Value[] values;
-    final _Statement[] stmts;
-    
-    int numURIs, numLiterals, numBNodes;
-    int numValues;
-    int numStmts;
+    /**
+     * Buffer for parsed RDF {@link Statement}s.
+     */
+    protected final _Statement[] stmts;
 
+    /**
+     * #of valid entries in {@link #values}.
+     */
+    protected int numValues;
+    
+    /**
+     * #of valid entries in {@link #stmts}.
+     */
+    protected int numStmts;
+
+    /**
+     * @todo consider tossing out these counters - they only add complexity to
+     * the code in {@link #handleStatement(Resource, URI, Value, StatementEnum)}.
+     */
+    protected int numURIs, numLiterals, numBNodes;
+    
     /**
      * Map used to filter out duplicate terms.  The use of this map provides
      * a ~40% performance gain.
      */
-    final Map<_Value, _Value> distinctTermMap;
+    final private Map<_Value, _Value> distinctTermMap;
 
     /**
-     * Map used to filter out duplicate statements. 
+     * Map used to filter out duplicate statements.
+     * 
+     * @deprecated this is not efficient and will be discarded.
      */
     final Map<_Statement,_Statement> distinctStmtMap;
     
+    private final AbstractTripleStore statementStore;
+
+    /**
+     * The optional store into which statements will be inserted when non-<code>null</code>.
+     */
+    public final AbstractTripleStore getStatementStore() {
+        
+        return statementStore;
+        
+    }
+    
     private final AbstractTripleStore database;
     
+    /**
+     * The database that will be used to resolve terms.  When {@link #getStatementStore()}
+     * is <code>null</code>, statements will be written into this store as well.
+     */
     public final AbstractTripleStore getDatabase() {
         
         return database;
@@ -146,9 +174,10 @@ public class StatementBuffer {
     protected final int capacity;
 
     /**
-     * When true only distinct terms and statements are stored in the buffer.
+     * When true only distinct terms are stored in the buffer (this is always
+     * true since this condition always outperforms the alternative).
      */
-    protected final boolean distinct;
+    protected final boolean distinct = true;
     
     boolean haveKeys = false;
     
@@ -176,64 +205,61 @@ public class StatementBuffer {
      */
     public StatementBuffer(AbstractTripleStore database, int capacity) {
         
-        this(database,capacity,true/*distinct*/);
+        this(null,database,capacity);
         
     }
 
     /**
      * Create a buffer.
      * 
+     * @param statementStore
+     *            The store into which the statements will be inserted
+     *            (optional). When <code>null</code>, both statments and
+     *            terms will be inserted into the <i>database</i>. This
+     *            optional argument provides the ability to load statements into
+     *            a temporary store while the terms are resolved against the
+     *            main database. This facility is used during incremental
+     *            load+close operations.
      * @param database
-     *            The database into which the terma and statements will be
-     *            inserted.
+     *            The database. When <i>statementStore</i> is <code>null</code>,
+     *            both terms and statements will be inserted into the
+     *            <i>database</i>.
      * @param capacity
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
      *            buffer can hold. The minimum capacity is three (3) since that
      *            corresponds to a single triple where all terms are URIs.
-     * @param distinct
-     *            Whether or not terms and statements are made distinct in the
-     *            buffer.
-     *            <p>
-     *            Note: data load performance is generally substantially better
-     *            with <code>distinct := true</code>.
      */
-    public StatementBuffer(AbstractTripleStore database, int capacity, boolean distinct) {
-    
+    public StatementBuffer(AbstractTripleStore statementStore, AbstractTripleStore database, int capacity) {
+            
         if (database == null)
             throw new IllegalArgumentException();
 
-        if(capacity<3)
+        if (capacity < 1)
             throw new IllegalArgumentException();
+
+        this.statementStore = statementStore; // MAY be null.
         
         this.database = database;
         
         this.capacity = capacity;
-    
-        this.distinct = distinct;
         
         if( capacity == -1 ) {
             
-//            uris = null;
-//            literals = null;
-//            bnodes = null;
             values = null;
+
             stmts = null;
+            
             distinctTermMap = null;
+            
             distinctStmtMap = null;
             
             return;
             
         }
         
-//        uris = new _URI[ capacity ];
-//        
-//        literals = new _Literal[ capacity ];
-//        
-//        bnodes = new _BNode[ capacity ];
-
-        values = new _Value[ capacity * IRawTripleStore.N];
+        values = new _Value[capacity * IRawTripleStore.N];
         
-        stmts = new _Statement[ capacity ];
+        stmts = new _Statement[capacity];
 
         if (distinct) {
 
@@ -267,7 +293,7 @@ public class StatementBuffer {
      */
     public void clear() {
         
-        numURIs = numLiterals = numBNodes = numStmts = 0;
+        numURIs = numLiterals = numBNodes = numStmts = numValues = 0;
         
         if(distinctTermMap!=null) {
             
@@ -312,12 +338,6 @@ public class StatementBuffer {
         assert numTerms == numValues;
         
         final long begin = System.currentTimeMillis();
-        
-//        database.generateSortKeys(keyBuilder, uris, numURIs);
-//        
-//        database.generateSortKeys(keyBuilder, literals, numLiterals);
-//        
-//        database.generateSortKeys(keyBuilder, bnodes, numBNodes);
 
         database.generateSortKeys(keyBuilder, values, numValues);
 
@@ -338,9 +358,6 @@ public class StatementBuffer {
         
 //        assert haveKeys;
         assert ! sorted;
-//        assert uris != null;
-//        assert literals != null;
-//        assert bnodes != null;
         assert values != null;
         
         final int numTerms = numURIs + numLiterals + numBNodes;
@@ -349,15 +366,6 @@ public class StatementBuffer {
 
         final long begin = System.currentTimeMillis();
         
-//        if (numURIs > 0)
-//            Arrays.sort(uris, 0, numURIs, _ValueSortKeyComparator.INSTANCE);
-//
-//        if (numLiterals > 0)
-//            Arrays.sort(literals, 0, numLiterals, _ValueSortKeyComparator.INSTANCE);
-//
-//        if( numBNodes>0)
-//            Arrays.sort(bnodes, 0, numBNodes, _ValueSortKeyComparator.INSTANCE);
-
         if (numValues > 0)
             Arrays.sort(values, 0, numValues, _ValueSortKeyComparator.INSTANCE);
         
@@ -374,15 +382,6 @@ public class StatementBuffer {
     public void sortTermsByTermIds() {
         
         final long begin = System.currentTimeMillis();
-        
-//        if (numURIs > 0)
-//            Arrays.sort(uris, 0, numURIs, TermIdComparator.INSTANCE);
-//
-//        if (numLiterals > 0)
-//            Arrays.sort(literals, 0, numLiterals, TermIdComparator.INSTANCE);
-//
-//        if( numBNodes>0)
-//            Arrays.sort(bnodes, 0, numBNodes, TermIdComparator.INSTANCE);
 
         if( numValues>0)
             Arrays.sort(values, 0, numValues, TermIdComparator.INSTANCE);
@@ -402,12 +401,6 @@ public class StatementBuffer {
         /*
          * insert terms (batch operation).
          */
-        
-//        database.insertTerms(uris, numURIs, haveKeys, sorted);
-//
-//        database.insertTerms(literals, numLiterals, haveKeys, sorted);
-//
-//        database.insertTerms(bnodes, numBNodes, haveKeys, sorted);
         
         database.insertTerms(values, numValues, haveKeys, sorted);
 
@@ -451,7 +444,19 @@ public class StatementBuffer {
             
         }
         
-        return database.addStatements(tmp, numStmts);
+        if(statementStore!=null) {
+
+            // Writing statements on the secondary store.
+            
+            return statementStore.addStatements(tmp, numStmts);
+            
+        } else {
+            
+            // Write statements on the primary database.
+            
+            return database.addStatements(tmp, numStmts);
+            
+        }
 
     }
 
@@ -465,17 +470,11 @@ public class StatementBuffer {
      *         added.
      */
     public boolean nearCapacity() {
-        
-//        if(numURIs+3>capacity) return true;
-//
-//        if(numLiterals+3>capacity) return true;
-//        
-//        if(numBNodes+3>capacity) return true;
-
-        if(numValues+1>values.length) return true;
 
         if(numStmts+1>capacity) return true;
-        
+
+        if(numValues+IRawTripleStore.N>values.length) return true;
+
         return false;
         
     }
@@ -612,12 +611,10 @@ public class StatementBuffer {
             
             if (s instanceof _URI) {
 
-//                uris[numURIs++] = (_URI) s;
                 numURIs++;
 
             } else {
 
-//                bnodes[numBNodes++] = (_BNode) s;
                 numBNodes++;
 
             }
@@ -630,8 +627,6 @@ public class StatementBuffer {
 
             numURIs++;
             
-//            uris[numURIs++] = (_URI) p;
-            
         }
 
         if (!duplicateO) {
@@ -640,17 +635,14 @@ public class StatementBuffer {
 
             if (o instanceof _URI) {
 
-//                uris[numURIs++] = (_URI) o;
                 numURIs++;
 
             } else if (o instanceof _BNode) {
 
-//                bnodes[numBNodes++] = (_BNode) o;
                 numBNodes++;
 
             } else {
 
-//                literals[numLiterals++] = (_Literal) o;
                 numLiterals++;
 
             }
@@ -807,12 +799,8 @@ public class StatementBuffer {
 
         public TermIterator(StatementBuffer buffer) {
 
-            src = new Striterator(new TermArrayIterator(buffer.values, buffer.numValues));
-//            src = new Striterator(EmptyIterator.DEFAULT)
-//                .append(new TermClassIterator(buffer.uris, buffer.numURIs))
-//                .append(new TermClassIterator(buffer.literals, buffer.numLiterals))
-//                .append(new TermClassIterator(buffer.bnodes,buffer.numBNodes))
-//                ;
+            src = new Striterator(new TermArrayIterator(buffer.values,
+                    buffer.numValues));
             
         }
 
@@ -872,12 +860,8 @@ public class StatementBuffer {
 
         public TermIdIterator(StatementBuffer buffer) {
             
-            src = new Striterator(new TermArrayIterator(buffer.values, buffer.numValues));
-//            src = new Striterator(EmptyIterator.DEFAULT)
-//                .append(new TermClassIterator(buffer.uris, buffer.numURIs))
-//                .append(new TermClassIterator(buffer.literals, buffer.numLiterals))
-//                .append(new TermClassIterator(buffer.bnodes,buffer.numBNodes))
-//                ;
+            src = new Striterator(new TermArrayIterator(buffer.values,
+                    buffer.numValues));
             
         }
 

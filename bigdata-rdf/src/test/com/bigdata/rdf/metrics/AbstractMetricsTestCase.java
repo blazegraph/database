@@ -56,6 +56,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Vector;
 
+import org.openrdf.sesame.constants.RDFFormat;
+
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
@@ -95,6 +97,8 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
         if(store!=null) {
             
             store.closeAndDelete();
+         
+            store = null;
             
         }
         
@@ -264,7 +268,7 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
      * 
      * @return The array of sources.
      */
-    public static FileAndBaseURI[] getSources( String s )
+    public static FileAndBaseURL[] getSources( String s )
     {
 
         String[] args = s.split( "\\s+" );
@@ -340,7 +344,7 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
                     )
                       );
 
-                v.add( new FileAndBaseURI( filename, baseURI ) );
+                v.add( new FileAndBaseURL( filename, baseURI ) );
 
                 } else {
 
@@ -358,8 +362,8 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
         // in which they are given on the command line.
         //
 
-        FileAndBaseURI[] sources = (FileAndBaseURI[]) v.toArray
-            ( new FileAndBaseURI[]{}
+        FileAndBaseURL[] sources = (FileAndBaseURL[]) v.toArray
+            ( new FileAndBaseURL[]{}
               );
 
         if( sources.length == 0 ) {
@@ -384,27 +388,39 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
      * Trivial helper class for RDF filename and optional base URI used to
      * describe the files to upload to the repository during a test run.
      */
-    public static class FileAndBaseURI {
+    public static class FileAndBaseURL {
 
         String m_filename;
 
-        String m_baseURI;
+        String m_baseURL;
 
+        RDFFormat m_format;
+        
         public String getFilename() {
             return m_filename;
         }
 
-        public String getBaseURI() {
-            return m_baseURI;
+        public String getBaseURL() {
+            return m_baseURL;
         }
 
-        public FileAndBaseURI(String filename) {
+        public RDFFormat getFormat() {
+            return m_format;
+        }
+
+        public FileAndBaseURL(String filename) {
 
             this(filename, "");
 
         }
 
-        public FileAndBaseURI(String filename, String baseURI) {
+        public FileAndBaseURL(String filename, String baseURL) {
+            
+            this(filename,baseURL,RDFFormat.RDFXML);
+            
+        }
+        
+        public FileAndBaseURL(String filename, String baseURL, RDFFormat format) {
 
             if (filename == null) {
 
@@ -412,19 +428,27 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
 
             }
 
-            if (baseURI == null) {
+            if (baseURL == null) {
 
-                throw new IllegalArgumentException("baseURI");
+                throw new IllegalArgumentException("baseURL");
 
             }
 
+            if (format == null) {
+
+                throw new IllegalArgumentException("RDFFormat");
+
+            }
+            
             m_filename = filename;
 
-            m_baseURI = baseURI;
+            m_baseURL = baseURL;
 
+            m_format = format;
+            
         }
 
-        public static String[] getFileNames(FileAndBaseURI[] sources) {
+        public static String[] getFileNames(FileAndBaseURL[] sources) {
 
             int len = sources.length;
             String[] ret = new String[len];
@@ -435,11 +459,20 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
 
         }
 
-        public static String[] getBaseURIs(FileAndBaseURI[] sources) {
+        public static String[] getBaseURLs(FileAndBaseURL[] sources) {
             int len = sources.length;
             String[] ret = new String[len];
             for (int i = 0; i < len; i++) {
-                ret[i] = sources[i].getBaseURI();
+                ret[i] = sources[i].getBaseURL();
+            }
+            return ret;
+        }
+
+        public static RDFFormat[] getFormats(FileAndBaseURL[] sources) {
+            int len = sources.length;
+            RDFFormat[] ret = new RDFFormat[len];
+            for (int i = 0; i < len; i++) {
+                ret[i] = sources[i].getFormat();
             }
             return ret;
         }

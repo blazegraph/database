@@ -154,7 +154,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         
         try {
             
-            StatementBuffer buffer = new StatementBuffer(store,100/*capacity*/,true/*distinct*/);
+            StatementBuffer buffer = new StatementBuffer(store,100/*capacity*/);
 
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");

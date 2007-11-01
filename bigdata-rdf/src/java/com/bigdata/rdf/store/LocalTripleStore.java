@@ -330,12 +330,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     }
     
     /**
-     * FIXME This class needs to listen for an {@link MasterJournal#overflow()} event
-     * and clear its index references when one occurs. Failure to do this means
-     * that a journal overflow event will cause the index references to become
-     * bad (the will refer to the old, closed journal).
-     * 
-     * @param state
+     * @deprecated overflow handling is being moved into the journal.
      */
     protected void didOverflow(Object state) {
         
@@ -345,6 +340,15 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         ndx_spo = null;
         ndx_pos = null;
         ndx_osp = null;
+        
+    }
+
+    public void usage(){
+        
+        System.err.println("file="+store.getBufferStrategy().getFile());
+        System.err.println("byteCount="+store.getBufferStrategy().getNextOffset());
+        
+        super.usage();
         
     }
     

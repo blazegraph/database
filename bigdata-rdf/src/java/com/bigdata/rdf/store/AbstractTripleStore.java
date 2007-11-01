@@ -47,14 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -76,7 +69,6 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
 import org.openrdf.vocabulary.OWL;
 import org.openrdf.vocabulary.RDF;
@@ -99,11 +91,6 @@ import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.rio.IRioLoader;
-import com.bigdata.rdf.rio.LoadStats;
-import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.RioLoaderEvent;
-import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -456,169 +443,14 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /*
-     * Data loading.
-     */
-    
-    /**
-     * The capacity of the {@link StatementBuffer} used when reading RDF data.
-     * Values up to 1M are good for the {@link LocalTripleStore} when loading
-     * large data sets, but smaller values should be used for the
-     * {@link ScaleOutTripleStore}. The default is (500k).
-     * 
-     * @return The buffer capacity.
-     * 
-     * @todo make this a configuration property and use a lower default. examine
-     *       performance over a sequence of loads with a smaller default.
-     */
-    protected int getDataLoadBufferCapacity() {
-        
-        return 500000;
-        
-    }
-
-    /**
-     * Used to retain the {@link StatementBuffer} between runs of the parser
-     * while allowing it to be garbage collected if necessary.
-     */
-    private SoftReference<StatementBuffer> buffer;
-    
-    /**
-     * Returns the {@link StatementBuffer} instance that is used by the data
-     * loader.
-     */
-    public StatementBuffer getStatementBuffer() {
-
-        /*
-         * Note: distinct := true has substantially better performance.
-         */
-        
-        StatementBuffer b = null;
-        
-        if(buffer!=null) {
-            
-            b = buffer.get();
-            
-        }
-        
-        if(b == null) {
-            
-            final int capacity = getDataLoadBufferCapacity();
-            
-            b = new StatementBuffer(this, capacity, true/* distinct */);
-            
-            buffer = new SoftReference<StatementBuffer>(b);
-            
-            log.info("Allocated statement buffer: capacity="+capacity);
-            
-        }
-
-        return b;
-        
-    }
-    
-    /**
-     * FIXME In order to support incremental data load with closure, we need to
-     * load data into a temporary store while the terms identifiers must be
-     * resolved against the database. Refactor to support this use case but also
-     * the use case of loading statements into the database without closure (or
-     * when you are only going to close the database once, after all statements
-     * have been loaded). Consider whether this is best supported using a helper
-     * class. Integrate support for this into the SAIL.
-     */ 
-    final public LoadStats loadData(String resource, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData, boolean commit) throws IOException {
-
-        final long begin = System.currentTimeMillis();
-        
-        LoadStats stats = new LoadStats();
-        
-        log.info( "loading: " + resource );
-        
-        IRioLoader loader = new PresortRioLoader(this, rdfFormat, verifyData,
-                getStatementBuffer());
-
-        loader.addRioLoaderListener( new RioLoaderListener() {
-            
-            public void processingNotification( RioLoaderEvent e ) {
-                
-                log.info
-                    ( e.getStatementsProcessed() + 
-                      " stmts added in " + 
-                      ((double)e.getTimeElapsed()) / 1000d +
-                      " secs, rate= " + 
-                      e.getInsertRate() 
-                      );
-                
-            }
-            
-        });
-        
-        /*
-         * @todo change to use correct Parser method depending on Reader vs
-         * InputStream (SAX Source).  Changing this means updating all of
-         * the parser implementations, not just the PresortRioLoader.
-         */
-        
-        InputStream rdfStream = getClass().getResourceAsStream(resource);
-
-        if (rdfStream == null) {
-
-            // If we do not find as a Resource then try the file system.
-            rdfStream = new BufferedInputStream(new FileInputStream(resource));
-
-        }
-
-        Reader reader = new BufferedReader(new InputStreamReader(rdfStream));
-        
-        try {
-            
-            loader.loadRdf( reader, baseURI );
-            
-            long nstmts = loader.getStatementsAdded();
-            
-            stats.toldTriples += nstmts;
-            
-            stats.loadTime = System.currentTimeMillis() - begin;
-            
-            // commit the data.
-            if(commit) {
-                
-                long beginCommit = System.currentTimeMillis();
-                
-                commit();
-
-                stats.commitTime = System.currentTimeMillis() - beginCommit;
-
-                log.info("commit: latency="+stats.commitTime+"ms");
-                
-            }
-            
-            stats.totalTime = System.currentTimeMillis() - begin;
-            
-            log.info( nstmts + 
-                    " stmts added in " + 
-                    ((double)loader.getInsertTime()) / 1000d +
-                    " secs, rate= " + 
-                    loader.getInsertRate()
-                    );
-
-            return stats;
-            
-        } catch ( Exception ex ) {
-            
-            throw new RuntimeException("While loading: "+resource, ex);
-            
-        } finally {
-            
-            reader.close();
-            
-        }
-
-    }
-
-    /*
      * Sesame integration.
      */
+
+    final public DataLoader getDataLoader() {
+        
+        return new DataLoader(getProperties(),this);
+        
+    }
     
     final public void addStatement(Resource s, URI p, Value o) {
 
@@ -626,7 +458,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * Note: This uses the batch API.
          */
         
-        StatementBuffer buffer = new StatementBuffer(this,1,false);
+        StatementBuffer buffer = new StatementBuffer(this, 1);
         
         buffer.add(s, p, o);
         
@@ -1728,7 +1560,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     /**
      * Writes out some usage information for the database on System.err.
      */
-    final public void usage() {
+    public void usage() {
 
         usage(name_termId, getTermIdIndex());
         usage(name_idTerm, getIdTermIndex());
@@ -1736,7 +1568,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         usage(name_pos, getPOSIndex());
         usage(name_osp, getOSPIndex());
         usage(name_just, getJustificationIndex());
-         
+        
     }
 
     /**

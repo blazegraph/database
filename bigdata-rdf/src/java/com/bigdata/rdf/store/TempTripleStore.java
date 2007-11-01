@@ -83,6 +83,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     private final BTree ndx_just;
     
     final private TemporaryStore store;
+    
+    public TemporaryStore getBackingStore() {
+        
+        return store;
+        
+    }
 
     final public IIndex getSPOIndex() {
 
@@ -172,6 +178,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         super(properties);
 
+        /*
+         * @todo property for how large the temporary store can get in memory
+         * before it overflows (Question is how to minimize the time to create
+         * the backing file, which adds significant latency - plus the temp
+         * store is not as concurrency savvy).
+         */
         store = new TemporaryStore();
         
         ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
@@ -200,4 +212,13 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     }
 
+    public void usage(){
+        
+        System.err.println("file="+store.getBufferStrategy().getFile());
+        System.err.println("byteCount="+store.getBufferStrategy().getNextOffset());
+        
+        super.usage();
+        
+    }
+    
 }

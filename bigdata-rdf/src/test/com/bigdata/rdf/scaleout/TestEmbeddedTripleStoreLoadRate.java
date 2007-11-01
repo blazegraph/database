@@ -78,8 +78,7 @@ public class TestEmbeddedTripleStoreLoadRate extends
 
     public void test_loadNCIOncology() throws IOException {
 
-        store.loadData("data/nciOncology.owl", "", RDFFormat.RDFXML,
-                false, false /*commit*/);
+        store.getDataLoader().loadData("data/nciOncology.owl", "", RDFFormat.RDFXML);
 
     }
 

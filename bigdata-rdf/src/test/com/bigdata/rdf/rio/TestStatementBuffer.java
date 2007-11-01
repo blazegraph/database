@@ -95,7 +95,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         
         try {
             
-            StatementBuffer buffer = new StatementBuffer(store,capacity,false);
+            StatementBuffer buffer = new StatementBuffer(store,capacity);
             
             assertEquals(store,buffer.getDatabase());
             assertFalse(buffer.distinct);
@@ -125,7 +125,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         
         try {
         
-            StatementBuffer buffer = new StatementBuffer(store,capacity,false);
+            StatementBuffer buffer = new StatementBuffer(store,capacity);
             
             /*
              * add a statement.
@@ -285,7 +285,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         
         try {
         
-            StatementBuffer buffer = new StatementBuffer(store,capacity,true);
+            StatementBuffer buffer = new StatementBuffer(store,capacity);
             
             assertTrue(buffer.distinct);
             

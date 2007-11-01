@@ -44,7 +44,6 @@ Modifications:
 package com.bigdata.rdf.rio;
 
 import java.io.Reader;
-import java.util.Iterator;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -83,17 +82,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandler
+public class MultiThreadedPresortRioLoader extends BasicRioLoader implements IRioLoader, StatementHandler
 {
-
-    /**
-     * The default buffer size.
-     * <p>
-     * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
-     * value.
-     */
-    static final int DEFAULT_BUFFER_SIZE = 100000;
-    
     /**
      * Terms and statements are inserted into this store.
      */
@@ -106,17 +96,6 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      * terminate.
      */
     protected final int capacity;
-
-    /**
-     * When true only distinct terms and statements are stored in the buffer.
-     */
-    protected final boolean distinct;
-
-    long stmtsAdded;
-    
-    long insertTime;
-    
-    long insertStart;
 
     /**
      * The capacity of the bufferQueue queue.
@@ -149,13 +128,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
      */
     StatementBuffer buffer;
     
-    public MultiThreadedPresortRioLoader( AbstractTripleStore store ) {
-    
-        this( store, DEFAULT_BUFFER_SIZE, false );
-        
-    }
-    
-    public MultiThreadedPresortRioLoader( AbstractTripleStore store, int capacity, boolean distinct ) {
+    public MultiThreadedPresortRioLoader( AbstractTripleStore store, int capacity) {
 
         assert store != null;
         
@@ -165,188 +138,75 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
         
         this.capacity = capacity;
         
-        this.distinct = distinct;
-        
-        this.buffer = new StatementBuffer(store, capacity, distinct );
+        this.buffer = new StatementBuffer(store, capacity);
        
         this.keyBuilder = store.getKeyBuilder();
         
     }
-    
-    public long getStatementsAdded() {
-        
-        return stmtsAdded;
-        
-    }
-    
-    public long getInsertTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getTotalTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getInsertRate() {
-        
-        return (long) 
-            ( ((double)stmtsAdded) / ((double)getTotalTime()) * 1000d );
-        
-    }
-    
-    public void addRioLoaderListener( RioLoaderListener l ) {
-        
-        if ( listeners == null ) {
-            
-            listeners = new Vector<RioLoaderListener>();
-            
-        }
-        
-        listeners.add( l );
-        
-    }
-    
-    public void removeRioLoaderListener( RioLoaderListener l ) {
-        
-        listeners.remove( l );
-        
-    }
-    
-    protected void notifyListeners() {
-        
-        RioLoaderEvent e = new RioLoaderEvent
-            ( stmtsAdded,
-              System.currentTimeMillis() - insertStart
-              );
-        
-        for ( Iterator<RioLoaderListener> it = listeners.iterator(); 
-              it.hasNext(); ) {
-            
-            it.next().processingNotification( e );
-            
-        }
-        
-    }
-    
-    /**
-     * We need to collect two (three including bnode) term arrays and one
-     * statement array.  These should be buffers of a settable size.
-     * <p>
-     * Once the term buffers are full (or the data is exhausted), the term 
-     * arrays should be sorted and batch inserted into the LocalTripleStore.
-     * <p>
-     * As each term is inserted, its id should be noted in the Value object,
-     * so that the statement array is sortable based on term id.
-     * <p>
-     * Once the statement bufferQueue is full (or the data is exhausted), the 
-     * statement array should be sorted and batch inserted into the
-     * LocalTripleStore.  Also the term buffers should be flushed first.
-     * 
-     * @param reader
-     *                  the RDF/XML source
-     */
 
-    public void loadRdf( Reader reader, String baseURI ) throws Exception {
+    protected void before() {
         
-        OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
-        
-        Parser parser = new RdfXmlParser( valueFac );
-        
-        parser.setVerifyData( false );
-        
-        parser.setStatementHandler( this );
-        
-        // Note: reset to that rates reflect load times not clock times.
-        insertStart = System.currentTimeMillis();
-        insertTime = 0; // clear.
-        
-        // Note: reset so that rates are correct for each source loaded.
-        stmtsAdded = 0;
-        
-        // Allocate the initial bufferQueue for parsed data.
-        if(buffer==null) {
-
-            buffer = new StatementBuffer(store, capacity, distinct);
-            
-        }
-
         // Start thread to consume buffered data.
         consumer = new ConsumerThread(bufferQueue);
+        
+        consumer.start();
+        
+    }
+    
+    protected void success() {
+        
+        /*
+         * Typically the last buffer will be non-empty so we put it on the
+         * queue.
+         */
+        if(buffer != null) {
 
-        try {
-
-            log.info("Starting parse.");
-            
-            consumer.start();
-            
-            // Parse the data.
-            parser.parse(reader, baseURI );
-            
-            log.info("parse complete: elapsed="
-                    + (System.currentTimeMillis() - insertStart) + "ms");
-            
-            /*
-             * Typically the last buffer will be non-empty so we put it on the
-             * queue.
-             */
-            if(buffer != null) {
-
-                putBufferOnQueue();
-                
-            }
-
-            /*
-             * Put a poison object on the queue to cause the ConsumerThread to
-             * shutdown once it has processed everything on the queue. 
-             */
-
-            buffer = new StatementBuffer(store,-1,false);
-            
             putBufferOnQueue();
             
-            /* wait until the queue is empty.
-             * 
-             * @todo alternatively, wait until the ConsumerThread quits.
-             */
-            while(!bufferQueue.isEmpty()) {
-                try {
-                    Thread.sleep(100); // yeild for a bit.
-                    checkConsumer(); // look for an error condition.
-                } catch(InterruptedException ex) {
-                    continue;
-                }
-            }
-            log.info("data loaded: elapsed="
-                    + (System.currentTimeMillis() - insertStart) + "ms");
-
-            // check for an error condition.
-            checkConsumer();
-
-        } catch (RuntimeException ex) {
-
-            log.error("While parsing data: "+ex, ex);
-            
-            // shutdown the consumer.
-            consumer.shutdown();
-
-            // clear the queue.
-            bufferQueue.clear();
-            
-            // discard the buffer.
-            buffer = null;
-            
-            throw ex;
-            
         }
+
+        /*
+         * Put a poison object on the queue to cause the ConsumerThread to
+         * shutdown once it has processed everything on the queue. 
+         */
+
+        buffer = new StatementBuffer(store,-1);
         
-        insertTime += System.currentTimeMillis() - insertStart;
+        putBufferOnQueue();
+        
+        /* wait until the queue is empty.
+         * 
+         * @todo alternatively, wait until the ConsumerThread quits.
+         */
+        while(!bufferQueue.isEmpty()) {
+            try {
+                Thread.sleep(100); // yeild for a bit.
+                checkConsumer(); // look for an error condition.
+            } catch(InterruptedException ex) {
+                continue;
+            }
+        }
+        log.info("data loaded: elapsed="
+                + (System.currentTimeMillis() - insertStart) + "ms");
+
+        // check for an error condition.
+        checkConsumer();
 
     }
+    
+    protected void cleanUp() {
 
+        // shutdown the consumer.
+        consumer.shutdown();
+
+        // clear the queue.
+        bufferQueue.clear();
+        
+        // discard the buffer.
+        buffer = null;
+        
+    }
+    
     /**
      * Checks the consumer for an error condition and if there is one then
      * throws an exception in the main thread to halt processing.
@@ -554,7 +414,7 @@ public class MultiThreadedPresortRioLoader implements IRioLoader, StatementHandl
             putBufferOnQueue();
             
             // allocate a new buffer.
-            buffer = new StatementBuffer(store,capacity,distinct);
+            buffer = new StatementBuffer(store,capacity);
             
             // fall through.
             

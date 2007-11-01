@@ -134,7 +134,7 @@ public class TestAccessPath extends AbstractTripleStoreTestCase {
         try {
 
             StatementBuffer buffer = new StatementBuffer(store,
-                    100/* capacity */, true/*distinct*/);
+                    100/* capacity */);
 
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");

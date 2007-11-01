@@ -254,7 +254,7 @@ abstract class BaseAxioms implements Axioms {
     public void addAxioms(AbstractTripleStore database) {
         
         StatementBuffer buffer = new StatementBuffer(database, getAxioms()
-                .size(), true/* distinct */);
+                .size());
 
         for (Iterator<Axioms.Triple> itr = getAxioms().iterator(); itr
                 .hasNext();) {

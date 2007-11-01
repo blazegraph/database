@@ -1,5 +1,7 @@
 package com.bigdata.rdf.rio;
 
+import com.bigdata.rdf.inf.ClosureStats;
+
 /**
  * Used to report statistics when loading data.
  * 
@@ -13,9 +15,26 @@ public class LoadStats {
     public long commitTime;
     public long totalTime;
     
+    /**
+     * Set iff the closure is computed as the data are loaded.
+     */
+    public ClosureStats closureStats;
+    
     public long triplesPerSecond() {
         
         return ((long)( ((double)toldTriples) / ((double)totalTime) * 1000d ));
+        
+    }
+    
+    public void add(LoadStats stats) {
+        
+        toldTriples += stats.toldTriples;
+        
+        loadTime += stats.loadTime;
+        
+        commitTime += stats.commitTime;
+        
+        totalTime += stats.totalTime;
         
     }
     
@@ -24,13 +43,17 @@ public class LoadStats {
      */
     public String toString() {
 
-        return toldTriples+" stmts added in " + 
-                ((double)loadTime) / 1000d +
-                " secs, rate= " + 
-                triplesPerSecond()+
-                ", commitLatency="+
-                commitTime+"ms" 
-                ;
+        return toldTriples
+                + " stmts added in "
+                + ((double) loadTime)
+                / 1000d
+                + " secs, rate= "
+                + triplesPerSecond()
+                + ", commitLatency="
+                + commitTime
+                + "ms"
+                + (closureStats != null ? "closure:: "
+                        + closureStats.toString() : "");
 
     }
     

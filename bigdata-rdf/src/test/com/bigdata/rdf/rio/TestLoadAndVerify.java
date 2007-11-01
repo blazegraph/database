@@ -61,6 +61,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.DataLoader;
 
 /**
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
@@ -92,9 +93,10 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 //        String file = "data/nciOncology.owl";
         String file = "data/alibaba_v41.rdf";
     
+        DataLoader dataLoader = store.getDataLoader();
+        
         // load into the datbase.
-        store.loadData(file, "" /* baseURI */, RDFFormat.RDFXML,
-                false/* verifyData */, true/* commit */);
+        dataLoader.loadData(file, "" /* baseURI */, RDFFormat.RDFXML);
         
         store.commit();
         
@@ -136,7 +138,8 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             };
             
             loader.loadRdf(new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file))), ""/* baseURI */);
+                    new FileInputStream(file))), ""/* baseURI */,
+                    RDFFormat.RDFXML, false/* verify */);
             
         }
         

@@ -43,6 +43,12 @@ Modifications:
 */
 package com.bigdata.rdf.rio;
 
+/**
+ * Periodic notification of data load progress.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public interface RioLoaderListener {
 
     void processingNotification( RioLoaderEvent e );

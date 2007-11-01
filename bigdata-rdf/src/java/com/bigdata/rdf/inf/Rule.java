@@ -1427,7 +1427,7 @@ abstract public class Rule {
                     
                 }
                 
-                closureStats.numComputed += stats.numComputed;
+                closureStats.nentailments += stats.numComputed;
                 
                 closureStats.elapsed += stats.elapsed;
                 
