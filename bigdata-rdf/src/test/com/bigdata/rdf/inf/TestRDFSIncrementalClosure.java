@@ -52,6 +52,7 @@ import java.util.Properties;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 
+import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -60,6 +61,13 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * Test suite for RDFS incremental closure correctness (when you load data in a
  * series of batches into the store and compute the closure of the batch against
  * the store rather than re-closing the entire store).
+ * 
+ * FIXME Do a unit test with alibaba where it is split into ontology and data.
+ * This will be a lot faster to run than Wordnet. We can even get rid of 90% of
+ * the data and it will stil be good for testing out incremental closure
+ * correctness.
+ * 
+ * @todo write tests for "Batch" style closure for the DataLoader.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -85,7 +93,7 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
     /**
      * Trivial example - good for debugging.
      */
-    public void test_testIncrementalClosure01() throws Exception {
+    public void test_testIncrementalClosure01_full() throws Exception {
 
         String[] resource = new String[] {
                 prefix+"testIncrementalClosure01-part01.nt",
@@ -99,8 +107,39 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
                 RDFFormat.NTRIPLES
                 };
 
-        Properties properties = getProperties();
+        // protect the caller's properties from modification.
+        Properties properties = new Properties(getProperties());
 
+        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Full.toString());
+        
+        // @todo set closure options (fast, backchain vs store x type resource, etc).
+        
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Trivial example - good for debugging.
+     */
+    public void test_testIncrementalClosure01_fast() throws Exception {
+
+        String[] resource = new String[] {
+                prefix+"testIncrementalClosure01-part01.nt",
+                prefix+"testIncrementalClosure01-part02.nt" };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.NTRIPLES,
+                RDFFormat.NTRIPLES
+                };
+
+        // protect the caller's properties from modification.
+        Properties properties = new Properties(getProperties());
+
+        properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Fast.toString());
+        
         // @todo set closure options (fast, backchain vs store x type resource, etc).
         
         assertCorrectClosure(properties,resource,baseURL,format);
@@ -185,6 +224,7 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
         
         try {
 
+            // load and close using an incremental approach.
             dataLoader.loadData(resource, baseURL, format);
             
             /*

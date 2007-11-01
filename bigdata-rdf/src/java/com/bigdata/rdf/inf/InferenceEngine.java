@@ -678,8 +678,15 @@ public class InferenceEngine extends RDFSHelper {
 
         final int nbefore = closureStore.getStatementCount();
         
-        // add RDF(S) axioms to the database.
-        RdfsAxioms.INSTANCE.addAxioms(closureStore); // @todo to the database also?
+        /*
+         * add RDF(S) axioms to the database.
+         * 
+         * Note: If you insert Statements using the Sesame object model into the
+         * focusStore then it will have different term identifiers for those
+         * assertions that the ones that are used by the database, which is
+         * very, very bad.
+         */
+        RdfsAxioms.INSTANCE.addAxioms(database);
 
         // entailment buffer writes on the closureStore.
         final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
@@ -739,8 +746,15 @@ public class InferenceEngine extends RDFSHelper {
         log.debug("Closing kb with " + firstStatementCount
                 + " statements");
 
-        // 1. add RDF(S) axioms to the closureStore (@todo also the database?)
-        RdfsAxioms.INSTANCE.addAxioms(closureStore);
+        /*
+         * 1. add RDF(S) axioms to the database.
+         * 
+         * Note: If you insert Statements using the Sesame object model into the
+         * focusStore then it will have different term identifiers for those
+         * assertions that the ones that are used by the database, which is
+         * very, very bad.
+         */ 
+        RdfsAxioms.INSTANCE.addAxioms(database);
         
         // 2. Compute P (the set of possible sub properties).
         final Set<Long> P = getSubProperties(focusStore,database);

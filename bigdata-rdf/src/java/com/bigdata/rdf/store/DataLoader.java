@@ -606,10 +606,18 @@ public class DataLoader {
                 
             }
             
-            log.info("Computing closure of the temporary store");
-            
+            final int nbeforeClosure = tempStore.getStatementCount();
+
+            log.info("Computing closure of the temporary store with "
+                    + nbeforeClosure + " statements");
+
             stats = inferenceEngine.computeClosure(tempStore);
 
+            final int nafterClosure = tempStore.getStatementCount();
+
+            log.info("There are " + nafterClosure
+                    + " statements in the temporary store after closure");
+            
             // measure time for these other operations as well.
 
             final long begin = System.currentTimeMillis();
@@ -620,8 +628,11 @@ public class DataLoader {
             
             log.info("Copying statements from the temporary store to the database");
             
-            tempStore.copyStatements(database, null/*filter*/);
-
+            int ncopied = tempStore.copyStatements(database, null/*filter*/);
+            
+            // note: this is the number that are _new_ to the database.
+            log.info("Copied "+ncopied+" statements that were new to the database.");
+            
             /*
              * clear the temporary store (drops the indices).
              */

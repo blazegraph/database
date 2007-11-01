@@ -563,29 +563,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public IAccessPath getAccessPath(long s, long p, long o) {
         
-        return new AccessPath(s,p,o);
+        return new AccessPath(KeyOrder.get(s,p,o),s,p,o);
         
     }
     
     final public IAccessPath getAccessPath(KeyOrder keyOrder) {
-
-        /*
-         * Note: An arbitrary non-NULL term identifier is used to select the
-         * access path. This means that AccessPath.getTriplePattern() will
-         * return the same arbitrary term identifier when the means is used to
-         * obtain an IAccessPath.
-         */
         
-        switch (keyOrder) {
-        case SPO:
-            return new AccessPath(1,NULL,NULL);
-        case POS:
-            return new AccessPath(NULL,1,NULL);
-        case OSP:
-            return new AccessPath(NULL,NULL,1);
-        default:
-            throw new AssertionError();
-        }
+        return new AccessPath(keyOrder,NULL,NULL,NULL);
         
     }
     
@@ -886,8 +870,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          *            The term identifier for the object -or-
          *            {@link IRawTripleStore#NULL}.
          */
-        public AccessPath(long s, long p, long o) {
+        AccessPath(final KeyOrder keyOrder, long s, long p, long o) {
 
+            if (keyOrder == null)
+                throw new IllegalArgumentException();
+            
+            this.keyOrder = keyOrder;
+            
             this.s = s;
             
             this.p = p;
@@ -897,8 +886,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             this.allBound = (s != NULL && p != NULL & o != NULL);
             
             if (s != NULL && p != NULL && o != NULL) {
-
-                keyOrder = KeyOrder.SPO;
+        
+                assert keyOrder == KeyOrder.SPO;
                 
                 fromKey = keyBuilder.statement2Key(s, p, o);
 
@@ -906,7 +895,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (s != NULL && p != NULL) {
 
-                keyOrder = KeyOrder.SPO;
+                assert keyOrder == KeyOrder.SPO;
                 
                 fromKey = keyBuilder.statement2Key(s, p, NULL);
 
@@ -914,7 +903,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (s != NULL && o != NULL) {
 
-                keyOrder = KeyOrder.OSP;
+                assert keyOrder == KeyOrder.OSP;
                 
                 fromKey = keyBuilder.statement2Key(o, s, NULL);
 
@@ -922,7 +911,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (p != NULL && o != NULL) {
 
-                keyOrder = KeyOrder.POS;
+                assert keyOrder == KeyOrder.POS;
                 
                 fromKey = keyBuilder.statement2Key(p, o, NULL);
 
@@ -930,7 +919,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (s != NULL) {
 
-                keyOrder = KeyOrder.SPO;
+                assert keyOrder == KeyOrder.SPO;
                 
                 fromKey = keyBuilder.statement2Key(s, NULL, NULL);
 
@@ -938,7 +927,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (p != NULL) {
 
-                keyOrder = KeyOrder.POS;
+                assert keyOrder == KeyOrder.POS;
                 
                 fromKey = keyBuilder.statement2Key(p, NULL, NULL);
 
@@ -946,7 +935,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else if (o != NULL) {
 
-                keyOrder = KeyOrder.OSP;
+                assert keyOrder == KeyOrder.OSP;
                 
                 fromKey = keyBuilder.statement2Key(o, NULL, NULL);
 
@@ -954,7 +943,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             } else {
 
-                keyOrder = KeyOrder.SPO;
+                /*
+                 * Note: The KeyOrder does not matter when you are fully
+                 * unbound.
+                 */
                 
                 fromKey = toKey = null;
 
@@ -1638,12 +1630,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * 
      * @todo write tests.
      */
-    public int copyStatements(final AbstractTripleStore dst,
-            final ISPOFilter filter) {
+    public int copyStatements(AbstractTripleStore dst, ISPOFilter filter) {
 
         if (dst == null)
             throw new IllegalArgumentException();
-        if (dst==this)
+
+        if (dst == this)
             throw new IllegalArgumentException();
         
         // obtain a chunked iterator reading from any access path.
