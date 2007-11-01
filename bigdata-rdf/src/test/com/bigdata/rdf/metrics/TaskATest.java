@@ -59,10 +59,12 @@ import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 
 import com.bigdata.rdf.inf.ClosureStats;
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.store.DataLoader.CommitEnum;
 
 /**
  * FIXME refactor to use the ExperimentDriver.  This let me collect better
@@ -74,8 +76,6 @@ import com.bigdata.rdf.rio.LoadStats;
  * 
  * @todo update javadoc.
  * @todo write some useful summary data into a file.
- * @todo modify to load or load+close into a single database rather than a distinct
- * database per source data set?
  * 
  * <p>
  * Class obtains metrics on access path usage and the costs of an ontology for
@@ -111,17 +111,13 @@ import com.bigdata.rdf.rio.LoadStats;
  * 
  * @todo Add output directory parameter?
  * 
- * @todo Write ontology costs iff proofs are stored and ontology costs are
- *       requested. Raise error if ontology costs are requested without proofs
- *       being stored.
- * 
  * @author thompsonbry
  */
 public class TaskATest
    extends AbstractMetricsTestCase
 {
 
-    final FileAndBaseURI[] _sources;
+    final FileAndBaseURL[] _sources;
 
     /** ctor used by junit. */
     public TaskATest() {
@@ -131,10 +127,13 @@ public class TaskATest
 
     /** ctor used by junit. */
     public TaskATest(String name) {
+        
         super(name);
+        
         _sources = null;
+        
     }
-
+    
     /** ctor used to run a particular datasource. */
     public TaskATest( String name, String sources, File outDir )
     {
@@ -161,7 +160,7 @@ public class TaskATest
         throws IOException
     {
 
-        String filename[] = FileAndBaseURI.getFileNames( _sources );
+        String filename[] = FileAndBaseURL.getFileNames( _sources );
         
         for( int i=0; i<filename.length; i++ ) {
   
@@ -210,70 +209,7 @@ public class TaskATest
      */
     public void writeStatistics()
     {
-
-//        File file = statisticsFile;
-//        
-//        System.err.println( "Writing: "+file );
-//        
-//        try {
-//
-//            Writer w = new FileWriter( file );
-//        
-//            m_stats.writeOn( w );
-//            
-//            w.flush();
-//            
-//            w.close();
-//            
-//            System.err.println( "Wrote: "+file );
-//            
-//        }
-//
-//        catch( IOException ex ) {
-//            
-//            log.error( "Could not write: "+file, ex );
-//            ex.printStackTrace( System.err );
-//            
-//        }
-        
     }
-    
-//    /**
-//     * Write ontology costs.
-//     * <p>
-//     * 
-//     * Note: Proof objects MUST be stored to compute the ontology costs.
-//     * <p>
-//     */
-//
-//    public void writeOntologyCosts()
-//    {
-//
-//        File file = ontologyFile;
-//
-//        System.err.println( "Writing: "+file );
-//        
-//        try {
-//
-//            Writer w = new FileWriter( file );
-//        
-//            OntologyCostsReporter.reportOntologyCosts((GRdfSchemaRepository)m_repo, w );
-//            
-//            w.flush();
-//            
-//            w.close();
-//            
-//            System.err.println( "Wrote: "+file );
-//        }
-//
-//        catch( Throwable ex ) {
-//            
-//            log.error( "Could not write: "+file, ex );
-//            ex.printStackTrace( System.err );
-//            
-//        }
-//
-//    }
     
     /**
      * Load each RDF source in turn.
@@ -283,94 +219,62 @@ public class TaskATest
      * 
      * @return The elasped time to load the data and perform closure.
      */
-    public long loadData(boolean computeEntailments) throws IOException, UpdateException {
+    public long loadData() throws IOException, UpdateException {
 
+        /*
+         * Configure the DataLoader and InferenceEngine.
+         */
+        
+        Properties properties = new Properties(getProperties());
+
+        // whether and when to compute the closure.
+//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Incremental.toString());
+//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Batch.toString());
+        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+
+        // after every set of resources loaded.
+        properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
+
+        // generate justifications for TM.
+        properties.setProperty(Options.JUSTIFY, "true");
+
+        // forward chain (x rdf:type rdfs:Resource)
+//        properties.setProperty(
+//                Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "true");
+        properties.setProperty(
+                Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
+
+        // choice of the forward closure method.
+//        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
+        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
+
+        /*
+         * load (and optionally close) the data.
+         */
+        
         long begin = System.currentTimeMillis();
 
-        String filename[] = FileAndBaseURI.getFileNames(_sources);
-        String baseURI[] = FileAndBaseURI.getBaseURIs(_sources);
-
-        // cumulative across each file loaded for a given test.
+        String[] resource = FileAndBaseURL.getFileNames(_sources);
         
-        final LoadStats totalLoadStats = new LoadStats();
-        final ClosureStats totalClosureStats = new ClosureStats();
+        String[] baseURL = FileAndBaseURL.getBaseURLs(_sources);
         
-        for(int i=0; i<filename.length; i++) {
+        RDFFormat[] rdfFormat = FileAndBaseURL.getFormats(_sources);
 
-            final LoadStats loadStats = store
-                    .loadData(filename[i], baseURI[i],
-                            RDFFormat.RDFXML, false/* verifyData */, false/* commit */);
-                        
-            long elapsedLoadTime = System.currentTimeMillis() - begin;
+        DataLoader dataLoader = new DataLoader(properties,store);
+        
+        loadStats = dataLoader.loadData(resource, baseURL, rdfFormat);
+        
+        if(true && dataLoader.getClosureEnum()==ClosureEnum.None) {
             
-            System.err.println("*** Elapsed load time: " + (elapsedLoadTime/ 1000) + "s\n");
-
-            final ClosureStats closureStats;
-            if(computeEntailments) {
-                
-                long beginInfTime = System.currentTimeMillis();
-                
-                /*
-                 * Configure the inference engine.
-                 */
-                
-                Properties properties = new Properties(getProperties());
-
-                properties.setProperty(Options.JUSTIFY, "true");
-
-//                properties.setProperty(
-//                        Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "true");
-                properties.setProperty(
-                        Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "false");
-
-//                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
-                properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
-
-                closureStats = new InferenceEngine(properties,store).computeClosure();
+            // compute the full closure of the database.
             
-                long elapsedInfTime = System.currentTimeMillis() - beginInfTime;
-
-                System.err.println("*** Elapsed inf. time: " + (elapsedInfTime/ 1000) + "s\n");
-
-            } else {
-                
-                closureStats = new ClosureStats();
-                
-            }
-            
-            // commit now so that it is always after the load and the optional closure.
-            
-            long beginCommitTime = System.currentTimeMillis();
-            
-            store.commit();
-            
-            long elapsedCommitTime = System.currentTimeMillis() - beginCommitTime;
-
-            System.err.println("*** Elapsed commit time: " + elapsedCommitTime + "ms\n");
-            
-            // cumulative load stats
-            {
-                
-                totalLoadStats.toldTriples += loadStats.toldTriples;
-                totalLoadStats.loadTime += loadStats.loadTime;
-                totalLoadStats.commitTime += loadStats.commitTime;
-                totalLoadStats.totalTime += loadStats.totalTime;
-                
-            }
-            
-            // cumulative closure stats
-            {
-                
-                totalClosureStats.elapsed += closureStats.elapsed;
-                totalClosureStats.numComputed += closureStats.numComputed;
-                
-            }
+            loadStats.closureStats = dataLoader.doClosure();
             
         }
 
-        this.loadStats = totalLoadStats;
-        this.closureStats = totalClosureStats;
-
+        // release resources.
+        dataLoader.close();
+        
         long elapsed = System.currentTimeMillis() - begin;
 
         System.err.println("*** Elapsed total time: " + (elapsed/ 1000) + "s\n");
@@ -383,11 +287,6 @@ public class TaskATest
      * Set by {@link #loadData()}.
      */
     protected LoadStats loadStats;
-
-    /**
-     * Set by {@link #loadData(boolean)}.
-     */
-    protected ClosureStats closureStats;
     
     /**
      * Datasets to load - in order by size. Each dataset described by three (3)
@@ -495,8 +394,6 @@ public class TaskATest
 
     public void test() throws FileNotFoundException {
   
-        final boolean computeEntailments = true;
-        
         int nok = 0;
         int nruns = all_sources.length / 3;
         
@@ -522,8 +419,6 @@ public class TaskATest
 
         LoadStats[] loadStats = new LoadStats[ all_sources.length ];
         
-        ClosureStats[] closureStats = new ClosureStats[ all_sources.length ];
-
         for( int i=0, run=0; i<all_sources.length; i+=3, run++ ) {
             
             String desc = all_sources[ i ];
@@ -540,10 +435,8 @@ public class TaskATest
                 test.setUp();
                 try {
                     test.assertFilesExist();
-                    test.loadData(computeEntailments);
+                    test.loadData();
                     loadStats[run] = test.loadStats;
-                    closureStats[run] = test.closureStats;
-//                    test.testReadPerformance();
                     w.println( "SUCCESS" );
                     nok++;
                     errors[ run ] = null;
@@ -580,13 +473,17 @@ public class TaskATest
         
         for( int run=0; run<nruns; run++ ) {
             
+            // MAY be null.
+            ClosureStats closureStats = loadStats[run].closureStats;
+            
+            
             // Explicit + (Entailments = Axioms + Inferred)
             final long totalTriples = loadStats[run].toldTriples
-                    + (computeEntailments ? closureStats[run].numComputed : 0);
+                    + (closureStats!=null?closureStats.nentailments : 0);
 
             // loadTime + closureTime + commitTime.
             final long totalTime = loadStats[run].loadTime
-                    + (computeEntailments ? closureStats[run].elapsed : 0)
+                    + (closureStats != null ? closureStats.elapsed : 0)
                     + loadStats[run].commitTime;
             
             System.out.println( all_sources[ run * 3 ]+ ", " +
@@ -595,9 +492,9 @@ public class TaskATest
                             +", "+loadStats[run].toldTriples
                             +", "+loadStats[run].loadTime/1000
                             +", "+tps(loadStats[run].toldTriples,loadStats[run].loadTime)
-                            +", "+(computeEntailments?closureStats[run].numComputed:"")
-                            +", "+(computeEntailments?closureStats[run].elapsed/1000:"")
-                            +", "+(computeEntailments?tps(closureStats[run].numComputed,closureStats[run].elapsed):"")
+                            +", "+(closureStats!=null?closureStats.nentailments:"")
+                            +", "+(closureStats!=null?closureStats.elapsed/1000:"")
+                            +", "+(closureStats!=null?tps(closureStats.nentailments,closureStats.elapsed):"")
                             +", "+loadStats[run].commitTime
                             +", "+tps(totalTriples,totalTime)
 

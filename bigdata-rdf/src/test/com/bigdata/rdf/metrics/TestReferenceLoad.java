@@ -51,6 +51,8 @@ import java.io.IOException;
 
 import org.openrdf.sesame.constants.RDFFormat;
 
+import com.bigdata.rdf.store.DataLoader;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -66,7 +68,7 @@ public class TestReferenceLoad extends AbstractMetricsTestCase {
 
     public void test_referenceLoad() throws IOException {
         
-        String[] files = new String[] {
+        String[] resource = new String[] {
           
                 "data/APSTARS/ontology-2-5-07/combine-ont.owl",
                 "data/APSTARS/ontology-2-5-07/combine-refload.rdf",
@@ -74,12 +76,21 @@ public class TestReferenceLoad extends AbstractMetricsTestCase {
                 
         };
         
-        for(int i=0; i<files.length; i++) {
-         
-            store.loadData(files[i], "", RDFFormat.RDFXML,
-                    false/* verifyData */, false/*commit*/);
-            
-        }
+        String[] baseURL = new String[] {
+                "",
+                "",
+                ""
+        };
+        
+        RDFFormat[] rdfFormat = new RDFFormat[] {
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML
+        };
+        
+        DataLoader dataLoader = store.getDataLoader();
+        
+        dataLoader.loadData(resource, baseURL, rdfFormat);
         
         store.commit();
         

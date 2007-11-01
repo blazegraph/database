@@ -113,13 +113,21 @@ public class TestAll extends TestCase {
         // test suite for RDFS closure correctness with incremental load (TM).
         suite.addTestSuite( TestRDFSIncrementalClosure.class );
 
-        // @todo test suite for RDFS closure correctness with incremental delete (TM).
+        // test suite for RDFS closure correctness with incremental delete (TM).
+        suite.addTestSuite( TestRDFSTruthMaintenance.class );
 
         // @todo test suite for backward chaining of (?x owl:sameAs ?y).
         
         // @todo test suite for semi-naive evaluation (magic sets / SLD).
 //        suite.addTestSuite( TestMagicSets.class);
 
+        /*
+         * @todo write a test of concurrent load and close rates using LUBM.
+         * This data set is good since it reuses the same ontology and will let
+         * us scale the #of concurrent clients and the #of files to be loaded to
+         * an arbitrary degree.
+         */
+        
         return suite;
         
     }

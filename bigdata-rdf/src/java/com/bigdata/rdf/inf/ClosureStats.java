@@ -17,7 +17,7 @@ public class ClosureStats {
      * change in the #of statements in the database across the closure
      * operation.
      */
-    public int numComputed;
+    public int nentailments;
 
     /**
      * Time to compute the entailments and store them within the database
@@ -48,19 +48,6 @@ public class ClosureStats {
         }
         
     }
-    
-//    /**
-//     * @todo thread-safe addAll()
-//     */ 
-//    public void addAll(Collection<Rule> rules) {
-//        
-//        for(Rule r : rules) {
-//            
-//            add(r);
-//            
-//        }
-//        
-//    }
     
     /*
      * @todo obtain lock when generating the representation to avoid concurrent modification.

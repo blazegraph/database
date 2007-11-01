@@ -143,7 +143,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
      */
     public BulkLoaderBuffer(AbstractTripleStore database, int capacity) {
         
-        super(database, capacity, true);
+        super(database, capacity);
         
         this.database = database;
         

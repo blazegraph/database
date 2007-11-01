@@ -43,6 +43,12 @@ Modifications:
 */
 package com.bigdata.rdf.rio;
 
+/**
+ * Event generated periodically.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class RioLoaderEvent {
 
     long stmtsProcessed, timeElapsed;

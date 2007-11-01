@@ -64,6 +64,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.store.DataLoader;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -607,12 +608,16 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * since triples may dupicate one another).
      */
     long totalToldTriples = 0L;
+
+    private DataLoader dataLoader;
     
     public void setUp() throws Exception
     {
         
         super.setUp();
 
+        dataLoader = store.getDataLoader();
+        
         writeMetricsLogHeaders();
         
     }
@@ -624,6 +629,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
         // After shutdown.
         writeStatistics();
+
+        dataLoader.close();
         
     }
 
@@ -861,10 +868,14 @@ public class TestMetrics extends AbstractMetricsTestCase {
             LoadStats loadStats;
             
             try {
+
+                loadStats = dataLoader.loadData(file, baseURL, RDFFormat.RDFXML);
                 
-                loadStats = store
-                        .loadData(file, "", RDFFormat.RDFXML,
-                                false/* verifyData */, true/* commit */);
+                store.commit();
+                
+//                loadStats = store
+//                        .loadData(file, "", RDFFormat.RDFXML,
+//                                false/* verifyData */, true/* commit */);
                 
 //                InputStream rdfStream = new BufferedInputStream(
 //                        new FileInputStream(file));

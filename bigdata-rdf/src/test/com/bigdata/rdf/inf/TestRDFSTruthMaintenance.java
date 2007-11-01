@@ -42,60 +42,41 @@ Modifications:
 
 */
 /*
- * Created on Jan 27, 2007
+ * Created on Nov 1, 2007
  */
 
-package com.bigdata.rdf.rio;
-
-import java.io.Reader;
-
-import org.apache.log4j.Logger;
-import org.openrdf.sesame.constants.RDFFormat;
+package com.bigdata.rdf.inf;
 
 /**
- * Interface for parsing RDF data using the Sesame RIO parser.
+ * Test suite for truth maintenance when statements are deleted from the
+ * database.
+ * 
+ * @todo verify that we correctly distinguish Axioms, Explicit, and Inferred
+ *       statements. Axioms are checked against those defined by
+ *       {@link RdfsAxioms}. Explicit statements are checked against the
+ *       dataset w/o closure. The rest of the statements should be marked as
+ *       Inferred. Note that an Axiom can be marked as Explicit when loading
+ *       data, but that TM needs to convert the statement back to an Axiom if it
+ *       is deleted. Also note that an inference that concludes a triple that is
+ *       an axiom MUST be marked as an Axiom NOT Inferred.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRioLoader {
-    
-    public static Logger log = Logger.getLogger(IRioLoader.class);
+public class TestRDFSTruthMaintenance extends AbstractInferenceEngineTestCase {
 
-    public long getStatementsAdded();
+    public TestRDFSTruthMaintenance() {
+        
+    }
     
-    public long getInsertTime();
-    
-    public long getInsertRate();
+    public TestRDFSTruthMaintenance(String name) {
+        super(name);
+    }
 
-    /**
-     * Register a listener.
-     * 
-     * @param l
-     *            The listener.
-     */
-    public void addRioLoaderListener( RioLoaderListener l );
-    
-    /**
-     * Remove a listener.
-     * 
-     * @param l
-     *            The listener.
-     */
-    public void removeRioLoaderListener( RioLoaderListener l );
-
-    /**
-     * Parse RDF data.
-     * 
-     * @param reader
-     *            The source from which the data will be read.
-     * @param baseURL
-     *            The base URL for those data.
-     * @throws Exception
-     */
-    public void loadRdf(Reader reader, String baseURL, RDFFormat rdfFormat,
-            boolean verify) throws Exception;
-
-    // public void loadRdf( InputStream is, String baseURI ) throws Exception;
+    public void testNothing() {
+        
+        fail("write tests");
+        
+    }
     
 }

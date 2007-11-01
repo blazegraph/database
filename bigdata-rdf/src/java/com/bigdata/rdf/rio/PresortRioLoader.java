@@ -43,69 +43,22 @@ Modifications:
 */
 package com.bigdata.rdf.rio;
 
-import java.io.Reader;
-import java.util.Iterator;
-import java.util.Vector;
-
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-import org.openrdf.rio.Parser;
 import org.openrdf.rio.StatementHandler;
-import org.openrdf.rio.ntriples.NTriplesParser;
-import org.openrdf.rio.rdfxml.RdfXmlParser;
-import org.openrdf.rio.turtle.TurtleParser;
-import org.openrdf.sesame.constants.RDFFormat;
-
-import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
- * Statement handler for the RIO RDF Parser that collects values and statements
- * in batches and inserts ordered batches into the {@link ITripleStore}.  The
- * default batch size is large enough to absorb many ontologies in a single
- * batch.
+ * Statement handler for the RIO RDF Parser that writes on a
+ * {@link StatementBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PresortRioLoader implements IRioLoader, StatementHandler
+public class PresortRioLoader extends BasicRioLoader implements IRioLoader, StatementHandler
 {
 
-    /**
-     * The default buffer size.
-     * <p>
-     * Note: I am seeing a 1000 tps performance boost at 1M vs 100k for this
-     * value.
-     */
-    static final int DEFAULT_BUFFER_SIZE = 1000000;
-    
-    /**
-     * Terms and statements are inserted into this store.
-     */
-    protected final AbstractTripleStore store;
-    
-    /**
-     * The RDF syntax to be parsed.
-     */
-    protected final RDFFormat rdfFormat;
-
-    /**
-     * Controls the {@link Parser#setVerifyData(boolean)} option.
-     */
-    protected final boolean verifyData;
-    
-    long stmtsAdded;
-    
-    long insertTime;
-    
-    long insertStart;
-    
-    Vector<RioLoaderListener> listeners;
-    
     /**
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
@@ -113,229 +66,48 @@ public class PresortRioLoader implements IRioLoader, StatementHandler
     final StatementBuffer buffer;
 
     /**
-     * Used as the value factory for the {@link Parser}.
-     */
-    OptimizedValueFactory valueFac = OptimizedValueFactory.INSTANCE;
-
-    /**
      * Sets up parser to load RDF.
      * 
-     * @param store
-     *            The store into which to insert the loaded statements.
-     * @param rdfFormat
-     *            The RDF interchange syntax to be parsed.
-     * @param verifyData
-     *            Controls the {@link Parser#setVerifyData(boolean)} option.
      * @param buffer
      *            The buffer used to collect, sort, and write statements onto
      *            the database.
      */
-    public PresortRioLoader(AbstractTripleStore store, RDFFormat rdfFormat,
-            boolean verifyData, StatementBuffer buffer) {
+    public PresortRioLoader(StatementBuffer buffer) {
 
-        assert store != null;
-
-        assert rdfFormat != null;
-        
-        this.store = store;
-        
-        this.rdfFormat = rdfFormat;
-        
-        this.verifyData = verifyData;
-        
+        assert buffer != null;
+                
         this.buffer = buffer;
         
     }
-    
-    public long getStatementsAdded() {
         
-        return stmtsAdded;
-        
-    }
-    
-    public long getInsertTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getTotalTime() {
-        
-        return insertTime;
-        
-    }
-    
-    public long getInsertRate() {
-        
-        return (long) 
-            ( ((double)stmtsAdded) / ((double)getTotalTime()) * 1000d );
-        
-    }
-    
-    public void addRioLoaderListener( RioLoaderListener l ) {
-        
-        if ( listeners == null ) {
-            
-            listeners = new Vector<RioLoaderListener>();
-            
-        }
-        
-        listeners.add( l );
-        
-    }
-    
-    public void removeRioLoaderListener( RioLoaderListener l ) {
-        
-        listeners.remove( l );
-        
-    }
-    
-    protected void notifyListeners() {
-        
-        RioLoaderEvent e = new RioLoaderEvent
-            ( stmtsAdded,
-              System.currentTimeMillis() - insertStart
-              );
-        
-        for ( Iterator<RioLoaderListener> it = listeners.iterator(); 
-              it.hasNext(); ) {
-            
-            it.next().processingNotification( e );
-            
-        }
-        
-    }
-    
     /**
-     * Choose the parser based on the {@link RDFFormat} specified to the
-     * constructor.
-     * 
-     * @param valFactory
-     *            The value factory.
-     * 
-     * @return The parser.
+     * bulk insert the buffered data into the store.
      */
-    protected Parser newParser(ValueFactory valFactory) {
+    protected void success() {
 
-        final Parser parser;
-        
-        if (RDFFormat.RDFXML.equals(rdfFormat)) {
+        if(buffer != null) {
             
-            parser = new RdfXmlParser(valFactory);
-            
-        } else if (RDFFormat.NTRIPLES.equals(rdfFormat)) {
-            
-            parser = new NTriplesParser(valFactory);
-            
-        } else if (RDFFormat.TURTLE.equals(rdfFormat)) {
-            
-            parser = new TurtleParser(valFactory);
-            
-        } else {
-            
-            throw new IllegalArgumentException("Format not supported: "
-                    + rdfFormat);
+            buffer.flush();
             
         }
-        
-        parser.setVerifyData( verifyData );
-        
-        parser.setStatementHandler( this );
-        
-        return parser;
 
     }
-    
-//    InputStream rdfStream = getClass().getResourceAsStream(ontology);
-//
-//    if (rdfStream == null) {
-//
-//        /*
-//         * If we do not find as a Resource then try as a URL.
-//         * 
-//         */
-//        try {
-//            
-//            rdfStream = new URL(ontology).openConnection().getInputStream();
-//            
-//        } catch (IOException ex) {
-//            
-//            ex.printStackTrace(System.err);
-//            
-//            return false;
-//            
-//        }
-//        
-//    }
-//
-//    rdfStream = new BufferedInputStream(rdfStream);
-//
-//    ...
-//    
-//    finally {
-//    rdfStream.close();
-//    }
-//    
-    
+
     /**
-     * We need to collect two (three including bnode) term arrays and one
-     * statement array. These should be buffers of a settable size.
-     * <p>
-     * Once the term buffers are full (or the data is exhausted), the term
-     * arrays should be sorted and batch inserted into the LocalTripleStore.
-     * <p>
-     * As each term is inserted, its id should be noted in the Value object, so
-     * that the statement array is sortable based on term id.
-     * <p>
-     * Once the statement buffer is full (or the data is exhausted), the
-     * statement array should be sorted and batch inserted into the LocalTripleStore.
-     * Also the term buffers should be flushed first.
-     * 
-     * @param reader
-     *            the RDF/XML source
-     * @param baseURI
-     *            The baseURI or "" if none is known.
+     * Clear the buffer.
      */
-    public void loadRdf( Reader reader, String baseURI ) throws Exception {
+    protected void cleanUp() {
+
+        buffer.clear();
+
+    }
+
+    public StatementHandler newStatementHandler() {
         
-        Parser parser = newParser(valueFac);
-        
-        // Note: reset to that rates reflect load times not clock times.
-        insertStart = System.currentTimeMillis();
-        insertTime = 0; // clear.
-        
-        // Note: reset so that rates are correct for each source loaded.
-        stmtsAdded = 0;
-        
-        try {
-
-            // Parse the data.
-            parser.parse(reader, baseURI);
-
-            // bulk insert the buffered data into the store.
-            if(buffer != null) {
-                
-                buffer.flush();
-                
-            }
-
-        } catch (RuntimeException ex) {
-
-            log.error("While parsing: " + ex, ex);
-
-            throw ex;
-            
-        } finally {
-
-            // clear the buffer.
-            buffer.clear();
-
-        }
-
-        insertTime += System.currentTimeMillis() - insertStart;
+        return this;
         
     }
-    
+
     public void handleStatement( Resource s, URI p, Value o ) {
 
         // buffer the write (handles overflow).
