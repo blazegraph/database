@@ -433,7 +433,7 @@ public class RdfKeyBuilder {
                 .append(id3).getKey();
         
     }
-
+    
     /**
      * Forms the statement key.
      * 

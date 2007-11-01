@@ -167,7 +167,9 @@ public interface IRawTripleStore extends ITripleStore {
     public IAccessPath getAccessPath(long s, long p, long o);
 
     /**
-     * Return the {@link IAccessPath} for the specified {@link KeyOrder}.
+     * Return the {@link IAccessPath} for the specified {@link KeyOrder} and
+     * a fully unbound triple pattern.  This is generally used only when you
+     * want to perform a {@link IAccessPath#distinctTermScan()}.
      */
     public IAccessPath getAccessPath(KeyOrder keyOrder);
     

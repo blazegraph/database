@@ -53,6 +53,7 @@ import com.bigdata.rdf.spo.OSPComparator;
 import com.bigdata.rdf.spo.POSComparator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Represents the key order used by an index.
@@ -65,6 +66,8 @@ public enum KeyOrder {
     SPO,
     POS,
     OSP;
+
+    final static transient private long NULL = IRawTripleStore.NULL;    
 
     private KeyOrder() {
         
@@ -87,6 +90,53 @@ public enum KeyOrder {
             throw new IllegalArgumentException("Unknown: " + this);
         }
         
+    }
+
+    /**
+     * Return the {@link KeyOrder} that will be used to read from the statement
+     * index that is most efficient for the specified triple pattern.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @return
+     */
+    final public static KeyOrder get(long s, long p, long o) {
+       
+        if (s != NULL && p != NULL && o != NULL) {
+
+            return KeyOrder.SPO;
+            
+        } else if (s != NULL && p != NULL) {
+
+            return KeyOrder.SPO;
+            
+        } else if (s != NULL && o != NULL) {
+
+            return KeyOrder.OSP;
+            
+        } else if (p != NULL && o != NULL) {
+
+            return KeyOrder.POS;
+
+        } else if (s != NULL) {
+
+            return KeyOrder.SPO;
+
+        } else if (p != NULL) {
+
+            return KeyOrder.POS;
+
+        } else if (o != NULL) {
+
+            return KeyOrder.OSP;
+
+        } else {
+
+            return KeyOrder.SPO;
+
+        }
+
     }
     
 }
