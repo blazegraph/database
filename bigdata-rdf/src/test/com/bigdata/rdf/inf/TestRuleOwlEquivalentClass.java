@@ -42,80 +42,91 @@ Modifications:
 
 */
 /*
- * Created on Apr 13, 2007
+ * Created on Nov 2, 2007
  */
 
 package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.vocabulary.OWL;
 
-import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Note: rdfs 5 and 11 use the same base class.
- * 
- * @see RuleRdfs05
- * @see RuleRdfs11
+ * Test suite for {@link RuleOwlEquivalentClass}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleRdfs11 extends AbstractRuleTestCase {
+public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestRuleRdfs11() {
+    public TestRuleOwlEquivalentClass() {
+        super();
     }
 
     /**
      * @param name
      */
-    public TestRuleRdfs11(String name) {
+    public TestRuleOwlEquivalentClass(String name) {
         super(name);
     }
 
     /**
-     * Simple test verifies inference of a subclassof entailment.
+     * Test where the data satisifies the rule exactly once.
+     * 
+     * <pre>
+     *  (a owl:equivalentClass b) -&gt; (b owl:equivalentClass a) 
+     * </pre>
      */
-    public void test_rdfs11() {
+    public void test_owlEquivalentClass() {
 
         AbstractTripleStore store = getStore();
-        
+
         try {
-        
+
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI B = new URIImpl("http://www.foo.org/B");
+
+            StatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            
+            buffer.add(A, new URIImpl(OWL.EQUIVALENTCLASS), B);
+
+            // write on the store.
+            buffer.flush();
+
+            // verify statement(s).
+            assertTrue(store.hasStatement(A, new URIImpl(OWL.EQUIVALENTCLASS), B));
+            assertEquals(1,store.getStatementCount());
+
             InferenceEngine inf = new InferenceEngine(store);
 
-            URI A = new _URI("http://www.foo.org/A");
-            URI B = new _URI("http://www.foo.org/B");
-            URI C = new _URI("http://www.foo.org/C");
-
-            URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
-
-            store.addStatement(A, rdfsSubClassOf, B);
-            store.addStatement(B, rdfsSubClassOf, C);
-
-            assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
-            assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
-            assertFalse(store.hasStatement(A, rdfsSubClassOf, C));
-
-            applyRule(inf, inf.rdfs11, 1/* numComputed */);
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.ruleOwlEquivalentClass, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
              */
-            assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
-            assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
-            assertTrue(store.hasStatement(A, rdfsSubClassOf, C));
+
+            // told
+            assertTrue(store.hasStatement(A, new URIImpl(OWL.EQUIVALENTCLASS), B));
+
+            // entailed
+            assertTrue(store.hasStatement(B, new URIImpl(OWL.EQUIVALENTCLASS), A));
+
+            // final #of statements in the store.
+            assertEquals(2,store.getStatementCount());
 
         } finally {
 
             store.closeAndDelete();
 
         }
-
+        
     }
-
+    
 }

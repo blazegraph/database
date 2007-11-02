@@ -47,14 +47,13 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+
 /**
  * owl:sameAs2
  * 
  * <pre>
  * (x owl:sameAs y), (x a z) -&gt; (y a z).
  * </pre>
- * 
- * @todo x != y for same1, same2, same3.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,8 +70,19 @@ public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
                 new Pred[] { //
                     new Triple(var("x"), inf.owlSameAs, var("y")),//
                     new Triple(var("x"), var("a"), var("z"))//
-                });
-        
+                },
+                new IConstraint[]{
+                    /*
+                     * Reject bindings where x == y.
+                     */
+                    new NE(var("x"),var("y")),
+                    /*
+                     * reject bindings that would conclude y owl:sameAs z.
+                     */
+                    new NEConstant(var("a"),inf.owlSameAs.id)
+                }
+        );
+       
     }
 
 }

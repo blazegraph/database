@@ -23,17 +23,35 @@ x. Done. rule refactor to support (new, new+old).
 
 x. Done. backward chain (x rdf:type rdfs:Resource)
 
-x. backward chain owl:sameAs entailments.
-
-   - also owl:equivilentProperty
-
-   - also owl:equivilentClass
+x. Done. forward chain owl:sameAs, owl:equivilentProperty, and owl:equivilentClass
 
 x. incremental closure of loaded documents w/o re-closing the entire store.
 
-   x support focus (new, new+db, db) - requires ITripleStore impl. that is a view.
+   x. Done. AccessPath that is a view.
 
-   - run the metrics task for this.
+   x. Done. Support focus (new, new+db, db)
+
+   x. Done. DataLoader abstraction.
+
+   - Take a closer look at the evaluation order.  When running wordnet
+     D+S I see the following, which is a clear example when you do NOT
+     want to run the focusGroup predicate 1st.  In this specific case
+     there is far more data in the temporary store.  Of course, the
+     temporary store is also faster when it is in RAM (~200M) so who
+     knows.
+
+INFO : 99361 [main] com.bigdata.rdf.inf.Rule$State.computeEvaluationOrder(Rule.java:706): Evaluation order: [1, 2, 0]
+INFO : 99704 [main] com.bigdata.rdf.inf.Rule$State.computeEvaluationOrder(Rule.java:706): Evaluation order: [1, 2, 0]
+INFO : 99704 [main] com.bigdata.rdf.inf.Rule$State.computeEvaluationOrder(Rule.java:706): Evaluation order: [1, 2, 0]
+step11: RuleFastClosure11, #rounds=0, #stmts=[473157, 174020, 1867419], #subqueries=[373476, 18, 1867419], #computed=273683, elapsed=59750, stmts/sec=42085
+
+   x. create some small test sets that can be used to prove correct
+   incremental closure.
+   
+   x. create unit tests for correctness for the owl entailments.
+
+   - run the metrics task for this (incremental data load).
+
 
 2. truth maintanence.  if ungrounded justification chains then filter during TM.
 

@@ -53,4 +53,10 @@ public abstract class AbstractRuleRdf extends Rule {
 
     }
        
+    public AbstractRuleRdf(AbstractTripleStore db, Triple head, Pred[] body, IConstraint[] constraints) {
+
+        super(db, head, body, constraints);
+
+    }
+       
 }

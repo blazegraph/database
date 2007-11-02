@@ -374,9 +374,9 @@ public class TaskATest
             "nciOncology",
             "-rdf data/nciOncology.owl",
 
-            "NCI Oncology (new)", // ftp://ftp1.nci.nih.gov/pub/cacore/EVS/Thesaurus_06.04d.OWL.zip
-            "Thesaurus",
-            "-rdf data/Thesaurus.owl",
+//            "NCI Oncology (new)", // ftp://ftp1.nci.nih.gov/pub/cacore/EVS/Thesaurus_06.04d.OWL.zip
+//            "Thesaurus",
+//            "-rdf data/Thesaurus.owl",
 
         /*
          * @todo I have seen what appears to be a tight loop emerge during
