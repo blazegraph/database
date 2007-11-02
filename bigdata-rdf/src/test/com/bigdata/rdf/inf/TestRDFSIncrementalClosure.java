@@ -62,12 +62,12 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * series of batches into the store and compute the closure of the batch against
  * the store rather than re-closing the entire store).
  * 
- * FIXME Do a unit test with alibaba where it is split into ontology and data.
- * This will be a lot faster to run than Wordnet. We can even get rid of 90% of
- * the data and it will stil be good for testing out incremental closure
- * correctness.
- * 
  * @todo write tests for "Batch" style closure for the DataLoader.
+ * 
+ * @todo set closure options (fast, backchain vs store x type resource, etc).
+ * 
+ * @todo run more small tests that focus on specific inferences split across
+ *       multiple data file loads.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -112,8 +112,6 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
 
         properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Full.toString());
         
-        // @todo set closure options (fast, backchain vs store x type resource, etc).
-        
         assertCorrectClosure(properties,resource,baseURL,format);
                 
     }
@@ -140,7 +138,52 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
 
         properties.setProperty(InferenceEngine.Options.FORWARD_CLOSURE,ForwardClosureEnum.Fast.toString());
         
-        // @todo set closure options (fast, backchain vs store x type resource, etc).
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Alibaba data + schema order (resources must exist).
+     */
+    public void test_alibabaDataSchema() throws Exception {
+
+        String[] resource = new String[] {
+                "data/alibaba_data.rdf",
+                "data/alibaba_schema.rdf" };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML
+                };
+
+        Properties properties = getProperties();
+        
+        assertCorrectClosure(properties,resource,baseURL,format);
+                
+    }
+
+    /**
+     * Alibaba schema + data order (resources must exist).
+     */
+    public void test_alibabaSchemaData() throws Exception {
+
+        String[] resource = new String[] {
+                "data/alibaba_schema.rdf",
+                "data/alibaba_data.rdf"
+                };
+
+        String[] baseURL = new String[] { "", "" 
+                };
+
+        RDFFormat[] format = new RDFFormat[] {
+                RDFFormat.RDFXML,
+                RDFFormat.RDFXML
+                };
+
+        Properties properties = getProperties();
         
         assertCorrectClosure(properties,resource,baseURL,format);
                 
@@ -164,8 +207,6 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
                 };
 
         Properties properties = getProperties();
-
-        // @todo set closure options (fast, backchain vs store x type resource, etc).
         
         assertCorrectClosure(properties,resource,baseURL,format);
                 
@@ -190,8 +231,6 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
 
         Properties properties = getProperties();
 
-        // @todo set closure options (fast, backchain vs store x type resource, etc).
-        
         assertCorrectClosure(properties,resource,baseURL,format);
                 
     }
