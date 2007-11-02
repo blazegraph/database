@@ -306,14 +306,24 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         final ClosureStats stats;
 
-        if (buffer == null)
-            throw new IllegalStateException("No statement buffer?");
-
-        if (tempStore == null)
-            throw new IllegalStateException("No temporary store?");
+        if(isEmpty()) {
+            
+            // nothing to assert.
+            
+            return new ClosureStats();
+            
+        }
         
-        // flush anything that might still be buffered.
-        buffer.flush();
+        // flush anything to the temporary store.
+        flush();
+        
+        if (tempStore == null) {
+
+            // Should exist since flushed and not empty.
+         
+            throw new AssertionError();
+            
+        }
 
         final int nbeforeClosure = tempStore.getStatementCount();
 
@@ -358,6 +368,33 @@ public class TMStatementBuffer implements IStatementBuffer {
      * @todo return statistics.
      */
     public ClosureStats retractAll() {
+
+        final ClosureStats stats;
+
+//        if (buffer == null)
+//            throw new IllegalStateException("No statement buffer?");
+//
+//        if (tempStore == null)
+//            throw new IllegalStateException("No temporary store?");
+        
+        if(isEmpty()) {
+            
+            // nothing to assert.
+            
+            return new ClosureStats();
+            
+        }
+        
+        // flush anything to the temporary store.
+        flush();
+        
+        if (tempStore == null) {
+
+            // Should exist since flushed and not empty.
+         
+            throw new AssertionError();
+            
+        }
 
         // ... do closure
         

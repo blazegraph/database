@@ -229,8 +229,8 @@ public class TaskATest
 
         // whether and when to compute the closure.
 //        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Incremental.toString());
-//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Batch.toString());
-        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Batch.toString());
+//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
         // after every set of resources loaded.
         properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
