@@ -181,7 +181,7 @@ abstract public class TestBigdataRdfRepository extends org.openrdf.sesame.sail.R
          * empty after closure.
          */
 
-        params.put(Options.RDFS_CLOSURE, "false");
+        params.put(Options.TRUTH_MAINTENANCE, "false");
             
         try {
             

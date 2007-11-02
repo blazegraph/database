@@ -50,6 +50,7 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -96,7 +97,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
 
             URI U = new URIImpl("http://www.foo.org/U");
 
-            StatementBuffer buffer = new StatementBuffer(store,
+            IStatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */);
             
             buffer.add(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
@@ -151,7 +152,7 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             URI U1 = new URIImpl("http://www.foo.org/U1");
             URI U2 = new URIImpl("http://www.foo.org/U2");
 
-            StatementBuffer buffer = new StatementBuffer(store,
+            IStatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */);
             
             buffer.add(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);

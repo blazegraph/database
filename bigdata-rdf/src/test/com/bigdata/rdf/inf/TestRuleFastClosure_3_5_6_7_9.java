@@ -55,6 +55,7 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -154,7 +155,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         
         try {
             
-            StatementBuffer buffer = new StatementBuffer(store,100/*capacity*/);
+            IStatementBuffer buffer = new StatementBuffer(store,100/*capacity*/);
 
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");

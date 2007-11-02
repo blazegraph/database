@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.OWL;
 
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -92,7 +93,7 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");
 
-            StatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
             buffer.add(A, new URIImpl(OWL.EQUIVALENTCLASS), B);
 

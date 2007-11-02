@@ -630,7 +630,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         // After shutdown.
         writeStatistics();
 
-        dataLoader.close();
+        dataLoader = null;
         
     }
 

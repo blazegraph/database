@@ -50,6 +50,7 @@ package com.bigdata.rdf.rio;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.model.Resource;
@@ -62,6 +63,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
@@ -93,7 +95,13 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 //        String file = "data/nciOncology.owl";
         String file = "data/alibaba_v41.rdf";
     
-        DataLoader dataLoader = store.getDataLoader();
+        // avoid modification of the properties.
+        Properties properties = new Properties(getProperties());
+        
+        // turn off RDFS closure for this test.
+        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
+        
+        DataLoader dataLoader = new DataLoader(properties,store);
         
         // load into the datbase.
         dataLoader.loadData(file, "" /* baseURI */, RDFFormat.RDFXML);
