@@ -60,20 +60,25 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
- * rules of the general form:
+ * Rules of the general form:
  * 
  * <pre>
- *  (_,_,_) :- (u,C,v), (v,C,x).
+ *   (_,_,_) :- (u,C,v), (v,C,x).
  * </pre>
  * 
- * This kind of rule is used to compute the transitive closure for some
- * specific predicate. For example:
+ * This kind of rule is used to compute the transitive closure for some specific
+ * predicate. For example:
  * 
  * <pre>
- *  (u,C,x) :- (u,C,v), (v,C,x).
+ *   (u,C,x) :- (u,C,v), (v,C,x).
  * </pre>
  * 
  * where C might be rdfs:subClassOf (rdfs11) or rdfs:subPropertyOf (rdfs5)
+ * <p>
+ * Note: This implementation "optimizes out" one of the body predicates and uses
+ * an in-memory self-join that reads from only a single data sources and
+ * therefore MUST NOT be used with truth maintenance since that requires reading
+ * from a focusStore and the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -124,11 +129,6 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
 
     }
 
-    /**
-     * FIXME This needs to run as a nested query in order to work with a
-     * focusStore. We can only use the self join when we are just closing the
-     * database by itself.
-     */
     final public void apply( State state ) {
         
         final long computeStart = System.currentTimeMillis();

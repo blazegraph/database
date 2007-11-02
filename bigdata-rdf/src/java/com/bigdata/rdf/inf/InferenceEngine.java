@@ -83,7 +83,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                                 pred :- pred*.
+ *                                  pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -118,17 +118,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                                  triple(?v,rdf:type,?x) :-
- *                                     triple(?u,rdfs:subClassOf,?x),
- *                                     triple(?v,rdf:type,?u). 
+ *                                   triple(?v,rdf:type,?x) :-
+ *                                      triple(?u,rdfs:subClassOf,?x),
+ *                                      triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                                  triple(?u,rdfs:subClassOf,?x) :-
- *                                     triple(?u,rdfs:subClassOf,?v),
- *                                     triple(?v,rdf:subClassOf,?x). 
+ *  triple(?u,rdfs:subClassOf,?x) :-
+ *    triple(?u,rdfs:subClassOf,?v),
+ *    triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -151,7 +151,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo provide option for "owl:sameAs" semantics using destructive merging
  *       (the terms are assigned the same term identifier, one of them is
  *       treated as a canonical, and there is no way to retract the sameAs
- *       assertion).
+ *       assertion). If you take this approach then you must also re-write all
+ *       existing assertions using the term whose term identifier is changed to
+ *       be that of another term.
  * 
  * @todo if we are not storing rules or magic facts in the main statement
  *       indices then get rid of the leading byte used in all keys for the
