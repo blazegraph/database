@@ -51,16 +51,8 @@ package com.bigdata.rdf.inf;
  * owl:sameAs1
  * 
  * <pre>
- *      
- *      same1: xxx owl:sameAs yyy -&gt; yyy owl:sameAs xxx
- *      
- *      same2: xxx owl:sameAs yyy + xxx aaa zzz -&gt; yyy aaa zzz
- *      
- *      same3: xxx owl:sameas yyy + zzz aaa zzz -&gt; zzz aaa yyy
- *      
+ * (x owl:sameAs y) -&gt; (y owl:sameAs x)
  * </pre>
- * 
- * @todo x != y for same1, same2, same3.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

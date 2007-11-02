@@ -135,9 +135,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
 
                         assert spo.p == p;
 
-                        state.bind(0,spo);
+                        if(state.bind(0,spo)) {
 
-                        state.emit();
+                            state.emit();
+                            
+                        }
 
                     } // next stmt
 

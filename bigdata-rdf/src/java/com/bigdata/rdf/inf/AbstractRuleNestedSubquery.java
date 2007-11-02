@@ -92,9 +92,21 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
      */
     public AbstractRuleNestedSubquery(AbstractTripleStore db, Triple head,
             Pred[] body) {
-        
+
         super(db, head, body);
-        
+
+    }
+
+    /**
+     * @param db
+     * @param head
+     * @param body
+     */
+    public AbstractRuleNestedSubquery(AbstractTripleStore db, Triple head,
+            Pred[] body, IConstraint[] constraints) {
+
+        super(db, head, body, constraints);
+
     }
 
     /**
@@ -158,17 +170,24 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                                     + getName());
                         }
 
+                        state.stats.nstmts[state.order[index]]++;
+
                         /*
                          * Then bind this statement, which propagates bindings
                          * to the next predicate.
                          */
-                        state.clearDownstreamBindings(index + 1);
-                        state.bind(state.order[index], stmt);
-                        state.stats.nstmts[state.order[index]]++;
 
-                        // run the subquery.
-                        apply1(index + 1, state);
-                        state.stats.nsubqueries[state.order[index]]++;
+                        state.clearDownstreamBindings(index + 1);
+                        
+                        if(state.bind(state.order[index], stmt)) {
+
+                            // run the subquery.
+                            
+                            state.stats.nsubqueries[state.order[index]]++;
+
+                            apply1(index + 1, state);
+                            
+                        }
 
                     }
 
@@ -184,12 +203,15 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                                     + getName());
                         }
 
-                        // bind this statement.
-                        state.bind(state.order[index], stmt);
                         state.stats.nstmts[state.order[index]]++;
 
-                        // emit entailment.
-                        state.emit();
+                        // bind this statement.
+                        if( state.bind(state.order[index], stmt) ) {
+
+                            // emit entailment.
+                            state.emit();
+                            
+                        }
 
                     }
 
@@ -275,13 +297,15 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
     
                         state.clearDownstreamBindings(index+1);
 
-                        state.bind(state.order[index],innerSet.get(0));
+                        if( state.bind(state.order[index],innerSet.get(0)) ) {
                         
-                        // run the subquery.
+                            // run the subquery.
                         
-                        state.stats.nsubqueries[state.order[index]]++;
+                            state.stats.nsubqueries[state.order[index]]++;
     
-                        apply2(index+1,state,innerSet);
+                            apply2(index+1,state,innerSet);
+                            
+                        }
                         
                     } else {
                     
@@ -293,17 +317,20 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                          * the order[] of evaluation.
                          */
                         
-                        state.stats.nstmts[state.order[index]] ++;
+                        state.stats.nstmts[state.order[index]]++;
                         
                         // Apply bindings for the the current statement.
-                        state.bind(state.order[index],chunk[i]);
                         
-                        // run the subquery.
+                        if( state.bind(state.order[index],chunk[i]) ) {
                         
-                        state.stats.nsubqueries[state.order[index]]++;
+                            // run the subquery.
+                        
+                            state.stats.nsubqueries[state.order[index]]++;
     
-                        apply2(index+1,state,EMPTY_SET);
+                            apply2(index+1,state,EMPTY_SET);
 
+                        }
+                        
                         i++; // next in this chunk.
                         
                     }
@@ -316,26 +343,32 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
                 
                 for( SPO stmt : chunk ) {
                     
-                    // bind this statement.
-                    state.bind(state.order[index],stmt);
-
                     state.stats.nstmts[state.order[index]]++;
 
-                    if(outerSet.isEmpty()) {
+                    // bind this statement.
+                    
+                    if( state.bind(state.order[index],stmt) ) {
 
-                        state.emit();
-
-                    } else {
-
-                        for (SPO ostmt : outerSet) {
-
-                            // bind the statement from the _outer_ query.
-                            state.bind(state.order[index-1],ostmt);
-                        
+                        if(outerSet.isEmpty()) {
+    
                             state.emit();
-                        
+    
+                        } else {
+    
+                            for (SPO ostmt : outerSet) {
+    
+                                // bind the statement from the _outer_ query.
+                                
+                                if( state.bind(state.order[index-1],ostmt) ) {
+                            
+                                    state.emit();
+                                    
+                                }
+                            
+                            }
+    
                         }
-
+                        
                     }
                     
                 }

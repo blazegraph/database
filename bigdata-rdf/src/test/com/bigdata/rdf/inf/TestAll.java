@@ -77,6 +77,10 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF(S)+ inference and truth maintenance");
 
+        /*
+         * test forward chainer rules.
+         */
+        
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
         
@@ -104,28 +108,57 @@ public class TestAll extends TestCase {
         // Note: fast closure rules using the same base class.
         suite.addTestSuite( TestRuleFastClosure_3_5_6_7_9.class );
 
+        // owl:sameAs rules.
+        suite.addTestSuite( TestRuleOwlSameAs.class );
+
+        // test owl:equivilantClass
+        suite.addTestSuite( TestRuleOwlEquivalentClass.class );
+
+        // test owl:equivilantProperty
+        suite.addTestSuite( TestRuleOwlEquivalentProperty.class );
+
+        /*
+         * test backward chainer rules.
+         */
+        
         // test suite for backward chaining of (?x rdf:type rdfs:Resource).
         suite.addTestSuite( TestBackchainTypeResourceIterator.class );
-        
-        // test suite for RDFS closure correctness.
-        suite.addTestSuite( TestRDFSClosure.class );
-
-        // test suite for RDFS closure correctness with incremental load (TM).
-        suite.addTestSuite( TestRDFSIncrementalClosure.class );
-
-        // test suite for RDFS closure correctness with incremental delete (TM).
-        suite.addTestSuite( TestRDFSTruthMaintenance.class );
 
         // @todo test suite for backward chaining of (?x owl:sameAs ?y).
+
+        /*
+         * test SLD / magic sets / semi-naive evaluation (constrained forward
+         * chainer that may be used to prove whether or not statement(s) are
+         * entailed by the database as opposed to generating entailments from
+         * the data).
+         */
         
         // @todo test suite for semi-naive evaluation (magic sets / SLD).
 //        suite.addTestSuite( TestMagicSets.class);
 
         /*
-         * @todo write a test of concurrent load and close rates using LUBM.
-         * This data set is good since it reuses the same ontology and will let
-         * us scale the #of concurrent clients and the #of files to be loaded to
-         * an arbitrary degree.
+         * test closure correctness on data sets against ground truth using
+         * a variety of forward and backward strategies.
+         */
+        
+        // test suite for RDFS closure correctness.
+        suite.addTestSuite( TestRDFSClosure.class );
+
+        /*
+         * test incremental closure and truth maintenance on statement removal.
+         */
+        
+        // test suite for RDFS closure correctness with incremental load (TM).
+        suite.addTestSuite( TestRDFSIncrementalClosure.class );
+
+        // test suite for RDFS closure correctness with incremental delete (TM).
+        suite.addTestSuite( TestRDFSTruthMaintenance.class );
+        
+        /*
+         * @todo write a performance test of concurrent load and close rates
+         * using LUBM. This data set is good since it reuses the same ontology
+         * and will let us scale the #of concurrent clients and the #of files to
+         * be loaded to an arbitrary degree.
          */
         
         return suite;

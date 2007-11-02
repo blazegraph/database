@@ -798,6 +798,35 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * support traversal with concurrent modification, which could be as
          * simple as restarting the iterator from the successor of the last
          * visited key if the tree has been modified.
+         * <p>
+         * Updated position: There are two uses to support. One is remove() on
+         * IEntryIterator with a single-thread accessing the BTree. This case is
+         * easy enough since we only need to support "delete behind." It can be
+         * handled with restarting the iterator if necessary to accomodate a
+         * delete which causes a structural modification (leaves to merge).
+         * <p>
+         * The second use case is logically concurrent tasks that read and write
+         * on the same unisolated index(s). This use case is already supported
+         * by the concurrency control mechanisms in the concurrent journal.
+         * However, the refactor should wait on a change to the concurrency
+         * control to: (a) check point the indices at the each of each write so
+         * that we can abort individual tasks without throwing away the work of
+         * other tasks; and (b) add an "awaitCommit" property to the task so
+         * that tasks may execute without either forcing a commit or awaiting a
+         * commit. When false, "awaitCommit" does NOT mean that the application
+         * can rely on the data to NOT be durable, it simply means that the
+         * application does not require an immediate commit (ie, is willing to
+         * discover that the data were not durable on restart). This would be
+         * useful in an embedded application such as the RDF database which
+         * performs a lot of write tasks on the unisolated indices before it has
+         * completed an atomic operation from the application perspective. Note
+         * that "awaitCommit" probably is only viable in an environment without
+         * application level concurrency since partial writes would be visible
+         * immediately and COULD be restart safe. However, an application such
+         * as the {@link ScaleOutTripleStore} already manages concurrency at the
+         * application level using a "consistent" data approach (but this issue
+         * has not been solved for computing closure or truth maintenance on
+         * statement removal.)
          */
         public ISPOIterator iterator() {
 

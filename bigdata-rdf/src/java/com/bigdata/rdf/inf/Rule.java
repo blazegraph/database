@@ -171,6 +171,53 @@ abstract public class Rule {
      * is empty.
      */
     final protected Pred[] body;
+
+    /**
+     * Optional constraints on the bindings.
+     */
+    final protected IConstraint[] constraints;
+    
+    /**
+     * An interface for specifying constraints on bindings for a {@link Rule}.
+     * Constraints are particularly useful for rules that specialize
+     * {@link AbstractRuleNestedSubquery}. A typical use case is might impose
+     * the constraint that two variables must have distinct bindings. Another
+     * use case could impose the constraint that a binding must be (or must not
+     * be) a Literal (since that is typed using a bit on the term identifier).
+     * 
+     * <pre>
+     * public boolean accept(State s) {
+     * 
+     *     // get binding for &quot;x&quot;.
+     *     long x = s.get(var(&quot;x&quot;));
+     * 
+     *     if (x == NULL)
+     *         return true; // not yet bound.
+     * 
+     *     // get binding for &quot;y&quot;.
+     *     long y = s.get(var(&quot;y&quot;));
+     * 
+     *     if (y == NULL)
+     *         return true; // not yet bound.
+     * 
+     *     return x != y;
+     * 
+     * }
+     * </pre>
+     * 
+     * Constraints are automatically applied by {@link State#bind(int, SPO)}.
+     * If a constraint is violated, then {@link State#bind(int, SPO)} will
+     * return <code>false</code>. The rule must then skip that binding, e.g.,
+     * by issuing the next subquery.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IConstraint {
+        
+        public boolean accept(State s);
+        
+    }
     
     /**
      * The #of terms in the tail of the rule.
@@ -225,6 +272,12 @@ abstract public class Rule {
     }
 
     public Rule(AbstractTripleStore db, Pred head, Pred[] body) {
+    
+        this(db,head,body,null);
+        
+    }
+    
+    public Rule(AbstractTripleStore db, Pred head, Pred[] body, IConstraint[] constraints) {
 
         assert db != null;
         
@@ -236,6 +289,25 @@ abstract public class Rule {
         // the predicate declarations for the body.
         this.body = body;
         
+        for(int i=0; i<body.length; i++) {
+            
+            assert body[i] != null;
+            
+        }
+        
+        // constraint(s) on the variable bindings (MAY be null). 
+        this.constraints = constraints;
+
+        if(constraints!=null) {
+
+            for(int i=0; i<constraints.length; i++) {
+            
+                assert constraints[i] != null;
+            
+            }
+            
+        }
+
     }
 
     /**
@@ -696,8 +768,8 @@ abstract public class Rule {
                 
                 used[index] = true;
                 
-                // propagate bindings.
-                bind(index,tmp);
+                // propagate bindings w/o constraint checking.
+                bind2(index,tmp);
                 
             }
             
@@ -912,16 +984,16 @@ abstract public class Rule {
             }
             
             /*
-             * scan the body for the variable.
+             * scan the body for the variable in evaluation order.
              */
             
             for(int i=0; i<body.length; i++) {
                 
-                int indexOf = body[i].indexOf(var);
+                int indexOf = body[order[i]].indexOf(var);
                 
                 if(indexOf != -1) {
                     
-                    final long id = bindings[i * N + indexOf];
+                    final long id = bindings[order[i] * N + indexOf];
 
                     // MAY be NULL.
                     return id;
@@ -1023,6 +1095,10 @@ abstract public class Rule {
          * @param spo
          *            A statement materialized by the triple pattern that predicate.
          * 
+         * @return <code>true</code> iff the binding is allowed.
+         * 
+         * @see IConstraint
+         * 
          * @throws NullPointerException
          *             if the statement is <code>null</code>.
          * @throws IndexOutOfBoundsException
@@ -1030,7 +1106,7 @@ abstract public class Rule {
          * 
          * @see #clearDownstreamBindings(int index)
          */
-        public void bind(int index, SPO spo) {
+        public boolean bind(int index, SPO spo) {
             
             // Note: if you are doing nested subqueries and you are not invoking
             // this method then you have a problem!
@@ -1039,6 +1115,55 @@ abstract public class Rule {
             // just move the invocation into this method as:
             //
 //            clearDownstreamBindings(index + 1);
+
+            // propagate bindings.
+            
+            bind2( index, spo );
+            
+            if (constraints != null) {
+
+                // check constraints.
+                
+                for (int i = 0; i < constraints.length; i++) {
+
+                    IConstraint constraint = constraints[i];
+                    
+                    if (!constraint.accept(this)) {
+
+                        if(DEBUG) {
+                            
+                            log.debug("Rejected by "
+                                    + constraint.getClass().getSimpleName() + "\n"
+                                    + toString(true/*asBound*/));
+                            
+                        }
+                        
+                        return false;
+
+                    }
+
+                }
+
+            }
+            
+            return true;
+            
+        }
+        
+        /**
+         * Propagate bindings without constraint checking.
+         * 
+         * @param index
+         *            The index of the predicate in the body of the rule.
+         * @param spo
+         *            A statement materialized by the triple pattern that predicate.
+         * 
+         * @throws NullPointerException
+         *             if the statement is <code>null</code>.
+         * @throws IndexOutOfBoundsException
+         *             if the index is out of bounds.
+         */
+        private void bind2(int index, SPO spo) {
             
             Pred pred = body[index];
             
