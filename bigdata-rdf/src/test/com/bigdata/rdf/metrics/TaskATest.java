@@ -273,7 +273,7 @@ public class TaskATest
         }
 
         // release resources.
-        dataLoader.close();
+        dataLoader = null;
         
         long elapsed = System.currentTimeMillis() - begin;
 

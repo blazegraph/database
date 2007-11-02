@@ -69,6 +69,9 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * @todo run more small tests that focus on specific inferences split across
  *       multiple data file loads.
  * 
+ * @todo the wordnet tests blow out the code that verifies to see if the graphs
+ *       are the same.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -189,51 +192,51 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
                 
     }
 
-    /**
-     * Wordnet data + schema order (resources must exist).
-     */
-    public void test_wordnetDataSchema() throws Exception {
-
-        String[] resource = new String[] {
-                "data/wordnet_nouns-20010201.rdf",
-                "data/wordnet-20000620.rdfs" };
-
-        String[] baseURL = new String[] { "", "" 
-                };
-
-        RDFFormat[] format = new RDFFormat[] {
-                RDFFormat.RDFXML,
-                RDFFormat.RDFXML
-                };
-
-        Properties properties = getProperties();
-        
-        assertCorrectClosure(properties,resource,baseURL,format);
-                
-    }
-
-    /**
-     * Wordnet schema + data order (resources must exist).
-     */
-    public void test_wordnetSchemaData() throws Exception {
-
-        String[] resource = new String[] {
-                "data/wordnet_nouns-20010201.rdf",
-                "data/wordnet-20000620.rdfs" };
-
-        String[] baseURL = new String[] { "", "" 
-                };
-
-        RDFFormat[] format = new RDFFormat[] {
-                RDFFormat.RDFXML,
-                RDFFormat.RDFXML
-                };
-
-        Properties properties = getProperties();
-
-        assertCorrectClosure(properties,resource,baseURL,format);
-                
-    }
+//    /**
+//     * Wordnet data + schema order (resources must exist).
+//     */
+//    public void test_wordnetDataSchema() throws Exception {
+//
+//        String[] resource = new String[] {
+//                "data/wordnet_nouns-20010201.rdf",
+//                "data/wordnet-20000620.rdfs" };
+//
+//        String[] baseURL = new String[] { "", "" 
+//                };
+//
+//        RDFFormat[] format = new RDFFormat[] {
+//                RDFFormat.RDFXML,
+//                RDFFormat.RDFXML
+//                };
+//
+//        Properties properties = getProperties();
+//        
+//        assertCorrectClosure(properties,resource,baseURL,format);
+//                
+//    }
+//
+//    /**
+//     * Wordnet schema + data order (resources must exist).
+//     */
+//    public void test_wordnetSchemaData() throws Exception {
+//
+//        String[] resource = new String[] {
+//                "data/wordnet_nouns-20010201.rdf",
+//                "data/wordnet-20000620.rdfs" };
+//
+//        String[] baseURL = new String[] { "", "" 
+//                };
+//
+//        RDFFormat[] format = new RDFFormat[] {
+//                RDFFormat.RDFXML,
+//                RDFFormat.RDFXML
+//                };
+//
+//        Properties properties = getProperties();
+//
+//        assertCorrectClosure(properties,resource,baseURL,format);
+//                
+//    }
 
     /**
      * Test helper for RDFS incremental closure correctness.
@@ -281,7 +284,7 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
                 store.dumpStore(false, true, false);
             }
 
-            assertTrue("Closure does not agree",modelsEqual(groundTruth, dataLoader.inferenceEngine));
+            assertTrue("Closure does not agree",modelsEqual(groundTruth, dataLoader.getInferenceEngine()));
 
         } finally {
 

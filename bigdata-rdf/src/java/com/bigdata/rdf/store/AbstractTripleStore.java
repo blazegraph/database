@@ -50,6 +50,7 @@ package com.bigdata.rdf.store;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -78,11 +79,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.isolation.IIsolatableIndex;
-import com.bigdata.isolation.IsolatableFusedView;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.Bytes;
@@ -90,6 +89,7 @@ import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -100,7 +100,6 @@ import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -457,7 +456,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * Note: This uses the batch API.
          */
         
-        StatementBuffer buffer = new StatementBuffer(this, 1);
+        IStatementBuffer buffer = new StatementBuffer(this, 1);
         
         buffer.add(s, p, o);
         
@@ -552,14 +551,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
     
-    /**
-     * FIXME define a means to obtain a fused view of the access path selected
-     * by a triple pattern in this database and in another triple store, which
-     * will typically be a {@link TempTripleStore}. This will be used to
-     * support TM so that we can read from a fused view. This can be implemented
-     * using a {@link ReadOnlyFusedView} or an {@link IsolatableFusedView}.
-     * There will have to be a similar mechanism for the {@link ClientIndexView}.
-     */
     final public IAccessPath getAccessPath(long s, long p, long o) {
         
         return new AccessPath(KeyOrder.get(s,p,o),s,p,o);
@@ -1288,7 +1279,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * statement externalization serialization stuff.
      */
     
-    // namespace to prefix @todo integrate namespace stuff in the SAIL.
+    // namespace to prefix
     private final Map<String, String> uriToPrefix = new HashMap<String, String>();
     
     /**
@@ -1303,6 +1294,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
         uriToPrefix.put(namespace, prefix);
 
+    }
+    
+    /**
+     * Return an unmodifiable view of the mapping from namespaces to namespace
+     * prefixes.
+     * <p>
+     * Note: this is NOT a persistent map. It is used by {@link #toString(long)}
+     * when externalizing URIs.
+     */
+    final public Map<String,String> getNamespaces() {
+        
+        return Collections.unmodifiableMap(uriToPrefix);
+        
     }
 
     final public String toString( long s, long p, long o ) {

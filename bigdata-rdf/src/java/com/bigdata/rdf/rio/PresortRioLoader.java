@@ -63,7 +63,7 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, Stat
      * Used to buffer RDF {@link Value}s and {@link Statement}s emitted by
      * the RDF parser.
      */
-    final StatementBuffer buffer;
+    final IStatementBuffer buffer;
 
     /**
      * Sets up parser to load RDF.
@@ -72,7 +72,7 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, Stat
      *            The buffer used to collect, sort, and write statements onto
      *            the database.
      */
-    public PresortRioLoader(StatementBuffer buffer) {
+    public PresortRioLoader(IStatementBuffer buffer) {
 
         assert buffer != null;
                 
@@ -93,14 +93,15 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, Stat
 
     }
 
-    /**
-     * Clear the buffer.
-     */
-    protected void cleanUp() {
-
-        buffer.clear();
-
-    }
+    // Let the caller clear the buffer!!!
+//    /**
+//     * Clear the buffer.
+//     */
+//    protected void cleanUp() {
+//
+//        buffer.clear();
+//
+//    }
 
     public StatementHandler newStatementHandler() {
         

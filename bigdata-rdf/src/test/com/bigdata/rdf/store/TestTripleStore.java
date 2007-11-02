@@ -64,6 +64,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
@@ -595,7 +596,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             URIImpl B = new URIImpl("http://www.bigdata.com/B");
             URIImpl C = new URIImpl("http://www.bigdata.com/C");
             
-            StatementBuffer buffer = new StatementBuffer(store,100);
+            IStatementBuffer buffer = new StatementBuffer(store,100);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
             buffer.add(A, URIImpl.RDF_TYPE, C);
@@ -658,7 +659,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             URIImpl B = new URIImpl("http://www.bigdata.com/B");
             URIImpl C = new URIImpl("http://www.bigdata.com/C");
             
-            StatementBuffer buffer = new StatementBuffer(store,100);
+            IStatementBuffer buffer = new StatementBuffer(store,100);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
             buffer.add(A, URIImpl.RDF_TYPE, C);

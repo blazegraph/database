@@ -54,6 +54,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -106,7 +107,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * will only visit statements for (A).
              */
             
-            StatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
             buffer.add(B, URIImpl.RDF_TYPE, C);
@@ -210,7 +211,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * distinct subjects.
              */
             
-            StatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
             buffer.add(B, URIImpl.RDF_TYPE, C);
@@ -331,7 +332,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
              * Note: this gives us TWO (2) distinct subjects (A and B).
              */
             
-            StatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
             buffer.add(B, URIImpl.RDF_TYPE, C);

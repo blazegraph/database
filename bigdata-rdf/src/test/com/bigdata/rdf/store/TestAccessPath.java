@@ -52,6 +52,7 @@ import java.util.Arrays;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -133,7 +134,7 @@ public class TestAccessPath extends AbstractTripleStoreTestCase {
 
         try {
 
-            StatementBuffer buffer = new StatementBuffer(store,
+            IStatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */);
 
             URI A = new URIImpl("http://www.foo.org/A");

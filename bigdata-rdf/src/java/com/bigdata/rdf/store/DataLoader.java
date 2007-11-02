@@ -54,35 +54,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.lang.ref.SoftReference;
 import java.util.Arrays;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.IRioLoader;
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.rdf.sail.BigdataRdfRepository;
 
 /**
  * A utility class to facility loading RDF data into an
- * {@link AbstractTripleStore}.
- * 
- * @todo for concurrent data writers, this class should probably allocate an
- *       {@link RdfKeyBuilder} provisioned according to the target database and
- *       attach it to the {@link StatementBuffer}. Alternatively, have the
- *       {@link StatementBuffer} do that. In either case, the batch API on the
- *       {@link AbstractTripleStore} should then use the {@link RdfKeyBuilder}
- *       attached to the {@link StatementBuffer}.
+ * {@link AbstractTripleStore} without using {@link BigdataRdfRepository}..
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -93,15 +84,53 @@ public class DataLoader {
      * Logger.
      */
     public static final Logger log = Logger.getLogger(DataLoader.class);
-    
+
     private final boolean verifyData;
 
+    /**
+     * The {@link StatementBuffer} capacity.
+     */
     private final int bufferCapacity;
+    
+    /**
+     * The target database.
+     */
+    private final AbstractTripleStore database;
+    
+    /**
+     * The target database.
+     */
+    public AbstractTripleStore getDatabase() {
+        
+        return database;
+        
+    }
+    
+    /**
+     * The object used to compute entailments for the database.
+     */
+    private final InferenceEngine inferenceEngine;
+    
+    /**
+     * The object used to compute entailments for the database.
+     */
+    public InferenceEngine getInferenceEngine() {
+        
+        return inferenceEngine;
+        
+    }
+    
+    /**
+     * Used to buffer writes. This will be a {@link TMStatementBuffer} iff we are
+     * using {@link ClosureEnum#Incremental} and a {@link StatementBuffer}
+     * otherwise.
+     */
+    private final IStatementBuffer buffer;
     
     private final CommitEnum commitEnum;
     
     private final ClosureEnum closureEnum;
-
+    
     /**
      * How the {@link DataLoader} will maintain closure on the database.
      */
@@ -120,18 +149,6 @@ public class DataLoader {
         return commitEnum;
         
     }
-    
-    /**
-     * The target database.
-     */
-    private final AbstractTripleStore database;
-    
-    /**
-     * The object used to compute the closure of the {@link #tempStoreRef}
-     * against the {@link #database} (IFF entailments are to be computed).
-     */
-    // Note: public since exposed to a test case.
-    public final InferenceEngine inferenceEngine;
 
     /**
      * A type-safe enumeration of options effecting whether and when the database
@@ -264,82 +281,23 @@ public class DataLoader {
     }
     
     /**
-     * Used to retain the {@link StatementBuffer} between runs of the parser
-     * while allowing it to be garbage collected if necessary.
-     */
-    private SoftReference<StatementBuffer> bufferRef;
-
-    /**
-     * Returns the {@link StatementBuffer} instance that is used by the data
-     * loader.
-     */
-    protected StatementBuffer getStatementBuffer() {
-
-        StatementBuffer b = null;
-
-        if (bufferRef != null) {
-
-            b = bufferRef.get();
-
-        }
-
-        if (b == null) {
-
-            /*
-             * Note: will write on the tempStore iff it is defined.
-             */
-            
-            b = new StatementBuffer(getTempStore(), database, bufferCapacity);
-
-            bufferRef = new SoftReference<StatementBuffer>(b);
-
-            log.info("Allocated statement buffer: capacity=" + bufferCapacity);
-
-        }
-
-        return b;
-
-    }
-
-    /**
-     * Used to retain the {@link TempTripleStore} between runs of the parser
-     * while allowing it to be garbage collected if necessary.
-     */
-    private SoftReference<TempTripleStore> tempStoreRef;
-
-    /**
-     * Return the {@link TempTripleStore} for the {@link DataLoader} IFF it the
-     * {@link ClosureEnum} will maintain closure. The {@link TempTripleStore} is
-     * lazily allocated since it may have been released by {@link #close()}.
-     */
-    protected TempTripleStore getTempStore() {
-
-        TempTripleStore t = null;
-        
-        if(tempStoreRef!=null) {
-            
-            t = tempStoreRef.get();
-            
-        }
-        
-        if(t==null && closureEnum!=ClosureEnum.None) {
-
-            t = new TempTripleStore(database.getProperties());
-            
-            tempStoreRef = new SoftReference<TempTripleStore>( t );
-            
-        }
-        
-        return t;
-        
-    }
-    
-    /**
+     * Create a data loader.
      * 
+     * @param properties
+     *            Configuration properties - see {@link Options}.
+     * 
+     * @param database
+     *            The database.
+     *            
+     * @todo have the caller pass in the InferenceEngine?
      */
     public DataLoader(Properties properties, AbstractTripleStore database) {
         
-        this.database = database;
+        if (properties == null)
+            throw new IllegalArgumentException();
+
+        if (database == null)
+            throw new IllegalArgumentException();
         
         verifyData = Boolean.parseBoolean(properties.getProperty(
                 Options.VERIFY_DATA, Options.DEFAULT_VERIFY_DATA));
@@ -350,20 +308,30 @@ public class DataLoader {
                 Options.COMMIT, Options.DEFAULT_COMMIT));
         
         log.info(Options.COMMIT+"="+commitEnum);
-        
-        bufferCapacity = Integer.parseInt(properties.getProperty(
-                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
-        
-        log.info(Options.BUFFER_CAPACITY+"="+bufferCapacity);
 
         closureEnum = ClosureEnum.valueOf(properties.getProperty(Options.CLOSURE,
                 Options.DEFAULT_CLOSURE));
 
         log.info(Options.CLOSURE+"="+closureEnum);
 
-        // allocated regardless - useful for recomputing the full closure.
-        this.inferenceEngine = new InferenceEngine(properties, database);
+        bufferCapacity = Integer.parseInt(properties.getProperty(
+                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));        
 
+        this.database = database;
+        
+        inferenceEngine = new InferenceEngine(properties, database);
+
+        if (closureEnum != ClosureEnum.None) {
+            
+            buffer = new TMStatementBuffer(inferenceEngine, bufferCapacity,
+                    true/* buffer contains assertions */);
+            
+        } else {
+            
+            buffer = new StatementBuffer(null, database, bufferCapacity);
+            
+        }
+        
     }
 
     /**
@@ -417,16 +385,7 @@ public class DataLoader {
             throw new IllegalArgumentException();
 
         log.info("commit="+commitEnum+", closure="+closureEnum+", resource="+Arrays.toString(resource));
-        
-        /*
-         * Hold a hard reference (will be null if we are not using the temporary
-         * store). Holding a hard reference prevents GC from sweeping the temp
-         * store while we are loading data! Otherwise it might get swept between
-         * data set loads!!!
-         */
 
-        final TempTripleStore hardRef = getTempStore();
-        
         LoadStats totals = new LoadStats();
         
         LoadStats[] loadStats = new LoadStats[resource.length];
@@ -459,7 +418,7 @@ public class DataLoader {
             log.info("commit: latency="+totals.commitTime+"ms");
 
         }
-        
+                
         return totals;
         
     }
@@ -481,7 +440,7 @@ public class DataLoader {
         
         log.info( "loading: " + resource );
         
-        IRioLoader loader = new PresortRioLoader(getStatementBuffer());
+        IRioLoader loader = new PresortRioLoader(buffer);
 
         loader.addRioLoaderListener( new RioLoaderListener() {
             
@@ -565,18 +524,6 @@ public class DataLoader {
         }
 
     }
-
-    /**
-     * Wipes out the entailments from the database (this requires a full scan on
-     * all statement indices).
-     * 
-     * @todo implement and move to {@link AbstractTripleStore}.
-     */
-    public void removeEntailments() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
     
     /**
      * Compute closure as configured. If {@link ClosureEnum#None} was selected
@@ -593,79 +540,9 @@ public class DataLoader {
         case Incremental:
         case Batch: {
 
-            /*
-             * closes the temporary store against the database, writing
-             * entailments into the temporary store.
-             */
+            assert buffer != null;
             
-            TempTripleStore tempStore = this.tempStoreRef.get();
-            
-            if(tempStore==null) {
-                
-                throw new RuntimeException("No temporary store?");
-                
-            }
-            
-            final int nbeforeClosure = tempStore.getStatementCount();
-
-            log.info("Computing closure of the temporary store with "
-                    + nbeforeClosure + " statements");
-
-            stats = inferenceEngine.computeClosure(tempStore);
-
-            final int nafterClosure = tempStore.getStatementCount();
-
-            log.info("There are " + nafterClosure
-                    + " statements in the temporary store after closure");
-            
-            // measure time for these other operations as well.
-
-            final long begin = System.currentTimeMillis();
-            
-            /*
-             * copy statements from the temporary store to the database.
-             */
-            
-            log.info("Copying statements from the temporary store to the database");
-            
-            int ncopied = tempStore.copyStatements(database, null/*filter*/);
-            
-            // note: this is the number that are _new_ to the database.
-            log.info("Copied "+ncopied+" statements that were new to the database.");
-            
-            /*
-             * clear the temporary store (drops the indices).
-             */
-
-            log.info("Clearing the temporary store");
-            
-            tempStore.clear();
-            
-            /*
-             * If the temporary store has grown "too large" then delete it and
-             * create a new one.
-             * 
-             * Note: The backing store is a WORM (wrote once, read many).
-             * Therefore it never shrinks in size. By periodically deleting the
-             * backing store we avoid having it consume too much space on the
-             * disk.
-             */
-            
-            TemporaryStore backingStore = tempStore.getBackingStore();
-            
-            if(backingStore.getBufferStrategy().getNextOffset() > 200 * Bytes.megabyte) {
-                
-                log.info("Closing the temporary store");
-                
-                // delete the backing file.
-                tempStore.close();
-
-                // clear the soft reference.
-                tempStoreRef = null;
-                
-            }
-            
-            stats.elapsed += System.currentTimeMillis() - begin;
+            stats = ((TMStatementBuffer)buffer).assertAll();
             
             break;
             
@@ -693,28 +570,6 @@ public class DataLoader {
         }
 
         return stats;
-        
-    }
-
-    /**
-     * Closes the optional {@link TempTripleStore} and releases the
-     * {@link StatementBuffer} for GC. They will be re-created as necessary.
-     * <p>
-     * Note: Do NOT invoke this if you are concurrently loading data...
-     */
-    public void close() {
-
-        TempTripleStore t = (tempStoreRef==null?null:tempStoreRef.get());
-
-        if (t != null) {
-            
-            t.close();
-            
-        }
-        
-        tempStoreRef = null;
-        
-        bufferRef = null;
         
     }
     

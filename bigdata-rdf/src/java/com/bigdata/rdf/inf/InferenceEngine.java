@@ -134,8 +134,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME truth maintenance (check the SAIL also).
- * 
  * @todo consider support for owl:inverseFunctionalProperty. Are there any other
  *       low hanging fruit there?
  * 

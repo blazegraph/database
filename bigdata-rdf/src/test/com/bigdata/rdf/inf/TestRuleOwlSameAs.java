@@ -51,6 +51,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.OWL;
 
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -106,7 +107,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             URI X = new URIImpl("http://www.foo.org/X");
             URI Y = new URIImpl("http://www.foo.org/Y");
 
-            StatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
             buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
 
@@ -164,7 +165,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             URI X = new URIImpl("http://www.foo.org/X");
             URI Y = new URIImpl("http://www.foo.org/Y");
 
-            StatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
             buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
             buffer.add(X, A, Z);
@@ -225,7 +226,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             URI X = new URIImpl("http://www.foo.org/X");
             URI Y = new URIImpl("http://www.foo.org/Y");
 
-            StatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
             buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
             buffer.add(Z, A, X);

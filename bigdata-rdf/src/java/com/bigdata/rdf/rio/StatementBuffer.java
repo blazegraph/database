@@ -101,7 +101,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementBuffer {
+public class StatementBuffer implements IStatementBuffer {
 
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -183,9 +183,12 @@ public class StatementBuffer {
     
     boolean sorted = false;
     
-    /**
-     * The #of buffered statements.
-     */
+    public boolean isEmpty() {
+        
+        return numStmts == 0;
+        
+    }
+    
     public int size() {
         
         return numStmts;
@@ -292,6 +295,18 @@ public class StatementBuffer {
      * Resets the state of the buffer (any pending writes are discarded).
      */
     public void clear() {
+        
+        for(int i=0; i<numValues; i++) {
+            
+            values[i] = null;
+            
+        }
+
+        for(int i=0; i<numStmts; i++) {
+            
+            stmts[i] = null;
+            
+        }
         
         numURIs = numLiterals = numBNodes = numStmts = numValues = 0;
         

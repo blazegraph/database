@@ -488,7 +488,7 @@ abstract public class AbstractTestCase
         
         Properties properties = new Properties(getProperties());
         
-        properties.setProperty(BigdataRdfRepository.Options.RDFS_CLOSURE,
+        properties.setProperty(BigdataRdfRepository.Options.TRUTH_MAINTENANCE,
                 "" + true);
         
         repo.initialize( properties );
