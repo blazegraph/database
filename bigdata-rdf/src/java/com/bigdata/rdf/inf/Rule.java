@@ -215,6 +215,8 @@ abstract public class Rule {
      */
     public static interface IConstraint {
         
+        public final static long NULL = IRawTripleStore.NULL;
+        
         public boolean accept(State s);
         
     }

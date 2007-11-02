@@ -73,13 +73,9 @@ public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
                 },
                 new IConstraint[]{
                     /*
-                     * Reject bindings where x == y.
+                     * Reject (y sameAs z) as the head.
                      */
-                    new NE(var("x"),var("y")),
-                    /*
-                     * reject bindings that would conclude y owl:sameAs z.
-                     */
-                    new NEConstant(var("a"),inf.owlSameAs.id)
+                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),inf.owlSameAs)
                 }
         );
        

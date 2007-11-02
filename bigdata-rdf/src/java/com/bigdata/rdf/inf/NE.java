@@ -34,12 +34,12 @@ public class NE implements IConstraint {
         // get binding for "x".
         long x = s.get(this.x);
        
-        if(x==RuleOwlSameAs2.NULL) return true; // not yet bound.
+        if(x==NULL) return true; // not yet bound.
 
         // get binding for "y".
         long y = s.get(this.y);
     
-        if(y==RuleOwlSameAs2.NULL) return true; // not yet bound.
+        if(y==NULL) return true; // not yet bound.
     
         return x != y; 
 
