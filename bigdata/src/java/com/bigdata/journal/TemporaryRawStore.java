@@ -186,7 +186,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
     protected void finalize() throws Throwable {
         
         try {
-            close();
+            if(open) close();
         } catch (Throwable t) {
             t.printStackTrace(System.err);
         }

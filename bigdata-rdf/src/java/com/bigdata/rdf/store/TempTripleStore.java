@@ -73,14 +73,14 @@ import com.bigdata.rdf.spo.JustificationSerializer;
  */
 public class TempTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
-    private final BTree ndx_termId;
-    private final BTree ndx_idTerm;
+    private BTree ndx_termId;
+    private BTree ndx_idTerm;
 
-    private final BTree ndx_spo;
-    private final BTree ndx_pos;
-    private final BTree ndx_osp;
+    private BTree ndx_spo;
+    private BTree ndx_pos;
+    private BTree ndx_osp;
 
-    private final BTree ndx_just;
+    private BTree ndx_just;
     
     final private TemporaryStore store;
     
@@ -141,14 +141,37 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     
     final public void clear() {
         
-        ndx_termId.removeAll();
-        ndx_idTerm.removeAll();
-
-        ndx_spo.removeAll();
-        ndx_pos.removeAll();
-        ndx_osp.removeAll();
+        /*
+         * FIXME probable problem with removeAll failing to clear the hard
+         * reference cache in BTree.  if fixed, then also make the indices
+         * final.
+         */
         
-        ndx_just.removeAll();
+        if(false) {
+            
+            ndx_termId.removeAll();
+            ndx_idTerm.removeAll();
+    
+            ndx_spo.removeAll();
+            ndx_pos.removeAll();
+            ndx_osp.removeAll();
+            
+            ndx_just.removeAll();
+            
+        } else {        
+        
+            store.dropIndex(name_idTerm); ndx_termId = null;
+            store.dropIndex(name_termId); ndx_idTerm = null;
+            
+            store.dropIndex(name_spo); ndx_spo = null;
+            store.dropIndex(name_pos); ndx_pos = null;
+            store.dropIndex(name_osp); ndx_osp = null;
+            
+            store.dropIndex(name_just); ndx_just = null;
+            
+            createIndices();
+            
+        }
         
     }
     
@@ -185,6 +208,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
          * store is not as concurrency savvy).
          */
         store = new TemporaryStore();
+
+        createIndices();
+        
+    }
+
+    private void createIndices() {
         
         ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
                 BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
@@ -211,7 +240,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                                     JustificationSerializer.INSTANCE));
 
     }
-
+    
     public void usage(){
         
         System.err.println("file="+store.getBufferStrategy().getFile());

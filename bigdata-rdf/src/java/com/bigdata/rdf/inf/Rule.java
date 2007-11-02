@@ -1484,8 +1484,8 @@ abstract public class Rule {
                             + (inferenceCount)
                             + " inferences"
                             + ", entailmentsPerSec="
-                            + ((long) (((double) inferenceCount)
-                                    / ((double) elapsed) * 1000d)));
+                            + (elapsed == 0 ? "N/A" : ""
+                            + ((long) (inferenceCount * 1000d) / elapsed)));
 
         }
 

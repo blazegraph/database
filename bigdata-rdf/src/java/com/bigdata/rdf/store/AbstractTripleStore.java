@@ -1651,6 +1651,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if( numStmts == 0 ) return 0;
 
         return addStatements( new SPOArrayIterator(stmts,numStmts), null /*filter*/);
+
     }
     
     public int addStatements(SPO[] stmts, int numStmts, ISPOFilter filter ) {
