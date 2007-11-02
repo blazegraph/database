@@ -1663,8 +1663,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @return The #of statements inserted into the main store (the count only
      *         reports those statements that were not already in the main
      *         store).
-     * 
-     * @todo write tests.
      */
     public int copyStatements(AbstractTripleStore dst, ISPOFilter filter) {
 

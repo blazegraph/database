@@ -99,14 +99,16 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TMStatementBuffer;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.StatementWithType;
+import com.bigdata.rdf.store.TMStatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 
 /**
@@ -224,7 +226,7 @@ public class BigdataRdfRepository implements RdfRepository {
      * Used to collect statements being retracted IFF truth maintenance is
      * enabled.
      */
-    private IStatementBuffer retractBuffer;
+    private TMStatementBuffer retractBuffer;
     
     /**
      * When true, a SAIL "transaction" is running.
@@ -470,13 +472,22 @@ public class BigdataRdfRepository implements RdfRepository {
 
         assertTransactionStarted();
 
+        // flush any pending retractions first!
+        
+        if(retractBuffer!=null && !retractBuffer.isEmpty()) {
+            
+            retractBuffer.doClosure();
+            
+        }
+
         s = (Resource) valueFactory.toNativeValue(s);
 
         p = (URI) valueFactory.toNativeValue(p);
 
         o = (Value) valueFactory.toNativeValue(o);
         
-        // buffer the write (handles overflow).
+        // buffer the assertion.
+        
         assertBuffer.add(s, p, o);
         
     }
@@ -582,55 +593,59 @@ public class BigdataRdfRepository implements RdfRepository {
         
         assertTransactionStarted();
         
-        // flush any pending writes first!
-        flushStatementBuffers();
-
-        /*
-         * Note: When truth maintenance is enabled this MUST perform truth
-         * maintenance rather than simply removing the explicit statements
-         * matched by the triple pattern from the database. What we do is
-         * collect up all explicit statements in the [retractBuffer] and then
-         * handle TM when the buffers are flushed (no later than the commit).
-         * 
-         * @todo there is a possible optimization here for removal where we do
-         * not require the materialization of the Sesame Statement and Value
-         * objects but work directly with the internal data model.
-         */
+        // flush any pending assertions first!
         
+        assertBuffer.flush();
+        
+        if(getTruthMaintenance()) {
+        
+            // do truth maintenance.
+            
+            ((TMStatementBuffer)assertBuffer).doClosure();
+            
+        }
+
+        // #of explicit statements removed.
         final int n;
 
         if (getTruthMaintenance()) {
 
-            StatementIterator itr = getStatements(s, p, o);
+            /*
+             * Since we are doing truth maintenance we need to copy the matching
+             * "explicit" statements into a temporary store rather than deleting
+             * them directly. This uses the internal API to copy the statements
+             * to the temporary store without materializing them as Sesame
+             * Statement objects.
+             * 
+             * @todo add an ISPOFilter parameter to IAccessPath#iterator() so
+             * that we can send the filter to the database rather than filtering
+             * on the client.
+             */
+            
+            // obtain a chunked iterator using the triple pattern.
+            ISPOIterator itr = database.getAccessPath(s,p,o).iterator();
+            
+            // copy explicit statements to the temporary store.
+            n = retractBuffer.getStatementStore().addStatements(itr, new ISPOFilter() {
 
-            int i = 0;
+                public boolean isMatch(SPO spo) {
+               
+                    // only copy explicit statements.
 
-            while (itr.hasNext()) {
-
-                StatementWithType stmt = (StatementWithType) itr.next();
-
-                /*
-                 * Note: you can only retract explicit statements.
-                 */
-
-                if(stmt.getStatementType()==StatementEnum.Explicit) {
-
-                    // buffer the statement to be removed.
-                    
-                    retractBuffer.add(s, p, o);
-                    
-                    i++;
+                    return spo.type==StatementEnum.Explicit;
                     
                 }
                 
-            }
-
-            // #of explicit statements to be retracted.
-            
-            n = i;
+            });
 
         } else {
 
+            /*
+             * Since we are not doing truth maintenance, just remove the
+             * statements from the database (synchronous, batch api, not
+             * buffered).
+             */
+            
             n = database.removeStatements(s, p, o);
 
         }
@@ -699,22 +714,23 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     /**
-     * Flush any pending writes to the database using efficient batch
-     * operations.
+     * Flush any pending assertions or retractions to the database using
+     * efficient batch operations. If {@link #getTruthMaintenance()} returns
+     * <code>true</code> this method will also handle truth maintenance.
      * <p>
      * Note: This tests whether or not a transaction has been started. It MUST
      * be invoked within any method that will read on the database to ensure
      * that any pending writes have been flushed (otherwise the read operation
-     * will not be able to see the pending writes).
-     * <p>
-     * Note: When {@link #getTruthMaintenance()} returns <code>true</code>
-     * this method will handle truth maintenance.
+     * will not be able to see the pending writes). However, methods that assert
+     * or retract statements MUST only flush the buffer on which they will NOT
+     * write.  E.g., if you are going to retract statements, then first flush
+     * the assertions buffer and visa versa.
      */
     protected void flushStatementBuffers() {
 
         if (transactionStarted) {
 
-            if (assertBuffer != null && assertBuffer.size() > 0) {
+            if (assertBuffer != null && !assertBuffer.isEmpty()) {
 
                 assertBuffer.flush();
                 
@@ -728,16 +744,10 @@ public class BigdataRdfRepository implements RdfRepository {
 
             }
 
-            if (retractBuffer != null && retractBuffer.size() > 0) {
+            if (retractBuffer != null && !retractBuffer.isEmpty()) {
 
-                retractBuffer.flush();
-
-                if(getTruthMaintenance()) {
-
-                    ((TMStatementBuffer)retractBuffer).doClosure();
-                    
-                }
-
+                retractBuffer.doClosure();
+                
                 m_stmtRemoved = true;
 
             }
