@@ -68,7 +68,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.sesame.sail.StatementIterator;
 import org.openrdf.vocabulary.OWL;
 import org.openrdf.vocabulary.RDF;
@@ -686,6 +685,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
+        /**
+         * Note: Returns instances of {@link StatementWithType}.
+         */
         public Statement next() {
 
             SPO spo = src.next();
@@ -694,10 +696,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              * resolve the term identifiers to the terms.
              */
             
-            return new StatementImpl( //
+            return new StatementWithType( //
                     (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.s)),//
                     (URI) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.p)), //
-                    (Value) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.o))
+                    (Value) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.o)),
+                    spo.type
                     );
             
         }
