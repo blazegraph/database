@@ -28,7 +28,7 @@ public class NEConstant implements IConstraint {
         // get binding for the variable.
         long var = s.get(this.var);
     
-        if(var==RuleOwlSameAs2.NULL) return true; // not yet bound.
+        if(var==NULL) return true; // not yet bound.
     
         return var != constant; 
 
