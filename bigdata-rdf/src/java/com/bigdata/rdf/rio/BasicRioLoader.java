@@ -59,7 +59,6 @@ import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.sun.swing.internal.plaf.basic.resources.basic;
 
 /**
  * Parses data but does not load it into the indices.
@@ -99,8 +98,7 @@ public class BasicRioLoader implements IRioLoader {
     
     final public long getInsertRate() {
         
-        return (long) 
-            ( ((double)stmtsAdded) / ((double)insertTime) * 1000d );
+        return (long) ((stmtsAdded * 1000d) / (double) insertTime);
         
     }
 
@@ -233,10 +231,9 @@ public class BasicRioLoader implements IRioLoader {
             // Parse the data.
             parser.parse(reader, baseURI);
 
-            insertTime += System.currentTimeMillis() - insertStart;
+            insertTime = System.currentTimeMillis() - insertStart;
 
-            log.info("parse complete: elapsed="
-                    + (System.currentTimeMillis() - insertStart)
+            log.info("parse complete: elapsed=" + insertTime
                     + "ms, toldTriples=" + stmtsAdded + ", tps="
                     + getInsertRate());
             
