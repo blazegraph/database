@@ -50,6 +50,8 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 /**
+ * The axioms for RDF Schema.
+ * 
  * @author personickm
  */
 public class RdfsAxioms extends BaseAxioms {

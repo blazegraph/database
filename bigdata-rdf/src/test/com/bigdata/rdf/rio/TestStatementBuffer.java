@@ -98,11 +98,9 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             StatementBuffer buffer = new StatementBuffer(store,capacity);
             
             assertEquals(store,buffer.getDatabase());
-            assertFalse(buffer.distinct);
+            assertTrue(buffer.distinct);
             assertEquals(capacity,buffer.capacity);
             assertEquals(capacity*IRawTripleStore.N,buffer.values.length);
-//            assertEquals(capacity,buffer.literals.length);
-//            assertEquals(capacity,buffer.bnodes.length);
             assertEquals(capacity,buffer.stmts.length);
             assertEquals(0,buffer.numURIs);
             assertEquals(0,buffer.numLiterals);
@@ -274,8 +272,11 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
     }
     
     /**
-     * Test with the <code>distinct</code> terms feature is enabled to uniquify
-     * the terms in the buffer.
+     * Test with the <code>distinct</code> terms feature is enabled to
+     * uniquify the terms in the buffer.
+     * 
+     * FIXME update this test to reflect the recent changes in the
+     * {@link StatementBuffer}.
      */
     public void test_handleStatement_distinct() {
         

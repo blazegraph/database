@@ -44,19 +44,27 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 /**
- * rdfs5:
+ * rdfs5: this variant uses a nested subquery and may be safely used during
+ * truth maintenance.
  * 
  * <pre>
- *       triple(?u,rdfs:subPropertyOf,?x) :-
- *          triple(?u,rdfs:subPropertyOf,?v),
- *          triple(?v,rdfs:subPropertyOf,?x). 
+ *        triple(?u,rdfs:subPropertyOf,?x) :-
+ *           triple(?u,rdfs:subPropertyOf,?v),
+ *           triple(?v,rdfs:subPropertyOf,?x). 
  * </pre>
+ * 
+ * @see RuleRdfs05_SelfJoin
  */
-public class RuleRdfs05 extends AbstractRuleRdfs_5_11 {
+public class RuleRdfs05 extends AbstractRuleNestedSubquery {
 
     public RuleRdfs05(InferenceEngine inf) {
 
-        super(inf.database, inf.rdfsSubPropertyOf );
+    super( inf.database, //
+            new Triple(var("u"), inf.rdfsSubPropertyOf, var("x")), //
+            new Pred[] { //
+                new Triple(var("u"), inf.rdfsSubPropertyOf, var("v")),//
+                new Triple(var("v"), inf.rdfsSubPropertyOf, var("x")) //
+            });
 
     }
     

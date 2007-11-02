@@ -44,27 +44,21 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 /**
- * rdfs11: this variant uses a nested subquery and may be safely used during
- * truth maintenance.
+ * rdfs5: this variant assumes that it is reading from a single source (the
+ * database) and does an in-memory self-join - it is NOT safe for use in truth
+ * maintenance since it will fail to read from the focusStore.
  * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?x) :-
- *          triple(?u,rdfs:subClassOf,?v),
- *          triple(?v,rdfs:subClassOf,?x). 
+ *        triple(?u,rdfs:subPropertyOf,?x) :-
+ *           triple(?u,rdfs:subPropertyOf,?v),
+ *           triple(?v,rdfs:subPropertyOf,?x). 
  * </pre>
- * 
- * @see RuleRdfs11_SelfJoin
  */
-public class RuleRdfs11 extends AbstractRuleNestedSubquery {
+public class RuleRdfs05_SelfJoin extends AbstractRuleRdfs_5_11 {
 
-    public RuleRdfs11(InferenceEngine inf) {
+    public RuleRdfs05_SelfJoin(InferenceEngine inf) {
 
-        super( inf.database, //
-                new Triple(var("u"), inf.rdfsSubClassOf, var("x")), //
-                new Pred[] { //
-                    new Triple(var("u"), inf.rdfsSubClassOf, var("v")),//
-                    new Triple(var("v"), inf.rdfsSubClassOf, var("x")) //
-                });
+        super(inf.database, inf.rdfsSubPropertyOf );
 
     }
     
