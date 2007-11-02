@@ -90,12 +90,8 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
     public TestRDFSClosure(String name) {
         super(name);
     }
-
-    /**
-     * The RDF/XML resource that will be used by the unit tests.
-     */
-    final String resource = "data/alibaba_v41.rdf";
-    final String baseURL = "";
+    
+    private final String prefix = "/com/bigdata/rdf/inf/";
     
     /**
      * Unit test based on the test resource <code>testClosure01.nt</code>.
@@ -114,7 +110,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
         
-        assertCorrectClosure(properties,"testClosure01.nt", baseURL, RDFFormat.NTRIPLES);
+        assertCorrectClosure(properties,prefix+"testClosure01.nt", ""/*baseURL*/, RDFFormat.NTRIPLES);
         
     }
 
@@ -128,7 +124,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
         
-        assertCorrectClosure(properties,"testClosure01.nt", baseURL, RDFFormat.NTRIPLES);
+        assertCorrectClosure(properties,prefix+"testClosure01.nt", ""/*baseURL*/, RDFFormat.NTRIPLES);
         
     }
 
@@ -149,7 +145,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
-        assertCorrectClosure(properties, "alibaba_v41.rdf", baseURL,
+        assertCorrectClosure(properties, "data/alibaba_v41.rdf", ""/*baseURL*/,
                 RDFFormat.RDFXML);
         
     }
@@ -164,7 +160,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 //        properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Full.toString());
         properties.setProperty(Options.FORWARD_CLOSURE, ForwardClosureEnum.Fast.toString());
 
-        assertCorrectClosure(properties, "alibaba_v41.rdf", baseURL,
+        assertCorrectClosure(properties, "data/alibaba_v41.rdf", ""/*baseURL*/,
                 RDFFormat.RDFXML);
         
     }
@@ -208,11 +204,10 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
             
             DataLoader dataLoader = new DataLoader(properties,store);
             
-            dataLoader.loadData("/com/bigdata/rdf/inf/" + resource, baseURL,
-                    format);
+            dataLoader.loadData(resource, baseURL, format);
 
             /*
-             * Automatically enabled for dumping small stores. 
+             * Automatically enabled for dumping small stores.
              */
             final boolean dump = store.getStatementCount() < 200;
             
