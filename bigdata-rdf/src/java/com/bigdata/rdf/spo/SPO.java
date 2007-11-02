@@ -145,14 +145,6 @@ public class SPO {
         
     }
     
-//    /**
-//     * The #of times this SPO is encountered in an {@link SPOBuffer}.
-//     * 
-//     * @todo drop this field if making {@link SPO}s distinct in the
-//     *       {@link SPOBuffer} does not prove cost effective.
-//     */
-//    int count = 0;
-    
 //    private int hashCode = 0;
 //    
 //    /**
@@ -160,8 +152,6 @@ public class SPO {
 //     *       the individual components of the triple (each component uses the
 //     *       same hash code algorithm as {@link Long#hashCode()}).
 //     */
-    
-//    Note: No very good - distinct based on hash is slower (2x).
 //    public int hashCode() {
 //        
 //        if(hashCode==0) {
@@ -173,19 +163,6 @@ public class SPO {
 //        
 //        return hashCode;
 //        
-//    }
-
-    // Note: No good - distinct based on hash is slower (>2x).
-//    public int hashCode() {
-//        if(hashCode==0) {
-//        hashCode = 
-//            (int) ( ((s ^ (s >>> 32)) & 0xFF0000)
-//                  | ((p ^ (p >>> 32)) & 0xFF0000)
-//                  | ((o ^ (o >>> 32)) & 0xFF0000)
-//                  )
-//            ;
-//        }
-//        return hashCode;
 //    }
     
     /**

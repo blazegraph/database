@@ -55,12 +55,14 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AccessPathFusedView;
+import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
@@ -81,7 +83,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A rule always has the form:
  * 
  * <pre>
- *                              pred :- pred*.
+ *                                 pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -116,71 +118,30 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                               triple(?v,rdf:type,?x) :-
- *                                  triple(?u,rdfs:subClassOf,?x),
- *                                  triple(?v,rdf:type,?u). 
+ *                                  triple(?v,rdf:type,?x) :-
+ *                                     triple(?u,rdfs:subClassOf,?x),
+ *                                     triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *                               triple(?u,rdfs:subClassOf,?x) :-
- *                                  triple(?u,rdfs:subClassOf,?v),
- *                                  triple(?v,rdf:subClassOf,?x). 
+ *                                  triple(?u,rdfs:subClassOf,?x) :-
+ *                                     triple(?u,rdfs:subClassOf,?v),
+ *                                     triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Provide incremental closure of data sets are they are loaded.
- * <p>
- * The {@link Rule} class needs to be modified to accept a "new" (statements
- * being loaded or removed from the database) and "db" (either the database
- * (during TM for statement removal) or the union of the new and the database
- * (when adding statements)) parameter and to automatically appy() the rule N
- * times, where N is the #of terms in the tail. In each pass, tail[i] is
- * designated as reading from the "new" data and the other terms in the tail
- * read from the "old" data. This can be done by a variant of apply(). The
- * results are read as a union over the passes, e.g., as an {@link ISPOIterator}.
- * On each pass, the rule should do a rangeCount and execute the individual
- * terms as subqueries where the most selective subquery is run first.
- * <p>
- * 
  * FIXME truth maintenance (check the SAIL also).
  * 
- * FIXME owl:sameAs by backward chaining on query.
+ * @todo consider support for owl:inverseFunctionalProperty. Are there any other
+ *       low hanging fruit there?
  * 
- * <pre>
- *    Here are the axioms:
- *    
- *    owl:equivP rdfs:subPropertyOf rdfs:subPropertyOf
- *    
- *    owl:equivC rdfs:subPropertyOf rdfs:subClassOf
- *    
- *    
- *    Here are the rules:
- *    
- *    eqp: aaa owl:equivP bbb -&gt; bbb owl:equivP aaa
- *    
- *    eqc: xxx owl:equivC yyy -&gt; yyy owl:equivC xxx
- *    
- *    same1: xxx owl:sameAs yyy -&gt; yyy owl:sameAs xxx
- *    
- *    same2: xxx owl:sameAs yyy + xxx aaa zzz -&gt; yyy aaa zzz
- *    
- *    same3: xxx owl:sameas yyy + zzz aaa zzz -&gt; zzz aaa yyy
- *    
- *    Filter out xxx owl:sameAs xxx for same2, same3.
- *    
- *    Best guess for &quot;fast&quot; integration:
- *  
- *  eqp: run to completion before step 2
- *  
- *  eqc: run to completion before step 7
- *  
- *  fix point the sameAs rules together at the very end.
- *  
- * </pre>
+ * @todo compare performance for backward and forward chaining for owl:sameAs
+ * 
+ * @todo update the javadoc on this class.
  * 
  * @todo Improve write efficiency for the proofs - they are slowing things way
  *       down. Note that using magic sets or a backward chainer will let us
@@ -218,49 +179,35 @@ public class InferenceEngine extends RDFSHelper {
     public static final long NULL = IRawTripleStore.NULL;
 
     /**
-     * The capacity of the {@link SPOBuffer}.
-     * <p>
-     * Results on a 45k triple data set:
-     * <pre>
-     * 1k    - Computed closure in 4469ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=17966
-     * 10k   - Computed closure in 3250ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=24704
-     * 50k   - Computed closure in 3187ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=25193
-     * 100k  - Computed closure in 3359ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23903
-     * 1000k - Computed closure in 3954ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=20306
-     * </pre>
+     * The capacity of the {@link SPOBuffer} used when computing entailments.
      * 
-     * Note that the actual performance will depend on the sustained behavior
-     * of the JVM, including tuning, and the characteristics of the specific
-     * ontology, especially how it influences the #of entailments generated
-     * by each rule.  A larger value will be better for sustained closure
-     * operations.
+     * @see Options#BUFFER_CAPACITY
      */
-    final int BUFFER_SIZE = 200 * Bytes.kilobyte32;
+    private final int bufferCapacity;
     
     /**
      * Note: making statements distinct in the {@link SPOBuffer} appears to slow
-     * things down slightly:
+     * things down. This makes sense for two reasons. First, the big win with
+     * the {@link StatementBuffer} was to make the terms distinct. The extra
+     * effort to make the statements also distinct was not rewarded.
+     * Set-at-a-time processing of the rules tends not to reproduce the same
+     * entailment from the same pass of a given rule, so there is little upside
+     * to be gained.
      * 
      * <pre>
-     *  
+     *     
      *  fast: distinct := false;
      *  Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
-     *  
+     *     
      *  fast: distinct := true;
      *  Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
-     *  
+     *     
      *  full: distinct := false;
      *  Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
-     *  
+     *     
      *  full: distinct := true
      *  Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
      * </pre>
-     * 
-     * FIXME The numbers above were based on the default
-     * {@link Object#hashCode()}, which is clearly wrong for this application.
-     * I tried to uncomment {@link SPO#hashCode()}, but it slowed things down
-     * by 2x. Research the correct way to compute the hash code of three longs
-     * and then try this out again!
      */
     final boolean distinct = false;
 
@@ -307,6 +254,11 @@ public class InferenceEngine extends RDFSHelper {
     RuleRdfs11 rdfs11;
     RuleRdfs12 rdfs12;
     RuleRdfs13 rdfs13;
+    RuleOwlEquivalentClass ruleOwlEquivalentClass;
+    RuleOwlEquivalentProperty ruleOwlEquivalentProperty;
+    RuleOwlSameAs1 ruleOwlSameAs1;
+    RuleOwlSameAs2 ruleOwlSameAs2;
+    RuleOwlSameAs3 ruleOwlSameAs3;
 
     /**
      * A filter for keeping certain entailments out of the database. It is
@@ -339,11 +291,7 @@ public class InferenceEngine extends RDFSHelper {
     /**
      * Options for the {@link InferenceEngine}.
      * 
-     * @todo Add options:
-     *       <p>
-     *       The {@link SPOBuffer} capacity.
-     *       <p>
-     *       The {@link InferenceEngine#readService} capacity?
+     * @todo {@link InferenceEngine#readService} capacity?
      *       
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -353,8 +301,6 @@ public class InferenceEngine extends RDFSHelper {
         /**
          * Boolean option - when true the proofs for entailments will be generated and stored in
          * the database.  This option is required by some truth maintenance strategies.
-         * 
-         * @todo one proof, all proofs, no proofs?
          */
         public static final String JUSTIFY = "justify"; 
         
@@ -370,26 +316,97 @@ public class InferenceEngine extends RDFSHelper {
         public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
         
         /**
-         * When true <code>(?x rdf:type rdfs:Resource)</code> entailments are
-         * computed AND stored in the database. When false, rules that produce
-         * those entailments are turned off such that they are neither computer
-         * NOR stored and the backward chainer will generate the entailments at
-         * query time. Default is <code>false</code>.
+         * When <code>true</code> <code>(?x rdf:type rdfs:Resource)</code>
+         * entailments are computed AND stored in the database. When
+         * <code>false</code>, rules that produce those entailments are
+         * turned off such that they are neither computed NOR stored and a
+         * backward chainer or magic sets technique must be used to generate the
+         * entailments at query time. Default is <code>false</code>.
+         * 
+         * @see BackchainTypeResourceIterator
          */
         public static final String FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE = "forwardChainRdfTypeRdfsResource";
 
         public static final String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
 
         /**
-         * @todo document and implement. if we only support this by backward
-         *       chaining then get rid of this option.
+         * When <code>true</code> the entailments for <code>owl:sameAs</code>
+         * are computed by forward chaining and stored in the database. When
+         * <code>false</code>, rules that produce those entailments are
+         * turned off such that they are neither computed NOR stored and a
+         * backward chainer or magic sets technique must be used to generate the
+         * entailments at query time. Default is <code>true</code>.
          * 
+         * @todo implement backward chaining for owl:sameAs and compare
+         *       performance.
+         *       
          * @todo option for destructive merging for owl:sameAs (collapes term
          *       identifers together)?
          */
         public static final String FORWARD_CHAIN_OWL_SAMEAS= "forwardChainOwlSameAs";
 
         public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS = "true";
+
+        /**
+         * When <code>true</code> the entailments for
+         * <code>owl:equivilantProperty</code> are computed by forward
+         * chaining and stored in the database. When <code>false</code>,
+         * rules that produce those entailments are turned off such that they
+         * are neither computed NOR stored and a backward chainer or magic sets
+         * technique must be used to generate the entailments at query time.
+         * Default is <code>true</code>.
+         * 
+         * @todo implement backward chaining for owl:equivalentProperty and
+         *       compare performance.
+         */
+        public static final String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "forwardChainOwlEquivalentProperty";
+
+        public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
+
+        /**
+         * When <code>true</code> the entailments for
+         * <code>owl:equivilantClass</code> are computed by forward chaining
+         * and stored in the database. When <code>false</code>, rules that
+         * produce those entailments are turned off such that they are neither
+         * computed NOR stored and a backward chainer or magic sets technique
+         * must be used to generate the entailments at query time. Default is
+         * <code>true</code>.
+         * 
+         * @todo implement backward chaining for owl:equivalentClass and
+         *       compare performance.
+         */
+        public static final String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "forwardChainOwlEquivalentClass";
+
+        public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
+
+        /**
+         * <p>
+         * Sets the capacity of the {@link SPOBuffer} used to buffer entailments
+         * for efficient ordered writes using the batch API (default 200k).
+         * </p>
+         * <p>
+         * Some results for comparison on a 45k triple data set:
+         * </p>
+         * 
+         * <pre>
+         *  1k    - Computed closure in 4469ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=17966
+         *  10k   - Computed closure in 3250ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=24704
+         *  50k   - Computed closure in 3187ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=25193
+         *  100k  - Computed closure in 3359ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23903
+         *  1000k - Computed closure in 3954ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=20306
+         * </pre>
+         * 
+         * <p>
+         * Note that the actual performance will depend on the sustained
+         * behavior of the JVM, including online performance tuning, parallism
+         * in the implementation, and the characteristics of the specific
+         * ontology, especially how it influences the #of entailments generated
+         * by each rule.
+         * </p>
+         */
+        public static final String BUFFER_CAPACITY = "bufferCapacity";
+
+        public static final String DEFAULT_BUFFER_CAPACITY = ""+200*Bytes.kilobyte32;
         
     }
 
@@ -432,6 +449,32 @@ public class InferenceEngine extends RDFSHelper {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
+        this.forwardChainOwlSameAs = Boolean.parseBoolean(properties
+                .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS,
+                        Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS));
+
+        log.info(Options.FORWARD_CHAIN_OWL_SAMEAS + "="
+                + forwardChainOwlSameAs);
+
+        this.forwardChainOwlEquivalentProperty = Boolean.parseBoolean(properties
+                .getProperty(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY,
+                        Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY));
+
+        log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY + "="
+                + forwardChainOwlEquivalentProperty);
+
+        this.forwardChainOwlEquivalentClass = Boolean.parseBoolean(properties
+                .getProperty(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS,
+                        Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS));
+
+        log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS + "="
+                + forwardChainOwlEquivalentClass);
+
+        bufferCapacity = Integer.parseInt(properties.getProperty(
+                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
+        
+        log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
+
         setupRules();
 
 //        // writes out the base rule model (does not include the "fast" rules).
@@ -454,6 +497,21 @@ public class InferenceEngine extends RDFSHelper {
     final protected boolean forwardChainRdfTypeRdfsResource;
 
     /**
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_SAMEAS}.
+     */
+    final protected boolean forwardChainOwlSameAs;
+
+    /**
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY}.
+     */
+    final protected boolean forwardChainOwlEquivalentProperty;
+
+    /**
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_CLASS}.
+     */
+    final protected boolean forwardChainOwlEquivalentClass;
+
+    /**
      * Return true iff the {@link InferenceEngine} is configured to forward
      * chain and store entailments of the form (x rdf:type rdfs:Resource). When
      * this returns false, those entailments are not computed and are not
@@ -469,6 +527,11 @@ public class InferenceEngine extends RDFSHelper {
     
     /**
      * Sets up the basic rule model for the inference engine.
+     * 
+     * @todo setup both variants of rdfs5 and rdfs11 and then use the self-join
+     *       variant when we are closing the database against itself and the
+     *       nested subquery variant when we are doing truth maintenance (or for
+     *       extremely large data sets).
      */
     private void setupRules() {
 
@@ -503,7 +566,17 @@ public class InferenceEngine extends RDFSHelper {
         rdfs12 = new RuleRdfs12(this);
 
         rdfs13 = new RuleRdfs13(this);
+
+        ruleOwlEquivalentClass = new RuleOwlEquivalentClass(this);
+
+        ruleOwlEquivalentProperty = new RuleOwlEquivalentProperty(this);
         
+        ruleOwlSameAs1 = new RuleOwlSameAs1(this);
+
+        ruleOwlSameAs2 = new RuleOwlSameAs2(this);
+        
+        ruleOwlSameAs3 = new RuleOwlSameAs3(this);
+
     }
 
     /**
@@ -577,10 +650,28 @@ public class InferenceEngine extends RDFSHelper {
          * @todo make sure that they are back-chained or add them in here.
          */
 
-        /*
-         * @todo owl same as if forward closure used for that.
-         */
-        
+        if(forwardChainOwlSameAs) {
+            
+            rules.add(ruleOwlSameAs1);
+
+            rules.add(ruleOwlSameAs2);
+            
+            rules.add(ruleOwlSameAs3);
+            
+        }
+
+        if(forwardChainOwlEquivalentProperty) {
+            
+            rules.add(ruleOwlEquivalentProperty);
+            
+        }
+
+        if(forwardChainOwlEquivalentClass) {
+            
+            rules.add(ruleOwlEquivalentClass);
+            
+        }
+
         return rules.toArray(new Rule[rules.size()]);
 
     }
@@ -621,6 +712,13 @@ public class InferenceEngine extends RDFSHelper {
     /**
      * Compute the forward closure of a focusStore against the database using
      * the algorithm selected by {@link Options#FORWARD_CLOSURE}.
+     * <p>
+     * Note: If the <i>focusStore</i> is given then the entailments will be
+     * asserted against the focusStore. Either this method or the caller MUST
+     * copy the <i>focusStore</i> onto the database using
+     * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, com.bigdata.rdf.spo.ISPOFilter)}.
+     * If you are loading data from some kind of resource, then see
+     * {@link DataLoader} which already knows how to do this.
      * 
      * @param focusStore
      *            The data set that will be closed against the database
@@ -628,11 +726,6 @@ public class InferenceEngine extends RDFSHelper {
      *            against itself.
      * 
      * @return Statistics about the operation.
-     * 
-     * FIXME If the focusStore is given then the entailments will be asserted
-     * against the focusStore. Either this method or the caller MUST copy the
-     * focusStore onto the database using
-     * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, com.bigdata.rdf.spo.ISPOFilter)}
      */
     public ClosureStats computeClosure(AbstractTripleStore focusStore) {
 
@@ -690,7 +783,7 @@ public class InferenceEngine extends RDFSHelper {
 
         // entailment buffer writes on the closureStore.
         final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                BUFFER_SIZE, distinct, isJustified());
+                bufferCapacity, distinct, isJustified());
 
         // compute the full forward closure.
         System.err.println(Rule.fixedPoint(closureStats, getRuleModel(),
@@ -737,7 +830,7 @@ public class InferenceEngine extends RDFSHelper {
         
         // Entailment buffer writes on the closureStore.
         final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                BUFFER_SIZE, distinct, isJustified());
+                bufferCapacity, distinct, isJustified());
         
         final int firstStatementCount = closureStore.getStatementCount();
 
@@ -756,6 +849,13 @@ public class InferenceEngine extends RDFSHelper {
          */ 
         RdfsAxioms.INSTANCE.addAxioms(database);
         
+        // owl:equivalentProperty
+        if (forwardChainOwlEquivalentProperty) {
+            Rule.fixedPoint(closureStats,
+                    new Rule[] { ruleOwlEquivalentProperty }, justify,
+                    focusStore, database, buffer);
+        }
+
         // 2. Compute P (the set of possible sub properties).
         final Set<Long> P = getSubProperties(focusStore,database);
 
@@ -799,6 +899,13 @@ public class InferenceEngine extends RDFSHelper {
             // dependency.
         }
 
+        // owl:equivalentClass
+        if (forwardChainOwlEquivalentClass) {
+            Rule.fixedPoint(closureStats,
+                    new Rule[] { ruleOwlEquivalentClass }, justify, focusStore,
+                    database, buffer);
+        }
+        
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
         {
             Rule r = new RuleFastClosure7(this, C);
@@ -943,6 +1050,15 @@ public class InferenceEngine extends RDFSHelper {
             closureStats.add(stats);
             System.err.println("rdfs7: " + stats);
             buffer.flush();
+        }
+        
+        // owl:sameAs
+        if(forwardChainOwlSameAs) {
+            
+            Rule.fixedPoint(closureStats, new Rule[] { ruleOwlSameAs1,
+                    ruleOwlSameAs2, ruleOwlSameAs3 }, justify, focusStore,
+                    database, buffer);            
+            
         }
         
         /*

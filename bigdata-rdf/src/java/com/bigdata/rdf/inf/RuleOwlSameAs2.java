@@ -41,31 +41,38 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
+/*
+ * Created on Nov 1, 2007
+ */
+
 package com.bigdata.rdf.inf;
 
 /**
- * rdfs11: this variant uses a nested subquery and may be safely used during
- * truth maintenance.
+ * owl:sameAs2
  * 
  * <pre>
- *       triple(?u,rdfs:subClassOf,?x) :-
- *          triple(?u,rdfs:subClassOf,?v),
- *          triple(?v,rdfs:subClassOf,?x). 
+ * (x owl:sameAs y), (x a z) -&gt; (y a z).
  * </pre>
  * 
- * @see RuleRdfs11_SelfJoin
+ * @todo x != y for same1, same2, same3.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class RuleRdfs11 extends AbstractRuleNestedSubquery {
+public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
 
-    public RuleRdfs11(InferenceEngine inf) {
+    /**
+     * @param inf
+     */
+    public RuleOwlSameAs2(InferenceEngine inf) {
 
         super( inf.database, //
-                new Triple(var("u"), inf.rdfsSubClassOf, var("x")), //
+                new Triple(var("y"), var("a"), var("z")), //
                 new Pred[] { //
-                    new Triple(var("u"), inf.rdfsSubClassOf, var("v")),//
-                    new Triple(var("v"), inf.rdfsSubClassOf, var("x")) //
+                    new Triple(var("x"), inf.owlSameAs, var("y")),//
+                    new Triple(var("x"), var("a"), var("z"))//
                 });
-
+        
     }
-    
+
 }

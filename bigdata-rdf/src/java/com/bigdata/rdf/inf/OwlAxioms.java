@@ -5,6 +5,9 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 /**
+ * The axioms for RDF Schema plus a few axioms to support owl:sameAs,
+ * owl:equivalentProperty, and owl:equivalentClass.
+ * 
  * @author personickm
  */
 public class OwlAxioms extends RdfsAxioms {

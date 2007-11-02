@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import org.openrdf.vocabulary.OWL;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
@@ -83,6 +84,10 @@ public class RDFSHelper {
     public final Id rdfsDatatype;
     public final Id rdfsMember;
     public final Id rdfsLiteral;
+    
+    public final Id owlSameAs;
+    public final Id owlEquivalentClass;
+    public final Id owlEquivalentProperty;
 
     /**
      * Resolves or defines well-known RDF values.
@@ -109,6 +114,10 @@ public class RDFSHelper {
         _Value rdfsMember = new _URI(RDFS.MEMBER);
         _Value rdfsLiteral = new _URI(RDFS.LITERAL);
         
+        _Value owlSameAs = new _URI(OWL.SAMEAS);
+        _Value owlEquivlentClass = new _URI(OWL.EQUIVALENTCLASS);
+        _Value owlEquivlentProperty = new _URI(OWL.EQUIVALENTPROPERTY);
+        
         _Value[] terms = new _Value[]{
         
                 rdfType,
@@ -122,7 +131,11 @@ public class RDFSHelper {
                 rdfsCMP,
                 rdfsDatatype,
                 rdfsMember,
-                rdfsLiteral
+                rdfsLiteral,
+                
+                owlSameAs,
+                owlEquivlentClass,
+                owlEquivlentProperty
                 
         };
         
@@ -141,6 +154,10 @@ public class RDFSHelper {
         this.rdfsMember = new Id(rdfsMember.termId);
         this.rdfsLiteral = new Id(rdfsLiteral.termId);
 
+        this.owlSameAs = new Id(owlSameAs.termId);
+        this.owlEquivalentClass = new Id(owlEquivlentClass.termId);
+        this.owlEquivalentProperty = new Id(owlEquivlentProperty.termId);
+        
     }
 
 }
