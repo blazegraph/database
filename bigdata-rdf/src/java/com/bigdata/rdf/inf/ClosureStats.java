@@ -1,5 +1,7 @@
 package com.bigdata.rdf.inf;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -29,6 +31,15 @@ public class ClosureStats {
      * The rules that were executed in order by their names.
      */
     private Map<String,RuleStats> rules = new TreeMap<String,RuleStats>();
+
+    /**
+     * The statistics on the rules.
+     */
+    public Collection<RuleStats> getRuleStats() {
+        
+        return Collections.unmodifiableCollection(rules.values());
+        
+    }
     
     /**
      * @todo thread-safe add()
