@@ -67,6 +67,8 @@ public class ClosureStats {
 
         StringBuilder sb = new StringBuilder();
         
+        // summary
+        
         sb.append("rule    \tms\t#entms\tentms/ms\n");
 
         for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
@@ -85,6 +87,15 @@ public class ClosureStats {
             
         }
 
+        // details.
+        
+        for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
+
+            sb.append(entry.getValue()+"\n");
+            
+            
+        }
+        
         return sb.toString();
         
     }

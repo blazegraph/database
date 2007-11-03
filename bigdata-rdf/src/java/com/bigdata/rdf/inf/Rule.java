@@ -511,9 +511,6 @@ abstract public class Rule {
             
             this.buffer = buffer;
             
-            // collects statistics on the rule.
-            this.stats = new RuleStats(Rule.this);
-            
             // Allocate bindings for the tail.
             this.bindings = new long[body.length*N];
 
@@ -551,6 +548,18 @@ abstract public class Rule {
             // initialize the bindings from the predicate declarations.
             resetBindings();
 
+            // collects statistics on the rule.
+            this.stats = new RuleStats(this);
+            
+        }
+
+        /**
+         * The {@link Rule} that is being executed. 
+         */
+        public Rule getRule() {
+            
+            return Rule.this;
+            
         }
         
         /**
@@ -1639,15 +1648,14 @@ abstract public class Rule {
 
             log.info("Rules: "+names);
 
-            Collection<RuleStats> ruleStats = closureStats.getRuleStats();
-            
-            for (RuleStats tmp : ruleStats) {
-                
-                log.info(tmp.toString());
-                
-            }
-            
-            
+//            Collection<RuleStats> ruleStats = closureStats.getRuleStats();
+//            
+//            for (RuleStats tmp : ruleStats) {
+//                
+//                log.info(tmp.toString());
+//                
+//            }
+                        
         }
 
         return closureStats;
