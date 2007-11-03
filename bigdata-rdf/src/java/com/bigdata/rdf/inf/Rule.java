@@ -44,6 +44,7 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -1602,6 +1603,28 @@ abstract public class Rule {
 
             final int inferenceCount = lastStatementCount - firstStatementCount;
             
+            // names of the rules that we ran.
+            final String names; 
+            {
+            
+                StringBuilder sb = new StringBuilder();
+                
+                sb.append("[");
+                
+                for(int i=0; i<rules.length; i++) {
+                    
+                    if(i>0) sb.append(",");
+
+                    sb.append(rules[i].getName());
+                    
+                }
+
+                sb.append("]");
+
+                names = sb.toString();
+                
+            }
+            
             log.info("\nComputed closure of "+rules.length+" rules in "
                             + (round+1) + " rounds and "
                             + elapsed
@@ -1614,6 +1637,17 @@ abstract public class Rule {
                             + (elapsed == 0 ? "N/A" : ""
                             + ((long) (inferenceCount * 1000d) / elapsed)));
 
+            log.info("Rules: "+names);
+
+            Collection<RuleStats> ruleStats = closureStats.getRuleStats();
+            
+            for (RuleStats tmp : ruleStats) {
+                
+                log.info(tmp.toString());
+                
+            }
+            
+            
         }
 
         return closureStats;

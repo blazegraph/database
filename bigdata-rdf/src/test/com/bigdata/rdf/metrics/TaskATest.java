@@ -264,7 +264,7 @@ public class TaskATest
         
         loadStats = dataLoader.loadData(resource, baseURL, rdfFormat);
         
-        if(true && dataLoader.getClosureEnum()==ClosureEnum.None) {
+        if(false && dataLoader.getClosureEnum()==ClosureEnum.None) {
             
             // compute the full closure of the database.
             

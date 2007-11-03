@@ -449,7 +449,7 @@ public class DataLoader {
                 log.info
                     ( e.getStatementsProcessed() + 
                       " stmts added in " + 
-                      ((double)e.getTimeElapsed()) / 1000d +
+                      (e.getTimeElapsed() / 1000d) +
                       " secs, rate= " + 
                       e.getInsertRate() 
                       );
@@ -484,6 +484,10 @@ public class DataLoader {
                 
                 /*
                  * compute the closure.
+                 * 
+                 * FIXME closure stats are not being reported out, e.g., to the DataLoader.
+                 * 
+                 * Also, batch closure logically belongs in the outer method.
                  */
                 
                 log.info("Computing closure.");
