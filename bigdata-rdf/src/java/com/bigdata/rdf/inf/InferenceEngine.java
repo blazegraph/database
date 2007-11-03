@@ -56,9 +56,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.DataLoader;

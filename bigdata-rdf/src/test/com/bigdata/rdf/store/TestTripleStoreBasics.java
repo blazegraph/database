@@ -83,7 +83,7 @@ public class TestTripleStoreBasics extends TestCase2 {
 
         // test suite for the access path api.
         suite.addTestSuite(TestAccessPath.class);
-        
+
         // somewhat dated test of sustained insert rate on synthetic data.
         suite.addTestSuite(TestInsertRate.class);
 

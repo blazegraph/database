@@ -52,7 +52,6 @@ import java.util.List;
 import java.util.Vector;
 
 import com.bigdata.rdf.inf.Rule.State;
-import com.bigdata.rdf.spo.SPOBuffer;
 
 /**
  * Statistics about what the Rule did.

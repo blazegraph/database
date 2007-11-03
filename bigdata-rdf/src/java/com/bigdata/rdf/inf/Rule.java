@@ -44,7 +44,6 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -56,9 +55,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.IAccessPath;
@@ -520,24 +517,87 @@ abstract public class Rule {
             // The evaluation order.
             this.order = computeEvaluationOrder();
             
-            if(focusStore!=null) {
+            if (focusStore != null && focusIndex > 0) {
                 
                 /*
-                 * Always evaluate the predicate that will read from the
-                 * focusStore 1st.
+                 * The rule of thumb is to always evaluate the predicate that
+                 * will read from the focusStore 1st since we presume that any
+                 * triple pattern reading on the [focusStore] will be
+                 * significantly smaller than any other triple pattern reading
+                 * on the fused view [focusStore + database].
                  * 
-                 * Note: This presumes that any predicate reading from the
-                 * [focusStore] will be more selective than any predicate
-                 * reading from the fused view [focusStore + database]. This
-                 * should be true in all except a few edge cases -- e.g., when
-                 * the database is empty.
+                 * However, there are counter examples. Loading schema and then
+                 * data into a database is one, e.g., the wordnet ontology
+                 * followed by the wordnet nouns data. Another is when the 2nd
+                 * predicate in the body is none bound - you are often better
+                 * off NOT running the all none bound predicate 1st.
+                 * 
+                 * Note: All of this logic is executed IFF the focusIndex is >
+                 * 0. When the focusIndex is 0, the focusStore is already being
+                 * read by the predicate that is first in the evaluation order.
                  */
 
-                int tmp = order[0];
-                
-                order[0] = order[focusIndex];
-                
-                order[focusIndex] = tmp;
+                /*
+                 * In this alternative, we simply refuse to order a 3-unbound
+                 * predicate to the 1st position in the evaluation order.
+                 */
+                if (true && body[focusIndex].getVariableCount() < 3) {
+
+                    /*
+                     * Swap the places of those predicates in the evaluation
+                     * order such that we will evaluate the predicate at the
+                     * focusIndex 1st.
+                     */
+
+                    int tmp = order[0];
+
+                    order[0] = order[focusIndex];
+
+                    order[focusIndex] = tmp;
+
+                } else {
+
+                    /*
+                     * In order to catch those counter examples we range count
+                     * the predicate that is already 1st in the evaluate order
+                     * against [focusStore+database] and then the predicate at
+                     * the focusIndex against the [focusStore]. We then reorder
+                     * the predicate at the focusIndex 1st iff it has a smaller
+                     * range count that the predicate that is already first in
+                     * the evaluation order.
+                     */
+                    
+                    /*
+                     * Range count for the predicate that is 1st in the
+                     * evaluation order. This will read against [focusStore +
+                     * database].
+                     */
+                    final int rangeCount1 = getAccessPath(0).rangeCount();
+
+                    /*
+                     * Range count for the predicate at the focusIndex. This
+                     * will read against [focusStore].
+                     */
+                    final int rangeCount2 = getAccessPath(focusIndex)
+                            .rangeCount();
+
+                    if (rangeCount2 < rangeCount1) {
+
+                        /*
+                         * Swap the places of those predicates in the evaluation
+                         * order such that we will evaluate the predicate at the
+                         * focusIndex 1st.
+                         */
+
+                        int tmp = order[0];
+
+                        order[0] = order[focusIndex];
+
+                        order[focusIndex] = tmp;
+
+                    }
+
+                }
                 
             }
             

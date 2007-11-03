@@ -1,9 +1,11 @@
-package com.bigdata.rdf.spo;
+package com.bigdata.rdf.inf;
+
+import java.util.Arrays;
 
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
@@ -15,7 +17,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * </p>
  * 
  * <pre>
- *        (?u ?a ?y) -&gt; (?a rdf:type rdf:Property)
+ *            (?u ?a ?y) -&gt; (?a rdf:type rdf:Property)
  * </pre>
  * 
  * <p>
@@ -23,7 +25,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * <p>
  * 
  * <pre>
- *    (0 ?a 0)
+ *        (0 ?a 0)
  * </pre>
  * 
  * <p>
@@ -34,19 +36,34 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * </p>
  * 
  * <pre>
- *    head := [?a rdf:type rdf:Property]
- *    
- *    tail := [0 ?a 0]
+ *        head := [?a rdf:type rdf:Property]
+ *        
+ *        tail := [0 ?a 0]
  * </pre>
  * 
  * <p>
- * This means we need to do an existence test on the triple pattern during TM.
- * If an element of the tail is still proven, regardless of whether it is fully
- * bound or has wildcard "0"s, then the head is still valid. This looks more or
- * less like: <strong>Find all matching the pattern. If any are explicit, then
- * that part of the tail is grounded. If none are explicit, then chase the
- * justification recursively. Only retract a justification when it can no longer
- * be grounded.</strong>
+ * In fact, the total bindings for the rule are represented as a long[] with the
+ * head occupying the 1st N positions in that array and the bindings for the
+ * tail appearing thereafter in the declared order of the predicates in the
+ * tail.
+ * </p>
+ * 
+ * <p>
+ * When a {@link StatementEnum#Explicit} statement is to be retracted from the
+ * database we need to determined whether or not there exists a <strong>grounded</strong>
+ * justification for that statement (same head). For each justification for that
+ * statement we consider the tail. If there exists either an explicit statement
+ * that satisifies the triple pattern for the tail or if there exists an
+ * inference that satisifies the triple pattern for the tail and the inference
+ * can be proven to be grounded by recursive examination of its justifications,
+ * then the head is still valid and is converted from an explicit statement into
+ * an inference.
+ * </p>
+ * <p>
+ * This looks more or less like: <strong>Find all statements matching the
+ * pattern. If any are explicit, then that part of the tail is grounded. If none
+ * are explicit, then chase the justification recursively. Only retract a
+ * justification when it can no longer be grounded.</strong>
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -57,8 +74,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * 
  * @todo write a method to chase a proof chain for a given head and determine
  *       whether it is grounded or ungrounded.
- * 
- * @todo write unit test for key (de-)serialization for the justifications.
  */
 public class Justification implements Comparable<Justification> {
 
@@ -82,19 +97,8 @@ public class Justification implements Comparable<Justification> {
      * Note: A term identifier MAY be {@link IRawTripleStore#NULL} to indicate a
      * wildcard.
      */
-    private final long[] ids;
+    final long[] ids;
     
-//    private final SPO head;
-//    private final SPO[] bindings;
-
-//    /**
-//     * Note: This is not being persisted at present. It could be saved as the
-//     * value in the justification index, but that would absorb a lot of space
-//     * and we really do not need the information for anything other than
-//     * debugging.
-//     */
-//    private final Rule rule;
-
     /**
      * Construct an entailment for an {@link StatementEnum#Inferred} statement.
      * 
@@ -130,6 +134,54 @@ public class Justification implements Comparable<Justification> {
             
         }
     
+    }
+    
+    /**
+     * Returns the head as an {@link SPO}.
+     * <p>
+     * Note: The {@link StatementEnum} associated with the head is actually
+     * unknown, but it is marked as {@link StatementEnum#Inferred} in the
+     * returned object. In order to discover the {@link StatementEnum} for the
+     * head you MUST either already know it (this is not uncommon) or you MUST
+     * read one of the statement indices.
+     * 
+     * @return
+     */
+    public SPO getHead() {
+
+        return new SPO(ids[0], ids[1], ids[2], StatementEnum.Inferred);
+        
+    }
+    
+    /**
+     * Returns the tail as an {@link SPO}[].
+     * <p>
+     * Note: The {@link StatementEnum} associated triple patterns in the tail is
+     * actually unknown, but it is marked as {@link StatementEnum#Inferred} in
+     * the returned object. In fact, since the tail consists of triple patterns
+     * and not necessarily fully bound triples, the concept of a
+     * {@link StatementEnum} is not even defined.
+     * 
+     * @return
+     */
+    public SPO[] getTail() {
+        
+        // #of triple patterns in the tail.
+        final int m = (ids.length / N) - 1;
+
+        SPO[] tail = new SPO[m];
+        
+        // for each triple pattern in the tail.
+        int j = 0;
+        for(int i=0; i<m; i++, j+=N) {
+        
+            tail[i] = new SPO(ids[j], ids[j + 1], ids[j + 2],
+                    StatementEnum.Inferred);
+            
+        }
+
+        return tail;
+        
     }
     
     /**
@@ -197,15 +249,9 @@ public class Justification implements Comparable<Justification> {
 
         ids = new long[m];
         
-        int i = 0;
-        
-        for(int j=0; j<m; j++) {
+        for(int i=0; i<m; i++) {
 
-            for(int k=0; k<N; k++) {
-              
-                ids[i] = KeyBuilder.decodeLong(key, i*8);
-                
-            }
+            ids[i] = KeyBuilder.decodeLong(key, i*8);
             
         }
         
@@ -234,14 +280,19 @@ public class Justification implements Comparable<Justification> {
         
     }
     
+    public boolean equals(Justification o) {
+        
+        // Note: ignores transient [rule].
+        
+        if(this==o) return true;
+        
+        return Arrays.equals(ids, o.ids);
+        
+    }
+    
     /**
-     * FIXME write unit tests.
-     * <P>
-     * Check for overflow of long.
-     * <p>
-     * Check when this is a longer or shorter array than the other where the two
-     * justifications have the same data in common up to the end of whichever is
-     * the shorter array.
+     * Places the justifications into an ordering that clusters them based on
+     * the entailment is being justified.
      */
     public int compareTo(Justification o) {
 
@@ -365,4 +416,51 @@ public class Justification implements Comparable<Justification> {
 
     }
 
+    /**
+     * Return true iff a grounded justification chain exists for the statement.
+     * 
+     * @param head The statement.
+     * 
+     * @return
+     */
+    public static boolean isGrounded(AbstractTripleStore db, SPO head) {
+
+        /*
+         * Examine all justifications for the statement. If any of them are
+         * grounded then the statement is still entailed by the database.
+         */
+        
+        JustificationIterator itr = new JustificationIterator(db,head);
+        
+        while(itr.hasNext()) {
+            
+            /*
+             * For each justification we consider the bindings. The first N are
+             * just the statement that was proven. The remaining bindings are
+             * M-1 triple patterns of N elements each.
+             */
+            
+            Justification jst = itr.next();
+            
+            SPO[] tail = jst.getTail();
+            
+            /*
+             * if all in tail are explicit in the statement indices, then done.
+             * 
+             * since tail is triple patterns, we have to scan those patterns for
+             * the first explicit statement matched.
+             * 
+             * if none in tail are explicit, then we can recurse. we could also
+             * scan the rest of the justifications for something that was easily
+             * proven to be explicit. it is a depth vs breadth 1st issue.
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        return false;
+        
+    }
+    
 }

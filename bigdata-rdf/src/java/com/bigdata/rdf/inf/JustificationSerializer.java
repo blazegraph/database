@@ -41,7 +41,7 @@ suggestions and support of the Cognitive Web.
 Modifications:
 
 */
-package com.bigdata.rdf.spo;
+package com.bigdata.rdf.inf;
 
 import java.io.DataInput;
 import java.io.IOException;

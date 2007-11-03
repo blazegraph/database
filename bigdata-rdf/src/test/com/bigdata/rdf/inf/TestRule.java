@@ -56,7 +56,6 @@ import com.bigdata.rdf.inf.Rule.State;
 import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 

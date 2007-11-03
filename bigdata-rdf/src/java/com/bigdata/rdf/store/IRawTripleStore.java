@@ -50,9 +50,9 @@ package com.bigdata.rdf.store;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
 

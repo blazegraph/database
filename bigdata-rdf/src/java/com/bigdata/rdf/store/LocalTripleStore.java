@@ -56,11 +56,11 @@ import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.inf.JustificationSerializer;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.rdf.spo.JustificationSerializer;
 import com.bigdata.scaleup.MasterJournal;
 
 /**

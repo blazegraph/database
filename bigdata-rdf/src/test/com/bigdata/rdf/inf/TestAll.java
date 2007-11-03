@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -83,6 +84,11 @@ public class TestAll extends TestCase {
         
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
+       
+        // @todo SPOBuffer
+
+        // test suite for writing, reading, chasing and retracting justifications.
+        suite.addTestSuite(TestJustifications.class);
         
         // test suite for rdf1.
         suite.addTestSuite( TestRuleRdf01.class );

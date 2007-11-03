@@ -96,7 +96,7 @@ public class OptimizedValueFactory implements ValueFactory {
      *         {@link _Value} with the same data. If the value is
      *         <code>null</code> then <code>null</code> is returned.
      */
-    final public Value toNativeValue( Value v ) {
+    final public _Value toNativeValue( Value v ) {
         
         if(v == null) return null;
         
@@ -132,7 +132,7 @@ public class OptimizedValueFactory implements ValueFactory {
             
         }
         
-        return v;
+        return (_Value)v;
         
     }
     

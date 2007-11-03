@@ -95,7 +95,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      */
     final public long addTerm(Value value) {
 
-        final _Value val = (_Value) value;
+        final _Value val = OptimizedValueFactory.INSTANCE.toNativeValue(value);
         
         if(val.known) {
             
