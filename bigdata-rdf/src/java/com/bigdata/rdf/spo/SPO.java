@@ -46,6 +46,7 @@ package com.bigdata.rdf.spo;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -57,6 +58,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @version $Id$
  */
 public class SPO {
+    
+    private transient static final long NULL = IRawTripleStore.NULL;
     
     /**
      * @see RdfKeyBuilder#CODE_STMT
@@ -259,6 +262,20 @@ public class SPO {
         
         return store.toString(s,p,o)+(type==null?"":" : "+type);
         
+    }
+
+    /**
+     * Return true iff all position (s,p,o) are non-{@link #NULL}.
+     * <p>
+     * Note: {@link SPO} are sometimes used to represent triple patterns. E.g.,
+     * in the tail of a {@link Justification}. This method will return
+     * <code>true</code> if the "triple pattern" is fully bound and
+     * <code>false</code> if there are any unbound positions.
+     */
+    public boolean isFullyBound() {
+    
+        return s != NULL && p != NULL && o != NULL;
+
     }
     
 }

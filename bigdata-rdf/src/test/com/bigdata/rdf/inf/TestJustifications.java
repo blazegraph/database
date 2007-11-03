@@ -149,6 +149,13 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
             
             Justification jst = new Justification(r, head, bindings);
 
+            assertEquals(head,jst.getHead());
+
+            assertEquals(
+                    new SPO[]{new SPO(U,A,Y,StatementEnum.Inferred)},
+                    jst.getTail()
+                    );
+            
             SPOBuffer buf = new SPOBuffer(store, null/* filter */,
                     100/* capacity */, true/* justified */);
 
@@ -208,6 +215,13 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                 assertEquals(jst,tmp);
                 
             }
+            
+            /*
+             * The inference (A rdf:type rdf:property) is grounded by the
+             * explicit statement (U A Y).
+             */
+            
+            assertTrue(Justification.isGrounded(store, head));
             
             /*
              * remove the justified statements.
