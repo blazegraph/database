@@ -48,9 +48,29 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Vector;
+
+import com.bigdata.rdf.inf.Rule.State;
+import com.bigdata.rdf.spo.SPOBuffer;
 
 /**
  * Statistics about what the Rule did.
+ * 
+ * @todo it would be nice to report the #of new entailments and not just the #of
+ *       computed entailments. The {@link SPOBuffer} knows how many new
+ *       entailments are written each time the buffer is
+ *       {@link SPOBuffer#flush()}ed. However, the buffer can be flushed more
+ *       than once during the execution of the rule, so we need to aggregate
+ *       those counts across flushes and then reset once the rule is done. Also
+ *       note that we sometimes defer a flush across rules if only a few
+ *       entailments were generated, so correct reporting would mean modifying
+ *       that practice. One approach is to modify {@link SPOBuffer#flush()} to
+ *       accept a boolean argument. When true, the #of statements written by the
+ *       buffer would be reset after the flush. When false the counter would
+ *       continue to aggregate across flushes. The javadoc on flush would have
+ *       to indicate that the return value was a running sum since the last
+ *       reset of the counter.
  * 
  * @author mikep
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -58,6 +78,14 @@ import java.util.Arrays;
  */
 public class RuleStats {
 
+    /**
+     * Initilizes statistics for a {@link Rule}.
+     * <p>
+     * Note: This form is used when statistics will be aggregated across
+     * multiple execution {@link State}s for the same rule.
+     * 
+     * @param rule The rule.
+     */
     RuleStats(Rule rule) {
        
         this.rule = rule;
@@ -68,8 +96,44 @@ public class RuleStats {
 
         this.nsubqueries = new int[rule.body.length];
         
+        this.order = new int[rule.body.length];
+        
+        this.nexecutions = 0;
+        
+        this.aggregate = true;
+        
     }
 
+    /**
+     * Initilizes statistics from a {@link Rule}'s execution {@link State}.
+     * <p>
+     * Note: This makes the order of execution for the body predicates
+     * available.
+     * 
+     * @param state
+     *            The rule execution state.
+     */
+    RuleStats(State state) {
+        
+        this(state.getRule());
+        
+        System.arraycopy(state.order, 0, order, 0, state.order.length);
+
+        this.nexecutions = 1;
+        
+        this.aggregate = false;
+        
+        this.focusIndex = state.focusIndex;
+        
+        // @todo report the focus index?
+        
+    }
+
+    /**
+     * True iff this is an aggregation of individual rule execution {@link State}s.
+     */
+    private boolean aggregate;
+    
     /**
      * The name of the rule.
      */
@@ -81,16 +145,26 @@ public class RuleStats {
     public final Rule rule;
     
     /**
-     * The #of rounds that have been executed for this rule.
+     * The #of times that the rule has been executed (ONE(1) if executed once;
+     * N if executed N times when evaluating an N predicate rule during truth
+     * maintenance).
      */
-    public int nrounds;
+    public int nexecutions;
+
+    /**
+     * This field has meaning iff the rule is being used for truth maintenance,
+     * in which case it is the index of the predicate in the body that will read
+     * from the [focusStore] rather than the fused view [focusStore+database].
+     * The field is only available for detail records.
+     */
+    public int focusIndex = -1;
     
     /**
      * The #of statement considered for the each predicate in the body of the
      * rule (in the order in which they were declared, not the order in which
      * they were evaluated).
      */
-    public int[] nstmts;
+    public final int[] nstmts;
 
     /**
      * The #of subqueries examined for each predicate in the rule. The indices
@@ -99,7 +173,15 @@ public class RuleStats {
      * a subquery for N-1 predicates so at least one index will always be
      * zero(0).
      */
-    public int[] nsubqueries;
+    public final int[] nsubqueries;
+    
+    /**
+     * The order of execution of the predicates in the body of the rule (only
+     * available at the detail level of a single {@link State} execution. When
+     * aggregated, the order[] will always contain zeros since it can not be
+     * meaningfully combined across executions.
+     */
+    public final int[] order;
     
     /**
      * #of entailments computed by the rule (does not consider whether or not
@@ -110,8 +192,6 @@ public class RuleStats {
     
     /**
      * Time to compute the entailments (ms).
-     * 
-     * @todo convert this to nano seconds?
      */
     public long elapsed;
 
@@ -138,17 +218,25 @@ public class RuleStats {
         
     }
     
-    public String toString() {
+    /**
+     * Reports only the aggregate.
+     */
+    public String toStringSimple() {
 
         int n = getStatementCount();
         
         String stmtsPerSec = (n == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
-                + ((long) (((double) n) / ((double) elapsed) * 1000d))));
+                + (long) (n * 1000d / elapsed)));
 
         return name //
-             + ", #rounds="+nrounds//
-             + ", #stmts=" + Arrays.toString(nstmts) //
+             + (!aggregate
+                     ?(", focusIndex="+focusIndex+//
+                       ", #order="+Arrays.toString(order)//
+                       )
+                     :(", #exec="+nexecutions//
+                     ))
              + ", #subqueries="+Arrays.toString(nsubqueries)//
+             + ", #stmts=" + Arrays.toString(nstmts) //
              + ", #computed=" + numComputed//
              + ", elapsed=" + elapsed//
              + ", stmts/sec="+stmtsPerSec//
@@ -157,30 +245,67 @@ public class RuleStats {
     }
 
     /**
-     * Resets all of the counters.
+     * Reports aggregate and details.
      */
-    public void reset() {
+    public String toString() {
         
-        for(int i=0; i<nstmts.length; i++) {
-
-            nstmts[i] = nsubqueries[i] = 0;
-
+        if(detailStats.isEmpty()) return toStringSimple();
+        
+        Object[] a = detailStats.toArray();
+        
+        StringBuilder sb = new StringBuilder();
+        
+        // aggregate level.
+        sb.append("total : "+toStringSimple());
+        
+        // detail level.
+        for( int i = 0; i<a.length; i++ ) {
+            
+            RuleStats x = (RuleStats)a[i];
+            
+            sb.append("\n");
+            
+            sb.append("detail: "+x.toString());
+            
         }
-
-        nrounds = 0;
         
-        numComputed = 0;
-        
-        elapsed = 0L;
+        return sb.toString();
         
     }
+    
+//    /**
+//     * Resets all of the counters.
+//     */
+//    public void reset() {
+//        
+//        for(int i=0; i<nstmts.length; i++) {
+//
+//            nstmts[i] = nsubqueries[i] = order[i] = 0;
+//
+//        }
+//
+//        nexecutions = 0;
+//        
+//        numComputed = 0;
+//        
+//        elapsed = 0L;
+//        
+//    }
 
+    /**
+     * When execution {@link State}s are being aggregated, this will contain
+     * the individual {@link RuleStats} for each execution {@link State}. 
+     */
+    public List<RuleStats> detailStats = new Vector<RuleStats>();
+    
     /**
      * Aggregates statistics.
      * 
      * @param o Statistics for another rule.
      */
     public void add(RuleStats o) {
+    
+        detailStats.add(o);
         
         for(int i=0; i<nstmts.length; i++) {
 
@@ -188,9 +313,11 @@ public class RuleStats {
             
             nsubqueries[i] += o.nsubqueries[i];
 
+            // Note: order[] is NOT aggregated.
+            
         }
         
-        nrounds += o.nrounds;
+        nexecutions += o.nexecutions;
         
         numComputed += o.numComputed;
     

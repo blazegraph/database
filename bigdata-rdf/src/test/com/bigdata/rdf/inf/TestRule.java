@@ -117,7 +117,7 @@ public class TestRule extends AbstractRuleTestCase {
             Rule r = new MyRule(store, head, body);
 
             State s = r.newState(false/* justify */, store, new SPOBuffer(
-                    store, false/* justify */));
+                    store, null/*filter*/,100/*capacity*/,false/* justify */));
             
             // write out the rule on the console.
             System.err.println(r.toString());
@@ -210,7 +210,8 @@ public class TestRule extends AbstractRuleTestCase {
 
             Rule r = new MyRulePattern1(new RDFSHelper(store));
 
-            State s = r.newState(false/*justify*/, store, new SPOBuffer(store,false/*justify*/));
+            State s = r.newState(false/* justify */, store, new SPOBuffer(store,
+                    null/* filter */, 100/* capacity */, false/* justify */));
             
             // (u rdfs:subClassOf x)
             assertEquals(KeyOrder.POS,s.getAccessPath(0).getKeyOrder());

@@ -43,7 +43,6 @@ Modifications:
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**

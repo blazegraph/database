@@ -55,7 +55,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
@@ -185,31 +184,31 @@ public class InferenceEngine extends RDFSHelper {
      */
     private final int bufferCapacity;
     
-    /**
-     * Note: making statements distinct in the {@link SPOBuffer} appears to slow
-     * things down. This makes sense for two reasons. First, the big win with
-     * the {@link StatementBuffer} was to make the terms distinct. The extra
-     * effort to make the statements also distinct was not rewarded.
-     * Set-at-a-time processing of the rules tends not to reproduce the same
-     * entailment from the same pass of a given rule, so there is little upside
-     * to be gained.
-     * 
-     * <pre>
-     *     
-     *  fast: distinct := false;
-     *  Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
-     *     
-     *  fast: distinct := true;
-     *  Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
-     *     
-     *  full: distinct := false;
-     *  Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
-     *     
-     *  full: distinct := true
-     *  Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
-     * </pre>
-     */
-    final boolean distinct = false;
+//    /**
+//     * Note: making statements distinct in the {@link SPOBuffer} appears to slow
+//     * things down. This makes sense for two reasons. First, the big win with
+//     * the {@link StatementBuffer} was to make the terms distinct. The extra
+//     * effort to make the statements also distinct was not rewarded.
+//     * Set-at-a-time processing of the rules tends not to reproduce the same
+//     * entailment from the same pass of a given rule, so there is little upside
+//     * to be gained.
+//     * 
+//     * <pre>
+//     *     
+//     *  fast: distinct := false;
+//     *  Computed closure in 3407ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=23566
+//     *     
+//     *  fast: distinct := true;
+//     *  Computed closure in 3594ms yeilding 125943 statements total, 80291 inferences, entailmentsPerSec=22340
+//     *     
+//     *  full: distinct := false;
+//     *  Computed closure of 12 rules in 3 rounds and 2015ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=14717
+//     *     
+//     *  full: distinct := true
+//     *  Computed closure of 12 rules in 3 rounds and 2188ms yeilding 75449 statements total, 29656 inferences, entailmentsPerSec=13553
+//     * </pre>
+//     */
+//    final boolean distinct = false;
 
     /**
      * True iff the Truth Maintenance strategy requires that we store
@@ -783,7 +782,7 @@ public class InferenceEngine extends RDFSHelper {
 
         // entailment buffer writes on the closureStore.
         final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                bufferCapacity, distinct, isJustified());
+                bufferCapacity, isJustified());
 
         // compute the full forward closure.
         System.err.println(Rule.fixedPoint(closureStats, getRuleModel(),
@@ -830,7 +829,7 @@ public class InferenceEngine extends RDFSHelper {
         
         // Entailment buffer writes on the closureStore.
         final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                bufferCapacity, distinct, isJustified());
+                bufferCapacity, isJustified());
         
         final int firstStatementCount = closureStore.getStatementCount();
 

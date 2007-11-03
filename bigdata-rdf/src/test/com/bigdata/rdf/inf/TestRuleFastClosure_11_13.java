@@ -127,7 +127,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              */
 
             SPOBuffer buffer = new SPOBuffer(store, null/* filter */,
-                    100/* capacity */, false/* distinct */, inf.isJustified()/* justifications */);
+                    100/* capacity */,inf.isJustified()/* justifications */);
 
             State state = rule.newState(inf.isJustified(), store, buffer);
             
@@ -206,7 +206,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              */
 
             SPOBuffer buffer = new SPOBuffer(store, null/* filter */,
-                    100/* capacity */, false/* distinct */, inf.isJustified()/* justifications */);
+                    100/* capacity */, inf.isJustified()/* justifications */);
 
             State state = rule.newState(inf.isJustified(), store, buffer);
             

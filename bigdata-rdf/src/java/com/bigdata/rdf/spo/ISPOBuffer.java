@@ -47,6 +47,8 @@
 
 package com.bigdata.rdf.spo;
 
+import com.bigdata.rdf.store.IRawTripleStore;
+
 /**
  * A buffer for {@link SPO}s.
  * <p>
@@ -86,7 +88,15 @@ public interface ISPOBuffer {
 
     /**
      * Flush any buffered statements to the backing store.
+     * 
+     * @return The #of statements that were written on the indices (a statement
+     *         that was previously an axiom or inferred and that is converted to
+     *         an explicit statement by this method will be reported in this
+     *         count as well as any statement that was not pre-existing in the
+     *         database).
+     *         
+     * @see IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)
      */
-    public void flush();
+    public int flush();
     
 }
