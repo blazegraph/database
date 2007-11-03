@@ -5,6 +5,7 @@ import java.util.Arrays;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -172,7 +173,7 @@ public class Justification implements Comparable<Justification> {
         SPO[] tail = new SPO[m];
         
         // for each triple pattern in the tail.
-        int j = 0;
+        int j = N;
         for(int i=0; i<m; i++, j+=N) {
         
             tail[i] = new SPO(ids[j], ids[j + 1], ids[j + 2],
@@ -419,46 +420,140 @@ public class Justification implements Comparable<Justification> {
     /**
      * Return true iff a grounded justification chain exists for the statement.
      * 
-     * @param head The statement.
+     * @param head
+     *            The statement (fully bound).
      * 
-     * @return
+     * @return True iff the statement is entailed by a grounded justification
+     *         chain in the database.
      */
     public static boolean isGrounded(AbstractTripleStore db, SPO head) {
+     
+        assert head.isFullyBound();
+        
+        return isGrounded(db,head,false);
+        
+    }
+        
+    /**
+     * 
+     * @param db
+     * @param head
+     *            A triple pattern. When invoked on a statement during truth
+     *            maintenance this will be fully bound. However, during
+     *            recursive processing triple patterns may be encountered in the
+     *            tail of {@link Justification}s that are not fully bound. In
+     *            such cases we test for any statement matching the triple
+     *            pattern that can be proven to be grounded.
+     * @param testHead
+     * @return
+     * 
+     * @todo if we decide that we have only grounded justifications using the
+     *       fast closure method then this should be rewritten to be
+     *       non-recursive.
+     */
+    private static boolean isGrounded(AbstractTripleStore db, SPO head, boolean testHead) {
 
-        /*
-         * Examine all justifications for the statement. If any of them are
-         * grounded then the statement is still entailed by the database.
-         */
-        
-        JustificationIterator itr = new JustificationIterator(db,head);
-        
-        while(itr.hasNext()) {
+        if(testHead) {
             
             /*
-             * For each justification we consider the bindings. The first N are
-             * just the statement that was proven. The remaining bindings are
-             * M-1 triple patterns of N elements each.
+             * Scan the statement indices for the head. This covers both the
+             * case when it is fully bound (since we need to know whether or not
+             * it is explicit) and the case when it has unbound positions (where
+             * we need to scan them and see if any matching statements in the
+             * database are explicit).
              */
             
-            Justification jst = itr.next();
+            ISPOIterator itr = db.getAccessPath(head.s,head.p,head.o).iterator();
             
-            SPO[] tail = jst.getTail();
-            
-            /*
-             * if all in tail are explicit in the statement indices, then done.
-             * 
-             * since tail is triple patterns, we have to scan those patterns for
-             * the first explicit statement matched.
-             * 
-             * if none in tail are explicit, then we can recurse. we could also
-             * scan the rest of the justifications for something that was easily
-             * proven to be explicit. it is a depth vs breadth 1st issue.
-             */
-            
-            throw new UnsupportedOperationException();
+            while(itr.hasNext()) {
+                
+                SPO spo = itr.next();
+                
+                if (spo.type == StatementEnum.Explicit) {
+
+                    // grounded for this triple pattern.
+                    
+                    return true;
+                    
+                } else {
+                    
+                    if(isGrounded(db,spo,false)) {
+                    
+                        // recursively grounded somewhere.
+                        
+                        return true;
+                        
+                    } else {
+                        
+                        // next spo.
+                        
+                    }
+                    
+                }
+                
+            }
             
         }
-        
+
+        if(head.isFullyBound()) {
+
+            /*
+             * Examine all justifications for the statement. If any of them are
+             * grounded then the statement is still entailed by the database.
+             */
+            
+            JustificationIterator itr = new JustificationIterator(db,head);
+            
+            while(itr.hasNext()) {
+                
+                /*
+                 * For each justification we consider the bindings. The first N are
+                 * just the statement that was proven. The remaining bindings are
+                 * M-1 triple patterns of N elements each.
+                 */
+                
+                Justification jst = itr.next();
+                
+                SPO[] tail = jst.getTail();
+                
+                /*
+                 * if all in tail are explicit in the statement indices, then done.
+                 * 
+                 * since tail is triple patterns, we have to scan those patterns for
+                 * the first explicit statement matched.
+                 * 
+                 * if none in tail are explicit, then we can recurse. we could also
+                 * scan the rest of the justifications for something that was easily
+                 * proven to be explicit. it is a depth vs breadth 1st issue.
+                 * 
+                 * this is definately going to be expensive in a distributed store
+                 * since it is all random RPCs.
+                 */
+                
+                boolean ok = true;
+                
+                for( SPO t : tail ) {
+                    
+                    if(!isGrounded(db, t, true/*testHead*/)) {
+                        
+                        ok = false;
+                        
+                        break;
+                        
+                    }
+                    
+                }
+
+                if(ok) {
+                    
+                    return true;
+                    
+                }
+                
+            } // next justification.
+
+        } // head.isFullyBound()
+            
         return false;
         
     }

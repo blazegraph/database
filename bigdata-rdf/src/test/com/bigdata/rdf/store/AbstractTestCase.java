@@ -57,6 +57,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
@@ -247,6 +248,68 @@ abstract public class AbstractTestCase
         if(!expected.equals(actual)) {
             
             fail("Expecting: "+expected+" not "+actual);
+            
+        }
+        
+    }
+    
+    public void assertEquals(SPO[] expected, SPO[] actual) {
+
+        assertEquals(null,expected,actual);
+        
+    }
+    
+    public void assertEquals(String msg, SPO[] expected, SPO[] actual) {
+    
+        if( msg == null ) {
+            msg = "";
+        } else {
+            msg = msg + " : ";
+        }
+
+        if( expected == null && actual == null ) {
+            
+            return;
+            
+        }
+        
+        if( expected == null && actual != null ) {
+            
+            fail( msg+"Expected a null array." );
+            
+        }
+        
+        if( expected != null && actual == null ) {
+            
+            fail( msg+"Not expecting a null array." );
+            
+        }
+        
+        if (expected.length != actual.length) {
+            /*
+             * Only do message construction if we know that the assert will
+             * fail.
+             */
+            assertEquals(msg + "length differs.", expected.length,
+                    actual.length);
+        }
+        
+        for( int i=0; i<expected.length; i++ ) {
+            
+            try {
+
+                assertEquals(expected[i], actual[i]);
+                
+            } catch (AssertionFailedError ex) {
+                
+                /*
+                 * Only do the message construction once the assertion is known
+                 * to fail.
+                 */
+                
+                fail(msg + "values differ: index=" + i, ex);
+                
+            }
             
         }
         
