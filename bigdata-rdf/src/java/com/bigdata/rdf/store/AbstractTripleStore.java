@@ -85,7 +85,11 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
+import com.bigdata.rdf.inf.SPOBuffer;
+import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -93,10 +97,8 @@ import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.Justification;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -197,6 +199,12 @@ import cutthecrap.utils.striterators.Striterator;
 abstract public class AbstractTripleStore implements ITripleStore, IRawTripleStore {
 
     /**
+     * This is used to conditionally enable the logic to retract justifications
+     * when the corresponding statements is retracted.
+     */
+    final private boolean justify;
+    
+    /**
      * Used to generate the compressed sort keys for the
      * {@link #getTermIdIndex()}.
      */
@@ -225,7 +233,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         // Copy the properties object.
         this.properties = (Properties)properties.clone();
-        
+
+        /*
+         * Reads off the property for the inference engine that tells us whether
+         * or not the justification index is being used. This is used to
+         * conditionally enable the logic to retract justifications when the
+         * corresponding statements is retracted.
+         */
+        this.justify = Boolean.parseBoolean(properties.getProperty(
+                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
@@ -997,30 +1014,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          */
         public int removeAll() {
 
-            // @todo this is only going to be an optimization when the indices are
-            // local.
-//            /*
-//             * if all bound, then a slight optimization.
-//             */
-//            
-//            if (s != NULL && p != NULL && o != NULL) {
-//
-//                byte[] key = keyBuilder.statement2Key(s, p, o);
-//                
-//                if (getSPOIndex().contains(key)) {
-//
-//                    getSPOIndex().remove(key);
-//                    getPOSIndex().remove(keyBuilder.statement2Key(p, o, s));
-//                    getOSPIndex().remove(keyBuilder.statement2Key(o, s, p));
-//                    
-//                    return 1;
-//                    
-//                }
-//                
-//                return 0;
-//                
-//            }
-
             // @todo try with an asynchronous read-ahead iterator.
 //            ISPOIterator itr = iterator(0,0);
             
@@ -1135,16 +1128,123 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         
                     }
 
-                    List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
-
-                    /*
-                     * @todo figure out which index is the most expensive and have it
-                     * use the original data without cloning.
+                    /**
+                     * Class writes on the justification index, removing all
+                     * justifications for each statement that is being removed.
+                     * <p>
+                     * Note: There is only one index for justifications. The
+                     * keys all use the SPO of the entailed statement as their
+                     * prefix, so given a statement it is trivial to do a range
+                     * scan for its justifications.
+                     * 
+                     * @todo if we supported remove() on the IEntryIterator then
+                     *       we would not have to buffer the justifications that
+                     *       we want to delete.
+                     * 
+                     * @author <a
+                     *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
+                     *         Thompson</a>
+                     * @version $Id$
                      */
+                    class JustificationWriter implements Callable<Long> {
+
+                        final SPO[] a;
+
+                        /*
+                         * Private key builder.
+                         * 
+                         * Note: This capacity estimate is based on N longs per SPO, one head,
+                         * and 2-3 SPOs in the tail. The capacity will be extended automatically
+                         * if necessary.
+                         */
+                        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
+
+                        JustificationWriter(boolean clone) {
+                            
+                            if(clone) {
+                                
+                                a = new SPO[numStmts];
+                                
+                                System.arraycopy(stmts, 0, a, 0, numStmts);
+                                
+                            } else {
+                                
+                                this.a = stmts;
+                                
+                            }
+                            
+                        }
+
+                        public Long call() throws Exception {
+                            
+                            final long begin = System.currentTimeMillis();
+                            
+                            IIndex ndx = AbstractTripleStore.this.getJustificationIndex();
+
+                            /*
+                             * Place statements in index order (SPO since all
+                             * justifications begin with the SPO of the entailed
+                             * statement.
+                             */
+                            Arrays.sort(a, 0, numStmts, KeyOrder.SPO.getComparator());
+
+                            final long beginWrite = System.currentTimeMillis();
+                            
+                            sortTime.addAndGet(beginWrite - begin);
+
+                            // remove statements from the index.
+                            for (int i = 0; i < numStmts; i++) {
+
+                                SPO spo = a[i];
+
+                                // will visit justifications for that statement.
+                                JustificationIterator itr = new JustificationIterator(
+                                        AbstractTripleStore.this, spo);
+                                
+                                if(DEBUG) {
+                                    
+                                    log.debug("Removing "
+                                                    + ndx.rangeCount(fromKey,toKey)
+                                                    + " justifications for "
+                                                    + spo.toString(AbstractTripleStore.this));
+                                    
+                                }
+
+                                while(itr.hasNext()) {
+                                    
+                                    itr.next();
+                                    
+                                    itr.remove();
+                                    
+                                }
+
+                            }
+
+                            final long endWrite = System.currentTimeMillis();
+                            
+                            writeTime.addAndGet(endWrite - beginWrite);
+                            
+                            return endWrite - begin;
+
+                        }
+                        
+                    }
+                    
+                    List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
                     tasks.add(new IndexWriter(KeyOrder.SPO, false/* clone */));
                     tasks.add(new IndexWriter(KeyOrder.POS, true/* clone */));
                     tasks.add(new IndexWriter(KeyOrder.OSP, true/* clone */));
+                    
+                    if(justify) {
+
+                        /*
+                         * Also retract the justifications for the statements.
+                         */
+                        
+                        tasks.add(new JustificationWriter(true/* clone */));
+                        
+                    }
 
                     System.err.print("Removing " + numStmts + " statements...");
 
@@ -1152,6 +1252,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     final long elapsed_SPO;
                     final long elapsed_POS;
                     final long elapsed_OSP;
+                    final long elapsed_JST;
 
                     try {
 
@@ -1160,6 +1261,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         elapsed_SPO = futures.get(0).get();
                         elapsed_POS = futures.get(1).get();
                         elapsed_OSP = futures.get(2).get();
+                        if(justify) {
+                            elapsed_JST = futures.get(3).get();
+                        } else {
+                            elapsed_JST = 0;
+                        }
 
                     } catch (InterruptedException ex) {
 
@@ -1176,7 +1282,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     System.err.println("in " + elapsed + "ms; sort=" + sortTime
                             + "ms, keyGen+delete=" + writeTime + "ms; spo="
                             + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
-                            + elapsed_OSP + "ms");
+                            + elapsed_OSP + "ms, jst="+elapsed_JST);
 
                     // removed all statements in this chunk.
                     nremoved += numStmts;
@@ -1975,11 +2081,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
-                /*
-                 * @todo figure out which index is the most expensive and have
-                 * it use the original data without cloning.
-                 */
-
                 tasks.add(new IndexWriter(false/* clone */, KeyOrder.SPO,
                         filter));
 
@@ -2049,12 +2150,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param n
      *            The #of elements in the array that are valid.
      * 
-     * @todo Define a method to remove justifications that will be invoked by
-     *       TM. Buffer and use bulk operations. Allow iterator as a source?
-     * 
-     * @todo refactor to {@link AbstractLocalTripleStore} and
-     *       {@link ScaleOutTripleStore}
-     * 
      * @todo a lot of the cost of loading data is writing the justifications.
      *       SLD/magic sets will relieve us of the need to write the
      *       justifications since we can efficiently prove whether or not the
@@ -2076,12 +2171,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         Arrays.sort(a, 0, n);
         
         /*
-         * Note: This capacity estimate is based on 3 longs per SPO, one head,
+         * Note: This capacity estimate is based on N longs per SPO, one head,
          * and 2-3 SPOs in the tail. The capacity will be extended automatically
          * if necessary.
          */
         
-        KeyBuilder keyBuilder = new KeyBuilder(3 * (1 + 3) * Bytes.SIZEOF_LONG);
+        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
         
         for (int i = 0; i < n; i++) {
 

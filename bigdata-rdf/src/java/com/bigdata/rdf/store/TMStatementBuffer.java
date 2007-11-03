@@ -379,7 +379,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         if(isEmpty()) {
             
-            // nothing to assert.
+            // nothing to retract.
             
             return new ClosureStats();
             

@@ -54,10 +54,10 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.inf.JustificationSerializer;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.rdf.spo.JustificationSerializer;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data

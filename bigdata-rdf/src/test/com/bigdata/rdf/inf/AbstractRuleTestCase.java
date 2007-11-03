@@ -48,7 +48,6 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.inf.Rule.State;
-import com.bigdata.rdf.spo.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**

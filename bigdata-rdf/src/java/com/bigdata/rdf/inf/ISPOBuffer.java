@@ -45,8 +45,11 @@
  * Created on Oct 30, 2007
  */
 
-package com.bigdata.rdf.spo;
+package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -82,7 +85,8 @@ public interface ISPOBuffer {
      *            The justification for that {@link SPO} (optional, depending on
      *            the TM strategy and only if the {@link SPO} is an inference).
      * 
-     * @return true if the buffer will store the statement.
+     * @return true if the buffer will store the statement (i.e., the statement
+     *         is not excluded by the filter).
      */
     public boolean add(SPO spo, Justification justification);
 

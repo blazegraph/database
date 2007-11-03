@@ -252,7 +252,9 @@ public class SPOArrayIterator implements ISPOIterator {
         
         }
         
-        return stmts[i++];
+        current = stmts[i++];
+        
+        return current;
         
     }
 

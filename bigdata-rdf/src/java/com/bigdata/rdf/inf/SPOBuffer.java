@@ -45,7 +45,7 @@ Modifications:
  * Created on Apr 13, 2007
  */
 
-package com.bigdata.rdf.spo;
+package com.bigdata.rdf.inf;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +61,8 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -149,27 +151,12 @@ public class SPOBuffer implements ISPOBuffer {
         return stmts[i];
         
     }
-    
-//    /**
-//     * Map used to filter out duplicate statements. 
-//     */
-//    final private Map<SPO,SPO> distinctStmtMap;
 
     /**
      * The backing store into which the statements are added when the buffer
      * overflows.
      */
     public final AbstractTripleStore store;
-    
-//    /**
-//     * The backing store into which the statements are added when the buffer
-//     * overflows.
-//     */
-//    public AbstractTripleStore getBackingStore() {
-//        
-//        return store;
-//        
-//    }
     
     /**
      * An optional filter. When present, statements matched by the filter are
@@ -184,27 +171,12 @@ public class SPOBuffer implements ISPOBuffer {
      */
     protected final int capacity;
 
-//    /**
-//     * When true only distinct statements are stored in the buffer.
-//     */
-//    protected final boolean distinct;
-    
     /**
      * true iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
      */
     protected final boolean justify;
-    
-//    /**
-//     * Convenience constructor - do NOT use for large operations since the
-//     * capacity is only 1000 {@link SPO}s.
-//     */
-//    public SPOBuffer(AbstractTripleStore store, boolean justified) {
-//        
-//        this(store,null/*filter*/,1000/*capacity*/,justified);
-//        
-//    }
-    
+        
     /**
      * Create a buffer.
      * 
@@ -234,24 +206,12 @@ public class SPOBuffer implements ISPOBuffer {
         
         this.capacity = capacity;
 
-//        this.distinct = distinct;
-
         this.justify = justified;
         
         stmts = new SPO[capacity];
 
         justifications = justified ? new Justification[capacity] : null;
         
-//        if (distinct) {
-//
-//            distinctStmtMap = new HashMap<SPO, SPO>(capacity);
-//
-//        } else {
-//
-//            distinctStmtMap = null;
-//
-//        }
-
     }
         
     /**
@@ -284,55 +244,6 @@ public class SPOBuffer implements ISPOBuffer {
         
     }
      
-//    /**
-//     * Uniquify a statement.
-//     * <p>
-//     * Note: this will treat statements that are inferred vs explicit vs axioms
-//     * as distinct since {@link SPO#equals(SPO)} recognizes the
-//     * {@link StatementEnum} as a distinction. However, the {@link SPOBuffer} is
-//     * generally used to buffer either explicit statements or entailments but
-//     * not both at once.
-//     * <p>
-//     * Note: If we are storing justifications, then we want to store all
-//     * justifications so we CAN NOT make them unique. There for uniqueness is
-//     * defined solely in terms of the {@link SPO} and we ALWAYS store the
-//     * justification. This means that we will flush the buffer as soon as either
-//     * array is at capacity.
-//     * 
-//     * @param stmt
-//     * 
-//     * @return Either the given statement or the pre-existing statement with the
-//     *         same data.
-//     */
-//    private SPO getDistinctStatement(SPO stmt) {
-//
-//        assert distinct == true;
-//
-//        SPO existingStmt = distinctStmtMap.get(stmt);
-//
-//        if (existingStmt != null) {
-//
-//            // return the pre-existing statement.
-//
-//            return existingStmt;
-//
-//        } else {
-//
-//            // put the new statement in the map.
-//
-//            if (distinctStmtMap.put(stmt,stmt) != null) {
-//
-//                throw new AssertionError();
-//
-//            }
-//
-//            // return the new statement.
-//            return stmt;
-//
-//        }
-//
-//    }
-    
     /**
      * A service used to write statements and justifications at the same time.
      */
@@ -477,7 +388,7 @@ public class SPOBuffer implements ISPOBuffer {
      * @see #nearCapacity()
      * @see #flush()
      */
-    public boolean add( SPO stmt, Justification justification ) {
+    public boolean add( SPO stmt, Justification justification) {
         
         assert stmt != null;
         
@@ -489,7 +400,7 @@ public class SPOBuffer implements ISPOBuffer {
          */
 
         assert justify ? justification != null : justification == null;
-        
+
         if (filter != null && filter.isMatch(stmt)) {
             
             /*
@@ -509,36 +420,7 @@ public class SPOBuffer implements ISPOBuffer {
             return false;
             
         }
-        
-//        if(DEBUG) {
-//
-//            /*
-//             * This checks constraints on the RDF data model in case one of the
-//             * rules is using the wrong bindings and trying to emit an
-//             * entailment that is invalid per the data model. E.g., a literal in
-//             * the subject position.
-//             */
-//            
-//            if( ! (store.getTerm(stmt.s) instanceof _Resource) ) {
-//                
-//                throw new AssertionError(stmt.toString(store));
-//                
-//            }
-//            
-//            if( ! (store.getTerm(stmt.p) instanceof _URI) ) {
-//                
-//                throw new AssertionError(stmt.toString(store));
-//                
-//            }
-//            
-//            if( ! (store.getTerm(stmt.o) instanceof _Value) ) {
-//                
-//                throw new AssertionError(stmt.toString(store));
-//                
-//            }
-//            
-//        }
-        
+                
         if(nearCapacity()) {
 
             flush();
@@ -547,30 +429,6 @@ public class SPOBuffer implements ISPOBuffer {
         
         final boolean newStmt;
         
-//        if(distinct) {
-//
-//            SPO tmp = getDistinctStatement(stmt);
-//            
-//            if(tmp==stmt) {
-//                
-//                stmts[numStmts++] = stmt;
-//                
-//                newStmt = true;
-//                
-//            } else {
-//                
-//                newStmt = false;
-//                
-//            }
-//
-//            if(justify) {
-//
-//                justifications[numJustifications++] = justification;
-//                    
-//            }
-//          
-//        } else {
-
             stmts[numStmts++] = stmt;
 
             newStmt = true;

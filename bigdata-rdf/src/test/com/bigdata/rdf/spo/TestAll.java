@@ -78,9 +78,15 @@ public class TestAll extends TestCase {
      
         /* FIXME write tests.
          * 
-         * @todo comparator orderings.
+         * @todo SPO (compareTo, equals, hashCode)
          * 
-         * @todo ???  
+         * @todo SPO (de-)serialization as key + statement type.
+         * 
+         * @todo SPO comparators.
+         * 
+         * @todo SPOIterator
+         * 
+         * @todo SPOArrayIterator
          */
         
         return suite;

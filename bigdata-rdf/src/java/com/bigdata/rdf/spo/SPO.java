@@ -43,6 +43,7 @@ Modifications:
 */
 package com.bigdata.rdf.spo;
 
+import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
