@@ -99,7 +99,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
          * this test class and its optional .properties file.
          */
         
-//        suite.addTest(TestTripleStoreBasics.suite());
+        suite.addTest(TestTripleStoreBasics.suite());
 
         /*
          * Pickup the Sesame 1.x test suite.
