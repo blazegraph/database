@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.sail;
 
-import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -1306,21 +1305,22 @@ public class BigdataRdfRepository implements RdfRepository {
      * Computes the closure of the triple store for RDFS entailments.
      * <p>
      * This computes the full forward closure of the store and then commits the
-     * store. Since incremental closure and truth maintenance are NOT supported,
-     * you should load all your data into store using
-     * {@link LocalTripleStore#loadData(File, String, org.openrdf.sesame.constants.RDFFormat, boolean, boolean)}
-     * and then invoke this method to compute the RDFS entailments.
+     * store. This can be used if you do NOT enable truth maintenance and choose
+     * instead to load up all of your data first and then compute the closure of
+     * the database.
      * <p>
      * This method lies outside of the SAIL and does not rely on the SAIL
      * "transaction" mechanisms.
      * 
-     * @deprecated by support for incremental closure.
+     * @todo offer a method to retract any entailments so that people can choose
+     *       to re-close a database. that method will probably be defined by
+     *       {@link TMStatementBuffer}.
      */
     public void fullForwardClosure() {
         
         flushStatementBuffers();
         
-        inf.computeClosure();
+        inf.computeClosure(null/*focusStore*/);
         
         database.commit();
                 

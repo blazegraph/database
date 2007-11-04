@@ -69,7 +69,12 @@ import com.bigdata.rdf.store.DataLoader;
 /**
  * Test harness for loading randomly generated files into a repository.
  * 
- * @todo Modidy to permit running as load N then close vs load+close for each of N?
+ * FIXME modify to collect explicitly the time for inference (it may already be
+ * in one of the fields) and to get the #of entailments, etc. out of bigdata.
+ * Several columns are zeros.
+ * 
+ * @todo Modidy to permit running as load N then close vs load+close for each of
+ *       N?
  * 
  * @todo Support concurrent query against the repository. Concurrent query
  *       should begin after some number of files or triples have been loaded.

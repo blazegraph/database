@@ -51,6 +51,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -172,6 +173,27 @@ public interface IRawTripleStore extends ITripleStore {
      * want to perform a {@link IAccessPath#distinctTermScan()}.
      */
     public IAccessPath getAccessPath(KeyOrder keyOrder);
+    
+    /**
+     * Return the statement from the database (fully bound s:p:o only).
+     * <p>
+     * Note: This may be used to examine the {@link StatementEnum}.
+     * 
+     * @param s
+     *            The term identifier for the subject.
+     * @param p
+     *            The term identifier for the predicate.
+     * @param o
+     *            The term identifier for the object.
+     * 
+     * @return The {@link SPO} for that statement, including its
+     *         {@link StatementEnum} -or- <code>null</code> iff the statement
+     *         is not in the database.
+     * 
+     * @exception IllegalArgumentException
+     *                if any of the arguments is {@link #NULL}.
+     */
+    public SPO getStatement(long s, long p, long o);
     
     /**
      * Writes the statements onto the statements indices (batch, parallel, NO

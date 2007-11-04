@@ -51,12 +51,10 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.SPOBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Iterator visits {@link SPO}s and supports removal (fully buffered).
@@ -95,11 +93,6 @@ public class SPOArrayIterator implements ISPOIterator {
      * The {@link SPO} most recently returned by {@link #next()}.
      */
     private SPO current = null;
-    
-    /**
-     * Lazily allocated by {@link #remove()}.
-     */
-    private RdfKeyBuilder keyBuilder = null;
     
     /**
      * The #of statements that this iterator buffered.
@@ -268,38 +261,38 @@ public class SPOArrayIterator implements ISPOIterator {
      * @throws UnsupportedOperationException
      *             if a ctor variant was used that did not convey the database
      *             reference.
+     * 
+     * FIXME modify this to collect up statements to be removed and to batch
+     * remove them no later than when the iterator is exhausted (rather than
+     * closed since we close the iterator in finally clauses and we only need to
+     * insure removal if the itr completes normally). Do the same for
+     * {@link SPOIterator}. However, note that this method is only useful if
+     * you are using the iterator in its one-at-a-time mode. If you are using
+     * the chunked mode of the iterator then we need a remove(SPO) method here.
+     * It should just write on an interal {@link SPOBuffer} which removes the
+     * statements from the database when it is flushed. The buffer should be
+     * flushed when the iterator is exhausted.
      */
     public void remove() {
 
         assertOpen();
 
-        if(db==null) {
-            
+        if (db == null) {
+
             throw new UnsupportedOperationException();
-            
+
         }
-        
-        if(current==null) {
+
+        if (current == null) {
             
             throw new IllegalStateException();
             
         }
+       
+        db.getAccessPath(current.s, current.p, current.o).removeAll();
         
-        if(keyBuilder == null) {
-            
-            keyBuilder = new RdfKeyBuilder(new KeyBuilder(3 * Bytes.SIZEOF_LONG));
-            
-        }
-        
-        long s = current.s;
-        long p = current.p;
-        long o = current.o;
-        
-        // @todo Do this in parallel threads with AbstractTripleStore#indexWriteService
-        
-        db.getSPOIndex().remove(keyBuilder.statement2Key(s, p, o));
-        db.getPOSIndex().remove(keyBuilder.statement2Key(p, o, s));
-        db.getOSPIndex().remove(keyBuilder.statement2Key(o, s, p));
+        // clear the reference.
+        current = null;
         
     }
 
@@ -407,8 +400,6 @@ public class SPOArrayIterator implements ISPOIterator {
         current = null;
         
         i = numStmts = 0;
-        
-        keyBuilder = null;
         
     }
 

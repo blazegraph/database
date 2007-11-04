@@ -50,12 +50,14 @@ package com.bigdata.rdf.store;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.DataLoader.Options;
 
 /**
@@ -203,6 +205,8 @@ public interface ITripleStore {
     
     /**
      * Wraps an {@link ISPOIterator} as a {@link StatementIterator}.
+     * <p>
+     * Note: The object visited will be {@link StatementWithType}s.
      * 
      * @param src
      *            An {@link ISPOIterator}
@@ -214,6 +218,18 @@ public interface ITripleStore {
      */
     public StatementIterator asStatementIterator(ISPOIterator src);
 
+    /**
+     * Convert an internal {@link SPO} into a Sesame {@link Statement}.
+     * <p>
+     * Note: The object returned will be a {@link StatementWithType}
+     * 
+     * @param spo
+     *            The {@link SPO}.
+     * 
+     * @return The Sesame {@link Statement} -or- <code>null</code>.
+     */
+    public Statement asStatement(SPO spo);
+    
     /**
      * Return a new {@link DataLoader} provisioned using the properties that
      * were used to construct the {@link ITripleStore}.

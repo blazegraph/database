@@ -1,6 +1,5 @@
 package com.bigdata.rdf.inf;
 
-
 /**
  * Rule for step 11 of {@link InferenceEngine#fastForwardClosure()}.
  * 
@@ -27,7 +26,10 @@ public class RuleFastClosure11 extends AbstractRuleFastClosure_11_13 {
                     new Triple(var("x"), var("y"), var("z")),//
                     new Triple(var("y"), inf.rdfsSubPropertyOf, var("a")),//
                     new Triple(var("a"), inf.rdfsDomain, var("b"))//
-                });
+                },
+                new IConstraint[] {
+                    new NE(var("y"),var("a"))
+        });
         
     }
 

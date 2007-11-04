@@ -216,7 +216,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     final protected Properties properties;
     
     /**
-     * A read-only copy of the properties used to configure the database.
+     * The properties used to configure the configure the database wrapped up by
+     * a new {@link Properties} object to prevent accidental modification by the
+     * caller.
      */
     final public Properties getProperties() {
         
@@ -240,6 +242,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * conditionally enable the logic to retract justifications when the
          * corresponding statements is retracted.
          */
+
         this.justify = Boolean.parseBoolean(properties.getProperty(
                 Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
 
@@ -481,6 +484,33 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    final public SPO getStatement(long s, long p, long o) {
+        
+        if (s == NULL || p == NULL || o == NULL) {
+
+            throw new IllegalArgumentException();
+            
+        }
+
+        // @todo thread-safety for the key builder.
+        byte[] key = getKeyBuilder().statement2Key(s, p, o);
+
+        byte[] val = (byte[]) getStatementIndex(KeyOrder.SPO).lookup(key);
+
+        if (val == null) {
+
+            return null;
+
+        }
+
+        // The statement is known to the database.
+
+        StatementEnum type = StatementEnum.deserialize(val);
+
+        return new SPO(s, p, o, type);
+
+    }
+    
     /**
      * Return true if the triple pattern matches any statement(s) in the store
      * (non-batch API).
@@ -524,6 +554,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    public Statement asStatement(SPO spo) {
+
+        return new StatementWithType( //
+                (Resource) OptimizedValueFactory.INSTANCE
+                        .toSesameObject(getTerm(spo.s)),//
+                (URI) OptimizedValueFactory.INSTANCE
+                        .toSesameObject(getTerm(spo.p)), //
+                (Value) OptimizedValueFactory.INSTANCE
+                        .toSesameObject(getTerm(spo.o)), //
+                spo.type//
+        );
+        
+    }
+    
     public StatementIterator asStatementIterator(ISPOIterator src) {
         
         return new MyStatementIterator(src);
@@ -698,18 +742,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          */
         public Statement next() {
 
-            SPO spo = src.next();
-            
-            /*
-             * resolve the term identifiers to the terms.
-             */
-            
-            return new StatementWithType( //
-                    (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.s)),//
-                    (URI) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.p)), //
-                    (Value) OptimizedValueFactory.INSTANCE.toSesameObject(getTerm(spo.o)),
-                    spo.type
-                    );
+            return asStatement( src.next() );
             
         }
         
@@ -1098,9 +1131,14 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                                 if(DEBUG) {
                                     
+                                    /*
+                                     * Note: will remove NOT FOUND when removing
+                                     * a statement from a temp store since the
+                                     * term identifiers for the temp store are
+                                     * generally only stored in the database.
+                                     */
                                     log.debug("Removing "
-                                                    + spo
-                                                            .toString(AbstractTripleStore.this)
+                                                    + spo.toString(AbstractTripleStore.this)
                                                     + " from " + keyOrder);
                                     
                                 }
@@ -1246,7 +1284,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         
                     }
 
-                    System.err.print("Removing " + numStmts + " statements...");
+                    if(numStmts>1000) {
+
+                        System.err.print("Removing " + numStmts + " statements...");
+                        
+                    }
 
                     final List<Future<Long>> futures;
                     final long elapsed_SPO;
@@ -1279,10 +1321,14 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     long elapsed = System.currentTimeMillis() - begin;
 
-                    System.err.println("in " + elapsed + "ms; sort=" + sortTime
+                    if(numStmts>1000) {
+
+                        System.err.println("in " + elapsed + "ms; sort=" + sortTime
                             + "ms, keyGen+delete=" + writeTime + "ms; spo="
                             + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
                             + elapsed_OSP + "ms, jst="+elapsed_JST);
+                        
+                    }
 
                     // removed all statements in this chunk.
                     nremoved += numStmts;
