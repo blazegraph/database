@@ -18,7 +18,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * </p>
  * 
  * <pre>
- *            (?u ?a ?y) -&gt; (?a rdf:type rdf:Property)
+ *               (?u ?a ?y) -&gt; (?a rdf:type rdf:Property)
  * </pre>
  * 
  * <p>
@@ -26,7 +26,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * <p>
  * 
  * <pre>
- *        (0 ?a 0)
+ *           (0 ?a 0)
  * </pre>
  * 
  * <p>
@@ -37,9 +37,9 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * </p>
  * 
  * <pre>
- *        head := [?a rdf:type rdf:Property]
- *        
- *        tail := [0 ?a 0]
+ *           head := [?a rdf:type rdf:Property]
+ *           
+ *           tail := [0 ?a 0]
  * </pre>
  * 
  * <p>
@@ -67,14 +67,15 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * justification when it can no longer be grounded.</strong>
  * </p>
  * 
+ * <p>
+ * The concept of grounded vs ungrounded justifications is described in <a
+ * href="http://www.openrdf.org/doc/papers/inferencing.pdf"> Inferencing and
+ * Truth Maintenance in RDF Schema : Exploring a naive practical approach</a>
+ * by Jeen Broekstra and Arjohn Kampman.
+ * </p>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo document the concept of grounded vs ungrounded justifications per the
- *       Sesame paper on TM.
- * 
- * @todo write a method to chase a proof chain for a given head and determine
- *       whether it is grounded or ungrounded.
  */
 public class Justification implements Comparable<Justification> {
 
@@ -449,7 +450,7 @@ public class Justification implements Comparable<Justification> {
      * 
      * @todo if we decide that we have only grounded justifications using the
      *       fast closure method then this should be rewritten to be
-     *       non-recursive.
+     *       non-recursive and it will be MUCH faster.
      */
     private static boolean isGrounded(AbstractTripleStore db, SPO head, boolean testHead) {
 

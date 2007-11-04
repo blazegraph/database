@@ -370,12 +370,6 @@ public class TMStatementBuffer implements IStatementBuffer {
     public ClosureStats retractAll() {
 
         final ClosureStats stats;
-
-//        if (buffer == null)
-//            throw new IllegalStateException("No statement buffer?");
-//
-//        if (tempStore == null)
-//            throw new IllegalStateException("No temporary store?");
         
         if(isEmpty()) {
             
@@ -396,7 +390,30 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
 
-        // ... do closure
+        /*
+         * FIXME do closure
+         * 
+         * Only explicit statements were added to the tempStore.
+         * 
+         * For each statement in the tempStore, determine whether or not it is
+         * has a grounded justification chain. If yes, then change the statement
+         * type to inferred and we are done with that statement.
+         * 
+         * If there is no grounded justification chain for a statement then it
+         * gets put into a buffer, writing on yet another tempStore.
+         * 
+         * Once all statement in this tempStore have been processed, we delete
+         * it using clear().
+         * 
+         * We then compute the closure of the new tempStore against the database
+         * in order to discover additional statements that may no longer be
+         * supported and hence will have to be retracted. This closure operation
+         * is similar to the incremental load closure but with two twists: (1)
+         * we do NOT generate justification chains; and (2) we do NOT copy the
+         * result onto the database - instead we leave it in the new tempStore.
+         * Once we have the new set of statements to consider for retraction we
+         * simply invoke retractAll() again on that tempStore.
+         */
         
         clear();
 
