@@ -60,6 +60,20 @@ public class ClosureStats {
         
     }
     
+    public void add(ClosureStats closureStats) {
+        
+        nentailments += closureStats.nentailments;
+        
+        elapsed += closureStats.elapsed;
+        
+        for(RuleStats ruleStats:closureStats.getRuleStats()) {
+            
+            add(ruleStats);
+            
+        }
+        
+    }
+    
     /*
      * @todo obtain lock when generating the representation to avoid concurrent modification.
      */
@@ -78,17 +92,17 @@ public class ClosureStats {
             
             RuleStats stats = entry.getValue();
             
-            // @todo consider hiding low cost rules (elapsed<=10)
+            // note: hides low cost rules (elapsed<=10)
             
-            sb.append(stats.name
-                    + "\t"
-                    + stats.elapsed
-                    + "\t"
-                    + stats.numComputed
-                    + "\t"
-                    + stats.getEntailmentsPerMillisecond());
+            if(elapsed>=10) {
             
-            sb.append("\n");
+                sb.append(stats.name + "\t" + stats.elapsed + "\t"
+                        + stats.numComputed + "\t"
+                        + stats.getEntailmentsPerMillisecond());
+
+                sb.append("\n");
+                
+            }
             
             elapsed += stats.elapsed;
             
@@ -102,14 +116,20 @@ public class ClosureStats {
         
         /* details.
          * 
-         * @todo consider showing details each time for high cost rules.
+         * Note: showing details each time for high cost rules.
          */
         
         if(InferenceEngine.DEBUG) {
 
             for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
 
-                sb.append(entry.getValue()+"\n");
+                RuleStats stats = entry.getValue();
+
+                if(stats.elapsed>100) {
+
+                    sb.append(stats+"\n");
+                    
+                }
             
             }
             
