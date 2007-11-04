@@ -59,11 +59,13 @@ import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 /**
  * Test suite for writing, reading, chasing and retracting {@link Justification}s.
  * 
- * @todo test out the {@link JustificationIterator}, including remove and with
- *       more than one justification for more than one statement.
+ * FIXME isGroundedJustification - there is one simple test (directly proven)
+ * but this needs more testing.
  * 
- * @todo do test for isGroundedJustification() or possibly a proof chain
- *       iterator.
+ * @todo more tests of the {@link JustificationIterator}, including remove and
+ *       with more than one justification for more than one statement (it is
+ *       used when actually removing justifications by the
+ *       {@link AbstractTripleStore}).
  * 
  * @todo test the comparator. it is especially important that that all
  *       justifications for the same entailment are clustered.
@@ -73,10 +75,6 @@ import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
  *       Check when this is a longer or shorter array than the other where the
  *       two justifications have the same data in common up to the end of
  *       whichever is the shorter array.
- * 
- * @todo isGroundedJustification
- * 
- * @todo ProofIterator
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
