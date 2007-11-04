@@ -47,6 +47,10 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -54,8 +58,15 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.inf.SPOBuffer;
+import com.bigdata.rdf.inf.InferenceEngine.Options;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
@@ -131,7 +142,12 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         if (tempStore == null) {
 
-            tempStore = new TempTripleStore(database.getProperties());
+            Properties properties = database.getProperties();
+            
+            // turn off justifications for the tempStore.
+            properties.setProperty(Options.JUSTIFY, "false");
+            
+            tempStore = new TempTripleStore(properties);
             
         }
         
@@ -330,6 +346,16 @@ public class TMStatementBuffer implements IStatementBuffer {
         log.info("Computing closure of the temporary store with "
                 + nbeforeClosure + " statements");
 
+        /*
+         * For each statement in the tempStore that is already in the database,
+         * we convert the statement to an explicit statement (if it is not
+         * already explicit) and REMOVE the statement from the from the
+         * tempStore as a side-effect. This prevents the application of the
+         * rules to data that is already known to the database.
+         */
+
+        filterExistingStatements(tempStore, database);
+
         stats = inferenceEngine.computeClosure(tempStore);
 
         final int nafterClosure = tempStore.getStatementCount();
@@ -362,6 +388,120 @@ public class TMStatementBuffer implements IStatementBuffer {
 
     }
 
+    /**
+     * Any statements in the <i>fousStore</i> that are already in the database
+     * are converted to explicit statements (if they are not already explicit)
+     * and <strong>removed</strong> from the <i>focusStore</i> as a
+     * side-effect. This prevents the application of the rules to data that is
+     * already known to the database.
+     * 
+     * @todo this uses some techniques that are not scaleable if the focusStore
+     *       is extremely large.
+     */
+    public void filterExistingStatements(AbstractTripleStore focusStore, AbstractTripleStore database) {
+        
+        log.info("Filtering statements already known to the database");
+        
+        /*
+         * Filter used to keep some statements out of the database.
+         */
+        ISPOFilter filter = inferenceEngine.doNotAddFilter;
+
+        /*
+         * The buffer will write on the database. This will cause any statement
+         * that is found in the focusStore and already known to the database to
+         * be made into an explicit statement in the database.
+         */
+        SPOBuffer buffer = new SPOBuffer(database, filter, 10000/* capacity */,
+                false/*justified*/);
+
+        ISPOIterator itr = focusStore.getAccessPath(KeyOrder.SPO).iterator();
+
+        List<SPO> removeList = new LinkedList<SPO>();
+        
+        try {
+
+            while (itr.hasNext()) {
+
+                SPO[] chunk = itr.nextChunk();
+
+                for (SPO spo : chunk) {
+
+                    /*
+                     * Filter out statements that we do not want in the db.
+                     * 
+                     * Note: This will let in all explicit statements as
+                     * presently configured so it is here only to keep things
+                     * consistent if we change our mind about that practice.
+                     */
+                    if (filter.isMatch(spo)) {
+
+                        itr.remove();
+
+                        continue;
+
+                    }
+
+                    // Lookup the statement in the database.
+                    SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
+                    
+                    if (tmp != null) {
+
+                        // The statement is known to the database.
+
+                        if (tmp.type != StatementEnum.Explicit) {
+
+                            /*
+                             * The statement was not explicit in the database so
+                             * we buffer it. When the buffer is flushed, the
+                             * statement will be written onto the database and
+                             * made explicit.
+                             */
+
+                            buffer.add(spo, null/* justification */);
+
+                        }
+
+                        removeList.add(spo);
+
+                    }
+
+                }
+
+            }
+
+            // flush buffer statements to the database.
+            
+            buffer.flush();
+
+        } finally {
+
+            itr.close();
+
+        }
+        
+        /*
+         * Remove all statements that were known to the database from the
+         * focusStore.
+         * 
+         * @todo It might be worth doing a more efficient method for bulk
+         * statement removal. This will wind up doing M * N operations. The N
+         * are parallelized, but the M are not.
+         */
+        {
+
+            log.info("Removing "+removeList.size()+" statements already known to the database");
+            
+            for(SPO spo : removeList) {
+
+                focusStore.getAccessPath(spo.s, spo.p, spo.o).removeAll();
+                
+            }
+            
+        }
+        
+    }
+    
     /**
      * FIXME Implement TM for statement retraction.
      * 

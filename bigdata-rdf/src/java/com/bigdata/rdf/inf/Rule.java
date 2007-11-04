@@ -541,19 +541,31 @@ abstract public class Rule {
                  * In this alternative, we simply refuse to order a 3-unbound
                  * predicate to the 1st position in the evaluation order.
                  */
-                if (true && body[focusIndex].getVariableCount() < 3) {
+                
+                if (false && body[order[focusIndex]].getVariableCount() < 3) {
 
                     /*
-                     * Swap the places of those predicates in the evaluation
-                     * order such that we will evaluate the predicate at the
-                     * focusIndex 1st.
+                     * Note: This does not work since we may have already done a
+                     * rangeCount (w/o bindings) when computing the evaluation
+                     * order so we can not undo that purely by considering the
+                     * variable bindings. An alternative is to mark as "pinned"
+                     * any part of the evaluation order that have already been
+                     * tested in the data, e.g., by retaining the rangeCounts if
+                     * computed by computeEvaluationOrder.  If we do that then
+                     * we could try this simpler test again.
                      */
-
-                    int tmp = order[0];
-
-                    order[0] = order[focusIndex];
-
-                    order[focusIndex] = tmp;
+                    
+//                    /*
+//                     * Swap the places of those predicates in the evaluation
+//                     * order such that we will evaluate the predicate at the
+//                     * focusIndex 1st.
+//                     */
+//
+//                    int tmp = order[0];
+//
+//                    order[0] = order[focusIndex];
+//
+//                    order[focusIndex] = tmp;
 
                 } else {
 
@@ -572,14 +584,17 @@ abstract public class Rule {
                      * evaluation order. This will read against [focusStore +
                      * database].
                      */
-                    final int rangeCount1 = getAccessPath(0).rangeCount();
+
+                    final int rangeCount1 = getAccessPath(order[0], false/* asBound */)
+                            .rangeCount();
 
                     /*
                      * Range count for the predicate at the focusIndex. This
                      * will read against [focusStore].
                      */
-                    final int rangeCount2 = getAccessPath(focusIndex)
-                            .rangeCount();
+
+                    final int rangeCount2 = getAccessPath(order[focusIndex],
+                            false/*asBound*/).rangeCount();
 
                     if (rangeCount2 < rangeCount1) {
 
@@ -812,8 +827,9 @@ abstract public class Rule {
             
             for(int i=0; i<body.length; i++) {
 
-                int minVarCount = Integer.MAX_VALUE;
                 int index = -1;
+                int minVarCount = Integer.MAX_VALUE;
+                int minRangeCount = Integer.MAX_VALUE;
                 
                 for( int j=0; j<body.length; j++) {
                     
@@ -822,10 +838,65 @@ abstract public class Rule {
                     int varCount = body[j].getVariableCount();
                     
                     if(varCount<minVarCount) {
+                                                
+                        index = j;
                         
                         minVarCount = varCount;
                         
-                        index = j;
+                    } else if(true && varCount==minVarCount) {
+
+                        /*
+                         * Tweaks the evaluation order for predicates where the
+                         * #of variable bindings is the same by examining the
+                         * range counts.
+                         * 
+                         * Note: In doing this, we disregard the bindings that
+                         * were propagated since they are -1 and will NOT match
+                         * anything anywhere!
+                         * 
+                         * Note: In the case where some other predicate is
+                         * already first in the evaluation order by the virtue
+                         * of having more variables bound this tweak is purely
+                         * heuristic regardless of the fact that it considers
+                         * the data. The reason is that the actual bindings that
+                         * are propagated during the execution of the rule will
+                         * determine which of the two predicates under
+                         * consideration is, in fact, more selective in the
+                         * data. However, in the special case where the two
+                         * predicates are competing for the 1st position in the
+                         * evaluation order, this "tweak" is exact.
+                         * 
+                         * @todo Some tails use the same triple pattern in both
+                         * predicates. E.g., rdfs11 (u subClassOf v) (v
+                         * subClassOf x). In these cases comparing range counts
+                         * is pointless and could be avoided by testing for this
+                         * pattern.
+                         */
+                        
+                        if(minRangeCount == Integer.MAX_VALUE) {
+                            
+                            // range count of the current best choice (computed lazily).
+                            minRangeCount = getAccessPath(index,false/*asBound*/).rangeCount();
+                            
+                        }
+                        
+                        // range count of the current predicate under examination.
+                        int rangeCount = getAccessPath(j,false/*asBound*/).rangeCount();
+                        
+                        if(rangeCount<minRangeCount) {
+
+                            /*
+                             * choose the predicate that is more selective given
+                             * the variable bindings.
+                             */
+                            
+                            index = j;
+                            
+                            minVarCount = varCount;
+                            
+                            minRangeCount = rangeCount;
+                            
+                        }
                         
                     }
                     
@@ -847,7 +918,7 @@ abstract public class Rule {
             
             assert checkBindings();
            
-            log.info("Evaluation order: "+Arrays.toString(order));
+            log.info(getName()+": order="+Arrays.toString(order));
             
             return order;
             
@@ -1352,50 +1423,88 @@ abstract public class Rule {
             IAccessPath accessPath = this.accessPath[index];
             
             if (accessPath == null) {
-            
-                // based on the current bindings.
-                
-                final long s = bindings[index * N + 0];
-                final long p = bindings[index * N + 1];
-                final long o = bindings[index * N + 2];
 
-                if (focusStore == null) {
-                 
-                    accessPath = database.getAccessPath(s, p, o);
-
-                } else {
-
-                    if (index == focusIndex) {
-
-                        accessPath = focusStore.getAccessPath(s, p, o);
-
-                    } else {
-
-                        /*
-                         * Return a read-only access path for the fused view
-                         * [focusStore + database].
-                         */
-                        
-                        return new AccessPathFusedView(
-                                focusStore.getAccessPath(s, p, o),
-                                database.getAccessPath(s, p, o)
-                                );
-
-                    }
-
-                }
+                accessPath = getAccessPath(index, true/*asBound*/);
 
                 // update the cache.
                 this.accessPath[index] = accessPath;
+            
+            }
+        
+            return accessPath;
+
+        }
+
+        /**
+         * Return the {@link IAccessPath} that would be used to read from the
+         * selected tail {@link Pred} (no caching).
+         * 
+         * @param index
+         *            The index into {@link #body}.
+         * @param asBound
+         *            When <code>true</code>, the current bindings will be
+         *            used to generate the access path. When <code>false</code>
+         *            the triple pattern will use wildcards in every position
+         *            where the predicate declares a variable.
+         *            
+         * @return The {@link IAccessPath}.
+         * 
+         * @throws IndexOutOfBoundsException
+         *             if index is out of bounds.
+         */
+        public IAccessPath getAccessPath(int index, boolean asBound) {
+ 
+            final IAccessPath accessPath;
+            final long s, p, o;
+            
+            if(asBound) {
+
+                // based on the current bindings.
+                
+                s = bindings[index * N + 0];
+                p = bindings[index * N + 1];
+                o = bindings[index * N + 2];
+                
+            } else {
+                
+                // as declared by the predicate (no bindings).
+                
+                s = body[index].s.id;
+                p = body[index].p.id;
+                o = body[index].o.id;
                 
             }
-            
+
+            if (focusStore == null) {
+                 
+                accessPath = database.getAccessPath(s, p, o);
+
+            } else {
+
+                if (index == focusIndex) {
+
+                    accessPath = focusStore.getAccessPath(s, p, o);
+
+                } else {
+
+                    /*
+                     * Return a read-only access path for the fused view
+                     * [focusStore + database].
+                     */
+
+                    return new AccessPathFusedView(focusStore.getAccessPath(s,
+                            p, o), database.getAccessPath(s, p, o));
+
+                }
+
+            }
+
             return accessPath;
             
         }
 
-//        /**
-//         * The index of the {@link Rule#body}[] predicate that is the most
+// /**
+// * The index of the {@link Rule#body}[] predicate that is the most
 //         * selective given the data and the current variable bindings.
 //         * 
 //         * @return The index of the {@link Pred} in {@link #body} that is the

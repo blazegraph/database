@@ -60,6 +60,7 @@ import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -417,6 +418,13 @@ public class RdfKeyBuilder {
      * directly. For example, if you provide (s,p,o) then you could form the
      * (p,o,s) key by copying 8 byte sections of the returned sort key around to
      * generate the desired permutation.
+     * <p>
+     * Note: When an identifier is {@link IRawTripleStore#NULL} we can generate
+     * a shorter key by not including the NULL value.  This should be fine since
+     * identifiers SHOULD NOT be NULL unless they are in the tail position(s) of
+     * a triple pattern.  Such keys are always used for rangeCount or rangeQuery
+     * purposes where the additional length does not matter (unless it interacts
+     * with how we choose to compact the keys for RPC calls).
      * 
      * @param id1
      *            An RDF value identifier from the term index.

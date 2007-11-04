@@ -418,7 +418,9 @@ public class DataLoader {
             log.info("commit: latency="+totals.commitTime+"ms");
 
         }
-                
+
+        log.info("Loaded "+resource.length+" resources: "+totals);
+        
         return totals;
         
     }

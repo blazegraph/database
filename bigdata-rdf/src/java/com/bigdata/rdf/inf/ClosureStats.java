@@ -71,9 +71,14 @@ public class ClosureStats {
         
         sb.append("rule    \tms\t#entms\tentms/ms\n");
 
+        long elapsed = 0;
+        long numComputed = 0;
+        
         for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
             
             RuleStats stats = entry.getValue();
+            
+            // @todo consider hiding low cost rules (elapsed<=10)
             
             sb.append(stats.name
                     + "\t"
@@ -85,14 +90,28 @@ public class ClosureStats {
             
             sb.append("\n");
             
+            elapsed += stats.elapsed;
+            
+            numComputed += stats.numComputed;
+            
         }
 
-        // details.
+        sb.append("totals: elapsed=" + elapsed + ", numComputed="
+                        + numComputed + ", entailments/sec="
+                        + (elapsed==0?"N/A":(long) (numComputed * 1000d / elapsed)+"\n"));
         
-        for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
+        /* details.
+         * 
+         * @todo consider showing details each time for high cost rules.
+         */
+        
+        if(InferenceEngine.DEBUG) {
 
-            sb.append(entry.getValue()+"\n");
+            for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
+
+                sb.append(entry.getValue()+"\n");
             
+            }
             
         }
         

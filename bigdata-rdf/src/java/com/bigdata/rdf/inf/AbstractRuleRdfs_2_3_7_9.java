@@ -83,14 +83,24 @@ public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleNestedSubquer
           Pred[] body
           ) {
 
-        super( db, head, body );
-
-        // only two predicates in the tail.
-        assert body.length == 2;
-        
-        // only one shared variable.
-        assert getSharedVars(0/*body[0]*/, 1/*body[1]*/).size() == 1;
+        this(db,head,body,null);
         
     }
     
+    public AbstractRuleRdfs_2_3_7_9
+    ( AbstractTripleStore db, 
+      Triple head, 
+      Pred[] body,
+      IConstraint[] constraints
+      ) {
+
+        super(db, head, body, constraints);
+
+        // only two predicates in the tail.
+        assert body.length == 2;
+
+        // only one shared variable.
+        assert getSharedVars(0/* body[0] */, 1/* body[1] */).size() == 1;
+
+    }
 }

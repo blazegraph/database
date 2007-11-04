@@ -60,7 +60,11 @@ public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
                 new Pred[] {//
                     new Triple(var("a"), inf.rdfsSubPropertyOf, var("b")),//
                     new Triple(var("u"), var("a"), var("y"))//
-                });
+                },
+                new IConstraint[] {
+                    new NE(var("a"),var("b"))
+                }
+        );
 
     }
 
