@@ -494,7 +494,7 @@ public class DataLoader {
                 
                 log.info("Computing closure.");
                 
-                stats.closureStats = doClosure();
+                stats.closureStats.add(doClosure());
                 
             }
             

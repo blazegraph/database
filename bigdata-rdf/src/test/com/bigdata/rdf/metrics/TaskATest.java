@@ -227,10 +227,27 @@ public class TaskATest
         
         Properties properties = new Properties(getProperties());
 
+        /*
+         * Note: the interesting comparisons are None (close the database once
+         * the data are loaded into the database) and incremental (load each
+         * file into a temporary store and then close the temporary store
+         * against the databaser).
+         * 
+         * Note: these data sets are getting loaded into distinct databases.
+         * Wordnet D+S and S+D are the only exceptions, where we load two files
+         * into a single database.
+         * 
+         * @todo an interesting comparison is to load all data into a single
+         * database and then compute its closure.
+         * 
+         * @todo if the various uniprot data sets are related (and I am not sure
+         * about that) then they should be loaded as a single data set.
+         */
+        
         // whether and when to compute the closure.
 //        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Incremental.toString());
-        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Batch.toString());
-//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+//        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.Batch.toString());
+        properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
         // after every set of resources loaded.
         properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
@@ -264,11 +281,17 @@ public class TaskATest
         
         loadStats = dataLoader.loadData(resource, baseURL, rdfFormat);
         
-        if(false && dataLoader.getClosureEnum()==ClosureEnum.None) {
+        if(dataLoader.getClosureEnum()==ClosureEnum.None) {
             
-            // compute the full closure of the database.
+            /*
+             * When None is selected above we compute the full closure of the
+             * database after the file(s) have been loaded. In this case the
+             * told triples are written directly on the database rather than
+             * onto a temporary store and the closure of the database is
+             * computed - this is the fastest way to close a large data set.
+             */
             
-            loadStats.closureStats = dataLoader.doClosure();
+            loadStats.closureStats.add( dataLoader.doClosure() );
             
         }
 
@@ -365,18 +388,18 @@ public class TaskATest
             "wordnetD+S",
             "-rdf data/wordnet_nouns-20010201.rdf -rdf data/wordnet-20000620.rdfs",
 
-            // @todo do closure times for cyc - it has a lot of subClassOf stuff.
-//            "OpenCyc",
-//            "cyc",
-//            "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
+            // cyc has a lot of subClassOf stuff.
+            "OpenCyc",
+            "cyc",
+            "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
 
             "NCI Oncology (old)",
             "nciOncology",
             "-rdf data/nciOncology.owl",
 
-//            "NCI Oncology (new)", // ftp://ftp1.nci.nih.gov/pub/cacore/EVS/Thesaurus_06.04d.OWL.zip
-//            "Thesaurus",
-//            "-rdf data/Thesaurus.owl",
+            "NCI Oncology (new)", // ftp://ftp1.nci.nih.gov/pub/cacore/EVS/Thesaurus_06.04d.OWL.zip
+            "Thesaurus",
+            "-rdf data/Thesaurus.owl",
 
         /*
          * @todo I have seen what appears to be a tight loop emerge during
@@ -386,9 +409,9 @@ public class TaskATest
          * occasionally results in non-terminating loops?
          */
          // Very large data set with large ontology.
-//          "Uniprot Protein Sequence Taxonomy",
-//          "taxonomy",
-//          "-rdf data/taxonomy.rdf" // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
+          "Uniprot Protein Sequence Taxonomy",
+          "taxonomy",
+          "-rdf data/taxonomy.rdf" // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
             
     };
 
@@ -513,9 +536,15 @@ public class TaskATest
      * @param elapsed
      * @return
      */
-    private long tps(long ntriples, long elapsed) {
+    private String tps(long ntriples, long elapsed) {
         
-        return ((long)( ((double)ntriples) / ((double)elapsed) * 1000d ));
+        if(elapsed==0) {
+            
+            return "N/A";
+            
+        }
+        
+        return ""+(long) (ntriples * 1000d / elapsed);
         
     }
     
