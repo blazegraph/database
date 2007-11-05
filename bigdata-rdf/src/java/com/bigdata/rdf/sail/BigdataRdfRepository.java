@@ -1107,7 +1107,7 @@ public class BigdataRdfRepository implements RdfRepository {
             
             rangeCount = rangeCount(tp);
 
-            System.err.println("rangeCount: " + rangeCount + " : " + pe);
+            log.info("rangeCount: " + rangeCount + " : " + pe);
             
             rangeCounts.put(pe,rangeCount);
             
