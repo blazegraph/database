@@ -68,11 +68,7 @@ public enum StatementEnum {
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred((byte)2),
-    /**
-     * A statement that is undergoing truth maintenance.
-     */
-    Suspended((byte)3);
+    Inferred((byte)2);
 
     private final byte code;
     
@@ -94,7 +90,6 @@ public enum StatementEnum {
      * <li>Explicit</li>
      * <li>Axiom</li>
      * <li>Inferred</li>
-     * <li>Suspended</li>
      * </ul>
      * @param a
      * @param b
@@ -122,7 +117,6 @@ public enum StatementEnum {
         case 0: return Explicit;
         case 1: return Axiom;
         case 2: return Inferred;
-        case 3: return Suspended;
         default: throw new RuntimeException("Unexpected byte: "+val[0]);
         }
         

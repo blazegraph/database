@@ -53,11 +53,9 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
- * A buffer for {@link SPO}s.
- * <p>
- * Note: {@link ISPOBuffer}s are used to collect {@link SPO}s into chunks that
- * can be sorted in order to support efficient batch operations on statement
- * indices.
+ * A buffer for {@link SPO}s. {@link ISPOBuffer}s are used to collect
+ * {@link SPO}s into chunks that can be sorted in order to support efficient
+ * batch operations on statement indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,14 +79,11 @@ public interface ISPOBuffer {
      * 
      * @param spo
      *            The {@link SPO}.
-     * @param justification
-     *            The justification for that {@link SPO} (optional, depending on
-     *            the TM strategy and only if the {@link SPO} is an inference).
      * 
      * @return true if the buffer will store the statement (i.e., the statement
      *         is not excluded by the filter).
      */
-    public boolean add(SPO spo, Justification justification);
+    public boolean add(SPO spo);
 
     /**
      * Flush any buffered statements to the backing store.
@@ -97,8 +92,8 @@ public interface ISPOBuffer {
      *         that was previously an axiom or inferred and that is converted to
      *         an explicit statement by this method will be reported in this
      *         count as well as any statement that was not pre-existing in the
-     *         database).
-     *         
+     *         database). Statement removal also counts as a "write".
+     * 
      * @see IRawTripleStore#addStatements(ISPOIterator, ISPOFilter)
      */
     public int flush();

@@ -42,44 +42,67 @@ Modifications:
 
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Nov 5, 2007
  */
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Test suite for truth maintenance when statements are deleted from the
- * database.
- * 
- * @todo trivial test with a few statements, compute the closure, and then
- *       retract some statements and verify that we recover the correct closure.
- * 
- * @todo is there an efficient way to prove that two {@link AbstractTripleStore}s
- *       are the same? We have to materialize the terms in order to verify that
- *       the same terms are bound for the statements. Also, if the terms were
- *       created in a different order, then the term identifiers will differ. In
- *       this case the statement indices will not visit the statements in the
- *       same order.
+ * A buffer for {@link SPO}s which causes the corresponding statements (and
+ * their {@link Justification}s) be retracted from the database when it is
+ * {@link #flush()}ed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRDFSTruthMaintenance extends AbstractInferenceEngineTestCase {
+public class SPORetractionBuffer extends AbstractSPOBuffer {
 
-    public TestRDFSTruthMaintenance() {
+    /**
+     * @param store
+     * @param capacity
+     */
+    public SPORetractionBuffer(AbstractTripleStore store, int capacity) {
         
-    }
-    
-    public TestRDFSTruthMaintenance(String name) {
-        super(name);
+        super(store, null/*filter*/, capacity);
+        
     }
 
-    public void testNothing() {
+    public int flush() {
+
+        if (isEmpty()) return 0;
+
+        log.info("numStmts=" + numStmts);
+
+        final long begin = System.currentTimeMillis();
+
+        int n = 0;
+
+        /*
+         * @todo It might be worth doing a more efficient method for bulk
+         * statement removal. This will wind up doing M * N operations. The N
+         * are parallelized, but the M are not.
+         */
+
+        for(int i=0; i<numStmts; i++) {
+
+            SPO spo = stmts[i];
+            
+            n += store.getAccessPath(spo.s, spo.p, spo.o).removeAll();
         
-        fail("write tests");
+        }
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Retracted "+n+" statements in "+elapsed+"ms");
+
+        // reset the counter.
+        numStmts = 0;
+
+        return n;
         
     }
-    
+
 }

@@ -88,7 +88,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
-import com.bigdata.rdf.inf.SPOBuffer;
+import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
@@ -691,7 +691,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
+        public ISPOIterator iterator(ISPOFilter filter) {
+
+            return new SPOArrayIterator(new SPO[]{},0);
+            
+        }
+
         public ISPOIterator iterator(int limit, int capacity) {
+
+            return new SPOArrayIterator(new SPO[]{},0);
+            
+        }
+
+        public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter) {
 
             return new SPOArrayIterator(new SPO[]{},0);
             
@@ -704,6 +716,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
 
         public int removeAll() {
+
+            return 0;
+            
+        }
+        
+        public int removeAll(ISPOFilter filter) {
 
             return 0;
             
@@ -815,6 +833,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
+        public ISPOIterator iterator() {
+            
+            return iterator(null/*filter*/);
+            
+        }
+
         /**
          * FIXME This currently sucks everything into an array. Get traversal
          * with concurrent modification working for {@link IEntryIterator} and
@@ -823,7 +847,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * <p>
          * Note: the {@link Rule}s basically assume that they can traverse the
          * statement indices with concurrent modification of those indices (the
-         * {@link SPOBuffer} incrementally flushes the results to the database,
+         * {@link SPOAssertionBuffer} incrementally flushes the results to the database,
          * which means that it is writing on the statement indices at the same
          * time as we are reading from those indices).
          * <p>
@@ -872,28 +896,29 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * has not been solved for computing closure or truth maintenance on
          * statement removal.)
          */
-        public ISPOIterator iterator() {
+        public ISPOIterator iterator(ISPOFilter filter) {
 
             if (allBound) {
 
                 // Optimization for point test.
 
-                return new SPOArrayIterator(AbstractTripleStore.this, this, 1/* limit */);
+                return new SPOArrayIterator(AbstractTripleStore.this, this,
+                        1/* limit */, filter);
 
             }
-            
+
             /*
              * This is an async incremental iterator that buffers some but not
              * necessarily all statements.
              */
-//            return iterator(0/*limit*/, 0/*capacity*/);
-            
+            // return iterator(0/*limit*/, 0/*capacity*/, filter);
             /*
              * This is a synchronous read that buffers all statements.
              */
-            
-            return new SPOArrayIterator(AbstractTripleStore.this,this,0/*no limit*/);
-            
+
+            return new SPOArrayIterator(AbstractTripleStore.this, this,
+                    0/* no limit */, filter);
+
         }
 
         /**
@@ -904,11 +929,24 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          */
         public ISPOIterator iterator(int limit, int capacity) {
 
+            return iterator(limit, capacity, null/*filter*/);
+            
+        }
+
+        /**
+         * Note: Return an iterator that will use transparent read-ahead when no
+         * limit is specified (limit is zero) or the limit is "small".
+         * 
+         * @see SPOIterator
+         */
+        public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter) {
+
             if (allBound) {
 
                 // Optimization for point test.
 
-                return new SPOArrayIterator(AbstractTripleStore.this, this, 1/* limit */);
+                return new SPOArrayIterator(AbstractTripleStore.this, this,
+                        1/* limit */, filter);
 
             }
 
@@ -919,14 +957,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                  * the limit is small, especially when all that you are doing is
                  * an existence test (limit := 1).
                  */
-                
-                return new SPOArrayIterator(AbstractTripleStore.this,this,limit);
-                
+
+                return new SPOArrayIterator(AbstractTripleStore.this, this,
+                        limit, filter);
+
             }
-            
+
             boolean async = true;
-            
-            return new SPOIterator(this, limit, capacity, async);
+
+            return new SPOIterator(this, limit, capacity, async, filter);
 
         }
         
@@ -1046,12 +1085,24 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * the triple pattern have been removed.
          */
         public int removeAll() {
+            
+            return removeAll(null/*filter*/);
+            
+        }
+        
+        /**
+         * This materializes a set of {@link SPO}s at a time and then submits
+         * tasks to parallel threads to remove those statements from each of the
+         * statement indices. This continues until all statements selected by
+         * the triple pattern have been removed.
+         */
+        public int removeAll(ISPOFilter filter) {
 
             // @todo try with an asynchronous read-ahead iterator.
 //            ISPOIterator itr = iterator(0,0);
             
             // synchronous fully buffered iterator.
-            ISPOIterator itr = iterator();
+            ISPOIterator itr = iterator(filter);
             
             int nremoved = 0;
             
@@ -1144,7 +1195,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                                 }
                                 
                                 byte[] key = keyBuilder.statement2Key(keyOrder, spo);
-                                
+
                                 if(ndx.remove( key )==null) {
                                     
                                     throw new AssertionError(
@@ -1825,10 +1876,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             throw new IllegalArgumentException();
         
         // obtain a chunked iterator reading from any access path.
-        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator();
+        ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(filter);
         
         // add statements to the target store.
-        return dst.addStatements(itr, filter);
+        return dst.addStatements(itr, null/*filter*/);
 
     }
     
@@ -2054,14 +2105,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                                 for (int i = 0; i < numToAdd; i++) {
 
+                                    SPO spo = stmts[i];
+                                    
                                     byte[] oldval = (byte[]) ndx
                                             .lookup(keys[i]);
 
-                                    if (oldval == null) {
+                                    if (oldval == null || spo.override) {
 
-                                        // Statement is NOT pre-existing.
+                                        /*
+                                         * Statement is NOT pre-existing -or- we
+                                         * are downgrading a statement from
+                                         * explicit to inferred during TM.
+                                         */
 
-                                        ndx.insert(keys[i], stmts[i].type
+                                        ndx.insert(keys[i], spo.type
                                                 .serialize());
 
                                         writeCount++;
@@ -2073,7 +2130,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                                                 .deserialize(oldval);
 
                                         // proposed statement type.
-                                        StatementEnum newType = stmts[i].type;
+                                        StatementEnum newType = spo.type;
 
                                         // choose the max of the old and the
                                         // proposed.

@@ -319,7 +319,7 @@ abstract public class Rule {
      */
     public State newState(boolean justify,
                 AbstractTripleStore database,
-                SPOBuffer buffer) {
+                SPOAssertionBuffer buffer) {
         
         return newState(0/* index */,justify,null/* focusStore */,database,buffer);
         
@@ -328,7 +328,7 @@ abstract public class Rule {
     public State newState(int index, boolean justify,
                 AbstractTripleStore focusStore,
                 AbstractTripleStore database,
-                SPOBuffer buffer) {
+                SPOAssertionBuffer buffer) {
         
         return new State(index, justify, focusStore, database, buffer);
         
@@ -392,7 +392,7 @@ abstract public class Rule {
      * (new, new+db), where "new" is a focusStore.
      * 
      * @see Rule#fixedPoint(ClosureStats, Rule[], boolean, AbstractTripleStore,
-     *      AbstractTripleStore, SPOBuffer)
+     *      AbstractTripleStore, SPOAssertionBuffer)
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -429,7 +429,7 @@ abstract public class Rule {
          * Used to buffer entailments so that we can perform efficient ordered
          * writes on the statement indices.
          */
-        public final SPOBuffer buffer;
+        public final SPOAssertionBuffer buffer;
         
         /**
          * Instance array of bindings for each term in the tail in the order in
@@ -487,7 +487,7 @@ abstract public class Rule {
         private State(int focusIndex, boolean justify,
                 AbstractTripleStore focusStore,
                 AbstractTripleStore database,
-                SPOBuffer buffer) {
+                SPOAssertionBuffer buffer) {
 
             assert focusIndex >= 0;
             assert focusIndex <= body.length;
@@ -640,7 +640,7 @@ abstract public class Rule {
         /**
          * Emits an {@link SPO} entailment based on the current variable bindings
          * for the {@link #head}, and its {@link Justification} iff required, to
-         * the {@link SPOBuffer}.
+         * the {@link SPOAssertionBuffer}.
          */
         protected void emit() {
             
@@ -1584,7 +1584,7 @@ abstract public class Rule {
      *       for both map parallelism and for parallelism of subqueries within
      *       rules.
      *       <p>
-     *       Make the {@link SPOBuffer} thread-safe so that the N passes may be
+     *       Make the {@link SPOAssertionBuffer} thread-safe so that the N passes may be
      *       concurrent and they all write onto the same buffer, hence their
      *       union is automatically visible in the iterator wrapping that
      *       buffer.
@@ -1596,7 +1596,7 @@ abstract public class Rule {
      *       but {@link RuleStats#add(RuleStats)} also needs to be thread-safe.
      */
     public RuleStats apply(boolean justify, AbstractTripleStore focusStore,
-            AbstractTripleStore database, SPOBuffer buffer) { 
+            AbstractTripleStore database, SPOAssertionBuffer buffer) { 
     
         if (focusStore == null) {
 
@@ -1696,7 +1696,7 @@ abstract public class Rule {
      */
     static public ClosureStats fixedPoint(ClosureStats closureStats,
             Rule[] rules, boolean justify, AbstractTripleStore focusStore,
-            AbstractTripleStore database, SPOBuffer buffer) {
+            AbstractTripleStore database, SPOAssertionBuffer buffer) {
         
         final int nrules = rules.length;
 

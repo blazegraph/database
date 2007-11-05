@@ -73,6 +73,17 @@ public class SPO {
     public final StatementEnum type;
     
     /**
+     * When this field is set the statement will be written onto the database
+     * with exactly its current {@link #type}. This feature is used during
+     * Truth Maintenance when we need to downgrade an {@link SPO} from
+     * "Explicit" to "Inferred". Normally, a statement is automatically upgraded
+     * from "Inferred" to "Explicit" so within this {@link #override} you could
+     * not downgrade the {@link StatementEnum} in the database without first
+     * deleting the statement (which would also delete its justifications).
+     */
+    public transient boolean override = false;
+    
+    /**
      * Construct a statement.
      * <p>
      * Note: When the statement is {@link StatementEnum#Inferred} you MUST also
@@ -146,6 +157,33 @@ public class SPO {
         }
 
         type = StatementEnum.deserialize((byte[])val); 
+        
+    }
+
+    /**
+     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
+     */
+    public final boolean isExplicit() {
+        
+        return type == StatementEnum.Explicit;
+        
+    }
+    
+    /**
+     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Inferred}. 
+     */
+    public final boolean isInferred() {
+        
+        return type == StatementEnum.Inferred;
+        
+    }
+    
+    /**
+     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Axiom}. 
+     */
+    public final boolean isAxiom() {
+        
+        return type == StatementEnum.Axiom;
         
     }
     

@@ -79,6 +79,8 @@ public class ClosureStats {
      */
     public String toString() {
 
+        if(rules.isEmpty()) return "No rules were run.\n";
+        
         StringBuilder sb = new StringBuilder();
         
         // summary
@@ -94,7 +96,7 @@ public class ClosureStats {
             
             // note: hides low cost rules (elapsed<=10)
             
-            if(elapsed>=10) {
+            if(stats.elapsed>=10) {
             
                 sb.append(stats.name + "\t" + stats.elapsed + "\t"
                         + stats.numComputed + "\t"
@@ -119,7 +121,7 @@ public class ClosureStats {
          * Note: showing details each time for high cost rules.
          */
         
-        if(InferenceEngine.DEBUG) {
+//        if(InferenceEngine.DEBUG) {
 
             for( Map.Entry<String,RuleStats> entry : rules.entrySet() ) {
 
@@ -133,7 +135,7 @@ public class ClosureStats {
             
             }
             
-        }
+//        }
         
         return sb.toString();
         

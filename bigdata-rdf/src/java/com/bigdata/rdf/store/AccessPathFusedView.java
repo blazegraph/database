@@ -51,6 +51,7 @@ import java.util.Iterator;
 
 import com.bigdata.btree.FusedEntryIterator;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.util.KeyOrder;
@@ -151,7 +152,13 @@ public class AccessPathFusedView implements IAccessPath {
      */
     public ISPOIterator iterator() {
 
-        return new SPOArrayIterator(null/* db */, this, 0/* no limit */);
+        return iterator(null/*filter*/);
+
+    }
+
+    public ISPOIterator iterator(ISPOFilter filter) {
+
+        return new SPOArrayIterator(null/* db */, this, 0/* no limit */, filter);
 
     }
 
@@ -161,7 +168,13 @@ public class AccessPathFusedView implements IAccessPath {
      */
     public ISPOIterator iterator(int limit, int capacity) {
 
-        return new SPOArrayIterator(null/* db */, this, limit);
+        return iterator(limit,capacity,null/*filter*/);
+        
+    }
+
+    public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter) {
+
+        return new SPOArrayIterator(null/* db */, this, limit, filter);
         
     }
 
@@ -173,6 +186,12 @@ public class AccessPathFusedView implements IAccessPath {
     }
 
     public int removeAll() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public int removeAll(ISPOFilter filter) {
         
         throw new UnsupportedOperationException();
         

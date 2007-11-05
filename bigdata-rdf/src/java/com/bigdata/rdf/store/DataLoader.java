@@ -62,6 +62,8 @@ import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.inf.TMStatementBuffer;
+import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
@@ -324,7 +326,7 @@ public class DataLoader {
         if (closureEnum != ClosureEnum.None) {
             
             buffer = new TMStatementBuffer(inferenceEngine, bufferCapacity,
-                    true/* buffer contains assertions */);
+                    BufferEnum.AssertionBuffer);
             
         } else {
             

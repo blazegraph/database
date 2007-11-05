@@ -51,7 +51,7 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.rdf.inf.SPOBuffer;
+import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
@@ -76,6 +76,12 @@ public class SPOArrayIterator implements ISPOIterator {
      * <code>null</code> if not known.
      */
     private final KeyOrder keyOrder;
+
+//    /**
+//     * Optional filter. When non-<code>null</code>, only matching statements
+//     * will be vistied.
+//     */
+//    private final ISPOFilter filter;
     
     /** SPO buffer. */
     private SPO[] stmts;
@@ -132,6 +138,7 @@ public class SPOArrayIterator implements ISPOIterator {
         
         this.numStmts = numStmts;
 
+//        this.filter = null;
         
     }
 
@@ -149,8 +156,12 @@ public class SPOArrayIterator implements ISPOIterator {
      *            The statements.
      * @param numStmts
      *            The #of entries in <i>stmts</i> that are valid.
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, KeyOrder keyOrder, SPO[] stmts, int numStmts) {
+    public SPOArrayIterator(AbstractTripleStore db, KeyOrder keyOrder,
+            SPO[] stmts, int numStmts, ISPOFilter filter) {
 
         this.db = db; // MAY be null (remove() will be disabled).
 
@@ -159,6 +170,8 @@ public class SPOArrayIterator implements ISPOIterator {
         this.stmts = stmts;
         
         this.numStmts = numStmts;
+        
+//        this.filter = filter;
 
     }
 
@@ -182,9 +195,14 @@ public class SPOArrayIterator implements ISPOIterator {
      *            When non-zero, this is the maximum #of {@link SPO}s that will
      *            be read. When zero, all {@link SPO}s for that access path
      *            will be read and buffered.
+     * 
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, IAccessPath accessPath, int limit) {
-        
+    public SPOArrayIterator(AbstractTripleStore db, IAccessPath accessPath,
+            int limit, ISPOFilter filter) {
+
         if (accessPath == null)
             throw new IllegalArgumentException();
 
@@ -195,6 +213,8 @@ public class SPOArrayIterator implements ISPOIterator {
         
         this.keyOrder = accessPath.getKeyOrder();
 
+//        this.filter = filter;
+        
         final int rangeCount = accessPath.rangeCount();
 
         final int n = limit > 0 ? Math.min(rangeCount, limit) : rangeCount;
@@ -203,6 +223,8 @@ public class SPOArrayIterator implements ISPOIterator {
 
         /*
          * Materialize the matching statements.
+         * 
+         * @todo for scale-out, pass the filter to the data service.
          */
         
         IEntryIterator itr = accessPath.rangeQuery();
@@ -213,7 +235,15 @@ public class SPOArrayIterator implements ISPOIterator {
 
             Object val = itr.next();
 
-            stmts[i++] = new SPO(keyOrder, itr.getKey(), val);
+            SPO spo = new SPO(keyOrder, itr.getKey(), val);
+            
+            if (filter != null && !filter.isMatch(spo)) {
+
+                continue;
+                
+            }
+            
+            stmts[i++] = spo;
 
         }
 
@@ -269,7 +299,7 @@ public class SPOArrayIterator implements ISPOIterator {
      * {@link SPOIterator}. However, note that this method is only useful if
      * you are using the iterator in its one-at-a-time mode. If you are using
      * the chunked mode of the iterator then we need a remove(SPO) method here.
-     * It should just write on an interal {@link SPOBuffer} which removes the
+     * It should just write on an interal {@link SPOAssertionBuffer} which removes the
      * statements from the database when it is flushed. The buffer should be
      * flushed when the iterator is exhausted.
      */

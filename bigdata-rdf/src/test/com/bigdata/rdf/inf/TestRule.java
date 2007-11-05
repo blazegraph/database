@@ -115,7 +115,7 @@ public class TestRule extends AbstractRuleTestCase {
             
             Rule r = new MyRule(store, head, body);
 
-            State s = r.newState(false/* justify */, store, new SPOBuffer(
+            State s = r.newState(false/* justify */, store, new SPOAssertionBuffer(
                     store, null/*filter*/,100/*capacity*/,false/* justify */));
             
             // write out the rule on the console.
@@ -209,7 +209,7 @@ public class TestRule extends AbstractRuleTestCase {
 
             Rule r = new MyRulePattern1(new RDFSHelper(store));
 
-            State s = r.newState(false/* justify */, store, new SPOBuffer(store,
+            State s = r.newState(false/* justify */, store, new SPOAssertionBuffer(store,
                     null/* filter */, 100/* capacity */, false/* justify */));
             
             // (u rdfs:subClassOf x)
