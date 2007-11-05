@@ -49,10 +49,13 @@ package com.bigdata.rdf.inf;
 
 import java.util.Properties;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
+import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;

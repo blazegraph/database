@@ -150,6 +150,9 @@ public class TestAll extends TestCase {
         // test suite for RDFS closure correctness.
         suite.addTestSuite( TestRDFSClosure.class );
 
+        // test suite for basic TM mechansism encapsulated by this class.
+        suite.addTestSuite( TestTMStatementBuffer.class );
+        
         // test suite for RDFS closure correctness with incremental load (TM).
         suite.addTestSuite( TestRDFSIncrementalClosure.class );
 

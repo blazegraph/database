@@ -184,7 +184,13 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         return false;
         
     }
-     
+    
+    public String toString() {
+        
+        return super.toString()+":#stmts="+numStmts;
+        
+    }
+    
     abstract public int flush();
     
     public boolean add( SPO stmt ) {
