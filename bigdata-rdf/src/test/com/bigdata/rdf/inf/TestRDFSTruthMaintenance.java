@@ -53,8 +53,18 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Test suite for truth maintenance when statements are deleted from the
  * database.
  * 
- * @todo trivial test with a few statements, compute the closure, and then
- *       retract some statements and verify that we recover the correct closure.
+ * @todo write some tests that load up a 2-part data set, then retract one part,
+ *       then add it back in again and verify the correct closures at each
+ *       stage.
+ * 
+ * @todo stress test that loads an arbitrary data set. scan the statement
+ *       indices in some order, selecting N explicit statement to delete. Delete
+ *       them, update the closure, and then add the statements back in and
+ *       verify that the original closure was restored. note that this test by
+ *       itself does not guarentee that any entailments of those explicit
+ *       statements were removed - we need to write other tests for that. repeat
+ *       several times on the dataset, potentially doing multiple retractions
+ *       before we back out of them.
  * 
  * @todo is there an efficient way to prove that two {@link AbstractTripleStore}s
  *       are the same? We have to materialize the terms in order to verify that
@@ -75,11 +85,4 @@ public class TestRDFSTruthMaintenance extends AbstractInferenceEngineTestCase {
     public TestRDFSTruthMaintenance(String name) {
         super(name);
     }
-
-    public void testNothing() {
-        
-        fail("write tests");
-        
-    }
-    
 }

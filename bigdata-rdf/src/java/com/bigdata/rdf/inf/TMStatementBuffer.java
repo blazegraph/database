@@ -49,6 +49,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Properties;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -58,7 +59,6 @@ import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -95,6 +95,18 @@ public class TMStatementBuffer implements IStatementBuffer {
      */
     public static final Logger log = Logger.getLogger(TMStatementBuffer.class);
     
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     private final int bufferCapacity;
     
     /**
@@ -350,9 +362,9 @@ public class TMStatementBuffer implements IStatementBuffer {
 
     /**
      * Any statements in the <i>fousStore</i> that are already in the database
-     * are <strong>optionally</strong> converted to explicit statements (if
-     * they are not already explicit) and <strong>removed</strong> from the
-     * <i>focusStore</i> as a side-effect.
+     * are <strong>optionally</strong> converted to explicit statements (iff
+     * they are not already explicit AND <code>upgrade := true</code>) and
+     * <strong>removed</strong> from the <i>focusStore</i> as a side-effect.
      * 
      * @param focusStore
      * @param database
@@ -365,24 +377,16 @@ public class TMStatementBuffer implements IStatementBuffer {
      * @todo this uses some techniques that are not scaleable if the focusStore
      *       is extremely large.
      */
-    private int filterExistingStatements(AbstractTripleStore focusStore, AbstractTripleStore database, boolean upgrade) {
+    private int filterExistingStatements(AbstractTripleStore focusStore,
+            AbstractTripleStore database, boolean upgrade) {
         
         final long begin = System.currentTimeMillis();
-        
-        /*
-         * Filter used to keep some statements out of the database.
-         * 
-         * Note: This will let in all explicit statements as presently
-         * configured so it is here only to keep things consistent if we change
-         * our mind about that practice.
-         */
-        final ISPOFilter filter = inferenceEngine.doNotAddFilter;
         
         /*
          * Visit statements in the tempStore.
          */
         final ISPOIterator itr = focusStore.getAccessPath(KeyOrder.SPO)
-                .iterator(filter);
+                .iterator();
 
         int nremoved = 0;
         
@@ -393,13 +397,17 @@ public class TMStatementBuffer implements IStatementBuffer {
             final int tempStoreSize = tempStore.getStatementCount();
             
             /*
-             * This buffer will write on the database causing any statement that is
-             * found in the focusStore and already known to the database to be made
-             * into an explicit statement in the database.
+             * This buffer will write on the database causing any statement that
+             * is found in the focusStore and already known to the database to
+             * be made into an explicit statement in the database.
+             * 
+             * Note: we pass along the DoNotAddFilter. This will let in all
+             * explicit statements as presently configured so it is here only to
+             * keep things consistent if we change our mind about that practice.
              */
             
             final SPOAssertionBuffer assertionBuffer = new SPOAssertionBuffer(database,
-                    filter, tempStoreSize/* capacity */, false/* justified */);
+                    inferenceEngine.doNotAddFilter, tempStoreSize/* capacity */, false/* justified */);
 
             /*
              * This buffer will retract statements from the tempStore that are
@@ -469,7 +477,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         }
 
-        final long elapsed = System.currentTimeMillis();
+        final long elapsed = System.currentTimeMillis() - begin;
 
         log.info("Removed "
                 + nremoved
@@ -604,6 +612,9 @@ public class TMStatementBuffer implements IStatementBuffer {
         // #of given statements to retract.
         final int ngiven = tempStore.getStatementCount();
         
+        log.info("Computing closure of the temporary store with "
+                + ngiven+ " statements");
+
         // do truth maintenance.
         retractAll(stats,tempStore);
         
@@ -683,8 +694,10 @@ public class TMStatementBuffer implements IStatementBuffer {
      */
     private void retractAll(ClosureStats stats, AbstractTripleStore tempStore) {
 
-        log.info("Doing truth maintenance with "
-                + tempStore.getStatementCount() + " statements");
+        final int tempStoreCount = tempStore.getStatementCount();
+
+        log.info("Doing truth maintenance with " + tempStoreCount
+                + " statements");
         
         /*
          * Temp store used to absorb statements for which no grounded
@@ -802,10 +815,12 @@ public class TMStatementBuffer implements IStatementBuffer {
         // drop the tempStore.
         tempStore.closeAndDelete();
 
-        if (focusStore.getStatementCount() == 0) {
+        int focusStoreCount = focusStore.getStatementCount();
+
+        if (focusStoreCount == 0) {
 
             // Done.
-            
+
             log.info("Done - focus store is empty after retraction.");
 
             return;
@@ -824,13 +839,43 @@ public class TMStatementBuffer implements IStatementBuffer {
             TempTripleStore tmp = new TempTripleStore(database.getProperties());
 
             // copy all statements in the focusStore so that we can subtract them out below.
-            focusStore.copyStatements(tmp, null/*filter*/);
+            final int ncopied = focusStore.copyStatements(tmp, null/*filter*/);
+            
+            if(DEBUG) {
+                
+                log.debug("focusStore before closure:");
+                
+                focusStore.dumpStore(true,true,false);
+            
+                log.debug("tmp before closure:");
+                
+                focusStore.dumpStore(true,true,false);
+            
+            }
 
             // compute closure of the focus store.
             stats.add( inferenceEngine.computeClosure(focusStore,false/*justify*/) );
 
+            if(DEBUG) {
+                
+                log.debug("focusStore after closure:");
+                
+                focusStore.dumpStore(true,true,false);
+            
+            }
+            
             // subtract out the statements we used to start the closure.
-            filterExistingStatements(tmp, focusStore, false/*upgrade*/);
+            int nremoved = filterExistingStatements(tmp, focusStore, false/*upgrade*/);
+            
+            if(DEBUG) {
+                
+                log.debug("focusStore after subtracting out tmp:");
+                
+                focusStore.dumpStore(true,true,false);
+            
+            }
+            
+            log.info("copied "+ncopied+" to tmp store; removed "+nremoved+" from focusStore");
             
         }
 
