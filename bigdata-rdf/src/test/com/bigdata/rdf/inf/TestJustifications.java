@@ -55,6 +55,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for writing, reading, chasing and retracting {@link Justification}s.
@@ -107,7 +108,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
     
     /**
      * Creates a {@link Justification}, writes it on the store using an
-     * {@link SPOBuffer}, verifies that we can read it back from the store, and
+     * {@link SPOAssertionBuffer}, verifies that we can read it back from the store, and
      * then retracts the justified statement and verifies that the justification
      * was also retracted.
      */
@@ -154,7 +155,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                     jst.getTail()
                     );
             
-            SPOBuffer buf = new SPOBuffer(store, null/* filter */,
+            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, null/* filter */,
                     100/* capacity */, true/* justified */);
 
             assertTrue(buf.add(head, jst));
@@ -214,12 +215,24 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                 
             }
             
+            // an empty focusStore.
+            TempTripleStore focusStore = new TempTripleStore(store.getProperties());
+            
             /*
              * The inference (A rdf:type rdf:property) is grounded by the
              * explicit statement (U A Y).
              */
+
+            assertTrue(Justification.isGrounded(focusStore,store, head));
+
+            // add the statement (U A Y) to the focusStore.
+            focusStore.addStatements(new SPO[]{new SPO(U,A,Y,StatementEnum.Explicit)}, 1);
             
-            assertTrue(Justification.isGrounded(store, head));
+            /*
+             * The inference is no longer grounded since we have declared that
+             * we are also retracting its grounds.
+             */
+            assertFalse(Justification.isGrounded(focusStore,store, head));
             
             /*
              * remove the justified statements.

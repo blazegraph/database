@@ -228,6 +228,8 @@ public class RdfKeyBuilder {
      * @param value
      * @return
      * 
+     * FIXME Handle all of the basic data types.
+     * 
      * @todo handle unknown datatypes, perhaps by inheritance from some basic
      * classes.
      * 

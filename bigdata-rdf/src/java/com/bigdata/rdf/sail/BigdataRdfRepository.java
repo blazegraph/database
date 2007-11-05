@@ -93,21 +93,21 @@ import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.inf.TMStatementBuffer;
+import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.ISPOFilter;
+import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.StatementWithType;
-import com.bigdata.rdf.store.TMStatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 
 /**
@@ -351,9 +351,11 @@ public class BigdataRdfRepository implements RdfRepository {
         
         if(truthMaintenance) {
 
-            assertBuffer = new TMStatementBuffer(inf,bufferCapacity,true/*assertions*/);
+            assertBuffer = new TMStatementBuffer(inf, bufferCapacity,
+                    BufferEnum.AssertionBuffer);
 
-            retractBuffer = new TMStatementBuffer(inf,bufferCapacity,true/*assertions*/);
+            retractBuffer = new TMStatementBuffer(inf, bufferCapacity,
+                    BufferEnum.RetractionBuffer);
             
         } else {
 
@@ -615,27 +617,16 @@ public class BigdataRdfRepository implements RdfRepository {
              * them directly. This uses the internal API to copy the statements
              * to the temporary store without materializing them as Sesame
              * Statement objects.
-             * 
-             * @todo add an ISPOFilter parameter to IAccessPath#iterator() so
-             * that we can send the filter to the database rather than filtering
-             * on the client.
              */
             
-            // obtain a chunked iterator using the triple pattern.
-            ISPOIterator itr = database.getAccessPath(s,p,o).iterator();
+            /*
+             * obtain a chunked iterator using the triple pattern that visits
+             * only the explicit statements.
+             */
+            ISPOIterator itr = database.getAccessPath(s,p,o).iterator(ExplicitSPOFilter.INSTANCE);
             
             // copy explicit statements to the temporary store.
-            n = retractBuffer.getStatementStore().addStatements(itr, new ISPOFilter() {
-
-                public boolean isMatch(SPO spo) {
-               
-                    // only copy explicit statements.
-
-                    return spo.type==StatementEnum.Explicit;
-                    
-                }
-                
-            });
+            n = retractBuffer.getStatementStore().addStatements(itr,null/*filter*/);
 
         } else {
 
@@ -1302,28 +1293,44 @@ public class BigdataRdfRepository implements RdfRepository {
     }
 
     /**
-     * Computes the closure of the triple store for RDFS entailments.
+     * Computes the closure of the triple store for RDF(S)+ entailments.
      * <p>
-     * This computes the full forward closure of the store and then commits the
-     * store. This can be used if you do NOT enable truth maintenance and choose
-     * instead to load up all of your data first and then compute the closure of
-     * the database.
+     * This computes the full forward closure of the store. This can be used if
+     * you do NOT enable truth maintenance and choose instead to load up all of
+     * your data first and then compute the closure of the database.
      * <p>
-     * This method lies outside of the SAIL and does not rely on the SAIL
-     * "transaction" mechanisms.
+     * Note: This method lies outside of the SAIL and does not rely on the SAIL
+     * "transaction" mechanisms. However, it MAY NOT be used concurrently with
+     * writes on the SAIL.
+     * <p>
+     * Note: If there are already entailments in the database AND you have
+     * retracted statements since the last time the closure was computed then
+     * you MUST delete all entailments from the database before re-computing the
+     * closure.
+     * <p>
+     * Note: This method does NOT commit the database. See
+     * {@link ITripleStore#commit()} and {@link #getDatabase()}.
      * 
-     * @todo offer a method to retract any entailments so that people can choose
-     *       to re-close a database. that method will probably be defined by
-     *       {@link TMStatementBuffer}.
+     * @see #removeAllEntailments()
      */
     public void fullForwardClosure() {
         
         flushStatementBuffers();
         
         inf.computeClosure(null/*focusStore*/);
-        
-        database.commit();
                 
+    }
+    
+    /**
+     * Removes all "inferred" statements from the database.
+     * <p>
+     * Note: This does NOT commit the database.
+     */
+    public void removeAllEntailments() {
+        
+        database.getAccessPath(NULL, NULL, NULL).removeAll(
+                InferredSPOFilter.INSTANCE);
+        
     }
     
 }

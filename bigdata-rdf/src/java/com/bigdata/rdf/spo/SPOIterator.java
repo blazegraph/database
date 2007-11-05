@@ -103,9 +103,17 @@ public class SPOIterator implements ISPOIterator {
     private final int capacity;
     
     /**
-     * The #of statements that have been read <strong>from the source</strong>.
+     * Optional filter. When non-<code>null</code>, only matching statements
+     * will be vistied.
      */
-    private int numReadFromSource;
+    private final ISPOFilter filter;
+    
+    /**
+     * The #of statements that have been read <strong>from the source</strong>
+     * and placed into the buffer. All such statements will also have passed the
+     * optional {@link ISPOFilter}.
+     */
+    private int numBuffered;
 
     /**
      * The #of statements that have been read by the caller using
@@ -191,8 +199,12 @@ public class SPOIterator implements ISPOIterator {
      *            buffer as it becomes depleted. When false, read-ahead will be
      *            synchronous (this is useful when you want to read at most N
      *            statements from the index).
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            matching statements will be visited.
      */
-    public SPOIterator(IAccessPath accessPath, int limit, int capacity, boolean async) {
+    public SPOIterator(IAccessPath accessPath, int limit, int capacity,
+            boolean async, ISPOFilter filter) {
 
         assert accessPath != null;
         
@@ -287,11 +299,14 @@ public class SPOIterator implements ISPOIterator {
         }
         
         this.capacity = capacity;
+
+        this.filter = filter;
         
         this.accessPath = accessPath;
 
         this.keyOrder = accessPath.getKeyOrder();
         
+        // @todo in scale-out version send the filter to rangeQuery?
         this.src = accessPath.rangeQuery();
         
         this.buffer = new ArrayBlockingQueue<SPO>(capacity);
@@ -336,9 +351,14 @@ public class SPOIterator implements ISPOIterator {
 
                 Object val = src.next();
 
-                numReadFromSource++;
-                
                 SPO spo = new SPO(keyOrder, src.getKey(), val);
+
+                if (filter != null && !filter.isMatch(spo)) {
+
+                    // does not satisify the filter.
+                    continue;
+                    
+                }
 
                 try {
 
@@ -348,6 +368,8 @@ public class SPOIterator implements ISPOIterator {
                     
                     buffer.put(spo);
 
+                    numBuffered++;
+                    
                 } catch (InterruptedException ex) {
 
                     throw new RuntimeException(ex);
@@ -355,7 +377,7 @@ public class SPOIterator implements ISPOIterator {
                 }
 
 
-                if(limit != 0 && numReadFromSource == limit) {
+                if(limit != 0 && numBuffered == limit) {
                     
                     // We have read all that we are going to read.
 
@@ -401,7 +423,7 @@ public class SPOIterator implements ISPOIterator {
 
             while (src.hasNext() && buffer.remainingCapacity() > 0) {
 
-                if (limit != 0 && numReadFromSource == limit) {
+                if (limit != 0 && numBuffered == limit) {
 
                     // We have read all that we are going to read.
 
@@ -413,13 +435,19 @@ public class SPOIterator implements ISPOIterator {
 
                 Object val = src.next();
 
-                numReadFromSource++;
-
                 SPO spo = new SPO(keyOrder, src.getKey(), val);
 
+                if(filter != null && !filter.isMatch(spo)) {
+                    
+                    continue;
+                    
+                }
+                
                 try {
 
                     buffer.put(spo);
+
+                    numBuffered++;
 
                 } catch (InterruptedException ex) {
 
@@ -548,7 +576,7 @@ public class SPOIterator implements ISPOIterator {
         }
 
         log.info("chunkSize=" + n + ", nchunks=" + nchunks + ", #read(caller)="
-                + numReadByCaller + ", #read(src)=" + numReadFromSource);
+                + numReadByCaller + ", #read(src)=" + numBuffered);
         
         return stmts;
         

@@ -50,9 +50,9 @@ package com.bigdata.rdf.store;
 import java.util.Iterator;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
@@ -104,8 +104,11 @@ public interface IAccessPath {
     public int rangeCount();
 
     /**
-     * The raw iterator for traversing the selected index within the key
-     * range implied by the triple pattern specified to the ctor.
+     * The raw iterator for traversing the selected index within the key range
+     * implied by the triple pattern specified to the ctor.
+     * 
+     * @todo for scale-out version, the optional {@link ISPOFilter} should be
+     *       sent to the data service.
      */
     public IEntryIterator rangeQuery();
 
@@ -119,6 +122,18 @@ public interface IAccessPath {
      *       state here that it will do so.
      */
     public ISPOIterator iterator();
+
+    /**
+     * An iterator visiting {@link SPO}s using the natural order of the index
+     * selected for the triple pattern.
+     * 
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            statements matching this filter will be visited.
+     * 
+     * @return The iterator.
+     */
+    public ISPOIterator iterator(ISPOFilter filter);
 
     /**
      * An iterator visiting {@link SPO}s using the natural order of the index
@@ -140,6 +155,29 @@ public interface IAccessPath {
     public ISPOIterator iterator(int limit, int capacity);
 
     /**
+     * An iterator visiting {@link SPO}s using the natural order of the index
+     * selected for the triple pattern.
+     * 
+     * @param limit
+     *            The maximum #of {@link SPO}s that will be visited.
+     * 
+     * @param capacity
+     *            The maximum capacity for the buffer used by the iterator. When
+     *            ZERO(0), a default capacity will be used. When a <i>limit</i>
+     *            is specified, the capacity will never exceed the <i>limit</i>.
+     * 
+     * @param filter
+     *            An optional filter. When non-<code>null</code>, only
+     *            statements matching this filter will be visited.
+     * 
+     * @return The iterator.
+     * 
+     * @todo modify the iterator to support {@link ISPOIterator#remove()} and
+     *       state here that it will do so.
+     */
+    public ISPOIterator iterator(int limit, int capacity, ISPOFilter filter);
+
+    /**
      * Performs an efficient scan of a statement index returning the distinct
      * term identifiers found in the first key component for the
      * {@link IAccessPath}. Depending on the {@link KeyOrder} for the
@@ -150,6 +188,9 @@ public interface IAccessPath {
      *         statement index associated with this {@link IAccessPath}. The
      *         term identifiers are in ascending order (this is the order in
      *         which they are read from the index).
+     * 
+     * @todo modify to accept a term filter so that we can choose to include or
+     *       exclude literals based on an examination of the term identifier.
      */
     public Iterator<Long> distinctTermScan();
 
@@ -163,5 +204,20 @@ public interface IAccessPath {
      * @return The #of statements that were removed.
      */
     public int removeAll();
+
+    /**
+     * Remove all statements selected by the triple pattern (batch, parallel,
+     * chunked, NO truth maintenance).
+     * <p>
+     * Note: This does NOT perform truth maintenance. Statements are removed
+     * regardless of their {@link StatementEnum} value.
+     * 
+     * @param An
+     *            optional filter. When non-<code>null</code>, only matching
+     *            statements are removed.
+     * 
+     * @return The #of statements that were removed.
+     */
+    public int removeAll(ISPOFilter filter);
     
 }

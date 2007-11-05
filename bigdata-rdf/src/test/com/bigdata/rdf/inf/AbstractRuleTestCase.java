@@ -99,14 +99,14 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         AbstractTripleStore db = inf.database;
         
-        SPOBuffer buffer = new SPOBuffer(db, inf.doNotAddFilter/* filter */,
-                capacity, inf.justify);
+        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, inf.doNotAddFilter/* filter */,
+                capacity, inf.isJustified());
         
         // dump the database on the console.
         System.err.println("database::");
         db.dumpStore();
         
-        State state = rule.newState(inf.justify, db, buffer);
+        State state = rule.newState(inf.isJustified(), db, buffer);
         
         // apply the rule.
         rule.apply(state);

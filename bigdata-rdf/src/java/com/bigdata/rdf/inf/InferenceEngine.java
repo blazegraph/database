@@ -63,7 +63,6 @@ import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
-import com.bigdata.rdf.store.TMStatementBuffer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -177,7 +176,7 @@ public class InferenceEngine extends RDFSHelper {
     public static final long NULL = IRawTripleStore.NULL;
 
     /**
-     * The capacity of the {@link SPOBuffer} used when computing entailments.
+     * The capacity of the {@link SPOAssertionBuffer} used when computing entailments.
      * 
      * @see Options#BUFFER_CAPACITY
      */
@@ -213,7 +212,7 @@ public class InferenceEngine extends RDFSHelper {
      * True iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
      */
-    final boolean justify;
+    private final boolean justify;
     
     /**
      * True iff the Truth Maintenance strategy requires that we store
@@ -379,7 +378,7 @@ public class InferenceEngine extends RDFSHelper {
 
         /**
          * <p>
-         * Sets the capacity of the {@link SPOBuffer} used to buffer entailments
+         * Sets the capacity of the {@link SPOAssertionBuffer} used to buffer entailments
          * for efficient ordered writes using the batch API (default 200k).
          * </p>
          * <p>
@@ -675,7 +674,7 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @todo use for parallel execution of sub-queries.
      * 
-     * @todo {@link SPOBuffer} must be thread-safe.  {@link Rule} bindings must be per-thread.
+     * @todo {@link SPOAssertionBuffer} must be thread-safe.  {@link Rule} bindings must be per-thread.
      * 
      * @todo Note that rules that write entailments on the database statement
      *       MUST coordinate to avoid concurrent modification during traversal
@@ -719,13 +718,35 @@ public class InferenceEngine extends RDFSHelper {
      */
     public ClosureStats computeClosure(AbstractTripleStore focusStore) {
         
+        return computeClosure(focusStore, isJustified());
+        
+    }
+    
+    /**
+     * This variant allows you to explicitly NOT generate {@link Justification}s
+     * for the computed entailments. It is used by the {@link TMStatementBuffer}
+     * as part of the algorithm for truth maintenance when retracting statements
+     * from the database. It SHOULD NOT be used for any other purpose or you may
+     * risk failing to generate justifications.
+     * 
+     * @param focusStore
+     *            The data set that will be closed against the database.
+     * @param justify
+     *            {@link Justification}s will be generated iff this flag is
+     *            <code>true</code>.
+     * @return
+     * 
+     * @see #computeClosure(AbstractTripleStore)
+     */
+    /*package private*/ ClosureStats computeClosure(AbstractTripleStore focusStore, boolean justify) {
+        
         switch(forwardClosure) {
 
         case Fast:
-            return fastForwardClosure(focusStore);
+            return fastForwardClosure(focusStore, justify);
         
         case Full:
-            return fullForwardClosure(focusStore);
+            return fullForwardClosure(focusStore, justify);
         
         default: throw new UnsupportedOperationException();
         
@@ -749,7 +770,8 @@ public class InferenceEngine extends RDFSHelper {
      *            database. When <code>null</code>, the entire database will
      *            be closed.
      */
-    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore) {
+    protected ClosureStats fullForwardClosure(AbstractTripleStore focusStore,
+            boolean justify) {
 
         final long begin = System.currentTimeMillis();
        
@@ -772,8 +794,8 @@ public class InferenceEngine extends RDFSHelper {
         RdfsAxioms.INSTANCE.addAxioms(database);
 
         // entailment buffer writes on the closureStore.
-        final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                bufferCapacity, isJustified());
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
+                doNotAddFilter, bufferCapacity, justify);
 
         // compute the full forward closure.
         
@@ -809,7 +831,8 @@ public class InferenceEngine extends RDFSHelper {
      *            database. When <code>null</code>, the entire database will
      *            be closed.
      */
-    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore) {
+    protected ClosureStats fastForwardClosure(AbstractTripleStore focusStore,
+            boolean justify) {
 
         /*
          * Note: The steps below are numbered with regard to the paper cited in
@@ -826,8 +849,8 @@ public class InferenceEngine extends RDFSHelper {
                 : database);
         
         // Entailment buffer writes on the closureStore.
-        final SPOBuffer buffer = new SPOBuffer(closureStore, doNotAddFilter,
-                bufferCapacity, isJustified());
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore, doNotAddFilter,
+                bufferCapacity, justify);
         
         final int firstStatementCount = closureStore.getStatementCount();
 

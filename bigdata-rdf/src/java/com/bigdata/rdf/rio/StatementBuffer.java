@@ -59,7 +59,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.NoSuccessorException;
-import com.bigdata.rdf.inf.SPOBuffer;
+import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -91,7 +91,7 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link Statement} duplication. Hence we pay an unnecessary overhead if we try
  * to make the statements distinct in the buffer.
  * <p>
- * Note: This also provides an explanation for why the {@link SPOBuffer} does
+ * Note: This also provides an explanation for why the {@link SPOAssertionBuffer} does
  * not do better when "distinct" is turned on - the "Value" objects in that case
  * are only represented by long integers and duplication in their values does
  * not impose a burden on either the heap or the index writers. In contrast, the

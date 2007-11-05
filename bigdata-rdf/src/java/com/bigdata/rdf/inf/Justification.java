@@ -421,22 +421,36 @@ public class Justification implements Comparable<Justification> {
     /**
      * Return true iff a grounded justification chain exists for the statement.
      * 
+     * @param focusStore
+     *            The focusStore contains the set of statements that are being
+     *            retracted from the database. When looking for grounded
+     *            justifications we do NOT consider any statement that is found
+     *            in this store. This prevents statements that are being
+     *            retracted from providing either their own justification or the
+     *            justiciation of any other statement that is being retracted at
+     *            the same time.
+     * @param db
+     *            The database from which the statements are to be retracted and
+     *            in which we will search for grounded justifications.
      * @param head
-     *            The statement (fully bound).
+     *            A statement (fully bound) whose grounded justification will be
+     *            sought.
      * 
      * @return True iff the statement is entailed by a grounded justification
      *         chain in the database.
      */
-    public static boolean isGrounded(AbstractTripleStore db, SPO head) {
-     
+    public static boolean isGrounded(AbstractTripleStore focusStore,
+            AbstractTripleStore db, SPO head) {
+
         assert head.isFullyBound();
-        
-        return isGrounded(db,head,false);
-        
+
+        return isGrounded(focusStore, db, head, false);
+
     }
         
     /**
      * 
+     * @param focusStore 
      * @param db
      * @param head
      *            A triple pattern. When invoked on a statement during truth
@@ -452,8 +466,11 @@ public class Justification implements Comparable<Justification> {
      *       fast closure method then this should be rewritten to be
      *       non-recursive and it will be MUCH faster.
      */
-    private static boolean isGrounded(AbstractTripleStore db, SPO head, boolean testHead) {
+    private static boolean isGrounded(AbstractTripleStore focusStore,
+            AbstractTripleStore db, SPO head, boolean testHead) {
 
+        assert focusStore != null;
+        
         if(testHead) {
             
             /*
@@ -464,7 +481,8 @@ public class Justification implements Comparable<Justification> {
              * database are explicit).
              */
             
-            ISPOIterator itr = db.getAccessPath(head.s,head.p,head.o).iterator();
+            ISPOIterator itr = db.getAccessPath(head.s, head.p, head.o)
+                    .iterator();
             
             while(itr.hasNext()) {
                 
@@ -472,26 +490,40 @@ public class Justification implements Comparable<Justification> {
                 
                 if (spo.type == StatementEnum.Explicit) {
 
-                    // grounded for this triple pattern.
+                    /*
+                     * Before we can accept this spo as providing support for a
+                     * grounded justification we have to test the focusStore and
+                     * make sure that this is NOT one of the statements that is
+                     * being retracted.
+                     */
+                    
+                    if (!focusStore.hasStatement(spo.s, spo.p, spo.o)) {
+
+                        /*
+                         * This spo provides grounded support for a
+                         * justification.
+                         */
+
+                        return true;
+
+                    }
+
+                    // fall through.
+                    
+                }
+
+                // depth-first recursion to see if the statement is grounded.
+                
+                if (isGrounded(focusStore, db, spo, false)) {
+                
+                    // recursively grounded somewhere.
                     
                     return true;
                     
-                } else {
-                    
-                    if(isGrounded(db,spo,false)) {
-                    
-                        // recursively grounded somewhere.
-                        
-                        return true;
-                        
-                    } else {
-                        
-                        // next spo.
-                        
-                    }
-                    
                 }
                 
+                // otherwise consider the next spo.
+            
             }
             
         }
@@ -535,7 +567,7 @@ public class Justification implements Comparable<Justification> {
                 
                 for( SPO t : tail ) {
                     
-                    if(!isGrounded(db, t, true/*testHead*/)) {
+                    if (!isGrounded(focusStore, db, t, true/* testHead */)) {
                         
                         ok = false;
                         

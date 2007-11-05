@@ -42,44 +42,34 @@ Modifications:
 
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Nov 5, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.model.StatementEnum;
 
 /**
- * Test suite for truth maintenance when statements are deleted from the
- * database.
- * 
- * @todo trivial test with a few statements, compute the closure, and then
- *       retract some statements and verify that we recover the correct closure.
- * 
- * @todo is there an efficient way to prove that two {@link AbstractTripleStore}s
- *       are the same? We have to materialize the terms in order to verify that
- *       the same terms are bound for the statements. Also, if the terms were
- *       created in a different order, then the term identifiers will differ. In
- *       this case the statement indices will not visit the statements in the
- *       same order.
+ * Filter matches only {@link StatementEnum#Inferred} statements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRDFSTruthMaintenance extends AbstractInferenceEngineTestCase {
+public class InferredSPOFilter implements ISPOFilter {
 
-    public TestRDFSTruthMaintenance() {
-        
-    }
-    
-    public TestRDFSTruthMaintenance(String name) {
-        super(name);
+    /**
+     * Shared instance.
+     */
+    static public final transient ISPOFilter INSTANCE = new InferredSPOFilter();
+
+    private InferredSPOFilter() {
+        super();
     }
 
-    public void testNothing() {
+    public boolean isMatch(SPO spo) {
         
-        fail("write tests");
+        return spo.type==StatementEnum.Inferred;
         
     }
-    
+
 }

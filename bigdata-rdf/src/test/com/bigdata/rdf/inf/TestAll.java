@@ -85,7 +85,8 @@ public class TestAll extends TestCase {
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
        
-        // @todo SPOBuffer
+        // @todo SPOAssertionBuffer
+        // @todo SPORetractionBuffer
 
         // test suite for writing, reading, chasing and retracting justifications.
         suite.addTestSuite(TestJustifications.class);
@@ -143,17 +144,12 @@ public class TestAll extends TestCase {
 //        suite.addTestSuite( TestMagicSets.class);
 
         /*
-         * test closure correctness on data sets against ground truth using
-         * a variety of forward and backward strategies.
+         * test truth maintenance.
          */
         
         // test suite for RDFS closure correctness.
         suite.addTestSuite( TestRDFSClosure.class );
 
-        /*
-         * test incremental closure and truth maintenance on statement removal.
-         */
-        
         // test suite for RDFS closure correctness with incremental load (TM).
         suite.addTestSuite( TestRDFSIncrementalClosure.class );
 

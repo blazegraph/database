@@ -57,14 +57,14 @@ import com.bigdata.rdf.inf.Rule.State;
  * Statistics about what the Rule did.
  * 
  * @todo it would be nice to report the #of new entailments and not just the #of
- *       computed entailments. The {@link SPOBuffer} knows how many new
+ *       computed entailments. The {@link SPOAssertionBuffer} knows how many new
  *       entailments are written each time the buffer is
- *       {@link SPOBuffer#flush()}ed. However, the buffer can be flushed more
+ *       {@link SPOAssertionBuffer#flush()}ed. However, the buffer can be flushed more
  *       than once during the execution of the rule, so we need to aggregate
  *       those counts across flushes and then reset once the rule is done. Also
  *       note that we sometimes defer a flush across rules if only a few
  *       entailments were generated, so correct reporting would mean modifying
- *       that practice. One approach is to modify {@link SPOBuffer#flush()} to
+ *       that practice. One approach is to modify {@link SPOAssertionBuffer#flush()} to
  *       accept a boolean argument. When true, the #of statements written by the
  *       buffer would be reset after the flush. When false the counter would
  *       continue to aggregate across flushes. The javadoc on flush would have
