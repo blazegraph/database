@@ -205,6 +205,9 @@ public class TMStatementBuffer implements IStatementBuffer {
 
     /**
      * Adds a statement to the buffer.
+     * <p>
+     * Note: You MUST NOT submit a statement that is not an explicit statement
+     * in the database to the retraction buffer!
      * 
      * @param s
      * @param p
@@ -765,6 +768,28 @@ public class TMStatementBuffer implements IStatementBuffer {
                         
                     }
 
+                    if (DEBUG && depth == 0) {
+
+                        SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
+
+                        if (tmp == null) {
+
+                            throw new IllegalArgumentException(
+                                    "Given statement not in database: "
+                                            + spo.toString(database));
+
+                        }
+
+                        if (tmp.type != StatementEnum.Explicit) {
+
+                            throw new IllegalArgumentException(
+                                    "Given statement not explicit database: "
+                                            + tmp.toString(database));
+
+                        }
+
+                    }
+                    
                     if( inferenceEngine.isAxiom(spo.s,spo.p,spo.o) ) {
                         
                         /*
