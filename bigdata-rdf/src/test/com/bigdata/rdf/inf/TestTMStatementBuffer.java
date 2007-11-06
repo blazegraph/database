@@ -319,29 +319,33 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
 
             }
-            
+
             /*
-             * Retract the entailment and verify that it is NOT removed from the
-             * database (removing an inference has no effect).
+             * Note: You MUST NOT submit a statement that is not an explicit
+             * statement in the database to the retraction buffer!
              */
-            {
-                
-                TMStatementBuffer retractionBuffer = new TMStatementBuffer(inf,
-                        100/* capacity */, BufferEnum.RetractionBuffer);
-
-                retractionBuffer.add(V, rdfsSubClassOf, X);
-
-                // update the closure.
-                retractionBuffer.doClosure();
-
-                // explicit.
-                assertTrue(store.hasStatement(U, rdfsSubClassOf, V));
-                assertTrue(store.hasStatement(V, rdfsSubClassOf, X));
-
-                // inferred.
-                assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
-
-            }
+//            /*
+//             * Retract the entailment and verify that it is NOT removed from the
+//             * database (removing an inference has no effect).
+//             */
+//            {
+//                
+//                TMStatementBuffer retractionBuffer = new TMStatementBuffer(inf,
+//                        100/* capacity */, BufferEnum.RetractionBuffer);
+//
+//                retractionBuffer.add(U, rdfsSubClassOf, X);
+//
+//                // update the closure.
+//                retractionBuffer.doClosure();
+//
+//                // explicit.
+//                assertTrue(store.hasStatement(U, rdfsSubClassOf, V));
+//                assertTrue(store.hasStatement(V, rdfsSubClassOf, X));
+//
+//                // inferred.
+//                assertTrue(store.hasStatement(U, rdfsSubClassOf, X));
+//
+//            }
             
         } finally {
             
