@@ -320,10 +320,10 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
             }
 
-            /*
-             * Note: You MUST NOT submit a statement that is not an explicit
-             * statement in the database to the retraction buffer!
-             */
+//            /*
+//             * Note: You MUST NOT submit a statement that is not an explicit
+//             * statement in the database to the retraction buffer!
+//             */
 //            /*
 //             * Retract the entailment and verify that it is NOT removed from the
 //             * database (removing an inference has no effect).

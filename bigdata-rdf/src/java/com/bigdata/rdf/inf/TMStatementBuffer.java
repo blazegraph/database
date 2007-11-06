@@ -65,6 +65,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
@@ -207,7 +208,13 @@ public class TMStatementBuffer implements IStatementBuffer {
      * Adds a statement to the buffer.
      * <p>
      * Note: You MUST NOT submit a statement that is not an explicit statement
-     * in the database to the retraction buffer!
+     * in the database to the retraction buffer! This error is NOT checked.
+     * Correctness here is easy to achieve when the statements to be removed are
+     * drawn from a triple pattern. Simply add an {@link ExplicitSPOFilter} to
+     * the {@link IAccessPath#iterator(ISPOFilter)} reading on the triple
+     * pattern and you will NOT see anything except explicit statements. Those
+     * statements can then be added to the {@link BufferEnum#RetractionBuffer}
+     * safely using this method.
      * 
      * @param s
      * @param p
@@ -783,7 +790,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                         if (tmp.type != StatementEnum.Explicit) {
 
                             throw new IllegalArgumentException(
-                                    "Given statement not explicit database: "
+                                    "Given statement not explicit in database: "
                                             + tmp.toString(database));
 
                         }
@@ -872,8 +879,11 @@ public class TMStatementBuffer implements IStatementBuffer {
         }
 
         if(DEBUG) {
-            System.err.println("dumping database after retraction");
+            
+            System.err.println("dumping database after retraction: depth="+depth);
+
             database.dumpStore(true, true, false);
+            
         }
         
         // drop the tempStore.
@@ -909,7 +919,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             
             if(DEBUG) {
                 
-                log.debug("focusStore before closure:");
+                System.err.println("focusStore before closure: depth="+depth);
                 
                 focusStore.dumpStore(database,true,true,false);
             
@@ -921,7 +931,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             if(DEBUG) {
                 
-                log.debug("focusStore after closure:");
+                System.err.println("focusStore after closure: depth="+depth);
                 
                 focusStore.dumpStore(database,true,true,false);
             
@@ -932,7 +942,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             
             if(DEBUG) {
                 
-                log.debug("focusStore after subtracting out tmp:");
+                System.err.println("focusStore after subtracting out tmp: depth="+depth);
                 
                 focusStore.dumpStore(database,true,true,false);
             
