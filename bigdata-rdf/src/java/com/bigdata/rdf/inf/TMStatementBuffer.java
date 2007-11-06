@@ -686,8 +686,8 @@ public class TMStatementBuffer implements IStatementBuffer {
      *            called. At depth ZERO(0) the tempStore MUST contain only the
      *            explicit statements to be retracted.
      * 
-     * FIXME we need to test for axioms. if something is an axiom then it is
-     * always provable.
+     * FIXME we need a fast test for axioms. if something is an axiom then it is
+     * always provable.  See {@link RDFSHelper} and {@link RdfsAxioms} and friends.
      */
     private void retractAll(ClosureStats stats, AbstractTripleStore tempStore, int depth) {
 
@@ -756,9 +756,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                         /*
                          * At depth zero the statements to be retracted should
-                         * be fully bound and explicit. At depth greater than
-                         * zero they MAY be triple patterns (a NULL indicating a
-                         * wildcard in the grounded justification chain search).
+                         * be fully bound and explicit.
                          */
                         
                         assert spo.isFullyBound();
@@ -860,7 +858,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         {
 
             /*
-             * Such everything in the focusStore into an SPO[].
+             * Suck everything in the focusStore into an SPO[].
              */
             
             SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore
@@ -870,7 +868,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                 
                 log.debug("focusStore before closure:");
                 
-                focusStore.dumpStore(true,true,false);
+                focusStore.dumpStore(database,true,true,false);
             
             }
 
@@ -882,7 +880,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                 
                 log.debug("focusStore after closure:");
                 
-                focusStore.dumpStore(true,true,false);
+                focusStore.dumpStore(database,true,true,false);
             
             }
             
@@ -893,7 +891,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                 
                 log.debug("focusStore after subtracting out tmp:");
                 
-                focusStore.dumpStore(true,true,false);
+                focusStore.dumpStore(database,true,true,false);
             
             }
             
