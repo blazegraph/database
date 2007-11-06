@@ -846,6 +846,11 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         }
 
+        if(DEBUG) {
+            System.err.println("dumping database after retraction");
+            database.dumpStore(true, true, false);
+        }
+        
         // drop the tempStore.
         tempStore.closeAndDelete();
 
