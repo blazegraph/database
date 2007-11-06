@@ -55,6 +55,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
+import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -264,6 +265,13 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
         
         properties.setProperty(DataLoader.Options.CLOSURE,
                 ClosureEnum.Incremental.toString());
+
+        /*
+         * Note: overrides properties to make sure that the OWL axioms are
+         * not defined since they are not going to be in the graph produced
+         * by Sesame.
+         */
+        properties.setProperty(Options.RDFS_ONLY, "true");
 
         DataLoader dataLoader = new DataLoader(properties, store);
         

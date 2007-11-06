@@ -46,9 +46,11 @@ Modifications:
  */
 package com.bigdata.rdf.inf;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.UUID;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -56,9 +58,16 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.serializers.StatementSerializer;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * @author personickm
@@ -69,8 +78,39 @@ abstract class BaseAxioms implements Axioms {
     
     Set<String> vocabulary = new HashSet<String>();
     
-    protected BaseAxioms()
+    /**
+     * The axioms in SPO order.
+     */
+    private BTree btree;
+
+    /**
+     * Used to generate keys for the {@link #btree}.
+     */
+    private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder());    
+
+    private final AbstractTripleStore db;
+
+    /**
+     * 
+     * @param db
+     *            The database whose lexicon will define the term identifiers
+     *            for the axioms and on which the axioms will be lazily written
+     *            by {@link #addAxioms()}.
+     */
+    protected BaseAxioms(AbstractTripleStore db)
     {
+        
+        if (db == null)
+            throw new IllegalArgumentException();
+        
+        this.db = db;
+  
+        /*
+         * @todo eagerly defining the axioms breaks a some unit tests that
+         * assume that the store is still empty after the inference engine has
+         * been instantiated.
+         */
+//        defineAxioms();
         
     }
     
@@ -243,18 +283,38 @@ abstract class BaseAxioms implements Axioms {
     
     /**
      * Add the axiomatic RDF(S) triples to the store.
-     * <p>
-     * Note: The termIds are defined with respect to the backing triple store
-     * since the axioms will be copied into the store when the closure is
-     * complete.
-     * 
-     * @param database
-     *            The store to which the axioms will be added.
      */
-    public void addAxioms(AbstractTripleStore database) {
+    public void addAxioms() {
+
+        if(btree==null) {
+
+            /*
+             * FIXME Lazy insert of axioms is probably a bad idea. The only
+             * problems with doing this eagerly when the InferenceEngine is
+             * instantiated is that a bunch of unit tests all presume that the
+             * store is still empty after creating an InferenceEngine.  This,
+             * those tests should probably be modified and the axioms defined
+             * when the inference engine is instantiated.
+             */
+
+            defineAxioms();
+            
+        }
         
-        StatementBuffer buffer = new StatementBuffer(database, getAxioms()
-                .size());
+    }
+
+    private void defineAxioms() {
+        
+        /*
+         * Write the axioms on the database.
+         * 
+         * Note: if the terms for the axioms are already in the lexicon and the
+         * axioms are already in the database then this will not write on the
+         * database, but it will still result in the SPO[] containing the axioms
+         * to be defined in MyStatementBuffer.
+         */
+        
+        MyStatementBuffer buffer = new MyStatementBuffer(db, getAxioms().size());
 
         for (Iterator<Axioms.Triple> itr = getAxioms().iterator(); itr
                 .hasNext();) {
@@ -273,7 +333,102 @@ abstract class BaseAxioms implements Axioms {
 
         // write on the database.
         buffer.flush();
+
+        /*
+         * Fill the btree with the axioms in SPO order.
+         */
+        {
+        
+            // exact fill of the root leaf.
+            final int branchingFactor = axioms.size();
+            
+            btree = new BTree(new TemporaryRawStore(),
+                    branchingFactor, UUID.randomUUID(),
+                    StatementSerializer.INSTANCE);
+
+            // SPO[] exposed by our StatementBuffer subclass.
+            SPO[] stmts = ((MyStatementBuffer)buffer).stmts;
+            
+            for(SPO spo : stmts ) {
+
+                btree.insert(keyBuilder.statement2Key(KeyOrder.SPO, spo),
+                        spo.type.serialize());
+
+            }
+            
+        }
         
     }
 
+    /**
+     * Return true iff the fully bound statement is an axiom.
+     * 
+     * @param db
+     *            The axioms will be defined using the term identifiers for this
+     *            database.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * 
+     * @return
+     */
+    public boolean isAxiom(long s, long p, long o) {
+
+        if (btree == null) {
+
+            defineAxioms();
+
+        }
+
+        byte[] key = keyBuilder.statement2Key(s,p,o);
+        
+        if(btree.contains(key)) {
+            
+            return true;
+            
+        }
+        
+        return false;
+        
+    }
+
+    static class MyStatementBuffer extends StatementBuffer {
+
+        /**
+         * An array of the axioms in SPO order.
+         */
+        SPO[] stmts;
+        
+        /**
+         * @param database
+         * @param capacity
+         */
+        public MyStatementBuffer(AbstractTripleStore database, int capacity) {
+
+            super(database, capacity);
+            
+        }
+
+        /**
+         * Save off a copy of the axioms in SPO order on {@link #stmts}.
+         */
+        protected int writeSPOs(SPO[] stmts, int numStmts) {
+            
+            if (this.stmts == null) {
+
+                this.stmts = new SPO[numStmts];
+
+                System.arraycopy(stmts, 0, this.stmts, 0, numStmts);
+
+                Arrays.sort( this.stmts, KeyOrder.SPO.getComparator() );
+                
+            }
+            
+            return super.writeSPOs(stmts, numStmts);
+            
+        }
+        
+    }
+    
 }

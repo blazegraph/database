@@ -82,6 +82,9 @@ public class TestAll extends TestCase {
          * test forward chainer rules.
          */
         
+        // test suite for the axiom models.
+        suite.addTestSuite( TestAxiomModel.class );
+        
         // test suite for basic rule mechanisms.
         suite.addTestSuite( TestRule.class );
        

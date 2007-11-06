@@ -4,6 +4,8 @@ import org.openrdf.vocabulary.OWL;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 /**
  * The axioms for RDF Schema plus a few axioms to support owl:sameAs,
  * owl:equivalentProperty, and owl:equivalentClass.
@@ -12,10 +14,10 @@ import org.openrdf.vocabulary.RDFS;
  */
 public class OwlAxioms extends RdfsAxioms {
     
-    static public final Axioms INSTANCE = new OwlAxioms();
-    
-    protected OwlAxioms()
+    protected OwlAxioms(AbstractTripleStore db)
     {
+        
+        super( db );
         
         // axioms for owl:equivalentClass
         addAxiom( OWL.EQUIVALENTCLASS, RDFS.SUBPROPERTYOF, RDFS.SUBCLASSOF );
