@@ -49,6 +49,8 @@ package com.bigdata.rdf.inf;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 /**
  * The axioms for RDF Schema.
  * 
@@ -56,10 +58,11 @@ import org.openrdf.vocabulary.RDFS;
  */
 public class RdfsAxioms extends BaseAxioms {
     
-    static public final BaseAxioms INSTANCE = new RdfsAxioms();
-    
-    protected RdfsAxioms()
+    protected RdfsAxioms(AbstractTripleStore db)
     {
+        
+        super(db);
+        
         /*
          * RDF AXIOMATIC TRIPLES
          * 

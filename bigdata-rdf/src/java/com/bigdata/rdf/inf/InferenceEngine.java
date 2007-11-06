@@ -62,7 +62,6 @@ import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -215,6 +214,11 @@ public class InferenceEngine extends RDFSHelper {
     private final boolean justify;
     
     /**
+     * The axiom model used by the inference engine.
+     */
+    private final BaseAxioms axiomModel;
+    
+    /**
      * True iff the Truth Maintenance strategy requires that we store
      * {@link Justification}s for entailments.
      */
@@ -327,6 +331,15 @@ public class InferenceEngine extends RDFSHelper {
         public static final String DEFAULT_FORWARD_RDF_TYPE_RDFS_RESOURCE = "false";
 
         /**
+         * When true the rule model will only run rules for RDFS model theory
+         * (no OWL) and the OWL axioms will not be defined (default
+         * <code>false</code>).
+         */
+        public static final String RDFS_ONLY = "rdfsOnly";
+
+        public static final String DEFAULT_RDFS_ONLY = "false";
+        
+        /**
          * When <code>true</code> the entailments for <code>owl:sameAs</code>
          * are computed by forward chaining and stored in the database. When
          * <code>false</code>, rules that produce those entailments are
@@ -412,9 +425,9 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @param database
      */
-    public InferenceEngine(ITripleStore database) {
+    public InferenceEngine(AbstractTripleStore database) {
     
-        this(new Properties(),database);
+        this(new Properties(), database);
         
     }
     
@@ -424,7 +437,7 @@ public class InferenceEngine extends RDFSHelper {
      * @param database
      *            The database for which this class will compute entailments.
      */
-    public InferenceEngine(Properties properties, ITripleStore database) {
+    public InferenceEngine(Properties properties, AbstractTripleStore database) {
 
         super((AbstractTripleStore) database);
 
@@ -446,32 +459,54 @@ public class InferenceEngine extends RDFSHelper {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
-        this.forwardChainOwlSameAs = Boolean.parseBoolean(properties
-                .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS,
-                        Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS));
+        final boolean rdfsOnly = Boolean.parseBoolean(properties
+                .getProperty(Options.RDFS_ONLY,
+                        Options.DEFAULT_RDFS_ONLY));
 
-        log.info(Options.FORWARD_CHAIN_OWL_SAMEAS + "="
-                + forwardChainOwlSameAs);
+        log.info(Options.RDFS_ONLY + "=" + rdfsOnly);
+        
+        if(rdfsOnly) {
+            
+            this.forwardChainOwlSameAs = false;
+            this.forwardChainOwlEquivalentProperty = false;
+            this.forwardChainOwlEquivalentClass = false;
+            
+        } else {
+            
+            this.forwardChainOwlSameAs = Boolean.parseBoolean(properties
+                    .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS));
 
-        this.forwardChainOwlEquivalentProperty = Boolean.parseBoolean(properties
-                .getProperty(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY,
-                        Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY));
+            log.info(Options.FORWARD_CHAIN_OWL_SAMEAS + "="
+                    + forwardChainOwlSameAs);
 
-        log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY + "="
-                + forwardChainOwlEquivalentProperty);
+            this.forwardChainOwlEquivalentProperty = Boolean
+                    .parseBoolean(properties
+                            .getProperty(
+                                    Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY,
+                                    Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY));
 
-        this.forwardChainOwlEquivalentClass = Boolean.parseBoolean(properties
-                .getProperty(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS,
-                        Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS));
+            log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY + "="
+                    + forwardChainOwlEquivalentProperty);
 
-        log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS + "="
-                + forwardChainOwlEquivalentClass);
+            this.forwardChainOwlEquivalentClass = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS));
 
+            log.info(Options.FORWARD_CHAIN_OWL_EQUIVALENT_CLASS + "="
+                    + forwardChainOwlEquivalentClass);
+
+        }
+        
         bufferCapacity = Integer.parseInt(properties.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
         
         log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
+        axiomModel = (rdfsOnly ? new RdfsAxioms(database) : new OwlAxioms(
+                database));
+        
         setupRules();
 
     }
@@ -791,7 +826,7 @@ public class InferenceEngine extends RDFSHelper {
          * assertions that the ones that are used by the database, which is
          * very, very bad.
          */
-        RdfsAxioms.INSTANCE.addAxioms(database);
+        axiomModel.addAxioms();
 
         // entailment buffer writes on the closureStore.
         final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
@@ -867,7 +902,7 @@ public class InferenceEngine extends RDFSHelper {
          * assertions that the ones that are used by the database, which is
          * very, very bad.
          */ 
-        RdfsAxioms.INSTANCE.addAxioms(database);
+        axiomModel.addAxioms();
         
         // owl:equivalentProperty
         if (forwardChainOwlEquivalentProperty) {
@@ -1298,4 +1333,19 @@ public class InferenceEngine extends RDFSHelper {
 
     }
     
+    /**
+     * Return true iff the fully bound statement is an axiom.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * 
+     * @return
+     */
+    public boolean isAxiom(long s, long p, long o) {
+        
+        return axiomModel.isAxiom(s, p, o);
+        
+    }
+
 }

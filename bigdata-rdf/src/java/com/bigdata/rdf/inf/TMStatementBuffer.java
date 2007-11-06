@@ -752,6 +752,8 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                 for (SPO spo : chunk) {
 
+                    assert spo.isFullyBound();
+                    
                     if (depth == 0) {
 
                         /*
@@ -759,13 +761,24 @@ public class TMStatementBuffer implements IStatementBuffer {
                          * be fully bound and explicit.
                          */
                         
-                        assert spo.isFullyBound();
-                        
                         assert spo.isExplicit();
                         
                     }
-                    
-                    if (Justification.isGrounded(tempStore, database, spo, testHead )) {
+
+                    if( inferenceEngine.isAxiom(spo.s,spo.p,spo.o) ) {
+                        
+                        /*
+                         * Convert back to an axiom.
+                         */
+                        
+                        SPO tmp = new SPO(spo.s, spo.o, spo.p,
+                                StatementEnum.Axiom);
+
+                        tmp.override = true;
+
+                        downgradeBuffer.add(tmp, null);                        
+                        
+                    } else if (Justification.isGrounded(tempStore, database, spo, testHead )) {
 
                         /*
                          * Add a variant of the statement that is marked as

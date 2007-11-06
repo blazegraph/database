@@ -459,17 +459,33 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
         
+        return writeSPOs( tmp, numStmts );
+        
+    }
+
+    /**
+     * Adds the statements to each index (batch api, NO truth maintenance).
+     * 
+     * @param stmts
+     *            An array of {@link SPO}s
+     * 
+     * @return The #of statements written on the database.
+     * 
+     * @see IRawTripleStore#addStatements(SPO[], int)
+     */
+    protected int writeSPOs( SPO[] stmts, int numStmts ) {
+        
         if(statementStore!=null) {
 
             // Writing statements on the secondary store.
             
-            return statementStore.addStatements(tmp, numStmts);
+            return statementStore.addStatements(stmts, numStmts);
             
         } else {
             
             // Write statements on the primary database.
             
-            return database.addStatements(tmp, numStmts);
+            return database.addStatements(stmts, numStmts);
             
         }
 

@@ -194,14 +194,21 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
 
         try {
 
-            /**
+            /*
              * Note: overrides properties to make sure that entailments are NOT computed
              * on load since we want to close the database itself not the loaded data
              * set against the database!
              */
               
             properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
-            
+
+            /*
+             * Note: overrides properties to make sure that the OWL axioms are
+             * not defined since they are not going to be in the graph produced
+             * by Sesame.
+             */
+            properties.setProperty(Options.RDFS_ONLY, "true");
+
             DataLoader dataLoader = new DataLoader(properties,store);
             
             dataLoader.loadData(resource, baseURL, format);
