@@ -60,6 +60,10 @@ public class AbstractRuleRdfs_5_11 extends AbstractRuleChainedSelfJoin {
                 new Pred[] { //
                     new Triple(var("u"), C, var("v")),//
                     new Triple(var("v"), C, var("x")) //
+                },
+                new IConstraint[] {
+                    new NE(var("u"),var("v")),
+                    new NE(var("v"),var("x"))
                 });
         
     }

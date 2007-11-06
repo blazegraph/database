@@ -85,4 +85,11 @@ public class TestRDFSTruthMaintenance extends AbstractInferenceEngineTestCase {
     public TestRDFSTruthMaintenance(String name) {
         super(name);
     }
+    
+    public void test_nothing() {
+        
+        fail("write tests");
+        
+    }
+    
 }

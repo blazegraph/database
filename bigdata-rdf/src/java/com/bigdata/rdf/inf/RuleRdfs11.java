@@ -64,6 +64,10 @@ public class RuleRdfs11 extends AbstractRuleNestedSubquery {
                 new Pred[] { //
                     new Triple(var("u"), inf.rdfsSubClassOf, var("v")),//
                     new Triple(var("v"), inf.rdfsSubClassOf, var("x")) //
+                },
+                new IConstraint[] {
+                    new NE(var("u"),var("v")),
+                    new NE(var("v"),var("x"))
                 });
 
     }

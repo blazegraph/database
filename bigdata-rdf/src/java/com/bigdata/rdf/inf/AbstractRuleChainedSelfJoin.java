@@ -63,22 +63,22 @@ import com.bigdata.rdf.util.KeyOrder;
  * Rules of the general form:
  * 
  * <pre>
- *   (_,_,_) :- (u,C,v), (v,C,x).
+ *    (_,_,_) :- (u,C,v), (v,C,x).
  * </pre>
  * 
  * This kind of rule is used to compute the transitive closure for some specific
  * predicate. For example:
  * 
  * <pre>
- *   (u,C,x) :- (u,C,v), (v,C,x).
+ *    (u,C,x) :- (u,C,v), (v,C,x).
  * </pre>
  * 
  * where C might be rdfs:subClassOf (rdfs11) or rdfs:subPropertyOf (rdfs5)
  * <p>
  * Note: This implementation "optimizes out" one of the body predicates and uses
- * an in-memory self-join that reads from only a single data sources and
- * therefore MUST NOT be used with truth maintenance since that requires reading
- * from a focusStore and the database.
+ * an <strong>in-memory</strong> self-join that reads from only a single data
+ * sources and therefore MUST NOT be used with truth maintenance since that
+ * requires reading from a focusStore and the database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -95,9 +95,9 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
      * @param body
      */
     public AbstractRuleChainedSelfJoin(AbstractTripleStore db, Triple head,
-            Pred[] body) {
+            Pred[] body, IConstraint[] constraints ) {
 
-        super(db, head, body);
+        super(db, head, body, constraints );
 
         // two predicates
         assert body.length == 2;
@@ -197,7 +197,7 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
                 }
 
                 /*
-                 * FIXME The self-join requires that we fully buffer the
+                 * Note: The self-join requires that we fully buffer the
                  * statements. If they are not fully buffered then the self-join
                  * within a chunk can fail since the statement index is being
                  * traversed in POS order but we are joining stmt1.o := stmt2.s,

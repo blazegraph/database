@@ -60,13 +60,10 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
                 new Pred[] {//
                     new Triple(var("u"), inf.rdfsSubClassOf, var("x")),//
                     new Triple(var("v"), inf.rdfType, var("u"))//
+                },
+                new IConstraint[] {
+                    new NE(var("u"),var("x"))
                 });
-/* FIXME filter out u == x and retest.
- * 
- * 5, 7, 9, and 11 you can filter though.
- * 
- * And rdfs5 and rdfs11 for both tails
- */
     }
 
 }
