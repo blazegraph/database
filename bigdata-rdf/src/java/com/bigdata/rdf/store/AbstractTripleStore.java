@@ -2110,47 +2110,70 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                                     byte[] oldval = (byte[]) ndx
                                             .lookup(keys[i]);
 
-                                    if (oldval == null || spo.override) {
+                                    if (oldval == null) {
 
                                         /*
-                                         * Statement is NOT pre-existing -or- we
-                                         * are downgrading a statement from
-                                         * explicit to inferred during TM.
+                                         * Statement is NOT pre-existing.
                                          */
-
+                                        
                                         ndx.insert(keys[i], spo.type
                                                 .serialize());
 
                                         writeCount++;
-                                        
+
                                     } else {
 
+                                        /* 
+                                         * Statement is pre-existing.
+                                         */
+                                        
                                         // old statement type.
                                         StatementEnum oldType = StatementEnum
                                                 .deserialize(oldval);
 
-                                        // proposed statement type.
-                                        StatementEnum newType = spo.type;
-
-                                        // choose the max of the old and the
-                                        // proposed.
-                                        StatementEnum maxType = StatementEnum
-                                                .max(oldType, newType);
-
-                                        if (oldType != maxType) {
-
-                                            /*
-                                             * write on the index iff the type
-                                             * was actually changed.
-                                             */
-
-                                            ndx.insert(keys[i], maxType
-                                                    .serialize());
+                                        if (spo.override) {
                                             
-                                            writeCount++;
+                                            if (oldType != spo.type) {
+                                                
+                                                /*
+                                                 * We are downgrading a
+                                                 * statement from explicit to
+                                                 * inferred during TM
+                                                 */
+                                                
+                                                ndx.insert(keys[i], spo.type
+                                                        .serialize());
+
+                                                writeCount++;
+
+                                            }
+                                                                                
+                                        } else {
+
+                                            // proposed statement type.
+                                            StatementEnum newType = spo.type;
+
+                                            // choose the max of the old and the
+                                            // proposed.
+                                            StatementEnum maxType = StatementEnum
+                                                    .max(oldType, newType);
+
+                                            if (oldType != maxType) {
+
+                                                /*
+                                                 * write on the index iff the
+                                                 * type was actually changed.
+                                                 */
+
+                                                ndx.insert(keys[i], maxType
+                                                        .serialize());
+
+                                                writeCount++;
+
+                                            }
 
                                         }
-
+                                        
                                     }
 
                                 }
@@ -2344,5 +2367,44 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * The optional index on which {@link Justification}s are stored.
      */
     abstract public IIndex getJustificationIndex();
-    
+
+    /**
+     * @todo It might be worth doing a more efficient method for bulk statement
+     *       removal. This will wind up doing M * N operations. The N are
+     *       parallelized, but the M are not.
+     */
+    public int removeStatements(ISPOIterator itr) {
+
+        final long begin = System.currentTimeMillis();
+
+        int n = 0;
+
+        try {
+
+            while (itr.hasNext()) {
+
+                SPO[] chunk = itr.nextChunk();
+
+                for (SPO spo : chunk) {
+
+                    n += getAccessPath(spo.s, spo.p, spo.o).removeAll();
+
+                }
+
+            }
+
+        } finally {
+
+            itr.close();
+            
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        log.info("Retracted " + n + " statements in " + elapsed + " ms");
+
+        return n;
+
+    }
+
 }

@@ -71,11 +71,10 @@ import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.sail.BigdataRdfRepository;
 
 /**
  * A utility class to facility loading RDF data into an
- * {@link AbstractTripleStore} without using {@link BigdataRdfRepository}..
+ * {@link AbstractTripleStore} without using Sesame API.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

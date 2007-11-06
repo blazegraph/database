@@ -80,7 +80,11 @@ public class TestAll extends TestCase {
     {
 
         TestSuite suite = new TestSuite("concurrent");
+       
+        // Test suite for deadlock detection.
+        suite.addTestSuite(TestTxDag.class);
         
+        // Test suite for the lock manager.
         suite.addTestSuite(TestLockManager.class);
 
         return suite;

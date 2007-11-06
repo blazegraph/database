@@ -88,7 +88,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestNanosecondTimestampFactory.class );
         
         // test of the hybrid timestamp factory.
-        suite.addTestSuite( TestHybridTimestampFactory.class );
+        // Note: class is not debugged and is marked as deprecated, test is commented out.
+//        suite.addTestSuite( TestHybridTimestampFactory.class );
         
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );

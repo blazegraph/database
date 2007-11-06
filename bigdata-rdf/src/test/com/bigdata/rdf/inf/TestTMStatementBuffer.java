@@ -51,7 +51,10 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for {@link TMStatementBuffer}.
@@ -59,7 +62,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @todo verify that we can downgrade an explicit statement to an inferred one.
  * 
  * @todo write an explicit test of
- *       {@link TMStatementBuffer#filterExistingStatements(AbstractTripleStore, AbstractTripleStore)}
+ *       {@link TMStatementBuffer#applyExistingStatements(AbstractTripleStore, AbstractTripleStore)}
  *       or the private variant of that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -81,6 +84,100 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         super(name);
     }
 
+    /**
+     * Test for {@link TMStatementBuffer#applyExistingStatements(AbstractTripleStore, AbstractTripleStore, ISPOFilter filter)}.
+     */
+    public void test_filter_01() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            /*
+             * Setup the database.
+             */
+            {
+                SPOAssertionBuffer buf = new SPOAssertionBuffer(store,
+                        null/* filter */, 100/* capacity */, false/* justified */);
+
+                buf.add(new SPO(1, 2, 3, StatementEnum.Inferred));
+                
+                buf.add(new SPO(2, 2, 3, StatementEnum.Explicit));
+
+                buf.flush();
+
+                assertTrue(store.hasStatement(1, 2, 3));
+                assertTrue(store.getStatement(1, 2, 3).isInferred());
+                
+                assertTrue(store.hasStatement(2, 2, 3));
+                assertTrue(store.getStatement(2, 2, 3).isExplicit());
+
+                assertEquals(2,store.getStatementCount());
+
+            }
+            
+            /*
+             * Setup a temporary store.
+             */
+            TempTripleStore focusStore = new TempTripleStore(store.getProperties());
+            {
+            
+                SPOAssertionBuffer buf = new SPOAssertionBuffer(focusStore,
+                        null/* filter */, 100/* capacity */, false/* justified */);
+
+                // should be applied to the database since already there as inferred.
+                buf.add(new SPO(1, 2, 3, StatementEnum.Explicit));
+                
+                // should be applied to the database since already there as explicit.
+                buf.add(new SPO(2, 2, 3, StatementEnum.Explicit));
+
+                // should not be applied to the database since not there at all.
+                buf.add(new SPO(3, 2, 3, StatementEnum.Explicit));
+
+                buf.flush();
+
+                assertTrue(focusStore.hasStatement(1, 2, 3));
+                assertTrue(focusStore.getStatement(1, 2, 3).isExplicit());
+                
+                assertTrue(focusStore.hasStatement(2, 2, 3));
+                assertTrue(focusStore.getStatement(2, 2, 3).isExplicit());
+                
+                assertTrue(focusStore.hasStatement(3, 2, 3));
+                assertTrue(focusStore.getStatement(3, 2, 3).isExplicit());
+
+                assertEquals(3,focusStore.getStatementCount());
+
+            }
+
+            /*
+             * For each (explicit) statement in the focusStore that also exists
+             * in the database: (a) if the statement is not explicit in the
+             * database then mark it as explicit; and (b) remove the statement
+             * from the focusStore.
+             */
+            
+            int nremoved = TMStatementBuffer.applyExistingStatements(focusStore, store, null/*filter*/);
+
+            // statement was pre-existing and was converted from inferred to explicit.
+            assertTrue(store.hasStatement(1, 2, 3));
+            assertTrue(store.getStatement(1, 2, 3).isExplicit());
+            
+            // statement was pre-existing as "explicit" so no change.
+            assertTrue(store.hasStatement(2, 2, 3));
+            assertTrue(store.getStatement(2, 2, 3).isExplicit());
+
+            assertEquals(2,focusStore.getStatementCount());
+            
+            assertEquals("#removed",1,nremoved);
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+    
     /**
      * A simple test of {@link TMStatementBuffer} in which some statements are
      * asserted and their closure is computed and aspects of that closure are

@@ -45,16 +45,16 @@ package com.bigdata.btree;
 
 import java.io.DataInput;
 import java.io.IOException;
-import java.util.zip.Deflater;
-import java.util.zip.Inflater;
+//import java.util.zip.Deflater;
+//import java.util.zip.Inflater;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.io.DataInputBuffer;
+//import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.util.TestHuffmanEncoder.HuffmanDecoder;
-import com.bigdata.util.TestHuffmanEncoder.HuffmanEncoder;
+//import com.bigdata.util.TestHuffmanEncoder.HuffmanDecoder;
+//import com.bigdata.util.TestHuffmanEncoder.HuffmanEncoder;
 
 /**
  * Compact serialization for the key buffer.
@@ -86,24 +86,24 @@ public class KeyBufferSerializer implements IKeySerializer {
      */
     public static final transient short VERSION0 = 0x0;
     
-    /**
-     * Serialization variant where the data after the version identifier are
-     * compressed using a {@link Deflater} (ZLIB).
-     */
-    public static final transient short VERSION1 = 0x1;
+//    /**
+//     * Serialization variant where the data after the version identifier are
+//     * compressed using a {@link Deflater} (ZLIB).
+//     */
+//    public static final transient short VERSION1 = 0x1;
     
     public static final transient IKeySerializer INSTANCE = new KeyBufferSerializer();
 
-    /**
-     * Encoder provides just the huffman encoding aspect of ZLIB, but writes 
-     * data that are compatible with ZLIB decompression.
-     */
-    private HuffmanEncoder encoder = new HuffmanEncoder();
-    
-    /**
-     * Decoder just applies {@link Inflater} to decompress ZLIB format data.
-     */
-    private HuffmanDecoder decoder = new HuffmanDecoder();
+//    /**
+//     * Encoder provides just the huffman encoding aspect of ZLIB, but writes 
+//     * data that are compatible with ZLIB decompression.
+//     */
+//    private HuffmanEncoder encoder = new HuffmanEncoder();
+//    
+//    /**
+//     * Decoder just applies {@link Inflater} to decompress ZLIB format data.
+//     */
+//    private HuffmanDecoder decoder = new HuffmanDecoder();
 
     /**
      * The minimum aggregate length of the serialized keys before compression
@@ -211,34 +211,35 @@ public class KeyBufferSerializer implements IKeySerializer {
         
         final short version = ShortPacker.unpackShort(is);
         
-        if (version != VERSION0 && version != VERSION1) {
+//        if (version != VERSION0 && version != VERSION1) {
+        if (version != VERSION0) {
 
             throw new IOException("Unknown version=" + version);
             
         }
 
-        if(version == VERSION1) {
-
-            /*
-             * Decompress the record before deserializing it.
-             */
-            
-            counters.ndecompressed++;
-            
-            int nbytes = (int)LongPacker.unpackLong(is);
-            
-            counters.bytesDecompressed += nbytes;
-            
-            temp_baos.reset();
-            
-            temp_baos.write(is,nbytes);
-            
-            byte[] uncompressed = decoder.decompress(temp_baos.buf, 0,
-                    temp_baos.len);
-            
-            is = new DataInputBuffer(uncompressed);
-            
-        }
+//        if(version == VERSION1) {
+//
+//            /*
+//             * Decompress the record before deserializing it.
+//             */
+//            
+//            counters.ndecompressed++;
+//            
+//            int nbytes = (int)LongPacker.unpackLong(is);
+//            
+//            counters.bytesDecompressed += nbytes;
+//            
+//            temp_baos.reset();
+//            
+//            temp_baos.write(is,nbytes);
+//            
+//            byte[] uncompressed = decoder.decompress(temp_baos.buf, 0,
+//                    temp_baos.len);
+//            
+//            is = new DataInputBuffer(uncompressed);
+//            
+//        }
         
         /*
          * Deserialize the record.
@@ -347,48 +348,48 @@ public class KeyBufferSerializer implements IKeySerializer {
 
         counters.bytesWritten += temp_baos.len;
         
-        /*
-         * If the key buffer is long enough, then apply compression.
-         */
-        if (temp_baos.len >= minKeyLengthToCompress) {
-
-            /*
-             * Compress the serialized keys.
-             */
-            final byte[] compressed = encoder.compress(temp_baos.buf, 0, temp_baos.len);
-
-            // compute the compression ratio (compressed to uncompressed).
-            float ratio = ((float) compressed.length) / temp_baos.len;
-            
-            /* If the compression ratio is decent, then write as compressed.
-             * 
-             * Note: it is not worth a minor space savings to have the additional
-             * effort of decompressing the data, so unless the compression ratio
-             * is decent we will write out the uncompressed form of the record. 
-             */
-            if (ratio < minCompressionRatio) {
-                
-                /*
-                 * write compressed version.
-                 */
-                
-                counters.ncompressed++;
-                
-                counters.bytesCompressed += compressed.length;
-                
-                os.packShort(VERSION1);
-
-                // #of compressed bytes to follow.
-                os.packLong(compressed.length);
-
-                // the compressed data.
-                os.write(compressed);
-             
-                return;
-                
-            }
-
-        }
+//        /*
+//         * If the key buffer is long enough, then apply compression.
+//         */
+//        if (temp_baos.len >= minKeyLengthToCompress) {
+//
+//            /*
+//             * Compress the serialized keys.
+//             */
+//            final byte[] compressed = encoder.compress(temp_baos.buf, 0, temp_baos.len);
+//
+//            // compute the compression ratio (compressed to uncompressed).
+//            float ratio = ((float) compressed.length) / temp_baos.len;
+//            
+//            /* If the compression ratio is decent, then write as compressed.
+//             * 
+//             * Note: it is not worth a minor space savings to have the additional
+//             * effort of decompressing the data, so unless the compression ratio
+//             * is decent we will write out the uncompressed form of the record. 
+//             */
+//            if (ratio < minCompressionRatio) {
+//                
+//                /*
+//                 * write compressed version.
+//                 */
+//                
+//                counters.ncompressed++;
+//                
+//                counters.bytesCompressed += compressed.length;
+//                
+//                os.packShort(VERSION1);
+//
+//                // #of compressed bytes to follow.
+//                os.packLong(compressed.length);
+//
+//                // the compressed data.
+//                os.write(compressed);
+//             
+//                return;
+//                
+//            }
+//
+//        }
 
         /*
          * Write the uncompressed form of the serialized keys.

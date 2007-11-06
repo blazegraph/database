@@ -64,12 +64,9 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
-import org.CognitiveWeb.concurrent.locking.DeadlockException;
-import org.CognitiveWeb.concurrent.locking.TimeoutException;
-import org.CognitiveWeb.concurrent.locking.TxDag;
-import org.CognitiveWeb.concurrent.locking.LockContextManager.LockContext;
 import org.apache.log4j.Logger;
 
+import com.bigdata.concurrent.LockManager.HorridTaskDeath;
 import com.bigdata.service.DataService;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -170,21 +167,6 @@ public class TestLockManager extends TestCase implements IComparisonTest {
 
         }
 
-    }
-    
-    /**
-     * Thrown by {@link DeathResourceTask} in some test cases.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class HorridTaskDeath extends RuntimeException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 6798406260395237402L;
-        
     }
     
     /**

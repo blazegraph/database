@@ -239,12 +239,8 @@ public interface IRawTripleStore extends ITripleStore {
      * Writes the statements onto the statement indices (batch, parallel, NO
      * truth maintenance).
      * 
-     * @param stmts
-     *            The statements.
-     * 
-     * @param numStmts
-     *            The #of entries in <i>stmts</i> that are valid.
-     * 
+     * @param itr
+     *            An iterator visiting the statements to be added.
      * @param filter
      *            Optional statement filter. Statements matching the filter are
      *            NOT added to the database.
@@ -257,6 +253,21 @@ public interface IRawTripleStore extends ITripleStore {
      */
     public int addStatements(ISPOIterator itr, ISPOFilter filter);
 
+    /**
+     * Removes the statements from the statement indices (batch, parallel, NO
+     * truth maintenance).
+     * <p>
+     * Note: The {@link StatementEnum} on the {@link SPO}s is ignored by this
+     * method. It will delete all statements having the same bindings regardless
+     * of whether they are inferred, explicit, or axioms.
+     * 
+     * @param itr
+     *            The iterator
+     * 
+     * @return The #of statements that were removed from the indices.
+     */
+    public int removeStatements(ISPOIterator itr);
+    
     /**
      * Externalizes a statement using an appreviated syntax.
      */

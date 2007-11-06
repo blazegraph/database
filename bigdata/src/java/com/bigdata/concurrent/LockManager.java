@@ -55,9 +55,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.CognitiveWeb.concurrent.locking.DeadlockException;
-import org.CognitiveWeb.concurrent.locking.TimeoutException;
-import org.CognitiveWeb.concurrent.locking.TxDag;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.WeakValueCache;
@@ -778,4 +775,19 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
     }
 
+    /**
+     * Thrown by some unit tests.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class HorridTaskDeath extends RuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6798406260395237402L;
+        
+    }
+    
 }

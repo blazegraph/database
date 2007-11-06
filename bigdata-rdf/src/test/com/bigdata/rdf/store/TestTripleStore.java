@@ -59,6 +59,7 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 import org.openrdf.vocabulary.XmlSchema;
 
+import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -67,6 +68,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -691,6 +693,46 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         }
         
+    }
+    
+    /**
+     * Test of {@link IRawTripleStore#removeStatements(com.bigdata.rdf.spo.ISPOIterator)}
+     */
+    public void test_removeStatements() {
+        
+        AbstractTripleStore store = getStore();
+        
+        try {
+
+            // verify nothing in the store.
+            assertSameIterator(new Statement[]{},
+                    store.getAccessPath(null,null,null).iterator());
+            
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+                    null/* filter */, 100/* capacity */, false/*justify*/);
+            
+            buffer.add(new SPO(1, 2, 3,StatementEnum.Explicit));
+            buffer.add(new SPO(2, 2, 3,StatementEnum.Explicit));
+            
+            buffer.flush();
+
+            assertTrue(store.hasStatement(1,2,3));
+            assertTrue(store.hasStatement(2,2,3));
+            assertEquals(2,store.getStatementCount());
+            
+            assertEquals(1, store.removeStatements(new SPOArrayIterator(
+                    new SPO[] { new SPO(1, 2, 3, StatementEnum.Explicit) }, 1)));
+
+            assertFalse(store.hasStatement(1,2,3));
+            assertTrue(store.hasStatement(2,2,3));
+            assertEquals(1,store.getStatementCount());
+
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+
     }
     
 }

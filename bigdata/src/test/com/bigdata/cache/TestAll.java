@@ -73,7 +73,8 @@ public class TestAll extends TestCase {
     }
 
     public static junit.framework.Test suite() {
-        TestSuite retval = new TestSuite();
+        
+        TestSuite retval = new TestSuite("cache");
         
         retval.addTestSuite(TestHardReferenceCache.class);
         

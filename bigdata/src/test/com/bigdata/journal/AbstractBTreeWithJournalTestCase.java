@@ -166,9 +166,37 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
                 BTree btree = getBTree(m);
                 
-                doSplitWithIncreasingKeySequence( btree, m, m );
+                try {
+
+                    doSplitWithIncreasingKeySequence( btree, m, m );
                 
-                btree.getStore().closeAndDelete();
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+
+                try {
+
+                    doSplitWithIncreasingKeySequence( btree, m, m*m );
+
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
             
@@ -176,9 +204,18 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
                 BTree btree = getBTree(m);
                 
-                doSplitWithIncreasingKeySequence( btree, m, m*m );
-                
-                btree.getStore().closeAndDelete();
+                try {
+                    
+                    doSplitWithIncreasingKeySequence( btree, m, m*m*m );
+
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
             
@@ -186,19 +223,18 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
                 BTree btree = getBTree(m);
                 
-                doSplitWithIncreasingKeySequence( btree, m, m*m*m );
-                
-                btree.getStore().closeAndDelete();
-                
-            }
-            
-            {
+                try {
 
-                BTree btree = getBTree(m);
+                    doSplitWithIncreasingKeySequence( btree, m, m*m*m*m );
                 
-                doSplitWithIncreasingKeySequence( btree, m, m*m*m*m );
-                
-                btree.getStore().closeAndDelete();
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
             
@@ -220,9 +256,56 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
                 BTree btree = getBTree(m);
                 
-                doSplitWithDecreasingKeySequence( btree, m, m );
+                try {
+
+                    doSplitWithDecreasingKeySequence( btree, m, m );
                 
-                btree.getStore().closeAndDelete();
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+
+                try {
+
+                    doSplitWithDecreasingKeySequence( btree, m, m*m );
+                
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
+                
+            }
+            
+            {
+
+                BTree btree = getBTree(m);
+
+                try {
+
+                    doSplitWithDecreasingKeySequence( btree, m, m*m*m );
+
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
             
@@ -230,29 +313,18 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
 
                 BTree btree = getBTree(m);
                 
-                doSplitWithDecreasingKeySequence( btree, m, m*m );
-                
-                btree.getStore().closeAndDelete();
-                
-            }
-            
-            {
+                try {
 
-                BTree btree = getBTree(m);
-                
-                doSplitWithDecreasingKeySequence( btree, m, m*m*m );
-                
-                btree.getStore().closeAndDelete();
-                
-            }
-            
-            {
+                    doSplitWithDecreasingKeySequence( btree, m, m*m*m*m );
 
-                BTree btree = getBTree(m);
-                
-                doSplitWithDecreasingKeySequence( btree, m, m*m*m*m );
-                
-                btree.getStore().closeAndDelete();
+                } finally {
+
+                    try {btree.getStore().closeAndDelete();}
+                    catch(Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
 
@@ -261,8 +333,8 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
     }
 
     /**
-     * A stress test for random key insertion using a that runs with a variety
-     * of branching factors and #of keys to insert.
+     * A stress test for random key insertion that runs with a variety of
+     * branching factors and #of keys to insert.
      */
     public void test_splitRootLeaf_randomKeySequence() {
 
@@ -274,29 +346,59 @@ abstract public class AbstractBTreeWithJournalTestCase extends AbstractBTreeTest
             
                 BTree btree = getBTree(m);
                 
-                doSplitWithRandomDenseKeySequence( btree, m, m );
+                try {
+
+                    doSplitWithRandomDenseKeySequence( btree, m, m );
+                    
+                } finally {
                 
-                btree.getStore().closeAndDelete();
+                    try {
+                        btree.getStore().closeAndDelete();
+                    } catch (Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
                 
             }
             
             {
                 
                 BTree btree = getBTree(m);
-                
-                doSplitWithRandomDenseKeySequence( btree, m, m*m );
-                
-                btree.getStore().closeAndDelete();
+
+                try {
+
+                    doSplitWithRandomDenseKeySequence(btree, m, m * m);
+
+                } finally {
+
+                    try {
+                        btree.getStore().closeAndDelete();
+                    } catch (Throwable t) {
+                        log.warn(t);
+                    }
+
+                }
                 
             }
 
             {
 
                 BTree btree = getBTree(m);
+                
+                try {
 
-                doSplitWithRandomDenseKeySequence( btree, m, m * m * m);
+                    doSplitWithRandomDenseKeySequence( btree, m, m * m * m);
 
-                btree.getStore().closeAndDelete();
+                } finally {
+                    
+                    try {
+                        btree.getStore().closeAndDelete();
+                    } catch (Throwable t) {
+                        log.warn(t);
+                    }
+                    
+                }
 
             }
 

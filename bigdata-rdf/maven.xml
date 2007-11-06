@@ -52,7 +52,7 @@
 <!--                                                    -->
 <!-- Copy the architecture directory to generated site. -->
 <!--                                                    -->
-
+<!--
 <postGoal name="xdoc:init">
 
    <echo>Copying architecture directory into generated site.</echo>
@@ -62,5 +62,5 @@
    </copy>
   
 </postGoal>
-
+-->
 </project>

@@ -466,11 +466,17 @@ public class BytesUtil {
      * 
      * @see http://portal.acm.org/citation.cfm?doid=320521.320530
      * 
+     * @throws IllegalArgumentException if either key is <code>null</code>.
+     * 
      * FIXME implement shortest key logic. this returns the givenKey, which is
      * always legal.
      */
     final public static byte[] getSeparatorKey(byte[] givenKey, byte[] priorKey) {
 
+        if(givenKey==null) throw new IllegalArgumentException();
+
+        if(priorKey==null) throw new IllegalArgumentException();
+        
         return givenKey;
         
 //        final int givenKeyLen = givenKey.length;

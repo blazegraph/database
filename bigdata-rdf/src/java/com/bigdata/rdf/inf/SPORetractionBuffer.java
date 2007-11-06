@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -73,35 +74,13 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
     public int flush() {
 
         if (isEmpty()) return 0;
-
-        log.info("numStmts=" + numStmts);
-
-        final long begin = System.currentTimeMillis();
-
-        int n = 0;
-
-        /*
-         * @todo It might be worth doing a more efficient method for bulk
-         * statement removal. This will wind up doing M * N operations. The N
-         * are parallelized, but the M are not.
-         */
-
-        for(int i=0; i<numStmts; i++) {
-
-            SPO spo = stmts[i];
-            
-            n += store.getAccessPath(spo.s, spo.p, spo.o).removeAll();
         
-        }
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.info("Retracted "+n+" statements in "+elapsed+"ms");
+        int nremoved = store.removeStatements(new SPOArrayIterator(stmts,numStmts));
 
         // reset the counter.
         numStmts = 0;
 
-        return n;
+        return nremoved;
         
     }
 
