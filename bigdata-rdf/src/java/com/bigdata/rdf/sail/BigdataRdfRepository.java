@@ -600,7 +600,7 @@ public class BigdataRdfRepository implements RdfRepository {
         
         if(getTruthMaintenance()) {
         
-            // do truth maintenance.
+            // do truth maintenance, writing on the database.
             
             ((TMStatementBuffer)assertBuffer).doClosure();
             
@@ -625,7 +625,7 @@ public class BigdataRdfRepository implements RdfRepository {
              */
             ISPOIterator itr = database.getAccessPath(s,p,o).iterator(ExplicitSPOFilter.INSTANCE);
             
-            // copy explicit statements to the temporary store.
+            // copy explicit statements to retraction buffer.
             n = retractBuffer.getStatementStore().addStatements(itr,null/*filter*/);
 
         } else {
@@ -726,6 +726,7 @@ public class BigdataRdfRepository implements RdfRepository {
                 
                 if(getTruthMaintenance()) {
 
+                    // do TM, writing on the database.
                     ((TMStatementBuffer)assertBuffer).doClosure();
                     
                 }
@@ -736,6 +737,7 @@ public class BigdataRdfRepository implements RdfRepository {
 
             if (retractBuffer != null && !retractBuffer.isEmpty()) {
 
+                // do TM, writing on the database.
                 retractBuffer.doClosure();
                 
                 m_stmtRemoved = true;

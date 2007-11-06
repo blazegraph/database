@@ -1608,6 +1608,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     final public void dumpStore(boolean explicit, boolean inferred, boolean axioms) {
 
+        dumpStore(this,explicit,inferred,axioms);
+        
+    }
+
+    final public void dumpStore(AbstractTripleStore resolveTerms, boolean explicit, boolean inferred, boolean axioms) {
+
         final int nstmts = getStatementCount();
         
         IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
@@ -1652,7 +1658,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             }
             
-            System.err.println("#" + (i+1) + "\t" + spo.toString(this));
+            System.err.println("#" + (i+1) + "\t" + spo.toString(resolveTerms));
             
             i++;
             
