@@ -466,7 +466,7 @@ public class Justification implements Comparable<Justification> {
      *       fast closure method then this should be rewritten to be
      *       non-recursive and it will be MUCH faster.
      */
-    private static boolean isGrounded(AbstractTripleStore focusStore,
+    public static boolean isGrounded(AbstractTripleStore focusStore,
             AbstractTripleStore db, SPO head, boolean testHead) {
 
         assert focusStore != null;

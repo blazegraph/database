@@ -214,71 +214,78 @@ public class TestCommitList extends ProxyTestCase {
     
     /**
      * A variant of {@link #test_commitList_001()} in which we re-open the store
-     * after each commit and verify that the record written can read so that we
-     * know that the commit was made restart safe.
+     * after each commit and verify that the record written can be read so that
+     * we know that the commit was made restart safe.
      */
     public void test_commitList_001_restartSafe() {
-
+        
         Journal journal = new Journal(getProperties());
 
-        final String name = "abc";
+        try {
 
-        // register index.
-        IIndex ndx = journal.registerIndex(name);
-        
-        // verify a new index is on the commit list.
-        assertTrue(journal.name2Addr.willCommit(name));
+            final String name = "abc";
 
-        // commit.
-        journal.commit();
+            // register index.
+            IIndex ndx = journal.registerIndex(name);
 
-        // re-open the store.
-        journal = reopenStore(journal);
-        
-        // get the index object from the re-opened store..
-        ndx = journal.getIndex(name);
+            // verify a new index is on the commit list.
+            assertTrue(journal.name2Addr.willCommit(name));
 
-        assertNotNull(ndx);
-        
-        // not on the commit list.
-        assertFalse(journal.name2Addr.willCommit(name));
+            // commit.
+            journal.commit();
 
-        // write an entry on the index - the index becomes dirty and should
-        // show up on the commit list.
-        ndx.insert(new byte[]{1,2,3}, new byte[]{1,2,3});
-        
-        // verify on the commit list.
-        assertTrue(journal.name2Addr.willCommit(name));
-        
-        // commit.
-        journal.commit();
+            if (journal.isStable()) {
 
-        // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(name));
+                // re-open the store.
+                journal = reopenStore(journal);
 
-        if (journal.isStable()) {
-            
-            // re-open the store.
-            journal = reopenStore(journal);
+                // get the index object from the re-opened store..
+                ndx = journal.getIndex(name);
 
-            // get the index object from the re-opened store..
-            ndx = journal.getIndex(name);
+                assertNotNull(ndx);
 
-            assertNotNull(ndx);
+                // not on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
 
-            // not on the commit list.
-            assertFalse(journal.name2Addr.willCommit(name));
+                // write an entry on the index - the index becomes dirty and
+                // should
+                // show up on the commit list.
+                ndx.insert(new byte[] { 1, 2, 3 }, new byte[] { 1, 2, 3 });
 
-            // verify entry written by the commit.
-            assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
-                    .lookup(new byte[] { 1, 2, 3 }));
+                // verify on the commit list.
+                assertTrue(journal.name2Addr.willCommit(name));
 
-            // still not on the commit list.
-            assertFalse(journal.name2Addr.willCommit(name));
-        
+                // commit.
+                journal.commit();
+
+                // no longer on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
+
+                // re-open the store.
+                journal = reopenStore(journal);
+
+                // get the index object from the re-opened store..
+                ndx = journal.getIndex(name);
+
+                assertNotNull(ndx);
+
+                // not on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
+
+                // verify entry written by the commit.
+                assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
+                        .lookup(new byte[] { 1, 2, 3 }));
+
+                // still not on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
+
+            }
+
+        } finally {
+
+            journal.closeAndDelete();
+
         }
-        
-        journal.closeAndDelete();
         
     }
 
@@ -292,49 +299,55 @@ public class TestCommitList extends ProxyTestCase {
         
         Journal journal = new Journal(getProperties());
 
-        final String name = "abc";
+        try {
 
-        // register index.
-        IIndex ndx = journal.registerIndex(name);
-        
-        // verify a new index is on the commit list.
-        assertTrue(journal.name2Addr.willCommit(name));
+            final String name = "abc";
 
-        // write an entry on the index.
-        ndx.insert(new byte[]{1,2,3}, new byte[]{1,2,3});
-        
-        // verify on the commit list.
-        assertTrue(journal.name2Addr.willCommit(name));
-        
-        // commit.
-        journal.commit();
+            // register index.
+            IIndex ndx = journal.registerIndex(name);
 
-        // no longer on the commit list.
-        assertFalse(journal.name2Addr.willCommit(name));
+            // verify a new index is on the commit list.
+            assertTrue(journal.name2Addr.willCommit(name));
 
-        if (journal.isStable()) {
+            // write an entry on the index.
+            ndx.insert(new byte[] { 1, 2, 3 }, new byte[] { 1, 2, 3 });
 
-            // re-open the store.
-            journal = reopenStore(journal);
+            // verify on the commit list.
+            assertTrue(journal.name2Addr.willCommit(name));
 
-            // get the index object from the re-opened store..
-            ndx = journal.getIndex(name);
+            // commit.
+            journal.commit();
 
-            assertNotNull(ndx);
-
-            // not on the commit list.
+            // no longer on the commit list.
             assertFalse(journal.name2Addr.willCommit(name));
 
-            // verify entry written by the commit.
-            assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
-                    .lookup(new byte[] { 1, 2, 3 }));
+            if (journal.isStable()) {
 
-            // still not on the commit list.
-            assertFalse(journal.name2Addr.willCommit(name));
+                // re-open the store.
+                journal = reopenStore(journal);
+
+                // get the index object from the re-opened store..
+                ndx = journal.getIndex(name);
+
+                assertNotNull(ndx);
+
+                // not on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
+
+                // verify entry written by the commit.
+                assertEquals(new byte[] { 1, 2, 3 }, (byte[]) ndx
+                        .lookup(new byte[] { 1, 2, 3 }));
+
+                // still not on the commit list.
+                assertFalse(journal.name2Addr.willCommit(name));
+
+            }
+
+        } finally {
+
+            journal.closeAndDelete();
 
         }
-        
-        journal.closeAndDelete();
 
     }
     

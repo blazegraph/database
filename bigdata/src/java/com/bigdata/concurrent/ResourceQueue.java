@@ -9,9 +9,6 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.CognitiveWeb.concurrent.locking.DeadlockException;
-import org.CognitiveWeb.concurrent.locking.TimeoutException;
-import org.CognitiveWeb.concurrent.locking.TxDag;
 import org.apache.log4j.Logger;
 
 

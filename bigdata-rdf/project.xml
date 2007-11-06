@@ -3,7 +3,7 @@
   <id>bigdata-rdf</id>
   <name>bigdata-rdf</name>
   <package>com.bigdata</package>
-  <extends>../cweb/project.xml</extends>
+  <extends>../bigdata-master-pom/project.xml</extends>
   <groupId>com.bigdata</groupId>
   <currentVersion>0.1-b1-dev</currentVersion>
 
@@ -28,7 +28,90 @@
 
   <p>
 
-	  rdf database build on the bigdata architecture. 
+  This project provides an RDF database built on the bigdata
+  architecture.
+
+  </p>
+  
+  <p>
+
+  This project contains several implementations of an RDF database
+  layer, including one suitable for temporary data which might
+  overflow onto disk, one suitable for a scale-out (single host)
+  persistent knowledge base, and one designed for scale-out over a
+  cluster of machines.
+
+  </p><p>
+
+  The basic approach in both the single host and the scale-out
+  versions is to fully index the various access paths (s:p:o, p:o:s,
+  or o:s:p). RDF URIs, Literals, and BNodes are mapped internally to
+  64-bit long integers using forward (terms:ids) and a reverse
+  (ids:terms) indices. The presence of a key in a statement index
+  indicates that the statement is asserted on the database while its
+  absence indicates that the statemetn is not asserted on the
+  database.  In addition, each statement index associates the key for
+  a given access path with whether the statement is explicit,
+  inferred, or an axiom.
+
+  </p><p>
+
+  Entailments are supported for RDF Schema, owl:sameAs,
+  owl:equivalentProperty, and owl:equivalentClass.  The entailment
+  rules are mostly declarative and new rules can be written with
+  relatively little effort.  Truth maintenance currently relies on
+  writing justifications as entailments are computed during closure.
+  When statements are retracted, the justifications are searched to
+  determine whether or not the statements are still entailed by the
+  remaining assertions in the database.
+
+  </p><p>
+
+  The RDF database uses efficient ordered B-Tree read and write
+  operations throughout.  The underlying bigdata architecture uses
+  MVCC to allow concurrent readers and provides the maximum possible
+  interleaving for writers on resources (indices).  The scale-out RDF
+  database is a client of the bigdata federation.  At present is uses
+  range partitioned indices running on data services.  Since the
+  indices are range partitioned resource contention is limited to
+  unisolated operations running on an index partition.  In general,
+  those operations are modest batch B-Tree reads or writes and their
+  latency is quite low and streaming IO is used throughout.  Options
+  also exist to evict ranges of B-Trees onto "perfect" read-only
+  "index segments" using bulk index build operations.  Index segments
+  use a much larger branching factor than the mutable B-Trees in order
+  to maximize the opportunity for streaming IO.
+
+  </p><p>
+
+  Data load performance, inference, and triple pattern queries are
+  extremely fast.  For example, the database can load the Wordnet
+  schema and nouns data sets (273681 explicit triples) at a rate of
+  21,000+ triples per second on a dual CPU 3Ghz Intel Xeon workstation
+  using only 500M of RAM for the JVM.  The RDF(S)+ closure of the same
+  data set is computed at a rate of 8100 entailments per second.  The
+  total throughput to load and compute the closure of those data sets
+  is 14,000+ triples per second.
+
+  </p><p>
+
+  A prototype scale-out knowledge base is running but is still under
+  development.  It runs as a client of a bigdata federation.  Indices
+  are range partitioned and distributed across bigdata data services.
+  All index operations use ordered B-Tree reads or writes.  A custom
+  batch operation is used to provide consistent high-concurrency
+  assignment of 64-bit term identifiers without requiring the overhead
+  of transactional isolation.  We are also examining map/reduce
+  architectures which would provide asynchronous bulk data load and
+  closure, but might require the use of hash partitioned indices.
+  Network IO has not been tuned and is a known bottleneck.
+
+  </p><p>
+
+  While a Sesame 1.x integration is provided, the Sesame 1.x platform
+  does not make it possible to optimize high-level queries for the
+  backend database.  Therefore a Sesame 2.x integration is in the
+  works.  This will be a native quad store.
 
   </p>
 
@@ -38,6 +121,76 @@
 
   <versions>
   </versions>
+
+  <!-- copy down inheritance applies. -->
+  <siteAddress>www.bigdata.com</siteAddress>
+  <siteDirectory>
+    /home/groups/b/bi/bigd/htdocs/projects/${pom.artifactId}
+  </siteDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <distributionSite>www.sourceforge.net</distributionSite>
+  <distributionDirectory>/projects/bigdata</distributionDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <!--
+  <issueTrackingUrl>
+  http://jira.bigdata.com/browse/bigdata-rdf
+  </issueTrackingUrl>
+  -->
+  <issueTrackingUrl>
+  http://sourceforge.net/tracker/?group_id=191861
+  </issueTrackingUrl>
+
+
+  <!-- copy down inheritance applies. -->
+  <repository>
+    <connection>
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata
+    </connection>
+    <developerConnection>
+    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata-rdf
+    </developerConnection>
+    <url>http://bigdata.cvs.sourceforge.net/bigdata/bigdata-rdf</url>
+  </repository>
+
+  <!-- copy down inheritance applies. -->
+  <licenses>
+    <license>
+      <name>GPL (version 2)</name>
+      <url>http://www.opensource.org/licenses/gpl-license.php</url>
+      <distribution>manual</distribution>
+    </license>
+  </licenses>
+
+  <!-- copy down inheritance applies.
+  <mailingLists>
+    <mailingList>
+      <name>Announce List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-announce
+      </archive>
+    </mailingList>
+    <mailingList>
+      <name>Developer List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-developer
+      </archive>
+    </mailingList>
+  </mailingLists>
+  -->
 
   <!-- copy down inheritance applies. -->
   <developers>
@@ -79,11 +232,140 @@
       <url>http://www.junit.org/</url>
     </dependency>
 
+	<!-- bigdata. -->
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
+
+	<!-- cweb utility classes. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-commons</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+	<!-- Extensible Serialization framework. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-extser</artifactId>
+      <version>0.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
     <!-- LGPL utility classes. -->
     <dependency> 
-      <id>lgpl-util</id> 
-      <!--<version>3.8.1</version>-->
-      <url>http://cweb.cvs.sourceforge.net/cweb/lgpl-utils/</url>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>1.0-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+    <!-- Striterator support. -->
+    <!-- Note: The jar name reflects the date when I downloaded it -->
+    <!-- and makes it possible for me to rollback to historical CTC -->
+    <!-- versions.  Any recent "ctc_utils.jar" SHOULD work.  Just -->
+    <!-- extract the JAR and rename it. -->
+    <dependency>
+      <groupId>ctc</groupId>
+      <artifactId>utils</artifactId>
+      <jar>ctc_utils-5-4-2005.jar</jar>
+      <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
+    </dependency>
+
+    <!-- The openrdf framework. -->
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>openrdf-model</artifactId>
+      <version>1.2.1</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>openrdf-util</artifactId>
+      <version>1.2.1</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>rio</artifactId>
+      <version>1.2.1</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>sesame</artifactId>
+      <version>1.2.1</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <!-- Sesame Test suite (testing only). -->
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>sesame-tests</artifactId>
+      <version>1.2.1</version>
+      <!-- This is not an official Sesame artifact at this time. -->
+      <!-- A copy is maintained on the cweb maven repository. -->
+      <!-- From the sesame 1.1 root dir, do "ant build-tests" and then: -->
+      <!-- "jar vcf sesame-tests-1.2.1.jar test -C build/classes/tests/sesame ." -->
+      <url>http://proto.cognitiveweb.org/maven-repository/sesame/jars/sesame-test-1.1.jar</url>
+    </dependency>
+
+    <!--      -->
+    <!-- Jini -->
+    <!--      -->
+    <dependency> 
+	  <groupId>jini</groupId>
+	  <artifactId>jini-core</artifactId>
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>jini-ext</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency><!-- contains ServiceDiscoveryManager. -->
+	  <groupId>jini</groupId> 
+      <artifactId>jsk-lib</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>reggie</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>sun-util</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>start</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+
+    <!--     -->
+	<!-- ICU -->
+    <!--     -->
+	<!-- Unicode support (compressed sort keys). -->
+    <dependency>
+      <groupId>icu</groupId>
+      <artifactId>icu4j</artifactId> 
+      <version>3_6</version> 
+      <url>http://sourceforge.net/projects/icu/</url>
     </dependency>
 
   </dependencies>

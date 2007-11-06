@@ -50,11 +50,9 @@ package com.bigdata.concurrent;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 
-import org.CognitiveWeb.concurrent.locking.DeadlockException;
-import org.CognitiveWeb.concurrent.locking.TimeoutException;
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.TestLockManager.HorridTaskDeath;
+import com.bigdata.concurrent.LockManager.HorridTaskDeath;
 
 /**
  * Class encapsulates handshaking with the {@link LockManager} for an operation

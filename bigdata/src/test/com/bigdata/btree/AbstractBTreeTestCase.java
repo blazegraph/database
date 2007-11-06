@@ -906,20 +906,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         for( int i=0; i<20; i++ ) {
          
-            doInsertRandomKeySequenceTest(m, m, trace).getStore().closeAndDelete();
+            doInsertRandomKeySequenceTest(m, m, trace);
             
-            doInsertRandomSparseKeySequenceTest(m, m, trace).getStore().closeAndDelete();
-            
-        }
-        
-        /*
-         * Try several permutations of the key-value presentation order.
-         */
-        for( int i=0; i<20; i++ ) {
-         
-            doInsertRandomKeySequenceTest(m, m*m, trace).getStore().closeAndDelete();
-            
-            doInsertRandomSparseKeySequenceTest(m, m*m, trace).getStore().closeAndDelete();
+            doInsertRandomSparseKeySequenceTest(m, m, trace);
             
         }
         
@@ -928,9 +917,20 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         for( int i=0; i<20; i++ ) {
          
-            doInsertRandomKeySequenceTest(m, m*m*m, trace).getStore().closeAndDelete();
+            doInsertRandomKeySequenceTest(m, m*m, trace);
             
-            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace).getStore().closeAndDelete();
+            doInsertRandomSparseKeySequenceTest(m, m*m, trace);
+            
+        }
+        
+        /*
+         * Try several permutations of the key-value presentation order.
+         */
+        for( int i=0; i<20; i++ ) {
+         
+            doInsertRandomKeySequenceTest(m, m*m*m, trace);
+            
+            doInsertRandomSparseKeySequenceTest(m, m*m*m, trace);
             
         }
         
@@ -1095,10 +1095,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     protected BTree doInsertKeySequenceTest(int m, int[] keys, SimpleEntry[] entries, int[] order, int trace){
 
+        BTree btree = getBTree(m);
+
         try {
             
-            BTree btree = getBTree(m);
-
             int lastLeafCount = btree.nleaves;
 
             for (int i = 0; i < keys.length; i++) {
@@ -1201,6 +1201,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
             System.err.println("};");
             throw ex;
+        } finally {
+
+            try {
+                btree.getStore().closeAndDelete();
+            } catch(Throwable t) {
+                log.warn(t);
+            }
+            
         }
 
     }
@@ -1367,6 +1375,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         final BTree btree = getBTree(m);
 
+        try {
+        
         /*
          * Run test.
          */
@@ -1434,8 +1444,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         log.info(btree.counters.toString());
 
-        btree.getStore().closeAndDelete();
-        
+        } finally {
+
+            try {btree.getStore().closeAndDelete();}
+            catch(Throwable t) {
+                log.warn(t);
+            }
+            
+        }       
         
     }
 
@@ -1452,6 +1468,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         log.info("m="+m+", nkeys="+nkeys);
         
         BTree btree = getBTree(m);
+        
+        try {
         
         Integer[] keys = new Integer[nkeys];
         
@@ -1531,7 +1549,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("height", 0, btree.height);
         log.info(btree.counters.toString());
 
-        btree.getStore().closeAndDelete();
+        } finally {
+
+            try {btree.getStore().closeAndDelete();}
+            catch(Throwable t) {
+                log.warn(t);
+            }
+            
+        }
         
     }
     

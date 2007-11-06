@@ -66,7 +66,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite(TestAll.class.getName());
+        TestSuite suite = new TestSuite(TestAll.class.getPackage().getName());
 
         //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
 

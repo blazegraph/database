@@ -58,22 +58,6 @@
 	  
   </p>
   
-  <h2>Status</h2>
-  
-  <p>
-  	  
-  	  bigdata is currently in pre-release.  We are seeking beta users to
-  	  vet the architecture and work through robust scaling.  The basic index structures (mutable and
-  	  immutable btrees and bulk index build operations) and the persistent store
-  	  structure (the journal) have all been implemented and tested.  Current work
-  	  is focused on the distributed services architecture.  Aside from the test suite,
-  	  there is an RDF database application layer (bigdata-rdf) that is being used to
-  	  benchmark and tune the bigdata implementation. We have plans to provide an
-  	  transactional OODBMS integration (based on the Generic Object Model) as well
-  	  as a media index and search service (based on Lucene).
-  	  
-  </p>
-  
   <h2>Architecture</h2>
   
   <p>
@@ -196,6 +180,37 @@
   
   </p>
 
+  <h2>Status</h2>
+  
+  <p>
+  	  
+  	  The basic index structures (mutable and immutable btrees and
+  	  bulk index build operations) and the persistent store
+  	  structure (the journal) have all been implemented, tested
+  	  and are showing good performance.  The basic distributed
+  	  services architecture is up and running, but indices must be
+  	  statically range partitioned.  The "sparse row store" API
+  	  has been implemented, offering an interface similar to HBase
+  	  or bigtable.  The map/reduce services are up and running,
+  	  but further performance tuning is required (optimization for
+  	  local writes).  Data replication and service failover are
+  	  not finished.
+
+	  </p><p>
+
+	  There is an RDF database application layer (bigdata-rdf)
+  	  that is being used to benchmark and tune the bigdata
+  	  implementation. We have plans to provide an transactional
+  	  OODBMS integration (based on the Generic Object Model) as
+  	  well as a media index and search service.
+
+	  </p><p>
+
+	  We are seeking beta users to vet the architecture and work
+  	  through robust scaling.  
+  	  
+  </p>
+  
   <h2>License</h2>
   
   <p>
@@ -220,6 +235,34 @@
   
   </p>
 
+  <h2> Related links </h2>
+
+  <p>
+  
+  <dl>
+
+  <dt>CouchDB</dt>
+  <dd>http://couchdb.org/CouchDB/CouchDBWeb.nsf/Home?OpenForm</dd>
+
+  <dt>bigtable</dt>
+  <dd>http://labs.google.com/papers/bigtable.html</dd>
+
+  <dt>map/reduce</dt>
+  <dd>http://labs.google.com/papers/mapreduce.html</dd>
+
+  <dt>Hadoop</dt>
+  <dd>http://lucene.apache.org/hadoop/</dd>
+
+  <dt>Pig</dt>
+  <dd>http://research.yahoo.com/node/90</dd>
+
+  <dt>Sawsall</dt>
+  <dd>http://labs.google.com/papers/sawzall.html</dd>
+
+  </dl>
+
+  </p>
+
 ]]>
 
   </description>
@@ -238,7 +281,7 @@
   <!-- copy down inheritance applies. -->
   <siteAddress>www.bigdata.com</siteAddress>
   <siteDirectory>
-    /home/groups/b/bi/bigd/htdocs/technology/projects/${pom.artifactId}
+    /home/groups/b/bi/bigd/htdocs/projects/${pom.artifactId}
   </siteDirectory>
 
   <!-- copy down inheritance applies. -->

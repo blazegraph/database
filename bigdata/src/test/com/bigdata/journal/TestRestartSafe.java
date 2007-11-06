@@ -168,6 +168,8 @@ public class TestRestartSafe extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
+        try {
+        
         final int m = 3;
 
         final long addr1;
@@ -207,49 +209,57 @@ public class TestRestartSafe extends ProxyTestCase {
         /*
          * restart, re-opening the same file.
          */
-        final long addr2;
-        {
-        
-            journal = reopenStore(journal);
-            
-            final BTree btree = BTree.load(journal, addr1);
-            
-            assertTrue(btree.dump(Level.DEBUG,System.err));
-            
-            // @todo verify in more detail.
-            assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
-                    btree.entryIterator());
-
-            // remove all entries by replacing the root node.
-            
-            btree.removeAll();
-            
-            assertTrue(btree.dump(Level.DEBUG,System.err));
-
-            assertSameIterator( new Object[]{}, btree.entryIterator() );
-
-            addr2 = btree.write();
-
-            journal.commit();
-            
-        }
-        
-        /*
-         * restart, re-opening the same file.
-         */
         if(journal.isStable()){
 
-            journal = reopenStore(journal);
-            
-            final BTree btree = BTree.load(journal, addr2);
-            
-            assertTrue(btree.dump(Level.DEBUG,System.err));
+            final long addr2;
+            {
+                journal = reopenStore(journal);
 
-            assertSameIterator( new Object[]{}, btree.entryIterator() );
-            
+                final BTree btree = BTree.load(journal, addr1);
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                // @todo verify in more detail.
+                assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7,
+                        v8 }, btree.entryIterator());
+
+                // remove all entries by replacing the root node.
+
+                btree.removeAll();
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                assertSameIterator(new Object[] {}, btree.entryIterator());
+
+                addr2 = btree.write();
+
+                journal.commit();
+            }
+
+            /*
+             * restart, re-opening the same file.
+             */
+            {
+
+                journal = reopenStore(journal);
+
+                final BTree btree = BTree.load(journal, addr2);
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                assertSameIterator(new Object[] {}, btree.entryIterator());
+
+            }
+
+        }
+        
         }
 
-        journal.closeAndDelete();
+        finally {
+
+            journal.closeAndDelete();
+            
+        }
 
     }
     
@@ -260,6 +270,8 @@ public class TestRestartSafe extends ProxyTestCase {
        
         Journal journal = new Journal(getProperties());
 
+        try {
+        
         final int m = 3;
 
         final long addr1;
@@ -291,7 +303,11 @@ public class TestRestartSafe extends ProxyTestCase {
             
         }
 
-        journal.closeAndDelete();
+        } finally {
+
+            journal.closeAndDelete();
+            
+        }
         
     }
 
@@ -303,6 +319,8 @@ public class TestRestartSafe extends ProxyTestCase {
 
         Journal journal = new Journal(getProperties());
 
+        try {
+        
         final int m = 3;
 
         final long addr1;
@@ -357,7 +375,11 @@ public class TestRestartSafe extends ProxyTestCase {
 
         }
 
-        journal.closeAndDelete();
+        } finally {
+
+            journal.closeAndDelete();
+            
+        }
 
     }
 
