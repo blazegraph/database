@@ -56,7 +56,6 @@ import junit.framework.Test;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
-import com.bigdata.rdf.sail.TestBigdataRdfRepository;
 
 /**
  * Proxy test suite for {@link LocalTripleStore} when the backing indices are
@@ -101,57 +100,7 @@ public class TestLocalTripleStoreWithIsolatableIndices extends AbstractTestCase 
         
         suite.addTest(TestTripleStoreBasics.suite());
 
-        /*
-         * Pickup the Sesame 1.x test suite.
-         * 
-         * Note: This test suite requires access to the Sesame 1.x test suite
-         * classes, not just the Sesame JARs.
-         */
-        try {
-            
-            Class.forName("org.openrdf.sesame.sail.RdfRepositoryTest");
-            
-            suite.addTestSuite( TestRdfRepository.class );
-            
-        } catch(ClassNotFoundException ex) {
-            
-            log.warn("Will not run the Sesame 1.x integration test suite.");
-            
-        }
-
         return suite;
-
-    }
-
-    /**
-     * Integration for the Sesame 1.x repository test suite.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TestRdfRepository extends TestBigdataRdfRepository {
-
-        public TestRdfRepository(String arg0) {
-            super(arg0);
-        }
-
-        public Properties getProperties() {
-            
-            Properties properties = new Properties();
-            
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-
-            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
-
-            properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.ISOLATABLE_INDICES,"true");
-            
-            properties.setProperty(com.bigdata.rdf.sail.BigdataRdfRepository.Options.STORE_CLASS,LocalTripleStore.class.getName());
-            
-            return properties;
-            
-        }
 
     }
 
