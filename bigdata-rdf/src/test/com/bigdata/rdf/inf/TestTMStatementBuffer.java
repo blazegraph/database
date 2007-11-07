@@ -47,6 +47,7 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -425,6 +426,18 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      */
     public void doStressTest(String[] resource, String[] baseURL,
             RDFFormat[] format, int ntrials, int D, int N) {
+
+        for(String r : resource) {
+            
+            if(!new File(r).exists()) {
+                
+                System.err.println("Resource not found: "+r+", test="+getName()+" skipped.");
+                
+                return;
+                
+            }
+            
+        }
 
         AbstractTripleStore store = getStore();
         
