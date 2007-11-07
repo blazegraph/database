@@ -4,7 +4,7 @@
   <name>bigdata-rdf</name>
   <package>com.bigdata</package>
   <extends>../bigdata-master-pom/project.xml</extends>
-  <groupId>com.bigdata</groupId>
+  <groupId>bigdata</groupId>
   <currentVersion>0.1-b1-dev</currentVersion>
 
   <organization>
@@ -126,10 +126,7 @@
 
   </p><p>
 
-  While a Sesame 1.x integration is provided, the Sesame 1.x platform
-  does not make it possible to optimize high-level queries for the
-  backend database.  Therefore a Sesame 2.x integration is in the
-  works.  This will be a native quad store.
+  A related project bundles a Sesame 1.x integration.
 
   </p>
 
@@ -164,7 +161,7 @@
   <!-- copy down inheritance applies. -->
   <repository>
     <connection>
-    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata-rdf
     </connection>
     <developerConnection>
     scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata-rdf
@@ -298,46 +295,32 @@
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>openrdf-model</artifactId>
-      <version>1.2.1</version>
+      <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
 
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>openrdf-util</artifactId>
-      <version>1.2.1</version>
+      <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
 
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>rio</artifactId>
-      <version>1.2.1</version>
+      <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
 
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>sesame</artifactId>
-      <version>1.2.1</version>
+      <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
 
-    <!-- Sesame Test suite (testing only). -->
-    <dependency>
-      <groupId>sesame</groupId>
-      <artifactId>sesame-tests</artifactId>
-      <version>1.2.1</version>
-      <!-- This is not an official Sesame artifact at this time. -->
-      <!-- A copy is maintained on the cweb maven repository. -->
-      <!-- From the sesame 1.1 root dir, do "ant build-tests" and then: -->
-      <!-- "jar vcf sesame-tests-1.2.1.jar test -C build/classes/tests/sesame ." -->
-      <url>http://proto.cognitiveweb.org/maven-repository/sesame/jars/sesame-test-1.1.jar</url>
-    </dependency>
-
-    <!--      -->
-    <!-- Jini -->
-    <!--      -->
+    <!-- Jini is only required by the scale-out triple store. -->
     <dependency> 
 	  <groupId>jini</groupId>
 	  <artifactId>jini-core</artifactId>
@@ -375,10 +358,7 @@
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
 
-    <!--     -->
-	<!-- ICU -->
-    <!--     -->
-	<!-- Unicode support (compressed sort keys). -->
+	<!-- ICU : Unicode support (compressed sort keys). -->
     <dependency>
       <groupId>icu</groupId>
       <artifactId>icu4j</artifactId> 
@@ -405,7 +385,7 @@
     <unitTest>
 
       <includes>
-        <include>org/CognitiveWeb/dbcache/TestAll.java</include>
+        <include>com/bigdata/rdf/TestAll.java</include>
       </includes>
 
       <!-- Resources for test cases are declared here. -->

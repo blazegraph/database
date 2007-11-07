@@ -137,6 +137,14 @@ public class TestAll extends TestCase {
         // @todo test suite for backward chaining of (?x owl:sameAs ?y).
 
         /*
+         * @todo do some rigerous tests of the forward chainer to make sure that
+         * it is properly computing the RDFS entailments. There are tests of
+         * this in the bigdata-sails project, but they rely on testing against
+         * the Sesame in-memory repository as ground truth.  It would be nice to
+         * run some W3C test suites or the like here.
+         */
+        
+        /*
          * test SLD / magic sets / semi-naive evaluation (constrained forward
          * chainer that may be used to prove whether or not statement(s) are
          * entailed by the database as opposed to generating entailments from
@@ -150,17 +158,8 @@ public class TestAll extends TestCase {
          * test truth maintenance.
          */
         
-        // test suite for RDFS closure correctness.
-        suite.addTestSuite( TestRDFSClosure.class );
-
         // test suite for basic TM mechansism encapsulated by this class.
         suite.addTestSuite( TestTMStatementBuffer.class );
-        
-        // test suite for RDFS closure correctness with incremental load (TM).
-        suite.addTestSuite( TestRDFSIncrementalClosure.class );
-
-        // test suite for RDFS closure correctness with incremental delete (TM).
-        suite.addTestSuite( TestRDFSTruthMaintenance.class );
         
         /*
          * @todo write a performance test of concurrent load and close rates

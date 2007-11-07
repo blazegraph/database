@@ -47,17 +47,6 @@ Modifications:
 
 package com.bigdata.rdf.inf;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Properties;
-
-import org.openrdf.sesame.admin.UpdateException;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.RdfRepository;
-import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository;
-
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 
 /**
@@ -82,59 +71,4 @@ public class AbstractInferenceEngineTestCase extends AbstractTripleStoreTestCase
         super(name);
     }
     
-    /**
-     * Read the resource into an {@link RdfSchemaRepository}. This
-     * automatically computes the closure of the told triples.
-     * <p>
-     * Note: We treat the closure as computed by the {@link RdfSchemaRepository}
-     * as if it were ground truth.
-     * 
-     * @return The {@link RdfSchemaRepository} with the loaded resource.
-     * 
-     * @throws SailInitializationException
-     * @throws IOException
-     * @throws UpdateException
-     */
-    protected RdfRepository getGroundTruth(String resource, String baseURL,
-            RDFFormat format) throws SailInitializationException, IOException,
-            UpdateException {
-
-        return getGroundTruth(new String[] { resource },
-                new String[] { baseURL }, new RDFFormat[] { format });
-        
-    }
-
-    /**
-     * Read the resource(s) into an {@link RdfSchemaRepository}. This
-     * automatically computes the closure of the told triples.
-     * <p>
-     * Note: We treat the closure as computed by the {@link RdfSchemaRepository}
-     * as if it were ground truth.
-     * 
-     * @return The {@link RdfSchemaRepository} with the loaded resource.
-     * 
-     * @throws SailInitializationException
-     * @throws IOException
-     * @throws UpdateException
-     */
-    protected RdfRepository getGroundTruth(String[] resource, String[] baseURL,
-            RDFFormat[] format) throws SailInitializationException, IOException,
-            UpdateException {
-
-        assert resource.length == baseURL.length;
-        
-        RdfRepository repo = new org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository();
-
-        repo.initialize(new HashMap());
-        
-        for(int i=0; i<resource.length; i++) {
-            
-            upload(repo, resource[i], baseURL[i], format[i]);
-            
-        }
-
-        return repo;
-        
-    }
-
 }
