@@ -388,7 +388,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 };
 
         doStressTest(resource, baseURL, format, 100/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
-        
+    
+        // @todo enable more torturous tests.
 //        doStressTest(resource, baseURL, format, 10, 4, 20);
         
     }

@@ -1140,10 +1140,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                                 if(DEBUG) {
                                     
                                     /*
-                                     * Note: will remove NOT FOUND when removing
-                                     * a statement from a temp store since the
-                                     * term identifiers for the temp store are
-                                     * generally only stored in the database.
+                                     * Note: the externalized terms will be NOT
+                                     * FOUND when removing a statement from a
+                                     * temp store since the term identifiers for
+                                     * the temp store are generally only stored
+                                     * in the database.
                                      */
                                     log.debug("Removing "
                                                     + spo.toString(AbstractTripleStore.this)
