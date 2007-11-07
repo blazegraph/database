@@ -1,0 +1,66 @@
+<project default="build"
+ 	 xmlns:j="jelly:core"
+	 xmlns:artifact="artifact"
+ >
+
+<!--                                    -->
+<!-- Generate FAQ from xdocs/faq.fml.   -->
+<!--                                    -->
+
+<preGoal name="xdoc:jelly-transform">
+  <attainGoal name="faq"/>
+</preGoal>     
+
+<!--                                                      -->
+<!-- Conditionally disable linkcheck based on a property. -->
+<!--                                                      -->
+
+<postGoal name="xdoc:register-reports"> 
+  <j:if test="${maven.linkcheck.disable}">
+    <attainGoal name="maven-linkcheck-plugin:deregister"/> 
+    <echo>linkcheck is disabled.</echo>
+  </j:if>
+</postGoal>
+
+<!--                                                       -->
+<!-- Conditionally disable checkstyle based on a property. -->
+<!--                                                       -->
+
+<postGoal name="xdoc:register-reports"> 
+  <j:if test="${maven.checkstyle.disable}">
+    <attainGoal name="maven-checkstyle-plugin:deregister"/> 
+    <echo>checkstyle is disabled.</echo>
+  </j:if>
+</postGoal>
+
+<!--                                         -->
+<!-- Cause JAR to be built for install goal. -->
+<!--                                         -->
+
+<goal name="install">
+
+  <attainGoal name="jar"/>
+
+  <artifact:install
+      artifact="${maven.build.dir}/${maven.final.name}.jar"
+      type="jar"
+      project="${pom}"
+    /> 
+
+</goal>
+
+<!--                                                    -->
+<!-- Copy the architecture directory to generated site. -->
+<!--                                                    -->
+<!--
+<postGoal name="xdoc:init">
+
+   <echo>Copying architecture directory into generated site.</echo>
+
+   <copy todir="${basedir}/target/docs/architecture">
+      <fileset dir="${basedir}/src/architecture"/>
+   </copy>
+  
+</postGoal>
+-->
+</project>
