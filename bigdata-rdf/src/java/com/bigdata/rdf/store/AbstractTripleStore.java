@@ -570,7 +570,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     public StatementIterator asStatementIterator(ISPOIterator src) {
         
-        return new MyStatementIterator(src);
+        return new SesameStatementIterator(this,src);
         
     }
     
@@ -727,49 +727,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
         
-    }
-    
-    /**
-     * Wraps the raw iterator that traverses a statement index and exposes each
-     * visited statement as a {@link Statement} object.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class MyStatementIterator implements StatementIterator {
-
-        private ISPOIterator src;
-        
-        public MyStatementIterator(ISPOIterator src) {
-
-            if (src == null)
-                throw new IllegalArgumentException();
-
-            this.src = src;
-
-        }
-        
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        /**
-         * Note: Returns instances of {@link StatementWithType}.
-         */
-        public Statement next() {
-
-            return asStatement( src.next() );
-            
-        }
-        
-        public void close() {
-            
-            src.close();
-            
-        }
-
     }
     
     /**

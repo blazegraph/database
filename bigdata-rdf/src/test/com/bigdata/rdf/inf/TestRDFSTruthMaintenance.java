@@ -57,15 +57,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *       then add it back in again and verify the correct closures at each
  *       stage.
  * 
- * @todo stress test that loads an arbitrary data set. scan the statement
- *       indices in some order, selecting N explicit statement to delete. Delete
- *       them, update the closure, and then add the statements back in and
- *       verify that the original closure was restored. note that this test by
- *       itself does not guarentee that any entailments of those explicit
- *       statements were removed - we need to write other tests for that. repeat
- *       several times on the dataset, potentially doing multiple retractions
- *       before we back out of them.
- * 
  * @todo is there an efficient way to prove that two {@link AbstractTripleStore}s
  *       are the same? We have to materialize the terms in order to verify that
  *       the same terms are bound for the statements. Also, if the terms were

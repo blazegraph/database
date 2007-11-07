@@ -63,7 +63,25 @@
   writing justifications as entailments are computed during closure.
   When statements are retracted, the justifications are searched to
   determine whether or not the statements are still entailed by the
-  remaining assertions in the database.
+  remaining assertions in the database.  Several options are available
+  for computing closure, including: <dl>
+  
+  <dt>incremental</dt><dd> Truth maintenance is performed as each data
+  set is loaded (or as statements are retracted).  The best
+  performance will be released with documents of at least modest size.
+  If you are loading a lot of small documents, then consider
+  "batching" them.</dd>
+
+  <dt>batch</dt><dd> Truth maintenance is performed as each series of
+  data sets are loaded (or as statements are retracted).</dd>
+
+  <dt>database</dt><dd> A series of data sets are loaded without truth
+  maintenance and the closure of the entire database is computed once
+  all data have been loaded.  This mode is more efficient and truth
+  maintenance can be enabled after the closure of the database has
+  been computed.</dd>
+    
+  </dl>
 
   </p><p>
 

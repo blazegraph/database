@@ -63,6 +63,10 @@ import com.bigdata.rdf.util.KeyOrder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider refactor making this the primary interface so that we can
+ *       realize non-Sesame integrations by layering an appropriate interface
+ *       over this one.
  */
 public interface IRawTripleStore extends ITripleStore {
     
