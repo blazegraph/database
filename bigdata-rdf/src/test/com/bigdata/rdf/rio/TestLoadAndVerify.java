@@ -48,6 +48,7 @@ Modifications:
 package com.bigdata.rdf.rio;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.Properties;
@@ -90,10 +91,20 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
     /** @todo use some RDF/XML that we can pack with the distribution. */
     public void test_loadAndVerify() throws Exception {
         
+//      String file = "../rdf-data/nciOncology.owl";
+        String file = "../rdf-data/alibaba_v41.rdf";
+        
+        if(!new File(file).exists()) {
+            
+            log.warn("Resource not found: "+file+", test skipped: "+getName());
+            
+            return;
+            
+        }
+
         AbstractTripleStore store = getStore();
         
-//        String file = "data/nciOncology.owl";
-        String file = "data/alibaba_v41.rdf";
+        try {
     
         // avoid modification of the properties.
         Properties properties = new Properties(getProperties());
@@ -151,9 +162,13 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             
         }
         
-        store.closeAndDelete();
-        
         assertEquals("nerrors",0,nerrs.get());
+
+        } finally {
+        
+            store.closeAndDelete();
+            
+        }
         
     }
     
