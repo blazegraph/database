@@ -64,7 +64,7 @@ import com.bigdata.rdf.util.KeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IAccessPath {
+public interface IAccessPath extends Iterable<SPO> {
 
     /**
      * The triple pattern (s, p, o).

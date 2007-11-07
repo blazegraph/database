@@ -245,9 +245,21 @@ abstract public class AbstractTestCase
 
     public void assertEquals(SPO expected, SPO actual) {
         
+        assertEquals(null,expected,actual);
+        
+    }
+    
+    public void assertEquals(String msg, SPO expected, SPO actual) {
+        
         if(!expected.equals(actual)) {
-            
-            fail("Expecting: "+expected+" not "+actual);
+                    
+            if( msg == null ) {
+                msg = "";
+            } else {
+                msg = msg + " : ";
+            }
+
+            fail(msg+"Expecting: "+expected+" not "+actual);
             
         }
         

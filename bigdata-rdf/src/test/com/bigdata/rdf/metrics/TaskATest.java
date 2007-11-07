@@ -329,65 +329,65 @@ public class TaskATest
      */
     public static final String[] all_sources = new String[] {
             
-//            "Natural Protected Areas in Spain",
-//            "parques",
-//            "-rdf data/parques.daml http://www.sia.eui.upm.es/onto/parques.daml",
-//
-//            /* dc:source=http://www.daml.org/ontologies/76 */
-//            "Food/Wine Ontology",
-//            "wines.daml",
-//            "-rdf data/wines.daml http://cvs.sourceforge.net/viewcvs.py/instancestore/instancestore/ontologies/Attic/wines.daml?rev=1.2",
-//            
-//            "Semantic Web Research Community",
-//            "sw_community",
-//            "-rdf data/sw_community.owl http://www.semanticweb.gr/sw_community/sw_community.owl",
-//            
-//            "Information about Russia from Lockheed Martin",
-//            "russiaA",
-//            "-rdf data/russiaA.rdf http://www.atl.external.lmco.com/projects/ontology/ontologies/russia/russiaA.rdf",
-//            
-//            "University of Georgia Semantic web-related bibliography",
-//            "Could_have_been",
-//            "-rdf data/Could_have_been.rdf http://www.arches.uga.edu/~vstaub/GlobalInfoSys/project/ontology/Could_have_been.rdf",
-//            
-////            @todo can not find RDF version.
-////            "REIS Technical Manual from the Data Consortium",
-////            "REISDocuments",
-////            "-rdf /REISDocuments.rdf http://www.dataconsortium.org/REISDocuments.rdf",
-//            
-//            "IPTC Subject Reference",
-//            "iptc-srs",
-//            "-rdf data/iptc-srs.rdfs http://nets.ii.uam.es/neptuno/iptc/iptc-srs.rdfs",
-//            
-//            "Hydrological and watershed data",
-//            "hu",
-//            "-rdf data/hu.xml http://loki.cae.drexel.edu/~how/HydrologicUnits/2003/09/hu",
-//            
-//            "Uniprot Protein Sequence Ontology",
-//            "core",
-//            "-rdf data/core.owl http://www.isb-sib.ch/%7Eejain/rdf/data/core.owl",
-//
-//            "Uniprot Enzymes Data",
-//            "enzymes",
-//            "-rdf data/enzymes.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/enzymes.rdf.gz
-//
-//            "Alibaba v4.1",
-//            "alibaba_v41",
-//            "-rdf data/alibaba_v41.rdf",
-//            
-////            @todo this is gone, get the NLM mesh data instead?
-////            "Medical Subject Headings",
-////            "mesh",
-////            "-rdf /mesh.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/mesh.rdf.gz
-//            
-//            "Wordnet Schema + Nouns",
-//            "wordnetS+D",
-//            "-rdf data/wordnet-20000620.rdfs -rdf data/wordnet_nouns-20010201.rdf",
-//
-//            "Wordnet Nouns + Schema",
-//            "wordnetD+S",
-//            "-rdf data/wordnet_nouns-20010201.rdf -rdf data/wordnet-20000620.rdfs",
-//
+            "Natural Protected Areas in Spain",
+            "parques",
+            "-rdf data/parques.daml http://www.sia.eui.upm.es/onto/parques.daml",
+
+            /* dc:source=http://www.daml.org/ontologies/76 */
+            "Food/Wine Ontology",
+            "wines.daml",
+            "-rdf data/wines.daml http://cvs.sourceforge.net/viewcvs.py/instancestore/instancestore/ontologies/Attic/wines.daml?rev=1.2",
+            
+            "Semantic Web Research Community",
+            "sw_community",
+            "-rdf data/sw_community.owl http://www.semanticweb.gr/sw_community/sw_community.owl",
+            
+            "Information about Russia from Lockheed Martin",
+            "russiaA",
+            "-rdf data/russiaA.rdf http://www.atl.external.lmco.com/projects/ontology/ontologies/russia/russiaA.rdf",
+            
+            "University of Georgia Semantic web-related bibliography",
+            "Could_have_been",
+            "-rdf data/Could_have_been.rdf http://www.arches.uga.edu/~vstaub/GlobalInfoSys/project/ontology/Could_have_been.rdf",
+            
+//            @todo can not find RDF version.
+//            "REIS Technical Manual from the Data Consortium",
+//            "REISDocuments",
+//            "-rdf /REISDocuments.rdf http://www.dataconsortium.org/REISDocuments.rdf",
+            
+            "IPTC Subject Reference",
+            "iptc-srs",
+            "-rdf data/iptc-srs.rdfs http://nets.ii.uam.es/neptuno/iptc/iptc-srs.rdfs",
+            
+            "Hydrological and watershed data",
+            "hu",
+            "-rdf data/hu.xml http://loki.cae.drexel.edu/~how/HydrologicUnits/2003/09/hu",
+            
+            "Uniprot Protein Sequence Ontology",
+            "core",
+            "-rdf data/core.owl http://www.isb-sib.ch/%7Eejain/rdf/data/core.owl",
+
+            "Uniprot Enzymes Data",
+            "enzymes",
+            "-rdf data/enzymes.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/enzymes.rdf.gz
+
+            "Alibaba v4.1",
+            "alibaba_v41",
+            "-rdf data/alibaba_v41.rdf",
+            
+//            @todo this is gone, get the NLM mesh data instead?
+//            "Medical Subject Headings",
+//            "mesh",
+//            "-rdf /mesh.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/mesh.rdf.gz
+            
+            "Wordnet Schema + Nouns",
+            "wordnetS+D",
+            "-rdf data/wordnet-20000620.rdfs -rdf data/wordnet_nouns-20010201.rdf",
+
+            "Wordnet Nouns + Schema",
+            "wordnetD+S",
+            "-rdf data/wordnet_nouns-20010201.rdf -rdf data/wordnet-20000620.rdfs",
+
 //            "NCI Oncology (old)",
 //            "nciOncology",
 //            "-rdf data/nciOncology.owl",
@@ -405,10 +405,10 @@ public class TaskATest
 //          "taxonomy",
 //          "-rdf data/taxonomy.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
             
-          // cyc has a lot of subClassOf stuff.
-          "OpenCyc",
-          "cyc",
-          "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
+//          // cyc has a lot of subClassOf stuff.
+//          "OpenCyc",
+//          "cyc",
+//          "-rdf data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
 
     };
 

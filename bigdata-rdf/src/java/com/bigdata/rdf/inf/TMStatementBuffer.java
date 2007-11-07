@@ -86,9 +86,12 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  *       {@link RdfKeyBuilder} provisioned according to the target database and
  *       attach it to the {@link StatementBuffer}. Alternatively, have the
  *       {@link StatementBuffer} do that. In either case, the batch API on the
- *       {@link AbstractTripleStore} should then use the {@link RdfKey`Builder}
+ *       {@link AbstractTripleStore} should then use the {@link RdfKeyBuilder}
  *       attached to the {@link StatementBuffer}.
- *        
+ * 
+ * @todo refactor to TMSPOBuffer with only a wrapper for converting from the
+ *       Sesame object model into the SPO model.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -775,7 +778,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                         
                     }
 
-                    if (DEBUG && depth == 0) {
+                    if (DEBUG) {
 
                         SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
 
@@ -787,12 +790,16 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                         }
 
-                        if (tmp.type != StatementEnum.Explicit) {
+                        if(depth==0) {
 
-                            throw new IllegalArgumentException(
+                            if (tmp.type != StatementEnum.Explicit) {
+
+                                throw new IllegalArgumentException(
                                     "Given statement not explicit in database: "
                                             + tmp.toString(database));
-
+                            
+                            }
+                            
                         }
 
                     }
@@ -878,7 +885,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         }
 
-        if(DEBUG) {
+        if(DEBUG && database.getStatementCount()<200) {
             
             System.err.println("dumping database after retraction: depth="+depth);
 
@@ -917,7 +924,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             SPOArrayIterator tmp = new SPOArrayIterator(focusStore, focusStore
                     .getAccessPath(KeyOrder.SPO), 0/* limit */, null/* filter */);
             
-            if(DEBUG) {
+            if(DEBUG && database.getStatementCount()<200) {
                 
                 System.err.println("focusStore before closure: depth="+depth);
                 
@@ -929,7 +936,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             stats.add( inferenceEngine.computeClosure(focusStore,false/*justify*/) );
 
-            if(DEBUG) {
+            if(DEBUG && database.getStatementCount()<200) {
                 
                 System.err.println("focusStore after closure: depth="+depth);
                 
@@ -940,7 +947,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             // subtract out the statements we used to start the closure.
             int nremoved = focusStore.removeStatements(tmp);
             
-            if(DEBUG) {
+            if(DEBUG && database.getStatementCount()<200) {
                 
                 System.err.println("focusStore after subtracting out tmp: depth="+depth);
                 
