@@ -150,7 +150,7 @@ public interface IRawTripleStore extends ITripleStore {
      * @param value
      *            Any {@link Value} reference (MAY be <code>null</code>).
      * 
-     * @return The pre-assigned termId -or- {@link IRawTripleStore#NULL} iff the term is not
+     * @return The pre-assigned termId -or- {@link #NULL} iff the term is not
      *         known to the database.
      */
     public long getTermId(Value value);

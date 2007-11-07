@@ -1,17 +1,13 @@
 <html>
 <head>
-<title>Scale-out integration</title>
+<title>SAILs (Sesame 1.x integration).</title>
 </head>
 <body>
 <p>
-This package is developing an alternative bigdata integration suitable for
-scale-out on commodity hardware.  The original integration was tightly coupled
-to an embedded bigdata instance and used unisolatable indices that were responsible
-for (de-)serializing and storing terms and statements.  This integration uses
-scale-out indices, which accept variable length unsigned byte[] keys and byte[]
-values.  The client is responsible for (de-)serialization of values, which is
-mainly of interest for the terms and ids indices.  This integration also respects
-the client-data services divide.
+
+This package contains SAILs that allow bigdata to be used as a backend for the
+Sesame 1.x platform.
+
 </p>
 </body>
 </html>

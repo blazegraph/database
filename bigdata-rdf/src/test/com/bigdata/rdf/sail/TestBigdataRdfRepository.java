@@ -59,6 +59,7 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.vocabulary.XmlSchema;
 
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataRdfRepository.Options;
 
 /**
@@ -182,7 +183,7 @@ abstract public class TestBigdataRdfRepository extends org.openrdf.sesame.sail.R
          */
 
         params.put(Options.TRUTH_MAINTENANCE, "false");
-            
+
         try {
             
             repo.initialize( params );

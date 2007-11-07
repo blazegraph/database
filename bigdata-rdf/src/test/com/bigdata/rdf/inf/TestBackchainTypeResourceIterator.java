@@ -85,7 +85,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
     /**
      * Test when only the subject of the triple pattern is bound. In this case
-     * the iterator MUST add a single entailment (s rdf:Type rdfs:Resource).
+     * the iterator MUST add a single entailment (s rdf:Type rdfs:Resource)
+     * unless it is explicitly present in the database.
      */
     public void test_subjectBound() {
      
@@ -186,8 +187,119 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
     }
 
     /**
+     * Variant test where there is an explicit ( s rdf:type rdfs:Resource ) in
+     * the database for the given subject. For this test we verify that the
+     * iterator visits an "explicit" statement rather than adding its own
+     * inference.
+     */
+    public void test_subjectBound2() {
+     
+        AbstractTripleStore store = getStore();
+        
+        try {
+
+            // adds rdf:Type and rdfs:Resource to the store.
+            RDFSHelper vocab = new RDFSHelper(store);
+
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI B = new URIImpl("http://www.foo.org/B");
+            URI C = new URIImpl("http://www.foo.org/C");
+
+            /*
+             * add statements to the store.
+             * 
+             * Note: this gives us TWO (2) distinct subjects (A and B), but we 
+             * will only visit statements for (A).
+             */
+            
+            IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
+            
+            buffer.add(A, URIImpl.RDF_TYPE, B);
+
+            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_RESOURCE);
+
+            buffer.add(B, URIImpl.RDF_TYPE, C);
+            
+            buffer.flush();
+
+            store.dumpStore();
+            
+            /*
+             * build up the expected SPOs.
+             */
+            Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
+            
+            {
+                SPO spo = new SPO(//
+                        store.getTermId(A),//
+                        store.getTermId(URIImpl.RDF_TYPE),//
+                        store.getTermId(B),//
+                        StatementEnum.Explicit);
+                
+                expected.put(spo,spo);
+            }
+
+            {
+                SPO spo = new SPO(//
+                        store.getTermId(A), //
+                        store.getTermId(URIImpl.RDF_TYPE), //
+                        store.getTermId(URIImpl.RDFS_RESOURCE), //
+                        StatementEnum.Explicit);
+                
+                expected.put(spo,spo);
+            }
+
+            ISPOIterator itr = new BackchainTypeResourceIterator(//
+                    store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
+                    store.getTermId(A), NULL, NULL,//
+                    store, //
+                    vocab.rdfType.id, //
+                    vocab.rdfsResource.id //
+                    );
+
+            int i = 0;
+            
+            while(itr.hasNext()) {
+                
+                SPO actualSPO = itr.next();
+                
+                System.err.println("actual: "+actualSPO.toString(store));
+                
+                SPO expectedSPO = expected.remove(actualSPO);
+
+                if(expectedSPO==null) {
+                    
+                    fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
+                    
+                }
+
+                System.err.println("expected: "+expectedSPO.toString(store));
+
+                assertEquals(expectedSPO.type, actualSPO.type);
+                
+                i++;
+                
+            }
+            
+            if(!expected.isEmpty()) {
+                
+                fail("Expecting: "+expected.size()+" more statements");
+                
+            }
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+
+    /**
      * Test when the triple pattern has no bound variables. In this case the
-     * iterator MUST add an entailment for each distinct subject in the store.
+     * iterator MUST add an entailment for each distinct resource in the store
+     * unless there is also an explicit (s rdf:type rdfs:Resource) assertion in
+     * the database.
      */
     public void test_noneBound() {
         
@@ -214,6 +326,9 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
             buffer.add(A, URIImpl.RDF_TYPE, B);
+            
+            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_RESOURCE);
+            
             buffer.add(B, URIImpl.RDF_TYPE, C);
             
             buffer.flush();
@@ -248,7 +363,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                         store.getTermId(A), //
                         store.getTermId(URIImpl.RDF_TYPE), //
                         store.getTermId(URIImpl.RDFS_RESOURCE), //
-                        StatementEnum.Inferred);
+                        StatementEnum.Explicit);
                 
                 expected.put(spo,spo);
             }
@@ -400,6 +515,19 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
         }
 
+    }
+    
+    /**
+     * @todo write a test where we compute the forward closure of a data set
+     *       with (x type Resource) entailments included in the rule set and
+     *       then compare it to the forward closure of the same data set
+     *       computed without those entailments and using backward chaining to
+     *       supply the entailments. The result graphs should be equals.
+     */
+    public void test_forwardClosure() {
+        
+        fail("write test");
+        
     }
     
 }

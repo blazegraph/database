@@ -283,7 +283,7 @@ public class SPO {
      */
     public String toString() {
         
-        return (""+s+","+p+","+o)+(type==null?"":" : "+type);
+        return ("<"+s+","+p+","+o)+(type==null?"":" : "+type)+">";
         
     }
 
