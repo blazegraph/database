@@ -53,28 +53,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Properties;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.sesame.admin.RdfAdmin;
 import org.openrdf.sesame.admin.StdOutAdminListener;
 import org.openrdf.sesame.admin.UpdateException;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailInitializationException;
+import org.openrdf.sesame.sail.SailUtil;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.btree.BytesUtil;
@@ -555,11 +550,15 @@ abstract public class AbstractTestCase
      * 
      * FIXME This is extremely slow.  Find a faster way to write this!  It is
      * making some of the unit tests quite painful.
+     * 
+     * @see SailUtil#modelsEqual(org.openrdf.sesame.sail.RdfSource, org.openrdf.sesame.sail.RdfSource)
+     * which might be used instead.  However, it does not provide any details on
+     * how the models differ.
      */
     public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
             throws SailInitializationException {
 
-        RdfRepository repo = new BigdataRdfRepository(inf);
+        BigdataRdfRepository repo = new BigdataRdfRepository(inf);
         
         Properties properties = new Properties(getProperties());
         
@@ -576,9 +575,6 @@ abstract public class AbstractTestCase
      * Compares two RDF graphs for equality (same statements) - does NOT handle
      * bnodes, which much be treated as variables for RDF semantics.
      * 
-     * @todo Sesame probably bundles this logic in a manner that does handle
-     *       bnodes.
-     * 
      * @param expected
      * 
      * @param actual
@@ -586,31 +582,102 @@ abstract public class AbstractTestCase
      * @return true if all statements in the expected graph are in the actual
      *         graph and if the actual graph does not contain any statements
      *         that are not also in the expected graph.
+     * 
+     * @todo Sesame probably bundles this logic in
+     *       {@link SailUtil#modelsEqual(org.openrdf.sesame.sail.RdfSource, org.openrdf.sesame.sail.RdfSource)}
+     *       in a manner that handles bnodes.
      */
     public static boolean modelsEqual(RdfRepository expected,
-            RdfRepository actual) {
+            BigdataRdfRepository actual) {
 
-        Collection<Statement> testRepoStmts = getStatements(expected);
+        Collection<Statement> expectedRepo = getStatements(expected);
 
-        Collection<Statement> closureRepoStmts = getStatements(actual);
+//        Collection<Statement> actualRepo= getStatements(actual);
 
-        return compare(testRepoStmts, closureRepoStmts);
+        int actualSize = 0; 
+        boolean sameStatements1 = true;
+        {
+
+            StatementIterator it = actual.getStatements(null, null, null);
+
+            try {
+
+                for (; it.hasNext();) {
+
+                    Statement stmt = it.next();
+
+                    if (!expected.hasStatement(stmt.getSubject(), stmt
+                            .getPredicate(), stmt.getObject())) {
+
+                        sameStatements1 = false;
+
+                        log("Not expecting: " + stmt);
+
+                    }
+
+                    actualSize++; // count #of statements actually visited.
+                    
+                }
+
+            } finally {
+
+                it.close();
+
+            }
+            
+            log("all the statements in actual in expected? " + sameStatements1);
+
+        }
+
+        int expectedSize = 0;
+        boolean sameStatements2 = true;
+        {
+
+            for (Iterator<Statement> it = expectedRepo.iterator(); it.hasNext();) {
+
+                Statement stmt = it.next();
+
+                if (!actual.hasStatement(stmt.getSubject(),
+                        stmt.getPredicate(), stmt.getObject())) {
+
+                    sameStatements2 = false;
+
+                    log("    Expecting: " + stmt);
+
+                }
+                
+                expectedSize++; // counts statements actually visited.
+
+            }
+
+            log("all the statements in expected in actual? " + sameStatements2);
+
+        }
+
+        final boolean sameSize = expectedSize == actualSize;
+        
+        log("size of 'expected' repository: " + expectedSize);
+
+        log("size of 'actual'   repository: " + actualSize);
+
+        return sameSize && sameStatements1 && sameStatements2;
 
     }
 
-    private static ValueFactory simpleFactory = new ValueFactoryImpl();
-
     private static Collection<Statement> getStatements(RdfRepository repo) {
 
-        Collection<Statement> c = new HashSet<Statement>();
+        /*
+         * Note: do NOT use a hash set here since it will hide conceal the
+         * presence of duplicate statements in either graph.
+         */
+
+        Collection<Statement> c = new LinkedList<Statement>();
 
         StatementIterator statIter = repo.getStatements(null, null, null);
 
         while (statIter.hasNext()) {
 
             Statement stmt = statIter.next();
-
-            stmt = makeSimple(stmt);
 
             c.add(stmt);
 
@@ -619,102 +686,6 @@ abstract public class AbstractTestCase
         statIter.close();
 
         return c;
-
-    }
-
-    private static Statement makeSimple(Statement stmt) {
-
-        Resource s = stmt.getSubject();
-        URI p = stmt.getPredicate();
-        Value o = stmt.getObject();
-
-        s = (Resource) makeSimple(s);
-
-        p = (URI) makeSimple(p);
-
-        o = makeSimple(o);
-
-        stmt = simpleFactory.createStatement(s, p, o);
-
-        return stmt;
-
-    }
-
-    private static Value makeSimple(Value v) {
-
-        if (v instanceof URI) {
-
-            v = simpleFactory.createURI(((URI) v).getURI());
-
-        } else if (v instanceof Literal) {
-
-            String label = ((Literal) v).getLabel();
-            String language = ((Literal) v).getLanguage();
-            URI datatype = ((Literal) v).getDatatype();
-
-            if (datatype != null) {
-
-                v = simpleFactory.createLiteral(label, datatype);
-
-            } else if (language != null) {
-
-                v = simpleFactory.createLiteral(label, language);
-
-            } else {
-
-                v = simpleFactory.createLiteral(label);
-
-            }
-
-        } else {
-
-            v = simpleFactory.createBNode(((BNode) v).getID());
-
-        }
-
-        return v;
-
-    }
-
-    private static boolean compare(Collection<Statement> expectedRepo,
-            Collection<Statement> actualRepo) {
-
-        boolean sameStatements = true;
-
-        log("size of 'expected' repository: " + expectedRepo.size());
-        log("size of 'actual'   repository: " + actualRepo.size());
-
-        for (Iterator<Statement> it = actualRepo.iterator(); it.hasNext();) {
-
-            Statement stmt = it.next();
-
-            if (!expectedRepo.contains(stmt)) {
-
-                sameStatements = false;
-
-                log("Not expecting: " + stmt);
-
-            }
-
-        }
-
-        log("all the statements in actual in expected? " + sameStatements);
-
-        for (Iterator<Statement> it = expectedRepo.iterator(); it.hasNext();) {
-
-            Statement stmt = it.next();
-
-            if (!actualRepo.contains(stmt)) {
-
-                sameStatements = false;
-
-                log("    Expecting: " + stmt);
-
-            }
-
-        }
-
-        return expectedRepo.size() == actualRepo.size() && sameStatements;
 
     }
 

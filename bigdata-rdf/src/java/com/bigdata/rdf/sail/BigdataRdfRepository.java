@@ -67,6 +67,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.NamespaceIterator;
 import org.openrdf.sesame.sail.RdfRepository;
 import org.openrdf.sesame.sail.SailChangedEvent;
@@ -265,15 +266,10 @@ public class BigdataRdfRepository implements RdfRepository {
     }
     
     /**
+     * Initialize the repository.
+     * 
      * @param configParams
-     *            See {@link Options} for the persistence store options.
-     *            <p>
-     *            The optional boolean option "eagerClosure" may be used to turn
-     *            on a simple inference engine that will compute the eager
-     *            closure of data loaded into the store via either the SAIL
-     *            transaction mechanism or the batch load mechanism. The
-     *            selection of this option is NOT restart safe (it is not saved
-     *            in the store).
+     *            See {@link Options}.
      */
     public void initialize(Map configParams) throws SailInitializationException {
 
@@ -807,6 +803,16 @@ public class BigdataRdfRepository implements RdfRepository {
     public boolean hasStatement(Resource s, URI p, Value o) {
 
         flushStatementBuffers();
+
+        if( URIImpl.RDF_TYPE.equals(p) && URIImpl.RDFS_RESOURCE.equals(o) ) {
+            
+            if (database.getTermId(s) != NULL) {
+                
+                return true;
+                
+            }
+            
+        }
         
         return database.hasStatement(s, p, o);
         

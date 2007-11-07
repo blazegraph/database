@@ -57,11 +57,8 @@ import com.bigdata.rdf.store.TestLocalTripleStore;
 /**
  * Runs the Sesame 1.x test suite for the {@link RdfSchemaRepository}.
  * 
- * FIXME Implement BigdataRdfSchemaRepository and then we can run this test
- * suite. Once that class has been implemented and refactored into the source
- * tree we can then write an integration class in each of
- * {@link TestLocalTripleStore} and friends so that we can run the sesame test
- * suite.
+ * FIXME run for each of the triple store variants - only in
+ * {@link TestLocalTripleStore} at this time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -92,9 +89,14 @@ abstract public class TestBigdataRdfSchemaRepository extends
        throws SailInitializationException
     {
         
-        if(true) throw new UnsupportedOperationException();
-
         Properties params = getProperties();
+
+        /*
+         * Make sure that only the RDFS axioms and rules are used since that is
+         * all that the Sesame test suite is expecting.
+         */
+        
+        params.put(com.bigdata.rdf.inf.InferenceEngine.Options.RDFS_ONLY, "true");
 
         RdfSchemaRepository repo = new BigdataRdfSchemaRepository();
 

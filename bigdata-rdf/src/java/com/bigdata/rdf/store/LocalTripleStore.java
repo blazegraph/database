@@ -283,7 +283,11 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         store.dropIndex(name_pos); ndx_pos = null;
         store.dropIndex(name_osp); ndx_osp = null;
         
-        store.dropIndex(name_just); ndx_just = null;
+        if(store.getIndex(name_just)!=null) {
+
+            store.dropIndex(name_just); ndx_just = null;
+            
+        }
         
     }
     
