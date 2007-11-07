@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+  <id>bigdata-sails</id>
+  <name>bigdata-sails</name>
+  <package>com.bigdata</package>
+  <extends>../bigdata-master-pom/project.xml</extends>
+  <groupId>com.bigdata</groupId>
+  <currentVersion>0.1-b1-dev</currentVersion>
+
+  <organization>
+    <name>SYSTAP, LLC</name>
+    <url>http://www.systap.com/</url>
+  </organization>
+
+  <!-- required per-POM metadata. -->
+  <inceptionYear>2006</inceptionYear>
+  <url>http://www.systap.com/</url>
+
+  <!-- The short description is used in the JAR manifest.  For -->
+  <!-- compatibility reasons, no leading/trailing newlines and -->
+  <!-- 72 character length limit.                              -->
+
+  <shortDescription>bigdata-sails</shortDescription>
+
+  <description>
+
+<![CDATA[
+
+  <p>
+
+  This project provides an integration for Sesame 1.x.
+
+  </p><p>
+
+  SAIL is an acroynm for Storage And Inference Layer.  Sesame 1.x
+  defines two SAIL interfaces: <dl>
+
+  <dt>RdfRepository</dt><dd>The basic triple store API.</dd>
+
+  <dt>RdfSchemaRepository</dt><dd>An extended interface that requires
+  support for RDFS truth maintenance.</dd>
+
+  </dl>
+
+  Implementations of both SAILs are contained in this project.  In
+  addition, there is an option to turn on RDF(S)+ truth maintenance
+  for the RdfRepository and an option to turn on owl:sameAs,
+  owl:equivalentClass, and owl:equivalentProperty entailments.
+
+  </p><p>
+
+  Performance for bigdata and its RDF database layer are very good -
+  you can load data into the triple store at rates exceeding 20,000
+  triples per second on any reasonable computer.  The algorithms for
+  forward closure likewise exhibit high performance and loading with
+  incremental truth maintenance demonstrates throughput in the range
+  of 15,000 triples per second.  However, the Sesame 1.x platform does
+  not make it possible to optimize high-level queries for the backend
+  database and high-level queries will suffer as a result.  Therefore
+  a Sesame 2.x integration is in the works.  This will be a native
+  quad store.
+
+  </p>
+
+  <p>
+
+  Note that this project is under the LGPL (version 2).  We have to
+  reuse code from the Sesame QueryOptimizer class in order to re-order
+  triple patterns in queries such that it high-level query runs the
+  triple patterns that are most selective in the data first.  In order
+  to do this we had to change the methods from static to instance, so
+  that we could access the database and obtain the appropriate range
+  counts, and make the code an inner class within the
+  BigdataRdfRepository implementation class.  Therefore the SAILs are
+  under the same LGPL license as Sesame 1.2.7.
+
+  </p>
+
+]]>
+
+  </description>
+
+  <versions>
+  </versions>
+
+  <!-- copy down inheritance applies. -->
+  <siteAddress>www.bigdata.com</siteAddress>
+  <siteDirectory>
+    /home/groups/b/bi/bigd/htdocs/projects/${pom.artifactId}
+  </siteDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <distributionSite>www.sourceforge.net</distributionSite>
+  <distributionDirectory>/projects/bigdata</distributionDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <!--
+  <issueTrackingUrl>
+  http://jira.bigdata.com/browse/bigdata-sails
+  </issueTrackingUrl>
+  -->
+  <issueTrackingUrl>
+  http://sourceforge.net/tracker/?group_id=191861
+  </issueTrackingUrl>
+
+
+  <!-- copy down inheritance applies. -->
+  <repository>
+    <connection>
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata-sails
+    </connection>
+    <developerConnection>
+    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/bigdata:bigdata-sails
+    </developerConnection>
+    <url>http://bigdata.cvs.sourceforge.net/bigdata/bigdata-sails</url>
+  </repository>
+
+  <!-- copy down inheritance applies. -->
+  <licenses>
+    <license>
+      <name>LGPL (version 2.1)</name>
+      <url>http://www.opensource.org/licenses/lgpl-license.php</url>
+      <distribution>manual</distribution>
+    </license>
+  </licenses>
+
+  <!-- copy down inheritance applies.
+  <mailingLists>
+    <mailingList>
+      <name>Announce List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-announce
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-announce
+      </archive>
+    </mailingList>
+    <mailingList>
+      <name>Developer List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/bigdata-developer
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=bigdata-developer
+      </archive>
+    </mailingList>
+  </mailingLists>
+  -->
+
+  <!-- copy down inheritance applies. -->
+  <developers>
+
+    <developer>
+      <name>Bryan Thompson</name>
+      <id>bryan</id>
+      <email>bryan@systap.com</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+    <developer>
+      <name>Mike Personick</name>
+      <id>mike</id>
+      <email>mike@systap.com</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+  </developers>
+
+  <!-- project-specific data. -->
+  <dependencies>
+
+    <!-- log4j integration. -->
+    <dependency> 
+      <id>log4j</id> 
+      <version>1.2.8</version> 
+      <url>http://logging.apache.org</url>
+    </dependency>
+
+    <!-- junit extensions. -->
+    <dependency> 
+      <id>junit</id> 
+      <version>3.8.1</version> 
+      <url>http://www.junit.org/</url>
+    </dependency>
+
+	<!-- bigdata. -->
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
+
+	<!-- bigdata-rdf. -->
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata-rdf</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
+
+	<!-- cweb utility classes. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-commons</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+	<!-- Extensible Serialization framework. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-extser</artifactId>
+      <version>0.1-b2-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+    <!-- LGPL utility classes. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>1.0-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
+    </dependency>
+
+    <!-- Striterator support. -->
+    <!-- Note: The jar name reflects the date when I downloaded it -->
+    <!-- and makes it possible for me to rollback to historical CTC -->
+    <!-- versions.  Any recent "ctc_utils.jar" SHOULD work.  Just -->
+    <!-- extract the JAR and rename it. -->
+    <dependency>
+      <groupId>ctc</groupId>
+      <artifactId>utils</artifactId>
+      <jar>ctc_utils-5-4-2005.jar</jar>
+      <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
+    </dependency>
+
+    <!-- The openrdf framework. -->
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>openrdf-model</artifactId>
+      <version>1.2.7</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>openrdf-util</artifactId>
+      <version>1.2.7</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>rio</artifactId>
+      <version>1.2.7</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>sesame</artifactId>
+      <version>1.2.7</version>
+      <url>http://sourceforge.net/projects/sesame/</url>
+    </dependency>
+
+    <!-- Sesame Test suite (testing only). -->
+    <dependency>
+      <groupId>sesame</groupId>
+      <artifactId>sesame-tests</artifactId>
+      <version>1.2.1</version>
+      <!-- This is not an official Sesame artifact at this time. -->
+      <!-- A copy is maintained on the cweb maven repository. -->
+      <!-- From the sesame 1.1 root dir, do "ant build-tests" and then: -->
+      <!-- "jar vcf sesame-tests-1.2.1.jar test -C build/classes/tests/sesame ." -->
+      <url>http://proto.cognitiveweb.org/maven-repository/sesame/jars/sesame-test-1.1.jar</url>
+    </dependency>
+
+    <!-- ICU : Unicode support (compressed sort keys). -->
+    <dependency>
+      <groupId>icu</groupId>
+      <artifactId>icu4j</artifactId> 
+      <version>3_6</version> 
+      <url>http://sourceforge.net/projects/icu/</url>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <nagEmailAddress>
+      thompsonbry@users.sourceforge.net
+    </nagEmailAddress>
+
+    <sourceDirectory>${basedir}/src/java</sourceDirectory>
+
+    <unitTestSourceDirectory>${basedir}/src/test</unitTestSourceDirectory>
+
+    <aspectSourceDirectory/>
+
+    <!-- Unit test cases -->
+
+    <unitTest>
+
+      <includes>
+        <include>com/bigdata/rdf/sail/TestAll.java</include>
+      </includes>
+
+      <!-- Resources for test cases are declared here. -->
+
+      <resources>
+      </resources>
+
+    </unitTest>
+              
+    <!-- J A R  R E S O U R C E S -->
+    <resources>
+      <resource>
+        <directory>${basedir}/src/resources/logging</directory>
+        <includes>
+          <include>log4j.properties</include>
+        </includes>
+      </resource>
+
+    </resources>
+
+    <jars>
+    </jars>
+
+  </build>
+
+</project>
