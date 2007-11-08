@@ -192,7 +192,7 @@ import com.bigdata.rawstore.Bytes;
  *       on the capacity of a server. We could evict, e.g., close, segments that
  *       are not being queried to help stave off RAM starvation and we could
  *       fully buffer the leaves for very hot index segments to help stave off
- *       IO congestion. I don’t have the data today to estimate the proportion
+ *       IO congestion. I don't have the data today to estimate the proportion
  *       of an index segment that is the nodes (vs the leaves). It will depend
  *       on the size of the values stored in the leaves, but generally the
  *       leaves are much larger than the nodes of the tree. Beyond that you need
