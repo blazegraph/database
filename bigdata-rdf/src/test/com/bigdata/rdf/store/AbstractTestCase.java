@@ -172,11 +172,20 @@ abstract public class AbstractTestCase
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
 
             /*
-             * Use a temporary file for the test. Such files are always deleted when
-             * the journal is closed or the VM exits.
+             * If an explicit filename is not specified...
              */
-            m_properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-            m_properties.setProperty(Options.DELETE_ON_EXIT,"true");
+            if(m_properties.get(Options.FILE)==null) {
+
+                /*
+                 * Use a temporary file for the test. Such files are always deleted when
+                 * the journal is closed or the VM exits.
+                 */
+
+                m_properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+            
+                m_properties.setProperty(Options.DELETE_ON_EXIT,"true");
+                
+            }
             
         }        
         
