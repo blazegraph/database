@@ -112,9 +112,18 @@ public class ClosureStats {
             
         }
 
-        sb.append("totals: elapsed=" + elapsed + ", numComputed="
-                        + numComputed + ", entailments/sec="
-                        + (elapsed==0?"N/A":(long) (numComputed * 1000d / elapsed)+"\n"));
+        sb.append("totals: elapsed="
+                + elapsed
+                + ", nadded="
+                + nentailments
+                + ", numComputed="
+                + numComputed
+                + ", added/sec="
+                + (elapsed == 0 ? "N/A"
+                        : (long) (nentailments * 1000d / elapsed))
+                + ", computed/sec="
+                + (elapsed == 0 ? "N/A"
+                        : (long) (numComputed * 1000d / elapsed)) + "\n");
         
         /* details.
          * 
