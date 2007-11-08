@@ -36,13 +36,8 @@ import java.util.Properties;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 import org.openrdf.sesame.sail.SailInitializationException;
 
-import com.bigdata.rdf.store.TestLocalTripleStore;
-
 /**
  * Runs the Sesame 1.x test suite for the {@link RdfSchemaRepository}.
- * 
- * FIXME run for each of the triple store variants - only in
- * {@link TestLocalTripleStore} at this time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
