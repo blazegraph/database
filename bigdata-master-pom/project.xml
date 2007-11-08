@@ -45,7 +45,7 @@
   <!-- copy down inheritance applies. -->
   <siteAddress>www.bigdata.com</siteAddress>
   <siteDirectory>
-    /home/groups/b/bi/bigd/projects/${pom.artifactId}
+    /home/groups/b/bi/big/projects/${pom.artifactId}
   </siteDirectory>
 
   <!-- copy down inheritance applies. -->
