@@ -77,7 +77,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         super(name);
     }
     
-    private final String prefix = "/com/bigdata/rdf/inf/";
+    private final String prefix = "/com/bigdata/rdf/sail/";
     
     /**
      * Unit test based on the test resource <code>testClosure01.nt</code>.
