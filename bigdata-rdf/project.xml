@@ -322,42 +322,49 @@
 
     <!-- Jini is only required by the scale-out triple store. -->
     <dependency> 
-	  <groupId>jini</groupId>
+      <groupId>com.sun.jini</groupId>
 	  <artifactId>jini-core</artifactId>
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
-	  <groupId>jini</groupId> 
+      <groupId>com.sun.jini</groupId>
       <artifactId>jini-ext</artifactId> 
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency><!-- contains ServiceDiscoveryManager. -->
-	  <groupId>jini</groupId> 
+      <groupId>com.sun.jini</groupId>
       <artifactId>jsk-lib</artifactId> 
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
-	  <groupId>jini</groupId> 
+      <groupId>com.sun.jini</groupId>
       <artifactId>reggie</artifactId> 
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
-	  <groupId>jini</groupId> 
+      <groupId>com.sun.jini</groupId>
       <artifactId>sun-util</artifactId> 
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
-	  <groupId>jini</groupId> 
+      <groupId>com.sun.jini</groupId>
       <artifactId>start</artifactId> 
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
-
+	<dependency>
+	  <groupId>com.sun.jini</groupId>
+	  <artifactId>classserver</artifactId>
+	  <version>2.1</version>
+	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
+	<!-- end jini -->
+	
 	<!-- ICU : Unicode support (compressed sort keys). -->
     <dependency>
       <groupId>icu</groupId>
