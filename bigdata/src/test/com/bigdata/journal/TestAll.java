@@ -102,11 +102,11 @@ public class TestAll extends TestCase {
         /*
          * Test the different journal modes.
          * 
-         * -DminimizeUnitTests="" is used when building the project site to keep
+         * -DminimizeUnitTests="true" is used when building the project site to keep
          * down the nightly build demands.
          */
         
-        if(System.getProperty("minimizeUnitTests")==null) {
+        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
             suite.addTest( TestTransientJournal.suite() );
         
