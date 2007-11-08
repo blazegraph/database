@@ -78,7 +78,7 @@ public class TestRDFSIncrementalClosure extends AbstractInferenceEngineTestCase 
         super(name);
     }
 
-    final private String prefix = "/com/bigdata/rdf/inf/";
+    final private String prefix = "/com/bigdata/rdf/sail/";
     
     /**
      * Trivial example - good for debugging.
