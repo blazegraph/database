@@ -455,44 +455,52 @@
       <groupId>com.sun.jini</groupId>
 	  <artifactId>jini-core</artifactId>
       <version>2.1</version>
+      <jar>jini-core.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
       <groupId>com.sun.jini</groupId>
       <artifactId>jini-ext</artifactId> 
       <version>2.1</version>
+	  <jar>jini-ext.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency><!-- contains ServiceDiscoveryManager. -->
       <groupId>com.sun.jini</groupId>
       <artifactId>jsk-lib</artifactId> 
       <version>2.1</version>
+	  <jar>jsk-lib.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
       <groupId>com.sun.jini</groupId>
       <artifactId>reggie</artifactId> 
       <version>2.1</version>
+	  <jar>reggie.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
       <groupId>com.sun.jini</groupId>
       <artifactId>sun-util</artifactId> 
       <version>2.1</version>
+	  <jar>sun-util.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
     <dependency> 
       <groupId>com.sun.jini</groupId>
       <artifactId>start</artifactId> 
       <version>2.1</version>
+	  <jar>start.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
 	<dependency>
 	  <groupId>com.sun.jini</groupId>
 	  <artifactId>classserver</artifactId>
 	  <version>2.1</version>
+	  <jar>classserver.jar</jar>
 	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
+    <!-- end jini -->
 
     <!--     -->
 	<!-- ICU -->
