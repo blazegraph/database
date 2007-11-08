@@ -240,11 +240,19 @@
       <url>http://logging.apache.org</url>
     </dependency>
 
-    <!-- junit extensions. -->
+    <!-- junit. -->
     <dependency> 
       <id>junit</id> 
       <version>3.8.1</version> 
       <url>http://www.junit.org/</url>
+    </dependency>
+
+	<!-- junit extensions (tests only). -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-junit-ext</artifactId>
+      <version>1.1-b3-dev</version>
+      <url>http://www.sourceforge.net/projects/cweb</url>
     </dependency>
 
 	<!-- bigdata. -->
@@ -298,21 +306,18 @@
       <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
-
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>openrdf-util</artifactId>
       <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
-
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>rio</artifactId>
       <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
-
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>sesame</artifactId>
