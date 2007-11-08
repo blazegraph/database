@@ -180,6 +180,25 @@
   
   </p>
 
+  <h2>Embedded database</h2>
+  
+  <p>
+  
+  	  While bigdata is targetted at scale-out federations, it can also be deployed as an
+  	  embedded database - and embedded federations are available to make testing easier.
+  	  The key points when deploying as an embedded database are: (1) that journals MAY
+  	  range up to 4T in size; and (2) that the journal is at heart a WORM (Write Once
+  	  Read Many) (also known as an immortal database or a log-structured store).  This
+  	  means that you have to manage the journal size.  The basic means for doing this
+  	  is to export optimized read-only index segments corresponding to either entire
+  	  indices or key ranges of indices.  Once no live data remains on a journal it may
+  	  be discarded (unless you want an immortal database).  Tools are in the works to
+  	  make this process transparent - new journals are opened while indices are exported
+  	  from old ones with the net result that the total storage of the database remains
+  	  very compact.  (This is similar to the concept of a compacting merge.)
+  
+  </p>
+  
   <h2>Status</h2>
   
   <p>
@@ -193,7 +212,9 @@
   	  has been implemented, offering an interface similar to HBase
   	  or bigtable.  The map/reduce services are up and running,
   	  but further performance tuning is required (optimization for
-  	  local writes).  Data replication and service failover are
+  	  local writes).  Asynchronous overflow of the indices (aka compacting
+  	  merge) has been prototyped and needs to be refactored into the main
+  	  data service.  Data replication and service failover are
   	  not finished.
 
 	  </p><p>
