@@ -564,13 +564,13 @@
       	   
       	   This is being done in order to make the unit tests available to
       	   bigdata-rdf and other projects that wish to extend AbstractServerTestCase.
-      	   -->
       <resource>
         <directory>${basedir}/target/test-classes</directory>
         <includes>
           <include>com/bigdata/service/AbstractServerTestCase.class</include>
         </includes>
       </resource>
+      	   -->
 
     </resources>
 
