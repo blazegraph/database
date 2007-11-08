@@ -219,9 +219,10 @@
   	  our intention to make bigdata usable by non-GPL Free/Libre and Open Source
   	  Software (FLOSS) projects.  To this end, we are considering either a FLOSS
   	  exclusion (such as MySQL AB has issued) or a license change to something
-  	  with the same semantics as the SleepyCat License.  Please bear with us
-  	  while we work through this issue.  If you have any questions concerning the
-  	  license, write <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
+  	  with the same semantics as the SleepyCat License.  We are also considering
+  	  the Open Software License v 3.0.  Please bear with us while we work through
+  	  this issue.  If you have any questions concerning the license, write
+  	  <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
   
   </p>
   
