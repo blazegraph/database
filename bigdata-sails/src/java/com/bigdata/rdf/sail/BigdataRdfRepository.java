@@ -222,7 +222,8 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * pre-configured {@link InferenceEngine} - you MUST still invoke
      * {@link #initialize(Map)}.
      * 
-     * @param store
+     * @param inf
+     *            The {@link InferenceEngine}.
      */
     public BigdataRdfRepository(InferenceEngine inf) {
 
@@ -397,9 +398,9 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
     }
 
     /**
-     * Notifies {@link SailChangeListener}s if one or more statements
-     * have been added to or removed from the repository using the SAIL
-     * methods: <ul>
+     * Notifies {@link SailChangedListener}s if one or more statements have
+     * been added to or removed from the repository using the SAIL methods:
+     * <ul>
      * 
      * <li> {@link #addStatement(Resource, URI, Value)}
      * <li> {@link #removeStatements(Resource, URI, Value)}
