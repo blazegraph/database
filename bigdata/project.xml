@@ -487,6 +487,12 @@
       <version>2.1</version>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
+    <dependency> 
+	  <groupId>jini</groupId> 
+      <artifactId>classserver</artifactId> 
+      <version>2.1</version>
+      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
 
     <!--     -->
 	<!-- ICU -->
