@@ -45,7 +45,7 @@ Modifications:
  * Created on Aug 22, 2006
  */
 
-package org.CognitiveWeb.bigdata.nio;
+package com.bigdata.nio;
 
 import java.io.File;
 import java.io.IOException;

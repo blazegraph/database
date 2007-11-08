@@ -44,7 +44,7 @@ Modifications:
 /*
  * Created on Jun 18, 2006
  */
-package org.CognitiveWeb.bigdata.nio;
+package com.bigdata.nio;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;

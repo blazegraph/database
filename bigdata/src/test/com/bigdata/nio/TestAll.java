@@ -44,7 +44,7 @@ Modifications:
 /*
  * Created on Jun 26, 2006
  */
-package org.CognitiveWeb.bigdata.nio;
+package com.bigdata.nio;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

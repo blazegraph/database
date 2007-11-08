@@ -45,7 +45,7 @@ Modifications:
  * Created on Aug 4, 2006
  */
 
-package org.CognitiveWeb.bigdata.smp;
+package com.bigdata.smp;
 
 import java.util.Properties;
 
