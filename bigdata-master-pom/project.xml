@@ -5,7 +5,7 @@
   <id>bigdata-master-pom</id>
   <groupId>bigdata</groupId>
   <currentVersion>0.1-a1-dev</currentVersion>
-  <package>com.bigdata.*</package>
+  <package>com.bigdata</package>
   <organization>
     <name>SYSTAP, LLC</name>
     <url>http://www.bigdata.com</url>
@@ -74,7 +74,6 @@
   </repository>
 
   <!-- copy down inheritance applies. -->
-  <!-- copy down inheritance applies. -->
   <licenses>
     <license>
       <name>GPL (version 2)</name>
@@ -122,6 +121,15 @@
       <organization>SYSTAP, LLC.</organization>
       <!-- East coast. -->
       <timezone>-5</timezone>
+    </developer>
+
+    <developer>
+      <name>Mike Personick</name>
+      <id>mike</id>
+      <email>mrpersonick@users.sourceforge.net</email>
+      <organization>SYSTAP, LLC.</organization>
+      <!-- US Mountain. -->
+      <timezone>-7</timezone>
     </developer>
 
   </developers>
