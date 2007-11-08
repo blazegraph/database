@@ -500,6 +500,13 @@
 	  <jar>classserver.jar</jar>
 	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
+	<dependency>
+	  <groupId>com.sun.jini</groupId>
+	  <artifactId>tools</artifactId>
+	  <version>2.1</version>
+	  <jar>tools.jar</jar>
+	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
+    </dependency>
     <!-- end jini -->
 
     <!--     -->
@@ -537,9 +544,6 @@
 
       <!-- Resources for test cases are declared here. -->
 
-      <resources>
-      </resources>
-
     </unitTest>
               
     <!-- J A R  R E S O U R C E S -->
@@ -548,6 +552,23 @@
         <directory>${basedir}/src/resources/logging</directory>
         <includes>
           <include>log4j.properties</include>
+        </includes>
+        <directory>${basedir}/src/resources</directory>
+        <includes>
+          <include>config/**/*</include>
+        </includes>
+     </resource>
+
+      <!-- Note: This forces the bundling of unit tests, but ONLY if you run
+      	   (or at least build) the unit tests!
+      	   
+      	   This is being done in order to make the unit tests available to
+      	   bigdata-rdf and other projects that wish to extend AbstractServerTestCase.
+      	   -->
+      <resource>
+        <directory>${basedir}/target/test-classes</directory>
+        <includes>
+          <include>com/bigdata/service/AbstractServerTestCase.class</include>
         </includes>
       </resource>
 
