@@ -702,8 +702,6 @@ abstract public class Rule {
             
             for(int i=0; i<body.length; i++) {
                 
-//                // Note: show in the evaluation order.
-//                Pred pred = body[order[i]];
                 Pred pred = body[i];
                 
                 sb.append("(");
@@ -781,36 +779,14 @@ abstract public class Rule {
         /**
          * The evaluation {@link #order}[] is determined by analysis of the
          * propagation of bindings. The most selective predicate is choosen
-         * first and "fake" bindings are propagated to the other predicates in
-         * the tail. This process is repeated until all variables are bound and
-         * an evaluation order has been determined. The evaluation order is
-         * written into the {@link #order}[]. The indices in that array are
-         * correlated 1:1 with the predicates in {@link #body}.
+         * first (having the fewest unbound variables with ties broken by a
+         * range count on the data) and "fake" bindings are propagated to the
+         * other predicates in the tail. This process is repeated until all
+         * variables are bound and an evaluation order has been determined. The
+         * evaluation order is written into the {@link #order}[]. The indices
+         * in that array are correlated 1:1 with the predicates in {@link #body}.
          * 
          * @return The evaluation {@link #order}[].
-         * 
-         * @todo If we only considered the #of unbound variables then this could
-         *       computed when the rule is instantiated since the range counts
-         *       against the data are not being considered. However, if we do
-         *       that then we will make the wrong choices when considering
-         *       (new+db) since new will generally have far fewer statements for
-         *       any triple pattern, even when nothing is bound.
-         *       <p>
-         *       When we consider (new+db) during the evaluation of a rule,
-         *       there is always one predicate that is evaluated against new
-         *       while the other predicates are evaluated against database.
-         *       Therefore we need to "tweak" the statically determined order by
-         *       explicitly considering whether the predicate to be evaluated
-         *       against (new) is more selective in the data than the predicate
-         *       that is first in the evaluate {@link #order}[]. If it is (and
-         *       it generally will be) then we swap the indices of the two
-         *       predicates in a local copy of {@link #order}[].
-         *       <p>
-         *       Note that {@link #depends} MUST also be updated for this case.
-         *       <p>
-         *       Note that both {@link #order} and {@link #depends} MUST be
-         *       restored for normal evaluation, so maybe this should be done
-         *       when the rule is to be evaluated.
          */
         private int[] computeEvaluationOrder() {
          
@@ -1502,48 +1478,6 @@ abstract public class Rule {
             return accessPath;
             
         }
-
-// /**
-// * The index of the {@link Rule#body}[] predicate that is the most
-//         * selective given the data and the current variable bindings.
-//         * 
-//         * @return The index of the {@link Pred} in {@link #body} that is the
-//         *         most selective.
-//         */
-//        public int getMostSelectiveAccessPathByRangeCount() {
-//
-//            int index = -1;
-//
-//            int minRangeCount = Integer.MAX_VALUE;
-//
-//            for (int i = 0; i < body.length; i++) {
-//
-//                final int rangeCount;
-//                
-//                // skip over fully bound predicates.
-//                if( isFullyBound(i) ) {
-//                    
-//                    rangeCount = 1;
-//                    
-//                } else {
-//                
-//                    rangeCount = getAccessPath(i).rangeCount();
-//                    
-//                }
-//
-//                if (rangeCount < minRangeCount) {
-//
-//                    minRangeCount = rangeCount;
-//
-//                    index = i;
-//
-//                }
-//
-//            }
-//
-//            return index;
-//
-//        }
 
     }
     
