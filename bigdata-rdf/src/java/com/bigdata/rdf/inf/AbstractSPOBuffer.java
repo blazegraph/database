@@ -192,6 +192,27 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
     }
     
     abstract public int flush();
+
+    final public int flush(boolean reset) {
+        
+        final int tmp = nwritten += flush();
+
+        if(reset) {
+            
+            nwritten = 0;
+            
+        }
+
+        return tmp;
+
+    }
+
+    /**
+     * Cumulative counter of the #of statements actually written on the database
+     * by {@link #flush()}. This is reset by {@link #flush(boolean)} when
+     * <code>reset := true</code>
+     */
+    private int nwritten = 0;
     
     public boolean add( SPO stmt ) {
         
