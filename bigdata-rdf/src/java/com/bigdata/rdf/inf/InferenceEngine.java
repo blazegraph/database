@@ -238,6 +238,7 @@ public class InferenceEngine extends RDFSHelper {
     RuleOwlEquivalentClass ruleOwlEquivalentClass;
     RuleOwlEquivalentProperty ruleOwlEquivalentProperty;
     RuleOwlSameAs1 ruleOwlSameAs1;
+    RuleOwlSameAs1b ruleOwlSameAs1b;
     RuleOwlSameAs2 ruleOwlSameAs2;
     RuleOwlSameAs3 ruleOwlSameAs3;
 
@@ -577,6 +578,8 @@ public class InferenceEngine extends RDFSHelper {
         ruleOwlEquivalentProperty = new RuleOwlEquivalentProperty(this);
         
         ruleOwlSameAs1 = new RuleOwlSameAs1(this);
+
+        ruleOwlSameAs1b = new RuleOwlSameAs1b(this);
 
         ruleOwlSameAs2 = new RuleOwlSameAs2(this);
         
@@ -1093,13 +1096,36 @@ public class InferenceEngine extends RDFSHelper {
         
         // owl:sameAs
         if(forwardChainOwlSameAs) {
-            
+
+            // reflexive and transitive closure over owl:sameAs.
             Rule.fixedPoint(closureStats, new Rule[] { ruleOwlSameAs1,
-                    ruleOwlSameAs2, ruleOwlSameAs3 }, justify, focusStore,
-                    database, buffer);            
+                    ruleOwlSameAs1b }, justify, focusStore, database, buffer);            
             
-            // Note: don't both since this is the last rule that we run.
-//            if(DEBUG) log.debug("owl:sameAs"+closureStats);
+            if(DEBUG) log.debug("owl:sameAs1,1b: "+closureStats);
+
+            // apply properties 
+            {
+                /*
+                 * FIXME owl:sameAs2,3 should exclude matches where (a ==
+                 * owl:sameAs). This case is already covered by the 1 and 1b.
+                 * However, we also use 2 and 3 in the full forward closure
+                 * where all rules are brought to fix point together and we do
+                 * NOT want to make that exclusion in that case.
+                 */
+                RuleStats stats = ruleOwlSameAs2.apply(justify, focusStore, database, buffer);
+                closureStats.add(stats);
+                if(DEBUG) log.debug("ruleOwlSameAs2: " + stats);
+                buffer.flush();
+            }
+
+            // apply properties 
+            {
+                RuleStats stats = ruleOwlSameAs3.apply(justify, focusStore, database, buffer);
+                closureStats.add(stats);
+                if(DEBUG) log.debug("ruleOwlSameAs3: " + stats);
+                buffer.flush();
+            }
+
         }
         
         /*
