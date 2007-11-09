@@ -198,4 +198,322 @@ public class TestBTree extends AbstractBTreeTestCase {
         
     }
 
+//    /**
+//     * The branching factors that will be used in the stress tests. The larger
+//     * the branching factor, the longer the run for these tests. The very small
+//     * branching factors (3, 4) test the btree code more fully since they will
+//     * exercise the fence posts on the invariants for nodes and leaves on pretty
+//     * much each mutation.
+//     */
+//    int[] branchingFactors = new int[]{3,4};//,5,10,20,64};//,128};//,512};
+//    
+//    /**
+//     * A stress test for sequential key insertion that runs with a variety of
+//     * branching factors and #of keys to insert.
+//     */
+//    public void test_splitRootLeaf_increasingKeySequence() {
+//
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithIncreasingKeySequence( btree, m, m );
+//                
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//
+//                try {
+//
+//                    doSplitWithIncreasingKeySequence( btree, m, m*m );
+//
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//                    
+//                    doSplitWithIncreasingKeySequence( btree, m, m*m*m );
+//
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithIncreasingKeySequence( btree, m, m*m*m*m );
+//                
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * A stress test for sequential decreasing key insertions that runs with a
+//     * variety of branching factors and #of keys to insert.
+//     */
+//    public void test_splitRootLeaf_decreasingKeySequence() {
+//        
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithDecreasingKeySequence( btree, m, m );
+//                
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//
+//                try {
+//
+//                    doSplitWithDecreasingKeySequence( btree, m, m*m );
+//                
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//
+//                try {
+//
+//                    doSplitWithDecreasingKeySequence( btree, m, m*m*m );
+//
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithDecreasingKeySequence( btree, m, m*m*m*m );
+//
+//                } finally {
+//
+//                    try {btree.getStore().closeAndDelete();}
+//                    catch(Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//
+//        }
+//        
+//    }
+//
+//    /**
+//     * A stress test for random key insertion that runs with a variety of
+//     * branching factors and #of keys to insert.
+//     */
+//    public void test_splitRootLeaf_randomKeySequence() {
+//
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//            
+//            {
+//            
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithRandomDenseKeySequence( btree, m, m );
+//                    
+//                } finally {
+//                
+//                    try {
+//                        btree.getStore().closeAndDelete();
+//                    } catch (Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//                
+//            }
+//            
+//            {
+//                
+//                BTree btree = getBTree(m);
+//
+//                try {
+//
+//                    doSplitWithRandomDenseKeySequence(btree, m, m * m);
+//
+//                } finally {
+//
+//                    try {
+//                        btree.getStore().closeAndDelete();
+//                    } catch (Throwable t) {
+//                        log.warn(t);
+//                    }
+//
+//                }
+//                
+//            }
+//
+//            {
+//
+//                BTree btree = getBTree(m);
+//                
+//                try {
+//
+//                    doSplitWithRandomDenseKeySequence( btree, m, m * m * m);
+//
+//                } finally {
+//                    
+//                    try {
+//                        btree.getStore().closeAndDelete();
+//                    } catch (Throwable t) {
+//                        log.warn(t);
+//                    }
+//                    
+//                }
+//
+//            }
+//
+//         }
+//        
+//    }
+//
+//    /**
+//     * Stress test inserts random permutations of keys into btrees of order m
+//     * for several different btrees, #of keys to be inserted, and permutations
+//     * of keys.
+//     */
+//    public void test_stress_split() {
+//
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//        
+//            doSplitTest( m, 0 );
+//        
+//        }
+//        
+//    }
+//
+//    /**
+//     * Stress test of insert, removal and lookup of keys in the tree (allows
+//     * splitting of the root leaf).
+//     */
+//    public void test_insertLookupRemoveKeyTreeStressTest() {
+//
+//        int nkeys = 2000;
+//        
+//        int ntrials = 25000;
+//        
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//
+//            doInsertLookupRemoveStressTest(m, nkeys, ntrials);
+//            
+//        }
+//
+//    }
+//    
+//    /**
+//     * Stress test for building up a tree and then removing all keys in a random
+//     * order.
+//     */
+//    public void test_stress_removeStructure() {
+//       
+//        int nkeys = 5000;
+//        
+//        for(int i=0; i<branchingFactors.length; i++) {
+//            
+//            int m = branchingFactors[i];
+//            
+//            doRemoveStructureStressTest(m,nkeys);
+//            
+//        }
+//
+//    }
+
 }

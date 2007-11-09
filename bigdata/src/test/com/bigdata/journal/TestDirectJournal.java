@@ -82,9 +82,6 @@ public class TestDirectJournal extends AbstractTestCase {
         // test suite for MRMW correctness.
         suite.addTestSuite( TestMRMW.class );
 
-        // test suite for btree on the journal.
-        suite.addTestSuite( TestBTree.class );
-
         /*
          * Pickup the basic journal test suite. This is a proxied test suite, so
          * all the tests will run with the configuration specified in this test
@@ -268,28 +265,4 @@ public class TestDirectJournal extends AbstractTestCase {
         
     }
     
-    /**
-     * Test suite integration for {@link AbstractBTreeWithJournalTestCase}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TestBTree extends AbstractBTreeWithJournalTestCase {
-        
-        public TestBTree() {
-            super();
-        }
-
-        public TestBTree(String name) {
-            super(name);
-        }
-        
-        public BufferMode getBufferMode() {
-            
-            return BufferMode.Direct;
-            
-        }
-        
-    }
-
 }

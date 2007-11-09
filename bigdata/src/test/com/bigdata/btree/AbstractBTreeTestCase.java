@@ -1181,16 +1181,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
             System.err.println("};");
             throw ex;
-        } finally {
-
-            try {
-                btree.getStore().closeAndDelete();
-            } catch(Throwable t) {
-                log.warn(t);
-            }
-            
         }
-
     }
 
 
@@ -1355,8 +1346,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         final BTree btree = getBTree(m);
 
-        try {
-        
         /*
          * Run test.
          */
@@ -1423,16 +1412,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertTrue( btree.dump(System.err) );
         
         log.info(btree.counters.toString());
-
-        } finally {
-
-            try {btree.getStore().closeAndDelete();}
-            catch(Throwable t) {
-                log.warn(t);
-            }
-            
-        }       
-        
+    
     }
 
     /**
@@ -1448,8 +1428,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         log.info("m="+m+", nkeys="+nkeys);
         
         BTree btree = getBTree(m);
-        
-        try {
         
         Integer[] keys = new Integer[nkeys];
         
@@ -1528,15 +1506,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assertEquals("#leaves", 1, btree.nleaves);
         assertEquals("height", 0, btree.height);
         log.info(btree.counters.toString());
-
-        } finally {
-
-            try {btree.getStore().closeAndDelete();}
-            catch(Throwable t) {
-                log.warn(t);
-            }
-            
-        }
         
     }
     
