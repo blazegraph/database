@@ -107,6 +107,9 @@ public class TestAll extends TestCase {
         // test owl:equivilantProperty
         suite.addTestSuite( TestRuleOwlEquivalentProperty.class );
 
+        // compare two means of computing owl:sameAs for equivilence.
+        suite.addTestSuite( TestCompareOwlSameAsEntailments.class );
+        
         /*
          * test backward chainer rules.
          */

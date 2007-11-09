@@ -39,18 +39,16 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Test suite for owl:sameAs processing.
  * 
  * <pre>
- *   owl:sameAs1: (x owl:sameAs y) -&gt; (y owl:sameAs x)
- *   owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
- *   owl:sameAs3: (x owl:sameAs y), (z a x) -&gt; (z a y).
+ *   owl:sameAs1 : (x owl:sameAs y) -&gt; (y owl:sameAs x)
+ *   owl:sameAs1b: (x owl:sameAs y), (y owl:sameAs z) -&gt; (x owl:sameAs z)
+ *   owl:sameAs2 : (x owl:sameAs y), (x a z) -&gt; (y a z).
+ *   owl:sameAs3 : (x owl:sameAs y), (z a x) -&gt; (z a y).
  * </pre>
  * 
  * @see RuleOwlSameAs1
+ * @see RuleOwlSameAs1b
  * @see RuleOwlSameAs2
  * @see RuleOwlSameAs3
- * 
- * @todo Review the use of constraints on these rules. Are we able to break
- *       cycles using constaints? If so, then the rules do not need to be
- *       brought to fix point as a set but can instead by closed individually.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -115,6 +113,63 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             // final #of statements in the store.
             assertEquals(2,store.getStatementCount());
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+        
+    }
+
+    /**
+     * Test where the data satisifies the rule exactly once.
+     * 
+     * <pre>
+     * owl:sameAs1b: (x owl:sameAs y), (y owl:sameAs z) -&gt; (x owl:sameAs z)
+     * </pre>
+     */
+    public void test_owlSameAs1b() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            URI X = new URIImpl("http://www.foo.org/X");
+            URI Y = new URIImpl("http://www.foo.org/Y");
+            URI Z = new URIImpl("http://www.foo.org/Z");
+
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            
+            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(Y, new URIImpl(OWL.SAMEAS), Z);
+
+            // write on the store.
+            buffer.flush();
+
+            // verify statement(s).
+            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), Z));
+            assertEquals(2,store.getStatementCount());
+
+            InferenceEngine inf = new InferenceEngine(store);
+
+            // apply the rule.
+            RuleStats stats = applyRule(inf,inf.ruleOwlSameAs1b, 1/*expectedComputed*/);
+
+            /*
+             * validate the state of the primary store.
+             */
+
+            // told
+            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), Z));
+
+            // entailed
+            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Z));
+
+            // final #of statements in the store.
+            assertEquals(3,store.getStatementCount());
 
         } finally {
 
