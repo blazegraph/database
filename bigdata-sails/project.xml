@@ -62,19 +62,6 @@
 
   </p>
 
-  <p>
-
-  Note that this project is under the LGPL (version 2).  We had to
-  reuse code from the Sesame QueryOptimizer class in order to re-order
-  triple patterns in queries such that it high-level query runs the
-  triple patterns that are most selective in the data first.  In order
-  to do this we had to change the methods from static to instance, so
-  that we could access the database and obtain the appropriate range
-  counts.  Therefore the SAILs are under the same license as Sesame
-  1.x (LGPL).
-
-  </p>
-
 ]]>
 
   </description>

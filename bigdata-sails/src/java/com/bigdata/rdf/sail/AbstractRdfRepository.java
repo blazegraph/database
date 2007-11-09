@@ -25,6 +25,10 @@
  *  License along with this library; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * Portions of this file are derived from org.openrdf.sesame.sail.query.QueryOptimizer
+ * by Aduna.  Used by permission. 
+ */
 package com.bigdata.rdf.sail;
 
 import java.util.ArrayList;
@@ -63,11 +67,6 @@ import org.openrdf.sesame.sail.query.Var;
  * triple patterns based on the data at query time and thus choose a join order
  * that is less expensive. While this improves high-level query performance it
  * is not possible to truely optimize JOINs for the Sesame 1.x framework.
- * <p>
- * Note: Since this file contains code from the Sesame 1.2.3 distribution it
- * falls under the LGPL license which was used by that distribution. This is the
- * ONLY file in this project that contains code from the Sesame 1.x
- * distribution.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

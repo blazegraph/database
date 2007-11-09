@@ -130,6 +130,31 @@
 
   </p>
 
+  <h2>License</h2>
+  
+  <p>
+  
+  	  bigdata is currently being released under GPL (version 2).  However, it is
+  	  our intention to make bigdata usable by non-GPL Free/Libre and Open Source
+  	  Software (FLOSS) projects.  To this end, we are considering either a FLOSS
+  	  exclusion (such as MySQL AB has issued) or a license change to something
+  	  with the same semantics as the SleepyCat License.  We are also considering
+  	  the Open Software License v 3.0.  Please bear with us while we work through
+  	  this issue.  If you have any questions concerning the license, write
+  	  <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
+  
+  </p>
+  
+  <p>
+  
+  	  SYSTAP, LLC will offer commercial licenses for customers who either want the
+  	  value add (warrenty, technical support, additional regression testing), who
+  	  want to redistribute bigdata with their own commercial products, or who are
+  	  not "comfortable" with the GPL license.  For inquiries or further information,
+  	  please write <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
+  
+  </p>
+
 ]]>
 
   </description>
