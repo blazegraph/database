@@ -317,9 +317,6 @@
 
       <!-- Resources for test cases are declared here. -->
 
-      <resources>
-      </resources>
-
     </unitTest>
               
     <!-- J A R  R E S O U R C E S -->

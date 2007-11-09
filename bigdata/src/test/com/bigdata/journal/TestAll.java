@@ -86,7 +86,7 @@ public class TestAll extends TestCase {
         
         // test the root block api.
         suite.addTestSuite( TestRootBlockView.class );
-       
+
         // @todo tests of the index used map index names to indices.
         suite.addTestSuite( TestName2Addr.class );
 
@@ -109,9 +109,9 @@ public class TestAll extends TestCase {
         if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
             suite.addTest( TestTransientJournal.suite() );
-        
+
             suite.addTest( TestDirectJournal.suite() );
-            
+
             /*
              * Note: The mapped journal is somewhat problematic and its tests are
              * disabled for the moment since (a) we have to pre-allocate large

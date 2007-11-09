@@ -74,7 +74,7 @@ public class TestAll extends TestCase {
      */
     public static Test suite()
     {
-
+        
         TestSuite suite = new TestSuite("RDF");
 
         // test utility classes.
@@ -89,15 +89,20 @@ public class TestAll extends TestCase {
         // test various RDF database implementations.
         suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 
-        /*
-         * Test scale-out RDF database.
-         * 
-         * Note: This test suite sets up a local bigdata federation for
-         * each test.  See the test suite for more information about 
-         * required Java properties.
-         */
-     
-        suite.addTest( com.bigdata.rdf.scaleout.TestAll.suite() );
+        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
+                "false"))) {
+
+            /*
+             * Test scale-out RDF database.
+             * 
+             * Note: This test suite sets up a local bigdata federation for each
+             * test. See the test suite for more information about required Java
+             * properties.
+             */
+
+            suite.addTest(com.bigdata.rdf.scaleout.TestAll.suite());
+
+        }
 
         return suite;
         

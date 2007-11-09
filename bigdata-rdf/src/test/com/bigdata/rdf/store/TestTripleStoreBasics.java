@@ -72,8 +72,7 @@ public class TestTripleStoreBasics extends TestCase2 {
      */
     public static Test suite() {
 
-        TestSuite suite = new TestSuite(TestTripleStoreBasics.class.getPackage()
-                .getName());
+        TestSuite suite = new TestSuite("Triple store basics");
 
         // test adding terms and statements.
         suite.addTestSuite(TestTripleStore.class);

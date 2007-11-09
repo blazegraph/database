@@ -86,7 +86,7 @@ public class TestJournalBasics extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite(TestJournalBasics.class.getPackage().getName());
+        TestSuite suite = new TestSuite("journal basics");
 
         // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite( TestNamedIndices.class );
