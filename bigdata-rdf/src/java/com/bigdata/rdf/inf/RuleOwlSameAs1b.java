@@ -52,6 +52,7 @@ public class RuleOwlSameAs1b extends AbstractRuleNestedSubquery {
                 }, new IConstraint[] {
                     new NE(var("x"),var("y")),
                     new NE(var("y"),var("z")),
+                    new NE(var("x"),var("z")),
                     }
                 );
         

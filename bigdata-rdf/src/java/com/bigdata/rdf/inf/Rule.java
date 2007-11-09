@@ -297,7 +297,7 @@ abstract public class Rule {
      * @param buffer
      * @return
      */
-    public State newState(boolean justify,
+    /*public*/ State newState(boolean justify,
                 AbstractTripleStore database,
                 SPOAssertionBuffer buffer) {
         
@@ -376,6 +376,18 @@ abstract public class Rule {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo consider the use of an optional bloom filter for the emitted
+     *       triples on either the closure stats, the rule, or the rule
+     *       execution state. The bloom filter provides efficient fast rejection
+     *       of keys that are not in the index. If the bloom filter reports that
+     *       a key is in the index then we either have to test the index to
+     *       verify that the result is not a false positive or just emit the
+     *       result anyway and let the statement indices filter out duplicates.
+     *       A bloom filter is only additive, so it can not be reused across any
+     *       context which allows delete. So it could be attached to the
+     *       inference engine as long as it was discarded on remove, or to a
+     *       TMStatementBuffer, etc.
      */
     public class State {
 
@@ -614,6 +626,42 @@ abstract public class Rule {
         public Rule getRule() {
             
             return Rule.this;
+            
+        }
+        
+        /**
+         * Apply the rule.
+         * <p>
+         * Note: This is responsible for computing the #of entailments added to
+         * the focusStore or database as a side-effect of applying the rule.
+         * That number is can be obtained either
+         * {@link ISPOBuffer#flush(boolean)} or
+         * {@link AbstractTripleStore#getStatementCount()} but it will only be
+         * accurate when the buffer has been flushed before and after the rule.
+         * While it is a bit more efficient if we do not always force the
+         * buffers to be flushed since a few rules can be run in a sequence and
+         * do not depend on each other, but that is very rare. Also note that
+         * re-flushing an empty buffer is always a NOP.
+         */
+        public void apply() {
+
+            /*
+             * @todo since we in this method we do not need to flush elsewhere.
+             */
+            
+            buffer.flush(true);
+            
+//            final int nbefore = focusStore != null ? focusStore.getStatementCount()
+//                    : database.getStatementCount();
+            
+            Rule.this.apply(this);
+           
+            stats.numAdded = buffer.flush(true);
+            
+//            final int nafter = focusStore != null ? focusStore.getStatementCount()
+//                    : database.getStatementCount();
+            
+//            stats.numAdded = nafter - nbefore;
             
         }
         
@@ -1467,7 +1515,7 @@ abstract public class Rule {
      * @param state
      *            The rule execution state.
      */
-    abstract public void apply( State state );
+    abstract protected void apply( State state );
 
     /**
      * Map N executions of rule over the terms in the tail. In each pass term[i]
@@ -1520,7 +1568,7 @@ abstract public class Rule {
 
             State state = newState(0/*focusIndex*/, justify, focusStore, database, buffer);
 
-            apply(state);
+            state.apply();
 
             return state.stats;
             
@@ -1552,7 +1600,7 @@ abstract public class Rule {
             
             state[i] = newState(i/*focusIndex*/,justify,focusStore,database,buffer);
 
-            apply(state[i]);
+            state[i].apply();
             
             stats.add( state[i].stats );
             

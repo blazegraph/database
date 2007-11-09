@@ -31,7 +31,6 @@ import junit.framework.TestCase;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.service.AbstractServerTestCase;
 import com.bigdata.service.BigdataClient;
 import com.bigdata.service.DataServer;
 import com.bigdata.service.MetadataServer;
