@@ -56,6 +56,7 @@ public class RuleOwlSameAs3 extends AbstractRuleNestedSubquery {
                      * Reject (z sameAs y) as the head.
                      */
                     new RejectAnythingSameAsItself(var("z"),var("a"),var("y"),inf.owlSameAs)
+//                    , new NEConstant(var("a"),inf.owlSameAs.id)
                 }
         );
 
