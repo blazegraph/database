@@ -340,7 +340,7 @@
 	  <jar>jini-ext.jar</jar>
       <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
     </dependency>
-    <dependency><!-- contains ServiceDiscoveryManager. -->
+    <dependency>
       <groupId>com.sun.jini</groupId>
       <artifactId>jsk-lib</artifactId> 
       <version>2.1</version>
@@ -415,9 +415,6 @@
       </includes>
 
       <!-- Resources for test cases are declared here. -->
-
-      <resources>
-      </resources>
 
     </unitTest>
               

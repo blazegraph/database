@@ -59,10 +59,6 @@ import junit.framework.TestSuite;
  * -Djava.security.policy=policy.all -Djava.rmi.server.codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
  * </pre>
  * 
- * @todo run the Sesame 1.x SAIL tests for correctness testing
- * 
- * @todo run the LUBM query tests for performance and correctness testing.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -90,8 +86,8 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("scale-out");
 
+        // @todo refactor into the basic test suite?
         suite.addTestSuite(TestTermAndIdsIndex.class);
-
         suite.addTestSuite(TestStatementIndex.class);
         
         suite.addTestSuite(TestDistributedTripleStoreLoadRate.class);

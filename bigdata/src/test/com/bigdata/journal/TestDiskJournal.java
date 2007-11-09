@@ -110,7 +110,7 @@ public class TestDiskJournal extends AbstractTestCase {
          * class and its optional .properties file.
          */
         suite.addTest(TestJournalBasics.suite());
-
+        
         return suite;
 
     }

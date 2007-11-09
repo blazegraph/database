@@ -76,8 +76,12 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("util");
 
+        // @todo test KeyOrder
+        
         suite.addTestSuite( TestRdfKeyBuilder.class );
      
+        // @todo test AddTerms and AddIds here (move from the scale-out tests)
+        
         return suite;
         
     }
