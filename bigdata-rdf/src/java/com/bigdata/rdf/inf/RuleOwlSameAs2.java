@@ -43,7 +43,7 @@ public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
     /**
      * @param inf
      */
-    public RuleOwlSameAs2(InferenceEngine inf) {
+    public RuleOwlSameAs2(InferenceEngine inf/*, boolean aNEOwlSameAs*/) {
 
         super( inf.database, //
                 new Triple(var("y"), var("a"), var("z")), //

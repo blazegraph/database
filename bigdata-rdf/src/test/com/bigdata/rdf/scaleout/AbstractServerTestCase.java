@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 22, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.rdf.scaleout;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,6 +44,11 @@ import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.service.AbstractServer;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.MetadataService;
+import com.bigdata.service.PartitionMetadataWithSeparatorKeys;
 import com.sun.jini.tool.ClassServer;
 
 /**

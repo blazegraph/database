@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Vector;
 
 import com.bigdata.rdf.inf.Rule.State;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Statistics about what the Rule did.
@@ -165,6 +166,14 @@ public class RuleStats {
     public int numComputed;
     
     /**
+     * The #of entailments that were actually added to the statement indices
+     * (that is to say, the entailments were new to the database). This is
+     * computed using {@link AbstractTripleStore#getStatementCount()} before and
+     * after the rule is applied.
+     */
+    public int numAdded;
+    
+    /**
      * Time to compute the entailments (ms).
      */
     public long elapsed;
@@ -197,10 +206,14 @@ public class RuleStats {
      */
     public String toStringSimple() {
 
-        int n = getStatementCount();
+//        int n = getStatementCount();
         
-        String stmtsPerSec = (n == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
-                + (long) (n * 1000d / elapsed)));
+        String computedPerSec = (numComputed == 0 ? "N/A"
+                : (elapsed == 0L ? "0" : ""
+                        + (long) (numComputed * 1000d / elapsed)));
+
+        String newPerSec = (numAdded == 0 ? "N/A" : (elapsed == 0L ? "0" : ""
+                + (long) (numAdded * 1000d / elapsed)));
 
         return name //
              + (!aggregate
@@ -211,9 +224,11 @@ public class RuleStats {
                      ))
              + ", #subqueries="+Arrays.toString(nsubqueries)//
              + ", #stmts=" + Arrays.toString(nstmts) //
-             + ", #computed=" + numComputed//
              + ", elapsed=" + elapsed//
-             + ", stmts/sec="+stmtsPerSec//
+             + ", #computed=" + numComputed//
+             + ", computed/sec="+computedPerSec//
+             + ", #new=" + numAdded//
+             + ", new/sec="+newPerSec//
              ;
 
     }
