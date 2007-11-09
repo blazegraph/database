@@ -220,8 +220,8 @@ abstract public class AbstractTestCase
      * @return A new store.
      * 
      * @exception Throwable
-     *                if the existing store is not closed, e.g., from failure to
-     *                obtain a file lock, etc.
+     *                if the existing store is closed or if the store can not be
+     *                re-opened, e.g., from failure to obtain a file lock, etc.
      */
     protected Journal reopenStore(Journal store) {
         
