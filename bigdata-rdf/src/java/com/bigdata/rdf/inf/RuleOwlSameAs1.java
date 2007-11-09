@@ -48,7 +48,11 @@ public class RuleOwlSameAs1 extends AbstractRuleNestedSubquery {
                 new Triple(var("y"), inf.owlSameAs, var("x")), //
                 new Pred[] { //
                     new Triple(var("x"), inf.owlSameAs, var("y"))//
-                });
+                },
+                new IConstraint[] {
+                    new NE(var("x"),var("y"))
+                }
+                );
         
     }
 
