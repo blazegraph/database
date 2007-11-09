@@ -43,6 +43,7 @@ import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 
@@ -601,7 +602,12 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         super.setUp();
 
-        dataLoader = store.getDataLoader();
+        Properties properties = new Properties(getProperties());
+        
+        // Note: this turns off sameAs processing.
+//        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+        
+        dataLoader = new DataLoader(properties, store );
         
         writeMetricsLogHeaders();
         
