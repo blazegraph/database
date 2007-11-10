@@ -37,7 +37,7 @@ public class RuleFastClosure6 extends AbstractRuleFastClosure_3_5_6_7_9 {
      */
     public RuleFastClosure6(InferenceEngine inf, Set<Long> R) {
         
-        super(inf.database, inf.rdfsRange, R);
+        super(inf.rdfsRange, R);
         
     }
     

@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 1, 2007
  */
-
 package com.bigdata.rdf.inf;
-
 
 /**
  * owl:sameAs2
@@ -45,8 +43,7 @@ public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
      */
     public RuleOwlSameAs2(InferenceEngine inf/*, boolean aNEOwlSameAs*/) {
 
-        super( inf.database, //
-                new Triple(var("y"), var("a"), var("z")), //
+        super(  new Triple(var("y"), var("a"), var("z")), //
                 new Pred[] { //
                     new Triple(var("x"), inf.owlSameAs, var("y")),//
                     new Triple(var("x"), var("a"), var("z"))//

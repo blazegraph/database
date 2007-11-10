@@ -39,8 +39,7 @@ public class RuleRdfs05 extends AbstractRuleNestedSubquery {
 
     public RuleRdfs05(InferenceEngine inf) {
 
-    super( inf.database, //
-            new Triple(var("u"), inf.rdfsSubPropertyOf, var("x")), //
+    super(  new Triple(var("u"), inf.rdfsSubPropertyOf, var("x")), //
             new Pred[] { //
                 new Triple(var("u"), inf.rdfsSubPropertyOf, var("v")),//
                 new Triple(var("v"), inf.rdfsSubPropertyOf, var("x")) //

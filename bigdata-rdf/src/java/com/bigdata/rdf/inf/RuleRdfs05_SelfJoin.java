@@ -38,7 +38,7 @@ public class RuleRdfs05_SelfJoin extends AbstractRuleRdfs_5_11 {
 
     public RuleRdfs05_SelfJoin(InferenceEngine inf) {
 
-        super(inf.database, inf.rdfsSubPropertyOf );
+        super( inf.rdfsSubPropertyOf );
 
     }
     

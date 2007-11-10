@@ -35,8 +35,7 @@ public class RuleRdfs09 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs09( InferenceEngine inf) {
 
-        super(inf.database,//
-                new Triple(var("v"), inf.rdfType, var("x")),//
+        super( new Triple(var("v"), inf.rdfType, var("x")),//
                 new Pred[] {//
                     new Triple(var("u"), inf.rdfsSubClassOf, var("x")),//
                     new Triple(var("v"), inf.rdfType, var("u"))//

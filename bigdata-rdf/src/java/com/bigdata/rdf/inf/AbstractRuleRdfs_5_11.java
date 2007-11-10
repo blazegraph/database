@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * Common base class for rdfs5 and rdfs11.
  * 
@@ -33,10 +31,9 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class AbstractRuleRdfs_5_11 extends AbstractRuleChainedSelfJoin {
 
-    public AbstractRuleRdfs_5_11(AbstractTripleStore db, Id C) {
+    public AbstractRuleRdfs_5_11(Id C) {
 
-        super( db, //
-                new Triple(var("u"), C, var("x")), //
+        super( new Triple(var("u"), C, var("x")), //
                 new Pred[] { //
                     new Triple(var("u"), C, var("v")),//
                     new Triple(var("v"), C, var("x")) //

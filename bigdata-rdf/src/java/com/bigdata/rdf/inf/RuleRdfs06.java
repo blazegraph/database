@@ -37,8 +37,7 @@ public class RuleRdfs06 extends AbstractRuleRdfs_6_8_10_12_13 {
 
     public RuleRdfs06(InferenceEngine inf) {
 
-        super(inf.database,//
-                new Triple(var("u"), inf.rdfsSubPropertyOf, var("u")),//
+        super(  new Triple(var("u"), inf.rdfsSubPropertyOf, var("u")),//
                 new Triple(var("u"), inf.rdfType, inf.rdfProperty)//
                 );
 

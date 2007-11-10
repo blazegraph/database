@@ -111,13 +111,21 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestCompareOwlSameAsEntailments.class );
         
         /*
-         * test backward chainer rules.
+         * Test entailments that are computed at query time rather than when the
+         * data are loaded into the store.
+         * 
+         * Note: These are sometimes refered to as "backchained" rules, but in
+         * fact they are either highly specialized code, e.g., for the (x
+         * rdf:Type: rdfs:Resource) entailments, or an application of the
+         * relevant rules using the forward chainer once the rules have been
+         * constrained by the triple pattern (similar to magic sets but less
+         * general).
          */
         
         // test suite for backward chaining of (?x rdf:type rdfs:Resource).
         suite.addTestSuite( TestBackchainTypeResourceIterator.class );
 
-        // test suite for backward chaining of owl:sameAs {2,3}
+        // test suite for owl:sameAs {2,3} (constained forward evaluation).
         suite.addTestSuite( TestBackchainOwlSameAs.class );
 
         /*
@@ -128,16 +136,6 @@ public class TestAll extends TestCase {
          * run some W3C test suites or the like here.
          */
         
-        /*
-         * test SLD / magic sets / semi-naive evaluation (constrained forward
-         * chainer that may be used to prove whether or not statement(s) are
-         * entailed by the database as opposed to generating entailments from
-         * the data).
-         */
-        
-        // @todo test suite for semi-naive evaluation (magic sets / SLD).
-//        suite.addTestSuite( TestMagicSets.class);
-
         /*
          * test truth maintenance.
          */

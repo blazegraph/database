@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-
 /**
  * rdfs2:
  * <pre>
@@ -36,7 +35,7 @@ public class RuleRdfs02 extends AbstractRuleRdfs_2_3_7_9 {
 
     public RuleRdfs02(InferenceEngine inf) {
 
-        super(inf.database, new Triple(var("u"), inf.rdfType, var("x")),
+        super( new Triple(var("u"), inf.rdfType, var("x")),
                 new Pred[] {
                 new Triple(var("a"), inf.rdfsDomain, var("x")),
                 new Triple(var("u"), var("a"), var("y"))

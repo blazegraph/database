@@ -46,8 +46,7 @@ public class RuleRdfs04b extends AbstractRuleDistinctTermScan {
 
     public RuleRdfs04b(InferenceEngine inf) {
 
-            super(inf.database, //
-                    new Triple(var("v"), inf.rdfType, inf.rdfsResource), //
+            super(  new Triple(var("v"), inf.rdfType, inf.rdfsResource), //
                     new Pred[] { //
                         new Triple(var("u"), var("a"), var("v"))//
                     });

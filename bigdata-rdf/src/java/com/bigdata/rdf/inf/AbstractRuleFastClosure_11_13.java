@@ -24,8 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * Rule for steps 11 and 13 of {@link InferenceEngine#fastForwardClosure()}.
  * <p>
@@ -68,14 +66,14 @@ abstract public class AbstractRuleFastClosure_11_13 extends AbstractRuleNestedSu
     
     /**
      * 
-     * @param db
      * @param head
      * @param body
+     * @param constraints
      */
-    public AbstractRuleFastClosure_11_13(AbstractTripleStore db, Triple head,
-            Pred[] body, IConstraint[] constraints) {
+    public AbstractRuleFastClosure_11_13(Triple head, Pred[] body,
+            IConstraint[] constraints) {
 
-        super(db, head, body, constraints );
+        super( head, body, constraints );
 
         // validate the binding pattern for the tail of this rule.
         assert body.length == 3;

@@ -52,19 +52,16 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo The {@link Rule} is expressed as a sequence of conjunctive predicates.
- *       this is clearly sufficient for RDFS entailments and probably can be
- *       made to serve for a magic sets variant (as an alternative to backward
- *       chaining during TM).
+ * @todo get rid of Magic and Triple and make Pred a concrete class.
+ * 
+ * @todo add an XML serialization and parser for rules so that the rule sets may
+ *       be declared. some very specialized rules might not be handled in this
+ *       manner but the vast majority are executed as nested subqueries and can
+ *       be just declared.
  *       <p>
- *       If there is a requirement to be more general, then this should be
- *       refactored in terms of a boolean AND operator, a triple pattern, and
- *       rewrites for evaluation into a variety of specialized JOIN operations
- *       (self-join, distinct term scan, and nested subquery).
- *       <p>
- *       There is also the odd case for
- *       {@link AbstractRuleFastClosure_3_5_6_7_9} where the rule accepts a set
- *       of term identifers as on of its inputs.
+ *       This will make it possible for people to extend the rule sets, but
+ *       there are interactions in the rules choosen for evaluation during
+ *       forward closure and those choosen for evaluation at query time.
  */
 abstract public class Rule {
 
@@ -140,6 +137,11 @@ abstract public class Rule {
     }
     
     /**
+     * Name of the rule.
+     */
+    final private String name;
+    
+    /**
      * The head of the rule.
      */
     final protected Pred head;
@@ -213,7 +215,15 @@ abstract public class Rule {
      */
     public String getName() {
 
-        return getClass().getSimpleName();
+        if(name==null) {
+        
+            return getClass().getSimpleName();
+            
+        } else {
+            
+            return name;
+            
+        }
 
     }
     
@@ -251,18 +261,39 @@ abstract public class Rule {
         
     }
 
-    public Rule(AbstractTripleStore db, Pred head, Pred[] body) {
+    /**
+     * 
+     * @param head
+     * @param body
+     */
+    public Rule(Pred head, Pred[] body) {
     
-        this(db,head,body,null);
+        this(head,body,null);
         
     }
     
-    public Rule(AbstractTripleStore db, Pred head, Pred[] body, IConstraint[] constraints) {
+    public Rule(Pred head, Pred[] body, IConstraint[] constraints) {
+        
+        this(null,head,body,constraints);
+    }
 
-        assert db != null;
+    /**
+     * 
+     * @param name
+     *            The name of the rule (optional). When <code>null</code> the
+     *            simple name of the class is reported by {@link #getName()}.
+     * @param head
+     * @param body
+     * @param constraints
+     */
+    public Rule(String name, Pred head, Pred[] body, IConstraint[] constraints) {
+        
+        this.name = name;
         
         assert head != null;
 
+        assert body != null;
+        
         // the head of the rule.
         this.head = head;
 
@@ -290,6 +321,357 @@ abstract public class Rule {
 
     }
 
+    /**
+     * Specialize a rule by binding one or more variables in the head from a
+     * triple pattern.
+     * 
+     * @param head
+     *            A triple pattern that must be consistent with the existing
+     *            head for this rule and which MAY bind variables that are free
+     *            in the head of this rule.
+     *            
+     * @return The specialized rule.
+     * 
+     * @see #specialize(Map, com.bigdata.rdf.inf.Rule.IConstraint[])
+     */
+    public Rule specialize(Pred head) {
+        
+        return specialize( head, null );
+        
+    }
+
+    /**
+     * Specialize a rule by binding one or more variables in the head from a
+     * triple pattern.
+     * 
+     * @param head
+     *            A triple pattern that must be consistent with the existing
+     *            head for this rule and which MAY bind variables that are free
+     *            in the head of this rule.
+     * @param constaints
+     *            Optional constraints to be added to the rule.
+     * 
+     * @return The specialized rule.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>head</i> is <code>null</code>.
+     *             
+     * @see #specialize(Map, com.bigdata.rdf.inf.Rule.IConstraint[])
+     */
+    public Rule specialize(Pred head, IConstraint[] constaints ) {
+        
+        if(head==null) throw new IllegalArgumentException();
+
+        int nbound = N - head.getVariableCount();
+        
+        Var[] var = new Var[nbound];
+
+        long[] binding = new long[nbound];
+        
+        int i = 0;
+        
+        // examine [s].
+        if(head.s.isConstant()) {
+            
+            if(this.head.s.isConstant()) {
+                
+                if (head.s != this.head.s) {
+
+                    // attempt to change a constant.
+                    throw new IllegalArgumentException();
+                    
+                }
+                
+            } else {
+                
+                var[i] = (Var) this.head.s;
+                
+                binding[i] = head.s.id;
+             
+                i++;
+                
+            }
+            
+        }
+        
+        // examine [p].
+        if(head.p.isConstant()) {
+            
+            if(this.head.p.isConstant()) {
+                
+                if (head.p != this.head.p) {
+
+                    // attempt to change a constant.
+                    throw new IllegalArgumentException();
+                    
+                }
+                
+            } else {
+                
+                var[i] = (Var) this.head.p;
+                
+                binding[i] = head.p.id;
+             
+                i++;
+                
+            }
+            
+        }
+        
+        // examine [o].
+        if(head.o.isConstant()) {
+            
+            if(this.head.o.isConstant()) {
+                
+                if (head.o != this.head.o) {
+
+                    // attempt to change a constant.
+                    throw new IllegalArgumentException();
+                    
+                }
+                
+            } else {
+                
+                var[i] = (Var) this.head.o;
+                
+                binding[i] = head.o.id;
+             
+                i++;
+                
+            }
+            
+        }
+        
+        assert i == nbound;
+        
+        return specialize(var, binding, constraints );
+        
+    }
+
+    /**
+     * General purpose method used to specialize a rule.
+     * <p>
+     * Note: The new rule will always be an instance of
+     * {@link AbstractRuleNestedSubquery}. The name of the new rule will be
+     * derived from the name of the old rule with an appended single quote to
+     * indicate that it is a derived variant.
+     * <p>
+     * Note: An attempt to bind a variable not declared by the rule will be
+     * ignored.
+     * <p>
+     * Note: An attempt to bind a variable to {@link #NULL} will be ignored.
+     * 
+     * @param bindings
+     *            Bindings for zero or more free variables in this rule. The
+     *            rule will be rewritten such that the variable is replaced by
+     *            the binding throughout the rule.
+     * @param constraints
+     *            An array of additional constraints to be imposed on the rule
+     *            (optional).
+     * @return The specialized rule.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>bindings</i> is <code>null</code>.
+     */
+    public Rule specialize(Var[] var, long[] binding, IConstraint[] constraints ) {
+
+        if (var == null)
+            throw new IllegalArgumentException();
+
+        if (binding == null)
+            throw new IllegalArgumentException();
+
+        if(!(AbstractRuleNestedSubquery.class.isAssignableFrom(this.getClass()))) {
+            
+            /*
+             * Rules that do not extend the nested subquery execution strategy
+             * can not be specialized at this time. In order to do so we would
+             * have to dynamically create an instance of the appropriate class.
+             * This is not possible right now owing to the variety of
+             * constructor signatures throughout the subclass hierarchy of Rule.
+             */
+
+//            throw new UnsupportedOperationException();
+            
+            log.warn("Rule does not extend: "+AbstractRuleNestedSubquery.class);
+            
+        }
+        
+        /*
+         * The name of the specialized rule.
+         */
+
+        final String newName = getName()+"'";
+        
+        /*
+         * Setup the new head and the body for the new rule by applying the
+         * bindings.
+         */
+        
+        final Pred newHead = bind(head,var,binding);
+        
+        final Pred[] newTail = bind(body,var,binding);
+        
+        /*
+         * Setup the new constraints. We do not test for whether or not two
+         * constraints are the same, we just append the new constraints to the
+         * end of the old constraints. The rest of the logic just covers the
+         * edge cases where one or the other of the constraint arrays is null or
+         * empty.
+         */
+        
+        final IConstraint[] newConstraint;
+        
+        if(constraints==null||constraints.length==0) {
+
+            newConstraint = this.constraints;
+            
+        } else if(this.constraints==null||this.constraints.length==0) {
+            
+            newConstraint = constraints;
+            
+        } else {
+
+            int len = constraints.length + this.constraints.length;
+
+            newConstraint = new IConstraint[len];
+
+            System.arraycopy(this.constraints, 0, newConstraint, 0,
+                    this.constraints.length);
+
+            System.arraycopy(constraints, 0, newConstraint,
+                    this.constraints.length, constraints.length);
+            
+        }
+
+//        /*
+//         * Use reflection to instantiate the rule.
+//         */
+//        
+//        Class<?extends Rule> cls = this.getClass();
+//        
+//        final Rule newRule;
+//
+//        try {
+//            /*
+//             * Note: this require a uniform constructor for all rule classes.
+//             */
+//            Constructor<? extends Rule> ctor = cls.getConstructor(new Class[] {
+//                    AbstractTripleStore.class,// database
+//                    Pred.class,// head
+//                    (new Pred[0]).getClass(),// tail
+//                    (new IConstraint[0]).getClass() // constraints.
+//                    });
+//
+//            newRule = ctor.newInstance(new Object[] {
+//                    null/* database(not used) */, newHead, newTail,
+//                    newConstraint });
+//            
+//        } catch (Throwable t) {
+//
+//            throw new RuntimeException("Could not specialize rule: " + t);
+//
+//        }
+        
+        Rule newRule = new SpecializedRule(newName, newHead, newTail,
+                newConstraint);
+
+        return newRule;
+
+    }
+
+    /**
+     * Helper method used by
+     * {@link #specialize(com.bigdata.rdf.inf.Rule.Var[], long[], com.bigdata.rdf.inf.Rule.IConstraint[])}
+     * to apply bindings to a {@link Pred}. Any variable in <i>a</i> that is
+     * found in the predicate will be bound to the correlated value in <i>b</a>[].
+     * 
+     * @param pred
+     *            The predicate.
+     * @param a
+     *            The set of variables to be bound.
+     * @param b
+     *            The correlated set of bindings for those variables.
+     * 
+     * @return A new predicate with the additional bindings (if any).
+     */
+    private Pred bind(Pred pred,Var[] a, long[] b) {
+        
+        VarOrId s = pred.s;
+        VarOrId p = pred.p;
+        VarOrId o = pred.o;
+
+        if (s.isVar()) {
+
+            long x = get((Var) s, a, b);
+
+            if (x != NULL)
+                s = new Id(x);
+
+        }
+        
+        if (p.isVar()) {
+
+            long x = get((Var) p, a, b);
+
+            if (x != NULL)
+                p = new Id(x);
+
+        }
+        
+        if (o.isVar()) {
+
+            long x = get((Var) o, a, b);
+
+            if (x != NULL)
+                o = new Id(x);
+
+        }
+
+        return (pred.magic ? new Magic(s, p, o) : new Triple(s, p, o));
+        
+    }
+    
+    private Pred[] bind(Pred[] predicates, Var[] a, long[] b) {
+        
+        Pred[] tmp = new Pred[predicates.length];
+        
+        for(int i=0; i<predicates.length; i++) {
+            
+            tmp[i] = bind(predicates[i],a,b);
+            
+        }
+        
+        return tmp;
+        
+    }
+    
+    /**
+     * Helper method used by
+     * {@link #specialize(com.bigdata.rdf.inf.Rule.Var[], long[], com.bigdata.rdf.inf.Rule.IConstraint[])}
+     * to extract the binding for a variable from the parameters passed into
+     * that method.
+     * 
+     * @param v
+     *            A variable found in the head or tail of this rule (as
+     *            declared).
+     * @param a
+     *            The set of variables to be bound.
+     * @param b
+     *            The correlated set of bindings for those variables.
+     *            
+     * @return The binding for that variable -and- {@link #NULL} if the variable
+     *         is NOT to be bound.
+     */
+    private long get(Var v, Var[] a, long[] b) {
+
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] == v)
+                return b[i];
+        }
+        return NULL;
+    }
+    
     /**
      * Variant when not using a focusStore.
      * @param justify

@@ -32,7 +32,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * or <code>magic(triple(s,p,o))</code>. Since this is a boolean
  * distinction, we capture it with a boolean flag rather than allowing a
  * predicate name and arity.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

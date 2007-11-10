@@ -69,11 +69,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends AbstractRuleRdf 
      * @param propertyId
      * @param P
      */
-    public AbstractRuleFastClosure_3_5_6_7_9(AbstractTripleStore db,
-            Id propertyId, Set<Long> P) {
+    public AbstractRuleFastClosure_3_5_6_7_9(Id propertyId, Set<Long> P) {
 
-        super(db, //
-                new Triple(var("x"), propertyId, var("y")), //
+        super(  new Triple(var("x"), propertyId, var("y")), //
                 new Pred[] {//
                 new Triple(var("x"), var("{P}"), var("y")) //
                 });

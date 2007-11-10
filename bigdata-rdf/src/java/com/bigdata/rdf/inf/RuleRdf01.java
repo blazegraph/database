@@ -34,8 +34,7 @@ public class RuleRdf01 extends AbstractRuleDistinctTermScan {
     
     public RuleRdf01(InferenceEngine inf) {
 
-        super(inf.database, //
-                new Triple(var("a"), inf.rdfType, inf.rdfProperty), //
+        super(  new Triple(var("a"), inf.rdfType, inf.rdfProperty), //
                 new Pred[] { //
                     new Triple(var("u"), var("a"), var("y"))//
                 });

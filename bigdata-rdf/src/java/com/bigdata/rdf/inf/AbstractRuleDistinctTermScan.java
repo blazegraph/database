@@ -29,7 +29,6 @@ package com.bigdata.rdf.inf;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -61,9 +60,9 @@ abstract public class AbstractRuleDistinctTermScan extends AbstractRuleRdf {
      */
     private final KeyOrder keyOrder;
 
-    public AbstractRuleDistinctTermScan(AbstractTripleStore db, Triple head, Pred[] body) {
+    public AbstractRuleDistinctTermScan(Triple head, Pred[] body) {
 
-        super(db, head, body);
+        super( head, body);
         
         // head must be one bound.
         assert head.getVariableCount() == 1;

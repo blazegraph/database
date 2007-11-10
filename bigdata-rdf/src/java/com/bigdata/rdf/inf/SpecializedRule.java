@@ -22,43 +22,30 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Nov 10, 2007
  */
 
 package com.bigdata.rdf.inf;
 
-
 /**
- * owl:sameAs3
- * 
- * <pre>
- * (x owl:sameAs y), (z a x) -&gt; (z a y).
- * </pre>
+ * Instances of this class are created dynamically when a {@link Rule} is
+ * specialized.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleOwlSameAs3 extends AbstractRuleNestedSubquery {
+public class SpecializedRule extends AbstractRuleNestedSubquery {
 
     /**
-     * @param inf
+     * 
+     * @param name
+     * @param head
+     * @param body
      */
-    public RuleOwlSameAs3(InferenceEngine inf) {
-
-        super(  new Triple(var("z"), var("a"), var("y")), //
-                new Pred[] { //
-                    new Triple(var("x"), inf.owlSameAs, var("y")),//
-                    new Triple(var("z"), var("a"), var("x"))//
-                },
-                new IConstraint[] {
-                    /*
-                     * Reject (z sameAs y) as the head.
-                     */
-                    new RejectAnythingSameAsItself(var("z"),var("a"),var("y"),inf.owlSameAs)
-//                    , new NEConstant(var("a"),inf.owlSameAs.id)
-                }
-        );
-
+    public SpecializedRule(String name, Pred head, Pred[] body, IConstraint[] constraints) {
+        
+        super(name, head, body, constraints );
+        
     }
-
+    
 }

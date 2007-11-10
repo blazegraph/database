@@ -35,7 +35,6 @@ import java.util.Set;
 
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -66,29 +65,40 @@ abstract public class AbstractRuleNestedSubquery extends AbstractRuleRdf {
     final boolean subqueryElimination = false;
     
     /**
-     * @param db
      * @param head
      * @param body
      */
-    public AbstractRuleNestedSubquery(AbstractTripleStore db, Triple head,
-            Pred[] body) {
+    public AbstractRuleNestedSubquery(Pred head, Pred[] body) {
 
-        super(db, head, body);
+        super(head, body);
 
     }
 
     /**
-     * @param db
      * @param head
      * @param body
+     * @param constraints
      */
-    public AbstractRuleNestedSubquery(AbstractTripleStore db, Triple head,
-            Pred[] body, IConstraint[] constraints) {
+    public AbstractRuleNestedSubquery(Triple head, Pred[] body,
+            IConstraint[] constraints) {
 
-        super(db, head, body, constraints);
+        super( head, body, constraints);
 
     }
 
+    /**
+     * 
+     * @param name
+     * @param head
+     * @param body
+     * @param constraints
+     */
+    public AbstractRuleNestedSubquery(String name, Pred head, Pred[] body, IConstraint[] constraints) {
+
+        super( name, head, body, constraints );
+
+    }
+    
     /**
      * Recursively evaluate the subqueries.
      */

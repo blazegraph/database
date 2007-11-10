@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 /**
  * <p>
  * Abstract base class for rules with two terms in the tail where one term is
@@ -58,23 +56,21 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public abstract class AbstractRuleRdfs_2_3_7_9 extends AbstractRuleNestedSubquery {
 
     public AbstractRuleRdfs_2_3_7_9
-        ( AbstractTripleStore db, 
-          Triple head, 
+        ( Triple head, 
           Pred[] body
           ) {
 
-        this(db,head,body,null);
+        this(head,body,null);
         
     }
     
     public AbstractRuleRdfs_2_3_7_9
-    ( AbstractTripleStore db, 
-      Triple head, 
+    ( Triple head, 
       Pred[] body,
       IConstraint[] constraints
       ) {
 
-        super(db, head, body, constraints);
+        super( head, body, constraints);
 
         // only two predicates in the tail.
         assert body.length == 2;
