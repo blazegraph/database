@@ -43,8 +43,7 @@ public class RuleOwlEquivalentProperty extends AbstractRuleNestedSubquery {
      */
     public RuleOwlEquivalentProperty(InferenceEngine inf) {
 
-        super( inf.database, //
-                new Triple(var("b"), inf.owlEquivalentProperty, var("a")), //
+        super(  new Triple(var("b"), inf.owlEquivalentProperty, var("a")), //
                 new Pred[] { //
                     new Triple(var("a"), inf.owlEquivalentProperty, var("b"))//
                 });

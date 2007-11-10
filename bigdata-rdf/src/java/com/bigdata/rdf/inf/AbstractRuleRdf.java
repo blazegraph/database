@@ -23,19 +23,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-
 public abstract class AbstractRuleRdf extends Rule {
     
-    public AbstractRuleRdf(AbstractTripleStore db, Triple head, Pred[] body) {
+    public AbstractRuleRdf(Pred head, Pred[] body) {
 
-        super(db, head, body);
+        super(head, body);
 
     }
        
-    public AbstractRuleRdf(AbstractTripleStore db, Triple head, Pred[] body, IConstraint[] constraints) {
+    public AbstractRuleRdf(Pred head, Pred[] body, IConstraint[] constraints) {
 
-        super(db, head, body, constraints);
+        super(head, body, constraints);
+
+    }
+       
+    public AbstractRuleRdf(String name, Pred head, Pred[] body, IConstraint[] constraints) {
+
+        super(name, head, body, constraints);
 
     }
        

@@ -35,7 +35,6 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -70,14 +69,14 @@ abstract public class AbstractRuleChainedSelfJoin extends AbstractRuleRdf {
     final Id C;
 
     /**
-     * @param db
      * @param head
      * @param body
+     * @param constraints
      */
-    public AbstractRuleChainedSelfJoin(AbstractTripleStore db, Triple head,
-            Pred[] body, IConstraint[] constraints ) {
+    public AbstractRuleChainedSelfJoin(Triple head, Pred[] body,
+            IConstraint[] constraints) {
 
-        super(db, head, body, constraints );
+        super( head, body, constraints );
 
         // two predicates
         assert body.length == 2;

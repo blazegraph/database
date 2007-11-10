@@ -678,9 +678,6 @@ public class TMStatementBuffer implements IStatementBuffer {
      *            Recursive depth - this is ZERO(0) the first time the method is
      *            called. At depth ZERO(0) the tempStore MUST contain only the
      *            explicit statements to be retracted.
-     * 
-     * FIXME we need a fast test for axioms. if something is an axiom then it is
-     * always provable.  See {@link RDFSHelper} and {@link RdfsAxioms} and friends.
      */
     private void retractAll(ClosureStats stats, AbstractTripleStore tempStore, int depth) {
 

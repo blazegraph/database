@@ -29,13 +29,9 @@ package com.bigdata.rdf.inf;
 
 import java.util.Set;
 
-import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
-
+import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.State;
 import com.bigdata.rdf.inf.Rule.Var;
-import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -93,7 +89,7 @@ public class TestRule extends AbstractRuleTestCase {
             
             Pred[] body = new Pred[] { new Triple(u, vocab.rdfType, vocab.rdfsClass) };
             
-            Rule r = new MyRule(store, head, body);
+            Rule r = new MyRule(head, body);
 
             State s = r.newState(false/* justify */, store, new SPOAssertionBuffer(
                     store, null/*filter*/,100/*capacity*/,false/* justify */));
@@ -340,12 +336,45 @@ public class TestRule extends AbstractRuleTestCase {
 //        }
 //
 //    }
+
+    public void test_specializeRule() {
+        
+        AbstractTripleStore store = getStore();
+        
+        try {
+        
+            RDFSHelper vocab = new RDFSHelper(store);
+            
+            Rule r = new MyRulePattern1(vocab);
+            
+            System.err.println(r.toString());
+            
+            Rule r1 = r.specialize(new Var[] { Rule.var("u") },
+                    new long[] { vocab.rdfProperty.id }, new IConstraint[] {});
+
+            // verify "u" bound in body[0].
+            assertTrue(r1.body[0].s.isConstant());
+            assertEquals(vocab.rdfProperty.id, r1.body[0].s.id);
+
+            // verify "u" bound in body[1].
+            assertTrue(r1.body[1].o.isConstant());
+            assertEquals(vocab.rdfProperty.id, r1.body[1].o.id);
+            
+            System.err.println(r1.toString());
+
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
     
     private static class MyRule extends Rule {
 
-        public MyRule(AbstractTripleStore db, Triple head, Pred[] body) {
+        public MyRule( Triple head, Pred[] body) {
 
-            super(db, head, body);
+            super( head, body);
 
         }
 
@@ -368,8 +397,7 @@ public class TestRule extends AbstractRuleTestCase {
     private static class MyRulePattern1 extends Rule {
         
         public MyRulePattern1(RDFSHelper vocab) {
-            super(vocab.database,//
-                    new Triple(var("v"), vocab.rdfType, var("x")), //
+            super(  new Triple(var("v"), vocab.rdfType, var("x")), //
                     new Pred[] {//
                             new Triple(var("u"), vocab.rdfsSubClassOf, var("x")),//
                             new Triple(var("v"), vocab.rdfType, var("u")) //

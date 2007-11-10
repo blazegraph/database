@@ -44,8 +44,7 @@ public class RuleFastClosure11 extends AbstractRuleFastClosure_11_13 {
      */
     public RuleFastClosure11(InferenceEngine inf) {
         
-        super(inf.database,
-                new Triple(var("x"), inf.rdfType, var("b")),//
+        super(  new Triple(var("x"), inf.rdfType, var("b")),//
                 new Pred[] {//
                     new Triple(var("x"), var("y"), var("z")),//
                     new Triple(var("y"), inf.rdfsSubPropertyOf, var("a")),//
