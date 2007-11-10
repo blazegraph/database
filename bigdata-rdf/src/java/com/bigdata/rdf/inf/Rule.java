@@ -52,7 +52,9 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo get rid of Magic and Triple and make Pred a concrete class.
+ * @todo support magic sets so that we can rewrite the rule set in order to test
+ *       whether or not a statement is still provable when it is retracted
+ *       during TM.
  * 
  * @todo add an XML serialization and parser for rules so that the rule sets may
  *       be declared. some very specialized rules might not be handled in this
