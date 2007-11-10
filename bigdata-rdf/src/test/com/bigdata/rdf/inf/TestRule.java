@@ -337,30 +337,80 @@ public class TestRule extends AbstractRuleTestCase {
 //
 //    }
 
+    /**
+     * Test case for specializing a rule by binding some of its variables.
+     * 
+     * @todo verify all combinations of override (NULL, NULL, NULL), binding a
+     *       variable, binding a constant to the same value, and the illegal
+     *       action of binding a constant to a different value.
+     * 
+     * @todo test adding constraints.
+     */
     public void test_specializeRule() {
-        
+
         AbstractTripleStore store = getStore();
-        
+
         try {
-        
+
             RDFSHelper vocab = new RDFSHelper(store);
-            
+
+            // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
             Rule r = new MyRulePattern1(vocab);
-            
+
             System.err.println(r.toString());
-            
-            Rule r1 = r.specialize(new Var[] { Rule.var("u") },
-                    new long[] { vocab.rdfProperty.id }, new IConstraint[] {});
 
-            // verify "u" bound in body[0].
-            assertTrue(r1.body[0].s.isConstant());
-            assertEquals(vocab.rdfProperty.id, r1.body[0].s.id);
+            {
+                /*
+                 * Verify we can not override the rdf:type constant with a
+                 * different constant.
+                 */
 
-            // verify "u" bound in body[1].
-            assertTrue(r1.body[1].o.isConstant());
-            assertEquals(vocab.rdfProperty.id, r1.body[1].o.id);
+                try {
+                    
+                    r.specialize(NULL, vocab.rdfProperty.id, NULL, 
+                            new IConstraint[] {});
+                    
+                    fail("Expecting: "+IllegalArgumentException.class);
+                    
+                } catch(IllegalArgumentException ex) {
+                    
+                    System.err.println("Ignoring expected exception: "+ex);
+                    
+                }
+                
+            }
             
-            System.err.println(r1.toString());
+            {
+                /*
+                 * Verify we can override the subject with a constant.
+                 */
+
+                Rule r1 = r.specialize(vocab.rdfProperty.id, NULL, NULL,
+                        new IConstraint[] {});
+
+                System.err.println(r1.toString());
+
+                // verify "v" bound in body[1].
+                assertTrue(r1.body[1].s.isConstant());
+                assertEquals(vocab.rdfProperty.id, r1.body[1].s.id);
+
+            }
+
+            {
+                /*
+                 * Verify we can override the object with a constant.
+                 */
+
+                Rule r1 = r.specialize(NULL, NULL, vocab.rdfProperty.id,
+                        new IConstraint[] {});
+
+                System.err.println(r1.toString());
+
+                // verify "x" bound in body[0].
+                assertTrue(r1.body[0].o.isConstant());
+                assertEquals(vocab.rdfProperty.id, r1.body[0].o.id);
+
+            }
 
         } finally {
             
