@@ -112,9 +112,9 @@ import com.bigdata.rdf.util.KeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BackchainOwlSameAs2 implements ISPOIterator {
+public class BackchainOwlSameAs2Old implements ISPOIterator {
 
-    protected static final Logger log = Logger.getLogger(BackchainOwlSameAs2.class);
+    protected static final Logger log = Logger.getLogger(BackchainOwlSameAs2Old.class);
     
     private final ISPOIterator src;
     private final long p, o;
@@ -232,7 +232,7 @@ public class BackchainOwlSameAs2 implements ISPOIterator {
             
         }
 
-        return new BackchainOwlSameAs2(src,s,p,o,db,owlSameAs);
+        return new BackchainOwlSameAs2Old(src,s,p,o,db,owlSameAs);
         
     }
     
@@ -246,7 +246,7 @@ public class BackchainOwlSameAs2 implements ISPOIterator {
      * @param db
      * @param owlSameAs
      */
-    private BackchainOwlSameAs2(ISPOIterator src, long s, long p, long o,
+    private BackchainOwlSameAs2Old(ISPOIterator src, long s, long p, long o,
             AbstractTripleStore db, final long owlSameAs) {
 
         if (src == null)

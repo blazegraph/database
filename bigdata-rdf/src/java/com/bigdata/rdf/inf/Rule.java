@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
@@ -325,128 +326,88 @@ abstract public class Rule {
 
     /**
      * Specialize a rule by binding one or more variables in the head from a
-     * triple pattern.
+     * triple pattern. The triple pattern MUST be consistent with the existing
+     * head for this rule (it may not override constants with different
+     * constants). The triple pattern MAY bind variables that are unbound in the
+     * head of this rule. Likewise, the triple pattern MAY indicate that it does
+     * NOT wish to bind a position in the head (regardless of whether it is a
+     * variable or a constant) by specifying {@link #NULL} for that position.
      * 
-     * @param head
-     *            A triple pattern that must be consistent with the existing
-     *            head for this rule and which MAY bind variables that are free
-     *            in the head of this rule.
-     *            
-     * @return The specialized rule.
-     * 
-     * @see #specialize(Map, com.bigdata.rdf.inf.Rule.IConstraint[])
-     */
-    public Rule specialize(Pred head) {
-        
-        return specialize( head, null );
-        
-    }
-
-    /**
-     * Specialize a rule by binding one or more variables in the head from a
-     * triple pattern.
-     * 
-     * @param head
-     *            A triple pattern that must be consistent with the existing
-     *            head for this rule and which MAY bind variables that are free
-     *            in the head of this rule.
-     * @param constaints
+     * @param s
+     * @param p
+     * @param o
+     * @param constraints
      *            Optional constraints to be added to the rule.
      * 
      * @return The specialized rule.
      * 
-     * @throws IllegalArgumentException
-     *             if <i>head</i> is <code>null</code>.
-     *             
      * @see #specialize(Map, com.bigdata.rdf.inf.Rule.IConstraint[])
      */
-    public Rule specialize(Pred head, IConstraint[] constaints ) {
+    public Rule specialize(long s, long p, long o, IConstraint[] constraints ) {
         
-        if(head==null) throw new IllegalArgumentException();
+        final Map<Var,Long> bindings = new TreeMap<Var,Long>();
 
-        int nbound = N - head.getVariableCount();
-        
-        Var[] var = new Var[nbound];
-
-        long[] binding = new long[nbound];
-        
-        int i = 0;
-        
         // examine [s].
-        if(head.s.isConstant()) {
-            
-            if(this.head.s.isConstant()) {
-                
-                if (head.s != this.head.s) {
+        if (s != NULL) {
+
+            if (head.s.isConstant()) {
+
+                if (s != head.s.id) {
 
                     // attempt to change a constant.
                     throw new IllegalArgumentException();
-                    
+
                 }
-                
+
             } else {
-                
-                var[i] = (Var) this.head.s;
-                
-                binding[i] = head.s.id;
-             
-                i++;
-                
+
+                bindings.put((Var) head.s, s);
+
             }
-            
+
         }
-        
+
         // examine [p].
-        if(head.p.isConstant()) {
-            
-            if(this.head.p.isConstant()) {
-                
-                if (head.p != this.head.p) {
+        if (p != NULL) {
+
+            if (head.p.isConstant()) {
+
+                if (p != head.p.id) {
 
                     // attempt to change a constant.
                     throw new IllegalArgumentException();
-                    
+
                 }
-                
+
             } else {
-                
-                var[i] = (Var) this.head.p;
-                
-                binding[i] = head.p.id;
-             
-                i++;
-                
+
+                bindings.put((Var) head.p, p);
+
             }
-            
+
         }
-        
+
         // examine [o].
-        if(head.o.isConstant()) {
-            
-            if(this.head.o.isConstant()) {
-                
-                if (head.o != this.head.o) {
+        if (o != NULL) {
+
+            if (head.o.isConstant()) {
+
+                if (o != head.o.id) {
 
                     // attempt to change a constant.
                     throw new IllegalArgumentException();
-                    
+
                 }
-                
+
             } else {
-                
-                var[i] = (Var) this.head.o;
-                
-                binding[i] = head.o.id;
-             
-                i++;
-                
+
+                bindings.put((Var) head.o, o);
+
             }
-            
+
         }
         
-        assert i == nbound;
-        
-        return specialize(var, binding, constraints );
+        return specialize(bindings, constraints);
         
     }
 
@@ -475,12 +436,9 @@ abstract public class Rule {
      * @exception IllegalArgumentException
      *                if <i>bindings</i> is <code>null</code>.
      */
-    public Rule specialize(Var[] var, long[] binding, IConstraint[] constraints ) {
+    public Rule specialize(Map<Var,Long>bindings, IConstraint[] constraints ) {
 
-        if (var == null)
-            throw new IllegalArgumentException();
-
-        if (binding == null)
+        if (bindings == null)
             throw new IllegalArgumentException();
 
         if(!(AbstractRuleNestedSubquery.class.isAssignableFrom(this.getClass()))) {
@@ -510,9 +468,9 @@ abstract public class Rule {
          * bindings.
          */
         
-        final Pred newHead = bind(head,var,binding);
+        final Pred newHead = bind(head,bindings);
         
-        final Pred[] newTail = bind(body,var,binding);
+        final Pred[] newTail = bind(body,bindings);
         
         /*
          * Setup the new constraints. We do not test for whether or not two
@@ -597,7 +555,7 @@ abstract public class Rule {
      * 
      * @return A new predicate with the additional bindings (if any).
      */
-    private Pred bind(Pred pred,Var[] a, long[] b) {
+    private Pred bind(Pred pred,Map<Var,Long>b) {
         
         VarOrId s = pred.s;
         VarOrId p = pred.p;
@@ -605,7 +563,7 @@ abstract public class Rule {
 
         if (s.isVar()) {
 
-            long x = get((Var) s, a, b);
+            long x = get((Var) s, b);
 
             if (x != NULL)
                 s = new Id(x);
@@ -614,7 +572,7 @@ abstract public class Rule {
         
         if (p.isVar()) {
 
-            long x = get((Var) p, a, b);
+            long x = get((Var) p, b);
 
             if (x != NULL)
                 p = new Id(x);
@@ -623,7 +581,7 @@ abstract public class Rule {
         
         if (o.isVar()) {
 
-            long x = get((Var) o, a, b);
+            long x = get((Var) o, b);
 
             if (x != NULL)
                 o = new Id(x);
@@ -634,13 +592,13 @@ abstract public class Rule {
         
     }
     
-    private Pred[] bind(Pred[] predicates, Var[] a, long[] b) {
+    private Pred[] bind(Pred[] predicates, Map<Var,Long>b) {
         
         Pred[] tmp = new Pred[predicates.length];
         
         for(int i=0; i<predicates.length; i++) {
             
-            tmp[i] = bind(predicates[i],a,b);
+            tmp[i] = bind(predicates[i],b);
             
         }
         
@@ -657,21 +615,20 @@ abstract public class Rule {
      * @param v
      *            A variable found in the head or tail of this rule (as
      *            declared).
-     * @param a
-     *            The set of variables to be bound.
      * @param b
-     *            The correlated set of bindings for those variables.
+     *            The set of bindings to apply.
      *            
      * @return The binding for that variable -and- {@link #NULL} if the variable
      *         is NOT to be bound.
      */
-    private long get(Var v, Var[] a, long[] b) {
+    private long get(Var v, Map<Var,Long>b) {
 
-        for (int i = 0; i < a.length; i++) {
-            if (a[i] == v)
-                return b[i];
-        }
-        return NULL;
+        Long tmp = b.get(v);
+        
+        if(tmp==null) return NULL;
+        
+        return tmp;
+        
     }
     
     /**

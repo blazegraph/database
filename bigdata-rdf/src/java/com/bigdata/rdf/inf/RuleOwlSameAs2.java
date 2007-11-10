@@ -39,20 +39,20 @@ package com.bigdata.rdf.inf;
 public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
 
     /**
-     * @param inf
+     * @param vocab
      */
-    public RuleOwlSameAs2(InferenceEngine inf/*, boolean aNEOwlSameAs*/) {
+    public RuleOwlSameAs2(RDFSHelper vocab/*, boolean aNEOwlSameAs*/) {
 
         super(  new Triple(var("y"), var("a"), var("z")), //
                 new Pred[] { //
-                    new Triple(var("x"), inf.owlSameAs, var("y")),//
+                    new Triple(var("x"), vocab.owlSameAs, var("y")),//
                     new Triple(var("x"), var("a"), var("z"))//
                 },
                 new IConstraint[]{
                     /*
                      * Reject (y sameAs z) as the head.
                      */
-                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),inf.owlSameAs)
+                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.owlSameAs)
 //                    , new NEConstant(var("a"),inf.owlSameAs.id)
                 }
         );

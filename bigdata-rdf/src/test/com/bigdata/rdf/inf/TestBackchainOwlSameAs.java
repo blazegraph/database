@@ -31,6 +31,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.OWL;
 
+import com.bigdata.rdf.inf.Rule.IConstraint;
+import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -40,7 +42,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Test suite for {@link BackchainOwlSameAs2} (backchaining equivilent to
+ * Test suite for {@link BackchainOwlSameAs_2_3} (backchaining equivilent to
  * {@link RuleOwlSameAs2}) and {@link BackchainOwlSameAs3} (backchaining
  * equivilent to {@link RuleOwlSameAs3}).
  * 
@@ -60,6 +62,65 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
      */
     public TestBackchainOwlSameAs(String name) {
         super(name);
+    }
+    
+    
+    /**
+     * Test creates and executes a specialization of {@link RuleOwlSameAs2}
+     * 
+     * FIXME evolve the test until I have a handy means to feed the output of
+     * the rule (it writes on an {@link ISPOBuffer}) into an iterator that can
+     * be read to pass along results to the client.
+     * 
+     * FIXME evolve the test until I can do the above for each distinct subject.
+     * 
+     * FIXME then apply a specialization of {@link RuleOwlSameAs3} to each
+     * distinct object.
+     */
+    public void test_specializeRule() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+            
+            RDFSHelper vocab = new RDFSHelper(store);
+
+            URI A = new URIImpl("http://www.foo.org/A");
+            URI Z = new URIImpl("http://www.foo.org/Z");
+            URI X = new URIImpl("http://www.foo.org/X");
+            URI Y = new URIImpl("http://www.foo.org/Y");
+
+            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            
+            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, A, Z);
+
+            // write on the store.
+            buffer.flush();
+
+            // verify statement(s).
+            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, A, Z));
+            assertEquals(2,store.getStatementCount());
+            
+            // triple pattern for the query.
+            final long s = NULL, p=store.getTermId(A), o=NULL;
+            
+            // owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
+            Rule r = new RuleOwlSameAs2(vocab);
+            
+            r = r.specialize(//
+                    s, p, o, //
+                    new IConstraint[] {//
+                        new NEConstant((Var) r.head.p,vocab.owlSameAs.id)//
+                    });
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
     }
 
     /**
@@ -96,7 +157,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
 
             RDFSHelper vocab = new RDFSHelper(store);
 
-            ISPOIterator itr = BackchainOwlSameAs2.newIterator(//
+            ISPOIterator itr = BackchainOwlSameAs_2_3.newIterator(//
                     store.getAccessPath(NULL, vocab.owlSameAs.id, NULL).iterator(),//
                     NULL, vocab.owlSameAs.id, NULL,//
                     store, //
@@ -156,7 +217,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
 
             RDFSHelper vocab = new RDFSHelper(store);
 
-            ISPOIterator itr = BackchainOwlSameAs2.newIterator(//
+            ISPOIterator itr = BackchainOwlSameAs_2_3.newIterator(//
                     store.getAccessPath(NULL, NULL, NULL).iterator(),//
                     NULL, NULL, NULL,//
                     store, //
