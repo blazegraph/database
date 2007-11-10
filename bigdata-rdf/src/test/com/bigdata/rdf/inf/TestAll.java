@@ -117,7 +117,8 @@ public class TestAll extends TestCase {
         // test suite for backward chaining of (?x rdf:type rdfs:Resource).
         suite.addTestSuite( TestBackchainTypeResourceIterator.class );
 
-        // @todo test suite for backward chaining of (?x owl:sameAs ?y).
+        // test suite for backward chaining of owl:sameAs {2,3}
+        suite.addTestSuite( TestBackchainOwlSameAs.class );
 
         /*
          * @todo do some rigerous tests of the forward chainer to make sure that
