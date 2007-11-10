@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
-import java.util.Map;
-import java.util.TreeMap;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
@@ -38,7 +35,6 @@ import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -95,31 +91,6 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            /*
-             * build up the expected SPOs.
-             */
-            Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
-            
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A),//
-                        store.getTermId(URIImpl.RDF_TYPE),//
-                        store.getTermId(B),//
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A), //
-                        store.getTermId(URIImpl.RDF_TYPE), //
-                        store.getTermId(URIImpl.RDFS_RESOURCE), //
-                        StatementEnum.Inferred);
-                
-                expected.put(spo,spo);
-            }
-
             ISPOIterator itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
                     store.getTermId(A), NULL, NULL,//
@@ -128,35 +99,26 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     vocab.rdfsResource.id //
                     );
 
-            int i = 0;
-            
-            while(itr.hasNext()) {
-                
-                SPO actualSPO = itr.next();
-                
-                System.err.println("actual: "+actualSPO.toString(store));
-                
-                SPO expectedSPO = expected.remove(actualSPO);
-
-                if(expectedSPO==null) {
+            assertSameSPOsAnyOrder(store,
                     
-                    fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
+                    new SPO[]{
                     
-                }
-
-                System.err.println("expected: "+expectedSPO.toString(store));
-
-                assertEquals(expectedSPO.type, actualSPO.type);
-                
-                i++;
-                
-            }
-            
-            if(!expected.isEmpty()) {
-                
-                fail("Expecting: "+expected.size()+" more statements");
-                
-            }
+                    new SPO(//
+                            store.getTermId(A),//
+                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(B),//
+                            StatementEnum.Explicit),
+                            
+                    new SPO(//
+                            store.getTermId(A), //
+                            store.getTermId(URIImpl.RDF_TYPE), //
+                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            StatementEnum.Inferred)
+                    },
+                    
+                    itr
+                    
+            );            
             
         } finally {
             
@@ -203,31 +165,6 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             buffer.flush();
 
             store.dumpStore();
-            
-            /*
-             * build up the expected SPOs.
-             */
-            Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
-            
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A),//
-                        store.getTermId(URIImpl.RDF_TYPE),//
-                        store.getTermId(B),//
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A), //
-                        store.getTermId(URIImpl.RDF_TYPE), //
-                        store.getTermId(URIImpl.RDFS_RESOURCE), //
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
 
             ISPOIterator itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(store.getTermId(A), NULL, NULL).iterator(),//
@@ -237,35 +174,23 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     vocab.rdfsResource.id //
                     );
 
-            int i = 0;
-            
-            while(itr.hasNext()) {
-                
-                SPO actualSPO = itr.next();
-                
-                System.err.println("actual: "+actualSPO.toString(store));
-                
-                SPO expectedSPO = expected.remove(actualSPO);
-
-                if(expectedSPO==null) {
+            assertSameSPOsAnyOrder(store, new SPO[]{
                     
-                    fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
-                    
-                }
-
-                System.err.println("expected: "+expectedSPO.toString(store));
-
-                assertEquals(expectedSPO.type, actualSPO.type);
+                    new SPO(//
+                            store.getTermId(A),//
+                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(B),//
+                            StatementEnum.Explicit),
+                            
+                    new SPO(//
+                            store.getTermId(A), //
+                            store.getTermId(URIImpl.RDF_TYPE), //
+                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            StatementEnum.Explicit)
+                    },
                 
-                i++;
-                
-            }
-            
-            if(!expected.isEmpty()) {
-                
-                fail("Expecting: "+expected.size()+" more statements");
-                
-            }
+                itr
+                );
             
         } finally {
             
@@ -313,51 +238,6 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            /*
-             * build up the expected SPOs.
-             */
-            Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
-            
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A),//
-                        store.getTermId(URIImpl.RDF_TYPE),//
-                        store.getTermId(B),//
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(B),//
-                        store.getTermId(URIImpl.RDF_TYPE),//
-                        store.getTermId(C),//
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A), //
-                        store.getTermId(URIImpl.RDF_TYPE), //
-                        store.getTermId(URIImpl.RDFS_RESOURCE), //
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(B), //
-                        store.getTermId(URIImpl.RDF_TYPE), //
-                        store.getTermId(URIImpl.RDFS_RESOURCE), //
-                        StatementEnum.Inferred);
-                
-                expected.put(spo,spo);
-            }
-
             ISPOIterator itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(NULL, NULL, NULL).iterator(),//
                     NULL, NULL, NULL,//
@@ -366,35 +246,35 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     vocab.rdfsResource.id //
                     );
 
-            int i = 0;
-            
-            while(itr.hasNext()) {
-                
-                SPO actualSPO = itr.next();
-                
-                System.err.println("actual: "+actualSPO.toString(store));
-                
-                SPO expectedSPO = expected.remove(actualSPO);
+            assertSameSPOsAnyOrder(store, new SPO[]{
 
-                if(expectedSPO==null) {
+                    new SPO(//
+                            store.getTermId(A),//
+                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(B),//
+                            StatementEnum.Explicit),
+
+                    new SPO(//
+                            store.getTermId(B),//
+                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(C),//
+                            StatementEnum.Explicit),
                     
-                    fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
+                    new SPO(//
+                            store.getTermId(A), //
+                            store.getTermId(URIImpl.RDF_TYPE), //
+                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            StatementEnum.Explicit),
                     
-                }
-
-                System.err.println("expected: "+expectedSPO.toString(store));
-
-                assertEquals(expectedSPO.type, actualSPO.type);
-                
-                i++;
-                
-            }
+                    new SPO(//
+                            store.getTermId(B), //
+                            store.getTermId(URIImpl.RDF_TYPE), //
+                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            StatementEnum.Inferred)
+                    
+            },
             
-            if(!expected.isEmpty()) {
-                
-                fail("Expecting: "+expected.size()+" more statements");
-                
-            }
+            itr);
             
         } finally {
             
@@ -434,23 +314,6 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             buffer.flush();
 
-            /*
-             * build up the expected SPOs. Since we are reading with the object
-             * bound, only the explicit statements for that object should make
-             * it into the iterator.
-             */
-            Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
-            
-            {
-                SPO spo = new SPO(//
-                        store.getTermId(A),//
-                        store.getTermId(URIImpl.RDF_TYPE),//
-                        store.getTermId(B),//
-                        StatementEnum.Explicit);
-                
-                expected.put(spo,spo);
-            }
-
             ISPOIterator itr = new BackchainTypeResourceIterator(//
                     store.getAccessPath(NULL, NULL, store.getTermId(B)).iterator(),//
                     NULL, NULL, store.getTermId(B),//
@@ -459,35 +322,22 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     vocab.rdfsResource.id //
                     );
 
-            int i = 0;
-            
-            while(itr.hasNext()) {
-                
-                SPO actualSPO = itr.next();
-                
-                System.err.println("actual: "+actualSPO.toString(store));
-                
-                SPO expectedSPO = expected.remove(actualSPO);
+            /*
+             * Note: Since we are reading with the object bound, only the
+             * explicit statements for that object should make it into the
+             * iterator.
+             */
 
-                if(expectedSPO==null) {
+            assertSameSPOsAnyOrder(store, new SPO[]{
                     
-                    fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
+                    new SPO(//
+                            store.getTermId(A),//
+                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(B),//
+                            StatementEnum.Explicit)
                     
-                }
-
-                System.err.println("expected: "+expectedSPO.toString(store));
-
-                assertEquals(expectedSPO.type, actualSPO.type);
-                
-                i++;
-                
-            }
-            
-            if(!expected.isEmpty()) {
-                
-                fail("Expecting: "+expected.size()+" more statements");
-                
-            }
+                },
+                    itr);
             
         } finally {
             

@@ -30,7 +30,9 @@ package com.bigdata.rdf.store;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
@@ -51,6 +53,7 @@ import com.bigdata.journal.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**
@@ -533,6 +536,60 @@ abstract public class AbstractTestCase
 
     }
 
+    /**
+     * Verify that the iterator visits the expected {@link SPO}s in any order
+     * without duplicates.
+     * 
+     * @param store
+     *            Used to resolve term identifiers for messages.
+     * @param expected2
+     * @param itr
+     */
+    static public void assertSameSPOsAnyOrder(AbstractTripleStore store, SPO[] expected2, ISPOIterator itr) {
+        
+        Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
+
+        for(SPO tmp : expected2 ) {
+            
+            expected.put(tmp,tmp);
+            
+        }
+        
+        int i = 0;
+        
+        while(itr.hasNext()) {
+            
+            SPO actualSPO = itr.next();
+            
+            log.info("actual: "+actualSPO.toString(store));
+            
+            SPO expectedSPO = expected.remove(actualSPO);
+
+            if(expectedSPO==null) {
+                
+                fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
+                
+            }
+
+//            log.info("expected: "+expectedSPO.toString(store));
+
+            assertEquals(expectedSPO.type, actualSPO.type);
+            
+            i++;
+            
+        }
+        
+        if(!expected.isEmpty()) {
+            
+            // @todo convert term identifiers before rendering.
+            log.info("Iterator empty but still expecting: "+expected.values());
+            
+            fail("Expecting: "+expected.size()+" more statements");
+            
+        }
+
+    }
+    
     static public void assertSameStatements(Statement[] expected, StatementIterator actual) {
 
         assertSameStatements("", expected, actual);
