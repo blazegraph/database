@@ -713,6 +713,13 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     protected void assertSameGraphs(AbstractTripleStore expected,
             AbstractTripleStore actual) {
 
+        if (expected.getStatementCount() != actual.getStatementCount()) {
+
+            log.warn("statementCount: expected=" + expected.getStatementCount()
+                    + ", but actual=" + actual.getStatementCount());
+                    
+        }
+        
         ISPOIterator itre = expected.getAccessPath(KeyOrder.SPO).iterator(0, 0);
 
         ISPOIterator itra = actual.getAccessPath(KeyOrder.SPO).iterator(0, 0);
