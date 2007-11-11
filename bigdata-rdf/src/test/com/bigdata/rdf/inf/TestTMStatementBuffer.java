@@ -357,8 +357,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     public void test_stress() {
 
         String[] resource = new String[] {
-                "data/alibaba_data.rdf",
-                "data/alibaba_schema.rdf" };
+                "../rdf-data/alibaba_data.rdf",
+                "../rdf-data/alibaba_schema.rdf" };
 
         String[] baseURL = new String[] { "", "" 
                 };
@@ -368,7 +368,9 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 RDFFormat.RDFXML
                 };
 
-        doStressTest(resource, baseURL, format, 100/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
+        doStressTest(resource, baseURL, format, 10000/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
+
+        doStressTest(resource, baseURL, format, 100/*ntrials*/, 1/*depth*/, 10/*nstmts*/);
     
         // @todo enable more torturous tests.
 //        doStressTest(resource, baseURL, format, 10, 4, 20);
@@ -711,9 +713,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     protected void assertSameGraphs(AbstractTripleStore expected,
             AbstractTripleStore actual) {
 
-        assertEquals("statementCount", expected.getStatementCount(), actual
-                .getStatementCount());
-
         ISPOIterator itre = expected.getAccessPath(KeyOrder.SPO).iterator(0, 0);
 
         ISPOIterator itra = actual.getAccessPath(KeyOrder.SPO).iterator(0, 0);
@@ -741,6 +740,9 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             itra.close();
 
         }
+
+        assertEquals("statementCount", expected.getStatementCount(), actual
+                .getStatementCount());
 
     }
     
