@@ -498,7 +498,11 @@ abstract public class AbstractTestCase
         
         KeyOrder keyOrder = actual.getKeyOrder();
 
-        Arrays.sort(expected, keyOrder.getComparator());
+        if(keyOrder!=null) {
+
+            Arrays.sort(expected, keyOrder.getComparator());
+            
+        }
         
         int i = 0;
 
@@ -542,50 +546,60 @@ abstract public class AbstractTestCase
      * 
      * @param store
      *            Used to resolve term identifiers for messages.
-     * @param expected2
-     * @param itr
+     * @param expected
+     * @param actual
      */
-    static public void assertSameSPOsAnyOrder(AbstractTripleStore store, SPO[] expected2, ISPOIterator itr) {
-        
-        Map<SPO,SPO> expected = new TreeMap<SPO,SPO>(SPOComparator.INSTANCE);
+    static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
+            SPO[] expected, ISPOIterator actual) {
 
-        for(SPO tmp : expected2 ) {
-            
-            expected.put(tmp,tmp);
-            
-        }
-        
-        int i = 0;
-        
-        while(itr.hasNext()) {
-            
-            SPO actualSPO = itr.next();
-            
-            log.info("actual: "+actualSPO.toString(store));
-            
-            SPO expectedSPO = expected.remove(actualSPO);
+        try {
 
-            if(expectedSPO==null) {
-                
-                fail("Not expecting: "+actualSPO.toString(store)+" at index="+i);
-                
+            Map<SPO, SPO> map = new TreeMap<SPO, SPO>(SPOComparator.INSTANCE);
+
+            for (SPO tmp : expected) {
+
+                map.put(tmp, tmp);
+
             }
 
-//            log.info("expected: "+expectedSPO.toString(store));
+            int i = 0;
 
-            assertEquals(expectedSPO.type, actualSPO.type);
-            
-            i++;
-            
-        }
-        
-        if(!expected.isEmpty()) {
-            
-            // @todo convert term identifiers before rendering.
-            log.info("Iterator empty but still expecting: "+expected.values());
-            
-            fail("Expecting: "+expected.size()+" more statements");
-            
+            while (actual.hasNext()) {
+
+                SPO actualSPO = actual.next();
+
+                log.info("actual: " + actualSPO.toString(store));
+
+                SPO expectedSPO = map.remove(actualSPO);
+
+                if (expectedSPO == null) {
+
+                    fail("Not expecting: " + actualSPO.toString(store)
+                            + " at index=" + i);
+
+                }
+
+                // log.info("expected: "+expectedSPO.toString(store));
+
+                assertEquals(expectedSPO.type, actualSPO.type);
+
+                i++;
+
+            }
+
+            if (!map.isEmpty()) {
+
+                // @todo convert term identifiers before rendering.
+                log.info("Iterator empty but still expecting: " + map.values());
+
+                fail("Expecting: " + map.size() + " more statements");
+
+            }
+
+        } finally {
+
+            actual.close();
+
         }
 
     }

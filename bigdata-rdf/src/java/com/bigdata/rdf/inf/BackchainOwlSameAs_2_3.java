@@ -440,7 +440,7 @@ public class BackchainOwlSameAs_2_3 implements ISPOIterator {
         
         final SPO[] stmts;
         
-        if(n==chunkSize) {
+        if(n!=chunkSize) {
 
             // make it dense.
             
@@ -487,7 +487,7 @@ public class BackchainOwlSameAs_2_3 implements ISPOIterator {
 
         SPO[] stmts = nextChunk();
         
-        if (chunkKeyOrder != this.keyOrder) {
+        if (chunkKeyOrder != keyOrder) {
 
             // sort into the required order.
 

@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.OWL;
@@ -37,9 +42,12 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.EmptySPOIterator;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOBlockingBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for {@link BackchainOwlSameAs_2_3} (backchaining equivilent to
@@ -68,36 +76,37 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
     /**
      * Test creates and executes a specialization of {@link RuleOwlSameAs2}
      * 
-     * FIXME evolve the test until I have a handy means to feed the output of
-     * the rule (it writes on an {@link ISPOBuffer}) into an iterator that can
-     * be read to pass along results to the client.
-     * 
      * FIXME evolve the test until I can do the above for each distinct subject.
      * 
      * FIXME then apply a specialization of {@link RuleOwlSameAs3} to each
      * distinct object.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
-    public void test_specializeRule() {
+    public void test_specializeRule() throws InterruptedException, ExecutionException {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
             
-            RDFSHelper vocab = new RDFSHelper(store);
+            final RDFSHelper vocab = new RDFSHelper(store);
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI Z = new URIImpl("http://www.foo.org/Z");
-            URI X = new URIImpl("http://www.foo.org/X");
-            URI Y = new URIImpl("http://www.foo.org/Y");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI Z = new URIImpl("http://www.foo.org/Z");
+            final URI X = new URIImpl("http://www.foo.org/X");
+            final URI Y = new URIImpl("http://www.foo.org/Y");
 
-            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            {
+                IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+
+                buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+                buffer.add(X, A, Z);
+
+                // write on the store.
+                buffer.flush();
+            }
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
-            buffer.add(X, A, Z);
-
-            // write on the store.
-            buffer.flush();
-
             // verify statement(s).
             assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
             assertTrue(store.hasStatement(X, A, Z));
@@ -108,12 +117,60 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             
             // owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
             Rule r = new RuleOwlSameAs2(vocab);
-            
-            r = r.specialize(//
+
+            // specialize the rule by binding the triple pattern.
+            final Rule r1 = r.specialize(//
                     s, p, o, //
                     new IConstraint[] {//
                         new NEConstant((Var) r.head.p,vocab.owlSameAs.id)//
                     });
+            
+            /*
+             * Buffer on which the rule will write.
+             */
+            final SPOBlockingBuffer buffer = new SPOBlockingBuffer(store,
+                    null /* filter */, 100/* capacity */);
+            
+            ExecutorService service = Executors
+                    .newFixedThreadPool(2,DaemonThreadFactory
+                            .defaultThreadFactory());
+
+            Future f1 = service.submit(new Runnable() {
+
+                public void run() {
+
+                    // run the rule.
+                    r1.apply(false/* justify */, null/* focusStore */,
+                            store/* database */, buffer);
+                    
+                    // close the buffer
+                    buffer.close();
+
+                }
+
+            });
+
+            // verify the iterator.
+            Future f2 = service.submit(new Runnable() {
+                
+                public void run() {
+
+                    assertSameSPOsAnyOrder(store,
+                            new SPO[] {
+
+                                    new SPO(store.getTermId(Y), store
+                                            .getTermId(A), store.getTermId(Z),
+                                            StatementEnum.Inferred),
+
+                            }, buffer.iterator());
+
+                }
+                
+            });
+            
+            f1.get();
+            
+            f2.get();
             
         } finally {
             
@@ -247,4 +304,45 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
         
     }
 
+    /**
+     * Filter matches <code>(x rdf:type rdfs:Resource).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class RdfTypeRdfsResourceFilter implements ISPOFilter {
+
+        private final long rdfType;
+        private final long rdfsResource;
+        
+        /**
+         * 
+         * @param vocab
+         */
+        public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
+            
+            this.rdfType = vocab.rdfType.id;
+            
+            this.rdfsResource = vocab.rdfsResource.id;
+            
+        }
+
+        public boolean isMatch(SPO spo) {
+
+            if (spo.p == rdfType && spo.o == rdfsResource) {
+                
+                // reject (?x, rdf:type, rdfs:Resource )
+                
+                return true;
+                
+            }
+            
+            // Accept everything else.
+            
+            return false;
+            
+        }
+        
+    }
+    
 }

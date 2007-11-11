@@ -68,6 +68,8 @@ public class TestAll extends TestCase {
          * 
          * @todo SPOArrayIterator
          */
+       
+        suite.addTestSuite(TestSPOBlockingBuffer.class);
         
         return suite;
         

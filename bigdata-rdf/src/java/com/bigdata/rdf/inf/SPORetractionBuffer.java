@@ -43,12 +43,18 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
 
     /**
      * @param store
+     *            The database from which the statement will be removed when the
+     *            buffer is {@link #flush()}ed.
      * @param capacity
+     *            The capacity of the retraction buffer.
      */
     public SPORetractionBuffer(AbstractTripleStore store, int capacity) {
         
         super(store, null/*filter*/, capacity);
         
+        if (store == null)
+            throw new IllegalArgumentException();
+
     }
 
     public int flush() {

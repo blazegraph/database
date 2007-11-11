@@ -36,6 +36,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPOAssertionBuffer;
+import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AccessPathFusedView;
@@ -640,7 +642,7 @@ abstract public class Rule {
      */
     /*public*/ State newState(boolean justify,
                 AbstractTripleStore database,
-                SPOAssertionBuffer buffer) {
+                ISPOAssertionBuffer buffer) {
         
         return newState(0/* index */,justify,null/* focusStore */,database,buffer);
         
@@ -649,7 +651,7 @@ abstract public class Rule {
     public State newState(int index, boolean justify,
                 AbstractTripleStore focusStore,
                 AbstractTripleStore database,
-                SPOAssertionBuffer buffer) {
+                ISPOAssertionBuffer buffer) {
         
         return new State(index, justify, focusStore, database, buffer);
         
@@ -762,7 +764,7 @@ abstract public class Rule {
          * Used to buffer entailments so that we can perform efficient ordered
          * writes on the statement indices.
          */
-        public final SPOAssertionBuffer buffer;
+        public final ISPOAssertionBuffer buffer;
         
         /**
          * Instance array of bindings for each term in the tail in the order in
@@ -820,7 +822,7 @@ abstract public class Rule {
         private State(int focusIndex, boolean justify,
                 AbstractTripleStore focusStore,
                 AbstractTripleStore database,
-                SPOAssertionBuffer buffer) {
+                ISPOAssertionBuffer buffer) {
 
             assert focusIndex >= 0;
             assert focusIndex <= body.length;
@@ -1461,6 +1463,51 @@ abstract public class Rule {
          * @see #bind(int, SPO)
          */
         public long get(VarOrId var) {
+        
+            return get(var,true);
+            
+        }
+        
+        /**
+         * <p>
+         * Return the current binding for the variable or constant.
+         * </p>
+         * 
+         * @param var
+         *            The variable or constant.
+         * @param required
+         *            When <code>true</code> an exception is reported if the
+         *            variable is not used in the rule. Note that specializing a
+         *            rule often results in variables being replaced by
+         *            constants such that an {@link IConstraint} might no longer
+         *            be evaluable for the rule in terms of that variable.
+         * 
+         * @return Its binding. The binding will be {@link #NULL} if a variable
+         *         is not currently bound or if the variable is not used in the
+         *         rule and <code>required := false</code>.
+         * 
+         * @throws NullPointerException
+         *             if <i>var</i> is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if <code>required := true</code> and the variable is
+         *             not used in the rule.
+         * @throws IllegalArgumentException
+         *             if var is a constant.
+         * 
+         * @see #set(Var, long)
+         * @see #bind(int, SPO)
+         * 
+         * FIXME it is not entirely satisfactory to have variable names
+         * disappear from rules as they are specialized. It might be better to
+         * define a BoundVar (extends Var) whose id was the bound value and
+         * which reported true for both isVariable() and isConstant(). However
+         * this would mean that var(x) != var(x,id) where the latter is bound
+         * to a constant.  Yet another alternative is to store a map of the
+         * bound variables on the Rule (not the State) when the rule is specialized
+         * and to use that information when clearing setting, getting, or clearing
+         * bindings in State.
+         */
+        public long get(VarOrId var, boolean required) {
             
             if (var == null)
                 throw new NullPointerException();
@@ -1490,8 +1537,14 @@ abstract public class Rule {
                 
             }
             
-            throw new IllegalArgumentException("Not used: " + var + ", rule="
+            if(required) {
+             
+                throw new IllegalArgumentException("Not used: " + var + ", rule="
                     + this);
+                
+            }
+            
+            return NULL;
                     
         }
         
@@ -1899,7 +1952,7 @@ abstract public class Rule {
      *       but {@link RuleStats#add(RuleStats)} also needs to be thread-safe.
      */
     public RuleStats apply(boolean justify, AbstractTripleStore focusStore,
-            AbstractTripleStore database, SPOAssertionBuffer buffer) { 
+            AbstractTripleStore database, ISPOAssertionBuffer buffer) { 
     
         if (focusStore == null) {
 

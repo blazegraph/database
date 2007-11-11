@@ -50,7 +50,7 @@ public class NEConstant implements IConstraint {
     public boolean accept(State s) {
         
         // get binding for the variable.
-        long var = s.get(this.var);
+        long var = s.get(this.var,false);
     
         if(var==NULL) return true; // not yet bound.
     

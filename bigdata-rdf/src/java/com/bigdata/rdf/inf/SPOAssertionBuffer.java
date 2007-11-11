@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.rdf.spo.ISPOAssertionBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -51,7 +52,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOAssertionBuffer extends AbstractSPOBuffer {
+public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAssertionBuffer {
     
     /**
      * The array in which the optional {@link Justification}s are stored.
@@ -63,9 +64,6 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer {
      */
     private int numJustifications;
 
-    /**
-     * The #of justifications currently in the buffer.
-     */
     public int getJustificationCount() {
         
         return numJustifications;
@@ -86,11 +84,11 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer {
      *            inserted.
      * @param filter
      *            Option filter. When present statements matched by the filter
-     *            are NOT retained by the {@link SPOAssertionBuffer} and will NOT be
-     *            added to the <i>store</i>.
+     *            are NOT retained by the {@link SPOAssertionBuffer} and will
+     *            NOT be added to the <i>store</i>.
      * @param capacity
-     *            The maximum #of Statements, URIs, Literals, or BNodes that the
-     *            buffer can hold.
+     *            The maximum {@link SPO}s that the buffer can hold before it
+     *            is {@link #flush()}ed.
      * @param justified
      *            true iff the Truth Maintenance strategy requires that we store
      *            {@link Justification}s for entailments.
@@ -100,6 +98,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer {
         
         super(store,filter,capacity);
 
+        if(store==null) throw new IllegalArgumentException();
+        
         this.justify = justified;
 
         justifications = justified ? new Justification[capacity] : null;

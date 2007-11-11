@@ -41,7 +41,7 @@ public class RuleOwlSameAs2 extends AbstractRuleNestedSubquery {
     /**
      * @param vocab
      */
-    public RuleOwlSameAs2(RDFSHelper vocab/*, boolean aNEOwlSameAs*/) {
+    public RuleOwlSameAs2(RDFSHelper vocab) {
 
         super(  new Triple(var("y"), var("a"), var("z")), //
                 new Pred[] { //

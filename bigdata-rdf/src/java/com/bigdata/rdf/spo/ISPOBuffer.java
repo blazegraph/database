@@ -26,11 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 30, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
 
-import com.bigdata.rdf.spo.ISPOFilter;
-import com.bigdata.rdf.spo.ISPOIterator;
-import com.bigdata.rdf.spo.SPO;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -43,9 +43,22 @@ import com.bigdata.rdf.store.IRawTripleStore;
  */
 public interface ISPOBuffer {
 
+    final public Logger log = Logger.getLogger(ISPOBuffer.class);
+
     /**
-     * The #of statements currently in the buffer (if duplicates are not being
-     * filtered then this count will include any duplicate statements).
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
+     * The #of statements currently in the buffer.
      */
     public int size();
 
