@@ -43,11 +43,22 @@ import com.bigdata.rdf.spo.SPO;
  */
 public class DoNotAddFilter implements ISPOFilter {
 
-    private final InferenceEngine inf;
+    private final long rdfType;
+    private final long rdfsResource;
+    private final boolean forwardChainRdfTypeRdfsResource;
     
-    public DoNotAddFilter(InferenceEngine inf) {
+    /**
+     * 
+     * @param vocab
+     * @param forwardChainRdfTypeRdfsResource
+     */
+    public DoNotAddFilter(RDFSHelper vocab, boolean forwardChainRdfTypeRdfsResource) {
         
-        this.inf = inf;
+        this.rdfType = vocab.rdfType.id;
+        
+        this.rdfsResource = vocab.rdfsResource.id;
+        
+        this.forwardChainRdfTypeRdfsResource = forwardChainRdfTypeRdfsResource;
         
     }
 
@@ -74,8 +85,8 @@ public class DoNotAddFilter implements ISPOFilter {
             
         }
 
-        if (!inf.forwardChainRdfTypeRdfsResource && spo.p == inf.rdfType.id
-                && spo.o == inf.rdfsResource.id) {
+        if (!forwardChainRdfTypeRdfsResource && spo.p == rdfType
+                && spo.o == rdfsResource) {
             
             // reject (?x, rdf:type, rdfs:Resource ) 
             

@@ -27,7 +27,6 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A class that models either a constant identifier for an RDF {@link Value} or
@@ -38,8 +37,8 @@ abstract public class VarOrId implements Comparable<VarOrId>{
     static protected final transient long NULL = IRawTripleStore.NULL;
     
     /**
-     * The reserved value {@link #NULL} is used to denote variables, otherwise
-     * this is the long integer assigned by {@link ITripleStore#addTerm(Value)}.
+     * The reserved value {@link IRawTripleStore#NULL} is used to denote an
+     * unbound variable.
      */
     public final long id;
 

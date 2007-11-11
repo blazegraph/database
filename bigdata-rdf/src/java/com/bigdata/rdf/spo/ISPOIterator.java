@@ -105,6 +105,8 @@ public interface ISPOIterator extends Iterator<SPO> {
      * 
      * @throws NoSuchElementException
      *             if the iterator is exhausted.
+     * @throws IllegalArgumentException
+     *             if the <i>keyOrder</i> is <code>null</code>.
      */
     public SPO[] nextChunk(KeyOrder keyOrder);
 

@@ -31,6 +31,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -42,20 +43,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @version $Id$
  */
 abstract public class AbstractSPOBuffer implements ISPOBuffer {
-
-    final public Logger log = Logger.getLogger(ISPOBuffer.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
 
     /**
      * The array in which the statements are stored.
@@ -99,9 +86,9 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
     }
 
     /**
-     * The backing store for the batch api operation.
+     * The value provided to the constructor.
      */
-    public final AbstractTripleStore store;
+    protected final AbstractTripleStore store;
     
     /**
      * An optional filter. When present, statements matched by the filter are
@@ -118,12 +105,12 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      * Create a buffer.
      * 
      * @param store
-     *            The database into which the terms and statements will be
-     *            inserted.
+     *            The database used to resolve term identifiers in log
+     *            statements (optional).
      * @param filter
      *            Option filter. When present statements matched by the filter
-     *            are NOT retained by the {@link SPOAssertionBuffer} and will NOT be
-     *            added to the <i>store</i>.
+     *            are NOT retained by the {@link SPOAssertionBuffer} and will
+     *            NOT be added to the <i>store</i>.
      * @param capacity
      *            The maximum #of Statements, URIs, Literals, or BNodes that the
      *            buffer can hold.
@@ -131,8 +118,8 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
     protected AbstractSPOBuffer(AbstractTripleStore store, ISPOFilter filter,
             int capacity) {
 
-        assert store != null;
-        assert capacity > 0;
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
         
         this.store = store;
 
@@ -154,14 +141,15 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      */
     protected boolean nearCapacity() {
         
-        if (numStmts + 1 > capacity) {
+        if (numStmts < capacity) {
 
-            // would overflow the statement[].
-            
-            return true;
-            
+            return false;
+
         }
-        return false;
+        
+        // would overflow the statement[].
+            
+        return true;
         
     }
     

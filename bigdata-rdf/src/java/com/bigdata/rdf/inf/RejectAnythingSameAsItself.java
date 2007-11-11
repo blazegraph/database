@@ -74,7 +74,7 @@ public class RejectAnythingSameAsItself implements IConstraint {
         if(s==NULL) return true; // not yet bound.
 
         // get binding for "y".
-        long p = state.get(this.p);
+        long p = state.get(this.p,false);
     
         if(p==NULL) return true; // not yet bound.
     

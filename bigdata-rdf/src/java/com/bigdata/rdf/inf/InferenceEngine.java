@@ -213,7 +213,7 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @see DoNotAddFilter
      */
-    public final DoNotAddFilter doNotAddFilter = new DoNotAddFilter(this);
+    public final DoNotAddFilter doNotAddFilter;
     
     /**
      * Choice of the forward closure algorithm.
@@ -405,6 +405,9 @@ public class InferenceEngine extends RDFSHelper {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
+        doNotAddFilter = new DoNotAddFilter(this,
+                forwardChainRdfTypeRdfsResource);
+        
         final boolean rdfsOnly = Boolean.parseBoolean(properties
                 .getProperty(Options.RDFS_ONLY,
                         Options.DEFAULT_RDFS_ONLY));

@@ -442,7 +442,7 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
 
         SPO[] stmts = nextChunk();
         
-        if (chunkKeyOrder != this.keyOrder) {
+        if (chunkKeyOrder != keyOrder) {
 
             // sort into the required order.
 

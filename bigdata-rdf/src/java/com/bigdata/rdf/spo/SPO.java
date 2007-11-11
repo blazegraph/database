@@ -272,13 +272,23 @@ public class SPO {
      * representation of the statement using
      * {@link ITripleStore#toString(long, long, long)}.
      * 
-     * @param store The store.
+     * @param store
+     *            The store (optional). When non-<code>null</code> the store
+     *            will be used to resolve term identifiers to terms.
      * 
-     * @return The externalized representation of the statement. 
+     * @return The externalized representation of the statement.
      */
     public String toString(AbstractTripleStore store) {
         
-        return store.toString(s,p,o)+(type==null?"":" : "+type);
+        if(store!=null) {
+
+            return store.toString(s,p,o)+(type==null?"":" : "+type);
+            
+        } else {
+            
+            return toString();
+            
+        }
         
     }
 
