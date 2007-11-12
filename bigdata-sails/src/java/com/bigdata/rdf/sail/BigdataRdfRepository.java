@@ -114,7 +114,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options, com.bigdata.rdf.store.AbstractTripleStore.Options {
 
         /**
          * This optional boolean property may be used to specify whether or not
@@ -245,22 +245,11 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         String val;
 
         // truthMaintenance
-        {
-            val = properties.getProperty(Options.TRUTH_MAINTENANCE);
 
-            if (val != null) {
+        truthMaintenance = Boolean.parseBoolean(properties.getProperty(
+                Options.TRUTH_MAINTENANCE, Options.DEFAULT_TRUTH_MAINTENANCE));
 
-                truthMaintenance = Boolean.parseBoolean(val);
-
-            } else {
-
-                // No closure by default.
-                truthMaintenance = false;
-
-            }
-
-            log.info(Options.TRUTH_MAINTENANCE + "=" + truthMaintenance);
-        }
+        log.info(Options.TRUTH_MAINTENANCE + "=" + truthMaintenance);
         
         valueFactory = OptimizedValueFactory.INSTANCE;
 

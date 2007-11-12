@@ -38,6 +38,7 @@ import junit.framework.TestCase;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.SailInitializationException;
+import org.openrdf.sesame.sail.SailUpdateException;
 
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -135,6 +136,75 @@ public class TestStatementWithType extends TestCase {
                 StatementWithType stmt = (StatementWithType)repo.getStatements(S3,P,O).next();
                 
                 assertEquals(StatementEnum.Axiom,stmt.getStatementType());
+                
+            }
+            
+            store.dumpStore();
+
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
+            
+    }
+    
+    /**
+     * Test using the Sesame API to statements and verify {@link StatementWithType}.
+     * 
+     * @throws SailInitializationException 
+     * @throws SailUpdateException 
+     */
+    public void test_addStatements() throws SailInitializationException, SailUpdateException {
+
+        AbstractTripleStore store = repo.getDatabase();
+
+        try {
+
+            URI S1 = new URIImpl("http://www.bigdata.com/s1");
+            URI S2 = new URIImpl("http://www.bigdata.com/s2");
+            URI S3 = new URIImpl("http://www.bigdata.com/s3");
+            URI P = new URIImpl("http://www.bigdata.com/p");
+            URI O = new URIImpl("http://www.bigdata.com/o");
+
+            repo.startTransaction();
+            repo.addStatement(S1, P, O);
+            repo.addStatement(S2, P, O);
+            repo.addStatement(S3, P, O);
+            repo.commitTransaction();
+
+            {
+
+                StatementWithType stmt = (StatementWithType)repo.getStatements(S1,P,O).next();
+                
+                assertEquals(StatementEnum.Explicit,stmt.getStatementType());
+                
+            }
+            
+            {
+
+                StatementWithType stmt = (StatementWithType)repo.getStatements(S2,P,O).next();
+                
+                assertEquals(StatementEnum.Explicit,stmt.getStatementType());
+                
+            }
+            
+            {
+
+                StatementWithType stmt = (StatementWithType)repo.getStatements(S3,P,O).next();
+                
+                assertEquals(StatementEnum.Explicit,stmt.getStatementType());
+                
+            }
+            
+            {
+
+                StatementWithType stmt = (StatementWithType) repo
+                        .getStatements(S3, URIImpl.RDF_TYPE,
+                                URIImpl.RDFS_RESOURCE)
+                                .next();
+                
+                assertEquals(StatementEnum.Inferred,stmt.getStatementType());
                 
             }
             
