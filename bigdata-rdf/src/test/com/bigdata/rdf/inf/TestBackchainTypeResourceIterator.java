@@ -288,6 +288,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
     /**
      * Test for other triple patterns (all bound, predicate bound, object bound,
      * etc). In all cases the iterator MUST NOT add any entailments.
+     * 
+     * @todo this is only testing a single access path.
      */
     public void test_otherBound_01() {
         
