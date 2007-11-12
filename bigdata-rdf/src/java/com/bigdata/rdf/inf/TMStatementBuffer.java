@@ -811,7 +811,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                          * database).
                          */
 
-                        SPO tmp = new SPO(spo.s, spo.o, spo.p,
+                        SPO tmp = new SPO(spo.s, spo.p, spo.o,
                                 StatementEnum.Inferred);
 
                         tmp.override = true;
