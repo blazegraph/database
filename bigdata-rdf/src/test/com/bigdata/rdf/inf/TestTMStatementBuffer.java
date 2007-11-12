@@ -37,8 +37,10 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.log4j.MDC;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
@@ -468,6 +470,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                  * Do recursion.
                  */
 
+                MDC.put("trial", "trial="+trial);
+
                 retractAndAssert(inf,store,0/*depth*/,D,N);
 
                 /*
@@ -477,6 +481,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 assertSameGraphs(tmp, store);
 
+                MDC.remove("trial");
+                
             }
 
         } catch(IOException ex) {
@@ -513,6 +519,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      *            of recursion for retraction from the database.
      * 
      * @todo update logic to use TMSPOBuffer.
+     * 
+     * 
      */
     private void retractAndAssert(InferenceEngine inf, AbstractTripleStore db,
             int depth, final int D, final int N) {
@@ -521,18 +529,32 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         assert depth < D;
 
         /*
-         * Select N explicit statements at random.
+         * FIXME Select N explicit statements at random.
          */
         
-        SPO[] stmts = selectRandomExplicitStatements(db, N);
+//        SPO[] stmts = selectRandomExplicitStatements(db, N);
+        
+        SPO[] stmts = new SPO[] {
+                new SPO(
+//                        #entity-103  #telephoneNumber-10144  "436-7482"
+                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#entity-103")),
+                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#telephoneNumber-10144")),
+                        db.getTermId(new LiteralImpl("436-7482")),
+                        StatementEnum.Explicit
+                        )
+        };
         
         log.info("Selected "+stmts.length+" statements at random: depth="+depth);
-        
+
         /*
          * Retract those statements and update the closure of the database.
          */
         {
 
+            for(SPO tmp : stmts) {
+                log.info("Retracting: "+tmp.toString(db));
+            }
+            
             // FIXME refactor as TMSPOBuffer.
             TMStatementBuffer retractionBuffer = new TMStatementBuffer(inf, N,
                     BufferEnum.RetractionBuffer);
@@ -582,6 +604,10 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
          * Assert those statements and update the closure of the database.
          */
         {
+
+            for(SPO tmp : stmts) {
+                log.info("Asserting: "+tmp.toString(db));
+            }
 
             // FIXME refactor as TMSPOBuffer.
             TMStatementBuffer assertionBuffer = new TMStatementBuffer(inf, N,
@@ -705,7 +731,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             
             IAccessPath accessPath = db.getAccessPath(s,NULL,NULL);
             
-            ISPOIterator itr = accessPath.iterator(0, 0,
+            ISPOIterator itr = accessPath.iterator(//0, 0,
                     ExplicitSPOFilter.INSTANCE);
             
             if(!itr.hasNext()) continue;
@@ -804,7 +830,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                         if(!itre.hasNext()) break;
                         
-                        expectedSPO = itra.next();
+                        expectedSPO = itre.next();
 
                         if(nerrs++==maxerrs) fail("Too many errors");
 
