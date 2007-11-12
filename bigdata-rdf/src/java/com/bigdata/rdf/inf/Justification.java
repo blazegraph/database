@@ -463,12 +463,16 @@ public class Justification implements Comparable<Justification> {
      * @return True iff the statement is entailed by a grounded justification
      *         chain in the database.
      */
-    public static boolean isGrounded(AbstractTripleStore focusStore,
-            AbstractTripleStore db, SPO head) {
+    public static boolean isGrounded(
+            InferenceEngine inf,
+            AbstractTripleStore focusStore,
+            AbstractTripleStore db,
+            SPO head
+            ) {
 
         assert head.isFullyBound();
 
-        return isGrounded(focusStore, db, head, false);
+        return isGrounded(inf,focusStore, db, head, false);
 
     }
         
@@ -490,12 +494,19 @@ public class Justification implements Comparable<Justification> {
      *       fast closure method then this should be rewritten to be
      *       non-recursive and it will be MUCH faster.
      */
-    public static boolean isGrounded(AbstractTripleStore focusStore,
-            AbstractTripleStore db, SPO head, boolean testHead) {
+    public static boolean isGrounded(
+            InferenceEngine inf,
+            AbstractTripleStore focusStore,
+            AbstractTripleStore db,
+            SPO head,
+            boolean testHead
+            ) {
 
         assert focusStore != null;
         
         if(testHead) {
+
+            if(inf.isAxiom(head.s, head.p, head.o)) return true;
             
             /*
              * Scan the statement indices for the head. This covers both the
@@ -538,7 +549,7 @@ public class Justification implements Comparable<Justification> {
 
                 // depth-first recursion to see if the statement is grounded.
                 
-                if (isGrounded(focusStore, db, spo, false)) {
+                if (isGrounded(inf,focusStore, db, spo, false)) {
                 
                     // recursively grounded somewhere.
                     
@@ -591,7 +602,7 @@ public class Justification implements Comparable<Justification> {
                 
                 for( SPO t : tail ) {
                     
-                    if (!isGrounded(focusStore, db, t, true/* testHead */)) {
+                    if (!isGrounded(inf,focusStore, db, t, true/* testHead */)) {
                         
                         ok = false;
                         
