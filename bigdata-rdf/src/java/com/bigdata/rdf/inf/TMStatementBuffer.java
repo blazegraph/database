@@ -817,8 +817,8 @@ public class TMStatementBuffer implements IStatementBuffer {
                         log.info("Downgrading to axiom: "+spo.toString(database));
 
                     } else if (depth == 0
-                            && Justification.isGrounded(tempStore, database,
-                                    spo, testHead)) {
+                            && Justification.isGrounded(inferenceEngine,
+                                    tempStore, database, spo, testHead)) {
 
                         /*
                          * Add a variant of the statement that is marked as
@@ -846,8 +846,8 @@ public class TMStatementBuffer implements IStatementBuffer {
                                 + spo.toString(database));
                         
                     } else if (depth > 0
-                            && Justification.isGrounded(tempStore, database,
-                                    spo, testHead)) {
+                            && Justification.isGrounded(inferenceEngine,
+                                    tempStore, database, spo, testHead)) {
                         
                         /*
                          * Ignore.

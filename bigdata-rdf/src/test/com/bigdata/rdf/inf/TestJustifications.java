@@ -203,7 +203,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              * explicit statement (U A Y).
              */
 
-            assertTrue(Justification.isGrounded(focusStore,store, head));
+            assertTrue(Justification.isGrounded(inf,focusStore,store, head));
 
             // add the statement (U A Y) to the focusStore.
             focusStore.addStatements(new SPO[]{new SPO(U,A,Y,StatementEnum.Explicit)}, 1);
@@ -212,7 +212,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              * The inference is no longer grounded since we have declared that
              * we are also retracting its grounds.
              */
-            assertFalse(Justification.isGrounded(focusStore,store, head));
+            assertFalse(Justification.isGrounded(inf,focusStore,store, head));
             
             /*
              * remove the justified statements.
