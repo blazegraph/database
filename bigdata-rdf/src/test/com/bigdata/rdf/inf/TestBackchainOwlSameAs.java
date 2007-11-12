@@ -27,10 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -41,13 +39,10 @@ import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.EmptySPOIterator;
-import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBlockingBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for {@link BackchainOwlSameAs_2_3} (backchaining equivilent to
@@ -76,13 +71,8 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
     /**
      * Test creates and executes a specialization of {@link RuleOwlSameAs2}
      * 
-     * FIXME evolve the test until I can do the above for each distinct subject.
-     * 
-     * FIXME then apply a specialization of {@link RuleOwlSameAs3} to each
-     * distinct object.
-     * 
-     * @throws ExecutionException 
-     * @throws InterruptedException 
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     public void test_specializeRule() throws InterruptedException, ExecutionException {
 
@@ -111,7 +101,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
-            
+
             // triple pattern for the query.
             final long s = NULL, p=store.getTermId(A), o=NULL;
             
@@ -131,11 +121,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             final SPOBlockingBuffer buffer = new SPOBlockingBuffer(store,
                     null /* filter */, 100/* capacity */);
             
-            ExecutorService service = Executors
-                    .newFixedThreadPool(2,DaemonThreadFactory
-                            .defaultThreadFactory());
-
-            Future f1 = service.submit(new Runnable() {
+            store.readService.submit(new Runnable() {
 
                 public void run() {
 
@@ -148,30 +134,17 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
 
                 }
 
-            });
+            }).get();
 
-            // verify the iterator.
-            Future f2 = service.submit(new Runnable() {
-                
-                public void run() {
+            assertSameSPOsAnyOrder(store,
+                    new SPO[] {
 
-                    assertSameSPOsAnyOrder(store,
-                            new SPO[] {
+                            new SPO(store.getTermId(Y), store
+                                    .getTermId(A), store.getTermId(Z),
+                                    StatementEnum.Inferred),
 
-                                    new SPO(store.getTermId(Y), store
-                                            .getTermId(A), store.getTermId(Z),
-                                            StatementEnum.Inferred),
-
-                            }, buffer.iterator());
-
-                }
-                
-            });
-            
-            f1.get();
-            
-            f2.get();
-            
+                    }, buffer.iterator());
+    
         } finally {
             
             store.closeAndDelete();
@@ -181,59 +154,146 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
     }
 
     /**
-     * Test where the predicate in the backchain query (y a z) is bound to
-     * <code>owl:sameAs</code>
+     * Maps a specialization of {@link RuleOwlSameAs2} over each distinct
+     * subject visited by an iterator reading on a triple pattern from the
+     * database.
      * 
-     * <pre>
-     *   owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
-     * </pre>
+     * @todo filter (x type resource).
+     * 
+     * @todo test when subject is bound to Y -> (X A Z)
+     * @todo test when subject is bound to X -> (X A Z)
+     * @todo test when subject is bound to A -> {}
+     * @todo test when predicate is A
+     * @todo test when predicate is owl:sameAs
+     * @todo test more complex examples.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
      */
-    public void test_owlSameAs_predicateIsOwlSameAs() {
+    public void test_owlSameAs_01() throws InterruptedException, ExecutionException {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
 
-            URI A = new URIImpl("http://www.foo.org/A");
-            URI Z = new URIImpl("http://www.foo.org/Z");
-            URI X = new URIImpl("http://www.foo.org/X");
-            URI Y = new URIImpl("http://www.foo.org/Y");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI Z = new URIImpl("http://www.foo.org/Z");
+            final URI X = new URIImpl("http://www.foo.org/X");
+            final URI Y = new URIImpl("http://www.foo.org/Y");
 
-            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+            {
+                IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+
+                buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+                buffer.add(X, A, Z); // owl:sameAs2 -> (Y A Z)
+                buffer.add(Z, A, X); // owl:sameAs3 -> (Z A Y)
+
+                // write on the store.
+                buffer.flush();
+            }
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
-            buffer.add(X, A, Z);
-
-            // write on the store.
-            buffer.flush();
-
             // verify statement(s).
             assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
             assertTrue(store.hasStatement(X, A, Z));
-            assertEquals(2,store.getStatementCount());
+            assertTrue(store.hasStatement(Z, A, X));
+            assertEquals(3,store.getStatementCount());
 
-            RDFSHelper vocab = new RDFSHelper(store);
-
-            ISPOIterator itr = BackchainOwlSameAs_2_3.newIterator(//
-                    store.getAccessPath(NULL, vocab.owlSameAs.id, NULL).iterator(),//
-                    NULL, vocab.owlSameAs.id, NULL,//
-                    store, //
-                    vocab.owlSameAs.id //
-                    );
+            Properties properties = new Properties(store.getProperties());
             
-            // should be an empty iterator.
-            assertSameSPOsAnyOrder(store, new SPO[]{},itr);
+            // specify forward chaining so that the backchain iterator does not introduce these entailments.
+            properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+            
+            InferenceEngine inf = new InferenceEngine(properties,store);
 
-            // should be an instance of this class.
-            assertTrue( itr instanceof EmptySPOIterator );
+            // triple pattern for the query.
+            final long s = NULL, p=store.getTermId(A), o=NULL;
 
+            // original iterator reading on the database.
+            ISPOIterator src = store.getAccessPath(s, p, o).iterator();
+            
+            // iterator that also backchains owl:sameAs {2,3}.
+            ISPOIterator itr = inf.backchainIterator(src, s, p, o);
+            
+            assertSameSPOsAnyOrder(store,
+                new SPO[] {
+
+                  // Note: ruled out by the triple pattern.
+//                new SPO(store.getTermId(X), inf.owlSameAs.id, store.getTermId(Y),
+//                        StatementEnum.Explicit),
+                        
+                new SPO(store.getTermId(X), store.getTermId(A), store.getTermId(Z),
+                        StatementEnum.Explicit),
+                                    
+                new SPO(store.getTermId(Z), store.getTermId(A), store.getTermId(X),
+                        StatementEnum.Explicit),
+                                            
+                new SPO(store.getTermId(Y), store.getTermId(A), store.getTermId(Z),
+                        StatementEnum.Inferred),
+
+                new SPO(store.getTermId(Z), store.getTermId(A), store.getTermId(Y),
+                        StatementEnum.Inferred),
+
+                }, itr);
+                
         } finally {
-
+            
             store.closeAndDelete();
-
+            
         }
         
     }
+
+//    /**
+//     * Test where the predicate in the backchain query (y a z) is bound to
+//     * <code>owl:sameAs</code>
+//     * 
+//     * <pre>
+//     *   owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
+//     * </pre>
+//     */
+//    public void test_owlSameAs_predicateIsOwlSameAs() {
+//
+//        AbstractTripleStore store = getStore();
+//
+//        try {
+//
+//            URI A = new URIImpl("http://www.foo.org/A");
+//            URI Z = new URIImpl("http://www.foo.org/Z");
+//            URI X = new URIImpl("http://www.foo.org/X");
+//            URI Y = new URIImpl("http://www.foo.org/Y");
+//
+//            IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
+//            
+//            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+//            buffer.add(X, A, Z);
+//
+//            // write on the store.
+//            buffer.flush();
+//
+//            // verify statement(s).
+//            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+//            assertTrue(store.hasStatement(X, A, Z));
+//            assertEquals(2,store.getStatementCount());
+//
+//            RDFSHelper vocab = new RDFSHelper(store);
+//
+//            ISPOIterator itr = BackchainOwlSameAs_2_3.newIterator(//
+//                    store.getAccessPath(NULL, vocab.owlSameAs.id, NULL).iterator(),//
+//                    NULL, vocab.owlSameAs.id, NULL,//
+//                    store, //
+//                    vocab.owlSameAs.id //
+//                    );
+//            
+//            // should be an empty iterator.
+//            assertSameSPOsAnyOrder(store, new SPO[]{},itr);
+//
+//        } finally {
+//
+//            store.closeAndDelete();
+//
+//        }
+//        
+//    }
 
     /**
      * Test where the data satisifies the fully unbound query (y a z) exactly
@@ -242,13 +302,8 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
      *   owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
      * </pre>
      * 
-     * @todo test when subject is bound to Y -> (X A Z)
-     * @todo test when subject is bound to X -> (X A Z)
-     * @todo test when subject is bound to A -> {}
-     * @todo test when predicate is A
-     * @todo test more complex examples.
      */
-    public void test_owlSameAs2() {
+    public void test_owlSameAs_02() {
 
         AbstractTripleStore store = getStore();
 
@@ -272,18 +327,21 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
-            RDFSHelper vocab = new RDFSHelper(store);
+            Properties properties = new Properties(store.getProperties());
+            
+            // specify forward chaining so that the backchain iterator does not introduce these entailments.
+            properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,"true");
+            
+            InferenceEngine inf = new InferenceEngine(properties,store);
 
-            ISPOIterator itr = BackchainOwlSameAs_2_3.newIterator(//
+            ISPOIterator itr = inf.backchainIterator(
                     store.getAccessPath(NULL, NULL, NULL).iterator(),//
-                    NULL, NULL, NULL,//
-                    store, //
-                    vocab.owlSameAs.id //
+                    NULL, NULL, NULL
                     );
 
             assertSameSPOsAnyOrder(store, new SPO[]{
                     
-                    new SPO(store.getTermId(X), vocab.owlSameAs.id, store.getTermId(Y),
+                    new SPO(store.getTermId(X), inf.owlSameAs.id, store.getTermId(Y),
                             StatementEnum.Explicit),
                             
                     new SPO(store.getTermId(X), store.getTermId(A), store.getTermId(Z),
@@ -304,45 +362,4 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
         
     }
 
-    /**
-     * Filter matches <code>(x rdf:type rdfs:Resource).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class RdfTypeRdfsResourceFilter implements ISPOFilter {
-
-        private final long rdfType;
-        private final long rdfsResource;
-        
-        /**
-         * 
-         * @param vocab
-         */
-        public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
-            
-            this.rdfType = vocab.rdfType.id;
-            
-            this.rdfsResource = vocab.rdfsResource.id;
-            
-        }
-
-        public boolean isMatch(SPO spo) {
-
-            if (spo.p == rdfType && spo.o == rdfsResource) {
-                
-                // reject (?x, rdf:type, rdfs:Resource )
-                
-                return true;
-                
-            }
-            
-            // Accept everything else.
-            
-            return false;
-            
-        }
-        
-    }
-    
 }

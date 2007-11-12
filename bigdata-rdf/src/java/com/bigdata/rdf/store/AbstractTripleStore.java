@@ -315,6 +315,25 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     /**
+     * Executor service for read parallelism.
+     * 
+     * @todo use for parallel execution of map of new vs old+new over the terms
+     *       of a rule.
+     * 
+     * @todo use for parallel execution of sub-queries.
+     * 
+     * @todo {@link SPOAssertionBuffer} must be thread-safe. {@link Rule}
+     *       bindings must be per-thread.
+     * 
+     * @todo Note that rules that write entailments on the database statement
+     *       MUST coordinate to avoid concurrent modification during traversal
+     *       of the statement indices. The chunked iterators go a long way to
+     *       addressing this.
+     */
+    final public ExecutorService readService = Executors
+            .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+
+    /**
      * A service used to write on each of the statement indices in parallel.
      * 
      * @todo While this provides concurrency on the statement indices, it does

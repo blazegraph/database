@@ -60,7 +60,6 @@ import org.openrdf.sesame.sail.query.Var;
 import org.openrdf.sesame.sail.util.EmptyStatementIterator;
 import org.openrdf.sesame.sail.util.SailChangedEventImpl;
 
-import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TMStatementBuffer;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
@@ -739,21 +738,19 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
         ISPOIterator src = accessPath.iterator();
         
-        if(getTruthMaintenance() && !inf.getForwardChainRdfTypeRdfsResource()) {
-            
+        if(getTruthMaintenance()) {
+
             /*
-             * Since the inference engine is not computing and storing (x type
-             * resource) we need to backchain it now.
+             * Obtain an iterator that will generate any missing entailments at
+             * query time. The behavior of the iterator depends on how the
+             * InferenceEngine was configured.
              */
             
             long[] ids = accessPath.getTriplePattern();
-            
-            src = new BackchainTypeResourceIterator(
+
+            src = inf.backchainIterator(//
                     src,// the source iterator.
-                    ids[0], ids[1], ids[2], // the triple pattern.
-                    database,// the database
-                    inf.rdfType.id,//
-                    inf.rdfsResource.id//
+                    ids[0], ids[1], ids[2] // the triple pattern.
                     );
             
         }
