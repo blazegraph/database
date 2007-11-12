@@ -625,6 +625,45 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     }
 
     /**
+     * Test using the nation API of adding explicit, inferred, and axiom
+     * {@link SPO}s.
+     */
+    public void test_addInferredExplicitAxiom() {
+
+        AbstractTripleStore store = getStore();
+        
+        try {
+            
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+                    null/* filter */, 100/* capacity */, false/*justified*/);
+            
+            buffer.add(new SPO(1,2,3,StatementEnum.Explicit));
+            buffer.add(new SPO(2,2,3,StatementEnum.Inferred));
+            buffer.add(new SPO(3,2,3,StatementEnum.Axiom));
+            
+            buffer.flush();
+
+            store.commit();
+            
+            assertSameSPOs(new SPO[] {
+                    new SPO(1,2,3,StatementEnum.Explicit),
+                    new SPO(2, 2, 3, StatementEnum.Inferred),
+                    new SPO(3, 2, 3, StatementEnum.Axiom),
+                    },
+                    store.getAccessPath(NULL,NULL,NULL).iterator()
+                    );
+
+            store.dumpStore();
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+    
+    /**
      * Test the ability to add and remove statements using both fully bound and
      * partly bound triple patterns using the Sesame compatible API.
      */

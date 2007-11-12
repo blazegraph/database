@@ -239,7 +239,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("commit: commit latency="+elapsed+"ms");
+        log.info("commit: commit latency="+elapsed+"ms");
 
         if(INFO) usage();
         
@@ -328,8 +328,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     public void usage(){
         
-        System.err.println("file="+store.getBufferStrategy().getFile());
-        System.err.println("byteCount="+store.getBufferStrategy().getNextOffset());
+        log.info("file="+store.getBufferStrategy().getFile());
+        log.info("byteCount="+store.getBufferStrategy().getNextOffset());
         
         super.usage();
         

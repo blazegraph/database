@@ -36,6 +36,8 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
 /**
  * Fast special purpose serialization onto a managed byte[] buffer.
  * 
@@ -54,6 +56,8 @@ import java.nio.ByteBuffer;
  */
 public class DataOutputBuffer implements DataOutput {
 
+    protected static Logger log = Logger.getLogger(DataOutputBuffer.class);
+    
     /**
      * The default capacity of the buffer.
      */
@@ -297,8 +301,7 @@ public class DataOutputBuffer implements DataOutput {
 
         int capacity = Math.max(required, buf.length * 2);
 
-        System.err.println("Extending buffer to capacity=" + capacity
-                + " bytes.");
+        log.info("Extending buffer to capacity=" + capacity + " bytes.");
 
         return capacity;
         

@@ -239,8 +239,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     
     public void usage(){
         
-        System.err.println("file="+store.getBufferStrategy().getFile());
-        System.err.println("byteCount="+store.getBufferStrategy().getNextOffset());
+        log.info("file="+store.getBufferStrategy().getFile());
+        log.info("byteCount="+store.getBufferStrategy().getNextOffset());
         
         super.usage();
         

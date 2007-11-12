@@ -658,8 +658,6 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
         database.commit();
         
-        if(true) database.dumpStore();
-        
         transactionStarted = false;
         
         fireSailChangedEvents();

@@ -794,13 +794,6 @@ public class IndexSegmentBuilder {
             
             fpf.setMaximumFractionDigits(2);
 
-            System.err.println("index segment build: total=" + elapsed
-                    + "ms := setup(" + elapsed_setup + "ms) + build("
-                    + elapsed_build + "ms) +  write(" + elapsed_write + "ms); "
-                    + cf.format(plan.nentries) + " entries, "
-                    + fpf.format(((double) md.length / Bytes.megabyte32))
-                    + "MB" + ", rate=" + fpf.format(mbPerSec) + "MB/sec");
-
             log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build
                     + "ms) +  write(" + elapsed_write + "ms); nentries="

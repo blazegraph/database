@@ -390,7 +390,7 @@ public class IndexSegmentMerger {
 
             fpf.setMaximumFractionDigits(2);
 
-            System.err.println("merge: " + elapsed + "ms, "
+            log.info("merge: " + elapsed + "ms, "
                     + cf.format(nentries) + " entries, "
                     + fpf.format(((double) length / Bytes.megabyte32)) + "MB");
             

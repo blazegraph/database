@@ -239,12 +239,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         value = termCache.get(id);
         
-        if(value!=null) {
-//            System.err.print(".");
-            return value;
-        } else {
-//            System.err.print("x");
-        }
+        if(value!=null) return value;
         
         IIndex ndx = getIdTermIndex();
         
@@ -379,12 +374,6 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
         long insertTime = 0; // time to insert terms into the forward and reverse index.
-
-        if(numTerms>1000) {
-
-            System.err.print("Writing "+numTerms+" terms...");
-            
-        }
 
         {
 
@@ -639,8 +628,9 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         if(numTerms>1000) {
 
-            System.err.println("in " + elapsed + "ms; keygen=" + keyGenTime
-                + "ms, sort=" + sortTime + "ms, insert=" + insertTime + "ms");
+            log.info("wrote " + numTerms + " in " + elapsed + "ms; keygen="
+                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
+                    + insertTime + "ms");
             
         }
         

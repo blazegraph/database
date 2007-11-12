@@ -300,7 +300,7 @@ final public class WeakValueCache<K,T>
         
         double hitRatio = ((double)_nsuccess/_ntest);
         
-        System.err.println
+        log.info
            ( "WeakValueCache"+
              ": initialCapacity="+_initialCapacity+
              ", size="+size+
