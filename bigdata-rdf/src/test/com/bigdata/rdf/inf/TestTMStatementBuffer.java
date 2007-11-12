@@ -40,7 +40,6 @@ import java.util.Set;
 import org.apache.log4j.MDC;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
@@ -370,12 +369,15 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 RDFFormat.RDFXML
                 };
 
-        doStressTest(resource, baseURL, format, 100/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
+        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
 
-//        doStressTest(resource, baseURL, format, 100/*ntrials*/, 1/*depth*/, 10/*nstmts*/);
-    
-        // @todo enable more torturous tests.
-//        doStressTest(resource, baseURL, format, 10, 4, 20);
+        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 5/*nstmts*/);
+
+        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
+
+        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
+
+        doStressTest(resource, baseURL, format, 10/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
         
     }
     
@@ -532,17 +534,18 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
          * FIXME Select N explicit statements at random.
          */
         
-//        SPO[] stmts = selectRandomExplicitStatements(db, N);
-        
-        SPO[] stmts = new SPO[] {
-                new SPO(
-//                        #entity-103  #telephoneNumber-10144  "436-7482"
-                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#entity-103")),
-                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#telephoneNumber-10144")),
-                        db.getTermId(new LiteralImpl("436-7482")),
-                        StatementEnum.Explicit
-                        )
-        };
+        SPO[] stmts = selectRandomExplicitStatements(db, N);
+
+        // shows an error in direct byte buffer.
+//        SPO[] stmts = new SPO[] {
+//                new SPO(
+////                        #entity-103  #telephoneNumber-10144  "436-7482"
+//                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#entity-103")),
+//                        db.getTermId(new URIImpl("http://localhost/rdf/alibaba_v41.rdf#telephoneNumber-10144")),
+//                        db.getTermId(new LiteralImpl("436-7482")),
+//                        StatementEnum.Explicit
+//                        )
+//        };
         
         log.info("Selected "+stmts.length+" statements at random: depth="+depth);
 
@@ -774,9 +777,10 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     protected void assertSameGraphs(TempTripleStore expected,
             AbstractTripleStore actual) {
 
-        assertStatementIndicesConsistent(expected);
-        
-        assertStatementIndicesConsistent(actual);
+        // For the truly paranoid.
+//        assertStatementIndicesConsistent(expected);
+//        
+//        assertStatementIndicesConsistent(actual);
         
         if (expected.getStatementCount() != actual.getStatementCount()) {
 
