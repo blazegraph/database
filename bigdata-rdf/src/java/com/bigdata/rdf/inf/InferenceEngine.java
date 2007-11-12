@@ -75,7 +75,7 @@ import cutthecrap.utils.striterators.Striterator;
  * A rule always has the form:
  * 
  * <pre>
- *                                   pred :- pred*.
+ *                                    pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -110,17 +110,17 @@ import cutthecrap.utils.striterators.Striterator;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                                    triple(?v,rdf:type,?x) :-
- *                                       triple(?u,rdfs:subClassOf,?x),
- *                                       triple(?v,rdf:type,?u). 
+ *                                     triple(?v,rdf:type,?x) :-
+ *                                        triple(?u,rdfs:subClassOf,?x),
+ *                                        triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *   triple(?u,rdfs:subClassOf,?x) :-
- *     triple(?u,rdfs:subClassOf,?v),
- *     triple(?v,rdf:subClassOf,?x). 
+ *    triple(?u,rdfs:subClassOf,?x) :-
+ *      triple(?u,rdfs:subClassOf,?v),
+ *      triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -129,6 +129,10 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo update the javadoc on this class.
  * 
  * FIXME test backchain iterator at scale.
+ * 
+ * @todo verify the code in places where it tests against a specific term
+ *       identifer defined in {@link RDFSHelper} and not against the closure of
+ *       the subclasses of or the subproperties of that term.
  * 
  * @todo provide declarative rule models for forward chaining so that the rules
  *       may be extended without having to edit the code.

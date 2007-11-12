@@ -179,8 +179,6 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
             
             posItr = db.getAccessPath(NULL, rdfType, rdfsResource).iterator(ExplicitSPOFilter.INSTANCE);
 
-            // FIXME This tests against a specific property (rdf:type) and not its closure.
-            // FIXME This tests against a specific class (rdfs:Resource) and not its closure.
         } else if ((p == NULL || p == rdfType)
                 && (o == NULL || o == rdfsResource)) {
 
