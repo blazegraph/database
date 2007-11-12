@@ -156,9 +156,18 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
     protected AbstractTripleStore database;
     
     protected InferenceEngine inf;
+   
+    /**
+     * The inference engine if the SAIL is using one.
+     */
+    public InferenceEngine getInferenceEngine() {
+        
+        return inf;
+        
+    }
     
     protected Properties properties;
-    
+
     private int bufferCapacity = -1;
     
     /**
