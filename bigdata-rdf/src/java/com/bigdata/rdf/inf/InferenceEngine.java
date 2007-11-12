@@ -420,18 +420,16 @@ public class InferenceEngine extends RDFSHelper {
     }
 
     /**
-     * Configure {@link InferenceEngine} using default {@link Options}.
+     * Configure {@link InferenceEngine} using properties used to configure the
+     * database.
      * 
      * @param database
      * 
-     * FIXME modify to use the properties on the database, but check usage in
-     * the test suites first. Also consider a method on the database to return
-     * the {@link InferenceEngine} such that it is easier to reuse the same
-     * instance.
+     * @see AbstractTripleStore#getProperties()
      */
     public InferenceEngine(AbstractTripleStore database) {
     
-        this(new Properties(), database);
+        this(database.getProperties(), database);
         
     }
     
