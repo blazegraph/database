@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -83,6 +84,8 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class StatementBuffer implements IStatementBuffer {
 
+    protected static final Logger log = Logger.getLogger(StatementBuffer.class);
+    
     /**
      * Buffer for parsed RDF {@link Value}s.
      */
@@ -338,7 +341,7 @@ public class StatementBuffer implements IStatementBuffer {
 
         haveKeys = true;
         
-        System.err.println("generated "+numTerms+" term sort keys: "
+        log.info("generated "+numTerms+" term sort keys: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
     }
@@ -366,7 +369,7 @@ public class StatementBuffer implements IStatementBuffer {
         
         sorted = true;
 
-        System.err.println("sorted "+numTerms+" terms: "
+        log.info("sorted "+numTerms+" terms: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
     }
@@ -383,7 +386,7 @@ public class StatementBuffer implements IStatementBuffer {
 
         sorted = true;
 
-        System.err.println("sorted terms by ids: "
+        log.info("sorted terms by ids: "
                 + (System.currentTimeMillis() - begin) + "ms");
      
     }
@@ -910,7 +913,7 @@ public class StatementBuffer implements IStatementBuffer {
                 
             } catch(NoSuchElementException ex) {
                 
-                System.err.println("*** Iterator exhausted after: "+nvisited+" elements");
+                log.error("*** Iterator exhausted after: "+nvisited+" elements", ex);
                 
                 throw ex;
                 

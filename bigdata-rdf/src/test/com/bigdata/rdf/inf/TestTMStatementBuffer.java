@@ -369,15 +369,16 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 RDFFormat.RDFXML
                 };
 
-        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
-
-        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 5/*nstmts*/);
-
-        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
+//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
+//
+//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 5/*nstmts*/);
+//
+//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
 
         doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
 
-        doStressTest(resource, baseURL, format, 10/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
+        // very stressful.
+//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
         
     }
     

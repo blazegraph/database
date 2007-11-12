@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import org.apache.log4j.Logger;
+
 /**
  * Hard reference hash map with Least Recently Used ordering over entries. The
  * keys are object identifiers. The values are cache entries wrapping the
@@ -51,6 +53,8 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 public class LRUCache<K,T> implements ICachePolicy<K,T>
 {
+ 
+    protected static final Logger log = Logger.getLogger(LRUCache.class);
     
     /**
      * The maximum capacity of the cache.
@@ -196,7 +200,7 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
     protected void finalize() throws Throwable
     {
     
-        System.err.println
+        log.info
            ( "LRUCache: capacity="+capacity+
                      ", loadFactor="+loadFactor+
                      ", highTide="+highTide+

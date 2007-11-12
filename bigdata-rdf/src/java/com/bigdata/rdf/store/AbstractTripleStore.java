@@ -1328,12 +1328,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         
                     }
 
-                    if(numStmts>1000) {
-
-                        System.err.print("Removing " + numStmts + " statements...");
-                        
-                    }
-
                     final List<Future<Long>> futures;
                     final long elapsed_SPO;
                     final long elapsed_POS;
@@ -1367,7 +1361,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     if(numStmts>1000) {
 
-                        System.err.println("in " + elapsed + "ms; sort=" + sortTime
+                        log.info("Removed "+numStmts+" in " + elapsed + "ms; sort=" + sortTime
                             + "ms, keyGen+delete=" + writeTime + "ms; spo="
                             + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
                             + elapsed_OSP + "ms, jst="+elapsed_JST);
@@ -1448,8 +1442,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 // append tmp[0] to the output list.
                 ids.add(id);
 
-//                System.err.println(ids.size() + " : " + id + " : "
-//                        + toString(id));
+//                log.debug(ids.size() + " : " + id + " : "+ toString(id));
                 
                 // restart scan at the next possible term id.
 
@@ -1462,8 +1455,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 
             }
             
-//            System.err.println("Distinct key scan: KeyOrder=" + keyOrder
-//                    + ", #terms=" + ids.size());
+//            log.debug("Distinct key scan: KeyOrder=" + keyOrder + ", #terms=" + ids.size());
             
             return ids.iterator();
             
@@ -1835,7 +1827,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     /**
-     * Writes out some usage information for the database on System.err.
+     * Writes out some usage information for the database on
+     * {@link ITripleStore#log}.
      */
     public void usage() {
 
@@ -1872,7 +1865,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
             final int queueCapacity = btree.getHardReferenceQueueCapacity();
 
-            System.err.println(name + ": #entries=" + nentries + ", height="
+            log.info(name + ": #entries=" + nentries + ", height="
                     + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
                     + ", #(nodes+leaves)=" + (nnodes + nleaves)
                     + ", #distinctOnQueue=" + ndistinctOnQueue

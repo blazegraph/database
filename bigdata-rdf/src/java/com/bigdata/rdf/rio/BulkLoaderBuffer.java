@@ -144,7 +144,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
         // #of terms to be loaded into the index.
         numTerms = numTerms - numKnownTerms;
         
-        System.err.println("Building terms index segment: numTerms="+numTerms);
+        log.info("Building terms index segment: numTerms="+numTerms);
         
         final long begin = System.currentTimeMillis();
         
@@ -155,9 +155,8 @@ public class BulkLoaderBuffer extends StatementBuffer {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("Built terms index segment: numTerms="+numTerms+", elapsed="+elapsed);
+        log.info("Built terms index segment: numTerms="+numTerms+", elapsed="+elapsed);
         
-
     }
 
     /**
@@ -174,7 +173,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
 
         numTerms -= numKnownURIs + numKnownLiterals + numKnownBNodes;
 
-        System.err.println("Building ids index segment: numTerms="+numTerms);
+        log.info("Building ids index segment: numTerms="+numTerms);
         
         final long begin = System.currentTimeMillis();
 
@@ -185,7 +184,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("Built ids index segment: numTerms="+numTerms+", elapsed="+elapsed);
+        log.info("Built ids index segment: numTerms="+numTerms+", elapsed="+elapsed);
         
     }
 
@@ -197,7 +196,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
 
         int numStmts = this.numStmts - numKnownStmts;
         
-        System.err.println("Building statement index segment: numStmts="+numStmts);
+        log.info("Building statement index segment: numStmts="+numStmts);
         
         final long begin = System.currentTimeMillis();
         
@@ -223,7 +222,7 @@ public class BulkLoaderBuffer extends StatementBuffer {
         
         final long elapsed = System.currentTimeMillis() - begin;
 
-        System.err.println("Built " + keyOrder
+        log.info("Built " + keyOrder
                 + " statement index segment: numStmts=" + numStmts
                 + ", elapsed=" + elapsed);
         

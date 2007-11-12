@@ -89,6 +89,9 @@ public class TestAll extends TestCase {
         }
         
         TestSuite suite = new TestSuite("Sesame 1.x integration");
+       
+        // test suite for access to the statement type.
+        suite.addTestSuite(TestStatementWithType.class);
         
         // test suite for RDFS closure correctness.
         suite.addTestSuite(TestRDFSClosure.class);

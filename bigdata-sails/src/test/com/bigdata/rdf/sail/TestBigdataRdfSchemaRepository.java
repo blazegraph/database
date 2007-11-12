@@ -55,7 +55,7 @@ abstract public class TestBigdataRdfSchemaRepository extends
     /*
      * @todo any custom unit tests for this SAIL would go here.
      */
-
+    
     /**
      * Return the properties used to initialize the {@link BigdataRdfRepository}.
      */
