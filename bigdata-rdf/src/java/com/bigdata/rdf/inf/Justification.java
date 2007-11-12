@@ -489,7 +489,7 @@ public class Justification implements Comparable<Justification> {
      *            pattern that can be proven to be grounded.
      * @param testHead
      * @return
-     * 
+     * @todo this is depth 1st.  would breadth 1st be faster?
      * @todo if we decide that we have only grounded justifications using the
      *       fast closure method then this should be rewritten to be
      *       non-recursive and it will be MUCH faster.
@@ -506,8 +506,10 @@ public class Justification implements Comparable<Justification> {
         
         if(testHead) {
 
-            if(inf.isAxiom(head.s, head.p, head.o)) return true;
+            if(head.type!=StatementEnum.Inferred) return true;
             
+            if(inf.isAxiom(head.s, head.p, head.o)) return true;
+
             /*
              * Scan the statement indices for the head. This covers both the
              * case when it is fully bound (since we need to know whether or not
