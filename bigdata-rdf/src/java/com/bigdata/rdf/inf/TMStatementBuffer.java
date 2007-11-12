@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -598,6 +599,8 @@ public class TMStatementBuffer implements IStatementBuffer {
         // do truth maintenance.
         retractAll(stats,tempStore,0);
         
+        MDC.remove("depth");
+        
         assert ! tempStore.getBackingStore().isOpen();
         
         /*
@@ -681,6 +684,8 @@ public class TMStatementBuffer implements IStatementBuffer {
      */
     private void retractAll(ClosureStats stats, AbstractTripleStore tempStore, int depth) {
 
+        MDC.put("depth", "depth="+depth);
+        
         final int tempStoreCount = tempStore.getStatementCount();
 
         log.info("Doing truth maintenance with " + tempStoreCount
@@ -781,7 +786,22 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                     }
                     
-                    if( inferenceEngine.isAxiom(spo.s,spo.p,spo.o) ) {
+                    if( spo.type==StatementEnum.Axiom ) {
+
+                        /*
+                         * Ignore.
+                         */
+                        log.info("Ignoring axiom in the tempStore: "+spo);
+                        
+                    } else if( depth>0 && spo.type==StatementEnum.Explicit ) {
+                        
+                        /*
+                         * Ignore. If an explicit statement is discover by
+                         * closure then we do nothing.
+                         */
+                        log.info("Ignoring explicit statement in the tempStore at depth="+depth+", "+spo);
+                        
+                    } else if (inferenceEngine.isAxiom(spo.s, spo.p, spo.o)) {
                         
                         /*
                          * Convert back to an axiom.
@@ -793,22 +813,26 @@ public class TMStatementBuffer implements IStatementBuffer {
                         tmp.override = true;
 
                         downgradeBuffer.add(tmp, null);                        
-                        
-                    } else if (Justification.isGrounded(tempStore, database, spo, testHead )) {
+
+                        log.info("Downgrading to axiom: "+spo.toString(database));
+
+                    } else if (depth == 0
+                            && Justification.isGrounded(tempStore, database,
+                                    spo, testHead)) {
 
                         /*
                          * Add a variant of the statement that is marked as
-                         * "inferred" rather than as "explicit" to the buffer.
-                         * When the buffer is flushed the statement will be
-                         * written onto the database.
+                         * "inferred" rather than as "explicit" to the
+                         * buffer. When the buffer is flushed the statement
+                         * will be written onto the database.
                          * 
-                         * @todo consider returning the grounded justification
-                         * and then writing it onto the database where. This
-                         * will essentially "memoize" grounded justifications.
-                         * Of course, you still have to verify that there is
-                         * support for the justification (the statements in the
-                         * tail of the justification still exist in the
-                         * database).
+                         * @todo consider returning the grounded
+                         * justification and then writing it onto the
+                         * database where. This will essentially "memoize"
+                         * grounded justifications. Of course, you still
+                         * have to verify that there is support for the
+                         * justification (the statements in the tail of the
+                         * justification still exist in the database).
                          */
 
                         SPO tmp = new SPO(spo.s, spo.p, spo.o,
@@ -818,6 +842,17 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                         downgradeBuffer.add(tmp, null);
 
+                        log.info("Downgrading to inferred: "
+                                + spo.toString(database));
+                        
+                    } else if (depth > 0
+                            && Justification.isGrounded(tempStore, database,
+                                    spo, testHead)) {
+                        
+                        /*
+                         * Ignore.
+                         */
+                        
                     } else {
 
                         /*
@@ -827,6 +862,8 @@ public class TMStatementBuffer implements IStatementBuffer {
                          */
 
                         retractionBuffer.add(spo);
+                        
+                        log.info("Retracting: "+spo.toString(database));
 
                         /*
                          * The ungrounded statement will be added to the
@@ -848,13 +885,13 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             }
 
-            // flush buffers.
+            // flush buffers, logging counters.
 
-            downgradeBuffer.flush();
+            log.info("#downgraded="+downgradeBuffer.flush());
 
-            retractionBuffer.flush();
+            log.info("#retracted="+retractionBuffer.flush());
 
-            ungroundedBuffer.flush();
+            log.info("#ungrounded="+ungroundedBuffer.flush());
 
         } finally {
 
