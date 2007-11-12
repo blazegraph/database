@@ -35,6 +35,7 @@ import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -347,6 +348,84 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
     }
     
+    /**
+     * Backchain test when the subject is both bound and unbound and where the
+     * predicate is bound to <code>rdf:type</code> and the object is bound to
+     * <code>rdfs:Resource</code>.
+     * 
+     * FIXME test all access paths, including where the predicate is NULL and
+     * where it is rdf:type and where the object is NULL and where it is
+     * rdfs:Resource.
+     */
+    public void test_backchain_foo_type_resource() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            RDFSHelper vocab = new RDFSHelper(store);
+            
+            URI S = new URIImpl("http://www.bigdata.com/s");
+            URI P = new URIImpl("http://www.bigdata.com/p");
+            URI O = new URIImpl("http://www.bigdata.com/o");
+            
+            long s = store.addTerm(S);
+            long p = store.addTerm(P);
+            long o = store.addTerm(O);
+
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+                    null/* filter */, 100/* capacity */, false/* justified */);
+
+            buffer.add(new SPO(s, p, o, StatementEnum.Explicit));
+
+            buffer.flush();
+
+            AbstractTestCase.assertSameSPOs(new SPO[] {
+                    new SPO(s, p, o, StatementEnum.Explicit),
+                    },
+                    store.getAccessPath(NULL, NULL, NULL).iterator()
+                    );
+
+            {
+                // where s is bound.
+                ISPOIterator itr = new BackchainTypeResourceIterator(//
+                        store.getAccessPath(s, vocab.rdfType.id,
+                                vocab.rdfsResource.id).iterator(),//
+                        s, vocab.rdfType.id, vocab.rdfsResource.id,//
+                        store, //
+                        vocab.rdfType.id, //
+                        vocab.rdfsResource.id //
+                );
+
+                AbstractTestCase.assertSameSPOs(new SPO[] { new SPO(s,
+                        vocab.rdfType.id, vocab.rdfsResource.id,
+                        StatementEnum.Inferred), }, itr);
+            }
+
+            {
+                // where s is unbound.
+                ISPOIterator itr = new BackchainTypeResourceIterator(//
+                        store.getAccessPath(NULL, vocab.rdfType.id,
+                                vocab.rdfsResource.id).iterator(),//
+                        NULL, vocab.rdfType.id, vocab.rdfsResource.id,//
+                        store, //
+                        vocab.rdfType.id, //
+                        vocab.rdfsResource.id //
+                );
+
+                AbstractTestCase.assertSameSPOs(new SPO[] { new SPO(s,
+                        vocab.rdfType.id, vocab.rdfsResource.id,
+                        StatementEnum.Inferred), }, itr);
+            }
+            
+        } finally {
+
+            store.closeAndDelete();
+            
+        }
+            
+    }
+
     /**
      * @todo write a test where we compute the forward closure of a data set
      *       with (x type Resource) entailments included in the rule set and

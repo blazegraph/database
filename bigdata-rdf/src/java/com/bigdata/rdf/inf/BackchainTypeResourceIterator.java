@@ -157,7 +157,10 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
 
 //        this.s = s;
         
-        if (s == NULL && p == NULL && o == NULL) {
+        if (s == NULL
+                && (p == NULL || p == rdfType)
+                && (o == NULL || o == rdfsResource)
+                ) {
 
             /*
              * Backchain will generate one statement for each distinct subject
