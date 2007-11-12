@@ -127,7 +127,7 @@ import com.bigdata.service.ClientIndexView.Split;
 public class ScaleOutTripleStore extends AbstractTripleStore {
 
     private final IBigdataFederation fed;
-
+    
     /**
      * 
      */

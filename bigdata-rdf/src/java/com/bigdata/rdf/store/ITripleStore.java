@@ -36,8 +36,10 @@ import org.openrdf.model.Value;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.EmptySPOIterator;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 import com.bigdata.rdf.store.DataLoader.Options;
 
 /**
@@ -176,7 +178,9 @@ public interface ITripleStore {
      * @param o
      * 
      * @return The object that may be used to read efficiently on the indices
-     *         for that triple pattern.
+     *         for that triple pattern. In the special case where any of the
+     *         given {@link Value}s is <strong>not known</strong> to the
+     *         database this method will return an {@link EmptyAccessPath}.
      * 
      * @see IAccessPath
      * @see #asStatementIterator(ISPOIterator)

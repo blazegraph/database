@@ -787,7 +787,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                          * Convert back to an axiom.
                          */
                         
-                        SPO tmp = new SPO(spo.s, spo.o, spo.p,
+                        SPO tmp = new SPO(spo.s, spo.p, spo.o,
                                 StatementEnum.Axiom);
 
                         tmp.override = true;

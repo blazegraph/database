@@ -35,20 +35,31 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.rio.StatementHandler;
 import org.openrdf.rio.StatementHandlerException;
 import org.openrdf.sesame.constants.RDFFormat;
 
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
  * that all expected statements were made persistent in the database.
+ * 
+ * @todo this test will probably fail if the source data contains bnodes since
+ *       it does not validate bnodes based on consistent RDF properties but only
+ *       based on their Java fields.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -105,7 +116,12 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             
         }
 
-        // re-parse and verify all statements exist in the db.
+        store.predicateUsage();
+        
+        /*
+         * re-parse and verify all statements exist in the db using each
+         * statement index.
+         */
         final AtomicInteger nerrs = new AtomicInteger(0);
         {
             
@@ -119,16 +135,168 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
                         public void handleStatement(Resource s, URI p,
                                 Value o) throws StatementHandlerException {
-                            
-                            if(!db.hasStatement(s, p, o)) {
+
+                            if (nerrs.get() > 20) {
+
+                                throw new RuntimeException("Too many errors");
                                 
-                                System.err.println("Could not find: ("+s+", "+p+", "+o+")");
+                            }
+                            
+                            // convert to Sesame objects.
+                            s = (Resource) db.asValue(s);
+                            p = (URI) db.asValue(p);
+                            o = (Value) db.asValue(o);
+                            
+                            long _s = assertTerm(s);
+                            long _p = assertTerm(p);
+                            long _o = assertTerm(o);
+                            
+                            if (_s != NULL && _p != NULL && _o != NULL) {
+                            
+                                Statement stmt = new StatementImpl(s,p,o);
+                                
+                                assertStatement(db, KeyOrder.SPO, _s, _p, _o,
+                                        stmt );
+                                
+                                assertStatement(db, KeyOrder.OSP, _s, _p, _o,
+                                        stmt );
+
+                                assertStatement(db, KeyOrder.POS, _s, _p, _o,
+                                        stmt );
+
+                            }
+                            
+                        }
+
+                        /**
+                         * Verify the {@link Value} is in both the forward and
+                         * reverse indices.
+                         * 
+                         * @param v
+                         *            The value.
+                         * 
+                         * @return the term identifier for that value -or-
+                         *         <code>null</code> if it was not propertly
+                         *         found in both the forward and reverse
+                         *         indices.
+                         */
+                        private long assertTerm(Value v) {
+
+                            boolean ok = true;
+
+                            // lookup in the term:id index.
+                            long termId = db.getTermId(v);
+
+                            if (termId == NULL) {
+                            
+                                System.err.println("Term not in forward index: "+v);
+                                
+                                nerrs.incrementAndGet();
+                                
+                                ok = false;                                
+
+                            } else {
+
+                                // lookup in the id:term index.
+                                Value v2 = db.asValue(db.getTerm(termId));
+                                
+                                if(v2 == null) {
+
+                                    System.err.println("Term not in reverse index: "+v);
+
+                                    nerrs.incrementAndGet();
+                                    
+                                    ok = false;
+                                    
+//                                } else if(v.compareTo(v2)!=0) {
+                                } else if(!v.equals(v2)) {
+
+                                    System.err.println("Wrong term in reverse index: expected="+v+", but actual="+v2);
+
+                                    nerrs.incrementAndGet();
+                                    
+                                    ok = false;
+
+                                }
+
+                            }
+                            
+                            return ok?termId:NULL;
+
+                        }
+                        
+                        /**
+                         * Verify that the statement is found in each of the
+                         * statement indices.
+                         * 
+                         * @param db
+                         * @param keyOrder
+                         * @param s
+                         * @param p
+                         * @param o
+                         * @param stmt
+                         */
+                        private void assertStatement(
+                                AbstractTripleStore db, KeyOrder keyOrder,
+                                long s, long p, long o,
+                                Statement stmt) {
+
+                            IIndex ndx = db.getStatementIndex(keyOrder);
+
+                            final SPO expectedSPO = new SPO(s, p, o,
+                                    StatementEnum.Explicit);
+                            
+                            final byte[] fromKey = db.getKeyBuilder()
+                                        .statement2Key(keyOrder, expectedSPO);
+
+                            final byte[] toKey = null;
+
+                            IEntryIterator itr = ndx.rangeIterator(fromKey,
+                                    toKey);
+
+                            if (!itr.hasNext()) {
+
+                                /*
+                                 * This happens when the statement is not in the
+                                 * index AND there is no successor of the
+                                 * statement in the index.
+                                 */
+                                
+                                System.err.println("Statement not found"
+                                            + ": index=" + keyOrder + ", stmt="
+                                            + stmt + expectedSPO);
+                            
+                                nerrs.incrementAndGet();
+
+                                return;
+                                
+                            }
+
+                            final Object val = itr.next();
+
+                            final SPO actualSPO = new SPO(keyOrder, itr.getKey(), val);
+
+                            if (!expectedSPO.equals(actualSPO)) {
+
+                                /*
+                                 * This happens when the statement is not in the
+                                 * index but there is a successor of the
+                                 * statement in the index.
+                                 */
+                                System.err
+                                        .println("Statement not found"
+                                                + ": index=" + keyOrder
+                                                + ", stmt=" + stmt
+                                                + ", expected="
+                                                + expectedSPO
+                                                + ", nextInIndexOrder="
+                                                + actualSPO);
                                 
                                 nerrs.incrementAndGet();
                                 
                             }
-                            
-                        }
+                        
+                        }                     
 
                     };
 
@@ -144,6 +312,8 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         
         assertEquals("nerrors",0,nerrs.get());
 
+        assertStatementIndicesConsistent(store);
+        
         } finally {
         
             store.closeAndDelete();
@@ -151,5 +321,5 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         }
         
     }
-    
+
 }

@@ -38,7 +38,7 @@ import com.bigdata.rawstore.WormAddressManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Options {
+public interface Options {
 
     /**
      * <code>file</code> - The name of the file. If the file not found and

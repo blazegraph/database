@@ -157,7 +157,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options extends MetadataService.Options {
+    public static interface Options extends MetadataService.Options {
 
         /**
          * The name of the optional property whose value is the #of data

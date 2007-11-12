@@ -331,7 +331,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class TestOptions extends Options {
+    public static interface TestOptions extends Options {
         
         /**
          * The timeout for the test (seconds).

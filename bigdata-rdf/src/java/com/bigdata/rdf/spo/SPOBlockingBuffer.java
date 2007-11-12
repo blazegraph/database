@@ -302,7 +302,17 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
 
                 final SPO spo = buffer.peek();
 
-                if (spo == null) continue;
+                if (spo == null) {
+                    
+                    try {
+                        Thread.sleep(100/*millis*/);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    
+                    continue;
+                    
+                }
                 
                 if (filter != null && filter.isMatch(spo)) {
 
@@ -311,13 +321,17 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
                     log.info("reject: "+spo.toString(store));
 
                     // consume the head of the queue.
-                    assert buffer.poll() != null;
+                    try {
+                        buffer.take();
+                    } catch(InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
                     
                     continue;
                     
                 }
                 
-                log.info("next: "+spo.toString(store));
+                if(DEBUG) log.debug("next: "+spo.toString(store));
                 
                 return true;
                 

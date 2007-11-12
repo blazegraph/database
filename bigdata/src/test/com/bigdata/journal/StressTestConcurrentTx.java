@@ -530,7 +530,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     /**
      * Additional properties understood by this test.
      */
-    public static class TestOptions extends Options {
+    public static interface TestOptions extends Options {
 
         /**
          * The timeout for the test.

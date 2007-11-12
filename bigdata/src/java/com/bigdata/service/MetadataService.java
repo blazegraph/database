@@ -145,7 +145,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options extends DataService.Options {
+    public static interface Options extends DataService.Options {
         
     }
     
