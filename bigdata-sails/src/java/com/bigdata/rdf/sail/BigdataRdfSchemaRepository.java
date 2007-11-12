@@ -45,6 +45,7 @@ import org.openrdf.sesame.sail.StatementIterator;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
+import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.store.SesameStatementIterator;
 
 /**
@@ -83,7 +84,8 @@ public class BigdataRdfSchemaRepository extends BigdataRdfRepository implements 
     public StatementIterator getExplicitStatements(Resource s, URI p,
             Value o) {
 
-        return new SesameStatementIterator( database, database.getAccessPath(s, p, o).iterator() );
+        return new SesameStatementIterator(database, database.getAccessPath(s,
+                p, o).iterator(ExplicitSPOFilter.INSTANCE));
         
     }
 
