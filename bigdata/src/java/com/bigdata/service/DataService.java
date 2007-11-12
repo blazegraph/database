@@ -175,7 +175,7 @@ abstract public class DataService implements IDataService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options {
         
     }
     

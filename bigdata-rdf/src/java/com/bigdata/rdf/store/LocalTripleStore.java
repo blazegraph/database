@@ -41,7 +41,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
-import com.bigdata.scaleup.MasterJournal;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
@@ -283,7 +282,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
     
-    public static class Options extends ConcurrentJournal.Options {
+    public static interface Options extends AbstractTripleStore.Options, ConcurrentJournal.Options {
         
         /**
          * When true, the terms, ids, and statement indices will be registered

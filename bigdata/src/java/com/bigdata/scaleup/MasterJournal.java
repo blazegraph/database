@@ -329,7 +329,7 @@ public class MasterJournal implements IJournal {
      * @todo support the use of temporary files for the partitioned journal and
      *       their clean removal on exit.
      */
-    public static class Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options {
 
         /**
          * <code>basename</code> - The property whose value is the basename of

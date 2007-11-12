@@ -114,16 +114,16 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options {
 
         /**
          * This optional boolean property may be used to specify whether or not
          * RDFS entailments are maintained by eager closure of the knowledge
-         * base (default false).
+         * base (the default is <code>false</code>, but that is overriden by
+         * {@link BigdataRdfSchemaRepository}).
          */
         public static final String TRUTH_MAINTENANCE = "truthMaintenance"; 
 
-        // @todo change default to true?
         public static final String DEFAULT_TRUTH_MAINTENANCE = "false"; 
 
         /**
@@ -732,11 +732,21 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
 
         if(accessPath instanceof EmptyAccessPath) {
             
+            /*
+             * One of the Values was unknown so the access path will be empty.
+             * 
+             * Note: This is true even if we are doing some backchaining.
+             */
+            
             return new EmptyStatementIterator();
             
         }
         
-        ISPOIterator src = accessPath.iterator();
+        /*
+         * Some valid access path.
+         */
+        
+        final ISPOIterator src;
         
         if(getTruthMaintenance()) {
 
@@ -749,14 +759,23 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
             long[] ids = accessPath.getTriplePattern();
 
             src = inf.backchainIterator(//
-                    src,// the source iterator.
                     ids[0], ids[1], ids[2] // the triple pattern.
                     );
+            
+        } else {
+
+            /*
+             * Otherwise NO entailments are permitted and we only return the
+             * statements actually present in the database.
+             */
+            
+            // Read straight from the database.
+            src = accessPath.iterator();
             
         }
         
         return database.asStatementIterator(src);
-        
+
     }
         
     public ValueFactory getValueFactory() {

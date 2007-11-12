@@ -65,11 +65,11 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -211,6 +211,25 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    /**
+     * Configuration options.
+     * 
+     * @todo {@link AbstractTripleStore#readService} capacity.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options extends InferenceEngine.Options {
+        
+        
+    }
+    
+    /**
+     * 
+     * @param properties
+     * 
+     * @see Options.
+     */    
     protected AbstractTripleStore(Properties properties) {
         
         // Copy the properties object.
@@ -224,7 +243,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          */
 
         this.justify = Boolean.parseBoolean(properties.getProperty(
-                Options.JUSTIFY, Options.DEFAULT_JUSTIFY));
+                Options.JUSTIFY,
+                Options.DEFAULT_JUSTIFY));
 
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
@@ -553,6 +573,22 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    /**
+     * Converts an internal {@link _Value} to a Sesame {@link Value} object.
+     * 
+     * @param value
+     *            Either an internal {@link _Value}, a Sesame {@link Value}
+     *            object, or <code>null</code>.
+     * 
+     * @return A corresponding Sesame {@link Value} object -or-
+     *         <code>null</code> iff <i>value</i> is <code>null</code>.
+     */
+    final public Value asValue(Value value) {
+        
+        return OptimizedValueFactory.INSTANCE.toSesameObject(value);
+        
+    }
+    
     public Statement asStatement(SPO spo) {
 
         return new StatementWithType( //
@@ -1553,6 +1589,38 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    final public void predicateUsage() {
+        
+        predicateUsage(this);
+        
+    }
+
+    /**
+     * Dumps the #of statements using each predicate in the kb on
+     * {@link System#err} (tab delimited, unordered).
+     * 
+     * @param resolveTerms
+     *            Used to resolve term identifiers to terms (you can use this to
+     *            dump a {@link TempTripleStore} that is using the term
+     *            dictionary of the main database).
+     */
+    final public void predicateUsage(AbstractTripleStore resolveTerms) {
+
+        // visit distinct term identifiers for the predicate position.
+        Iterator<Long> itr = getAccessPath(KeyOrder.POS).distinctTermScan();
+        
+        while(itr.hasNext()) {
+            
+            long p = itr.next();
+            
+            int n = getAccessPath(NULL, p, NULL).rangeCount();
+            
+            System.err.println(n+"\t"+resolveTerms.toString(p));
+            
+        }
+        
+    }
+    
     /**
      * Utility method dumps the statements in the store onto {@link System#err}
      * using the SPO index (subject order).
@@ -1569,6 +1637,21 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    /**
+     * Dumps the store in a human readable format (not suitable for
+     * interchange).
+     * 
+     * @param resolveTerms
+     *            Used to resolve term identifiers to terms (you can use this to
+     *            dump a {@link TempTripleStore} that is using the term
+     *            dictionary of the main database).
+     * @param explicit
+     *            Show statements marked as explicit.
+     * @param inferred
+     *            Show statements marked inferred.
+     * @param axioms
+     *            Show statements marked as axioms.
+     */
     final public void dumpStore(AbstractTripleStore resolveTerms, boolean explicit, boolean inferred, boolean axioms) {
 
         final int nstmts = getStatementCount();

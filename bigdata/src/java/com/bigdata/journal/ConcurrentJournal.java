@@ -122,7 +122,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options {
 
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool

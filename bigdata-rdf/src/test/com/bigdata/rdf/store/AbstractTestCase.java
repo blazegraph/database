@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
@@ -653,4 +654,104 @@ abstract public class AbstractTestCase
 
     }
 
+    /**
+     * Validates that the same statements are found in each of the statement
+     * indices.
+     */
+    public void assertStatementIndicesConsistent(AbstractTripleStore db) {
+
+        log.info("Verifying statement indices");
+        
+        AtomicInteger nerrs = new AtomicInteger(0);
+
+        // scan SPO, checking...
+        assertSameStatements(db, KeyOrder.SPO, KeyOrder.POS, nerrs);
+        assertSameStatements(db, KeyOrder.SPO, KeyOrder.OSP, nerrs);
+
+        // scan POS, checking...
+        assertSameStatements(db, KeyOrder.POS, KeyOrder.SPO, nerrs);
+        assertSameStatements(db, KeyOrder.POS, KeyOrder.OSP, nerrs);
+        
+        // scan OSP, checking...
+        assertSameStatements(db, KeyOrder.OSP, KeyOrder.SPO, nerrs);
+        assertSameStatements(db, KeyOrder.OSP, KeyOrder.POS, nerrs);
+        
+        assertEquals(0,nerrs.get());
+        
+    }
+    
+    /**
+     * Verify all statements reported by one access path are found on another
+     * access path.
+     * 
+     * @param db
+     *            The database.
+     * @param keyOrderExpected
+     *            Scan this statement index.
+     * @param keyOrderActual
+     *            Verifying that each statement is also present in this index.
+     */
+    private void assertSameStatements(AbstractTripleStore db,
+            KeyOrder keyOrderExpected, KeyOrder keyOrderActual,
+            AtomicInteger nerrs) {
+
+        log.info("Verifying "+keyOrderExpected+" against "+keyOrderActual);
+
+        ISPOIterator itre = db.getAccessPath(keyOrderExpected).iterator();
+        
+        IIndex ndx = db.getStatementIndex(keyOrderActual);
+        
+        while(itre.hasNext()) {
+
+            if (nerrs.get() > 10)
+                throw new RuntimeException("Too many errors");
+            
+            final SPO expectedSPO = itre.next();
+            
+            final byte[] fromKey = db.getKeyBuilder().statement2Key(
+                    keyOrderActual, expectedSPO);
+
+            final byte[] toKey = null;
+
+            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+
+            if (!itr.hasNext()) {
+
+                /*
+                 * This happens when the statement is not in the index AND there
+                 * is no successor of the statement in the index.
+                 */
+                
+                log.error("Statement not found" + ": index="
+                        + keyOrderActual + ", stmt=" + expectedSPO);
+            
+                nerrs.incrementAndGet();
+
+                return;
+                
+            }
+
+            final Object val = itr.next();
+
+            final SPO actualSPO = new SPO(keyOrderActual, itr.getKey(), val);
+
+            if (!expectedSPO.equals(actualSPO)) {
+
+                /*
+                 * This happens when the statement is not in the
+                 * index but there is a successor of the
+                 * statement in the index.
+                 */
+                log.error("Statement not found" + ": index="
+                        + keyOrderActual + ", expected=" + expectedSPO
+                        + ", nextInIndexOrder=" + actualSPO);
+                
+                nerrs.incrementAndGet();
+                
+            }            
+            
+        }
+
+    }
+    
 }

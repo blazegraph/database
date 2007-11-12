@@ -46,7 +46,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.spo.ChunkedIterator;
-import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBlockingBuffer;
@@ -76,7 +75,7 @@ import cutthecrap.utils.striterators.Striterator;
  * A rule always has the form:
  * 
  * <pre>
- *                                  pred :- pred*.
+ *                                   pred :- pred*.
  * </pre>
  * 
  * where <i>pred</i> is either
@@ -111,35 +110,38 @@ import cutthecrap.utils.striterators.Striterator;
  * rdfs9 is represented as:
  * 
  * <pre>
- *                                   triple(?v,rdf:type,?x) :-
- *                                      triple(?u,rdfs:subClassOf,?x),
- *                                      triple(?v,rdf:type,?u). 
+ *                                    triple(?v,rdf:type,?x) :-
+ *                                       triple(?u,rdfs:subClassOf,?x),
+ *                                       triple(?v,rdf:type,?u). 
  * </pre>
  * 
  * rdfs11 is represented as:
  * 
  * <pre>
- *  triple(?u,rdfs:subClassOf,?x) :-
- *    triple(?u,rdfs:subClassOf,?v),
- *    triple(?v,rdf:subClassOf,?x). 
+ *   triple(?u,rdfs:subClassOf,?x) :-
+ *     triple(?u,rdfs:subClassOf,?v),
+ *     triple(?v,rdf:subClassOf,?x). 
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo update the javadoc on this class.
+ * 
+ * FIXME test backchain iterator at scale.
+ * 
+ * @todo provide declarative rule models for forward chaining so that the rules
+ *       may be extended without having to edit the code.
+ * 
  * @todo consider support for owl:inverseFunctionalProperty. Are there any other
  *       low hanging fruit there?
- * 
- * @todo compare performance for backward and forward chaining for owl:sameAs
- * 
- * @todo update the javadoc on this class.
  * 
  * @todo Improve write efficiency for the proofs - they are slowing things way
  *       down. Note that using magic sets or a backward chainer will let us
  *       avoid writing proofs altogether since we can prove whether or not a
  *       statement is still entailed without recourse to reading proofs chains.
  * 
- * @todo provide option for "owl:sameAs" semantics using destructive merging
+ * @todo explore an option for "owl:sameAs" semantics using destructive merging
  *       (the terms are assigned the same term identifier, one of them is
  *       treated as a canonical, and there is no way to retract the sameAs
  *       assertion). If you take this approach then you must also re-write all
@@ -241,12 +243,17 @@ public class InferenceEngine extends RDFSHelper {
     public static enum ForwardClosureEnum {
         
         /**
-         * Runs {@link InferenceEngine#fastForwardClosure()}.
+         * The "fast" algorithm breaks several cycles in the RDFS rules and is
+         * significantly faster.
+         * 
+         * @see InferenceEngine#fastForwardClosure(AbstractTripleStore, boolean)
          */
         Fast(),
 
         /**
-         * Runs {@link InferenceEngine#fullForwardClosure()}.
+         * The "full" algorithm runs the rules as a set to fixed point.
+         * 
+         * @see InferenceEngine#fullForwardClosure(AbstractTripleStore, boolean)
          */
         Full();
         
@@ -255,12 +262,10 @@ public class InferenceEngine extends RDFSHelper {
     /**
      * Options for the {@link InferenceEngine}.
      * 
-     * @todo {@link InferenceEngine#readService} capacity?
-     *       
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options {
+    public static interface Options {
 
         /**
          * Boolean option - when true the proofs for entailments will be generated and stored in
@@ -272,7 +277,7 @@ public class InferenceEngine extends RDFSHelper {
         
         /**
          * Choice of the forward closure algorithm.
-         * 
+         *  
          * @see ForwardClosureEnum
          */
         public static final String FORWARD_CLOSURE = "forwardClosure";
@@ -280,12 +285,15 @@ public class InferenceEngine extends RDFSHelper {
         public static final String DEFAULT_FORWARD_CLOSURE = ForwardClosureEnum.Fast.toString();
         
         /**
-         * When <code>true</code> <code>(?x rdf:type rdfs:Resource)</code>
-         * entailments are computed AND stored in the database. When
-         * <code>false</code>, rules that produce those entailments are
-         * turned off such that they are neither computed NOR stored and a
-         * backward chainer or magic sets technique must be used to generate the
-         * entailments at query time. Default is <code>false</code>.
+         * When <code>true</code> (default <code>false</code>)
+         * <code>(?x rdf:type rdfs:Resource)</code> entailments are computed
+         * AND stored in the database. When <code>false</code>, rules that
+         * produce those entailments are turned off such that they are neither
+         * computed NOR stored and a backward chainer or magic sets technique
+         * must be used to generate the entailments at query time.
+         * <p>
+         * Note: The default is <code>false</code> since eagerly materializing
+         * those entailments takes a lot of time and space.
          * 
          * @see BackchainTypeResourceIterator
          */
@@ -303,61 +311,69 @@ public class InferenceEngine extends RDFSHelper {
         public static final String DEFAULT_RDFS_ONLY = "false";
         
         /**
-         * When <code>true</code> the entailments that replication properties
-         * between instances that are identified as "the same" using
-         * <code>owl:sameAs</code> will be forward chained and stored in the
-         * database. When <code>false</code>, rules that produce those
-         * entailments are turned off such that they are neither computed NOR
-         * stored and a backward chainer or magic sets technique must be used to
-         * generate the entailments at query time. Default is <code>true</code>.
+         * When <code>true</code> (default <code>true</code>) the reflexive
+         * and transitive entailments for <code>owl:sameAs</code> are computed
+         * by forward chaining and stored in the database unless
+         * {@link #RDFS_ONLY} is used to completely disable those entailments.
+         * When <code>false</code> those entailments are not computed and
+         * <code>owl:sameAs</code> processing is disabled.
+         */
+        public static final String FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "forwardChainOwlSameAsClosure";
+
+        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE = "true";
+
+        /**
+         * When <code>true</code> (default <code>false</code>) the
+         * entailments that replication properties between instances that are
+         * identified as "the same" using <code>owl:sameAs</code> will be
+         * forward chained and stored in the database. When <code>false</code>,
+         * rules that produce those entailments are turned off such that they
+         * are neither computed NOR stored and the entailments may be accessed
+         * at query time using the
+         * {@link InferenceEngine#backchainIterator(ISPOIterator, long, long, long)}.
          * <p>
-         * Note: the reflexive and transitive entailments for
-         * <code>owl:sameAs</code> are always computed by forward chaining and
-         * stored in the database unless {@link #RDFS_ONLY} is used to
-         * completely disable those entailments.
+         * Note: The default is <code>false</code> since those entailments can
+         * take up a LOT of space in the store and are expensive to compute
+         * during data load. It is a lot easier to compute them dynamically when
+         * presented with a specific triple pattern. While more computation is
+         * performed if a fill triple scan is frequently requested, that is an
+         * unusual case and significantly less data will be stored regardless.
          * 
-         * FIXME clarify the semantics here.  the documentation is all well and
-         * good but the code does not agree.
+         * @see InferenceEngine#backchainIterator(ISPOIterator, long, long,
+         *      long)
          * 
-         * FIXME test at the SAIL.
+         * FIXME Finish backchaining for {@link RuleOwlSameAs2} and
+         * {@link RuleOwlSameAs3} and then change the default.
          */
-        public static final String FORWARD_CHAIN_OWL_SAMEAS= "forwardChainOwlSameAs";
+        public static final String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "forwardChainOwlSameAsProperties";
+
+        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "true";
 
         /**
-         * The default is <code>false</code> since those entailments can take
-         * up a LOT of space in the store and are expensive to compute during
-         * data load. It is a lot easier to compute them dynamically when
-         * presented with a specific triple pattern.
-         */
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS = "false";
-
-        /**
-         * When <code>true</code> the entailments for
-         * <code>owl:equivilantProperty</code> are computed by forward
-         * chaining and stored in the database. When <code>false</code>,
+         * When <code>true</code> (default <code>true</code>) the
+         * entailments for <code>owl:equivilantProperty</code> are computed by
+         * forward chaining and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they
          * are neither computed NOR stored and a backward chainer or magic sets
          * technique must be used to generate the entailments at query time.
-         * Default is <code>true</code>.
          * 
          * @todo implement backward chaining for owl:equivalentProperty and
-         *       compare performance or drop this option.
+         *       compare performance?
          */
         public static final String FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "forwardChainOwlEquivalentProperty";
 
         public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY = "true";
 
         /**
-         * When <code>true</code> the entailments for
-         * <code>owl:equivilantClass</code> are computed by forward chaining
-         * and stored in the database. When <code>false</code>, rules that
-         * produce those entailments are turned off such that they are neither
-         * computed NOR stored and a backward chainer or magic sets technique
-         * must be used to generate the entailments at query time. Default is
-         * <code>true</code>.
+         * When <code>true</code> (default <code>true</code>) the
+         * entailments for <code>owl:equivilantClass</code> are computed by
+         * forward chaining and stored in the database. When <code>false</code>,
+         * rules that produce those entailments are turned off such that they
+         * are neither computed NOR stored and a backward chainer or magic sets
+         * technique must be used to generate the entailments at query time.
          * 
-         * @todo implement backward chaining for owl:equivalentClass and
-         *       compare performance or drop this option.
+         * @todo implement backward chaining for owl:equivalentClass and compare
+         *       performance?
          */
         public static final String FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "forwardChainOwlEquivalentClass";
 
@@ -365,8 +381,9 @@ public class InferenceEngine extends RDFSHelper {
 
         /**
          * <p>
-         * Sets the capacity of the {@link SPOAssertionBuffer} used to buffer entailments
-         * for efficient ordered writes using the batch API (default 200k).
+         * Sets the capacity of the {@link SPOAssertionBuffer} used to buffer
+         * entailments generated by rules during eager closure for efficient
+         * ordered writes using the batch API (default 200k).
          * </p>
          * <p>
          * Some results for comparison on a 45k triple data set:
@@ -387,6 +404,10 @@ public class InferenceEngine extends RDFSHelper {
          * ontology, especially how it influences the #of entailments generated
          * by each rule.
          * </p>
+         * 
+         * @todo add a buffer capacity property for the
+         *       {@link InferenceEngine#backchainIterator(ISPOIterator, long, long, long)}
+         *       or use this capacity there as well.
          */
         public static final String BUFFER_CAPACITY = "bufferCapacity";
 
@@ -398,6 +419,11 @@ public class InferenceEngine extends RDFSHelper {
      * Configure {@link InferenceEngine} using default {@link Options}.
      * 
      * @param database
+     * 
+     * FIXME modify to use the properties on the database, but check usage in
+     * the test suites first. Also consider a method on the database to return
+     * the {@link InferenceEngine} such that it is easier to reuse the same
+     * instance.
      */
     public InferenceEngine(AbstractTripleStore database) {
     
@@ -444,18 +470,34 @@ public class InferenceEngine extends RDFSHelper {
         
         if(rdfsOnly) {
             
-            this.forwardChainOwlSameAs = false;
+            this.forwardChainOwlSameAsClosure = false;
+            this.forwardChainOwlSameAsProperties = false;
             this.forwardChainOwlEquivalentProperty = false;
             this.forwardChainOwlEquivalentClass = false;
             
         } else {
             
-            this.forwardChainOwlSameAs = Boolean.parseBoolean(properties
-                    .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS,
-                            Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS));
+            this.forwardChainOwlSameAsClosure = Boolean.parseBoolean(properties
+                    .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_CLOSURE));
 
-            log.info(Options.FORWARD_CHAIN_OWL_SAMEAS + "="
-                    + forwardChainOwlSameAs);
+            log.info(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE + "="
+                    + forwardChainOwlSameAsClosure);
+
+            if(forwardChainOwlSameAsClosure) {
+
+                this.forwardChainOwlSameAsProperties = Boolean.parseBoolean(properties
+                    .getProperty(Options.FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES));
+                
+            } else {
+                
+                this.forwardChainOwlSameAsProperties = false;
+                
+            }
+
+            log.info(Options.FORWARD_CHAIN_OWL_SAMEAS_CLOSURE + "="
+                    + forwardChainOwlSameAsClosure);
 
             this.forwardChainOwlEquivalentProperty = Boolean
                     .parseBoolean(properties
@@ -494,43 +536,56 @@ public class InferenceEngine extends RDFSHelper {
     final protected ForwardClosureEnum forwardClosure;
     
     /**
-     * Set based on {@link Options#RDFS_ONLY}.
+     * Set based on {@link Options#RDFS_ONLY}. When set, owl:sameAs and friends
+     * are disabled and only the RDFS MT entailments are used.
      */
     final protected boolean rdfsOnly; 
     
     /**
-     * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}.
+     * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}. When
+     * <code>true</code> the {@link InferenceEngine} is configured to forward
+     * chain and store entailments of the form
+     * <code>(x rdf:type rdfs:Resource)</code>. When <code>false</code>,
+     * those entailments are computed at query time by
+     * {@link #backchainIterator(ISPOIterator, long, long, long)}.
      */
     final protected boolean forwardChainRdfTypeRdfsResource;
 
     /**
-     * Set based on {@link Options#FORWARD_CHAIN_OWL_SAMEAS}.
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_SAMEAS_CLOSURE}. When
+     * <code>true</code> we will forward chain and store the reflexive and
+     * transitive closure of <code>owl:sameAs</code> using
+     * {@link RuleOwlSameAs1} and {@link RuleOwlSameAs2}.
+     * <p>
+     * Note: When <code>false</code>, NO owl:sameAs processing will be
+     * performed since there is no privision for backward chaining the
+     * owl:sameAs closure.
      */
-    final protected boolean forwardChainOwlSameAs;
+    final protected boolean forwardChainOwlSameAsClosure;
 
     /**
-     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY}.
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES}. When
+     * <code>true</code>, we will forward chain {@link RuleOwlSameAs2} and
+     * {@link RuleOwlSameAs3} which replicate properties on individuals
+     * identified as the "same" by <code>owl:sameAs</code>. When
+     * <code>false</code>, we will compute those entailments at query time in
+     * {@link #backchainIterator(ISPOIterator, long, long, long)}.
+     */
+    final protected boolean forwardChainOwlSameAsProperties;
+
+    /**
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_PROPERTY}. When
+     * <code>true</code>, we will forward chain and store those entailments.
+     * When <code>false</code>, those entailments will NOT be available.
      */
     final protected boolean forwardChainOwlEquivalentProperty;
 
     /**
-     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_CLASS}.
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_EQUIVALENT_CLASS}. When
+     * <code>true</code>, we will forward chain and store those entailments.
+     * When <code>false</code>, those entailments will NOT be available.
      */
     final protected boolean forwardChainOwlEquivalentClass;
-
-    /**
-     * Return true iff the {@link InferenceEngine} is configured to forward
-     * chain and store entailments of the form (x rdf:type rdfs:Resource). When
-     * this returns false, those entailments are not computed and are not
-     * stored.
-     * 
-     * @see Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE
-     */
-    public boolean getForwardChainRdfTypeRdfsResource() {
-        
-        return forwardChainRdfTypeRdfsResource;
-        
-    }
     
     /**
      * Sets up the basic rule model for the inference engine.
@@ -659,13 +714,19 @@ public class InferenceEngine extends RDFSHelper {
          * @todo make sure that they are back-chained or add them in here.
          */
 
-        if(forwardChainOwlSameAs) {
+        if(forwardChainOwlSameAsClosure) {
             
             rules.add(ruleOwlSameAs1);
 
-            rules.add(ruleOwlSameAs2);
+            rules.add(ruleOwlSameAs1b);
             
-            rules.add(ruleOwlSameAs3);
+            if(forwardChainOwlSameAsProperties) {
+                
+                rules.add(ruleOwlSameAs2);
+                
+                rules.add(ruleOwlSameAs3);
+                
+            }
             
         }
 
@@ -735,11 +796,12 @@ public class InferenceEngine extends RDFSHelper {
      * @param justify
      *            {@link Justification}s will be generated iff this flag is
      *            <code>true</code>.
-     * @return
+     * 
+     * @return Statistics about the operation.
      * 
      * @see #computeClosure(AbstractTripleStore)
      */
-    /*package private*/ ClosureStats computeClosure(AbstractTripleStore focusStore, boolean justify) {
+    public ClosureStats computeClosure(AbstractTripleStore focusStore, boolean justify) {
         
         switch(forwardClosure) {
 
@@ -1078,7 +1140,7 @@ public class InferenceEngine extends RDFSHelper {
         }
         
         // owl:sameAs
-        if(forwardChainOwlSameAs) {
+        if(forwardChainOwlSameAsClosure) {
 
             // reflexive and transitive closure over owl:sameAs.
             Rule.fixedPoint(closureStats, new Rule[] { ruleOwlSameAs1,
@@ -1086,27 +1148,45 @@ public class InferenceEngine extends RDFSHelper {
             
             if(DEBUG) log.debug("owl:sameAs1,1b: "+closureStats);
 
-            // apply properties 
-            {
+            if (forwardChainOwlSameAsProperties) {
+                
                 /*
-                 * FIXME owl:sameAs2,3 should exclude matches where (a ==
-                 * owl:sameAs). This case is already covered by the 1 and 1b.
-                 * However, we also use 2 and 3 in the full forward closure
+                 * Apply properties.
+                 * 
+                 * Note: owl:sameAs2,3 should exclude matches where the
+                 * predicate in the head is owl:sameAs. This case is already
+                 * covered by rules owl:sameas {1, 1b}. We specialize the rules
+                 * here since we also use 2 and 3 in the full forward closure
                  * where all rules are brought to fix point together and we do
                  * NOT want to make that exclusion in that case.
                  */
-                RuleStats stats = ruleOwlSameAs2.apply(justify, focusStore, database, buffer);
-                closureStats.add(stats);
-                if(DEBUG) log.debug("ruleOwlSameAs2: " + stats);
-                buffer.flush();
-            }
 
-            // apply properties 
-            {
-                RuleStats stats = ruleOwlSameAs3.apply(justify, focusStore, database, buffer);
-                closureStats.add(stats);
-                if(DEBUG) log.debug("ruleOwlSameAs3: " + stats);
-                buffer.flush();
+                {
+                    RuleStats stats = ruleOwlSameAs2.specialize(//
+                            NULL, NULL, NULL, //
+                            new IConstraint[] {
+                                new NEConstant((Var)ruleOwlSameAs2.head.p,owlSameAs.id)
+                            }).apply(justify, focusStore, database, buffer
+                            );
+                    closureStats.add(stats);
+                    if (DEBUG)
+                        log.debug("ruleOwlSameAs2: " + stats);
+                    buffer.flush();
+                }
+
+                {
+                    RuleStats stats = ruleOwlSameAs3.specialize(//
+                            NULL, NULL, NULL, //
+                            new IConstraint[] {
+                                new NEConstant((Var)ruleOwlSameAs3.head.p,owlSameAs.id)
+                            }).apply(justify, focusStore, database, buffer
+                            );
+                    closureStats.add(stats);
+                    if (DEBUG)
+                        log.debug("ruleOwlSameAs3: " + stats);
+                    buffer.flush();
+                }
+
             }
 
         }
@@ -1338,12 +1418,11 @@ public class InferenceEngine extends RDFSHelper {
     }
 
     /**
-     * Obtain an iterator that will backchain any entailments that whose forward
+     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
+     * for the database and also backchain any entailments for which forward
      * chaining has been turned off, including {@link RuleOwlSameAs2},
      * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
      * 
-     * @param src
-     *            An iterator reading from the database on an access path.
      * @param s
      *            The subject in triple pattern for that access path.
      * @param p
@@ -1351,20 +1430,23 @@ public class InferenceEngine extends RDFSHelper {
      * @param o
      *            The object in triple pattern for that access path.
      * 
-     * @return An iterator that will visit the statements in the source iterator
-     *         plus any necessary entailments.
+     * @return An iterator that will visit the statements in database matching
+     *         the triple pattern query plus any necessary entailments.
      * 
      * @todo configure buffer sizes.
      */
-    public ISPOIterator backchainIterator(ISPOIterator src, long s, long p, long o) {
+    public ISPOIterator backchainIterator(long s, long p, long o) {
+        
+        final ISPOIterator src = database.getAccessPath(s, p, o).iterator();
         
         final Striterator ret;
 
-        if (rdfsOnly || forwardChainOwlSameAs) {
+        if (rdfsOnly) {
             
-            ret = new Striterator(src);
+            // no entailments.
+            ret = null;
         
-        } else {
+        } else if(forwardChainOwlSameAsClosure && !forwardChainOwlSameAsProperties) {
             
             if(p == owlSameAs.id) {
                 
@@ -1400,41 +1482,44 @@ public class InferenceEngine extends RDFSHelper {
                     private static final long serialVersionUID = 1L;
     
                     void add(SPO spo) {
-                        log.info("addSubject: " + spo.s);
+                        log.info("addSubject: " + database.toString(spo.s)
+                                + " from " + spo.toString(database));
                         add(spo.s);
                     }
                 });
-    
+
                 ret.addFilter(new TermIdRecordingResolver(objects) {
                     private static final long serialVersionUID = 1L;
-    
+
                     void add(SPO spo) {
-                        log.info("addObject: " + spo.o);
+                        log.info("addObject: " + database.toString(spo.o)
+                                + " from " + spo.toString(database));
                         add(spo.o);
                     }
                 });
-    
+
                 /*
-                 * Append iterator yeilding owl:sameAs2 entailments for the distinct
-                 * subjects. This is wrapped so that we continue to collect up the
-                 * distinct objects visited in the entailments.
+                 * Append iterator yeilding owl:sameAs2 entailments for the
+                 * distinct subjects. This is wrapped so that we continue to
+                 * collect up the distinct objects visited in the entailments.
                  */
                 {
-    
+
                     // begin with the distinct subjects
                     Striterator tmp = new Striterator(new TermIdKeyIterator(
                             subjects));
-    
+
                     // expand each subject into an iterator with its owl:sameAs2
                     // entailments.
                     tmp.addFilter(new OwlSameAs2Expander(this, s, p, o));
-    
+
                     // notice the distinct objects in the visited entailments.
                     tmp.addFilter(new TermIdRecordingResolver(objects) {
                         private static final long serialVersionUID = 1L;
-    
+
                         void add(SPO spo) {
-                            log.info("addObject: " + spo.o);
+                            log.info("addObject: " + database.toString(spo.o)
+                                    + " from " + spo.toString(database));
                             add(spo.o);
                         }
                     });
@@ -1471,6 +1556,8 @@ public class InferenceEngine extends RDFSHelper {
     
                     public boolean hasNext() {
     
+                        log.info("End of owl:sameAs entailments.");
+                        
                         if (tempStore.isOpen()) {
     
                             tempStore.closeAndDelete();
@@ -1503,13 +1590,21 @@ public class InferenceEngine extends RDFSHelper {
     
             }
 
+        } else {
+            
+            // no entailments.
+            ret = null;
+            
         }
         
         /*
          * Wrap it up as a chunked iterator.
+         * 
+         * Note: If we are not adding any entailments then we just use the
+         * source iterator directly.
          */
 
-        ISPOIterator itr = new ChunkedIterator( ret );
+        ISPOIterator itr = (ret == null ? src : new ChunkedIterator(ret));
 
         if (!forwardChainRdfTypeRdfsResource) {
             
@@ -1531,46 +1626,46 @@ public class InferenceEngine extends RDFSHelper {
         
     }
     
-    /**
-     * Filter matches <code>(x rdf:type rdfs:Resource).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class RdfTypeRdfsResourceFilter implements ISPOFilter {
-
-        private final long rdfType;
-        private final long rdfsResource;
-        
-        /**
-         * 
-         * @param vocab
-         */
-        public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
-            
-            this.rdfType = vocab.rdfType.id;
-            
-            this.rdfsResource = vocab.rdfsResource.id;
-            
-        }
-
-        public boolean isMatch(SPO spo) {
-
-            if (spo.p == rdfType && spo.o == rdfsResource) {
-                
-                // reject (?x, rdf:type, rdfs:Resource )
-                
-                return true;
-                
-            }
-            
-            // Accept everything else.
-            
-            return false;
-            
-        }
-        
-    }
+//    /**
+//     * Filter matches <code>(x rdf:type rdfs:Resource).
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static public class RdfTypeRdfsResourceFilter implements ISPOFilter {
+//
+//        private final long rdfType;
+//        private final long rdfsResource;
+//        
+//        /**
+//         * 
+//         * @param vocab
+//         */
+//        public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
+//            
+//            this.rdfType = vocab.rdfType.id;
+//            
+//            this.rdfsResource = vocab.rdfsResource.id;
+//            
+//        }
+//
+//        public boolean isMatch(SPO spo) {
+//
+//            if (spo.p == rdfType && spo.o == rdfsResource) {
+//                
+//                // reject (?x, rdf:type, rdfs:Resource )
+//                
+//                return true;
+//                
+//            }
+//            
+//            // Accept everything else.
+//            
+//            return false;
+//            
+//        }
+//        
+//    }
 
     /**
      * An abstract base class for an iterator that records the a term identifier
@@ -1598,10 +1693,10 @@ public class InferenceEngine extends RDFSHelper {
 
         public void add(long v) {
 
+            btree.insert(keyBuilder.reset().append(v).getKey(),null);
+
             log.info("add: "+v+", size="+btree.getEntryCount());
 
-            btree.insert(keyBuilder.reset().append(v).getKey(),null);
-            
         }
 
         abstract void add(SPO spo);
@@ -1770,13 +1865,15 @@ public class InferenceEngine extends RDFSHelper {
             // setup bindings.
             Map<Var,Long> bindings = new TreeMap<Var, Long>();
             
-            // triple pattern.
-            if(s!=NULL) bindings.put((Var)r.head.s,s);
+            // the current distinct subject.
+            if(s!=NULL) bindings.put((Var)r.head.s,subject);
+
+            // from the triple pattern.
             if(p!=NULL) bindings.put((Var)r.head.p,p);
             if(o!=NULL) bindings.put((Var)r.head.o,o);
             
-            // the current subject on (x)
-            bindings.put((Var)r.body[0].s, subject);
+//            // the current subject on (x)
+//            bindings.put((Var)r.body[0].s, subject);
             
             // specialize the rule.
             final Rule r1 = r.specialize(//
@@ -1797,12 +1894,17 @@ public class InferenceEngine extends RDFSHelper {
 
                 public void run() {
 
-                    // run the rule.
-                    r1.apply(false/* justify */, null/* focusStore */,
-                            db/* database */, buffer);
+                    try {
                     
-                    // close the buffer
-                    buffer.close();
+                        // run the rule.
+                        r1.apply(false/* justify */, null/* focusStore */,
+                                db/* database */, buffer);
+                    } finally {
+
+                        // close the buffer
+                        buffer.close();
+
+                    }
 
                 }
 
@@ -1897,7 +1999,6 @@ public class InferenceEngine extends RDFSHelper {
             // setup bindings.
             Map<Var,Long> bindings = new TreeMap<Var, Long>();
             
-            // triple pattern.
             if(s!=NULL) bindings.put((Var)r.head.s,s);
             if(p!=NULL) bindings.put((Var)r.head.p,p);
             if(o!=NULL) bindings.put((Var)r.head.o,o);
@@ -1924,13 +2025,19 @@ public class InferenceEngine extends RDFSHelper {
 
                 public void run() {
 
-                    // run the rule.
-                    r1.apply(false/* justify */, null/* focusStore */,
-                            db/* database */, buffer);
-                    
-                    // close the buffer
-                    buffer.close();
+                    try {
 
+                        // run the rule.
+                        r1.apply(false/* justify */, null/* focusStore */,
+                                db/* database */, buffer);
+
+                    } finally {
+
+                        // close the buffer
+                        buffer.close();
+
+                    }
+                    
                 }
 
             });

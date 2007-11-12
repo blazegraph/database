@@ -748,6 +748,10 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     protected void assertSameGraphs(TempTripleStore expected,
             AbstractTripleStore actual) {
 
+        assertStatementIndicesConsistent(expected);
+        
+        assertStatementIndicesConsistent(actual);
+        
         if (expected.getStatementCount() != actual.getStatementCount()) {
 
             log.warn("statementCount: expected=" + expected.getStatementCount()

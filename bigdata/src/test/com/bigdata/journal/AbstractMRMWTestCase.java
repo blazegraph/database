@@ -101,7 +101,7 @@ abstract public class AbstractMRMWTestCase
     /**
      * Additional properties understood by this test.
      */
-    public static class TestOptions extends Options {
+    public static interface TestOptions extends Options {
 
         /**
          * The timeout for the test.

@@ -168,6 +168,18 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
+     * 
+     * @todo define options for {@link TemporaryStore} and then extend them
+     *       here.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options extends AbstractTripleStore.Options { //, TemporaryStore.Options {
+        
+    }
+    
+    /**
      * Create a transient {@link ITripleStore} backed by a
      * {@link TemporaryStore}.
      * <p>
@@ -176,6 +188,9 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
      * transactional isolation and purge of historical data). This offers a
      * significant performance boost when you do not need transactions or the
      * ability to purge historical data versions from the store as they age.
+     * 
+     * @param properties
+     *            See {@link Options}.
      */
     public TempTripleStore(Properties properties) {
 
@@ -187,6 +202,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
          * the backing file, which adds significant latency - plus the temp
          * store is not as concurrency savvy).
          */
+        
         store = new TemporaryStore();
 
         createIndices();
