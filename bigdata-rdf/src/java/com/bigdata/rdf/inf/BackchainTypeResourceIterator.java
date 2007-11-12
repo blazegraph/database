@@ -56,7 +56,7 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @see InferenceEngine
  * @see InferenceEngine.Options
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */ 

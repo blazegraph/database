@@ -258,6 +258,9 @@ public class SPOBlockingBuffer implements ISPOAssertionBuffer {
             
         }
 
+        /**
+         * Does nothing.
+         */
         public void close() {
 
             if (!open)
