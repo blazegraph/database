@@ -51,7 +51,9 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
     }
 
     public UUID getIndexUUID() {
+        
         return src.getIndexUUID();
+        
     }
 
     public ICounter getCounter() {
@@ -110,4 +112,10 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         throw new UnsupportedOperationException();
     }
 
+    public boolean isIsolatable() {
+        
+        return src.isIsolatable();
+        
+    }
+    
 }

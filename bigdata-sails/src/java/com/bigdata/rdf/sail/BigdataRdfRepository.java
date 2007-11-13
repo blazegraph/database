@@ -392,6 +392,10 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
             this.inf = new InferenceEngine(PropertyUtil
                     .convert(configParams), database);
             
+        } else {
+            
+            this.inf = database.getInferenceEngine();
+            
         }
 
         bufferCapacity = Integer.parseInt(properties.getProperty(

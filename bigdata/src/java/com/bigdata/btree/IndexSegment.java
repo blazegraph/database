@@ -30,6 +30,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
@@ -810,4 +811,10 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
+    public boolean isIsolatable() {
+        
+        return this instanceof IIsolatableIndex;
+        
+    }
+    
 }

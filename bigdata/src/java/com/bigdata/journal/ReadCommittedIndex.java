@@ -224,4 +224,9 @@ public class ReadCommittedIndex implements IIndexWithCounter {
         
     }
 
+    public boolean isIsolatable() {
+        
+        return getIndex().isIsolatable();
+        
+    }
 }

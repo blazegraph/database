@@ -324,7 +324,7 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getTermIdIndex();
 
-            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+            final boolean isolatableIndex = ndx.isIsolatable();
 
             IEntryIterator itr = ndx.rangeIterator(null, null);
 
@@ -369,7 +369,7 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getIdTermIndex();
 
-            final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+            final boolean isolatableIndex = ndx.isIsolatable();
 
             IEntryIterator itr = ndx.rangeIterator(null, null);
 

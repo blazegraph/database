@@ -1807,8 +1807,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         final IIndex ndx = getIdTermIndex();
 
-        // @todo this test does not work for the scale-out indices - see ClientIndexView.
-        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+        final boolean isolatableIndex = ndx.isIsolatable();
 
         return new Striterator(ndx.rangeIterator(null, null))
                 .addFilter(new Resolver() {
@@ -1840,8 +1839,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         IIndex ndx = getTermIdIndex();
 
-        // @todo this test does not work for the scale-out indices - see ClientIndexView.
-        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+        final boolean isolatableIndex = ndx.isIsolatable();
 
         return new Striterator(ndx.rangeIterator(null, null))
         .addFilter(new Resolver() {

@@ -50,6 +50,11 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
      */
     public final AbstractBTree[] srcs;
     
+    /**
+     * True iff all sources support isolation.
+     */
+    private final boolean isolatable;
+    
     public AbstractBTree[] getSources() {
         
         return srcs;
@@ -92,20 +97,42 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
                     "Only two sources are supported.");
         }
         
+        boolean isolatable = false; // arbitrary initial value.
+        
         for( int i=0; i<srcs.length; i++) {
             
             if (srcs[i] == null)
                 throw new IllegalArgumentException("a source is null");
+
+            if(i==0) {
+                
+                isolatable = srcs[0].isIsolatable();
+                
+            }
             
             for(int j=0; j<i; j++) {
                 
                 if (srcs[i] == srcs[j])
+                    
                     throw new IllegalArgumentException(
-                            "source used more than once");
+                            "Source used more than once"
+                            );
+                
 
                 if (! srcs[i].getIndexUUID().equals(srcs[j].getIndexUUID())) {
+                    
                     throw new IllegalArgumentException(
-                            "Sources have different index UUIDs");
+                            "Sources have different index UUIDs"
+                            );
+                    
+                }
+             
+                if( isolatable && ! srcs[i].isIsolatable() ) {
+                    
+                    throw new IllegalArgumentException(
+                            "Sources are not all same: isIsolatable()"
+                            );
+                    
                 }
                 
             }
@@ -113,6 +140,8 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
         }
 
         this.srcs = srcs.clone();
+        
+        this.isolatable = isolatable;
         
     }
     
@@ -244,6 +273,15 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
         return new FusedEntryIterator(srcs, fromKey, toKey);
+        
+    }
+    
+    /**
+     * <code>true</code> iff all sources support isolation.
+     */
+    public boolean isIsolatable() {
+        
+        return isolatable;
         
     }
     

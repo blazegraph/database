@@ -25,6 +25,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.bigdata.isolation.IIsolatableIndex;
+
 /**
  * <p>
  * Interface for mutable B+-Tree mapping arbitrary non-null keys to arbitrary
@@ -46,4 +48,17 @@ public interface IIndex extends ISimpleBTree, IBatchBTree {
      */
     public UUID getIndexUUID();
 
+    /**
+     * Return <code>true</code> iff the index supports isolation.
+     * <p>
+     * Note: This is declared as a method since the {@link IIsolatableIndex}
+     * interface is not always detectable. For example, a remote client will use
+     * a view of the index. That view does not declare {@link IIsolatableIndex}
+     * but the client can use this method instead to decide whether or not the
+     * index supports transactional isolation.
+     * 
+     * @see IIsolatableIndex
+     */
+    public boolean isIsolatable();
+    
 }
