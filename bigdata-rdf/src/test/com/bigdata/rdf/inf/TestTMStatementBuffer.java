@@ -55,6 +55,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.SesameStatementIterator;
+import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.util.KeyOrder;
@@ -191,9 +192,9 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             TMStatementBuffer assertionBuffer = new TMStatementBuffer(inf,
                     100/* capacity */, BufferEnum.AssertionBuffer);
             
-            URI U = new URIImpl("http://www.foo.org/U");
-            URI V = new URIImpl("http://www.foo.org/V");
-            URI X = new URIImpl("http://www.foo.org/X");
+            URI U = new URIImpl("http://www.bigdata.com/U");
+            URI V = new URIImpl("http://www.bigdata.com/V");
+            URI X = new URIImpl("http://www.bigdata.com/X");
 
             URI rdfsSubClassOf = URIImpl.RDFS_SUBCLASSOF;
 
@@ -235,9 +236,9 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      */
     public void test_retractAll_01() {
         
-        URI U = new URIImpl("http://www.foo.org/U");
-        URI V = new URIImpl("http://www.foo.org/V");
-        URI X = new URIImpl("http://www.foo.org/X");
+        URI U = new URIImpl("http://www.bigdata.com/U");
+        URI V = new URIImpl("http://www.bigdata.com/V");
+        URI X = new URIImpl("http://www.bigdata.com/X");
 
         URI rdfsSubClassOf = URIImpl.RDFS_SUBCLASSOF;
 
@@ -352,6 +353,100 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
     }
 
+    /**
+     * Given three explicit statements:
+     * 
+     * <pre>
+     *  stmt a:  #user #currentGraph #foo
+     *  
+     *  stmt b: #currentGraph rdfs:range #Graph
+     *  
+     *  stmt c: #foo rdf:type #Graph
+     * </pre>
+     * 
+     * a+b implies c
+     * <p>
+     * Delete a and verify that c is NOT gone since it is an explicit statement.
+     */
+    public void test_retractWhenStatementSupportsExplicitStatement() {
+     
+        URI user = new URIImpl("http://www.bigdata.com/user");
+        URI currentGraph = new URIImpl("http://www.bigdata.com/currentGraph");
+        URI foo = new URIImpl("http://www.bigdata.com/foo");
+        URI graph = new URIImpl("http://www.bigdata.com/Graph");
+        URI rdftype = URIImpl.RDF_TYPE;
+        URI rdfsRange = URIImpl.RDFS_RANGE;
+
+        AbstractTripleStore store = getStore();
+        
+        try {
+            
+            InferenceEngine inf = new InferenceEngine(store);
+
+            // add some assertions and verify aspects of their closure.
+            {
+            
+                TMStatementBuffer assertionBuffer = new TMStatementBuffer(inf,
+                        100/* capacity */, BufferEnum.AssertionBuffer);
+
+                // stmt a
+                assertionBuffer.add(user, currentGraph, foo );
+                
+                // stmt b
+                assertionBuffer.add(currentGraph, rdfsRange, graph );
+                
+                // stmt c
+                assertionBuffer.add(foo, rdftype, graph );
+                
+                // perform closure and write on the database.
+                assertionBuffer.doClosure();
+
+                // explicit.
+                assertTrue(store.hasStatement(user, currentGraph, foo ));
+                assertTrue(store.hasStatement(currentGraph, rdfsRange, graph ));
+                assertTrue(store.hasStatement(foo, rdftype, graph));
+
+                // verify that stmt c is marked as explicit in the kb.
+
+                StatementWithType stmtC = (StatementWithType) store
+                        .getStatement(foo, rdftype, graph);
+                
+                assertNotNull(stmtC);
+                
+                assertEquals(StatementEnum.Explicit, stmtC.getStatementType());
+
+            }
+            
+            /*
+             * retract stmt A and update the closure.
+             * 
+             * then verify that it is retracted statement is gone and that the
+             * other explicit statements were not touched.
+             */
+            {
+                
+                TMStatementBuffer retractionBuffer = new TMStatementBuffer(inf,
+                        100/* capacity */, BufferEnum.RetractionBuffer);
+
+                retractionBuffer.add(user, currentGraph, foo);
+
+                // update the closure.
+                retractionBuffer.doClosure();
+                
+                // explicit.
+                assertTrue(store.hasStatement(currentGraph, rdfsRange, graph));
+                assertFalse(store.hasStatement(foo, rdftype, graph));
+
+            }
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+
+    }
+    
     /**
      * This is a stress test for truth maintenance. It verifies that retraction
      * and assertion are symmetric by randomly retracting and then asserting
