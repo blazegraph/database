@@ -27,15 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.util.Iterator;
-
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.StatementBuffer.StatementIterator;
 import com.bigdata.rdf.rio.StatementBuffer.TermArrayIterator;
 import com.bigdata.rdf.rio.StatementBuffer.TermIterator;
@@ -95,169 +92,6 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         
     }
 
-    public void test_handleStatement() {
-
-        final int capacity = 5;
-        
-        AbstractTripleStore store = getStore();
-        
-        try {
-        
-            StatementBuffer buffer = new StatementBuffer(store,capacity);
-            
-            /*
-             * add a statement.
-             */
-            
-            _URI s1 = new _URI("http://www.foo.org");
-            _URI p1 = new _URI( RDF.TYPE);
-            _URI o1 =  new _URI(RDFS.RESOURCE);
-    
-            buffer.handleStatement(s1, p1, o1, StatementEnum.Explicit );
-            
-            assertEquals(3,buffer.numURIs);
-            assertEquals(0,buffer.numLiterals);
-            assertEquals(0,buffer.numBNodes);
-            assertEquals(1,buffer.numStmts);
-    
-            /*
-             * verify term class (URI, Literal or BNode) iterators.
-             */
-            assertSameIterator(new Object[] { /*uris*/s1, p1, o1 },
-                    new TermArrayIterator(buffer.values, buffer.numValues));
-            
-//            assertSameIterator(new Object[] { s1, p1, o1 },
-//                    new TermClassIterator(buffer.uris, buffer.numURIs));
-//    
-//            assertSameIterator(new Object[] {},
-//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-//    
-//            assertSameIterator(new Object[] {},
-//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
-    
-            /*
-             * verify all terms iterator.
-             */
-            assertSameIterator(new Object[] { s1, p1, o1 },
-                    new TermIterator(buffer));
-    
-            /*
-             * verify statement iterator.
-             */
-            assertSameIterator(new Object[] { buffer.stmts[0] },
-                    new StatementIterator(KeyOrder.SPO, buffer));
-            
-            /*
-             * add another statement.
-             */
-            
-            _URI s2 = new _URI("http://www.foo.org");
-            _URI p2 = new _URI( RDFS.LABEL);
-            _Literal o2 =  new _Literal("test uri.");
-            
-            buffer.handleStatement(s2, p2, o2, StatementEnum.Explicit );
-            
-            assertEquals(5,buffer.numURIs);
-            assertEquals(1,buffer.numLiterals);
-            assertEquals(0,buffer.numBNodes);
-            assertEquals(2,buffer.numStmts);
-    
-            /*
-             * verify term class (URI, Literal or BNode) iterators.
-             */
-            assertSameIterator(new Object[] { /*uris*/s1, p1, o1, s2, p2, /*literals*/o2 },
-                    new TermArrayIterator(buffer.values, buffer.numValues));
-
-//            assertSameIterator(new Object[] { s1, p1, o1, s2, p2 },
-//                    new TermClassIterator(buffer.uris, buffer.numURIs));
-//    
-//            assertSameIterator(new Object[] { o2 },
-//                    new TermClassIterator(buffer.literals, buffer.numLiterals));
-//    
-//            assertSameIterator(new Object[] {},
-//                    new TermClassIterator(buffer.bnodes, buffer.numBNodes));
-    
-            /*
-             * verify all terms iterator.
-             */
-            assertSameIterator(new Object[] { s1, p1, o1, s2, p2, o2 },
-                    new TermIterator(buffer));
-    
-            /*
-             * verify statement iterator.
-             */
-            assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
-                    new StatementIterator(KeyOrder.SPO, buffer));
-            
-            /*
-             * verify sort keys NOT assigned for terms.
-             */
-            {
-                Iterator<_Value> itr = new TermIterator(buffer);
-                while(itr.hasNext()) {
-                    assertNull(itr.next().key);
-                }
-            }
-    
-            /*
-             * assign sort keys for terms.
-             */
-            buffer.generateTermSortKeys(store.getKeyBuilder());
-    
-            /*
-             * verify sort keys assigned for terms.
-             */
-            {
-                Iterator<_Value> itr = new TermIterator(buffer);
-                while(itr.hasNext()) {
-                    assertNotNull(itr.next().key);
-                }
-            }
-    
-            /*
-             * sort terms by the assigned sort keys.
-             */
-            buffer.sortTermsBySortKeys();
-    
-            /*
-             * show terms in sorted order.
-             */
-            {
-                Iterator<_Value> itr = new TermIterator(buffer);
-                while(itr.hasNext()) {
-                    System.err.println(itr.next().toString());
-                }
-            }
-            
-            /* verify term iterator
-             * 
-             * Note: order URIs < Literals < BNodes.
-             * 
-             * Note: Arrays.sort() is stable.
-             * 
-             * Note: The sort order depends on the sort keys.  If you use an ASCII
-             * sort keys then the sort order is different from treating the strings
-             * as US-English Unicode data.  So this test can flunk depending on how
-             * you are encoding unicode strings to keys. 
-             */
-            assertSameIterator(new Object[] { s1, s2, p1, p2, o1, o2 },
-                    new TermIterator(buffer));
-        
-        } finally {
-        
-            store.closeAndDelete();
-            
-        }
-        
-    }
-    
-    /**
-     * Test with the <code>distinct</code> terms feature is enabled to
-     * uniquify the terms in the buffer.
-     * 
-     * FIXME update this test to reflect the recent changes in the
-     * {@link StatementBuffer}.
-     */
     public void test_handleStatement_distinct() {
         
         final int capacity = 5;
