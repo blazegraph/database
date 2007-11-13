@@ -71,7 +71,7 @@ public class AbstractBigdataRdfRepositoryTestCase extends TestCase2 {
 
         params.setProperty(Options.CREATE_TEMP_FILE, "true");
         
-        params.setProperty(Options.ISOLATABLE_INDICES, "true");
+//        params.setProperty(Options.ISOLATABLE_INDICES, "true");
         
         repo = new BigdataRdfSchemaRepository();
 

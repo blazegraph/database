@@ -55,6 +55,7 @@ import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.ResourceState;
@@ -484,6 +485,30 @@ abstract public class DataService implements IDataService,
             }
             
             return ndx.getIndexUUID();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+        
+    }
+
+    public boolean isIsolatable(String name) throws IOException {
+
+        setupLoggingContext();
+        
+        try {
+
+            final IIndex ndx = journal.getIndex(name);
+            
+            if(ndx == null) {
+                
+                throw new NoSuchIndexException(name);
+                
+            }
+            
+            return ndx.isIsolatable();
             
         } finally {
             

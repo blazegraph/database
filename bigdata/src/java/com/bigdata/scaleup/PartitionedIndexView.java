@@ -677,4 +677,13 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         
     }
 
+    /**
+     * <code>true</code> iff the mutable {@link BTree} supports isolation.
+     */
+    public boolean isIsolatable() {
+        
+        return btree.isIsolatable();
+        
+    }
+    
 }

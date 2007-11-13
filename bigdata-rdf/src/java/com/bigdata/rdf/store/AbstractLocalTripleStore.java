@@ -95,7 +95,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         final IIndexWithCounter terms = (IIndexWithCounter) getTermIdIndex();
 
-        final boolean isolatableIndex = terms instanceof IIsolatableIndex;
+        final boolean isolatableIndex = terms.isIsolatable();
         
         // formulate key from the RDF value.
         final byte[] termKey = keyBuilder.value2Key(val);
@@ -181,7 +181,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                 final IIndex ids = getIdTermIndex();
 
-                final boolean isolatableIndex2 = ids instanceof IIsolatableIndex;
+                final boolean isolatableIndex2 = ids.isIsolatable();
                 
                 // form the key from the term identifier.
                 final byte[] idKey = keyBuilder.id2key(val.termId);
@@ -243,7 +243,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         
         IIndex ndx = getIdTermIndex();
         
-        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+        final boolean isolatableIndex = ndx.isIsolatable();
         
         Object data = ndx.lookup(keyBuilder.id2key(id));
 
@@ -300,8 +300,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         IIndex ndx = getTermIdIndex();
         
-        // FIXME this test will not work for the read-committed view!
-        final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
+        final boolean isolatableIndex = ndx.isIsolatable();
 
         if (val.key == null) {
 
@@ -420,7 +419,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
                 IIndexWithCounter termId = (IIndexWithCounter)getTermIdIndex();
 
-                final boolean isolatableIndex = termId instanceof IIsolatableIndex;
+                final boolean isolatableIndex = termId.isIsolatable();
                 
                 ICounter counter = termId.getCounter();
                 
@@ -580,7 +579,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             
             IIndex idTerm = getIdTermIndex();
             
-            final boolean isolatableIndex2 = idTerm instanceof IIsolatableIndex;
+            final boolean isolatableIndex2 = idTerm.isIsolatable();
             
             // reused for all terms serialized.
             DataOutputBuffer out = new DataOutputBuffer();

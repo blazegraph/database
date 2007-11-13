@@ -185,14 +185,33 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public UUID getIndexUUID(String name) throws IOException;
 
     /**
-     * Drops the named index (unisolated).
+     * Return <code>true</code> iff the named index exists and supports
+     * transactional isolation.
+     * <p>
+     * Note:If you are inquiring about a scale-out index then you MUST provide
+     * the name of an index partition NOT the name of the metadata index.
      * 
      * @param name
-     *            The index name. In order to drop a partition of an index you
-     *            must form the name of the index partition using
-     *            {@link DataService#getIndexPartitionName(String, int)} (this
-     *            operation is generally performed by the
-     *            {@link IMetadataService} which manages scale-out indices).
+     *            The index name.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> does not identify a registered index.
+     * 
+     * @throws IOException
+     */
+    public boolean isIsolatable(String name) throws IOException;
+    
+    /**
+     * Drops the named index (unisolated).
+     * <p>
+     * Note: In order to drop a partition of an index you must form the name of
+     * the index partition using
+     * {@link DataService#getIndexPartitionName(String, int)} (this operation is
+     * generally performed by the {@link IMetadataService} which manages
+     * scale-out indices).
+     * 
+     * @param name
+     *            The index name.
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> does not identify a registered index.

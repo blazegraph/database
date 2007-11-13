@@ -30,9 +30,9 @@ import java.lang.reflect.Constructor;
 import java.util.UUID;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IJournal;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -919,4 +919,10 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
         
     }
 
+    public boolean isIsolatable() {
+        
+        return this instanceof IIsolatableIndex;
+        
+    }
+    
 }

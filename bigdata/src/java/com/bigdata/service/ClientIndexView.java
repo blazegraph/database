@@ -1656,4 +1656,39 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /**
+     * This reports the response for the index partition that spans an key (this
+     * index partition should always exist).
+     */
+    public boolean isIsolatable() {
+        
+        if (isolatable == null) {
+
+            final byte[] key = new byte[] {};
+
+            IPartitionMetadata pmd = getPartition(tx, name, key);
+
+            IDataService dataService = getDataService(pmd);
+
+            try {
+
+                isolatable = Boolean.valueOf(dataService
+                        .isIsolatable(DataService.getIndexPartitionName(name,
+                                pmd.getPartitionId())));
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+        
+        return isolatable.booleanValue();
+        
+    }
+
+    // cached value. @todo invalidate on drop/add.
+    private Boolean isolatable = null;
+    
 }
