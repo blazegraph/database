@@ -659,6 +659,42 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    /**
+     * Return the statement from the database matching the fully bound query.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @return
+     */
+    public StatementWithType getStatement(Resource s, URI p, Value o) {
+
+        if(s == null || p == null || o == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        StatementIterator itr = getStatements(s, p, o);
+
+        try {
+
+            if (!itr.hasNext()) {
+
+                return null;
+
+            }
+
+            return (StatementWithType) itr.next();
+
+        } finally {
+
+            itr.close();
+
+        }
+
+    }
+    
     public StatementIterator getStatements(Resource s, URI p, Value o) {
 
         return asStatementIterator( getAccessPath(s, p, o).iterator() );
