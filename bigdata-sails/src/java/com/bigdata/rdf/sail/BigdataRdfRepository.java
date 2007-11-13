@@ -186,7 +186,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      */
     protected static final long NULL = IRawTripleStore.NULL;
     
-    protected OptimizedValueFactory valueFactory;
+    final protected OptimizedValueFactory valueFactory = OptimizedValueFactory.INSTANCE;
 
     protected AbstractTripleStore database;
     
@@ -320,7 +320,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
                         }
                         
                     };
-                    
+                                        
                     readCommittedRef = new WeakReference<BigdataRdfRepository>(view);
                     
                 } else {
@@ -330,6 +330,16 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
 
                 }
                 
+                try {
+
+                    view.initialize(properties);
+                    
+                } catch (SailInitializationException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
             }
             
             return view; 
@@ -357,8 +367,6 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
 
         log.info(Options.TRUTH_MAINTENANCE + "=" + truthMaintenance);
         
-        valueFactory = OptimizedValueFactory.INSTANCE;
-
         if(database==null) {
 
             /*
@@ -1157,5 +1165,5 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         return database.getAccessPath(_s, _p, _o).rangeCount();
 
     }
-    
+   
 }

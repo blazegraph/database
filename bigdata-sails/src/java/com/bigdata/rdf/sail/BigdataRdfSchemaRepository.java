@@ -139,6 +139,16 @@ public class BigdataRdfSchemaRepository extends BigdataRdfRepository implements 
 
                 }
                 
+                try {
+
+                    view.initialize(properties);
+                    
+                } catch (SailInitializationException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+
             }
             
             return view; 
