@@ -90,6 +90,28 @@ public class TestAll extends TestCase {
         
         TestSuite suite = new TestSuite("Sesame 1.x integration");
        
+        /*
+         * @todo write a test for abortTransaction. it should verify that the
+         * write set is discarded by attempting to read data that had already
+         * been flushed to the database from the assertion or retraction buffer
+         * and also verify that nothing is left in those buffers after the
+         * abort.
+         * 
+         * @todo write a test to verify that concurrent attempts to start a
+         * transactio using startTransaction() will be serialized such that only
+         * a single writer is allowed.
+         * 
+         * @todo write BigdataReadCommittedRdf(Schema)Repository classes and
+         * verify that concurrent readers against those classes are allowed
+         * while writers are serialized by the BigdataRdf(Schema)Repository.
+         * 
+         * @todo if we support full transactions, then concurrent readers and
+         * writers should be allowed by the SAIL. in this case use thread local
+         * variables to associate the tx with the thread. readers will still use
+         * read-committed semantics since there is no means to create a
+         * read-only transaction with the SAIL.
+         */
+        
         // test suite for access to the statement type.
         suite.addTestSuite(TestStatementWithType.class);
         
