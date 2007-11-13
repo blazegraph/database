@@ -745,7 +745,6 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertFalse(store.hasStatement(1,2,3));
             assertTrue(store.hasStatement(2,2,3));
-            assertEquals(1,store.getStatementCount());
 
         } finally {
             

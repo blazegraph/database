@@ -27,9 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.UUID;
+
 import org.apache.log4j.Level;
 
+import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.TestRestartSafe;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link BTree#removeAll()}.
@@ -94,6 +100,56 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
             
         }
 
+    }
+    
+    /**
+     * Stress test of {@link BTree#removeAll()} where the btree is flushed
+     * {@link BTree#write()}. This will cause problems unless the cache is also
+     * cleared since nodes that have been detached from their parents will be in
+     * the cache.
+     */
+    public void test_removeAll_02() {
+
+        final int branchingFactor = 3;
+
+        IRawStore store = new SimpleMemoryRawStore();
+
+        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
+                SimpleEntry.Serializer.INSTANCE);
+
+        KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
+        
+        final int NTRIALS = 100;
+        
+        final int NINSERTS = 1000;
+        
+        final double removeAllRate = 0.05;
+        
+        for(int i=0; i<NTRIALS; i++) {
+            
+            for(int j=0; j<NINSERTS; j++) {
+
+                if(r.nextDouble()<removeAllRate) {
+                    
+                    log.info("removeAll with "+btree.getEntryCount()+" entries");
+                    
+                    btree.removeAll();
+                    
+                }
+                
+                int tmp = r.nextInt(10000);
+                
+                byte[] key = keyBuilder.reset().append(tmp).getKey();
+                
+                btree.insert(key, new SimpleEntry(tmp));
+                
+            }
+
+            // flush to the backing store.
+            btree.write();
+            
+        }
+        
     }
     
 }

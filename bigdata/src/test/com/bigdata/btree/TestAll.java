@@ -30,9 +30,6 @@ import junit.framework.TestSuite;
 /**
  * Aggregates test suites into increasing dependency order.
  *
- * FIXME write a test that verifies that spurious errors are not reported
- * when the log level for the com.bigdata.btree package is DEBUG.
- *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
