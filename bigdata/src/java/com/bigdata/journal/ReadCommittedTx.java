@@ -27,13 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.util.UUID;
-
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IIsolatedIndex;
@@ -137,7 +130,7 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
 
             }
 
-            return new ReadCommittedIndex(this, name);
+            return new ReadCommittedIsolatableIndex(this, name);
 
         } finally {
 
@@ -148,168 +141,45 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
     }
 
     /**
-     * Light-weight implementation of a read-committed index view.
-     * <p>
-     * A delegation model is used since commits or overflows of the journal
-     * might invalidate the index objects that actually read on the journal
-     * and/or index segments. The delegation strategy checks the commit counters
-     * and looks up a new delegate index object each time the commit counter is
-     * updated. In this way, newly committed data are always made visible to the
-     * next operation on the index. In-progress writes are NOT visible since we
-     * only read from a delegate index discovered by resolving the index name
-     * against the most recent {@link ICommitRecord}.
+     * Light-weight implementation of a read-committed view of an
+     * {@link IIsolatableIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class ReadCommittedIndex implements IIndex, IIsolatedIndex {
+    public static class ReadCommittedIsolatableIndex extends ReadCommittedIndex
+            implements IIsolatedIndex {
 
         /**
          * The transaction.
          */
         final protected ReadCommittedTx tx;
         
-        /**
-         * The name of the index.
-         */
-        final protected String name;
-        
-        /**
-         * The last commit record for which an index was returned.
-         */
-        private ICommitRecord commitRecord;
-        
-        /**
-         * The last index returned.
-         */
-        private IIsolatableIndex index;
-        
-        public ReadCommittedIndex(ReadCommittedTx tx, String name) {
-        
-            assert tx != null;
+        public ReadCommittedIsolatableIndex(ReadCommittedTx tx, String name) {
+
+            super(tx.journal,name);
             
             assert tx.isActive();
             
-            assert name != null;
-            
             this.tx = tx;
-            
-            this.name = name;
-            
-            this.index = getIndex();
             
         }
 
         /**
-         * Return the current {@link IIsolatableIndex} view. The read-committed
-         * view simply exposes this as a read-only {@link IIsolatedIndex}.
-         * <p>
-         * Note: This is <code>synchronized</code> so that the operation will
-         * be atomic (with respect to the callers) if there are multiple tasks
-         * running for the same read-committed transaction.
+         * Return the read-committed view of the named index case to an
+         * {@link IIsolatedIndex}.
          * 
-         * @return The current unisolated index on the journal (read-write).
+         * @return The read-committed index view.
          * 
          * @exception IllegalStateException
          *                if the named index is not registered.
+         * @exception ClassCastException
+         *                if the named index is an {@link IIsolatableIndex}.
          */
-        synchronized protected IIsolatableIndex getIndex() {
+        protected IIsolatableIndex getIndex() {
             
-            /*
-             * Obtain the most current {@link ICommitRecord} on the journal. All
-             * read operations are against the named index as resolved using
-             * this commit record.
-             */
-
-            ICommitRecord currentCommitRecord = tx.journal.getCommitRecord();
+            return (IIsolatableIndex) super.getIndex();
             
-            if (commitRecord != null
-                    && index != null
-                    && commitRecord.getCommitCounter() == currentCommitRecord
-                            .getCommitCounter()) {
-
-                /*
-                 * the commit record has not changed so we have the correct
-                 * index view.
-                 */
-                return index;
-                
-            }
-            
-            // update the commit record.
-            this.commitRecord = currentCommitRecord;
-            
-            /*
-             * Lookup the current committed index view against that commit
-             * record.
-             */
-            this.index = (IIsolatableIndex) tx.journal.getIndex(name,
-                    commitRecord);
-            
-            if(index == null) {
-                
-                throw new IllegalStateException("Index not defined: "+name);
-                
-            }
-            
-            return index;
-            
-        }
-        
-        public UUID getIndexUUID() {
-            return getIndex().getIndexUUID();
-        }
-        
-        public boolean contains(byte[] key) {
-            return getIndex().contains(key);
-        }
-
-        /**
-         * @exception UnsupportedOperationException always.
-         */
-        public Object insert(Object key, Object value) {
-            throw new UnsupportedOperationException();
-        }
-
-        public Object lookup(Object key) {
-            return getIndex().lookup(key);
-        }
-
-        /**
-         * @exception UnsupportedOperationException always.
-         */
-        public Object remove(Object key) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int rangeCount(byte[] fromKey, byte[] toKey) {
-            return getIndex().rangeCount(fromKey, toKey);
-        }
-
-        public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-            return getIndex().rangeIterator(fromKey, toKey);
-        }
-
-        public void contains(BatchContains op) {
-            getIndex().contains(op);
-        }
-
-        /**
-         * @exception UnsupportedOperationException always.
-         */
-        public void insert(BatchInsert op) {
-            throw new UnsupportedOperationException();
-        }
-
-        public void lookup(BatchLookup op) {
-            getIndex().lookup(op);
-        }
-
-        /**
-         * @exception UnsupportedOperationException always.
-         */
-        public void remove(BatchRemove op) {
-            throw new UnsupportedOperationException();
         }
         
     }

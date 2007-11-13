@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +44,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.openrdf.model.Resource;
@@ -219,7 +221,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends InferenceEngine.Options {
+    public static interface Options extends InferenceEngine.Options, com.bigdata.journal.Options {
         
         
     }
@@ -263,8 +265,54 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * remote database then only the connection is closed.
      * <p>
      * Note: This is mainly used by the test suites.
+     * <p>
+     * Note: The default implementation merely terminates some thread pools.
      */
-    abstract public void closeAndDelete();
+    public void closeAndDelete() {
+
+        shutdown();
+
+    }
+
+    /**
+     * Note: The default implementation merely terminates some thread pools.
+     */
+    public void close() {
+
+        shutdown();
+        
+    }
+
+    /**
+     * Terminates the {@link #readService} and the {@link #writeService}.
+     */
+    protected void shutdown() {
+        
+        writeService.shutdown();
+        
+        try {
+
+            writeService.awaitTermination(2, TimeUnit.SECONDS);
+            
+        } catch(InterruptedException ex) {
+            
+            log.warn("Write service did not terminate within timeout.");
+            
+        }
+        
+        readService.shutdown();
+        
+        try {
+
+            readService.awaitTermination(2, TimeUnit.SECONDS);
+            
+        } catch(InterruptedException ex) {
+            
+            log.warn("Read service did not terminate within timeout.");
+            
+        }
+        
+    }
     
     /**
      * True iff the backing store is stable (exists on disk somewhere and may be
@@ -363,8 +411,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       runs N tasks, one for each index) or a refactor to use the
      *       {@link ConcurrentJournal}.
      */
-    public ExecutorService indexWriteService = Executors.newFixedThreadPool(3,
-            DaemonThreadFactory.defaultThreadFactory());
+    public ExecutorService writeService = Executors.unconfigurableExecutorService(Executors.newFixedThreadPool(N,
+            DaemonThreadFactory.defaultThreadFactory()));
 
     /**
      * Generate the sort keys for the terms.
@@ -480,15 +528,59 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
 
     /*
-     * Sesame integration.
+     * singletons.
      */
-
-    final public DataLoader getDataLoader() {
+    
+    private WeakReference<InferenceEngine> inferenceEngineRef = null;
+    
+    final public InferenceEngine getInferenceEngine() {
+    
+        synchronized(this) {
         
-        return new DataLoader(getProperties(),this);
+            InferenceEngine inf = inferenceEngineRef == null ? null
+                    : inferenceEngineRef.get();
+            
+            if (inf == null) {
+                
+                inf = new InferenceEngine(this);
+            
+                inferenceEngineRef = new WeakReference<InferenceEngine>(inf);
+                
+            }
+            
+            return inf;
+            
+        }
         
     }
     
+    private WeakReference<DataLoader> dataLoaderRef = null;
+
+    final public DataLoader getDataLoader() {
+        
+        synchronized(this) {
+        
+            DataLoader dataLoader = dataLoaderRef == null ? null
+                    : dataLoaderRef.get();
+            
+            if (dataLoader == null) {
+                
+                dataLoader = new DataLoader(this);
+            
+                dataLoaderRef = new WeakReference<DataLoader>(dataLoader);
+                
+            }
+            
+            return dataLoader;
+            
+        }
+        
+    }
+    
+    /*
+     * Sesame integration.
+     */
+
     final public void addStatement(Resource s, URI p, Value o) {
 
         /*
@@ -1336,7 +1428,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     try {
 
-                        futures = indexWriteService.invokeAll(tasks);
+                        futures = writeService.invokeAll(tasks);
 
                         elapsed_SPO = futures.get(0).get();
                         elapsed_POS = futures.get(1).get();
@@ -2268,7 +2360,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 try {
 
-                    futures = indexWriteService.invokeAll(tasks);
+                    futures = writeService.invokeAll(tasks);
 
                     elapsed_SPO = futures.get(0).get();
                     elapsed_POS = futures.get(1).get();

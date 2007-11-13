@@ -588,9 +588,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     /**
      * NOP since the client uses unisolated writes which auto-commit.
+     * 
+     * @todo verify that no write state is maintained by the
+     *       {@link ClientIndexView} and that we therefore do NOT need to
+     *       discard those views on abort.
      */
     final public void abort() {
-        
         
     }
     
@@ -612,6 +615,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         fed.disconnect();
         
+        super.close();
+        
     }
 
     /**
@@ -623,6 +628,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         clear();
         
         fed.disconnect();
+        
+        super.closeAndDelete();
         
     }
 

@@ -353,7 +353,11 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     }
 
     /**
-     * This is a stress test for truth maintenance.
+     * This is a stress test for truth maintenance. It verifies that retraction
+     * and assertion are symmetric by randomly retracting and then asserting
+     * statements while using truth maintenance and verifying that the initial
+     * conditions are always recovered. It does NOT prove the correctness of the
+     * entailments, merely that retraction and assertion are symmetric.
      */
     public void test_stress() {
 
@@ -368,51 +372,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 RDFFormat.RDFXML,
                 RDFFormat.RDFXML
                 };
-
-//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
-//
-//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 1/*depth*/, 5/*nstmts*/);
-//
-//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
-
-        doStressTest(resource, baseURL, format, 10/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
-
-        // very stressful.
-//        doStressTest(resource, baseURL, format, 10/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
-        
-    }
-    
-    /**
-     * A stress test for truth maintenance using an arbitrary data set. The test
-     * scans the statement indices in some order, selecting N explicit statement
-     * to retract. It then retracts them, updates the closure, and then
-     * re-asserts them and verifies that original closure was restored.
-     * <p>
-     * Note: this test by itself does not guarentee that any entailments of
-     * those explicit statements were removed - we need to write other tests for
-     * that. repeat several times on the dataset, potentially doing multiple
-     * retractions before we back out of them.
-     * 
-     * @param resource
-     * @param baseURL
-     * @param format
-     * @param ntrials
-     *            The #of times that we will run the test.
-     * @param D
-     *            The recursive depth of the retractions. A depth of ONE (1)
-     *            means that one set of N statements will be retracted, closure
-     *            updated, and the re-asserted and closure updated and compared
-     *            against ground truth (the initial conditions). When the depth
-     *            is greater than ONE (1) we will recursively retract a set of N
-     *            statements D times. The statements will be reasserted as we
-     *            back out of the recursion and the graph compared with ground
-     *            truth when we return from the top level of the recursion.
-     * @param N
-     *            The #of explicit statements to be randomly selected and
-     *            retracted on each recursive pass.
-     */
-    public void doStressTest(String[] resource, String[] baseURL,
-            RDFFormat[] format, int ntrials, int D, int N) {
 
         for(String r : resource) {
             
@@ -452,7 +411,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             InferenceEngine inf = new InferenceEngine(properties,store);
             
             inf.computeClosure(null/*focusStore*/);
-            
+
             /*
              * Make a copy of the graph that will serve as ground truth.
              */
@@ -462,39 +421,93 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             store.copyStatements(tmp, null/*filter*/);
             
             /*
-             * Verify our initial conditions agree.
+             * Start the stress tests.
              */
+
+            doStressTest(tmp, inf, 10/*ntrials*/, 1/*depth*/, 1/*nstmts*/);
+
+            doStressTest(tmp, inf, 10/*ntrials*/, 1/*depth*/, 5/*nstmts*/);
+
+            doStressTest(tmp, inf, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
+
+            doStressTest(tmp, inf, 10/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
+
+//            // very stressful.
+//            doStressTest(tmp, inf, 100/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
             
-            assertSameGraphs( tmp, store );
-
-            for (int trial = 0; trial < ntrials; trial++) {
-
-                /*
-                 * Do recursion.
-                 */
-
-                MDC.put("trial", "trial="+trial);
-
-                retractAndAssert(inf,store,0/*depth*/,D,N);
-
-                /*
-                 * Verify that the closure is correct after all that recursive
-                 * mutation and restoration.
-                 */
-
-                assertSameGraphs(tmp, store);
-
-                MDC.remove("trial");
-                
-            }
-
         } catch(IOException ex) {
             
             fail("Not expecting: "+ex, ex);
             
         } finally {
-
+            
             store.closeAndDelete();
+            
+        }
+
+    }
+    
+    /**
+     * A stress test for truth maintenance using an arbitrary data set. The test
+     * scans the statement indices in some order, selecting N explicit statement
+     * to retract. It then retracts them, updates the closure, and then
+     * re-asserts them and verifies that original closure was restored.
+     * <p>
+     * Note: this test by itself does not guarentee that any entailments of
+     * those explicit statements were removed - we need to write other tests for
+     * that. repeat several times on the dataset, potentially doing multiple
+     * retractions before we back out of them.
+     * 
+     * @param tmp
+     *            Ground truth (the state that must be recovered in order for
+     *            truth maintenance to be symmetric).
+     * @param inf
+     *            The {@link InferenceEngine} to use in the test. This reads and
+     *            writes on the database whose closure is being maintained.
+     * @param ntrials
+     *            The #of times that we will run the test.
+     * @param D
+     *            The recursive depth of the retractions. A depth of ONE (1)
+     *            means that one set of N statements will be retracted, closure
+     *            updated, and the re-asserted and closure updated and compared
+     *            against ground truth (the initial conditions). When the depth
+     *            is greater than ONE (1) we will recursively retract a set of N
+     *            statements D times. The statements will be reasserted as we
+     *            back out of the recursion and the graph compared with ground
+     *            truth when we return from the top level of the recursion.
+     * @param N
+     *            The #of explicit statements to be randomly selected and
+     *            retracted on each recursive pass.
+     */
+    public void doStressTest(TempTripleStore tmp, InferenceEngine inf,
+            int ntrials, int D, int N) {
+
+        AbstractTripleStore store = inf.database;
+        
+        /*
+         * Verify our initial conditions agree.
+         */
+        
+        assertSameGraphs( tmp, store );
+
+        for (int trial = 0; trial < ntrials; trial++) {
+
+            /*
+             * Do recursion.
+             */
+
+            MDC.put("trial", "trial="+trial);
+
+            retractAndAssert(inf,store,0/*depth*/,D,N);
+
+            /*
+             * Verify that the closure is correct after all that recursive
+             * mutation and restoration.
+             */
+
+            assertSameGraphs(tmp, store);
+
+            MDC.remove("trial");
             
         }
         

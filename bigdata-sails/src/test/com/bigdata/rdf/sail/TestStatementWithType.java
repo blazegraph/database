@@ -31,10 +31,6 @@
 
 package com.bigdata.rdf.sail;
 
-import java.util.Properties;
-
-import junit.framework.TestCase;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.SailInitializationException;
@@ -42,7 +38,6 @@ import org.openrdf.sesame.sail.SailUpdateException;
 
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.sail.BigdataRdfRepository.Options;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -55,7 +50,7 @@ import com.bigdata.rdf.store.StatementWithType;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStatementWithType extends TestCase {
+public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase {
 
     /**
      * 
@@ -217,54 +212,5 @@ public class TestStatementWithType extends TestCase {
         }
             
     }
-    
-    /**
-     * Configures the test repository.
-     */
-    protected void setUp() throws Exception
-    {
-        
-        super.setUp();
-        
-        Properties params = new Properties();
-
-        params.setProperty(Options.CREATE_TEMP_FILE, "true");
-        
-        repo = new BigdataRdfSchemaRepository();
-
-        try {
-
-            repo.initialize(params);
-
-        }
-
-        catch (SailInitializationException ex) {
-
-            /*
-             * Note: Sesame is not provide the stack trace, so we do it
-             * ourselves.
-             */
-            ex.printStackTrace();
-
-            throw ex;
-
-        }
-        
-    }
-
-    protected void tearDown() throws Exception {
-
-        // @todo close out the store.
-//        if (repo != null) {
-//
-////            closeAndDelete();
-//            
-//        }
-        
-        super.tearDown();
-        
-    }
-    
-    protected BigdataRdfSchemaRepository repo;
     
 }

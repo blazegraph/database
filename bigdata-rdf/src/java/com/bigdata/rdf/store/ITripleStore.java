@@ -35,6 +35,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.sesame.sail.StatementIterator;
 
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -214,12 +215,20 @@ public interface ITripleStore {
     public Statement asStatement(SPO spo);
     
     /**
-     * Return a new {@link DataLoader} provisioned using the properties that
-     * were used to construct the {@link ITripleStore}.
+     * Return a {@link DataLoader} singleton configured using the properties
+     * that were used to configure the database.
      * 
      * @see Options
      */
     public DataLoader getDataLoader();
+    
+    /**
+     * Return an {@link InferenceEngine} singleton configured using the
+     * properties that were used to configure the database.
+     * 
+     * @see Options
+     */
+    public InferenceEngine getInferenceEngine();
     
     /**
      * Discard the write set.

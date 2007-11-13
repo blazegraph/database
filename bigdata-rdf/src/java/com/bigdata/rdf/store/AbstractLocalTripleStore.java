@@ -73,7 +73,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
     /**
      * Handles both unisolatable and isolatable indices.
      */
-    final public long addTerm(Value value) {
+    public long addTerm(Value value) {
 
         final _Value val = OptimizedValueFactory.INSTANCE.toNativeValue(value);
         
@@ -300,6 +300,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         IIndex ndx = getTermIdIndex();
         
+        // FIXME this test will not work for the read-committed view!
         final boolean isolatableIndex = ndx instanceof IIsolatableIndex;
 
         if (val.key == null) {
@@ -344,8 +345,6 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
     }
 
     /**
-     * FIXME I occasionally see a bug that results in term identifiers not being
-     * assigned to all terms.
      * 
      * @todo This could use two threads to write on the indices if we divide the
      *       work into batches. The first thread would write on the term:id
@@ -362,7 +361,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      *       its writes, but {@link ClientIndexView} can add transparent
      *       parallelism in that case.
      */
-    final public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
+    public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
 
         if (numTerms == 0)
             return;

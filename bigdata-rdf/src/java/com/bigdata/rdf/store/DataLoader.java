@@ -260,17 +260,28 @@ public class DataLoader {
         public static final String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
         
     }
-    
+
     /**
-     * Create a data loader.
+     * Configure {@link DataLoader} using properties used to configure the
+     * database.
+     * 
+     * @param database
+     *            The database.
+     */
+    public DataLoader(AbstractTripleStore database) {
+        
+        this(database.getProperties(), database );
+        
+    }
+
+    /**
+     * Configure a data loader with overriden properties.
      * 
      * @param properties
      *            Configuration properties - see {@link Options}.
      * 
      * @param database
      *            The database.
-     *            
-     * @todo have the caller pass in the InferenceEngine?
      */
     public DataLoader(Properties properties, AbstractTripleStore database) {
         
@@ -300,7 +311,7 @@ public class DataLoader {
 
         this.database = database;
         
-        inferenceEngine = new InferenceEngine(properties, database);
+        inferenceEngine = database.getInferenceEngine();
 
         if (closureEnum != ClosureEnum.None) {
             

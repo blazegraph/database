@@ -31,6 +31,7 @@
 
 package com.bigdata.rdf.sail;
 
+import java.lang.ref.WeakReference;
 import java.util.Map;
 
 import org.CognitiveWeb.util.PropertyUtil;
@@ -46,6 +47,9 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.SesameStatementIterator;
 
 /**
@@ -65,6 +69,84 @@ public class BigdataRdfSchemaRepository extends BigdataRdfRepository implements 
         
     }
 
+    /**
+     * Variant constructor used to wrap an exiting database.
+     * <p>
+     * Note: you MUST still invoke {@link #initialize(Map)}.
+     * 
+     * @param database
+     *            The database.
+     */
+    public BigdataRdfSchemaRepository(AbstractTripleStore database) {
+
+        super(database);
+        
+    }
+
+    private WeakReference<BigdataRdfSchemaRepository> readCommittedRef;
+    
+    /**
+     * A factory returning the singleton read-committed view of the database.
+     * <p>
+     * Note: This is only supported when the {@link Options#STORE_CLASS}
+     * specifies {@link LocalTripleStore} or {@link ScaleOutTripleStore}.
+     */
+    public BigdataRdfSchemaRepository asReadCommittedView() {
+        
+        synchronized(this) {
+        
+            BigdataRdfSchemaRepository view = readCommittedRef == null ? null
+                    : readCommittedRef.get();
+            
+            if(view == null) {
+                
+                if(database instanceof LocalTripleStore) {
+
+                    /*
+                     * Create the singleton using a read-committed view of the
+                     * database.
+                     */
+                    
+                    view = new BigdataRdfSchemaRepository(((LocalTripleStore)database).asReadCommittedView());
+                    
+                    readCommittedRef = new WeakReference<BigdataRdfSchemaRepository>(view);
+                    
+                } else if(database instanceof ScaleOutTripleStore) {
+                    
+                    /*
+                     * The scale-out triple store already has read-committed
+                     * semantics since it uses unisolated writes on the data
+                     * service.  Therefore we just disable startTransaction()
+                     * on the returned singleton.
+                     */
+                    
+                    view = new BigdataRdfSchemaRepository(database) {
+                      
+                        public void startTransaction() {
+                            
+                            throw new UnsupportedOperationException("Read-only");
+                            
+                        }
+                        
+                    };
+                    
+                    readCommittedRef = new WeakReference<BigdataRdfSchemaRepository>(view);
+                    
+                } else {
+                    
+                    throw new UnsupportedOperationException(Options.STORE_CLASS + "="
+                            + database.getClass().getName());                    
+
+                }
+                
+            }
+            
+            return view; 
+        
+        }
+        
+    }
+    
     public void initialize(Map configParams) throws SailInitializationException {
 
         properties = PropertyUtil.flatCopy(PropertyUtil.convert(configParams));
