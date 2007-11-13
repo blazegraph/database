@@ -52,7 +52,6 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.ReadCommittedTx.ReadCommittedIndex;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;

@@ -173,11 +173,15 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
         store.close();
         
+        super.close();
+        
     }
     
     final public void closeAndDelete() {
         
         store.closeAndDelete();
+        
+        super.closeAndDelete();
         
     }
     

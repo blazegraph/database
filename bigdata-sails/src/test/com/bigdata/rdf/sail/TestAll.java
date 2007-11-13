@@ -90,13 +90,10 @@ public class TestAll extends TestCase {
         
         TestSuite suite = new TestSuite("Sesame 1.x integration");
        
+        // test suite for SAIL transaction semantics.
+        suite.addTestSuite(TestSAILTransactionSemantics.class);
+
         /*
-         * @todo write a test for abortTransaction. it should verify that the
-         * write set is discarded by attempting to read data that had already
-         * been flushed to the database from the assertion or retraction buffer
-         * and also verify that nothing is left in those buffers after the
-         * abort.
-         * 
          * @todo write a test to verify that concurrent attempts to start a
          * transactio using startTransaction() will be serialized such that only
          * a single writer is allowed.

@@ -27,17 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.lang.ref.WeakReference;
 import java.util.Properties;
 import java.util.UUID;
+
+import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.ReadCommittedIndex;
 import com.bigdata.rdf.inf.JustificationSerializer;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
@@ -249,7 +253,22 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     final public void abort() {
         
+        // discard the write sets.
+        
         store.abort();
+        
+        /*
+         * Discard the hard references to the indices since they may have
+         * uncommitted writes. The indices will be re-loaded from the store the
+         * next time they are used.
+         */
+        
+        ndx_termId = null;
+        ndx_idTerm = null;
+        ndx_spo = null;
+        ndx_pos = null;
+        ndx_osp = null;
+        ndx_just = null;
         
     }
     
@@ -274,9 +293,13 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
         }
         
+        registerIndices();
+        
     }
     
     final public void close() {
+        
+        super.close();
         
         store.shutdown();
         
@@ -284,11 +307,13 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     
     final public void closeAndDelete() {
         
+        super.closeAndDelete();
+        
         store.closeAndDelete();
         
     }
     
-    public static interface Options extends AbstractTripleStore.Options, ConcurrentJournal.Options {
+    public static interface Options extends AbstractTripleStore.Options {
         
         /**
          * When true, the terms, ids, and statement indices will be registered
@@ -315,6 +340,35 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
                 .parseBoolean(properties.getProperty(
                         Options.ISOLATABLE_INDICES,
                         Options.DEFAULT_ISOLATABLE_INDICES));
+
+        registerIndices();
+        
+    }
+    
+    /**
+     * Note: This may be used to force eager registration of the indices such
+     * that they are always on hand for {@link #asReadCommittedView()}.
+     */
+    protected void registerIndices() {
+
+        getTermIdIndex();
+        
+        getIdTermIndex();
+        
+        getSPOIndex();
+        
+        getPOSIndex();
+        
+        getOSPIndex();
+        
+        getJustificationIndex();
+        
+        /*
+         * Note: A commit is required in order for a read-committed view to have
+         * access to the register indices.
+         */
+        
+        commit();
         
     }
     
@@ -340,5 +394,218 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         super.usage();
         
     }
+
+    private WeakReference<ReadCommittedTripleStore> readCommittedRef;
     
+    /**
+     * A factory returning the singleton read-committed view of the database.
+     */
+    public ReadCommittedTripleStore asReadCommittedView() {
+
+        synchronized(this) {
+        
+            ReadCommittedTripleStore view = readCommittedRef == null ? null
+                    : readCommittedRef.get();
+            
+            if(view == null) {
+                
+                view = new ReadCommittedTripleStore(this);
+                
+                readCommittedRef = new WeakReference<ReadCommittedTripleStore>(view);
+                
+            }
+            
+            return view; 
+        
+        }
+        
+    }
+    
+    /**
+     * A read-committed view of a read-write triple store. Data committed on the
+     * read-write triple store will become visible in this view. The view does
+     * NOT support any mutation operations.
+     * 
+     * @todo The {@link ScaleOutTripleStore} uses unisolated writes so it always
+     *       has read-committed semantics so it does not make sense to implement
+     *       a read-committed view for that class. However, the manner in which
+     *       it chooses the read-behavior point MAY change in order to support
+     *       long-running data load operations.
+     *
+     * @see LocalTripleStore#asReadCommittedView()
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class ReadCommittedTripleStore extends AbstractLocalTripleStore {
+
+        private final LocalTripleStore db;
+        
+        /**
+         * Create a read-committed view of a read-write triple store.
+         * 
+         * @param db
+         *            The read-write triple store.
+         */
+        protected ReadCommittedTripleStore(LocalTripleStore db) {
+
+            super(db.getProperties());
+        
+            this.db = db;
+            
+        }
+
+        /**
+         * True iff the backing database is stable.
+         */
+        public boolean isStable() {
+
+            return db.isStable();
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public void abort() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public void clear() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /** NOP */
+        public void close() {
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public void closeAndDelete() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public void commit() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public long addTerm(Value value) {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * This will resolve terms that are pre-existing but will throw an
+         * exception if there is an attempt to define a new term.
+         * 
+         * @throws UnsupportedOperationException
+         *             if there is an attempt to write on an index.
+         */
+        public void insertTerms(_Value[] terms, int numTerms, boolean haveKeys, boolean sorted) {
+
+            super.insertTerms(terms, numTerms, haveKeys, sorted);
+            
+        }
+
+        private IIndex ndx_termId;
+        private IIndex ndx_idTerm;
+        private IIndex ndx_spo;
+        private IIndex ndx_pos;
+        private IIndex ndx_osp;
+        private IIndex ndx_just;
+
+        public IIndex getTermIdIndex() {
+            
+            if(ndx_termId==null) {
+                
+                ndx_termId= new ReadCommittedIndex(db.store,name_termId);
+                
+            }
+            
+            return ndx_termId;
+            
+        }
+
+        public IIndex getIdTermIndex() {
+        
+            if(ndx_idTerm==null) {
+                
+                ndx_idTerm = new ReadCommittedIndex(db.store,name_idTerm);
+                
+            }
+            
+            return ndx_idTerm;
+
+        }
+
+        public IIndex getSPOIndex() {
+
+            if(ndx_spo ==null) {
+                
+                ndx_spo = new ReadCommittedIndex(db.store,name_spo);
+                
+            }
+            
+            return ndx_spo;
+
+        }
+        
+        public IIndex getPOSIndex() {
+
+            if(ndx_pos ==null) {
+                
+                ndx_pos = new ReadCommittedIndex(db.store,name_pos);
+                
+            }
+            
+            return ndx_pos;
+
+        }
+
+        public IIndex getOSPIndex() {
+
+            if(ndx_osp ==null) {
+                
+                ndx_osp = new ReadCommittedIndex(db.store,name_osp);
+                
+            }
+            
+            return ndx_osp;
+
+        }
+
+        public IIndex getJustificationIndex() {
+
+            if(ndx_just ==null) {
+                
+                ndx_just = new ReadCommittedIndex(db.store,name_just);
+                
+            }
+            
+            return ndx_just;
+
+        }
+
+    }
+
 }

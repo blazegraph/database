@@ -125,7 +125,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
     public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
             throws SailInitializationException {
 
-        BigdataRdfRepository repo = new BigdataRdfRepository(inf);
+        BigdataRdfRepository repo = new BigdataRdfRepository(inf.database);
         
         Properties properties = new Properties(getProperties());
         

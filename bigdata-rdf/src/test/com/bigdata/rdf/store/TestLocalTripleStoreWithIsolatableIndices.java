@@ -72,6 +72,14 @@ public class TestLocalTripleStoreWithIsolatableIndices extends AbstractTestCase 
          * List any non-proxied tests (typically bootstrapping tests).
          */
         
+        // ...
+        
+        /*
+         * Proxied test suite for use only with the LocalTripleStore.
+         */
+
+        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
+
         /*
          * Pickup the basic triple store test suite. This is a proxied test
          * suite, so all the tests will run with the configuration specified in

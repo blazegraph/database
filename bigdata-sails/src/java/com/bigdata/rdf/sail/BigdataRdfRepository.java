@@ -31,6 +31,7 @@
 
 package com.bigdata.rdf.sail;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -75,6 +76,7 @@ import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
 
@@ -132,10 +134,12 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
     /**
      * Additional parameters understood by the Sesame 1.x SAIL implementation.
      * 
+     * @todo also extend Options for the scale-out triple store once defined.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options, com.bigdata.rdf.store.AbstractTripleStore.Options {
+    public static interface Options extends com.bigdata.rdf.store.LocalTripleStore.Options {
 
         /**
          * This optional boolean property may be used to specify whether or not
@@ -247,18 +251,80 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
     }
 
     /**
-     * Alternative constructor used to wrap an existing store and a
-     * pre-configured {@link InferenceEngine} - you MUST still invoke
-     * {@link #initialize(Map)}.
+     * Variant constructor used to wrap an exiting database.
+     * <p>
+     * Note: you MUST still invoke {@link #initialize(Map)}.
      * 
-     * @param inf
-     *            The {@link InferenceEngine}.
+     * @param database
+     *            The database.
      */
-    public BigdataRdfRepository(InferenceEngine inf) {
+    public BigdataRdfRepository(AbstractTripleStore database) {
 
-        this.database = inf.database;
+        this.database = database;
         
-        this.inf = inf;
+    }
+    
+    private WeakReference<BigdataRdfRepository> readCommittedRef;
+    
+    /**
+     * A factory returning the singleton read-committed view of the database.
+     * <p>
+     * Note: This is only supported when the {@link Options#STORE_CLASS}
+     * specifies {@link LocalTripleStore} or {@link ScaleOutTripleStore}.
+     */
+    public BigdataRdfRepository asReadCommittedView() {
+        
+        synchronized(this) {
+        
+            BigdataRdfRepository view = readCommittedRef == null ? null
+                    : readCommittedRef.get();
+            
+            if(view == null) {
+                
+                if(database instanceof LocalTripleStore) {
+
+                    /*
+                     * Create the singleton using a read-committed view of the
+                     * database.
+                     */
+                    
+                    view = new BigdataRdfRepository(((LocalTripleStore)database).asReadCommittedView());
+                    
+                    readCommittedRef = new WeakReference<BigdataRdfRepository>(view);
+                    
+                } else if(database instanceof ScaleOutTripleStore) {
+                    
+                    /*
+                     * The scale-out triple store already has read-committed
+                     * semantics since it uses unisolated writes on the data
+                     * service.  Therefore we just disable startTransaction()
+                     * on the returned singleton.
+                     */
+                    
+                    view = new BigdataRdfRepository(database) {
+                      
+                        public void startTransaction() {
+                            
+                            throw new UnsupportedOperationException("Read-only");
+                            
+                        }
+                        
+                    };
+                    
+                    readCommittedRef = new WeakReference<BigdataRdfRepository>(view);
+                    
+                } else {
+                    
+                    throw new UnsupportedOperationException(Options.STORE_CLASS + "="
+                            + database.getClass().getName());                    
+
+                }
+                
+            }
+            
+            return view; 
+        
+        }
         
     }
     
