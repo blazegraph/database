@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.concurrent.Semaphore;
 
 import org.CognitiveWeb.util.PropertyUtil;
 import org.apache.log4j.Logger;
@@ -631,14 +632,23 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
 
     }
 
+    private Semaphore semaphore = new Semaphore(1);
+    
     public void startTransaction() {
         
-        if(transactionStarted) {
-            
-            throw new SailInternalException(
-                    "A transaction was already started.");
-
+        // this will block until the semaphore is available.
+        try {
+            semaphore.acquire();
+        } catch(InterruptedException ex) {
+            throw new SailInternalException(ex);
         }
+        
+//        if(transactionStarted) {
+//            
+//            throw new SailInternalException(
+//                    "A transaction was already started.");
+//
+//        }
         
         transactionStarted = true;
         
@@ -680,7 +690,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * {@link ITripleStore#abort()}.
      */
     public void abortTransaction() {
-        
+
         if( ! transactionStarted ) {
             
             throw new SailInternalException
@@ -688,7 +698,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
                   );
 
         }
-
+        
         // discard any pending asserts.
         assertBuffer.clear();
         
@@ -704,6 +714,9 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
         transactionStarted = false;
 
+        // release the semaphore allowing another tx to start.
+        semaphore.release();
+        
     }
     
     /**
@@ -736,9 +749,12 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
         database.commit();
         
+        fireSailChangedEvents();
+
         transactionStarted = false;
         
-        fireSailChangedEvents();
+        // release the semaphore allowing another tx to start.
+        semaphore.release();
 
     }
 
