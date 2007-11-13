@@ -33,6 +33,7 @@ import java.util.UUID;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.JustificationSerializer;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
@@ -47,6 +48,12 @@ import com.bigdata.rdf.serializers.TermIdSerializer;
  * statement indices are populated with the term identifiers from the main
  * database and the ids and terms indices in the {@link TempTripleStore} are NOT
  * used.
+ * <p>
+ * Note: This class does NOT support {@link #commit()} or {@link #abort()}. If
+ * you want an in-memory {@link ITripleStore} that supports commit and abort
+ * then use a {@link LocalTripleStore} and specify
+ * {@link com.bigdata.journal.Options#BUFFER_MODE} as
+ * {@link BufferMode#Transient}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -107,9 +114,16 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     }
     
     /**
-     * NOP.
+     * NOP - the temporary store does not support commits or aborts.
      */
     final public void commit() {
+        
+    }
+    
+    /**
+     * NOP - the temporary store does not support commits or aborts.
+     */
+    final public void abort() {
         
     }
     

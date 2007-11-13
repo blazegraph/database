@@ -587,6 +587,14 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     }
     
     /**
+     * NOP since the client uses unisolated writes which auto-commit.
+     */
+    final public void abort() {
+        
+        
+    }
+    
+    /**
      * The federation is considered stable regardless of whether the federation
      * is on stable storage since clients only disconnect when they use
      * {@link #close()}.
