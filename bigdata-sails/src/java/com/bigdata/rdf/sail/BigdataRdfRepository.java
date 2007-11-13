@@ -86,39 +86,49 @@ import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
  * Note: Sesame 1.x coupled the control logic and data structures in such a way
  * that you could not write your own JOIN operators, which makes it very
  * difficult to optimize performance.
+ * 
+ * <h2>SAIL Transactions</h2>
+ * 
+ * The SAIL transaction model is extended to include an
+ * {@link #abortTransaction()} operation. In order to ensure that the SAIL
+ * remains available to other writers you MUST code a transaction as follows:
+ * 
+ * <pre>
+ * repo.startTransaction();
+ * 
+ * try {
+ * 
+ *     // do work
+ * 
+ *     repo.commitTransaction();
+ * 
+ * } catch (Throwable t) {
+ * 
+ *     repo.abortTransaction();
+ * 
+ * }
+ * </pre>
+ * 
+ * This SAIL enforces the constraint that there may be at most one writer. This
+ * is done in {@link #startTransaction()}. If a 2nd thread attempts to start a
+ * transaction while one is already started then that thread will block until
+ * the SAIL becomes available again for writers.
+ * 
+ * <h2>Concurrent Query</h2>
+ * 
+ * While this class, by itself, is NOT safe for readers that run concurrently
+ * with a writer, it provides a read-committed view that is safe for concurrent
+ * readers and that is safe to use while a writer is concurrently running a
+ * transaction. See {@link #asReadCommittedView()}.
  * <p>
- * Note: Only a simple transaction model is supported. There is no transactional
- * isolation. Queries run against the "live" indices and therefore CAN NOT be
- * used concurrently or concurrently with writes on the store.
- * <p>
- * <em>THIS CLASS IS NOT THREAD SAFE</em>
- * 
- * @todo Queries could run concurrently against the last committed state of the
- *       store. This would require an {@link RdfRepository} wrapper that was
- *       initialized from the last commit record on the store and then was used
- *       to execute queries. In turn, that should probably be built over a
- *       read-only {@link ITripleStore} reading from the last commit record on
- *       the store at the time that the view is created.
- * 
- * FIXME The short step to concurrent query is to subclass LocalTripleStore (or
- * just define a parallel subclass of AbstractTripleStore) that is (a)
- * read-only; and (b) always reads from the last committed state of the
- * database. We would then create a read-only SAIL using that database object -
- * it would support concurrent query. The existing SAIL would support writers.
- * 
- * The trick is how to route writes to the writable sail.
- * 
- * I think that we could use a stacked sail and a Semaphore to get the right
- * effect. The 1st thread to start a transaction acquires the permit from the
- * Semaphore. Other threads that try to start a transaction will block until the
- * transaction releases the permit in commitTransaction. If an operation inside
- * of a transaction fails then the writable sail will need to release the permit
- * so that another transaction can begin.
- * 
- * In fact, I do nothing to handle errors during writes. They really need to
- * "abortTransaction()", but Sesame does not define that method. The abort needs
- * to release the permit, clear the assertion and retraction buffers, and do an
- * abort() on the journal to discard the writes since the transaction started.
+ * In order to use concurrent query you basically have to decide whether an
+ * operation is read-only or read-write. A read-only operation should be
+ * directed to the {@link #asReadCommittedView()} while read-write operations
+ * should obtain a lock on the mutable SAIL using {@link #startTransaction()}
+ * before doing any other work. When approached in this manner, you will be able
+ * to execute read operations (for example, high-level query) with full
+ * concurrency and SAIL transactions will be serialized (at most one will run at
+ * a time) but they will not block readers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
