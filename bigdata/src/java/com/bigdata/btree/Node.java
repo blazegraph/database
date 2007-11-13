@@ -1912,7 +1912,7 @@ public class Node extends AbstractNode implements INodeData {
     /**
      * Invoked when a non-root node or leaf has no more keys to detach the child
      * from its parent. If the node becomes deficient, then the node is joined
-     * witn one of its immediate siblings. If the node is the root of the tree,
+     * with one of its immediate siblings. If the node is the root of the tree,
      * then the root of the tree is also updated. The child is deleted as a
      * post-condition.
      * 
@@ -1945,10 +1945,11 @@ public class Node extends AbstractNode implements INodeData {
 
         if (INFO) {
             log.info("this="+this+", child="+child);
-            if(DEBUG) {
-                System.err.println("this"); dump(Level.DEBUG,System.err);
-                System.err.println("child"); child.dump(Level.DEBUG,System.err);
-            }
+            /* Note: dumping [this] or the [child] will throw false exceptions at this point - they are in an intermediate state. */
+//            if(DEBUG) {
+//                System.err.println("this"); dump(Level.DEBUG,System.err);
+//                System.err.println("child"); child.dump(Level.DEBUG,System.err);
+//            }
         }
 
         int i = getIndexOf(child);
