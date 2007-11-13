@@ -430,10 +430,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         nodeSer.close();
 
         /*
-         * Clear the hard reference queue (this will not trigger any writes
-         * since we know as a pre-condition that the root node is clean).
+         * Clear the hard reference queue.
+         * 
+         * Note: This is safe since we know as a pre-condition that the root
+         * node is clean and therefore that there are no dirty nodes or leaves
+         * in the hard reference queue.
          */
-        leafQueue.evictAll(true);
+        leafQueue.clear(true/*clearRefs*/);
 
         /*
          * Clear the reference to the root node (permits GC).

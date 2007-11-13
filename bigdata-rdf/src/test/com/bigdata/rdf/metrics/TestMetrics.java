@@ -46,6 +46,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -606,6 +607,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         // Note: this turns off sameAs processing.
 //        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+        
+        // Note: this turns off inference.
+        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
         
         dataLoader = new DataLoader(properties, store );
         

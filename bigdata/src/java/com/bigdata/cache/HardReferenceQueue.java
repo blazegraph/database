@@ -277,17 +277,51 @@ public class HardReferenceQueue<T> {
     }
 
     /**
+     * Clears the cache (sets the head, tail and count to zero) without
+     * generating eviction notices.
+     * 
+     * @param clearRefs
+     *            When <code>true</code> the references are explicitly set to
+     *            <code>null</code> which can facilitate garbage collection.
+     */
+    final public void clear(boolean clearRefs ) {
+     
+        if( clearRefs ) {
+
+            /*
+             * Evict all references, clearing each as we go.
+             */
+
+            while( count > 0 ) {
+                
+                refs[tail] = null; // drop LRU reference.
+                
+                count--; // update #of references.
+                
+                tail = (tail + 1) % capacity; // update tail.
+                
+            }
+            
+        }
+        
+        // reset to initial conditions.
+        
+        head = tail = count = 0;
+        
+    }
+    
+    /**
      * Evict all references, starting with the LRU reference and proceeding to
      * the MRU reference.
      * 
-     * @param clear
+     * @param clearRefs
      *            When true, the reference are actually cleared from the cache.
      *            This may be false to force persistence of the references in
      *            the cache without actually clearing the cache.
      */
-    final public void evictAll(boolean clear) {
+    final public void evictAll(boolean clearRefs) {
 
-        if( clear ) {
+        if( clearRefs ) {
 
             /*
              * Evict all references, clearing each as we go.

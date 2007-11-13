@@ -806,6 +806,19 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     public void removeAll() {
 
         /*
+         * Clear the hard reference cache (sets the head, tail and count to
+         * zero).
+         * 
+         * Note: This is important since the cache will typically contain dirty
+         * nodes and leaves. If those get evicted then an exception will be
+         * thrown since their parents are not grounded on the new root leaf.
+         * 
+         * Note: By clearing the references to null we also facilitate garbage
+         * collection of the nodes and leaves in the cache.
+         */
+        leafQueue.clear(true/*clearRefs*/);
+        
+        /*
          * Replace the root with a new root leaf.
          */
  
