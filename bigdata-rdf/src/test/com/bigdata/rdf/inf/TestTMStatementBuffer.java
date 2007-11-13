@@ -430,7 +430,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
             doStressTest(tmp, inf, 10/*ntrials*/, 5/*depth*/, 1/*nstmts*/);
 
-            doStressTest(tmp, inf, 10/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
+            doStressTest(tmp, inf, 5/*ntrials*/, 5/*depth*/, 5/*nstmts*/);
 
 //            // very stressful.
 //            doStressTest(tmp, inf, 100/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
