@@ -97,6 +97,26 @@ import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
  *       read-only {@link ITripleStore} reading from the last commit record on
  *       the store at the time that the view is created.
  * 
+ * FIXME The short step to concurrent query is to subclass LocalTripleStore (or
+ * just define a parallel subclass of AbstractTripleStore) that is (a)
+ * read-only; and (b) always reads from the last committed state of the
+ * database. We would then create a read-only SAIL using that database object -
+ * it would support concurrent query. The existing SAIL would support writers.
+ * 
+ * The trick is how to route writes to the writable sail.
+ * 
+ * I think that we could use a stacked sail and a Semaphore to get the right
+ * effect. The 1st thread to start a transaction acquires the permit from the
+ * Semaphore. Other threads that try to start a transaction will block until the
+ * transaction releases the permit in commitTransaction. If an operation inside
+ * of a transaction fails then the writable sail will need to release the permit
+ * so that another transaction can begin.
+ * 
+ * In fact, I do nothing to handle errors during writes. They really need to
+ * "abortTransaction()", but Sesame does not define that method. The abort needs
+ * to release the permit, clear the assertion and retraction buffers, and do an
+ * abort() on the journal to discard the writes since the transaction started.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -634,6 +654,66 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
     }
 
+    /**
+     * This method is MUST be invoked if an error arises during the execution of
+     * a transaction such that you wish to discard the write set of that
+     * transaction. The method clears the statement buffers and discards any
+     * writes on the database since the last commit. You SHOULD write your code
+     * like this:
+     * 
+     * <pre>
+     *  repo.startTransaction();
+     *  try {
+     *     ...
+     *     repo.commitTransaction();
+     *  } catch(Throwable t) {
+     *     repo.abortTransaction();
+     *  }
+     * </pre>
+     * 
+     * If you fail to either abort or commit a transaction then the SAIL will
+     * become unavailable to other writers!
+     * <p>
+     * Note: This method is NOT part of the Sesame API.
+     * <p>
+     * Note: The semantics depend on the {@link Options#STORE_CLASS}.  See
+     * {@link ITripleStore#abort()}.
+     */
+    public void abortTransaction() {
+        
+        if( ! transactionStarted ) {
+            
+            throw new SailInternalException
+                ( "No transaction has been started."
+                  );
+
+        }
+
+        // discard any pending asserts.
+        assertBuffer.clear();
+        
+        if(retractBuffer!=null) {
+        
+            // discard any pending retracts.
+            retractBuffer.clear();
+            
+        }
+        
+        // discard the write set.
+        database.abort();
+        
+        transactionStarted = false;
+
+    }
+    
+    /**
+     * Commit the write set.
+     * <p>
+     * Note: The semantics depend on the {@link Options#STORE_CLASS}.  See
+     * {@link ITripleStore#commit()}.
+     * 
+     * @see #abortTransaction()
+     */
     public void commitTransaction() {
 
         if( ! transactionStarted ) {

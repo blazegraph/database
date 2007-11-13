@@ -247,6 +247,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
 
+    final public void abort() {
+        
+        store.abort();
+        
+    }
+    
     final public boolean isStable() {
         
         return store.isStable();

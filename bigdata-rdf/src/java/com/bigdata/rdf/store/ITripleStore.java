@@ -36,7 +36,6 @@ import org.openrdf.model.Value;
 import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.EmptySPOIterator;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore.EmptyAccessPath;
@@ -221,6 +220,16 @@ public interface ITripleStore {
      * @see Options
      */
     public DataLoader getDataLoader();
+    
+    /**
+     * Discard the write set.
+     * <p>
+     * Note: The semantics of this operation depend on whether the database is
+     * embedded (discards the write set), temporary (ignored since the store is
+     * not restart safe), or a federation (ignored since unisolated writes on
+     * the federation are atomic and auto-committed).
+     */
+    public void abort();
     
     /**
      * Commit changes on the database.
