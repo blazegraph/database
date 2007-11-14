@@ -43,6 +43,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
+import org.openrdf.vocabulary.OWL;
 
 import com.bigdata.isolation.Value;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
@@ -452,6 +453,91 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertNotNull(stmtC);
                 
                 assertEquals(StatementEnum.Explicit, stmtC.getStatementType());
+                
+            }
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+
+    }
+    
+    /**
+     * Given three explicit statements:
+     * 
+     * <pre>
+     *  stmt a:  #user #currentGraph #foo
+     *  
+     *  stmt b: #currentGraph rdfs:range #Graph
+     *  
+     *  stmt c: #foo rdf:type #Graph
+     * </pre>
+     * 
+     * a+b implies c
+     * <p>
+     * Delete a and verify that c is NOT gone since it is an explicit statement.
+     */
+    public void test_infiniteloop() {
+     
+        URI a = new URIImpl("http://www.bigdata.com/a");
+        URI b = new URIImpl("http://www.bigdata.com/b");
+        URI x = new URIImpl("http://www.bigdata.com/x");
+        URI y = new URIImpl("http://www.bigdata.com/y");
+        URI entity = new URIImpl("http://www.bigdata.com/Entity");
+        URI sameAs = new URIImpl( OWL.SAMEAS );
+        URI rdfType = URIImpl.RDF_TYPE;
+
+        AbstractTripleStore store = getStore();
+        
+        try {
+            
+            InferenceEngine inf = store.getInferenceEngine();
+
+            // add some assertions and verify aspects of their closure.
+            {
+            
+                TMStatementBuffer assertionBuffer = new TMStatementBuffer(inf,
+                        100/* capacity */, BufferEnum.AssertionBuffer);
+
+                // stmt a
+                assertionBuffer.add(a, rdfType, entity );
+                // assertionBuffer.add(a, x, y );
+                
+                // stmt b
+                assertionBuffer.add(b, rdfType, entity );
+                
+                // assert the sameas
+                assertionBuffer.add(a, sameAs, b );
+                
+                // perform closure and write on the database.
+                assertionBuffer.doClosure();
+
+                // dump after closure.
+                store.dumpStore(true,true,false);
+
+            }
+            
+            /*
+             * retract stmt A and update the closure.
+             * 
+             * then verify that it is retracted statement is gone and that the
+             * other explicit statements were not touched.
+             */
+            {
+                
+                TMStatementBuffer retractionBuffer = new TMStatementBuffer(inf,
+                        100/* capacity */, BufferEnum.RetractionBuffer);
+
+                // retract the sameas
+                retractionBuffer.add(a, sameAs, b);
+
+                // update the closure.
+                retractionBuffer.doClosure();
+
+                // dump after re-closure.
+                store.dumpStore(true,true,false);
                 
             }
             
