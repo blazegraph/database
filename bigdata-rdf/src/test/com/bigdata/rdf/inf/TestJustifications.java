@@ -31,6 +31,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -43,7 +44,7 @@ import com.bigdata.rdf.store.TempTripleStore;
  * FIXME isGroundedJustification - there is one simple test (directly proven)
  * but this needs more testing.
  * 
- * @todo more tests of the {@link JustificationIterator}, including remove and
+ * @todo more tests of the {@link JustificationArrayIterator}, including remove and
  *       with more than one justification for more than one statement (it is
  *       used when actually removing justifications by the
  *       {@link AbstractTripleStore}).
@@ -112,8 +113,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
             assertTrue(store.hasStatement(U, A, Y));
             assertEquals(1,store.getStatementCount());
             
-            InferenceEngine inf = new InferenceEngine(store.getProperties(),
-                    store);
+            InferenceEngine inf = store.getInferenceEngine();
             
             // the rule.
             Rule r = new RuleRdf01(inf);
@@ -135,7 +135,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                     jst.getTail()
                     );
             
-            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, null/* filter */,
+            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store, null/* filter */,
                     100/* capacity */, true/* justified */);
 
             assertTrue(buf.add(head, jst));
@@ -185,7 +185,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             {
              
-                JustificationIterator itr = new JustificationIterator(store,head);
+                SPOJustificationIterator itr = new SPOJustificationIterator(store,head);
                 
                 assertTrue(itr.hasNext());
                 
@@ -203,16 +203,21 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              * explicit statement (U A Y).
              */
 
-            assertTrue(Justification.isGrounded(inf,focusStore,store, head));
+            assertTrue(Justification.isGrounded(inf, focusStore, store, head,
+                    false/* testHead */, true/* testFocusStore */,
+                    new VisitedSPOSet(focusStore.getBackingStore())));
 
             // add the statement (U A Y) to the focusStore.
-            focusStore.addStatements(new SPO[]{new SPO(U,A,Y,StatementEnum.Explicit)}, 1);
-            
+            focusStore.addStatements(new SPO[] { new SPO(U, A, Y,
+                    StatementEnum.Explicit) }, 1);
+
             /*
              * The inference is no longer grounded since we have declared that
              * we are also retracting its grounds.
              */
-            assertFalse(Justification.isGrounded(inf,focusStore,store, head));
+            assertFalse(Justification.isGrounded(inf, focusStore, store, head,
+                    false/* testHead */, true/* testFocusStore */,
+                    new VisitedSPOSet(focusStore.getBackingStore())));
             
             /*
              * remove the justified statements.

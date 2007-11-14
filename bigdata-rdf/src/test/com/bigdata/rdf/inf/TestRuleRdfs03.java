@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
-import java.util.Properties;
-
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
@@ -36,7 +34,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -133,8 +130,6 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
 
         try {
         
-            InferenceEngine inf = new InferenceEngine(getProperties(),store);
-
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");
             URI rdfsRange = new URIImpl(RDFS.RANGE);
@@ -146,9 +141,13 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
 
             assertTrue(store.hasStatement(A, rdfType, B));
             assertTrue(store.hasStatement(rdfType, rdfsRange, rdfsClass));
-//            assertEquals(2,store.getStatementCount());
+            assertEquals(2,store.getStatementCount());
+
+            RDFSHelper inf = new RDFSHelper(store);
             
-            applyRule(inf,inf.rdfs3, -1/* numComputed */);
+            Rule r = new RuleRdfs03(inf);
+
+            applyRule(store, r, -1/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -156,7 +155,7 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, rdfType, B));
             assertTrue(store.hasStatement(rdfType, rdfsRange, rdfsClass));
             assertTrue(store.hasStatement(B, rdfType, rdfsClass));
-//            assertEquals(3,store.getStatementCount());
+            assertEquals(3,store.getStatementCount());
 
         } finally {
 

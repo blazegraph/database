@@ -35,7 +35,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailUpdateException;
-import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -92,7 +91,7 @@ public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase 
             long p = store.addTerm(P);
             long o = store.addTerm(O);
 
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/* justified */);
 
             buffer.add(new SPO(s1, p, o, StatementEnum.Explicit));

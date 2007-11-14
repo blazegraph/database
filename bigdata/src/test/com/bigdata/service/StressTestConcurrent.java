@@ -360,6 +360,8 @@ public class StressTestConcurrent extends AbstractServerTestCase implements ICom
             
         }
         
+        executorService.shutdownNow();
+        
 //        String msg = "#clients=" + nclients + ", nops=" + nops + ", ntrials="
 //                + ntrials + ", ncomitted=" + ncommitted + ", nfailed="
 //                + nfailed + ", nuncommitted=" + nuncommitted + ", " + elapsed

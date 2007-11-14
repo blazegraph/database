@@ -107,7 +107,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
 
             boolean justified = false;
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, null/* filter */,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store, null/* filter */,
                     100/* capacity */, justified);
 
             State state = rule.newState(justified, store, buffer);
@@ -188,7 +188,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
 
             boolean justified = false;
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, null/* filter */,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store, null/* filter */,
                     100/* capacity */, justified);
 
             State state = rule.newState(justified, store, buffer);

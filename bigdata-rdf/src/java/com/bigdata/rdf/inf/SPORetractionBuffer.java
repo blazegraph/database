@@ -41,6 +41,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class SPORetractionBuffer extends AbstractSPOBuffer {
 
+    private final AbstractTripleStore store;
+    
     /**
      * @param store
      *            The database from which the statement will be removed when the
@@ -55,6 +57,8 @@ public class SPORetractionBuffer extends AbstractSPOBuffer {
         if (store == null)
             throw new IllegalArgumentException();
 
+        this.store = store;
+        
     }
 
     public int flush() {

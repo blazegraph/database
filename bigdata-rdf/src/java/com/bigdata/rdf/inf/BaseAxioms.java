@@ -40,7 +40,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.serializers.StatementSerializer;
@@ -326,7 +326,13 @@ abstract class BaseAxioms implements Axioms {
             // exact fill of the root leaf.
             final int branchingFactor = Math.max(BTree.MIN_BRANCHING_FACTOR, axioms.size() );
             
-            btree = new BTree(new TemporaryRawStore(),
+            /*
+             * Note: This uses a SimpleMemoryRawStore since we never explictly
+             * close the BaseAxioms class. Also, all data should be fully
+             * buffered in the leaf of the btree so the btree will never touch
+             * the store after it has been populated.
+             */
+            btree = new BTree(new SimpleMemoryRawStore(),
                     branchingFactor, UUID.randomUUID(),
                     StatementSerializer.INSTANCE);
 

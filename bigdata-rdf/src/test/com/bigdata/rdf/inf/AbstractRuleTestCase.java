@@ -64,75 +64,28 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * 
      * @param expectedComputed
      *            The #of entailments that should be computed by the rule.
-     * 
-     * @todo setup to write entailments on the database and without using a
-     *       "focusStore".
-     * 
-     * @deprecated this causes problems when we eagerly write the axioms on the
-     *             database since there is a dependency on the inference engine
-     *             which makes it much harder to test the rules in a closed
-     *             world scenarior.
      */
-    protected RuleStats applyRule(InferenceEngine inf,Rule rule, int expectedComputed) {
-        
-        /*
-         * Note: Choose a capacity large enough that all entailments will still
-         * be in the buffer until we explicitly flush them to the store. This
-         * let's us dump the entailments to the console below.
-         */
-        
-        final int capacity = Math.max(expectedComputed, 1000);
-        
-        AbstractTripleStore db = inf.database;
-        
-        SPOAssertionBuffer buffer = new SPOAssertionBuffer( db,
-                inf.doNotAddFilter/* filter */, capacity, inf.isJustified());
-        
-        // dump the database on the console.
-        System.err.println("database::");
-        db.dumpStore();
-        
-        State state = rule.newState(inf.isJustified(), db, buffer);
-        
-        // apply the rule.
-        rule.apply(state);
-        
-        // dump entailments on the console.
-        System.err.println("entailments:: (may duplicate statements in the database)");
-        buffer.dump(db/*used to resolve term identifiers*/);
-
-        // flush entailments to the database.
-        final int nwritten = buffer.flush();
-        
-        System.err.println("after write on the database");
-        db.dumpStore();
-
-        /*
-         * Verify the #of entailments computed. 
-         */
-        if(expectedComputed!=-1) {
-
-            /*
-             * This is disabled since axioms are flooded into the database and
-             * the counts are therefore wrong.
-             * 
-             * FIXME review all unit tests since this is now disable.
-             */
-            
-//            assertEquals("numComputed",expectedComputed,state.stats.numComputed);
-            
-        }
-        
-        return state.stats;
-        
-    }
-
     protected RuleStats applyRule(AbstractTripleStore db, Rule rule, int expectedComputed) {
 
         return applyRule(db, rule, null/*filter*/, false/*justified*/, expectedComputed);
         
     }
     
+    /**
+     * Applies the rule, copies the new entailments into the store and checks
+     * the expected #of inferences computed and new statements copied into the
+     * store.
+     * <p>
+     * Invoke as <code>applyRule( store.{rule}, ..., ... )</code>
+     * 
+     * @param rule
+     *            The rule, which must be one of those found on {@link #store}
+     *            or otherwise configured so as to run with the {@link #store}
+     *            instance.
+     * 
+     * @param expectedComputed
+     *            The #of entailments that should be computed by the rule.
+     */
     protected RuleStats applyRule(AbstractTripleStore db, Rule rule,
             ISPOFilter filter, boolean justified, int expectedComputed) {
         
@@ -144,7 +97,7 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         final int capacity = Math.max(expectedComputed, 1000);
         
-        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, filter,
+        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, db, filter,
                 capacity, justified);
         
         // dump the database on the console.
@@ -161,7 +114,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         buffer.dump(db/*used to resolve term identifiers*/);
 
         // flush entailments to the database.
-        final int nwritten = buffer.flush();
+//        final int nwritten = 
+            buffer.flush();
         
         System.err.println("after write on the database");
         db.dumpStore();

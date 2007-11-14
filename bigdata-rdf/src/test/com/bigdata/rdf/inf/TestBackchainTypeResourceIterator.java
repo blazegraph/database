@@ -375,7 +375,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             long p = store.addTerm(P);
             long o = store.addTerm(O);
 
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/* justified */);
 
             buffer.add(new SPO(s, p, o, StatementEnum.Explicit));

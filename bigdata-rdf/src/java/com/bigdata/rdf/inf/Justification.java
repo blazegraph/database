@@ -25,14 +25,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
+import java.util.UUID;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.NOPSerializer;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * <p>
@@ -102,6 +112,20 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public class Justification implements Comparable<Justification> {
+
+    protected static final Logger log = Logger.getLogger(Justification.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The #of term identifiers in a statement.
@@ -392,7 +416,7 @@ public class Justification implements Comparable<Justification> {
 
             for( int i=0; i<m; i++) {
 
-                sb.append("   (");
+                sb.append("\t(");
 
                 for( int j=0; j<N; j++ ) {
                     
@@ -415,7 +439,7 @@ public class Justification implements Comparable<Justification> {
                 
             }
             
-            sb.append("\n   -> ");
+            sb.append("\n\t-> ");
             
         }
         
@@ -457,32 +481,6 @@ public class Justification implements Comparable<Justification> {
      *            The database from which the statements are to be retracted and
      *            in which we will search for grounded justifications.
      * @param head
-     *            A statement (fully bound) whose grounded justification will be
-     *            sought.
-     * 
-     * @return True iff the statement is entailed by a grounded justification
-     *         chain in the database.
-     * 
-     * @deprecated only used by the test case.
-     */
-    public static boolean isGrounded(
-            InferenceEngine inf,
-            AbstractTripleStore focusStore,
-            AbstractTripleStore db,
-            SPO head
-            ) {
-
-        assert head.isFullyBound();
-
-        return isGrounded(inf, focusStore, db, head, false/* testHead */, true/* testFocusStore */);
-
-    }
-        
-    /**
-     * 
-     * @param focusStore 
-     * @param db
-     * @param head
      *            A triple pattern. When invoked on a statement during truth
      *            maintenance this will be fully bound. However, during
      *            recursive processing triple patterns may be encountered in the
@@ -490,23 +488,79 @@ public class Justification implements Comparable<Justification> {
      *            such cases we test for any statement matching the triple
      *            pattern that can be proven to be grounded.
      * @param testHead
+     *            When <code>true</code> the <i>head</i> will be tested
+     *            against the database on entry before seeking a grounded
+     *            justification chain. When <code>false</code> head will not
+     *            be tested directly but we will still seek a grounded
+     *            justification chain.
      * @param testFocusStore
-     * @return
-     * @todo this is depth 1st.  would breadth 1st be faster?
-     * @todo if we decide that we have only grounded justifications using the
-     *       fast closure method then this should be rewritten to be
-     *       non-recursive and it will be MUCH faster.
+     * 
+     * @param visited
+     *            A set of head (whether fully bound or query patterns) that
+     *            have already been considered. This parameter MUST be newly
+     *            allocated on each top-level call. It is used in order to avoid
+     *            infinite loops by rejecting for further consideration any head
+     *            which has already been visited.
+     * 
+     * @return True iff the statement is entailed by a grounded justification
+     *         chain in the database.
+     * 
+     * @todo this is depth 1st. would breadth 1st be faster?
      */
     public static boolean isGrounded(
             InferenceEngine inf,
-            AbstractTripleStore focusStore,
+            TempTripleStore focusStore,
             AbstractTripleStore db,
             SPO head,
             boolean testHead,
             boolean testFocusStore
             ) {
 
+        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getBackingStore());        
+        
+        try {
+
+            boolean ret = isGrounded(inf, focusStore, db, head, testHead, testFocusStore, visited);
+
+            log.info("head=" + head + " is " + (ret ? "" : "NOT ")
+                    + "grounded : testHead=" + testHead + ", testFocusStore="
+                    + testFocusStore + ", #visited=" + visited.size());
+            
+            /*
+             * FIXME we could also memoize goals that have been proven false at
+             * this level since we know the outcome for a specific head (fully
+             * bound or a query pattern). experiment with this and see if it
+             * reduces the costs of TM.  it certainly should if we are running
+             * the same query a lot!
+             */
+            
+            return ret;
+            
+        } finally {
+            
+            visited.close();
+            
+        }
+        
+    }
+    
+    public static boolean isGrounded(
+            InferenceEngine inf,
+            TempTripleStore focusStore,
+            AbstractTripleStore db,
+            SPO head,
+            boolean testHead,
+            boolean testFocusStore,
+            VisitedSPOSet visited
+            ) {
+
         assert focusStore != null;
+
+        if(DEBUG) {
+            log.debug("head=" + head + ", testHead=" + testHead
+                        + ", testFocusStore=" + testFocusStore + "#visited="
+                        + visited.size());
+        }
         
         if(testHead) {
 
@@ -514,6 +568,21 @@ public class Justification implements Comparable<Justification> {
             
             if(inf.isAxiom(head.s, head.p, head.o)) return true;
 
+            if(!visited.add(head)) {
+                
+                /*
+                 * Note: add() returns true if the element was added and false
+                 * if it was pre-existing. The presence of a pre-existing query
+                 * or fully bound SPO in this set means that we have already
+                 * consider it. In this case we return false without further
+                 * consideration in order to avoid entering into an infinite
+                 * loop among the justification chains.
+                 */
+                
+                return false;
+                
+            }
+            
             /*
              * Scan the statement indices for the head. This covers both the
              * case when it is fully bound (since we need to know whether or not
@@ -523,7 +592,7 @@ public class Justification implements Comparable<Justification> {
              */
             
             ISPOIterator itr = db.getAccessPath(head.s, head.p, head.o)
-                    .iterator();
+                    .iterator(0,0);
             
             while(itr.hasNext()) {
                 
@@ -566,7 +635,7 @@ public class Justification implements Comparable<Justification> {
                  * Note: testHead is [false] now since we just tested the head.
                  */
                 
-                if (isGrounded(inf,focusStore, db, spo, false, testFocusStore)) {
+                if (isGrounded(inf,focusStore, db, spo, false, testFocusStore, visited)) {
                 
                     // recursively grounded somewhere.
                     
@@ -587,7 +656,7 @@ public class Justification implements Comparable<Justification> {
              * grounded then the statement is still entailed by the database.
              */
             
-            JustificationIterator itr = new JustificationIterator(db,head);
+            SPOJustificationIterator itr = new SPOJustificationIterator(db,head);
             
             while(itr.hasNext()) {
                 
@@ -619,7 +688,7 @@ public class Justification implements Comparable<Justification> {
                 
                 for( SPO t : tail ) {
                     
-                    if (!isGrounded(inf,focusStore, db, t, true/* testHead */,testFocusStore)) {
+                    if (!isGrounded(inf,focusStore, db, t, true/* testHead */,testFocusStore, visited)) {
                         
                         ok = false;
                         
@@ -640,6 +709,69 @@ public class Justification implements Comparable<Justification> {
         } // head.isFullyBound()
             
         return false;
+        
+    }
+    
+    /**
+     * A collection of {@link SPO} objects (either fully bound or query
+     * patterns) that have already been visited.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class VisitedSPOSet {
+       
+        private final BTree btree;
+
+        /**
+         * Generate an SPO key.
+         */
+        private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(N * Bytes.SIZEOF_LONG));
+
+        public VisitedSPOSet(TemporaryRawStore tempStore) {
+            
+            btree = new BTree(tempStore,32,UUID.randomUUID(),NOPSerializer.INSTANCE);
+            
+        }
+
+        /**
+         * 
+         * @param spo
+         * 
+         * @return <code>true</code> iff the set did not already contain the
+         *         element (i.e., if the element was added to the set).
+         */
+        public boolean add(SPO spo) {
+           
+            byte[] key = keyBuilder.statement2Key(KeyOrder.SPO, spo);
+            
+            if(!btree.contains(key)) {
+             
+                btree.insert(key, null);
+                
+                return true;
+                
+            }
+            
+            return false;
+        
+        }
+
+        public int size() {
+            
+            return btree.getEntryCount();
+            
+        }
+
+        /**
+         * Discards anything written on the btree. If nothing has been written
+         * on the backing store yet then nothing ever will be.
+         */
+        public void close() {
+            
+            btree.removeAll();
+            
+        }
         
     }
     

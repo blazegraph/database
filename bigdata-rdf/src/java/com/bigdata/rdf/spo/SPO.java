@@ -282,7 +282,16 @@ public class SPO {
         
         if(store!=null) {
 
-            return store.toString(s,p,o)+(type==null?"":" : "+type);
+            String t = null;
+            
+            switch(type) {
+            case Explicit: t = "Explicit"; break;
+            case Inferred: t = "Inferred"; break;
+            case Axiom   : t = "Axiom   "; break;
+            default: throw new AssertionError();
+            }
+            
+            return t +" : " + store.toString(s, p, o);
             
         } else {
             

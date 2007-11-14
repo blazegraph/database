@@ -44,7 +44,7 @@ import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.Var;
-import com.bigdata.rdf.spo.ChunkedIterator;
+import com.bigdata.rdf.spo.ChunkedSPOIterator;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -780,7 +780,7 @@ public class InferenceEngine extends RDFSHelper {
      * Note: If the <i>focusStore</i> is given, then the entailments will be
      * asserted against the focusStore. Either this method or the caller MUST
      * copy the <i>focusStore</i> onto the database using
-     * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, com.bigdata.rdf.spo.ISPOFilter)}.
+     * {@link AbstractTripleStore#copyStatements(AbstractTripleStore, ISPOFilter,boolean)}.
      * If you are loading data from some kind of resource, then see
      * {@link DataLoader} which already knows how to do this.
      * <p>
@@ -875,8 +875,8 @@ public class InferenceEngine extends RDFSHelper {
 //        axiomModel.addAxioms();
 
         // entailment buffer writes on the closureStore.
-        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(
-                closureStore, doNotAddFilter, bufferCapacity, justify);
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
+                database, doNotAddFilter, bufferCapacity, justify);
 
         // compute the full forward closure.
         
@@ -930,8 +930,8 @@ public class InferenceEngine extends RDFSHelper {
                 : database);
         
         // Entailment buffer writes on the closureStore.
-        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(
-                closureStore, doNotAddFilter, bufferCapacity, justify);
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
+                database, doNotAddFilter, bufferCapacity, justify);
         
         final int firstStatementCount = closureStore.getStatementCount();
 
@@ -1467,7 +1467,7 @@ public class InferenceEngine extends RDFSHelper {
          * source iterator directly.
          */
 
-        ISPOIterator itr = (ret == null ? src : new ChunkedIterator(ret, 10000,
+        ISPOIterator itr = (ret == null ? src : new ChunkedSPOIterator(ret, 10000,
                 filter));
 
         if (!forwardChainRdfTypeRdfsResource) {

@@ -32,12 +32,17 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.TemporaryRawStore;
 
 /**
  * A purely transient append-only implementation useful when data need to be
  * buffered in memory. The writes are stored in an {@link ArrayList}.
+ * <p>
+ * Note: it is safe to NOT call {@link #close()} on this implementation. The
+ * implementation does not contain things like {@link ExecutorService}s that
+ * would hang around unless explicitly shutdown.
  * 
  * @see {@link TemporaryRawStore}, which provides a more scalable solution for
  *      temporary data.

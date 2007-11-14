@@ -1164,7 +1164,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     }
                 }
             }
-
+            
+            writerService.shutdownNow();
+            
             log.warn("End of test");
 
         }

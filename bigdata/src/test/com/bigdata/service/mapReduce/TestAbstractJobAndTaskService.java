@@ -326,6 +326,8 @@ public class TestAbstractJobAndTaskService extends TestCase {
         // verify that the outcomes are NOT available for a cancelled job.
         assertEquals("#outcomes",0,jobState.outcomes.size());
         
+        taskService.shutdownNow();
+        
     }
 
     /**
