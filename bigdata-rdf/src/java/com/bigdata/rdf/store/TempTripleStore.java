@@ -255,12 +255,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     }
     
-    public void usage(){
+    public String usage(){
         
-        log.info("file="+store.getBufferStrategy().getFile());
-        log.info("byteCount="+store.getBufferStrategy().getNextOffset());
-        
-        super.usage();
+        return super.usage()+
+        ("\nfile="+store.getBufferStrategy().getFile())+
+        ("\nbyteCount="+store.getBufferStrategy().getNextOffset())
+        ;
         
     }
     

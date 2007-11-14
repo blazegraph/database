@@ -582,7 +582,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      */
     final public void commit() {
         
-        if(INFO) usage();
+        if(INFO) log.info(usage());
         
     }
     

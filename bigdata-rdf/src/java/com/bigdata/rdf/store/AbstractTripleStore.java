@@ -2004,17 +2004,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     }
     
     /**
-     * Writes out some usage information for the database on
-     * {@link ITripleStore#log}.
+     * Returns some usage information for the database.
      */
-    public void usage() {
+    public String usage() {
 
-        usage(name_termId, getTermIdIndex());
-        usage(name_idTerm, getIdTermIndex());
-        usage(name_spo, getSPOIndex());
-        usage(name_pos, getPOSIndex());
-        usage(name_osp, getOSPIndex());
-        usage(name_just, getJustificationIndex());
+        return usage(name_termId, getTermIdIndex())
+                + "\n"+usage(name_idTerm, getIdTermIndex())
+                + "\n"+usage(name_spo, getSPOIndex())
+                + "\n"+usage(name_pos, getPOSIndex())
+                + "\n"+usage(name_osp, getOSPIndex())
+                + "\n"+usage(name_just, getJustificationIndex()
+                        );
         
     }
 
@@ -2029,7 +2029,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param ndx
      *            The index.
      */
-    final public void usage(String name,IIndex ndx) {
+    final public String usage(String name,IIndex ndx) {
         
         if (ndx instanceof BTree) {
 
@@ -2042,7 +2042,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
             final int queueCapacity = btree.getHardReferenceQueueCapacity();
 
-            log.info(name + ": #entries=" + nentries + ", height="
+            return (name + ": #entries=" + nentries + ", height="
                     + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
                     + ", #(nodes+leaves)=" + (nnodes + nleaves)
                     + ", #distinctOnQueue=" + ndistinctOnQueue
@@ -2052,7 +2052,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             // Note: this is only an estimate if the index is a view.
             final int nentries = ndx.rangeCount(null, null);
 
-            System.err.println(name+": #entries(est)="+nentries);
+            return (name+": #entries(est)="+nentries);
             
         }
         
