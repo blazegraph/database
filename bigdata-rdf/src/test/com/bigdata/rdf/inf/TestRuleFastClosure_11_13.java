@@ -73,7 +73,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             final long x = store.addTerm(new _URI("http://www.bigdata.com/x"));
             final long z = store.addTerm(new _URI("http://www.bigdata.com/z"));
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
 
             // told:
             {
@@ -105,10 +105,12 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * Test run the rule.
              */
 
+            boolean justified = false;
+            
             SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, null/* filter */,
-                    100/* capacity */,inf.isJustified()/* justifications */);
+                    100/* capacity */, justified);
 
-            State state = rule.newState(inf.isJustified(), store, buffer);
+            State state = rule.newState(justified, store, buffer);
             
             rule.apply(state);
 
@@ -152,7 +154,7 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
             final long x = store.addTerm(new _URI("http://www.bigdata.com/x"));
             final long z = store.addTerm(new _URI("http://www.bigdata.com/z"));
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
 
             // told:
             {
@@ -184,10 +186,12 @@ public class TestRuleFastClosure_11_13 extends AbstractInferenceEngineTestCase {
              * Test run the rule.
              */
 
+            boolean justified = false;
+            
             SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, null/* filter */,
-                    100/* capacity */, inf.isJustified()/* justifications */);
+                    100/* capacity */, justified);
 
-            State state = rule.newState(inf.isJustified(), store, buffer);
+            State state = rule.newState(justified, store, buffer);
             
             rule.apply(state);
 

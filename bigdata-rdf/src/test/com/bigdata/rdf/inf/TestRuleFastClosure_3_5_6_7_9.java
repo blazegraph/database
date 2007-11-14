@@ -73,45 +73,55 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
      * used to setup the pre-conditions for {@link RuleFastClosure3}.
      */
     public void test_getSubProperties() {
-       
-        URI A = new _URI("http://www.foo.org/A");
-        URI B = new _URI("http://www.foo.org/B");
-        URI C = new _URI("http://www.foo.org/C");
-
-        URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
 
         AbstractTripleStore store = getStore();
         
-        store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
-        store.addStatement(B, rdfsSubPropertyOf, A);
+        try {
 
-        assertTrue(store.hasStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf));
-        assertTrue(store.hasStatement(B, rdfsSubPropertyOf, A));
-        
-        InferenceEngine inf = new InferenceEngine(store);
+            URI A = new _URI("http://www.foo.org/A");
+            URI B = new _URI("http://www.foo.org/B");
+            URI C = new _URI("http://www.foo.org/C");
 
-        Set<Long> subProperties = inf.getSubProperties(null/*focusStore*/,store);
-        
-        assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
-        assertTrue(subProperties.contains(store.getTermId(A)));
-        assertTrue(subProperties.contains(store.getTermId(B)));
+            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
 
-        assertEquals(3,subProperties.size());
+            store.addStatement(A, rdfsSubPropertyOf, rdfsSubPropertyOf);
+            store.addStatement(B, rdfsSubPropertyOf, A);
 
-        store.addStatement(C, A, A);
-        
-        assertTrue(store.hasStatement(C, A, A));
+            assertTrue(store.hasStatement(A, rdfsSubPropertyOf,
+                    rdfsSubPropertyOf));
+            assertTrue(store.hasStatement(B, rdfsSubPropertyOf, A));
 
-        subProperties = inf.getSubProperties(null/*focusStore*/,store);
-        
-        assertTrue(subProperties.contains(store.getTermId(rdfsSubPropertyOf)));
-        assertTrue(subProperties.contains(store.getTermId(A)));
-        assertTrue(subProperties.contains(store.getTermId(B)));
-        assertTrue(subProperties.contains(store.getTermId(C)));
+            RDFSHelper inf = new RDFSHelper(store);
 
-        assertEquals(4,subProperties.size());
+            Set<Long> subProperties = inf.getSubProperties(null/* focusStore */,
+                    store);
 
-        store.closeAndDelete();
+            assertTrue(subProperties.contains(store
+                    .getTermId(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getTermId(A)));
+            assertTrue(subProperties.contains(store.getTermId(B)));
+
+            assertEquals(3, subProperties.size());
+
+            store.addStatement(C, A, A);
+
+            assertTrue(store.hasStatement(C, A, A));
+
+            subProperties = inf.getSubProperties(null/* focusStore */, store);
+
+            assertTrue(subProperties.contains(store
+                    .getTermId(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getTermId(A)));
+            assertTrue(subProperties.contains(store.getTermId(B)));
+            assertTrue(subProperties.contains(store.getTermId(C)));
+
+            assertEquals(4, subProperties.size());
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
         
     }
     
@@ -178,11 +188,11 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
              * setup the rule execution.
              */
             
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
             
             Rule rule = new RuleFastClosure6(inf,R);
             
-            applyRule(inf, rule, 1/*numComputed*/);
+            applyRule(store, rule, 1/*numComputed*/);
 
             // told.
             

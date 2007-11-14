@@ -225,6 +225,9 @@ public interface ITripleStore {
     /**
      * Return an {@link InferenceEngine} singleton configured using the
      * properties that were used to configure the database.
+     * <p>
+     * Note: The first time this object is requested it will attempt to write
+     * the axioms on the database.
      * 
      * @see Options
      */

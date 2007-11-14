@@ -89,10 +89,10 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             assertEquals(1,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            Rule r = new RuleRdfs10(new RDFSHelper(store));
 
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.rdfs10, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store,r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
@@ -146,10 +146,10 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
             assertEquals(2,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
-
+            Rule r = new RuleRdfs10(new RDFSHelper(store));
+            
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.rdfs10, 2/*expectedComputed*/);
+            RuleStats stats = applyRule(store, r, 2/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.

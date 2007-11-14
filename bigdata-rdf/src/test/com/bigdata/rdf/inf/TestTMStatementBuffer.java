@@ -187,7 +187,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
         try {
             
-            InferenceEngine inf = new InferenceEngine(store);
+            InferenceEngine inf = store.getInferenceEngine();
 
             TMStatementBuffer assertionBuffer = new TMStatementBuffer(inf,
                     100/* capacity */, BufferEnum.AssertionBuffer);
@@ -246,7 +246,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
         try {
             
-            InferenceEngine inf = new InferenceEngine(store);
+            InferenceEngine inf = store.getInferenceEngine();
 
             // add some assertions and verify aspects of their closure.
             {
@@ -381,7 +381,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
         try {
             
-            InferenceEngine inf = new InferenceEngine(store);
+            InferenceEngine inf = store.getInferenceEngine();
 
             // add some assertions and verify aspects of their closure.
             {
@@ -401,6 +401,9 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 // perform closure and write on the database.
                 assertionBuffer.doClosure();
 
+                // dump after closure.
+                store.dumpStore(true,true,false);
+
                 // explicit.
                 assertTrue(store.hasStatement(user, currentGraph, foo ));
                 assertTrue(store.hasStatement(currentGraph, rdfsRange, graph ));
@@ -414,7 +417,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertNotNull(stmtC);
                 
                 assertEquals(StatementEnum.Explicit, stmtC.getStatementType());
-
+                
             }
             
             /*
@@ -432,11 +435,24 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 // update the closure.
                 retractionBuffer.doClosure();
-                
-                // explicit.
-                assertTrue(store.hasStatement(currentGraph, rdfsRange, graph));
-                assertFalse(store.hasStatement(foo, rdftype, graph));
 
+                // dump after re-closure.
+                store.dumpStore(true,true,false);
+
+                // test the kb.
+                assertFalse(store.hasStatement(user, currentGraph, foo));
+                assertTrue(store.hasStatement(currentGraph, rdfsRange, graph));
+                assertTrue(store.hasStatement(foo, rdftype, graph));
+
+                // verify that stmt c is marked as explicit in the kb.
+
+                StatementWithType stmtC = (StatementWithType) store
+                        .getStatement(foo, rdftype, graph);
+                
+                assertNotNull(stmtC);
+                
+                assertEquals(StatementEnum.Explicit, stmtC.getStatementType());
+                
             }
             
         } finally {

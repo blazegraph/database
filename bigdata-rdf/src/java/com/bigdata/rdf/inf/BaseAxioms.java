@@ -46,6 +46,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -53,6 +54,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author personickm
  */
 abstract class BaseAxioms implements Axioms {
+    
+    private final long NULL = IRawTripleStore.NULL;
     
     Set<Triple> axioms = new HashSet<Triple>();
     
@@ -86,9 +89,8 @@ abstract class BaseAxioms implements Axioms {
         this.db = db;
   
         /*
-         * @todo eagerly defining the axioms breaks a some unit tests that
-         * assume that the store is still empty after the inference engine has
-         * been instantiated.
+         * Note: you can not define the axioms here since the base class is not
+         * yet fully initialized.
          */
 //        defineAxioms();
         
@@ -128,7 +130,13 @@ abstract class BaseAxioms implements Axioms {
               );
         
     }
-               
+    
+    public int size() {
+        
+        return axioms.size();
+        
+    }
+    
     public Set<Triple> getAxioms()
     {
         
@@ -262,20 +270,15 @@ abstract class BaseAxioms implements Axioms {
     }
     
     /**
-     * Add the axiomatic RDF(S) triples to the store.
+     * Add the axiomatic RDF(S) triples to the store (conditional operation).
+     * This is a NOP if the axioms are already defined locally (in this class).
+     * If the axioms already exist in the database then this operation does not
+     * result in any statements being written on the database (it will just
+     * verify that the axioms exist in the database).
      */
     public void addAxioms() {
 
         if(btree==null) {
-
-            /*
-             * FIXME Lazy insert of axioms is probably a bad idea. The only
-             * problems with doing this eagerly when the InferenceEngine is
-             * instantiated is that a bunch of unit tests all presume that the
-             * store is still empty after creating an InferenceEngine.  This,
-             * those tests should probably be modified and the axioms defined
-             * when the inference engine is instantiated.
-             */
 
             defineAxioms();
             
@@ -283,18 +286,19 @@ abstract class BaseAxioms implements Axioms {
         
     }
 
+    /**
+     * Write the axioms on the database.
+     * <p>
+     * Note: if the terms for the axioms are already in the lexicon and the
+     * axioms are already in the database then this will not write on the
+     * database, but it will still result in the SPO[] containing the axioms
+     * to be defined in MyStatementBuffer.
+     */
     private void defineAxioms() {
         
-        /*
-         * Write the axioms on the database.
-         * 
-         * Note: if the terms for the axioms are already in the lexicon and the
-         * axioms are already in the database then this will not write on the
-         * database, but it will still result in the SPO[] containing the axioms
-         * to be defined in MyStatementBuffer.
-         */
+        final int capacity = getAxioms().size();
         
-        MyStatementBuffer buffer = new MyStatementBuffer(db, getAxioms().size());
+        MyStatementBuffer buffer = new MyStatementBuffer(db, capacity );
 
         for (Iterator<Axioms.Triple> itr = getAxioms().iterator(); itr
                 .hasNext();) {
@@ -320,7 +324,7 @@ abstract class BaseAxioms implements Axioms {
         {
         
             // exact fill of the root leaf.
-            final int branchingFactor = axioms.size();
+            final int branchingFactor = Math.max(BTree.MIN_BRANCHING_FACTOR, axioms.size() );
             
             btree = new BTree(new TemporaryRawStore(),
                     branchingFactor, UUID.randomUUID(),
@@ -341,7 +345,8 @@ abstract class BaseAxioms implements Axioms {
     }
 
     /**
-     * Return true iff the fully bound statement is an axiom.
+     * Return true iff the fully bound statement is an axiom. The axioms will be
+     * written on the database using {@link #addAxioms()} iff necessary.
      * 
      * @param db
      *            The axioms will be defined using the term identifiers for this
@@ -355,6 +360,13 @@ abstract class BaseAxioms implements Axioms {
      */
     public boolean isAxiom(long s, long p, long o) {
 
+        // fast rejection.
+        if (s == NULL || p == NULL || o == NULL) {
+
+            return false;
+            
+        }
+        
         if (btree == null) {
 
             defineAxioms();

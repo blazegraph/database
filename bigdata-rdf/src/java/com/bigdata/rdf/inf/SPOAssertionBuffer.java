@@ -105,7 +105,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         justifications = justified ? new Justification[capacity] : null;
         
     }
-        
+    
     /**
      * Returns true iff there is no more space remaining in the buffer. Under
      * those conditions adding another statement to the buffer could cause an

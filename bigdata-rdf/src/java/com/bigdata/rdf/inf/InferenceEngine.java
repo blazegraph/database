@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,11 +45,11 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.Var;
 import com.bigdata.rdf.spo.ChunkedIterator;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBlockingBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AccessPathFusedView;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -173,11 +172,6 @@ public class InferenceEngine extends RDFSHelper {
             .toInt();
 
     /**
-     * Value used for a "NULL" term identifier.
-     */
-    public static final long NULL = IRawTripleStore.NULL;
-
-    /**
      * The capacity of the {@link SPOAssertionBuffer} used when computing entailments.
      * 
      * @see Options#BUFFER_CAPACITY
@@ -194,6 +188,15 @@ public class InferenceEngine extends RDFSHelper {
      * The axiom model used by the inference engine.
      */
     private final BaseAxioms axiomModel;
+    
+    /**
+     * The configured axioms.
+     */
+    public Axioms getAxioms() {
+        
+        return axiomModel;
+        
+    }
     
     /**
      * True iff the Truth Maintenance strategy requires that we store
@@ -383,6 +386,13 @@ public class InferenceEngine extends RDFSHelper {
 
         public static final String DEFAULT_FORWARD_CHAIN_OWL_EQUIVALENT_CLASS = "true";
 
+//        /**
+//         * Used by some unit tests to defer the load of the axioms into the
+//         * database. This option MUST NOT be used by applications as inference
+//         * depends on the axioms being available.
+//         */
+//        String NOAXIOMS = "noAxioms";
+        
         /**
          * <p>
          * Sets the capacity of the {@link SPOAssertionBuffer} used to buffer
@@ -425,7 +435,7 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @param database
      * 
-     * @see AbstractTripleStore#getProperties()
+     * @see AbstractTripleStore#getInferenceEngine()
      */
     public InferenceEngine(AbstractTripleStore database) {
     
@@ -461,9 +471,6 @@ public class InferenceEngine extends RDFSHelper {
         log.info(Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE + "="
                 + forwardChainRdfTypeRdfsResource);
 
-        doNotAddFilter = new DoNotAddFilter(this,
-                forwardChainRdfTypeRdfsResource);
-        
         this.rdfsOnly = Boolean.parseBoolean(properties
                 .getProperty(Options.RDFS_ONLY,
                         Options.DEFAULT_RDFS_ONLY));
@@ -525,12 +532,21 @@ public class InferenceEngine extends RDFSHelper {
         
         log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
+        // Note: used by the DoNotAddFilter.
         axiomModel = (rdfsOnly ? new RdfsAxioms(database) : new OwlAxioms(
                 database));
+        
+        // Add axioms to the database (writes iff not defined).
+        axiomModel.addAxioms();
+        
+        doNotAddFilter = new DoNotAddFilter(this, axiomModel,
+                forwardChainRdfTypeRdfsResource);
         
         setupRules();
 
     }
+    
+//    final boolean noAxioms;
     
     /**
      * Set based on {@link Options#FORWARD_CLOSURE}. 
@@ -848,19 +864,19 @@ public class InferenceEngine extends RDFSHelper {
 
         final int nbefore = closureStore.getStatementCount();
         
-        /*
-         * add RDF(S) axioms to the database.
-         * 
-         * Note: If you insert Statements using the Sesame object model into the
-         * focusStore then it will have different term identifiers for those
-         * assertions that the ones that are used by the database, which is
-         * very, very bad.
-         */
-        axiomModel.addAxioms();
+//        /*
+//         * add RDF(S) axioms to the database.
+//         * 
+//         * Note: If you insert Statements using the Sesame object model into the
+//         * focusStore then it will have different term identifiers for those
+//         * assertions that the ones that are used by the database, which is
+//         * very, very bad.
+//         */
+//        axiomModel.addAxioms();
 
         // entailment buffer writes on the closureStore.
-        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
-                doNotAddFilter, bufferCapacity, justify);
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(
+                closureStore, doNotAddFilter, bufferCapacity, justify);
 
         // compute the full forward closure.
         
@@ -914,8 +930,8 @@ public class InferenceEngine extends RDFSHelper {
                 : database);
         
         // Entailment buffer writes on the closureStore.
-        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore, doNotAddFilter,
-                bufferCapacity, justify);
+        final SPOAssertionBuffer buffer = new SPOAssertionBuffer(
+                closureStore, doNotAddFilter, bufferCapacity, justify);
         
         final int firstStatementCount = closureStore.getStatementCount();
 
@@ -924,15 +940,15 @@ public class InferenceEngine extends RDFSHelper {
         log.debug("Closing kb with " + firstStatementCount
                 + " statements");
 
-        /*
-         * 1. add RDF(S) axioms to the database.
-         * 
-         * Note: If you insert Statements using the Sesame object model into the
-         * focusStore then it will have different term identifiers for those
-         * assertions that the ones that are used by the database, which is
-         * very, very bad.
-         */ 
-        axiomModel.addAxioms();
+//        /*
+//         * 1. add RDF(S) axioms to the database (done at initialization).
+//         * 
+//         * Note: If you insert Statements using the Sesame object model into the
+//         * focusStore then it will have different term identifiers for those
+//         * assertions that the ones that are used by the database, which is
+//         * very, very bad.
+//         */ 
+//        axiomModel.addAxioms();
         
         // owl:equivalentProperty
         if (forwardChainOwlEquivalentProperty) {
@@ -1226,183 +1242,6 @@ public class InferenceEngine extends RDFSHelper {
         return closureStats;
         
     }
-
-    /**
-     * Computes the set of possible sub properties of rdfs:subPropertyOf (<code>P</code>).
-     * This is used by steps 2-4 in {@link #fastForwardClosure()}.
-     * 
-     * @param focusStore
-     * @param database
-     * 
-     * @return A set containing the term identifiers for the members of P.
-     */
-    public Set<Long> getSubProperties(AbstractTripleStore focusStore, AbstractTripleStore database) {
-
-        final Set<Long> P = new HashSet<Long>();
-        
-        P.add(rdfsSubPropertyOf.id);
-        
-        /*
-         * query := (?x, P, P), adding new members to P until P reaches fix
-         * point.
-         */
-        {
-
-            int nbefore;
-            int nafter = 0;
-            int nrounds = 0;
-
-            Set<Long> tmp = new HashSet<Long>();
-
-            do {
-
-                nbefore = P.size();
-
-                tmp.clear();
-
-                /*
-                 * query := (?x, p, ?y ) for each p in P, filter ?y element of
-                 * P.
-                 */
-
-                for (Long p : P) {
-
-                    final IAccessPath accessPath = (focusStore == null //
-                            ? database.getAccessPath(NULL, p, NULL)//
-                            : new AccessPathFusedView(focusStore.getAccessPath(
-                                    NULL, p, NULL), //
-                                    database.getAccessPath(NULL, p, NULL)//
-                            ));
-
-                    ISPOIterator itr = accessPath.iterator();
-
-                    while(itr.hasNext()) {
-                        
-                        SPO[] stmts = itr.nextChunk();
-                            
-                        for(SPO stmt : stmts) {
-
-                            if (P.contains(stmt.o)) {
-
-                                tmp.add(stmt.s);
-
-                            }
-
-                        }
-
-                    }
-                    
-                }
-
-                P.addAll(tmp);
-
-                nafter = P.size();
-
-                nrounds++;
-
-            } while (nafter > nbefore);
-
-        }
-        
-        if(DEBUG){
-            
-            Set<String> terms = new HashSet<String>();
-            
-            for( Long id : P ) {
-                
-                terms.add(database.toString(id));
-                
-            }
-            
-            log.debug("P: "+terms);
-        
-        }
-        
-        return P;
-
-    }
-    
-    /**
-     * Query the <i>database</i> for the sub properties of a given property.
-     * <p>
-     * Pre-condition: The closure of <code>rdfs:subPropertyOf</code> has been
-     * asserted on the database.
-     * 
-     * @param focusStore
-     * @param database
-     * @param p
-     *            The term identifier for the property whose sub-properties will
-     *            be obtain.
-     * 
-     * @return A set containing the term identifiers for the sub properties of
-     *         <i>p</i>.
-     */
-    public Set<Long> getSubPropertiesOf(AbstractTripleStore focusStore,
-            AbstractTripleStore database, final long p) {
-
-        final IAccessPath accessPath = //
-        (focusStore == null //
-        ? database.getAccessPath(NULL/* x */, rdfsSubPropertyOf.id, p)//
-                : new AccessPathFusedView(//
-                        focusStore.getAccessPath(NULL/* x */,
-                                rdfsSubPropertyOf.id, p), //
-                        database.getAccessPath(NULL/* x */,
-                                rdfsSubPropertyOf.id, p)//
-                ));
-
-        if(DEBUG) {
-            
-            log.debug("p="+database.toString(p));
-            
-        }
-        
-        final Set<Long> tmp = new HashSet<Long>();
-
-        /*
-         * query := (?x, rdfs:subPropertyOf, p).
-         * 
-         * Distinct ?x are gathered in [tmp].
-         * 
-         * Note: This query is two-bound on the POS index.
-         */
-
-        ISPOIterator itr = accessPath.iterator();
-
-        while(itr.hasNext()) {
-            
-            SPO[] stmts = itr.nextChunk();
-            
-            for( SPO spo : stmts ) {
-                
-                boolean added = tmp.add(spo.s);
-                
-                if(DEBUG) {
-                    
-                    log.debug(spo.toString(database) + ", added subject="+added);
-                    
-                }
-                
-            }
-
-        }
-        
-        if(DEBUG){
-        
-            Set<String> terms = new HashSet<String>();
-            
-            for( Long id : tmp ) {
-                
-                terms.add(database.toString(id));
-                
-            }
-            
-            log.debug("sub properties: "+terms);
-        
-        }
-        
-        return tmp;
-
-    }
     
     /**
      * Return true iff the fully bound statement is an axiom.
@@ -1434,12 +1273,34 @@ public class InferenceEngine extends RDFSHelper {
      * 
      * @return An iterator that will visit the statements in database matching
      *         the triple pattern query plus any necessary entailments.
-     * 
-     * @todo configure buffer sizes.
      */
     public ISPOIterator backchainIterator(long s, long p, long o) {
         
-        final ISPOIterator src = database.getAccessPath(s, p, o).iterator();
+        return backchainIterator(s, p, o, null );
+        
+    }
+
+    /**
+     * Obtain an iterator that will read on the appropriate {@link IAccessPath}
+     * for the database and also backchain any entailments for which forward
+     * chaining has been turned off, including {@link RuleOwlSameAs2},
+     * {@link RuleOwlSameAs3}, and <code>(x rdf:type rdfs:Resource)</code>.
+     * 
+     * @param s
+     *            The subject in triple pattern for that access path.
+     * @param p
+     *            The predicate in triple pattern for that access path.
+     * @param o
+     *            The object in triple pattern for that access path.
+     * 
+     * @return An iterator that will visit the statements in database matching
+     *         the triple pattern query plus any necessary entailments.
+     * 
+     * @todo configure buffer sizes.
+     */
+    public ISPOIterator backchainIterator(long s, long p, long o, ISPOFilter filter) {
+        
+        final ISPOIterator src = database.getAccessPath(s, p, o).iterator(filter);
         
         final Striterator ret;
 
@@ -1606,12 +1467,15 @@ public class InferenceEngine extends RDFSHelper {
          * source iterator directly.
          */
 
-        ISPOIterator itr = (ret == null ? src : new ChunkedIterator(ret));
+        ISPOIterator itr = (ret == null ? src : new ChunkedIterator(ret, 10000,
+                filter));
 
         if (!forwardChainRdfTypeRdfsResource) {
             
             /*
              * Backchain (x rdf:type rdfs:Resource ).
+             * 
+             * @todo pass the filter in here also.
              */
             
             itr = new BackchainTypeResourceIterator(//
@@ -1628,47 +1492,6 @@ public class InferenceEngine extends RDFSHelper {
         
     }
     
-//    /**
-//     * Filter matches <code>(x rdf:type rdfs:Resource).
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static public class RdfTypeRdfsResourceFilter implements ISPOFilter {
-//
-//        private final long rdfType;
-//        private final long rdfsResource;
-//        
-//        /**
-//         * 
-//         * @param vocab
-//         */
-//        public RdfTypeRdfsResourceFilter(RDFSHelper vocab) {
-//            
-//            this.rdfType = vocab.rdfType.id;
-//            
-//            this.rdfsResource = vocab.rdfsResource.id;
-//            
-//        }
-//
-//        public boolean isMatch(SPO spo) {
-//
-//            if (spo.p == rdfType && spo.o == rdfsResource) {
-//                
-//                // reject (?x, rdf:type, rdfs:Resource )
-//                
-//                return true;
-//                
-//            }
-//            
-//            // Accept everything else.
-//            
-//            return false;
-//            
-//        }
-//        
-//    }
-
     /**
      * An abstract base class for an iterator that records the a term identifier
      * from the visited {@link SPO}s on the caller's {@link BTree}. The keys

@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.Properties;
+
 import org.openrdf.model.URI;
 import org.openrdf.vocabulary.RDF;
 
+import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -68,8 +71,6 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
 
         try {
             
-            InferenceEngine inf = new InferenceEngine(store);
-            
             URI A = new _URI("http://www.foo.org/A");
             URI B = new _URI("http://www.foo.org/B");
             URI C = new _URI("http://www.foo.org/C");
@@ -81,14 +82,18 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
     
             assertTrue(store.hasStatement(A, B, C));
             assertFalse(store.hasStatement(B, rdfType, rdfProperty ));
+            assertEquals(1,store.getStatementCount());
     
-            applyRule(inf, inf.rdf1, 1/* numComputed */);
+            Rule r = new RuleRdf01(new RDFSHelper(store));
+            
+            applyRule(store, r, 1/* numComputed */);
             
             /*
              * validate the state of the primary store.
              */
             assertTrue(store.hasStatement(A, B, C));
             assertTrue(store.hasStatement(B, rdfType, rdfProperty ));
+            assertEquals(2,store.getStatementCount());
         
         } finally {
         
@@ -107,8 +112,6 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
 
         try {
-
-            InferenceEngine inf = new InferenceEngine(store);
 
             URI A = new _URI("http://www.foo.org/A");
             URI B = new _URI("http://www.foo.org/B");
@@ -134,8 +137,11 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, E, C));
             assertFalse(store.hasStatement(B, rdfType, rdfProperty));
             assertFalse(store.hasStatement(E, rdfType, rdfProperty));
+            assertEquals(3,store.getStatementCount());
 
-            applyRule(inf, inf.rdf1, 2/* numComputed */);
+            Rule r = new RuleRdf01(new RDFSHelper(store));
+
+            applyRule(store, r, 2/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -145,6 +151,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, E, C));
             assertTrue(store.hasStatement(B, rdfType, rdfProperty));
             assertTrue(store.hasStatement(E, rdfType, rdfProperty));
+            assertEquals(5,store.getStatementCount());
 
         } finally {
 

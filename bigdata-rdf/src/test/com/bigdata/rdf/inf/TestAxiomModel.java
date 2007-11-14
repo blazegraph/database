@@ -67,13 +67,14 @@ public class TestAxiomModel extends AbstractInferenceEngineTestCase {
             
             BaseAxioms axioms = new OwlAxioms(store);
 
-            // store is still empty (lazy assertion of axioms - at least for now).
+            // store is still empty (on demand assertion of axioms).
             assertEquals(0,store.getStatementCount());
 
             assertTrue(axioms.isAxiom(new StatementImpl(URIImpl.RDF_TYPE,
                     URIImpl.RDF_TYPE, URIImpl.RDF_PROPERTY)));
             
-            // add axioms to the store.
+            // We have to do this explicitly so that the identifiers for the
+            // axioms are defined.
             axioms.addAxioms();
             
             assertTrue(axioms.isAxiom(store.getTermId(URIImpl.RDF_TYPE), store

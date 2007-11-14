@@ -32,6 +32,8 @@ import java.util.NoSuchElementException;
 
 import com.bigdata.rdf.util.KeyOrder;
 
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Converts an <code>Iterator&lt;SPO&gt;</code> into chunked iterator.
  * <p>
@@ -60,7 +62,7 @@ public class ChunkedIterator implements ISPOIterator {
      */
     public ChunkedIterator(Iterator<SPO>src) {
         
-        this(src, 10000);
+        this(src, 10000, null);
         
     }
 
@@ -73,6 +75,22 @@ public class ChunkedIterator implements ISPOIterator {
      *            The desired chunk size.
      */
     public ChunkedIterator(Iterator<SPO>src, int chunkSize) {
+        
+        this(src, chunkSize , null );
+        
+    }
+    
+    /**
+     * Create an iterator that reads from the source.
+     * 
+     * @param src
+     *            The source iterator.
+     * @param chunkSize
+     *            The desired chunk size.
+     * @param filter
+     *            An optional filter.
+     */
+    public ChunkedIterator(Iterator<SPO>src, int chunkSize, ISPOFilter filter) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -80,12 +98,20 @@ public class ChunkedIterator implements ISPOIterator {
         if (chunkSize <= 0)
             throw new IllegalArgumentException();
         
-        this.src = src;
+        /*
+         * If a filter was specified then use a Striterator to filter the source
+         * iterator such that it includes only those SPOs that match the filter.
+         */
+        
+        this.src = (filter == null //
+                ? src //
+                : new Striterator(src).addFilter(new SPOFilter(filter))
+                );
      
         this.chunkSize = chunkSize;
         
     }
-
+    
     public void close() {
 
         if (!open)

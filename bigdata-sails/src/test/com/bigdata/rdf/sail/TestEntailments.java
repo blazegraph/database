@@ -26,7 +26,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
- * Created on Nov 12, 2007
+ * Created on Nov 13, 2007
  */
 
 package com.bigdata.rdf.sail;
@@ -37,120 +37,36 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sail.SailUpdateException;
 import org.openrdf.sesame.sail.StatementIterator;
 
-import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.StatementWithType;
 
 /**
- * Test for access to the {@link StatementEnum}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase {
+public class TestEntailments extends AbstractBigdataRdfSchemaRepositoryTestCase {
 
     /**
      * 
      */
-    public TestStatementWithType() {
-    }
-
-    /**
-     * @param arg0
-     */
-    public TestStatementWithType(String arg0) {
-        super(arg0);
-    }
-
-    /**
-     * Test using the nation API of adding explicit, inferred, and axiom
-     * {@link SPO}s.
-     * 
-     * @throws SailInitializationException 
-     */
-    public void test_addInferredExplicitAxiom() throws SailInitializationException {
-
-        final long NULL = IRawTripleStore.NULL;
+    public TestEntailments() {
         
-        AbstractTripleStore store = repo.getDatabase();
-
-        try {
-
-            URI S1 = new URIImpl("http://www.bigdata.com/s1");
-            URI S2 = new URIImpl("http://www.bigdata.com/s2");
-            URI S3 = new URIImpl("http://www.bigdata.com/s3");
-            URI P = new URIImpl("http://www.bigdata.com/p");
-            URI O = new URIImpl("http://www.bigdata.com/o");
-            
-            long s1 = store.addTerm(S1);
-            long s2 = store.addTerm(S2);
-            long s3 = store.addTerm(S3);
-            long p = store.addTerm(P);
-            long o = store.addTerm(O);
-
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
-                    null/* filter */, 100/* capacity */, false/* justified */);
-
-            buffer.add(new SPO(s1, p, o, StatementEnum.Explicit));
-            buffer.add(new SPO(s2, p, o, StatementEnum.Inferred));
-            buffer.add(new SPO(s3, p, o, StatementEnum.Axiom));
-
-            buffer.flush();
-
-            store.commit();
-
-            AbstractTestCase.assertSameSPOs(new SPO[] {
-                    new SPO(s1, p, o, StatementEnum.Explicit),
-                    new SPO(s2, p, o, StatementEnum.Inferred),
-                    new SPO(s3, p, o, StatementEnum.Axiom),
-                    },
-                    store.getAccessPath(NULL, NULL, NULL).iterator()
-                    );
-
-            {
-
-                StatementWithType stmt = (StatementWithType)repo.getStatements(S1,P,O).next();
-                
-                assertEquals(StatementEnum.Explicit,stmt.getStatementType());
-                
-            }
-            
-            {
-
-                StatementWithType stmt = (StatementWithType)repo.getStatements(S2,P,O).next();
-                
-                assertEquals(StatementEnum.Inferred,stmt.getStatementType());
-                
-            }
-            
-            {
-
-                StatementWithType stmt = (StatementWithType)repo.getStatements(S3,P,O).next();
-                
-                assertEquals(StatementEnum.Axiom,stmt.getStatementType());
-                
-            }
-            
-            store.dumpStore();
-
-        } finally {
-
-            store.closeAndDelete();
-            
-        }
-            
     }
-    
+
+    /**
+     * @param name
+     */
+    public TestEntailments(String name) {
+       
+        super(name);
+       
+    }
+
     /**
      * Test using the Sesame API to statements and verify
-     * {@link StatementWithType}.
-     * <p>
-     * Note: Since the repository only contains explicit statements we can not
-     * really look for inferences or axioms.
+     * {@link StatementWithType} including for the case of (x rdf:type
+     * rdfs:Resource).entailments.
      * 
      * @throws SailInitializationException
      * @throws SailUpdateException
@@ -194,6 +110,28 @@ public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase 
                 StatementWithType stmt = (StatementWithType)repo.getStatements(S3,P,O).next();
                 
                 assertEquals(StatementEnum.Explicit,stmt.getStatementType());
+                
+            }
+            
+            {
+
+                StatementIterator itr = 
+                    repo.getStatements(S3, URIImpl.RDF_TYPE,
+                            URIImpl.RDFS_RESOURCE);
+
+                try {
+                
+                    assertTrue(itr.hasNext());
+                    
+                    StatementWithType stmt = (StatementWithType) itr.next();
+                    
+                    assertEquals(StatementEnum.Inferred,stmt.getStatementType());
+                    
+                } finally {
+                    
+                    itr.close();
+                    
+                }
                 
             }
             

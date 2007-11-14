@@ -66,8 +66,6 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
         
         try {
         
-            InferenceEngine inf = new InferenceEngine(store);
-
             URI A = new _URI("http://www.foo.org/A");
             URI B = new _URI("http://www.foo.org/B");
             URI C = new _URI("http://www.foo.org/C");
@@ -80,8 +78,11 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
             assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
             assertFalse(store.hasStatement(A, rdfsSubClassOf, C));
+            assertEquals(2,store.getStatementCount());
 
-            applyRule(inf, inf.rdfs11, 1/* numComputed */);
+            Rule r = new RuleRdfs11(new RDFSHelper(store));
+            
+            applyRule(store, r, 1/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -89,6 +90,7 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, rdfsSubClassOf, B));
             assertTrue(store.hasStatement(B, rdfsSubClassOf, C));
             assertTrue(store.hasStatement(A, rdfsSubClassOf, C));
+            assertEquals(3,store.getStatementCount());
 
         } finally {
 

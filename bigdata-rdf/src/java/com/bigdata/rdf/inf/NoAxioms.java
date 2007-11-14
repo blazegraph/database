@@ -22,37 +22,26 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Nov 13, 2007
  */
 
 package com.bigdata.rdf.inf;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 /**
- * owl:sameAs1
- * 
- * <pre>
- * (x owl:sameAs y) -&gt; (y owl:sameAs x)
- * </pre>
+ * An empty axiom model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleOwlSameAs1 extends AbstractRuleNestedSubquery {
+public class NoAxioms extends BaseAxioms {
 
     /**
-     * @param inf
+     * @param db
      */
-    public RuleOwlSameAs1(RDFSHelper inf) {
-
-        super(  new Triple(var("y"), inf.owlSameAs, var("x")), //
-                new Pred[] { //
-                    new Triple(var("x"), inf.owlSameAs, var("y"))//
-                },
-                new IConstraint[] {
-                    new NE(var("x"),var("y"))
-                }
-                );
-        
+    public NoAxioms(AbstractTripleStore db) {
+        super(db);
     }
 
 }

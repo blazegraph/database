@@ -42,7 +42,7 @@ public class RuleFastClosure13 extends AbstractRuleFastClosure_11_13 {
     /**
      * @param inf
      */
-    public RuleFastClosure13(InferenceEngine inf) {
+    public RuleFastClosure13(RDFSHelper inf) {
         
         super(  new Triple(var("z"), inf.rdfType, var("b")),//
                 new Pred[] {//

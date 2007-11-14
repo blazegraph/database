@@ -708,7 +708,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              * Buffer writing on the [focusStore] removes any statements that are no longer grounded.
              */
 
-            SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer(
+            SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer( 
                     focusStore, null/* filter */, bufferCapacity, false/* justified */);
 
             /*
@@ -719,7 +719,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              * inferred then this will NOT write on the statement index.
              */
 
-            SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer(
+            SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer( 
                     database, inferenceEngine.doNotAddFilter,
                     10000/* capacity */, false/* justify */);
 
@@ -734,12 +734,25 @@ public class TMStatementBuffer implements IStatementBuffer {
                     database, 10000/* capacity */);
 
             /*
-             * Note: when entering recursively statements in the tempStore are
-             * entailments of statements that have been retracted but they MAY
-             * correspond to explicit statements in the database. We set this
-             * constant so that isGrounded will test for that.
+             * Note: when we enter this method recursively statements in the
+             * tempStore are entailments of statements that have been retracted
+             * but they MAY correspond to explicit statements in the database.
+             * We set this constant so that isGrounded will test for that.
              */
             final boolean testHead = depth > 0;
+            
+            /*
+             * When we enter this method for the 1st time the tempStore will
+             * contain only explicit statements that exist in the database. In
+             * this case we can not allow the presence of the statement in the
+             * database to serve as grounds for itself -- or for anything else
+             * that we are going to be retracting in that 1st round. Therefore
+             * we instruct isGrounded to test for the presence of the statement
+             * in the focusStore. if it is there then it is NOT considered
+             * support since we are in the processing of retracting that
+             * statement.
+             */
+            final boolean testFocusStore = depth == 0;
 
             while (itr.hasNext()) {
 
@@ -804,7 +817,9 @@ public class TMStatementBuffer implements IStatementBuffer {
                     } else if (inferenceEngine.isAxiom(spo.s, spo.p, spo.o)) {
                         
                         /*
-                         * Convert back to an axiom.
+                         * Convert back to an axiom.  We need this in case an
+                         * explicit statement is being retracted that is also
+                         * an axiom.
                          */
                         
                         SPO tmp = new SPO(spo.s, spo.p, spo.o,
@@ -818,7 +833,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
                     } else if (depth == 0
                             && Justification.isGrounded(inferenceEngine,
-                                    tempStore, database, spo, testHead)) {
+                                    tempStore, database, spo, testHead, testFocusStore)) {
 
                         /*
                          * Add a variant of the statement that is marked as
@@ -847,7 +862,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                         
                     } else if (depth > 0
                             && Justification.isGrounded(inferenceEngine,
-                                    tempStore, database, spo, testHead)) {
+                                    tempStore, database, spo, testHead, testFocusStore)) {
                         
                         /*
                          * Ignore.

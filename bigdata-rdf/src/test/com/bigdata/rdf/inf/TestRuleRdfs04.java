@@ -37,6 +37,7 @@ import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.inf.InferenceEngine.Options;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -84,8 +85,6 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
 
         try {
-        
-            InferenceEngine inf = new InferenceEngine(getProperties(),store);
 
             URI U = new URIImpl("http://www.foo.org/U");
             URI A = new URIImpl("http://www.foo.org/A");
@@ -98,7 +97,11 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, A, X));
             assertEquals(1,store.getStatementCount());
 
-            applyRule(inf,inf.rdfs4a, 1/* numComputed */);
+            RDFSHelper vocab = new RDFSHelper(store);
+            
+            Rule r = new RuleRdfs04a(vocab);
+            
+            applyRule(store, r, 1/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -128,8 +131,6 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
 
         try {
-        
-            InferenceEngine inf = new InferenceEngine(getProperties(),store);
 
             URI U = new URIImpl("http://www.foo.org/U");
             URI A = new URIImpl("http://www.foo.org/A");
@@ -142,7 +143,9 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U, A, V));
             assertEquals(1,store.getStatementCount());
 
-            applyRule(inf,inf.rdfs4b, 1/* numComputed */);
+            Rule r = new RuleRdfs04b(new RDFSHelper(store));
+            
+            applyRule(store, r, 1/* numComputed */);
 
             /*
              * validate the state of the primary store.
@@ -176,8 +179,6 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
 
         try {
-        
-            InferenceEngine inf = new InferenceEngine(getProperties(),store);
 
             URI A = new URIImpl("http://www.foo.org/A");
             Literal C = new LiteralImpl("C");
@@ -194,7 +195,15 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
              * DoNotAddFilter on the InferenceEngine, so it is counted here but
              * does not show in the database.
              */
-            applyRule(inf,inf.rdfs4b, 1/* numComputed */);
+            
+            RDFSHelper vocab = new RDFSHelper(store);
+            
+            Rule r = new RuleRdfs04b(vocab);
+            
+            ISPOFilter filter = new DoNotAddFilter(vocab, new NoAxioms(store),
+                    true/* forwardChainRdfTypeRdfsResource */);
+            
+            applyRule(store, r, filter, false /*justified*/, 1/* numComputed */);
 
             /*
              * validate the state of the primary store - there is no entailment
