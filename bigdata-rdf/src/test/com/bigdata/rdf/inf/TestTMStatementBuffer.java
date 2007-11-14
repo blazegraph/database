@@ -465,26 +465,103 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     }
     
     /**
-     * Given three explicit statements:
-     * 
-     * <pre>
-     *  stmt a:  #user #currentGraph #foo
-     *  
-     *  stmt b: #currentGraph rdfs:range #Graph
-     *  
-     *  stmt c: #foo rdf:type #Graph
-     * </pre>
-     * 
-     * a+b implies c
-     * <p>
-     * Delete a and verify that c is NOT gone since it is an explicit statement.
+     * This test demonstrates TM incorrectness.  I add three statements into 
+     * store A, then remove one of them.  Then I add the two statements that 
+     * remain in store A into store B and compare the stores.  They should be 
+     * the same, right?  Well, unfortunately they are not the same.  Too many 
+     * inferences were deleted from the first store during TM. 
+     */
+    public void test_closurecorrectness() {
+        
+        URI a = new URIImpl("http://www.bigdata.com/a");
+        URI b = new URIImpl("http://www.bigdata.com/b");
+        URI c = new URIImpl("http://www.bigdata.com/c");
+        URI d = new URIImpl("http://www.bigdata.com/d");
+        URI sco = URIImpl.RDFS_SUBCLASSOF;
+
+        AbstractTripleStore store = getStore();
+        
+        Properties properties = store.getProperties();
+        
+        TempTripleStore tempStore = new TempTripleStore(properties);
+        
+        try {
+            
+            // add three
+            {
+            
+                TMStatementBuffer assertionBuffer = new TMStatementBuffer(
+                        store.getInferenceEngine(),
+                        100/* capacity */, BufferEnum.AssertionBuffer);
+
+                assertionBuffer.add(a, sco, b );
+                assertionBuffer.add(b, sco, c );
+                assertionBuffer.add(c, sco, d );
+                
+                // perform closure and write on the database.
+                assertionBuffer.doClosure();
+
+                // dump after closure.
+                store.dumpStore(true,true,false);
+
+            }
+            
+            // retract one
+            {
+                
+                TMStatementBuffer retractionBuffer = new TMStatementBuffer(
+                        store.getInferenceEngine(),
+                        100/* capacity */, BufferEnum.RetractionBuffer);
+
+                retractionBuffer.add(b, sco, c);
+
+                // update the closure.
+                retractionBuffer.doClosure();
+
+                // dump after re-closure.
+                store.dumpStore(true,true,false);
+                
+            }
+            
+            // add two to the "control store"
+            {
+            
+                TMStatementBuffer assertionBuffer = new TMStatementBuffer(
+                        tempStore.getInferenceEngine(),
+                        100/* capacity */, BufferEnum.AssertionBuffer);
+
+                assertionBuffer.add(a, sco, b );
+                assertionBuffer.add(c, sco, d );
+                
+                // perform closure and write on the database.
+                assertionBuffer.doClosure();
+
+                // dump after closure.
+                tempStore.dumpStore(true,true,false);
+
+            }
+            
+            assertSameGraphs( tempStore, store );
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+            tempStore.closeAndDelete();
+            
+        }
+
+    }
+    
+    /**
+     * This test demonstrates an infinite loop in TM.
      */
     public void test_infiniteloop() {
      
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
-        URI x = new URIImpl("http://www.bigdata.com/x");
-        URI y = new URIImpl("http://www.bigdata.com/y");
+        //URI x = new URIImpl("http://www.bigdata.com/x");
+        //URI y = new URIImpl("http://www.bigdata.com/y");
         URI entity = new URIImpl("http://www.bigdata.com/Entity");
         URI sameAs = new URIImpl( OWL.SAMEAS );
         URI rdfType = URIImpl.RDF_TYPE;
