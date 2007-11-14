@@ -1679,7 +1679,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if (v == null)
             return "<NOT_FOUND#" + termId + ">";
 
-        return (v instanceof URI ? abbrev((URI) v) : v.toString());
+        String s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+        
+        return s + ("("+termId+")");
         
     }
 //    private final String TERM_NOT_FOUND = "<NOT_FOUND>";
@@ -1772,7 +1774,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param axioms
      *            Show statements marked as axioms.
      */
-    final public void dumpStore(AbstractTripleStore resolveTerms, boolean explicit, boolean inferred, boolean axioms) {
+    final public void dumpStore(AbstractTripleStore resolveTerms,
+            boolean explicit, boolean inferred, boolean axioms) {
 
         final int nstmts = getStatementCount();
         

@@ -99,6 +99,13 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
                 com.bigdata.rdf.sail.BigdataRdfRepository.Options.STORE_CLASS,
                 LocalTripleStore.class.getName());
 
+        /*
+         * Note: overrides properties to make sure that the OWL axioms are
+         * not defined since they are not going to be in the graph produced
+         * by Sesame.
+         */
+        properties.setProperty(com.bigdata.rdf.inf.InferenceEngine.Options.RDFS_ONLY, "true");
+
         return properties;
         
     }

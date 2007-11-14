@@ -220,7 +220,7 @@ public class StatementBuffer implements IStatementBuffer {
         if (database == null)
             throw new IllegalArgumentException();
 
-        if (capacity < 1)
+        if (capacity < 0)
             throw new IllegalArgumentException();
 
         this.statementStore = statementStore; // MAY be null.

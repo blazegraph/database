@@ -40,6 +40,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.NoAxiomFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOBlockingBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -347,7 +348,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             
             InferenceEngine inf = new InferenceEngine(properties,store);
 
-            ISPOIterator itr = inf.backchainIterator(NULL, NULL, NULL);
+            ISPOIterator itr = inf.backchainIterator(NULL, NULL, NULL, NoAxiomFilter.INSTANCE);
 
             assertSameSPOsAnyOrder(store, new SPO[]{
                     

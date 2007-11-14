@@ -33,7 +33,7 @@ package com.bigdata.rdf.inf;
  */
 public class RuleRdfs07 extends AbstractRuleRdfs_2_3_7_9 {
 
-    public RuleRdfs07( InferenceEngine inf) {
+    public RuleRdfs07( RDFSHelper inf) {
 
         super( new Triple(var("u"), var("b"), var("y")),//
                 new Pred[] {//

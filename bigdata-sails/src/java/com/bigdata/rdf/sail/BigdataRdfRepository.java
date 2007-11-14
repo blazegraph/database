@@ -190,16 +190,29 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
 
     protected AbstractTripleStore database;
     
-    protected InferenceEngine inf;
-   
     /**
      * The inference engine if the SAIL is using one.
+     * <p>
+     * Note: Requesting this object will cause the axioms to be written onto the
+     * database if they are not already present. If this is a read-only view and
+     * the mutable view does not already have the axioms defined then this will
+     * cause an exception to be thrown since the indices are not writable by the
+     * read-only view.
      */
     public InferenceEngine getInferenceEngine() {
         
-        return inf;
+        if(_inf==null) {
+        
+            _inf = database.getInferenceEngine();
+            
+        }
+        
+        return _inf;
         
     }
+    
+    // hard reference cache.
+    private InferenceEngine _inf = null;
     
     protected Properties properties;
 
@@ -350,6 +363,11 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
     
     /**
      * Initialize the repository.
+     * <p>
+     * Note: When using a constructor variant that accepts an existing
+     * {@link AbstractTripleStore} the {@link InferenceEngine} will be
+     * configured based on the properties used to configure that
+     * {@link AbstractTripleStore} NOT those specified here.
      * 
      * @param configParams
      *            See {@link Options}.
@@ -406,13 +424,13 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
             // the database.
             this.database = database;
             
-            // inference engine used to maintain RDF(S) closure.
-            this.inf = new InferenceEngine(PropertyUtil
-                    .convert(configParams), database);
+//            // inference engine used to maintain RDF(S) closure.
+//            this.inf = new InferenceEngine(PropertyUtil
+//                    .convert(configParams), database);
             
         } else {
             
-            this.inf = database.getInferenceEngine();
+//            this.inf = database.getInferenceEngine();
             
         }
 
@@ -421,6 +439,8 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
         
         if(truthMaintenance) {
 
+            InferenceEngine inf = getInferenceEngine();
+            
             assertBuffer = new TMStatementBuffer(inf, bufferCapacity,
                     BufferEnum.AssertionBuffer);
 
@@ -938,7 +958,7 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
             
             long[] ids = accessPath.getTriplePattern();
 
-            src = inf.backchainIterator(//
+            src = getInferenceEngine().backchainIterator(//
                     ids[0], ids[1], ids[2] // the triple pattern.
                     );
             
@@ -1024,10 +1044,6 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * you do NOT enable truth maintenance and choose instead to load up all of
      * your data first and then compute the closure of the database.
      * <p>
-     * Note: This method lies outside of the SAIL and does not rely on the SAIL
-     * "transaction" mechanisms. However, it MAY NOT be used concurrently with
-     * writes on the SAIL.
-     * <p>
      * Note: If there are already entailments in the database AND you have
      * retracted statements since the last time the closure was computed then
      * you MUST delete all entailments from the database before re-computing the
@@ -1038,11 +1054,13 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      * 
      * @see #removeAllEntailments()
      */
-    public void fullForwardClosure() {
+    public void computeClosure() {
+        
+        assertTransactionStarted();
         
         flushStatementBuffers();
         
-        inf.computeClosure(null/*focusStore*/);
+        getInferenceEngine().computeClosure(null/*focusStore*/);
                 
     }
     
@@ -1053,6 +1071,10 @@ public class BigdataRdfRepository extends AbstractRdfRepository implements RdfRe
      */
     public void removeAllEntailments() {
         
+        assertTransactionStarted();
+        
+        flushStatementBuffers();
+
         database.getAccessPath(NULL, NULL, NULL).removeAll(
                 InferredSPOFilter.INSTANCE);
         

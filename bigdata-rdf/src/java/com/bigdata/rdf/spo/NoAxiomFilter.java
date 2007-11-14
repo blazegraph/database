@@ -22,36 +22,34 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Nov 1, 2007
+ * Created on Nov 13, 2007
  */
 
-package com.bigdata.rdf.inf;
+package com.bigdata.rdf.spo;
+
+import com.bigdata.rdf.model.StatementEnum;
 
 /**
- * owl:sameAs1
- * 
- * <pre>
- * (x owl:sameAs y) -&gt; (y owl:sameAs x)
- * </pre>
+ * A filter that matches explicit or inferred statements but not those whose
+ * {@link StatementEnum} is {@link StatementEnum#Axiom}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleOwlSameAs1 extends AbstractRuleNestedSubquery {
+public class NoAxiomFilter implements ISPOFilter {
 
     /**
-     * @param inf
+     * Shared instance.
      */
-    public RuleOwlSameAs1(RDFSHelper inf) {
-
-        super(  new Triple(var("y"), inf.owlSameAs, var("x")), //
-                new Pred[] { //
-                    new Triple(var("x"), inf.owlSameAs, var("y"))//
-                },
-                new IConstraint[] {
-                    new NE(var("x"),var("y"))
-                }
-                );
+    static public final transient ISPOFilter INSTANCE = new NoAxiomFilter();
+    
+    private NoAxiomFilter() {
+        
+    }
+    
+    public boolean isMatch(SPO spo) {
+        
+        return spo.type!=StatementEnum.Axiom;
         
     }
 

@@ -75,8 +75,6 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         
         try {
             
-            InferenceEngine inf = new InferenceEngine(store);
-            
             URI A = new _URI("http://www.foo.org/A");
             URI B = new _URI("http://www.foo.org/B");
             URI U = new _URI("http://www.foo.org/U");
@@ -92,8 +90,10 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertFalse(store.hasStatement(U, B, Y));
             assertEquals(2,store.getStatementCount());
 
+            Rule r = new RuleRdfs07(new RDFSHelper(store));
+            
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.rdfs7,1);
+            RuleStats stats = applyRule(store,r,1);
     
             assertEquals("#subqueries",1,stats.nsubqueries[0]);
             assertEquals("#subqueries",0,stats.nsubqueries[1]);
@@ -104,6 +104,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B));
             assertTrue(store.hasStatement(U, A, Y));
             assertTrue(store.hasStatement(U, B, Y));
+            assertEquals(3,store.getStatementCount());
         
         } finally {
         
@@ -130,8 +131,6 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
         
         try {
-        
-            InferenceEngine inf = new InferenceEngine(store);
             
             URI A = new _URI("http://www.foo.org/A");
             URI B = new _URI("http://www.foo.org/B");
@@ -151,9 +150,12 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U2, A, Y2));
             assertFalse(store.hasStatement(U1, B, Y1));
             assertFalse(store.hasStatement(U2, B, Y2));
-    
+            assertEquals(3,store.getStatementCount());
+
+            Rule r = new RuleRdfs07(new RDFSHelper(store));
+            
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.rdfs7,2/*numComputed*/);
+            RuleStats stats = applyRule(store, r,2/*numComputed*/);
     
             assertEquals("#subqueries",1,stats.nsubqueries[0]);
             assertEquals("#subqueries",0,stats.nsubqueries[1]);
@@ -166,6 +168,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(U2, A, Y2));
             assertTrue(store.hasStatement(U1, B, Y1));
             assertTrue(store.hasStatement(U2, B, Y2));
+            assertEquals(5,store.getStatementCount());
         
         } finally {
 
@@ -196,8 +199,6 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
         AbstractTripleStore store = getStore();
 
         try {
-        
-            InferenceEngine inf = new InferenceEngine(store);
             
             URI A = new _URI("http://www.foo.org/A");
             URI B1 = new _URI("http://www.foo.org/B1");
@@ -215,9 +216,11 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, rdfsSubPropertyOf, B2));
             assertTrue(store.hasStatement(U, A, Y));
             assertEquals(3,store.getStatementCount());
-    
+
+            Rule r = new RuleRdfs07(new RDFSHelper(store));
+            
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.rdfs7,2/*expectedComputed*/);
+            RuleStats stats = applyRule(store,r,2/*expectedComputed*/);
     
             // FIXME enable tests when working on subquery elimination.
 //            /*

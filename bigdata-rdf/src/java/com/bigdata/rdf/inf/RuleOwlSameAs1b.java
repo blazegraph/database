@@ -42,7 +42,7 @@ public class RuleOwlSameAs1b extends AbstractRuleNestedSubquery {
     /**
      * @param inf
      */
-    public RuleOwlSameAs1b(InferenceEngine inf) {
+    public RuleOwlSameAs1b(RDFSHelper inf) {
 
         super(  new Triple(var("x"), inf.owlSameAs, var("z")), //
                 new Pred[] { //

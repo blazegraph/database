@@ -96,10 +96,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
             assertEquals(1,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
+            
+            Rule r = new RuleOwlSameAs1(inf);
 
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.ruleOwlSameAs1, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store, r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
@@ -152,10 +154,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), Z));
             assertEquals(2,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
+            
+            Rule r = new RuleOwlSameAs1b(inf);
 
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.ruleOwlSameAs1b, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store, r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
@@ -213,10 +217,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
+            
+            Rule r = new RuleOwlSameAs2(inf);
 
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.ruleOwlSameAs2, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store,r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.
@@ -274,10 +280,12 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(Z, A, X));
             assertEquals(2,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
 
+            Rule r = new RuleOwlSameAs3(inf);
+            
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.ruleOwlSameAs3, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store,r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.

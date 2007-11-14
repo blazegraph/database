@@ -207,13 +207,6 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
               
             properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
 
-            /*
-             * Note: overrides properties to make sure that the OWL axioms are
-             * not defined since they are not going to be in the graph produced
-             * by Sesame.
-             */
-            properties.setProperty(Options.RDFS_ONLY, "true");
-
             DataLoader dataLoader = new DataLoader(properties,store);
             
             dataLoader.loadData(resource, baseURL, format);

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import com.bigdata.rdf.inf.Rule.State;
+import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -66,6 +67,11 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
      * 
      * @todo setup to write entailments on the database and without using a
      *       "focusStore".
+     * 
+     * @deprecated this causes problems when we eagerly write the axioms on the
+     *             database since there is a dependency on the inference engine
+     *             which makes it much harder to test the rules in a closed
+     *             world scenarior.
      */
     protected RuleStats applyRule(InferenceEngine inf,Rule rule, int expectedComputed) {
         
@@ -79,8 +85,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         
         AbstractTripleStore db = inf.database;
         
-        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, inf.doNotAddFilter/* filter */,
-                capacity, inf.isJustified());
+        SPOAssertionBuffer buffer = new SPOAssertionBuffer( db,
+                inf.doNotAddFilter/* filter */, capacity, inf.isJustified());
         
         // dump the database on the console.
         System.err.println("database::");
@@ -95,14 +101,76 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         System.err.println("entailments:: (may duplicate statements in the database)");
         buffer.dump(db/*used to resolve term identifiers*/);
 
-        // flush entailments into the temporary store.
-        buffer.flush();
+        // flush entailments to the database.
+        final int nwritten = buffer.flush();
+        
+        System.err.println("after write on the database");
+        db.dumpStore();
 
         /*
          * Verify the #of entailments computed. 
          */
         if(expectedComputed!=-1) {
 
+            /*
+             * This is disabled since axioms are flooded into the database and
+             * the counts are therefore wrong.
+             * 
+             * FIXME review all unit tests since this is now disable.
+             */
+            
+//            assertEquals("numComputed",expectedComputed,state.stats.numComputed);
+            
+        }
+        
+        return state.stats;
+        
+    }
+
+    protected RuleStats applyRule(AbstractTripleStore db, Rule rule, int expectedComputed) {
+
+        return applyRule(db, rule, null/*filter*/, false/*justified*/, expectedComputed);
+        
+    }
+    
+    protected RuleStats applyRule(AbstractTripleStore db, Rule rule,
+            ISPOFilter filter, boolean justified, int expectedComputed) {
+        
+        /*
+         * Note: Choose a capacity large enough that all entailments will still
+         * be in the buffer until we explicitly flush them to the store. This
+         * let's us dump the entailments to the console below.
+         */
+        
+        final int capacity = Math.max(expectedComputed, 1000);
+        
+        SPOAssertionBuffer buffer = new SPOAssertionBuffer(db, filter,
+                capacity, justified);
+        
+        // dump the database on the console.
+        System.err.println("database::");
+        db.dumpStore();
+        
+        State state = rule.newState(justified, db, buffer);
+        
+        // apply the rule.
+        rule.apply(state);
+        
+        // dump entailments on the console.
+        System.err.println("entailments:: (may duplicate statements in the database)");
+        buffer.dump(db/*used to resolve term identifiers*/);
+
+        // flush entailments to the database.
+        final int nwritten = buffer.flush();
+        
+        System.err.println("after write on the database");
+        db.dumpStore();
+
+        /*
+         * Verify the #of entailments computed. 
+         */
+        if(expectedComputed!=-1) {
+    
             assertEquals("numComputed",expectedComputed,state.stats.numComputed);
             
         }
@@ -110,5 +178,5 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         return state.stats;
         
     }
-    
+
 }

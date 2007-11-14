@@ -34,6 +34,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.StatementIterator;
 
+import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -124,7 +125,7 @@ public class TestCompareOwlSameAsEntailments extends
             store1.getDataLoader().loadData(resource, baseURL, format);
             store2.getDataLoader().loadData(resource, baseURL, format);
         
-            assert modelsEqual(store1,store2);
+            assertTrue( modelsEqual(store1,store2) );
             
         } finally {
             
@@ -146,6 +147,9 @@ public class TestCompareOwlSameAsEntailments extends
      * @return true if all statements in the expected graph are in the actual
      *         graph and if the actual graph does not contain any statements
      *         that are not also in the expected graph.
+     * 
+     * FIXME refactor to {@link AbstractTestCase} and make sure that the same
+     * logic is not present in the rest of the test suite.
      */
     public static boolean modelsEqual(AbstractTripleStore expected,
             AbstractTripleStore actual) {

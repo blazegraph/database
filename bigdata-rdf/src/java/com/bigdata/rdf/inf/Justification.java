@@ -462,6 +462,8 @@ public class Justification implements Comparable<Justification> {
      * 
      * @return True iff the statement is entailed by a grounded justification
      *         chain in the database.
+     * 
+     * @deprecated only used by the test case.
      */
     public static boolean isGrounded(
             InferenceEngine inf,
@@ -472,7 +474,7 @@ public class Justification implements Comparable<Justification> {
 
         assert head.isFullyBound();
 
-        return isGrounded(inf,focusStore, db, head, false);
+        return isGrounded(inf, focusStore, db, head, false/* testHead */, true/* testFocusStore */);
 
     }
         
@@ -488,6 +490,7 @@ public class Justification implements Comparable<Justification> {
      *            such cases we test for any statement matching the triple
      *            pattern that can be proven to be grounded.
      * @param testHead
+     * @param testFocusStore
      * @return
      * @todo this is depth 1st.  would breadth 1st be faster?
      * @todo if we decide that we have only grounded justifications using the
@@ -499,7 +502,8 @@ public class Justification implements Comparable<Justification> {
             AbstractTripleStore focusStore,
             AbstractTripleStore db,
             SPO head,
-            boolean testHead
+            boolean testHead,
+            boolean testFocusStore
             ) {
 
         assert focusStore != null;
@@ -528,12 +532,19 @@ public class Justification implements Comparable<Justification> {
                 if (spo.type == StatementEnum.Explicit) {
 
                     /*
-                     * Before we can accept this spo as providing support for a
-                     * grounded justification we have to test the focusStore and
-                     * make sure that this is NOT one of the statements that is
-                     * being retracted.
+                     * If we do not have to test the focusStore then we are
+                     * done.
                      */
-                    
+
+                    if (!testFocusStore) return true;
+
+                    /*
+                     * Before we can accept this spo as providing support
+                     * for a grounded justification we have to test the
+                     * focusStore and make sure that this is NOT one of the
+                     * statements that is being retracted.
+                     */
+
                     if (!focusStore.hasStatement(spo.s, spo.p, spo.o)) {
 
                         /*
@@ -549,9 +560,13 @@ public class Justification implements Comparable<Justification> {
                     
                 }
 
-                // depth-first recursion to see if the statement is grounded.
+                /* 
+                 * depth-first recursion to see if the statement is grounded.
+                 * 
+                 * Note: testHead is [false] now since we just tested the head.
+                 */
                 
-                if (isGrounded(inf,focusStore, db, spo, false)) {
+                if (isGrounded(inf,focusStore, db, spo, false, testFocusStore)) {
                 
                     // recursively grounded somewhere.
                     
@@ -604,7 +619,7 @@ public class Justification implements Comparable<Justification> {
                 
                 for( SPO t : tail ) {
                     
-                    if (!isGrounded(inf,focusStore, db, t, true/* testHead */)) {
+                    if (!isGrounded(inf,focusStore, db, t, true/* testHead */,testFocusStore)) {
                         
                         ok = false;
                         

@@ -95,8 +95,8 @@ public class TestAll extends TestCase {
 
         /*
          * @todo write a test to verify that concurrent attempts to start a
-         * transactio using startTransaction() will be serialized such that only
-         * a single writer is allowed.
+         * transaction using startTransaction() will be serialized such that
+         * only a single writer is allowed.
          * 
          * @todo write BigdataReadCommittedRdf(Schema)Repository classes and
          * verify that concurrent readers against those classes are allowed
@@ -111,6 +111,9 @@ public class TestAll extends TestCase {
         
         // test suite for access to the statement type.
         suite.addTestSuite(TestStatementWithType.class);
+        
+        // test suite for entailments.
+        suite.addTestSuite(TestEntailments.class);
         
         // test suite for RDFS closure correctness.
         suite.addTestSuite(TestRDFSClosure.class);

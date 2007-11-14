@@ -32,7 +32,7 @@ package com.bigdata.rdf.inf;
  */
 public class RuleRdf01 extends AbstractRuleDistinctTermScan {
     
-    public RuleRdf01(InferenceEngine inf) {
+    public RuleRdf01(RDFSHelper inf) {
 
         super(  new Triple(var("a"), inf.rdfType, inf.rdfProperty), //
                 new Pred[] { //

@@ -36,6 +36,16 @@ import org.openrdf.model.URI;
  */
 public interface Axioms {
     
+    public interface Triple {
+
+        URI getS();
+        
+        URI getP();
+        
+        URI getO();
+        
+    }
+
     Set<Triple> getAxioms();
     
     Set<String> getVocabulary();
@@ -46,15 +56,6 @@ public interface Axioms {
     
     boolean isInVocabulary( URI uri );
 
-    
-    public interface Triple {
-
-        URI getS();
-        
-        URI getP();
-        
-        URI getO();
-        
-    }
+    int size();
     
 }

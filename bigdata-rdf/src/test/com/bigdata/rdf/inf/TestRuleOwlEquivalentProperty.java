@@ -84,10 +84,12 @@ public class TestRuleOwlEquivalentProperty extends AbstractRuleTestCase {
             assertTrue(store.hasStatement(A, new URIImpl(OWL.EQUIVALENTPROPERTY), B));
             assertEquals(1,store.getStatementCount());
 
-            InferenceEngine inf = new InferenceEngine(store);
+            RDFSHelper inf = new RDFSHelper(store);
+            
+            Rule r = new RuleOwlEquivalentProperty(inf);
 
             // apply the rule.
-            RuleStats stats = applyRule(inf,inf.ruleOwlEquivalentProperty, 1/*expectedComputed*/);
+            RuleStats stats = applyRule(store, r, 1/*expectedComputed*/);
 
             /*
              * validate the state of the primary store.

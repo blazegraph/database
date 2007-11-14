@@ -42,18 +42,18 @@ import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Abstract base class initializes an instance of the
- * {@link BigdataRdfRepository} using a {@link LocalTripleStore}.
+ * {@link BigdataRdfSchemaRepository} using a {@link LocalTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractBigdataRdfRepositoryTestCase extends TestCase2 {
+public class AbstractBigdataRdfSchemaRepositoryTestCase extends TestCase2 {
 
-    public AbstractBigdataRdfRepositoryTestCase() {
+    public AbstractBigdataRdfSchemaRepositoryTestCase() {
         
     }
 
-    public AbstractBigdataRdfRepositoryTestCase(String name) {
+    public AbstractBigdataRdfSchemaRepositoryTestCase(String name) {
         
         super(name);
         
@@ -73,7 +73,7 @@ public class AbstractBigdataRdfRepositoryTestCase extends TestCase2 {
         
 //        params.setProperty(Options.ISOLATABLE_INDICES, "true");
         
-        repo = new BigdataRdfRepository();
+        repo = new BigdataRdfSchemaRepository();
 
         try {
 
@@ -108,6 +108,6 @@ public class AbstractBigdataRdfRepositoryTestCase extends TestCase2 {
         
     }
     
-    protected BigdataRdfRepository repo;
+    protected BigdataRdfSchemaRepository repo;
     
 }

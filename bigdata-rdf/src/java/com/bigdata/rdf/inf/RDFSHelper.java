@@ -27,13 +27,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.openrdf.vocabulary.OWL;
 import org.openrdf.vocabulary.RDF;
 import org.openrdf.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.spo.ISPOIterator;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.AccessPathFusedView;
+import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Resolves or defines well-known RDF values against an {@link AbstractTripleStore}.
@@ -42,6 +52,25 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @version $Id$
  */
 public class RDFSHelper {
+
+    /**
+     * Value used for a "NULL" term identifier.
+     */
+    public final long NULL = IRawTripleStore.NULL;
+    
+    final static public Logger log = Logger.getLogger(RDFSHelper.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * The database that is the authority for the defined terms and term
@@ -138,6 +167,184 @@ public class RDFSHelper {
         this.owlEquivalentClass = new Id(owlEquivlentClass.termId);
         this.owlEquivalentProperty = new Id(owlEquivlentProperty.termId);
         
+    }
+
+
+    /**
+     * Computes the set of possible sub properties of rdfs:subPropertyOf (<code>P</code>).
+     * This is used by steps 2-4 in {@link #fastForwardClosure()}.
+     * 
+     * @param focusStore
+     * @param database
+     * 
+     * @return A set containing the term identifiers for the members of P.
+     */
+    public Set<Long> getSubProperties(AbstractTripleStore focusStore, AbstractTripleStore database) {
+
+        final Set<Long> P = new HashSet<Long>();
+        
+        P.add(rdfsSubPropertyOf.id);
+        
+        /*
+         * query := (?x, P, P), adding new members to P until P reaches fix
+         * point.
+         */
+        {
+
+            int nbefore;
+            int nafter = 0;
+            int nrounds = 0;
+
+            Set<Long> tmp = new HashSet<Long>();
+
+            do {
+
+                nbefore = P.size();
+
+                tmp.clear();
+
+                /*
+                 * query := (?x, p, ?y ) for each p in P, filter ?y element of
+                 * P.
+                 */
+
+                for (Long p : P) {
+
+                    final IAccessPath accessPath = (focusStore == null //
+                            ? database.getAccessPath(NULL, p, NULL)//
+                            : new AccessPathFusedView(focusStore.getAccessPath(
+                                    NULL, p, NULL), //
+                                    database.getAccessPath(NULL, p, NULL)//
+                            ));
+
+                    ISPOIterator itr = accessPath.iterator();
+
+                    while(itr.hasNext()) {
+                        
+                        SPO[] stmts = itr.nextChunk();
+                            
+                        for(SPO stmt : stmts) {
+
+                            if (P.contains(stmt.o)) {
+
+                                tmp.add(stmt.s);
+
+                            }
+
+                        }
+
+                    }
+                    
+                }
+
+                P.addAll(tmp);
+
+                nafter = P.size();
+
+                nrounds++;
+
+            } while (nafter > nbefore);
+
+        }
+        
+        if(DEBUG){
+            
+            Set<String> terms = new HashSet<String>();
+            
+            for( Long id : P ) {
+                
+                terms.add(database.toString(id));
+                
+            }
+            
+            log.debug("P: "+terms);
+        
+        }
+        
+        return P;
+
+    }
+    
+    /**
+     * Query the <i>database</i> for the sub properties of a given property.
+     * <p>
+     * Pre-condition: The closure of <code>rdfs:subPropertyOf</code> has been
+     * asserted on the database.
+     * 
+     * @param focusStore
+     * @param database
+     * @param p
+     *            The term identifier for the property whose sub-properties will
+     *            be obtain.
+     * 
+     * @return A set containing the term identifiers for the sub properties of
+     *         <i>p</i>.
+     */
+    public Set<Long> getSubPropertiesOf(AbstractTripleStore focusStore,
+            AbstractTripleStore database, final long p) {
+
+        final IAccessPath accessPath = //
+        (focusStore == null //
+        ? database.getAccessPath(NULL/* x */, rdfsSubPropertyOf.id, p)//
+                : new AccessPathFusedView(//
+                        focusStore.getAccessPath(NULL/* x */,
+                                rdfsSubPropertyOf.id, p), //
+                        database.getAccessPath(NULL/* x */,
+                                rdfsSubPropertyOf.id, p)//
+                ));
+
+        if(DEBUG) {
+            
+            log.debug("p="+database.toString(p));
+            
+        }
+        
+        final Set<Long> tmp = new HashSet<Long>();
+
+        /*
+         * query := (?x, rdfs:subPropertyOf, p).
+         * 
+         * Distinct ?x are gathered in [tmp].
+         * 
+         * Note: This query is two-bound on the POS index.
+         */
+
+        ISPOIterator itr = accessPath.iterator();
+
+        while(itr.hasNext()) {
+            
+            SPO[] stmts = itr.nextChunk();
+            
+            for( SPO spo : stmts ) {
+                
+                boolean added = tmp.add(spo.s);
+                
+                if(DEBUG) {
+                    
+                    log.debug(spo.toString(database) + ", added subject="+added);
+                    
+                }
+                
+            }
+
+        }
+        
+        if(DEBUG){
+        
+            Set<String> terms = new HashSet<String>();
+            
+            for( Long id : tmp ) {
+                
+                terms.add(database.toString(id));
+                
+            }
+            
+            log.debug("sub properties: "+terms);
+        
+        }
+        
+        return tmp;
+
     }
 
 }
