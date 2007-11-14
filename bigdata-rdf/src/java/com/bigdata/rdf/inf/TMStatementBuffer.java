@@ -391,7 +391,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              */
             
             final SPOAssertionBuffer assertionBuffer = new SPOAssertionBuffer(
-                    database, filter, focusStoreSize/* capacity */, false/* justified */);
+                    database, database, filter, focusStoreSize/* capacity */, false/* justified */);
 
             /*
              * This buffer will retract statements from the tempStore that are
@@ -541,7 +541,9 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         log.info("Copying statements from the temporary store to the database");
 
-        int ncopied = tempStore.copyStatements(database, null/*filter*/);
+//        tempStore.dumpStore(database,true,true,false,true);
+        int ncopied = tempStore.copyStatements(database, null/*filter*/, true /*copyJustifications*/);
+//        database.dumpStore(database,true,true,false,true);
 
         // note: this is the number that are _new_ to the database.
         log.info("Copied " + ncopied
@@ -682,7 +684,7 @@ public class TMStatementBuffer implements IStatementBuffer {
      *            called. At depth ZERO(0) the tempStore MUST contain only the
      *            explicit statements to be retracted.
      */
-    private void retractAll(ClosureStats stats, AbstractTripleStore tempStore, int depth) {
+    private void retractAll(ClosureStats stats, TempTripleStore tempStore, int depth) {
 
         MDC.put("depth", "depth="+depth);
         
@@ -702,6 +704,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         // consider each statement in the tempStore.
         ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
 
+        final int nretracted;
         try {
 
             /*
@@ -709,7 +712,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              */
 
             SPOAssertionBuffer ungroundedBuffer = new SPOAssertionBuffer( 
-                    focusStore, null/* filter */, bufferCapacity, false/* justified */);
+                    focusStore, database, null/* filter */, bufferCapacity, false/* justified */);
 
             /*
              * Buffer used to downgrade explicit statements that are still
@@ -720,7 +723,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              */
 
             SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer( 
-                    database, inferenceEngine.doNotAddFilter,
+                    focusStore, database, inferenceEngine.doNotAddFilter,
                     10000/* capacity */, false/* justify */);
 
             /*
@@ -811,15 +814,25 @@ public class TMStatementBuffer implements IStatementBuffer {
                         /*
                          * Ignore. If an explicit statement is discover by
                          * closure then we do nothing.
+                         * 
+                         * @todo since closure produces inferences (rather than
+                         * explicit statements) this block is probably never
+                         * executed.
                          */
                         log.info("Ignoring explicit statement in the tempStore at depth="+depth+", "+spo);
+                        throw new AssertionError(); // verify that we never execute this block.
                         
                     } else if (inferenceEngine.isAxiom(spo.s, spo.p, spo.o)) {
                         
                         /*
-                         * Convert back to an axiom.  We need this in case an
-                         * explicit statement is being retracted that is also
-                         * an axiom.
+                         * Convert back to an axiom. We need this in case an
+                         * explicit statement is being retracted that is also an
+                         * axiom.
+                         * 
+                         * @todo this block should only run at depth zero. at
+                         * depth greater than zero we only see inferences and we
+                         * are keeping axioms from being converted to inferences
+                         * in the DoNotAddFilter.
                          */
                         
                         SPO tmp = new SPO(spo.s, spo.p, spo.o,
@@ -832,8 +845,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                         log.info("Downgrading to axiom: "+spo.toString(database));
 
                     } else if (depth == 0
-                            && Justification.isGrounded(inferenceEngine,
-                                    tempStore, database, spo, testHead, testFocusStore)) {
+                            && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
 
                         /*
                          * Add a variant of the statement that is marked as
@@ -861,8 +873,7 @@ public class TMStatementBuffer implements IStatementBuffer {
                                 + spo.toString(database));
                         
                     } else if (depth > 0
-                            && Justification.isGrounded(inferenceEngine,
-                                    tempStore, database, spo, testHead, testFocusStore)) {
+                            && Justification.isGrounded(inferenceEngine, tempStore, database, spo, testHead, testFocusStore)) {
                         
                         /*
                          * Ignore.
@@ -904,7 +915,9 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             log.info("#downgraded="+downgradeBuffer.flush());
 
-            log.info("#retracted="+retractionBuffer.flush());
+            nretracted = retractionBuffer.flush();
+            
+            log.info("#retracted="+nretracted);
 
             log.info("#ungrounded="+ungroundedBuffer.flush());
 
@@ -914,6 +927,17 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         }
 
+        // drop the tempStore.
+        tempStore.closeAndDelete();
+
+        if(nretracted==0) {
+            
+            log.info("Done - nothing was retracted from the database");
+            
+            return;
+            
+        }
+        
         if(DEBUG && database.getStatementCount()<200) {
             
             System.err.println("dumping database after retraction: depth="+depth);
@@ -922,9 +946,6 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
         
-        // drop the tempStore.
-        tempStore.closeAndDelete();
-
         int focusStoreCount = focusStore.getStatementCount();
 
         if (focusStoreCount == 0) {

@@ -634,7 +634,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         
         try {
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/*justified*/);
             
             buffer.add(new SPO(1,2,3,StatementEnum.Explicit));
@@ -728,7 +728,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new Statement[]{},
                     store.getAccessPath(null,null,null).iterator());
             
-            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store,
+            SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/*justify*/);
             
             buffer.add(new SPO(1, 2, 3,StatementEnum.Explicit));

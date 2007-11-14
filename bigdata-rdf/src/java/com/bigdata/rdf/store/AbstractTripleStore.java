@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.openrdf.model.Resource;
@@ -63,20 +64,22 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
+import com.bigdata.rdf.inf.SPOJustificationIterator;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.IChunkedIterator;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -403,6 +406,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     /**
      * A service used to write on each of the statement indices in parallel.
+     * <p>
+     * Note: When writing justifications as well, we use two additional threads
+     * in order to have the {@link StatementWriter} and the
+     * {@link JustificationWriter} proceed in parallel. The
+     * {@link StatementWriter} in turn submits the N tasks, one for each
+     * statement index. Therefore this is allocated to N+2.
      * 
      * @todo While this provides concurrency on the statement indices, it does
      *       not support concurrent operations that each want to write on the
@@ -411,8 +420,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       runs N tasks, one for each index) or a refactor to use the
      *       {@link ConcurrentJournal}.
      */
-    public ExecutorService writeService = Executors.unconfigurableExecutorService(Executors.newFixedThreadPool(N,
-            DaemonThreadFactory.defaultThreadFactory()));
+    public ExecutorService writeService = Executors.newFixedThreadPool(N + 2,
+            DaemonThreadFactory.defaultThreadFactory());
 
     /**
      * Generate the sort keys for the terms.
@@ -1408,7 +1417,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                                 SPO spo = a[i];
 
                                 // will visit justifications for that statement.
-                                JustificationIterator itr = new JustificationIterator(
+                                // FIXME use chunks.
+                                SPOJustificationIterator itr = new SPOJustificationIterator(
                                         AbstractTripleStore.this, spo);
                                 
                                 if(DEBUG) {
@@ -1759,6 +1769,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    final public void dumpStore(AbstractTripleStore resolveTerms,
+            boolean explicit, boolean inferred, boolean axioms) {
+        
+        dumpStore(resolveTerms,explicit,inferred,axioms,false);
+        
+    }
+
     /**
      * Dumps the store in a human readable format (not suitable for
      * interchange).
@@ -1773,63 +1790,94 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *            Show statements marked inferred.
      * @param axioms
      *            Show statements marked as axioms.
+     * @param justifications
+     *            Dump the justifications index also.
      */
     final public void dumpStore(AbstractTripleStore resolveTerms,
-            boolean explicit, boolean inferred, boolean axioms) {
+            boolean explicit, boolean inferred, boolean axioms,
+            boolean justifications) {
 
         final int nstmts = getStatementCount();
-        
-        IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
-
-        int i = 0;
 
         int nexplicit = 0;
         int ninferred = 0;
         int naxioms = 0;
-        
-        while (itr.hasNext()) {
 
-            Object val = itr.next();
-            
-            SPO spo = new SPO(KeyOrder.SPO,itr.getKey(), val);
+        {
 
-            switch (spo.type) {
+            IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
 
-            case Explicit:
-                nexplicit++;
-                if (!explicit)
-                    continue;
-                else
-                    break;
-            
-            case Inferred:
-                ninferred++;
-                if (!inferred)
-                    continue;
-                else
-                    break;
-            
-            case Axiom:
-                naxioms++;
-                if (!axioms)
-                    continue;
-                else
-                    break;
-            
-            default:
-                throw new AssertionError();
-            
+            int i = 0;
+
+            while (itr.hasNext()) {
+
+                Object val = itr.next();
+
+                SPO spo = new SPO(KeyOrder.SPO, itr.getKey(), val);
+
+                switch (spo.type) {
+
+                case Explicit:
+                    nexplicit++;
+                    if (!explicit)
+                        continue;
+                    else
+                        break;
+
+                case Inferred:
+                    ninferred++;
+                    if (!inferred)
+                        continue;
+                    else
+                        break;
+
+                case Axiom:
+                    naxioms++;
+                    if (!axioms)
+                        continue;
+                    else
+                        break;
+
+                default:
+                    throw new AssertionError();
+
+                }
+
+                System.err.println("#" + (i + 1) + "\t"
+                        + spo.toString(resolveTerms));
+
+                i++;
+
             }
             
-            System.err.println("#" + (i+1) + "\t" + spo.toString(resolveTerms));
+        }
+        
+        int njust = 0;
+        
+        if(justifications) {
             
-            i++;
+            IIndex ndx = getJustificationIndex();
+            
+            IEntryIterator itrj = ndx.rangeIterator(null, null);
+            
+            while(itrj.hasNext()) {
+                
+                itrj.next();
+                
+                Justification jst = new Justification(itrj.getKey());
+                
+                System.err.println("#" + (njust + 1) + "\t"
+                        + jst.toString(resolveTerms));
+                
+                njust++;
+                
+            }
             
         }
-
+        
         System.err.println("dumpStore: #statements=" + nstmts + ", #explicit="
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
-                + naxioms);
+                + naxioms+(justifications?", #just="+njust:""));
 
     }
     
@@ -2025,30 +2073,210 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * <p>
      * Note: The statements in <i>this</i> store are NOT removed.
      * 
-     * @param src
-     *            The temporary store (source).
-     * 
      * @param dst
      *            The persistent database (destination).
+     * @param filter
+     *            An optional filter to be applied. Statements in <i>this</i>
+     *            matching the filter will NOT be copied.
+     * @param copyJustifications
+     *            When true, the justifications will be copied as well.
      * 
-     * @return The #of statements inserted into the main store (the count only
+     * @return The #of statements inserted into <i>dst</i> (the count only
      *         reports those statements that were not already in the main
      *         store).
      */
-    public int copyStatements(AbstractTripleStore dst, ISPOFilter filter) {
-
-        if (dst == null)
-            throw new IllegalArgumentException();
+    public int copyStatements(AbstractTripleStore dst, ISPOFilter filter,
+            boolean copyJustifications) {
 
         if (dst == this)
             throw new IllegalArgumentException();
-        
+
         // obtain a chunked iterator reading from any access path.
         ISPOIterator itr = getAccessPath(KeyOrder.SPO).iterator(filter);
         
-        // add statements to the target store.
-        return dst.addStatements(itr, null/*filter*/);
+        if (!copyJustifications) {
+            
+            // add statements to the target store.
+            return dst.addStatements(itr, null/*filter*/);
 
+        } else {
+            
+            /*
+             * Use a thread pool to write out the statement and the
+             * justifications concurrently. This drammatically reduces the
+             * latency when also writing justifications.
+             */
+
+            List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
+            
+            /*
+             * Note: we reject using the filter before stmts or
+             * justifications make it into the buffer so we do not need to
+             * apply the filter again here.
+             */
+           
+            // set as a side-effect.
+            AtomicInteger nwritten = new AtomicInteger();
+
+            // task will write SPOs on the statement indices.
+            tasks.add(new StatementWriter(dst, itr, nwritten));
+            
+            // task will write justifications on the justifications index.
+            AtomicInteger nwrittenj = new AtomicInteger();
+            {
+
+                IJustificationIterator jitr = new JustificationIterator(
+                        getJustificationIndex(), 0/* capacity */, true/* async */);
+                
+                tasks.add(new JustificationWriter(dst, jitr, nwrittenj ));
+                
+            }
+            
+            final List<Future<Long>> futures;
+            final long elapsed_SPO;
+            final long elapsed_JST;
+            
+            try {
+
+                futures = writeService.invokeAll( tasks );
+
+                elapsed_SPO = futures.get(0).get();
+                elapsed_JST = futures.get(1).get();
+
+            } catch(InterruptedException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            } catch(ExecutionException ex) {
+            
+                throw new RuntimeException(ex);
+            
+            }
+
+            log.info("Copy wrote " + nwritten + " statements in " + elapsed_SPO
+                    + "ms and " + nwrittenj + " justifications in "
+                    + elapsed_JST + "ms");
+            
+            return nwritten.get();
+            
+        }
+
+    }
+    
+    /**
+     * Writes statements on the statement indices.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class StatementWriter implements Callable<Long>{
+
+        private final AbstractTripleStore dst;
+        private final ISPOIterator itr;
+        
+        /**
+         * Incremented by the #of statements written on the statements indices.
+         */
+        public final AtomicInteger nwritten;
+
+        /**
+         * 
+         * @param dst
+         *            The database on which the statements will be written.
+         * @param itr
+         *            The source iterator for the {@link SPO}s to be written.
+         * @param nwritten
+         *            Incremented by the #of statements written on the statement
+         *            indices as a side-effect.
+         */
+        public StatementWriter(AbstractTripleStore dst, ISPOIterator itr,
+                AtomicInteger nwritten) {
+        
+            this.dst = dst;
+            
+            this.itr = itr;
+            
+            this.nwritten = nwritten;
+
+        }
+        
+        /**
+         * Writes on the statement indices (parallel, batch api).
+         * 
+         * @return The elapsed time for the operation.
+         */
+        public Long call() throws Exception {
+            
+            final long begin = System.currentTimeMillis();
+            
+            nwritten.addAndGet(dst.addStatements(itr,null/*filter*/));
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            return elapsed;
+
+        }
+        
+    }
+    
+    /**
+     * Writes {@link Justification}s on the justification index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class JustificationWriter implements Callable<Long>{
+
+        /**The database on which to write the justifications. */
+        private final AbstractTripleStore dst;
+
+        /**
+         * The source iterator.
+         */
+        private final IChunkedIterator<Justification> src;
+
+        /**
+         * The #of justifications that were written on the justifications index.
+         */
+        private final AtomicInteger nwritten;
+        
+        /**
+         * 
+         * @param dst
+         *            The database on which the statements will be written.
+         * @param src
+         *            The source iterator.
+         * @param nwritten
+         *            Incremented as a side-effect for each justification
+         *            actually written on the justification index.
+         */
+        public JustificationWriter(AbstractTripleStore dst, IChunkedIterator<Justification> src, AtomicInteger nwritten) {
+        
+            this.dst = dst;
+            
+            this.src = src;
+            
+            this.nwritten = nwritten;
+            
+        }
+        
+        /**
+         * Write justifications on the justifications index.
+         * 
+         * @return The elapsed time.
+         */
+        public Long call() throws Exception {
+            
+            final long begin = System.currentTimeMillis();
+            
+            nwritten.addAndGet(dst.addJustifications(src));
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            return elapsed;
+
+        }
+        
     }
     
     public int addStatements(SPO[] stmts, int numStmts ) {
@@ -2069,16 +2297,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     public int addStatements(ISPOIterator itr, ISPOFilter filter) {
 
-        if(!itr.hasNext()) return 0;
-        
-        final AtomicLong numWritten = new AtomicLong(0);
-
-        /*
-         * Note: We process the iterator a "chunk" at a time. If the iterator is
-         * backed by an SPO[] then it will all be processed in one "chunk".
-         */
-
         try {
+        
+            if(!itr.hasNext()) return 0;
+        
+            final AtomicLong numWritten = new AtomicLong(0);
+
+            /*
+             * Note: We process the iterator a "chunk" at a time. If the
+             * iterator is backed by an SPO[] then it will all be processed in
+             * one "chunk".
+             */
 
             while (itr.hasNext()) {
 
@@ -2426,23 +2655,25 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             }
 
+            return (int) numWritten.get();
+
         } finally {
 
             itr.close();
 
         }
 
-        return (int) numWritten.get();
-
     }
 
     /**
      * Adds justifications to the store.
      * 
-     * @param a
-     *            The justifications.
-     * @param n
-     *            The #of elements in the array that are valid.
+     * @param itr
+     *            The iterator from which we will read the {@link Justification}s
+     *            to be added. The iterator is closed by this operation.
+     * 
+     * @return The #of {@link Justification}s written on the justifications
+     *         index.
      * 
      * @todo a lot of the cost of loading data is writing the justifications.
      *       SLD/magic sets will relieve us of the need to write the
@@ -2453,42 +2684,63 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       source of latency, SLD/magic sets will translate into an immediate
      *       performance boost for data load.
      */
-    public void addJustifications(Justification[] a, int n) {
-        
-        if (n == 0)
-            return;
+    public int addJustifications(IChunkedIterator<Justification> itr) {
 
-        final long begin = System.currentTimeMillis();
-        
-        IIndex ndx = getJustificationIndex();
+        try {
 
-        Arrays.sort(a, 0, n);
-        
-        /*
-         * Note: This capacity estimate is based on N longs per SPO, one head,
-         * and 2-3 SPOs in the tail. The capacity will be extended automatically
-         * if necessary.
-         */
-        
-        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
-        
-        for (int i = 0; i < n; i++) {
+            if (!itr.hasNext())
+                return 0;
 
-            Justification jst = a[i];
-            
-            byte[] key = jst.getKey(keyBuilder);
-            
-            if (!ndx.contains(key)) {
-                
-                ndx.insert(key, null);
-                
+            final long begin = System.currentTimeMillis();
+
+            /*
+             * Note: This capacity estimate is based on N longs per SPO, one
+             * head, and 2-3 SPOs in the tail. The capacity will be extended
+             * automatically if necessary.
+             */
+
+            KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3)
+                    * Bytes.SIZEOF_LONG);
+
+            IIndex ndx = getJustificationIndex();
+
+            int nwritten = 0;
+
+            while (itr.hasNext()) {
+
+                Justification[] a = itr.nextChunk();
+
+                // sort into their natural order.
+                Arrays.sort(a);
+
+                for (Justification jst : a) {
+
+                    byte[] key = jst.getKey(keyBuilder);
+
+                    if (!ndx.contains(key)) {
+
+                        ndx.insert(key, null);
+
+                        nwritten++;
+
+                    }
+
+                }
+
             }
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            log.info("Wrote " + nwritten + " justifications in " + elapsed
+                    + " ms");
+
+            return nwritten;
             
+        } finally {
+
+            itr.close();
+
         }
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.info("Wrote "+n+" justifications in "+elapsed+" ms");
         
     }
 

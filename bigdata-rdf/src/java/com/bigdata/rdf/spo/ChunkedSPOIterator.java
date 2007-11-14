@@ -26,23 +26,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.spo;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.bigdata.rdf.util.KeyOrder;
+
+import cutthecrap.utils.striterators.Striterator;
+
 /**
- * Converts an <code>Iterator</code> into chunked iterator.
+ * Converts an <code>Iterator&lt;SPO&gt;</code> into chunked iterator.
  * <p>
- * Note: The visitation order is whatever the order was for the source
- * iterator.
+ * Note: The visitation order is whatever the order was for the source iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo todo refactor to extend {@link ChunkedIterator}. The filter will have
+ *       to be applied during the super() in the ctor.
  */
-public class ChunkedIterator<T> implements IChunkedIterator<T> {
+public class ChunkedSPOIterator implements ISPOIterator {
     
     private boolean open = true;
     
-    private final Iterator<T> src;
+    private final Iterator<SPO> src;
     
     private final int chunkSize;
     
@@ -52,9 +59,9 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
      * @param src
      *            The source iterator.
      */
-    public ChunkedIterator(Iterator<T>src) {
+    public ChunkedSPOIterator(Iterator<SPO>src) {
         
-        this(src, 10000 );
+        this(src, 10000, null);
         
     }
 
@@ -66,16 +73,40 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
      * @param chunkSize
      *            The desired chunk size.
      */
-    public ChunkedIterator(Iterator<T>src, int chunkSize) {
+    public ChunkedSPOIterator(Iterator<SPO>src, int chunkSize) {
         
+        this(src, chunkSize , null );
+        
+    }
+    
+    /**
+     * Create an iterator that reads from the source.
+     * 
+     * @param src
+     *            The source iterator.
+     * @param chunkSize
+     *            The desired chunk size.
+     * @param filter
+     *            An optional filter.
+     */
+    public ChunkedSPOIterator(Iterator<SPO>src, int chunkSize, ISPOFilter filter) {
+
         if (src == null)
             throw new IllegalArgumentException();
 
         if (chunkSize <= 0)
             throw new IllegalArgumentException();
-     
-        this.src = src;
         
+        /*
+         * If a filter was specified then use a Striterator to filter the source
+         * iterator such that it includes only those SPOs that match the filter.
+         */
+        
+        this.src = (filter == null //
+                ? src //
+                : new Striterator(src).addFilter(new SPOFilter(filter))
+                );
+     
         this.chunkSize = chunkSize;
         
     }
@@ -87,14 +118,24 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
         
         open = false;
 
-        if(src instanceof IChunkedIterator) {
+        if(src instanceof ISPOIterator) {
             
-            ((IChunkedIterator)src).close();
+            ((ISPOIterator)src).close();
             
         }
 
     }
 
+    /**
+     * Returns <code>null</code> since the {@link SPO}s are not in any
+     * specific order as visited by {@link #next()}.
+     */
+    public KeyOrder getKeyOrder() {
+
+        return null;
+        
+    }
+    
     /**
      * Return <code>true</code> if there are {@link SPO}s in the source
      * iterator.
@@ -107,7 +148,10 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
         
     }
 
-    public T next() {
+    /**
+     * The next {@link SPO} in the source iterator.
+     */
+    public SPO next() {
 
         if (!hasNext()) {
 
@@ -120,9 +164,10 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
     }
 
     /**
-     * The next chunk of in whatever order the were visited by {@link #next()}.
+     * The next chunk of {@link SPO}s in whatever order the were visited by
+     * {@link #next()}.
      */
-    public T[] nextChunk() {
+    public SPO[] nextChunk() {
 
         if (!hasNext()) {
 
@@ -130,28 +175,14 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
 
         }
 
+        SPO[] chunk = new SPO[chunkSize];
+
         int n = 0;
 
-        T[] chunk = null;
-        
         while (hasNext() && n < chunkSize) {
 
-            T t = next();
-            
-            if(chunk==null) {
-
-                /*
-                 * Dynamically instantiation an array of the same component type
-                 * as the objects that we are visiting.
-                 */
-                
-                chunk = (T[])java.lang.reflect.Array.newInstance(
-                        t.getClass().getComponentType(), chunkSize);
-
-            }
-            
             // add to this chunk.
-            chunk[n++] = t;
+            chunk[n++] = next();
             
         }
         
@@ -159,8 +190,7 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
 
             // make it dense.
             
-            T[] tmp = (T[])java.lang.reflect.Array.newInstance(
-                    chunk[0].getClass().getComponentType(), chunkSize);
+            SPO[] tmp = new SPO[n];
             
             System.arraycopy(chunk, 0, tmp, 0, n);
             
@@ -168,6 +198,21 @@ public class ChunkedIterator<T> implements IChunkedIterator<T> {
          
         }
         
+        return chunk;
+        
+    }
+
+    public SPO[] nextChunk(KeyOrder keyOrder) {
+        
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+
+        SPO[] chunk = nextChunk();
+        
+        // sort into the required order.
+
+        Arrays.sort(chunk, 0, chunk.length, keyOrder.getComparator());
+
         return chunk;
         
     }

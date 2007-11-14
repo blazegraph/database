@@ -2060,7 +2060,7 @@ abstract public class Rule {
          * We will fix point whichever store the buffer is writing on.
          */
         
-        final AbstractTripleStore fixPointStore = buffer.store;
+        final AbstractTripleStore fixPointStore = buffer.getFocusStore();
         
         final int firstStatementCount = fixPointStore.getStatementCount();
 

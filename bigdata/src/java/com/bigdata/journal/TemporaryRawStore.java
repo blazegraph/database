@@ -53,21 +53,14 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo drop the transient buffer strategy and just use the disk-only strategy
- *       with a write cache and disable {@link Options#FORCE_ON_COMMIT}. the
- *       performance should be just about the same as the transient mode and we
- *       also have the benefit of full read/write concurrency.
- *       <p>
- *       Actually, the one place where it will still be significantly slower is
- *       when the temporary store is created -- this is nearly instantenous if
- *       it is in memory but creating a backing store on disk adds significant
- *       latency. That latency could be significant when starting a new
- *       transaction and could have an impact when transaction write sets are
- *       small (we do defer the creation of the backing store for writable
- *       transactions, so maybe this is Ok).
+ * @todo add configuration properties.
  * 
- * @todo The {@link TemporaryRawStore} would benefit from any caching or AIO
- *       solutions developed for the {@link DiskOnlyStrategy}.
+ * FIXME Use the {@link DiskOnlyStrategy} here but add an option for lazy
+ * creation of the file on the disk, disable forcing of writes or force on
+ * commit, and mark the file as "temporary". This will let us write in memory
+ * until the write cache overflows and then it will start putting down the data
+ * on the disk. This has all of the advantages of the current approach (low
+ * latency on startup), plus we get MRMW for the temp store.
  */
 public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore, IMROW {
 

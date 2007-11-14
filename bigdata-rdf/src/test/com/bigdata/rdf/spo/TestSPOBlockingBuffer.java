@@ -234,6 +234,8 @@ public class TestSPOBlockingBuffer extends TestCase2 {
         
         f2.get();
         
+        service.shutdownNow();
+        
     }
     
 }

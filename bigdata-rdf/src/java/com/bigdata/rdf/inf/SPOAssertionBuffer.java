@@ -31,16 +31,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.rdf.spo.ISPOAssertionBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.rdf.store.AbstractTripleStore.JustificationWriter;
+import com.bigdata.rdf.store.AbstractTripleStore.StatementWriter;
 
 /**
  * A buffer for {@link SPO}s and optional {@link Justification}s that is
@@ -53,6 +53,24 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id$
  */
 public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAssertionBuffer {
+
+    /**
+     * The focusStore on which the entailments computed by closure will be
+     * written. This may be either the database or a temporary focusStore used during
+     * incremental TM.
+     */
+    final private AbstractTripleStore focusStore;
+
+    /**
+     * The focusStore on which the entailments computed by closure will be
+     * written. This may be either the database or a temporary focusStore used
+     * during incremental TM.
+     */
+    public AbstractTripleStore getFocusStore() {
+
+        return focusStore;
+        
+    }
     
     /**
      * The array in which the optional {@link Justification}s are stored.
@@ -71,7 +89,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
     }
     
     /**
-     * true iff the Truth Maintenance strategy requires that we store
+     * true iff the Truth Maintenance strategy requires that we focusStore
      * {@link Justification}s for entailments.
      */
     protected final boolean justify;
@@ -79,26 +97,34 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
     /**
      * Create a buffer.
      * 
-     * @param store
-     *            The database into which the terms and statements will be
-     *            inserted.
+     * @param focusStore
+     *            The focusStore on which the entailments computed by closure
+     *            will be written. This may be either the database or a
+     *            temporary focusStore used during incremental TM.
+     * @param db
+     *            The database in which the terms are defined (optional - this
+     *            is used to resolve term identifiers in log messages).
      * @param filter
      *            Option filter. When present statements matched by the filter
      *            are NOT retained by the {@link SPOAssertionBuffer} and will
-     *            NOT be added to the <i>store</i>.
+     *            NOT be added to the <i>focusStore</i>.
      * @param capacity
      *            The maximum {@link SPO}s that the buffer can hold before it
      *            is {@link #flush()}ed.
      * @param justified
-     *            true iff the Truth Maintenance strategy requires that we store
+     *            true iff the Truth Maintenance strategy requires that we focusStore
      *            {@link Justification}s for entailments.
      */
-    public SPOAssertionBuffer(AbstractTripleStore store, ISPOFilter filter,
-            int capacity, boolean justified) {
-        
-        super(store,filter,capacity);
+    public SPOAssertionBuffer(AbstractTripleStore focusStore,
+            AbstractTripleStore db, ISPOFilter filter, int capacity,
+            boolean justified) {
 
-        if(store==null) throw new IllegalArgumentException();
+        super(db, filter, capacity);
+
+        if (focusStore == null)
+            throw new IllegalArgumentException();
+        
+        this.focusStore = focusStore;
         
         this.justify = justified;
 
@@ -129,12 +155,6 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         return false;
         
     }
-     
-    /**
-     * A service used to write statements and justifications at the same time.
-     */
-    private ExecutorService indexWriteService = Executors.newFixedThreadPool(2,
-            DaemonThreadFactory.defaultThreadFactory());
 
     public int flush() {
 
@@ -148,8 +168,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         
         if (numJustifications == 0) {
             
-            // batch insert statements into the store.
-            n = store.addStatements(stmts, numStmts);
+            // batch insert statements into the focusStore.
+            n = focusStore.addStatements(stmts, numStmts);
 
         } else {
             
@@ -169,10 +189,16 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
            
             // set as a side-effect.
             AtomicInteger nwritten = new AtomicInteger();
+
+            // task will write SPOs on the statement indices.
+            tasks.add(new StatementWriter(focusStore, new SPOArrayIterator(
+                    stmts, numStmts), nwritten));
             
-            tasks.add(new StatementWriter(nwritten));
-            
-            tasks.add(new JustificationWriter());
+            // task will write justifications on the justifications index.
+            AtomicInteger nwrittenj = new AtomicInteger();
+            tasks.add(new JustificationWriter(focusStore,
+                    new JustificationArrayIterator(justifications,
+                            numJustifications),nwrittenj));
             
             final List<Future<Long>> futures;
             final long elapsed_SPO;
@@ -180,7 +206,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             try {
 
-                futures = indexWriteService.invokeAll( tasks );
+                futures = focusStore.writeService.invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
                 elapsed_JST = futures.get(1).get();
@@ -195,7 +221,9 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             }
 
-            log.info("stmts=" + elapsed_SPO + "ms, justs=" + elapsed_JST + "ms");
+            log.info("Wrote " + nwritten + " statements in " + elapsed_SPO
+                    + "ms and " + nwrittenj + " justifications in "
+                    + elapsed_JST + "ms");
             
             n = nwritten.get();
             
@@ -207,59 +235,21 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
 
         long elapsed = System.currentTimeMillis() - begin;
 
-        log.info("Wrote " + n + " statements "
-                + (justify ? " with justifications" : "") + " in " + elapsed
-                + "ms");
+        log.info("Wrote "
+                + n
+                + " statements"
+                + (justify ? " with " + numJustifications + " justifications"
+                        : "") + " in " + elapsed + "ms");
 
         numStmts = numJustifications = 0;
 
         return n;
 
     }
-    
-    private class StatementWriter implements Callable<Long>{
 
-        public final AtomicInteger nwritten;
-        
-        public StatementWriter(AtomicInteger nwritten) {
-            
-            this.nwritten = nwritten;
-            
-        }
-        
-        public Long call() throws Exception {
-            
-            final long begin = System.currentTimeMillis();
-            
-            nwritten.addAndGet(store.addStatements(stmts, numStmts));
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            return elapsed;
-
-        }
-        
-    }
-    
-    private class JustificationWriter implements Callable<Long>{
-
-        public Long call() throws Exception {
-            
-            final long begin = System.currentTimeMillis();
-            
-            store.addJustifications(justifications, numJustifications);
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            return elapsed;
-
-        }
-        
-    }
-    
     /**
      * When the buffer is {@link #nearCapacity()} the statements in the buffer
-     * will be flushed into the backing store.
+     * will be flushed into the backing focusStore.
      * 
      * @see #nearCapacity()
      * @see #flush()
@@ -269,7 +259,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
         if (!super.add(stmt)) {
 
             /*
-             * Note: Do not store statements (or justifications) matched by the
+             * Note: Do not focusStore statements (or justifications) matched by the
              * filter.
              */
 
@@ -277,8 +267,8 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
                 
                 log.debug("(filtered out)"
                         + "\n"
-                        + (justification == null ? stmt.toString(store)
-                                : justification.toString(store)));
+                        + (justification == null ? stmt.toString(getTermDatabase())
+                                : justification.toString(getTermDatabase())));
                 
             }
 
@@ -302,14 +292,14 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             if (DEBUG) {
                 
                 /*
-                 * Note: If [store] is a TempTripleStore then this will NOT be able
+                 * Note: If [focusStore] is a TempTripleStore then this will NOT be able
                  * to resolve the terms from the ids (since the lexicon is only in
                  * the database).
                  */
 
                 log.debug("\n"
-                        + (justification == null ? stmt.toString(store)
-                                : justification.toString(store)));
+                        + (justification == null ? stmt.toString(getTermDatabase())
+                                : justification.toString(getTermDatabase())));
             
             }
 

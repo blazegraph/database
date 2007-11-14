@@ -64,6 +64,9 @@ import com.bigdata.rdf.util.KeyOrder;
 /**
  * Test suite for {@link TMStatementBuffer}.
  * 
+ * @todo add a stress test where we assert random statements and then
+ * back out those assertions verifying that we recover the original closure?
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -96,7 +99,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
              * Setup the database.
              */
             {
-                SPOAssertionBuffer buf = new SPOAssertionBuffer(store,
+                SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
                         null/* filter */, 100/* capacity */, false/* justified */);
 
                 buf.add(new SPO(1, 2, 3, StatementEnum.Inferred));
@@ -121,7 +124,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             TempTripleStore focusStore = new TempTripleStore(store.getProperties());
             {
             
-                SPOAssertionBuffer buf = new SPOAssertionBuffer(focusStore,
+                SPOAssertionBuffer buf = new SPOAssertionBuffer(focusStore, store,
                         null/* filter */, 100/* capacity */, false/* justified */);
 
                 // should be applied to the database since already there as inferred.
@@ -205,6 +208,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             // perform closure and write on the database.
             assertionBuffer.doClosure();
 
+            store.dumpStore(store, true, true, false, true);
+            
             // explicit.
             assertTrue(store.hasStatement(U, rdfsSubClassOf, V));
             assertTrue(store.hasStatement(V, rdfsSubClassOf, X));
@@ -465,18 +470,18 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
     }
     
     /**
-     * This test demonstrates TM incorrectness.  I add three statements into 
-     * store A, then remove one of them.  Then I add the two statements that 
-     * remain in store A into store B and compare the stores.  They should be 
-     * the same, right?  Well, unfortunately they are not the same.  Too many 
-     * inferences were deleted from the first store during TM. 
+     * This test demonstrates TM incorrectness. I add two statements into store
+     * A, then remove one of them. Then I add the the statement that remain in
+     * store A into store B and compare the closure of the stores. They should
+     * be the same, right? Well, unfortunately they are not the same. Too many
+     * inferences were deleted from the first store during TM.
      */
     public void test_closurecorrectness() {
         
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
         URI c = new URIImpl("http://www.bigdata.com/c");
-        URI d = new URIImpl("http://www.bigdata.com/d");
+//        URI d = new URIImpl("http://www.bigdata.com/d");
         URI sco = URIImpl.RDFS_SUBCLASSOF;
 
         AbstractTripleStore store = getStore();
@@ -487,7 +492,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
         try {
             
-            // add three
+            // add two
             {
             
                 TMStatementBuffer assertionBuffer = new TMStatementBuffer(
@@ -496,13 +501,13 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 assertionBuffer.add(a, sco, b );
                 assertionBuffer.add(b, sco, c );
-                assertionBuffer.add(c, sco, d );
+//                assertionBuffer.add(c, sco, d );
                 
                 // perform closure and write on the database.
                 assertionBuffer.doClosure();
 
-                // dump after closure.
-                store.dumpStore(true,true,false);
+                System.err.println("dump after closure.");
+                store.dumpStore(store,true,true,false,true);
 
             }
             
@@ -518,12 +523,16 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 // update the closure.
                 retractionBuffer.doClosure();
 
-                // dump after re-closure.
+                System.err.println("dump after retraction and re-closure");
                 store.dumpStore(true,true,false);
                 
             }
             
-            // add two to the "control store"
+            /*
+             * Add statement(s) to the "control store" and compute its closure.
+             * This provides the basis for checking the result that we obtained
+             * above via retraction.
+             */
             {
             
                 TMStatementBuffer assertionBuffer = new TMStatementBuffer(
@@ -531,12 +540,12 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                         100/* capacity */, BufferEnum.AssertionBuffer);
 
                 assertionBuffer.add(a, sco, b );
-                assertionBuffer.add(c, sco, d );
+//                assertionBuffer.add(c, sco, d );
                 
                 // perform closure and write on the database.
                 assertionBuffer.doClosure();
 
-                // dump after closure.
+                System.err.println("dump comparison store after closure.");
                 tempStore.dumpStore(true,true,false);
 
             }
@@ -560,8 +569,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
-        //URI x = new URIImpl("http://www.bigdata.com/x");
-        //URI y = new URIImpl("http://www.bigdata.com/y");
         URI entity = new URIImpl("http://www.bigdata.com/Entity");
         URI sameAs = new URIImpl( OWL.SAMEAS );
         URI rdfType = URIImpl.RDF_TYPE;
@@ -592,14 +599,14 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 assertionBuffer.doClosure();
 
                 // dump after closure.
-                store.dumpStore(true,true,false);
+                store.dumpStore(store,true,true,false,true);
 
             }
             
             /*
              * retract stmt A and update the closure.
              * 
-             * then verify that it is retracted statement is gone and that the
+             * then verify that the retracted statement is gone and that the
              * other explicit statements were not touched.
              */
             {
@@ -614,7 +621,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 retractionBuffer.doClosure();
 
                 // dump after re-closure.
-                store.dumpStore(true,true,false);
+                store.dumpStore(store,true,true,false,true);
                 
             }
             
@@ -692,7 +699,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             
             TempTripleStore tmp = new TempTripleStore(properties);
             
-            store.copyStatements(tmp, null/*filter*/);
+            store.copyStatements(tmp, null/*filter*/, false/*copyJustifications*/);
             
             /*
              * Start the stress tests.
@@ -1091,7 +1098,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
             while (itre.hasNext()) {
 
-                assert itra.hasNext();
+                assertTrue( "Actual iterator exhausted before expected: i="+i, itra.hasNext() );
 
                 SPO expectedSPO = itre.next();
                 
@@ -1134,7 +1141,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
             }
 
-            assertFalse(itra.hasNext());
+            assertFalse("Actual iterator will visit more than expected", itra.hasNext());
 
         } finally {
 

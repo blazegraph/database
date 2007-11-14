@@ -83,6 +83,12 @@ public class TestSparseRowStore extends TestCase2 {
         
     }
     
+    public void tearDown() {
+        
+        store.closeAndDelete();
+        
+    }
+    
     /**
      * 
      */

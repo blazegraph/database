@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -37,58 +36,15 @@ import com.bigdata.rdf.util.KeyOrder;
 /**
  * Iterator visits {@link SPO}s.
  * 
- * @todo verify that all {@link ISPOIterator}s are being closed within a
- *       <code>finally</code> clause.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISPOIterator extends Iterator<SPO> {
+public interface ISPOIterator extends IChunkedIterator<SPO> {
 
     public final long NULL = IRawTripleStore.NULL;
+
     public final long N = IRawTripleStore.N;
     
-    /**
-     * Closes the iterator, releasing any associated resources. This method MAY
-     * be invoked safely if the iterator is already closed.
-     * <p>
-     * Note: Implementations MUST NOT eagerly close the iterator when it is
-     * exhausted since that would make it impossible to remove the last visited
-     * statement. Instead they MUST wait for an explicit {@link #close()} by the
-     * application.
-     */
-    public void close();
-
-    /**
-     * The next {@link SPO} available from the iterator.
-     * 
-     * @throws NoSuchElementException
-     *             if the iterator is exhausted.
-     */
-    public SPO next();
-    
-    /**
-     * Return the next "chunk" of statements from the iterator. The statements
-     * will be in the same order that they would be visited by
-     * {@link Iterator#next()}. The size of the chunk is up to the
-     * implementation.
-     * <p>
-     * This is designed to make it easier to write methods that use the batch
-     * APIs but do not require the statements matching some triple pattern to be
-     * fully materialized. You can use {@link #nextChunk()} instead of
-     * {@link Iterator#next()} to break down the operation into N chunks, where
-     * N is determined dynamically based on how much data the iterator returns
-     * in each chunk and how much data there is to be read.
-     * 
-     * @return The next chunk of statements.
-     * 
-     * @see #nextChunk(KeyOrder)
-     * 
-     * @throws NoSuchElementException
-     *             if the iterator is exhausted.
-     */
-    public SPO[] nextChunk();
-
     /**
      * Return the next "chunk" of statements from the iterator. The statements
      * will be in the specified order. If {@link #getKeyOrder()} would return

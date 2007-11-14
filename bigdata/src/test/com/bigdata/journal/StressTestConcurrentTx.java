@@ -307,6 +307,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
         }
 
+        executorService.shutdownNow();
+        
         // immediately terminate any tasks that are still running.
         log.warn("Shutting down now!");
         journal.shutdownNow();

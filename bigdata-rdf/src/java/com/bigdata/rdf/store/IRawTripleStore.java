@@ -227,7 +227,8 @@ public interface IRawTripleStore extends ITripleStore {
      *            An iterator visiting the statements to be added.
      * @param filter
      *            Optional statement filter. Statements matching the filter are
-     *            NOT added to the database.
+     *            NOT added to the database. The iterator is closed by this
+     *            operation.
      * 
      * @return The #of statements that were written on the indices (a statement
      *         that was previously an axiom or inferred and that is converted to
