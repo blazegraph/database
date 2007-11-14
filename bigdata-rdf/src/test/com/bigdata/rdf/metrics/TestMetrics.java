@@ -43,7 +43,6 @@ import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -619,6 +618,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
     
     public void tearDown() throws Exception
     {
+        
+        System.err.println(store.usage());
         
         super.tearDown();
 

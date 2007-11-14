@@ -438,7 +438,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             store.addStatements(new SPO[]{spo1,spo2}, 2);
 
-            store.usage();
+            System.err.println(store.usage());
             
             store.dumpStore();
 
@@ -489,7 +489,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             assertEquals(1,store.getAccessPath(spo1.s, spo1.p, spo1.o).removeAll());
 
-            store.usage();
+            System.err.println(store.usage());
             
             store.dumpStore();
 
@@ -549,7 +549,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameSPOs(new SPO[] {}, store.getAccessPath(NULL, NULL,
                     NULL).iterator());
 
-            store.usage();
+            System.err.println(store.usage());
             
             store.dumpStore();
             
