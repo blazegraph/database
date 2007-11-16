@@ -508,6 +508,18 @@ public class Node extends AbstractNode implements INodeData {
 
     }
 
+    public void delete() {
+        
+        super.delete();
+        
+        // clear state.
+        childRefs = null;
+        childAddr = null;
+        nentries = 0;
+        childEntryCounts = null;
+        
+    }
+    
     /**
      * Always returns <code>false</code>.
      */

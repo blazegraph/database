@@ -181,6 +181,10 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
         }
 
+        parent = null; // Note: probably already null.
+        nkeys = 0; keys = null; // release the key buffer.
+        // Note: do NOT clear the referenceCount.
+        
         if( identity != NULL ) {
             
             /*

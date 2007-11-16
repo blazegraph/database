@@ -31,6 +31,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +46,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.isolation.IIsolatedIndex;
+import com.bigdata.journal.WriteExecutorService.RetryException;
 
 /**
  * Abstract base class for tasks that may be submitted to the
@@ -367,6 +370,10 @@ public abstract class AbstractTask implements Callable<Object> {
      * Commit and abort are NOT invoked for an isolated operation regardless of
      * whether the operation succeeds or fails. It is the responsibility of the
      * "client" to commit or abort a transaction as it sees fit.
+     * 
+     * FIXME document exceptions that can be thrown from here.  They will all
+     * be wrapped as {@link ExecutionException}s by the {@link ExecutorService}.
+     * There is at least {@link ResubmitException} and {@link RetryException}.
      */
     final public Object call() throws Exception {
 
