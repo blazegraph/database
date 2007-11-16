@@ -201,6 +201,10 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
              * Note: This operation is not meaningful on an append only store.
              * If a read-write store is defined then this is where you would
              * delete the old version.
+             * 
+             * Note: Do NOT clear the [identity] field in delete().  copyOnWrite()
+             * depends on the field remaining defined on the cloned node so that
+             * it may be passed on.
              */
 
 //            btree.store.delete(identity);
@@ -295,6 +299,25 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
     /**
      * Copy constructor.
+     * <p>
+     * Note: The copy constructor steals the state of the source node, creating
+     * a new node with the same state but a distinct (and not yet assigned)
+     * address on the backing store. If the source node has immutable data for
+     * some aspect of its state, then a mutable copy of that data is made.
+     * <p>
+     * Note: The <strong>caller</strong> MUST {@link #delete()} the source node
+     * after invoking this copy constructor. If the backing store supports the
+     * operation, the source node will be reclaimed as free space at the next
+     * commit.
+     * <p>
+     * The source node must be deleted since it is no longer accessible and
+     * various aspects of its state have been stolen by the copy constructor. If
+     * the btree is committed then both the delete of the source node and the
+     * new tree structure will be made restart-safe atomically and all is well.
+     * If the operation is aborted then both changes will be undone and all is
+     * well. In no case can we access the source node after this operation
+     * unless all changes have been aborted, in which case it will simply be
+     * re-read from the backing store.
      * 
      * @param src
      *            The source node.
@@ -330,8 +353,36 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         assert src == btree.root
                 || (src.parent != null && src.parent.get() != null);
         
+        // copy the parent reference.
         this.parent = src.parent;
         
+        /*
+         * Steal/copy the keys.
+         * 
+         * Note: The copy constructor is invoked when we need to begin mutation
+         * operations on an immutable node or leaf, so make sure that the keys
+         * are mutable.
+         */
+        {
+
+            nkeys = src.nkeys;
+
+            if (src.keys instanceof MutableKeyBuffer) {
+
+                keys = src.keys;
+
+            } else {
+
+                keys = new MutableKeyBuffer((ImmutableKeyBuffer) src.keys);
+
+            }
+
+            // release reference on the source node.
+            src.nkeys = 0;
+            src.keys = null;
+            
+        }
+
     }
 
     /**
@@ -360,7 +411,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         // Always invoked first for a leaf and thereafter in its other form.
         assert isLeaf();
         
-        return copyOnWrite(null);
+        return copyOnWrite(NULL);
         
     }
     
@@ -384,44 +435,38 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * and needs to be used in place of the immutable version of the node.
      * </p>
      * 
-     * @param triggeredByChild
-     *            The child that triggered this event if any.
+     * @param triggeredByChildId
+     *            The persistent identity of child that triggered this event if
+     *            any.
      * 
      * @return Either this node or a copy of this node.
      */
-    protected AbstractNode copyOnWrite(AbstractNode triggeredByChild) {
+    protected AbstractNode copyOnWrite(long triggeredByChildId) {
 
         if (isPersistent()) {
 
             if(INFO) {
-                log.info("this="+this+", trigger="+triggeredByChild);
+                log.info("this="+this+", trigger="+triggeredByChildId);
                 if( DEBUG ) {
                     System.err.println("this"); dump(Level.DEBUG,System.err);
-                    /*
-                     * Note: I believe that this dump() invocation can cause
-                     * false reporting of "ERROR child[x] has wrong parent". I
-                     * think that the code path for this involves the parent
-                     * reference being changed during the copy-on-write
-                     * operation. However, I have not verified this is gruesome
-                     * detail, e.g., using a specially crafted test case with
-                     * DEBUG level logging forced on.  Instead, I have simply
-                     * commented out this additional logging.  If I am correct,
-                     * then the logging statement itself was the problem!
-                     */
-//                    if( triggeredByChild != null ) {
-//                        System.err.println("trigger"); triggeredByChild.dump(Level.DEBUG,System.err);
-//                    }
                 }
             }
 
             // cast to mutable implementation class.
             final BTree btree = (BTree) this.btree;
             
-            AbstractNode newNode;
+            // identify of the node that is being copied and deleted.
+            final long oldId = this.identity;
+
+            // parent of the node that is being cloned (null iff it is the root).
+            Node parent = this.getParent();
+
+            // the new node (mutable copy of the old node).
+            final AbstractNode newNode;
 
             if (this instanceof Node) {
 
-                newNode = new Node((Node) this, triggeredByChild );
+                newNode = new Node((Node) this, triggeredByChildId );
                 
                 btree.counters.nodesCopyOnWrite++;
 
@@ -433,8 +478,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
             }
 
-            Node parent = this.getParent();
-
+            // delete this node now that it has been cloned.
+            this.delete();
+            
             if (btree.root == this) {
 
                 assert parent == null;
@@ -464,10 +510,10 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                 if (!parent.isDirty()) {
 
                     /*
-                     * Note: pass up the old child since we want to avoid having
-                     * its parent reference reset.
+                     * Note: pass up the identity of the old child since we want
+                     * to avoid having its parent reference reset.
                      */
-                    parent = (Node) parent.copyOnWrite(this);
+                    parent = (Node) parent.copyOnWrite(oldId);
 
                 }
 
@@ -477,7 +523,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                  * navigation. It will be GCd once it falls off of the hard
                  * reference queue.
                  */
-                parent.replaceChildRef(this.getIdentity(), newNode);
+                parent.replaceChildRef(oldId, newNode);
 
             }
 
@@ -922,7 +968,8 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          * that information is available. However we do not have that
          * information in this case so we use a [null] trigger.
          */
-        final AbstractNode t = null; // a [null] trigger node.
+//        final AbstractNode t = null; // a [null] trigger node.
+        final long triggeredByChildId = NULL;
 
         // verify that this node is deficient.
         assert nkeys < minKeys;
@@ -971,7 +1018,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          */
         if (rightSibling != null && rightSibling.nkeys > rightSibling.minKeys) {
 
-            redistributeKeys(rightSibling.copyOnWrite(t), true);
+            redistributeKeys(rightSibling.copyOnWrite(triggeredByChildId), true);
 
             return;
 
@@ -979,7 +1026,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
         if (leftSibling != null && leftSibling.nkeys > leftSibling.minKeys) {
 
-            redistributeKeys(leftSibling.copyOnWrite(t), false);
+            redistributeKeys(leftSibling.copyOnWrite(triggeredByChildId), false);
 
             return;
 
@@ -995,7 +1042,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
             if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys  ) {
 
-                redistributeKeys(rightSibling.copyOnWrite(t),true);
+                redistributeKeys(rightSibling.copyOnWrite(triggeredByChildId),true);
                 
                 return;
                 
@@ -1009,7 +1056,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
             if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
 
-                redistributeKeys(leftSibling.copyOnWrite(t),false);
+                redistributeKeys(leftSibling.copyOnWrite(triggeredByChildId),false);
                 
                 return;
                 

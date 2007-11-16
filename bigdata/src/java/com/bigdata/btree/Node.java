@@ -392,21 +392,21 @@ public class Node extends AbstractNode implements INodeData {
      * @param src
      *            The source node (must be immutable).
      * 
-     * @param triggeredByChild
-     *            The child that triggered the copy constructor. This should be
-     *            the immutable child NOT the one that was already cloned. This
-     *            information is used to avoid stealing the original child since
-     *            we already made a copy of it. It is [null] when this
-     *            information is not available, e.g., when the copyOnWrite
-     *            action is triggered by a join() and we are cloning the sibling
-     *            before we redistribute a key to the node/leaf on which the
-     *            join was invoked.
+     * @param triggeredByChildId
+     *            The persistent identity of the child that triggered the copy
+     *            constructor. This should be the immutable child NOT the one
+     *            that was already cloned. This information is used to avoid
+     *            stealing the original child since we already made a copy of
+     *            it. It is {@link #NULL} when this information is not available, e.g.,
+     *            when the copyOnWrite action is triggered by a join() and we
+     *            are cloning the sibling before we redistribute a key to the
+     *            node/leaf on which the join was invoked.
      * 
      * FIXME Can't we just test to see if the child already has this node as its
      * parent reference and then skip it? If so, then that would remove a
      * toublesome parameter from the API.
      */
-    protected Node(Node src, IAbstractNode triggeredByChild) {
+    protected Node(Node src, final long triggeredByChildId) {
 
         super(src);
         
@@ -419,64 +419,43 @@ public class Node extends AbstractNode implements INodeData {
         nentries = src.nentries;
         
         /*
-         * Note: We always construct mutable keys since the copy constructor is
-         * invoked when we need to begin mutation operations on an immutable
-         * node or leaf.
+         * Steal the childAddr[] and childEntryCounts[] arrays.
          */
-        if (src.keys instanceof MutableKeyBuffer) {
+        {
 
-            keys = new MutableKeyBuffer((MutableKeyBuffer) src.keys);
+            // steal reference and clear reference on the source.
+            childAddr = src.childAddr; src.childAddr = null;
+            
+            // steal reference and clear reference on the source.
+            childEntryCounts = src.childEntryCounts;
 
-        } else {
-
-            keys = new MutableKeyBuffer((ImmutableKeyBuffer) src.keys);
+//            childAddr = new long[branchingFactor+1];
+//
+//            childEntryCounts = new int[branchingFactor+1];
+//
+//        // Note: There is always one more child than keys for a Node.
+//        System.arraycopy(src.childAddr, 0, childAddr, 0, nkeys+1);
+//
+//        // Note: There is always one more child than keys for a Node.
+//        System.arraycopy(src.childEntryCounts, 0, childEntryCounts, 0, nkeys+1);
             
         }
 
-        nkeys = src.nkeys;
-
-        childRefs = new WeakReference[branchingFactor+1];
-
-        childAddr = new long[branchingFactor+1];
-
-        childEntryCounts = new int[branchingFactor+1];
-
-        /*
-         * @todo Unless and until we have a means to recover leafs from a cache,
-         * can we just steal the keys[] and values[] rather than making copies?
-         * We are already doing this for the Leaf copy constructor, but I am not
-         * convinced that the situations are the same without further
-         * inspection. This is only at optimization - what is at stake is less
-         * churn on the heap.
-         */
-//        // Copy keys.
-//        System.arraycopy(src.keys, 0, keys, 0, nkeys*stride);
-
-        // Note: There is always one more child than keys for a Node.
-        System.arraycopy(src.childAddr, 0, childAddr, 0, nkeys+1);
-
-        // Note: There is always one more child than keys for a Node.
-        System.arraycopy(src.childEntryCounts, 0, childEntryCounts, 0, nkeys+1);
-
         /*
          * Steal strongly reachable unmodified children by setting their parent
-         * fields to the new node. Stealing the parent means that the node MUST
-         * NOT be used by its previous ancestor (our source node for this copy).
-         * 
-         * Note: Since the node state is unchanged (it is immutable) a slick
-         * trick would be to wrap the state node with a flyweight node having a
-         * different parent so that the node remained valid for its old parent.
-         * This probably means making getParent() abstract and moving the parent
-         * field into a flyweight class. This would help if we had to rollback
-         * to a prior state of the tree without wanting to discard the
-         * deserialized nodes.
+         * fields to the new node. Stealing the child means that it MUST NOT be
+         * used by its previous ancestor (our source node for this copy).
          */
+
+//        childRefs = new WeakReference[branchingFactor+1];
+        childRefs = src.childRefs; src.childRefs = null;
+
         for (int i = 0; i <= nkeys; i++) {
 
-            AbstractNode child = src.childRefs[i] == null ? null
-                    : src.childRefs[i].get();
+            AbstractNode child = childRefs[i] == null ? null : childRefs[i]
+                    .get();
 
-            if (child != null && child != triggeredByChild) {
+            if (child != null && child.identity != triggeredByChildId) {
 
                 /*
                  * Copy on write should never trigger for a dirty node and only
@@ -487,24 +466,12 @@ public class Node extends AbstractNode implements INodeData {
                 // Steal the child.
                 child.parent = new WeakReference<Node>(this);
 
-                // Keep a reference to the clean child.
-                childRefs[i] = new WeakReference<AbstractNode>(child);
+//                // Keep a reference to the clean child.
+//                childRefs[i] = new WeakReference<AbstractNode>(child);
                     
             }
             
         }
-        
-//        /*
-//         * Remove the source node from the btree since it has been replaced by
-//         * this node.
-//         * 
-//         * @todo mark the [src] as invalid if we develop a hash table based
-//         * cache for nodes to ensure that we never access it by mistake using
-//         * its persistent id. the current design only provides for access of
-//         * nodes by navigation from the root, so we can never visit a node once
-//         * it is no longer reachable from its parent.
-//         */ 
-//        btree.nodes.remove(src);
 
     }
 

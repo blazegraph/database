@@ -104,13 +104,6 @@ import com.bigdata.rawstore.IRawStore;
  * @todo keep the non-batch as well as the batch api or simplify to just the
  *       batch api?
  * 
- * @todo Modify to support "stealing" of immutable nodes by wrapping them with a
- *       thin class encapsulating the {parent, btree} references and refactor
- *       the design until it permits an isolated btree to reuse the in memory
- *       nodes and leaves of the base btree in order to minimize the resource
- *       and IO costs of having multiple concurrent transactions running on the
- *       same journal.
- * 
  * @todo test a GOM integration. this will also require an extser service /
  *       index. extser support could be handled using an extensible metadata
  *       record for the {@link BTree} or {@link IndexSegment}, at least for an

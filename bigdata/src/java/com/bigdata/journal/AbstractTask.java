@@ -370,10 +370,22 @@ public abstract class AbstractTask implements Callable<Object> {
      * Commit and abort are NOT invoked for an isolated operation regardless of
      * whether the operation succeeds or fails. It is the responsibility of the
      * "client" to commit or abort a transaction as it sees fit.
+     * <p>
+     * Note: Exceptions that are thrown from here will be wrapped as
+     * {@link ExecutionException}s by the {@link ExecutorService}.
      * 
-     * FIXME document exceptions that can be thrown from here.  They will all
-     * be wrapped as {@link ExecutionException}s by the {@link ExecutorService}.
-     * There is at least {@link ResubmitException} and {@link RetryException}.
+     * @throws {@link ResubmitException}
+     *             if the task has already been submitted.
+     * @throws {@link RetryException}
+     *             if the task MAY be retried.
+     * @throws {@link InterruptedException}
+     *             can be thrown if the task is interrupted, for example while
+     *             awaiting a lock, if the commit group is being discarded, or
+     *             if the journal is being shutdown (which will cause the
+     *             executor service running the task to be shutdown and thereby
+     *             interrupt all running tasks).
+     * 
+     * @todo document other exceptions that can be thrown here.
      */
     final public Object call() throws Exception {
 
