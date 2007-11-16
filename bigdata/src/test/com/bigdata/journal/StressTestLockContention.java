@@ -36,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.journal.WriteExecutorService.RetryException;
+
 /**
  * Lock contention results when unisolated writers seek conflicting locks. In
  * all cases lock contention reduces the possible parallelism. However, in the
@@ -84,7 +86,7 @@ public class StressTestLockContention extends ProxyTestCase {
         
         final String[] resource = new String[]{"foo","bar","baz"};
 
-        final int ntasks = 1000;
+        final int ntasks = 20000;
         
         Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
 
@@ -128,6 +130,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         int ncancelled = 0;
         int ncomplete = 0;
+        int nretry = 0;
         int nerror = 0;
         
         while(itr.hasNext()) {
@@ -147,6 +150,16 @@ public class StressTestLockContention extends ProxyTestCase {
                     ncomplete++;
                     
                 } catch (ExecutionException ex) {
+
+                    if( isInnerCause(ex, RetryException.class)) {
+                        
+                        log.warn("RetryException: "+ex);
+
+                        nretry++;
+                     
+                        continue;
+                        
+                    }
                     
                     nerror++;
                     
@@ -159,7 +172,8 @@ public class StressTestLockContention extends ProxyTestCase {
         }
         
         System.err.println("#tasks=" + ntasks + " : ncancelled=" + ncancelled
-                + ", ncomplete=" + ncomplete + ", nerror=" + nerror);
+                + ", ncomplete=" + ncomplete + ", nretry=" + nretry
+                + ", nerror=" + nerror);
         
         /*
          * No errors are allowed, but some tasks may never start due to the high

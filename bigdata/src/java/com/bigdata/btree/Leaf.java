@@ -179,6 +179,16 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     }
 
+    public void delete() {
+        
+        super.delete();
+
+        // release the value references.
+        // @todo clear the refs in values[]?
+        values = null;
+        
+    }
+    
     /**
      * Always returns <code>true</code>.
      */

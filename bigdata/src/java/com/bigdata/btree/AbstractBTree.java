@@ -259,15 +259,6 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      *       memory than nodes (for most trees). (As an alternative, allow a
      *       btree to retain some #of levels of the nodes in memory using a
      *       separate node cache.)
-     * 
-     * FIXME Verify that memory allocated for leaves or nodes on the queue is
-     * reclaimed when copy-on-write is triggered since those data are no longer
-     * reachable by this instance of the btree. This is essentially a memory
-     * leak. Note that we can not just clear the hard reference on the queue,
-     * but we can release the keys and values for the node, which constitute
-     * most of its state. The node will already be marked as "!dirty" since copy
-     * on write was triggered, so it will NOT be serialized when it is evicted
-     * from the hard reference queue.
      */
     final protected HardReferenceQueue<PO> leafQueue;
 
