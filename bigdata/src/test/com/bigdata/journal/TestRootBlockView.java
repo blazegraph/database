@@ -71,7 +71,7 @@ public class TestRootBlockView extends TestCase2 {
         
         final Random r = new Random();
         
-        final int nrounds = 10000;
+        final int nrounds = 5000;
         
         final ChecksumUtility checker = new ChecksumUtility();
         

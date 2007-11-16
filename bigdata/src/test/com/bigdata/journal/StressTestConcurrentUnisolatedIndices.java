@@ -247,6 +247,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
 //        int naborted = 0; // #of transactions that choose to abort rather than commit.
+        int ninterrupt = 0; // #of interrupted tasks.
         int ncommitted = 0; // #of transactions that successfully committed.
         int nuncommitted = 0; // #of transactions that did not complete in time.
         
@@ -269,8 +270,19 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                 ncommitted++;
                 
             } catch(ExecutionException ex ) {
-                
-                if(ex.getCause() instanceof SpuriousException) {
+
+                if(isInnerCause(ex, InterruptedException.class)) {
+
+                    /*
+                     * Note: Tasks will be interrupted if a timeout occurs when
+                     * attempting to run the submitted tasks - this is normal.
+                     */
+                    
+                    log.warn("Interrupted: "+ex);
+                    
+                    ninterrupt++;
+                    
+                } else if(isInnerCause(ex, SpuriousException.class)) {
                 
                     nfailed++;
                     
@@ -303,6 +315,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         // these are the results.
         ret.put("ncommitted",""+ncommitted);
+        ret.put("ninterrupt",""+ninterrupt);
         ret.put("nuncommitted", ""+nuncommitted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("bytesWrittenPerSec", ""+bytesWrittenPerSecond);

@@ -130,6 +130,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         int ncancelled = 0;
         int ncomplete = 0;
+        int ninterrupt = 0;
         int nretry = 0;
         int nerror = 0;
         
@@ -152,10 +153,18 @@ public class StressTestLockContention extends ProxyTestCase {
                 } catch (ExecutionException ex) {
 
                     if( isInnerCause(ex, RetryException.class)) {
-                        
+
                         log.warn("RetryException: "+ex);
 
                         nretry++;
+                     
+                        continue;
+                        
+                    } else if( isInnerCause(ex, RetryException.class)) {
+                        
+                        log.warn("Interrupted: "+ex);
+
+                        ninterrupt++;
                      
                         continue;
                         
@@ -172,8 +181,8 @@ public class StressTestLockContention extends ProxyTestCase {
         }
         
         System.err.println("#tasks=" + ntasks + " : ncancelled=" + ncancelled
-                + ", ncomplete=" + ncomplete + ", nretry=" + nretry
-                + ", nerror=" + nerror);
+                + ", ncomplete=" + ncomplete + ", ninterrupt=" + ninterrupt
+                + ", nretry=" + nretry + ", nerror=" + nerror);
         
         /*
          * No errors are allowed, but some tasks may never start due to the high

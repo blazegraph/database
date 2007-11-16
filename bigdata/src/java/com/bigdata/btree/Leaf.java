@@ -146,33 +146,12 @@ public class Leaf extends AbstractNode implements ILeafData {
         assert !src.isDirty();
         assert src.isPersistent();
         
-        nkeys = src.nkeys;
-
         /*
-         * Note: We always construct mutable keys since the copy constructor is
-         * invoked when we need to begin mutation operations on an immutable
-         * node or leaf.
-         */
-        if (src.keys instanceof MutableKeyBuffer) {
-
-            keys = new MutableKeyBuffer((MutableKeyBuffer) src.keys);
-
-        } else {
-
-            keys = new MutableKeyBuffer((ImmutableKeyBuffer) src.keys);
-            
-        }
-
-// // steal keys.
-//        keys = src.keys; src.keys = null;
-        
-        /*
-         * Note: Unless and until we have a means to recover leafs from a cache,
-         * we just steal the values[] rather than making copies.
+         * Steal the values[].
          */
 
-        // steal values.
-        values = src.values; src.values = null;
+        // steal reference and clear reference on the source node.
+        values = src.values;
 
 //        // Add to the hard reference queue.
 //        btree.touch(this);
