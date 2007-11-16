@@ -181,6 +181,14 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
         }
 
+        /*
+         * Release the state associated with a node or a leaf when it is marked
+         * as deleted, which occurs only as a side effect of copy-on-write. This
+         * is important since the node/leaf remains on the hard reference queue
+         * until it is evicted but it is unreachable and its state may be
+         * reclaimed immediately.
+         */
+        
         parent = null; // Note: probably already null.
         nkeys = 0; keys = null; // release the key buffer.
         // Note: do NOT clear the referenceCount.
