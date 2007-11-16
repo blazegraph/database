@@ -1076,40 +1076,47 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 //        assertStatementIndicesConsistent(expected);
 //        
 //        assertStatementIndicesConsistent(actual);
-        
-        if (expected.getStatementCount() != actual.getStatementCount()) {
 
-            log.warn("statementCount: expected=" + expected.getStatementCount()
-                    + ", but actual=" + actual.getStatementCount());
-                    
-        }
+        /*
+         * Note: You can not directly compare statement counts when using
+         * isolatable indices since they are upper bounds - not exact counts.
+         */
+//        if (expected.getStatementCount() != actual.getStatementCount()) {
+//
+//            log.warn("statementCount: expected=" + expected.getStatementCount()
+//                    + ", but actual=" + actual.getStatementCount());
+//                    
+//        }
         
         ISPOIterator itre = expected.getAccessPath(KeyOrder.SPO).iterator();
 
         ISPOIterator itra = actual.getAccessPath(KeyOrder.SPO).iterator();
 
-        int i = 0;
+//        int i = 0;
 
         int nerrs = 0;
         
         int maxerrs = 10;
+
+        int nexpected = 0;
+        int nactual = 0;
         
         try {
 
             while (itre.hasNext()) {
 
-                assertTrue( "Actual iterator exhausted before expected: i="+i, itra.hasNext() );
+                if(!itra.hasNext()) {
 
-                SPO expectedSPO = itre.next();
+                    fail("Actual iterator exhausted before expected: nexpected="
+                            + nexpected + ", nactual=" + nactual);
+                    
+                }
+
+                SPO expectedSPO = itre.next(); nexpected++;
                 
-                SPO actualSPO = itra.next();
+                SPO actualSPO = itra.next(); nactual++;
                 
                 if (!expectedSPO.equals(actualSPO)) {
-
-//                    // Note: term identifiers are all in [actual].
-//                    fail("index=" + i + ", expected="
-//                            + expectedSPO.toString(actual) + ", actual="
-//                            + actualSPO.toString(actual));
 
                     while (actualSPO.compareTo(expectedSPO) < 0) {
 
@@ -1117,7 +1124,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                         if(!itra.hasNext()) break;
                         
-                        actualSPO = itra.next();
+                        actualSPO = itra.next(); nactual++;
                         
                         if(nerrs++==maxerrs) fail("Too many errors");
 
@@ -1129,7 +1136,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                         if(!itre.hasNext()) break;
                         
-                        expectedSPO = itre.next();
+                        expectedSPO = itre.next(); nexpected++;
 
                         if(nerrs++==maxerrs) fail("Too many errors");
 
@@ -1137,7 +1144,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
                 }
                 
-                i++;
+//                i++;
 
             }
 
@@ -1151,8 +1158,13 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
         }
 
-        assertEquals("statementCount", expected.getStatementCount(), actual
-                .getStatementCount());
+        /*
+         * Note: This compares the #of statements actually visited by the two
+         * iterators rather than comparing getStatementCount(), which is an
+         * upper bound based on rangeCount().
+         */
+        
+        assertEquals("statementCount", nexpected, nactual );
 
     }
     
