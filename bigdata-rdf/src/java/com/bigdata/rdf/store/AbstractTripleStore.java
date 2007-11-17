@@ -2615,7 +2615,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 if(numStmts>1000) {
 
-                    System.err.print("Writing " + numStmts + " statements...");
+                    log.info("Writing " + numStmts + " statements...");
                     
                 }
 
@@ -2646,7 +2646,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 if (numStmts > 1000) {
                 
-                    System.err.println("in " + elapsed + "ms; sort=" + sortTime
+                    log.info("in " + elapsed + "ms; sort=" + sortTime
                         + "ms, keyGen+insert=" + insertTime + "ms; spo="
                         + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
                         + elapsed_OSP + "ms");
