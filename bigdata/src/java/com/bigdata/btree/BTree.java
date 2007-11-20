@@ -34,6 +34,7 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.ClientIndexView;
 
 /**
  * <p>
@@ -94,15 +95,8 @@ import com.bigdata.rawstore.IRawStore;
  *       those implementations since that gets into indirection about the data
  *       type of the key again.)
  * 
- * @todo reduce the #of argments on the stack in the batch api by introducing an
- *       object that encapsulates the batch parameters. this will reduce stack
- *       depth while permitting concurrent readers on immutable btrees.
- * 
  * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
  *       findChild, search, and autobox logic).
- * 
- * @todo keep the non-batch as well as the batch api or simplify to just the
- *       batch api?
  * 
  * @todo test a GOM integration. this will also require an extser service /
  *       index. extser support could be handled using an extensible metadata
@@ -179,9 +173,7 @@ import com.bigdata.rawstore.IRawStore;
  *       exception when true to support fast abort of scans. See
  *       {@link Node#getChild(int)}.
  * 
- * @todo pre-fetch leaves for range scans? this really does require asynchronous
- *       IO, which is not available for many platforms (it is starting to show
- *       up in linux 2.6 kernals).
+ * @todo pre-fetch leaves for range scans?
  * 
  * @todo Note that efficient support for large branching factors requires a more
  *       sophisticated approach to maintaining the key order within a node or
@@ -207,27 +199,13 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * The minimum hard reference queue capacity is two(2) in order to avoid
      * cache evictions of the leaves participating in a split.
      */
-    static public final int MINIMUM_LEAF_QUEUE_CAPACITY = 2;
+    static public final int MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY = 2;
     
     /**
-     * The size of the hard reference queue used to defer leaf eviction.
-     * 
-     * @todo if the journal is fully buffered, then the only IO that we are
-     *       talking about is serialization of the leaves onto the buffer with
-     *       incremental writes through to disk and NO random reads (since the
-     *       entire store is buffered in RAM, even though it writes through to
-     *       disk).
-     * 
-     * @todo The leaf cache capacity is effectively multiplied by the branching
-     *       factor so it makes sense that we would use a smaller leaf cache
-     *       when the branching factor was larger. This is a good reason for
-     *       moving the default for this parameter inside of the btree
-     *       implementation.
-     * 
-     * @todo testing with a large leaf cache and a large branching factor means
-     *       that you nearly never evict leaves
+     * The default capacity of the hard reference queue used to defer the
+     * eviction of dirty nodes (nodes or leaves).
      */
-    static public final int DEFAULT_HARD_REF_QUEUE_CAPACITY = 500;
+    static public final int DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = 500;
 
     /**
      * The #of entries on the hard reference queue that will be scanned for a
@@ -238,8 +216,27 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
      * is dirty.
      */
-    static public final int DEFAULT_HARD_REF_QUEUE_SCAN = 20;
-    
+    static public final int DEFAULT_WRITE_RETENTION_QUEUE_SCAN = 20;
+
+    /**
+     * The default capacity of the hard reference queue used to retain clean
+     * nodes (or leaves). The goal is to keep the read to write ratio down.
+     * 
+     * FIXME This is an experimental feature - it is disabled when set to zero.
+     */
+    static public final int DEFAULT_READ_RETENTION_QUEUE_CAPACITY = 0;
+
+    /**
+     * The #of entries on the hard reference queue that will be scanned for a
+     * match before a new reference is appended to the queue. This trades off
+     * the cost of scanning entries on the queue, which is handled by the queue
+     * itself, against the cost of queue churn. Note that queue eviction drives
+     * IOs required to write the leaves on the store, but incremental writes
+     * occurr iff the {@link AbstractNode#referenceCount} is zero and the leaf
+     * is dirty.
+     */
+    static public final int DEFAULT_READ_RETENTION_QUEUE_SCAN = 20;
+
     public int getHeight() {
         
         return height;
@@ -319,6 +316,48 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * The mutable counter exposed by #getCounter()}.
      */
     protected long counter;
+
+    /**
+     * Return some "statistics" about the btree.
+     * 
+     * @todo add this method to {@link IIndex}. refactor part of the method
+     *       into the base class. {@link ClientIndexView} can return client side
+     *       information.
+     * 
+     * FIXME reconcile with {@link AbstractBTree#counters}.
+     */
+    public String getStatistics() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("#entries=" + nentries);
+        sb.append( ", height=" + height );
+        sb.append( ", #nodes=" + nnodes );
+        sb.append( ", #leaves=" + nleaves );
+        sb.append( ", #(nodes+leaves)=" + (nnodes + nleaves));
+        sb.append( ", #distinctOnQueue=" + getWriteRetentionQueueDistinctCount());
+        sb.append( ", queueCapacity=" + getWriteRetentionQueueCapacity() );
+        sb.append( ", isolatable="+isIsolatable());
+
+        /*
+         * @todo report on soft vs weak refs.
+         * 
+         * @todo report on readRetentionQueue iff used. track #distinct.
+         * 
+         * @todo track life time of nodes and leaves and #of touches during life
+         * time.
+         * 
+         * @todo estimate heap requirements for nodes and leaves based on their
+         * state (keys, values, and other arrays). report estimated heap
+         * consumption here.
+         * 
+         * @todo use nanotime on read, write, and (de-)serialization and report
+         * those costs here.
+         */
+        
+        return sb.toString();
+              
+    }
     
     /**
      * Constructor for a new B+Tree with a default hard reference queue policy
@@ -341,8 +380,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     
         this(store, branchingFactor, indexUUID, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN), valSer, null/* recordCompressor */);
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN), valSer, null/* recordCompressor */);
         
     }
     
@@ -362,7 +401,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      *            The hard reference queue. The minimum capacity is 2 to avoid
      *            cache evictions of the leaves participating in a split. A
      *            reasonable capacity is specified by
-     *            {@link #DEFAULT_HARD_REF_QUEUE_CAPACITY}.
+     *            {@link #DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY}.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in a
      *            {@link Leaf}.
@@ -413,7 +452,7 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
          * Note: the mutable BTree has a limit here so that split() will always
          * succeed. That limit does not apply for an immutable btree.
          */
-        assert hardReferenceQueue.capacity() >= MINIMUM_LEAF_QUEUE_CAPACITY;
+        assert hardReferenceQueue.capacity() >= MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY;
 
         /*
          * Setup the initial root leaf.
@@ -512,8 +551,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     public BTree(IRawStore store, BTreeMetadata metadata) {
 
         this(store, metadata, new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(), DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                DEFAULT_HARD_REF_QUEUE_SCAN));
+                new DefaultEvictionListener(), DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                DEFAULT_WRITE_RETENTION_QUEUE_SCAN));
         
     }
     
@@ -809,7 +848,10 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
          * Note: By clearing the references to null we also facilitate garbage
          * collection of the nodes and leaves in the cache.
          */
-        leafQueue.clear(true/*clearRefs*/);
+        writeRetentionQueue.clear(true/*clearRefs*/);
+        if(readRetentionQueue!=null) {
+            readRetentionQueue.clear(true/*clearRefs*/);
+        }
         
         /*
          * Replace the root with a new root leaf.

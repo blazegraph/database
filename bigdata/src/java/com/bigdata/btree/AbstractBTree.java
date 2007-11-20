@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.UUID;
@@ -217,22 +220,25 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     public int referenceCount = 0;
 
     /**
-     * Leaves (and nodes) are added to a hard reference queue when they are
-     * created or read from the store. On eviction from the queue a dirty leaf
-     * (or node) is serialized by a listener against the {@link IRawStore}.
-     * Once the leaf is no longer strongly reachable its weak references may be
-     * cleared by the VM.
+     * Nodes (that is nodes or leaves) are added to a hard reference queue when
+     * they are created or read from the store. On eviction from the queue a
+     * dirty node is serialized by a listener against the {@link IRawStore}.
+     * Once the node is no longer strongly reachable weak references to that
+     * node may be cleared by the VM - in this manner the node will become
+     * unreachable by navigation from its ancestors in the btree.
      * <p>
-     * Note that leaves (and nodes) are evicted as new leaves (or nodes) are
-     * added to the hard reference queue. This occurs in two situations: (1)
-     * when a new leaf (or node) is created during a split of an existing leaf
-     * (or node); and (2) when a leaf (or node) is read in from the store.
+     * Note that nodes are evicted as new nodes are added to the hard reference
+     * queue. This occurs in two situations: (1) when a new node is created
+     * during a split of an existing node; and (2) when a node is read in from
+     * the store. Inserts on this hard reference queue always drive evictions.
+     * Incremental writes basically make it impossible for the commit set to get
+     * "too large" - the maximum #of nodes to be written is bounded by the size
+     * of the hard reference queue. This helps to ensure fast commit operations
+     * on the store.
      * <p>
      * The minimum capacity for the hard reference queue is two (2) so that a
-     * split may occur without forcing eviction of either leaf (or node) in the
-     * split. Incremental writes basically make it impossible for the commit IO
-     * to get "too large" where too large is defined by the size of the hard
-     * reference cache and help to ensure fast commit operations on the store.
+     * split may occur without forcing eviction of either node participating in
+     * the split.
      * <p>
      * Note: The code in {@link Node#postOrderIterator(boolean)} and
      * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
@@ -241,49 +247,77 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * a node and we touch the hard reference queue during the post-order
      * traversal then we break down the semantics of
      * {@link HardReferenceQueue#append(Object)} as the eviction does not
-     * necessarily cause the queue to reduce in length.
+     * necessarily cause the queue to reduce in length. Another way to handle
+     * this is to have {@link HardReferenceQueue#append(Object)} begin to evict
+     * objects before is is actually at capacity, but that is also a bit
+     * fragile.
      * 
-     * @todo This is all a bit fragile. Another way to handle this is to have
-     *       {@link HardReferenceQueue#append(Object)} begin to evict objects
-     *       before is is actually at capacity, but that is also a bit fragile.
-     * 
-     * @todo This queue is now used for both nodes and leaves. Update the
-     *       javadoc here, in the constants that provide minimums and defaults
-     *       for the queue, and in the other places where the queue is used or
-     *       configured. Also rename the field to nodeQueue or refQueue.
-     * 
-     * @todo Consider breaking this into one queue for nodes and another for
-     *       leaves. Would this make it possible to create a policy that targets
-     *       a fixed memory burden for the index? As it stands the #of nodes and
-     *       the #of leaves in memory can vary and leaves require much more
-     *       memory than nodes (for most trees). (As an alternative, allow a
-     *       btree to retain some #of levels of the nodes in memory using a
-     *       separate node cache.)
+     * @todo consider a policy that dynamically adjusts the queue capacities
+     *       based on the height of the btree in order to maintain a cache that
+     *       can contain a fixed percentage, e.g., 5% or 10%, of the nodes in
+     *       the btree. The minimum and maximum size of the cache should be
+     *       bounded. Bounding the minimum size gives better performance for
+     *       small trees. Bounding the maximum size is necessary when the trees
+     *       grow very large. (Partitioned indices may be used for very large
+     *       indices and they can be distributed across a cluster of machines.)
+     *       <p>
+     *       There is a discussion of some issues regarding such a policy in the
+     *       code inside of
+     *       {@link Node#Node(BTree btree, AbstractNode oldRoot, int nentries)}.
      */
-    final protected HardReferenceQueue<PO> leafQueue;
+    final protected HardReferenceQueue<PO> writeRetentionQueue;
 
     /**
-     * The #of distinct nodes and leaves on the {@link #leafQueue}.
+     * The #of distinct nodes and leaves on the {@link #writeRetentionQueue}.
      */
-    protected int ndistinctOnQueue;
+    protected int ndistinctOnWriteRetentionQueue;
 
     /**
-     * The #of distinct nodes and leaves on the {@link HardReferenceQueue}.
+     * The #of distinct nodes and leaves on the {@link #writeRetentionQueue}.
      */
-    final public int getNumDistinctOnQueue() {
+    final public int getWriteRetentionQueueDistinctCount() {
 
-        return ndistinctOnQueue;
+        return ndistinctOnWriteRetentionQueue;
 
     }
 
     /**
-     * The capacity of the {@link HardReferenceQueue}.
+     * The capacity of the {@link #writeRetentionQueue}.
      */
-    final public int getHardReferenceQueueCapacity() {
+    final public int getWriteRetentionQueueCapacity() {
 
-        return leafQueue.capacity();
+        return writeRetentionQueue.capacity();
 
     }
+    
+    /**
+     * The {@link #readRetentionQueue} reduces reads through to the backing
+     * store in order to prevent disk reads and reduces de-serialization costs
+     * for nodes by maintaining them as materialized objects.
+     * <p>
+     * Non-deleted nodes (that is nodes or leaves) are placed onto this hard
+     * reference queue when they are evicted from the
+     * {@link #writeRetentionQueue}. Nodes are always converted into their
+     * immutable variants when they are evicted from the
+     * {@link #writeRetentionQueue} so the {@link #readRetentionQueue} only
+     * contains hard references to immutable nodes. If there is a need to write
+     * on a node then {@link AbstractNode#copyOnWrite()} will be used to create
+     * a mutable copy of the node and the old node will be
+     * {@link AbstractNode#delete()}ed. Delete is responsible for releasing any
+     * state associated with the old node, so deleted nodes on the
+     * {@link #readRetentionQueue} will occupy very little space in the heap.
+     * <p>
+     * Note: evictions from this hard reference cache are driven by inserts.
+     * Inserts are driven by evictions of non-deleted nodes from the
+     * {@link #writeRetentionQueue}.
+     * <p>
+     * Note: the {@link #readRetentionQueue} will typically contain multiple
+     * references to a given node.
+     * 
+     * FIXME This is an experimental feature.  It is turned on or off in the
+     * ctor for now.
+     */
+    final protected HardReferenceQueue<PO> readRetentionQueue;
 
     /**
      * The minimum allowed branching factor (3). The branching factor may be odd
@@ -363,8 +397,21 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         this.branchingFactor = branchingFactor;
 
-        this.leafQueue = hardReferenceQueue;
+        this.writeRetentionQueue = hardReferenceQueue;
 
+        if (BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY != 0) {
+
+            this.readRetentionQueue = new HardReferenceQueue<PO>(
+                    NOPEvictionListener.INSTANCE,
+                    BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY,
+                    BTree.DEFAULT_READ_RETENTION_QUEUE_SCAN);
+            
+        } else {
+            
+            this.readRetentionQueue = null;
+            
+        }
+        
         this.nodeSer = new NodeSerializer(nodeFactory, branchingFactor,
                 initialBufferCapacity, addrSer, KeyBufferSerializer.INSTANCE,
                 valueSer, recordCompressor, useChecksum);
@@ -427,7 +474,10 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
          * node is clean and therefore that there are no dirty nodes or leaves
          * in the hard reference queue.
          */
-        leafQueue.clear(true/*clearRefs*/);
+        writeRetentionQueue.clear(true/*clearRefs*/);
+        if(readRetentionQueue!=null) {
+            readRetentionQueue.clear(true/*clearRefs*/);
+        }
 
         /*
          * Clear the reference to the root node (permits GC).
@@ -1081,7 +1131,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     /**
      * <p>
-     * Touch the node or leaf on the {@link #leafQueue}. If the node is not
+     * Touch the node or leaf on the {@link #writeRetentionQueue}. If the node is not
      * found on a scan of the tail of the queue, then it is appended to the
      * queue and its {@link AbstractNode#referenceCount} is incremented. If the
      * a node is being appended to the queue and the queue is at capacity, then
@@ -1099,7 +1149,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * <p>
      * In conjunction with {@link DefaultEvictionListener}, this method
      * guarentees that the reference counter for the node will reflect the #of
-     * times that the node is actually present on the {@link #leafQueue}.
+     * times that the node is actually present on the {@link #writeRetentionQueue}.
      * </p>
      * 
      * @param node
@@ -1122,11 +1172,11 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
          * to be made persistent.
          */
 
-        assert ndistinctOnQueue >= 0;
+        assert ndistinctOnWriteRetentionQueue >= 0;
 
         node.referenceCount++;
 
-        if (!leafQueue.append(node)) {
+        if (!writeRetentionQueue.append(node)) {
 
             /*
              * A false return indicates that the node was found on a scan of the
@@ -1151,7 +1201,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
             if (node.referenceCount == 1) {
 
-                ndistinctOnQueue++;
+                ndistinctOnWriteRetentionQueue++;
 
             }
 
@@ -1485,4 +1535,72 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 //
 //    }
 
+//    /**
+//     * When <code>true</code> {@link Node}s will hold onto their parents and
+//     * children using {@link SoftReference}s. When <code>false</code> they
+//     * will use {@link WeakReference}s.
+//     */
+//    private final static boolean softReferences = false;
+    
+    /**
+     * Create the reference that will be used by a {@link Node} to refer to its
+     * children (nodes or leaves).
+     * 
+     * @param child
+     *            A node.
+     *            
+     * @return A reference to that node.
+     * 
+     * @see SoftReference
+     * @see WeakReference
+     */
+    final Reference<AbstractNode> newRef(AbstractNode child) {
+        
+        /*
+         * Note: If the parent refers to its children using soft references the
+         * the presence of the parent will tend to keep the children wired into
+         * memory until the garbage collector is forced to sweep soft references
+         * in order to make room on the heap. Such major garbage collections
+         * tend to make the application "hesitate".
+         * 
+         * @todo it may be that frequently used access paths in the btree should
+         * be converted dynamically from a weak reference to soft reference in
+         * order to bias the garbage collector to leave those paths alone. if we
+         * play this game then we should limit the #of soft references and make
+         * the node choose among its children for those it will hold with a soft
+         * reference so that the notion of frequent access is dynamic and can
+         * change as the access patterns on the index change.
+         * 
+         * @todo examine heap usage further. it appears that we are reading the
+         * disk too much primarily because we are not holding onto "interesting"
+         * nodes and leaves long enough. the readRetentionQueue should help
+         * here. Maybe all references should be weak and the read retention
+         * queue should have a capacity of 10000 or more node references? 
+         */
+
+            return new WeakReference<AbstractNode>( child );
+//        return new SoftReference<AbstractNode>( child ); // causes significant GC "hesitations".
+
+    }
+    
+    /**
+     * Create the reference that will be used by a node to refer to its parent.
+     * 
+     * @param parent A node.
+     * 
+     * @return A reference to that node.
+     */
+    final Reference<Node> newRef(Node parent) {
+        
+        /*
+         * Note: A weak reference by a child to its parent means that the
+         * existence of the child object does not incline the garbage collector
+         * to keep the parent.
+         */
+
+        return new WeakReference<Node>( parent );
+//      return new SoftReference<Node>( parent ); // retains too much.
+
+    }
+    
 }

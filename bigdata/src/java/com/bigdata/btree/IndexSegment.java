@@ -125,8 +125,8 @@ public class IndexSegment extends AbstractBTree {
 
         this(fileStore, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
-                BTree.DEFAULT_HARD_REF_QUEUE_CAPACITY,
-                BTree.DEFAULT_HARD_REF_QUEUE_SCAN));
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN));
 
     }
 

@@ -61,6 +61,9 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("journal");
 
+        // test ability of the platform to synchronize writes to disk.
+        suite.addTestSuite( TestRandomAccessFileSynchronousWrites.class );
+        
         // test the ability to (de-)serialize the root addreses.
         suite.addTestSuite( TestCommitRecordSerializer.class );
         

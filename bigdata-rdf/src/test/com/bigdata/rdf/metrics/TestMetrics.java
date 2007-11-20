@@ -43,9 +43,11 @@ import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.store.DataLoader.CommitEnum;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -605,11 +607,14 @@ public class TestMetrics extends AbstractMetricsTestCase {
         Properties properties = new Properties(getProperties());
         
         // Note: this turns off sameAs processing.
-//        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
+        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
         
         // Note: this turns off inference.
         properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
-        
+
+        // Note: this turns off commit - useful for guaging the uninterrupted write rate.
+        properties.setProperty(DataLoader.Options.COMMIT, CommitEnum.None.toString());
+
         dataLoader = new DataLoader(properties, store );
         
         writeMetricsLogHeaders();
@@ -866,8 +871,6 @@ public class TestMetrics extends AbstractMetricsTestCase {
             try {
 
                 loadStats = dataLoader.loadData(file, baseURL, RDFFormat.RDFXML);
-                
-                store.commit();
                 
 //                loadStats = store
 //                        .loadData(file, "", RDFFormat.RDFXML,

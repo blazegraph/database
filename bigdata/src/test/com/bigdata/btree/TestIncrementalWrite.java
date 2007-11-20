@@ -107,7 +107,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * do an incremental write of the root leaf.
          */
         assertFalse( a.isPersistent() );
-        btree.leafQueue.getListener().evicted(btree.leafQueue, btree.root);
+        btree.writeRetentionQueue.getListener().evicted(btree.writeRetentionQueue, btree.root);
         assertTrue( a.isPersistent() );
         
     }
@@ -173,7 +173,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * is no parent of a and that we need to create one).
          */
         
-        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.leafQueue).toArray());
+        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.writeRetentionQueue).toArray());
         
         /*
          * force (b) to be evicted. since its reference count is one(1) it will
@@ -184,7 +184,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * so we can not continue with operation that would touch the queue.
          */
         
-        btree.leafQueue.getListener().evicted(btree.leafQueue, b);
+        btree.writeRetentionQueue.getListener().evicted(btree.writeRetentionQueue, b);
 
         // verify that b is now persistent.
         assertTrue(b.isPersistent());
@@ -259,7 +259,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * is no parent of a and that we need to create one).
          */
         
-        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.leafQueue).toArray());
+        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.writeRetentionQueue).toArray());
         
         /*
          * force (c) to be evicted. since its reference count is one(1) it will
@@ -270,7 +270,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * so we can not continue with operations that would touch the queue.
          */
         
-        btree.leafQueue.getListener().evicted(btree.leafQueue, c);
+        btree.writeRetentionQueue.getListener().evicted(btree.writeRetentionQueue, c);
 
         // verify that c and its children (a,b) are now persistent.
         assertTrue(c.isPersistent());

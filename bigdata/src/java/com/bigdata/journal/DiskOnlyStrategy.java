@@ -31,9 +31,15 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.text.NumberFormat;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Exchanger;
+import java.util.concurrent.Executors;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
@@ -44,10 +50,64 @@ import com.bigdata.rawstore.IRawStore;
  * overflow. As a result only large sequential writes are performed on the
  * store. Reads read through the write cache for consistency.
  * 
+ * FIXME Examine behavior when write caching is enabled/disabled for the OS.
+ * This has a profound impact. Asynchronous writes of multiple buffers, and the
+ * use of smaller buffers, may be absolutely when the write cache is disabled.
+ * It may be that swapping sets in because the Windows write cache is being
+ * overworked, in which case doing incremental and async IO would help. Compare
+ * with behavior on server platforms. See
+ * http://support.microsoft.com/kb/259716,
+ * http://www.accucadd.com/TechNotes/Cache/WriteBehindCache.htm,
+ * http://msdn2.microsoft.com/en-us/library/aa365165.aspx,
+ * http://www.jasonbrome.com/blog/archives/2004/04/03/writecache_enabled.html,
+ * http://support.microsoft.com/kb/811392,
+ * http://mail-archives.apache.org/mod_mbox/db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
+ * 
+ * <pre>
+ *   /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
+ *   /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
+ * </pre>
+ * 
  * @todo The flush of the write cache could be made asynchronous if we had two
  *       write buffers, but that increases the complexity significantly. It
  *       would have to be synchronous if invoked from {@link #force(boolean)} in
  *       any case.
+ *       <p>
+ *       Reconsider a 2nd buffer so that we can avoid waiting on the writes to
+ *       disk. Use
+ *       {@link Executors#newSingleThreadExecutor(java.util.concurrent.ThreadFactory)
+ *       to obtain the 2nd (daemon) thread and an. {@link Exchanger}.
+ *       <p>
+ *       Consider the generalization where a WriteCache encapulates the logic
+ *       that exists in this class and where we have a {@link BlockingQueue} of
+ *       available write caches. There is one "writable" writeCache object at
+ *       any given time, unless we are blocked waiting for one to show up on the
+ *       availableQueue. When a WriteCache is full it is placed onto a
+ *       writeQueue. A thread reads from the writeQueue and performs writes,
+ *       placing empty WriteCache objects onto the availableQueue. Sync places
+ *       the current writeCache on the writeQueue and then waits on the
+ *       writeQueue to be empty.
+ *       <p>
+ *       Consider that a WriteCache also doubles as a read cache IF we create
+ *       write cache objects encapsulating reads that we read directly from the
+ *       disk rather than from a WriteCache. In this case we might do a larger
+ *       read so as to populate more of the WriteCache object in the hope that
+ *       we will have more hits in that part of the journal.
+ *       <p>
+ *       Note: Most reads are nodes and leaves of {@link BTree}s which are
+ *       already cached by the btree and should not stay long in a read cache in
+ *       the journal itself - they will only be re-read if we reload the
+ *       {@link BTree} from its {@link BTreeMetadata}. Some reads are
+ *       {@link BTreeMetadata} records and there are a few {@link ICommitRecord}s.
+ *       That is all the different kinds of objects in the store at this time.
+ *       If we develop a read/write variant of the store then the metadata for
+ *       the allocation blocks will need to be cached.
+ *       <p>
+ *       Currently, GC of nodes in the btree is driving reads.
+ * 
+ * FIXME Add lazy creation of the backing file so that we can use the
+ * {@link DiskOnlyStrategy} for temporary stores as well. The backing file will
+ * never be created unless the write cache overflows.
  * 
  * @todo A separate read cache could be used for hot records, but the B+Tree
  *       implementations already buffer nodes and leaves so this is unlike to
@@ -78,7 +138,7 @@ import com.bigdata.rawstore.IRawStore;
  *       until (a) a threshold of data has been buffered; or (b)
  *       {@link #force(boolean)} is invoked. Note that the implementation will
  *       be a bit different since the Direct mode is already fully buffered so
- *       we do not need to allocate a separate writeCache.  However, we will
+ *       we do not need to allocate a separate writeCache. However, we will
  *       still need to track the {@link #writeCacheOffset} and maintain a
  *       {@link #writeCacheIndex}.
  * 
@@ -226,6 +286,216 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     final public FileChannel getChannel() {
         
         return getRandomAccessFile().getChannel();
+        
+    }
+
+    /**
+     * Counters for {@link IRawStore} access, including operations that read or
+     * write through to the underlying media.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo force counter.  force elapsed time counter.
+     * 
+     * @todo reopenChannel() counter. re-open elapsed time counter.
+     * 
+     * @todo refactor so that all buffer strategies support counters.
+     */
+    public static class Counters {
+        
+        /**
+         * #of read requests.
+         */
+        long nreads;
+
+        /**
+         * #of read requests that are satisified by our write cache (vs the
+         * OS or disk level write cache).
+         */
+        long ncacheRead;
+
+        /**
+         * #of read requests that read through to the backing file.
+         */
+        long ndiskRead;
+        
+        /**
+         * #of bytes read.
+         */
+        long bytesRead;
+        
+        /**
+         * Total elapsed time for reads.
+         */
+        long elapsedReadNanos;
+
+        /**
+         * Total elapsed time for reading on the disk.
+         */
+        long elapsedDiskReadNanos;
+        
+        /**
+         * #of write requests.
+         */
+        long nwrites;
+
+        /**
+         * #of write requests that are absorbed by our write cache (vs the OS or
+         * disk level write cache).
+         */
+        long ncacheWrite;
+        
+        /**
+         * #of write requests that write through to the backing file.
+         */
+        long ndiskWrite;
+        
+        /**
+         * #of bytes written.
+         */
+        long bytesWritten;
+        
+        /**
+         * Total elapsed time for writes.
+         */
+        long elapsedWriteNanos;
+
+        /**
+         * Total elapsed time for writing on the disk.
+         */
+        long elapsedDiskWriteNanos;
+        
+        /**
+         * Human readable representation of the counters.
+         */
+        public String toString() {
+            
+            StringBuilder sb = new StringBuilder();
+
+            // IRawStore statistics.
+            {
+
+                long elapsedReadSecs = (long) (elapsedReadNanos / 1000000000.);
+
+                String bytesReadPerSec = (elapsedReadSecs == 0L ? "N/A" : ""
+                        + commaFormat.format(bytesRead / elapsedReadSecs));
+
+                sb.append("store(read): #read=" + commaFormat.format(nreads)
+                        + ", bytesRead=" + commaFormat.format(bytesRead)
+                        + ", bytesPerSec=" + bytesReadPerSec + "\n");
+                
+                long elapsedWriteSecs = (long) (elapsedWriteNanos / 1000000000.);
+
+                String bytesWrittenPerSec = (elapsedWriteSecs == 0. ? "N/A"
+                        : ""
+                                + commaFormat.format(bytesWritten
+                                        / elapsedWriteSecs));
+
+                sb.append("store(write): #write=" + commaFormat.format(nwrites)
+                        + ", bytesWritten=" + commaFormat.format(bytesWritten)
+                        + ", bytesPerSec=" + bytesWrittenPerSec + "\n");
+                
+            }
+
+            // cache statisitics.
+            if (ncacheRead > 0 || ncacheWrite > 0) {
+
+                String cacheReadRate = (nreads == 0 ? "N/A" : ""
+                        + percentFormat.format((double) ncacheRead / nreads));
+
+                String cacheWriteRate = (nwrites == 0 ? "N/A" : ""
+                        + percentFormat.format((double) ncacheWrite / nwrites));
+
+                sb.append("cache(read):" + cacheReadRate + " (cache="
+                        + ncacheRead + ", disk=" + ndiskRead + ", total="
+                        + (ncacheRead + ndiskRead) + ")\n");
+
+                sb.append("cache(write):" + cacheWriteRate + " (cache="
+                        + ncacheWrite + ", disk=" + ndiskWrite + ", total="
+                        + (ncacheWrite + ndiskWrite) + ")\n");
+                
+            }
+            
+            // disk statistics.
+            {
+            
+                String bytesPerDiskRead = (ndiskRead == 0 ? "N/A" : commaFormat
+                        .format(bytesRead / ndiskRead));
+
+                String bytesPerDiskWrite = (ndiskWrite == 0 ? "N/A"
+                        : commaFormat.format(bytesWritten / ndiskWrite));
+
+                double elapsedDiskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+
+                double elapsedDiskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+
+                String readLatency = (elapsedDiskReadSecs == 0 ? "N/A"
+                        : secondsFormat.format(elapsedDiskReadSecs/ndiskRead));
+
+                String writeLatency = (elapsedDiskWriteSecs == 0 ? "N/A"
+                        : secondsFormat.format(elapsedDiskWriteSecs/ndiskWrite));
+
+                sb.append("disk(read): #read=" + ndiskRead + ", bytesPerRead="
+                        + bytesPerDiskRead + ", elapsed="
+                        + secondsFormat.format(elapsedDiskReadSecs)
+                        + "s, secs/read=" + readLatency + "\n");
+
+                sb.append("disk(write): #write=" + ndiskWrite
+                        + ", bytesPerWrite=" + bytesPerDiskWrite + ", elapsed="
+                        + secondsFormat.format(elapsedDiskWriteSecs)
+                        + "s, secs/write=" + writeLatency + "\n");
+
+            }
+
+            return sb.toString();
+            
+        }
+
+        static private final NumberFormat commaFormat = NumberFormat.getInstance();
+        static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
+        static private final NumberFormat secondsFormat = NumberFormat.getInstance();
+        
+        static
+        {
+    
+            commaFormat.setGroupingUsed(true);
+            commaFormat.setMaximumFractionDigits(0);
+            
+            secondsFormat.setMinimumFractionDigits(3);
+            secondsFormat.setMaximumFractionDigits(3);
+            
+        }
+        
+    }
+    
+    /**
+     * Counters on {@link IRawStore} and disk access.
+     */
+    final public Counters counters = new Counters();
+    
+    /**
+     * Return interesting information about the write cache and file operations.
+     * 
+     * @todo add information about the write cache configuration.
+     */
+    public String getStatistics() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("file="+file);
+
+        sb.append(", mode="+fileMode);
+        
+        sb.append(", nextOffset="+Counters.commaFormat.format(nextOffset));
+
+        sb.append(", extent="+Counters.commaFormat.format(extent));
+        
+        sb.append("\n");
+
+        sb.append(counters.toString());
+        
+        return sb.toString();
         
     }
     
@@ -390,6 +660,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     public ByteBuffer read(long addr) {
 
+        final long begin = System.nanoTime();
+        
         if (addr == 0L)
             throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
 
@@ -413,7 +685,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * Allocate a new buffer of the exact capacity.
          * 
          * Note: we do this even if we are reading from the writeCache since the
-         * writeCache may be flush and re-written while the caller is holding
+         * writeCache may be flushed and re-written while the caller is holding
          * onto the returned buffer. If the buffer were a view onto the
          * writeCache, then this would cause the data in returned view to
          * change!
@@ -488,6 +760,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 // flip buffer for reading.
                 dst.flip();
                 
+                /*
+                 * Update counters while synchronized.
+                 */
+                counters.nreads++;
+                counters.bytesRead+=nbytes;
+                counters.ncacheRead++;
+                counters.elapsedReadNanos+=(System.nanoTime()-begin);
+
                 // return the new buffer.
                 return dst;
 
@@ -497,6 +777,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * read through to the disk.
              */
 
+            final long beginDisk = System.nanoTime();
+            
             // the offset into the disk file.
             final long pos = offset + headerSize;
 
@@ -569,6 +851,15 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // flip for reading.
             dst.flip();
 
+            /*
+             * Update counters while synchronized.
+             */
+            counters.nreads++;
+            counters.bytesRead+=nbytes;
+            counters.ndiskRead++;
+            counters.elapsedReadNanos+=(System.nanoTime()-begin);
+            counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
+            
             // return the buffer.
             return dst;
 
@@ -645,6 +936,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (nbytes == 0)
             throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
 
+        final long begin = System.nanoTime();
+        
         final long addr; // address in the store.
         synchronized(this) {
             
@@ -694,6 +987,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     // add the record to the write cache index for read(addr).
                     writeCacheIndex.put(new Long(addr), new Integer(position));
 
+                    counters.ncacheWrite++;
+                    
                 }
                 
             } else {
@@ -724,9 +1019,19 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              */
             
             nextOffset += nbytes;
-            
+
+            /*
+             * Update counters while we are synchronized. If done outside of the
+             * synchronization block then we need to use AtomicLongs rather than
+             * primitive longs.
+             */
+
+            counters.nwrites++;
+            counters.bytesWritten+=nbytes;
+            counters.elapsedWriteNanos+=(System.nanoTime() - begin);
+
         } // synchronized
-                
+        
         return addr;
 
     }
@@ -749,6 +1054,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     void writeOnDisk(ByteBuffer data, long offset) {
 
+        final long begin = System.nanoTime();
+        
         final int nbytes = data.limit();
         
         /* 
@@ -794,6 +1101,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         // update the next offset at which data will be written on the disk.
         writeCacheOffset += nbytes;
+                
+        counters.ndiskWrite++;
+        counters.elapsedDiskWriteNanos+=(System.nanoTime()-begin);
 
     }
     

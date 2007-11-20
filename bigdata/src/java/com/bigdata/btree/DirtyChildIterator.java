@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.lang.ref.WeakReference;
+import java.lang.ref.Reference;
 import java.util.NoSuchElementException;
 
 /**
@@ -101,7 +101,7 @@ class DirtyChildIterator implements INodeIterator {
         
         for( ; index <= node.nkeys; index++ ) {
             
-            WeakReference<AbstractNode> childRef = node.childRefs[index];
+            Reference<AbstractNode> childRef = node.childRefs[index];
             
             if( childRef == null ) continue;
             

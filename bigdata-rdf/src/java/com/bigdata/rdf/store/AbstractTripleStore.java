@@ -2034,19 +2034,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if (ndx instanceof BTree) {
 
             BTree btree = (BTree) ndx;
-            
-            final int nentries = btree.getEntryCount();
-            final int height = btree.getHeight();
-            final int nleaves = btree.getLeafCount();
-            final int nnodes = btree.getNodeCount();
-            final int ndistinctOnQueue = btree.getNumDistinctOnQueue();
-            final int queueCapacity = btree.getHardReferenceQueueCapacity();
 
-            return (name + ": #entries=" + nentries + ", height="
-                    + height + ", #nodes=" + nnodes + ", #leaves=" + nleaves
-                    + ", #(nodes+leaves)=" + (nnodes + nleaves)
-                    + ", #distinctOnQueue=" + ndistinctOnQueue
-                    + ", queueCapacity=" + queueCapacity);
+            return name+btree.getStatistics();
+            
         } else {
 
             // Note: this is only an estimate if the index is a view.

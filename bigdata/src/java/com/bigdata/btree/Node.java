@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
-import java.lang.ref.WeakReference;
+import java.lang.ref.Reference;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -63,7 +63,7 @@ public class Node extends AbstractNode implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    transient protected WeakReference<AbstractNode>[] childRefs;
+    transient protected Reference<AbstractNode>[] childRefs;
 
     /**
      * <p>
@@ -233,7 +233,7 @@ public class Node extends AbstractNode implements INodeData {
 
         this.childEntryCounts = childEntryCounts;
 
-        childRefs = new WeakReference[branchingFactor+1];
+        childRefs = new Reference[branchingFactor+1];
 
         // must clear the dirty flag since we just de-serialized this node.
         setDirty(false);
@@ -251,7 +251,7 @@ public class Node extends AbstractNode implements INodeData {
         
         keys = new MutableKeyBuffer(branchingFactor);
 
-        childRefs = new WeakReference[branchingFactor+1];
+        childRefs = new Reference[branchingFactor+1];
 
         childAddr = new long[branchingFactor+1];
 
@@ -289,7 +289,7 @@ public class Node extends AbstractNode implements INodeData {
         
         keys = new MutableKeyBuffer( branchingFactor );
 
-        childRefs = new WeakReference[branchingFactor+1];
+        childRefs = new Reference[branchingFactor+1];
 
         childAddr = new long[branchingFactor+1];
 
@@ -313,14 +313,14 @@ public class Node extends AbstractNode implements INodeData {
          * Attach the old root to this node.
          */
 
-        childRefs[0] = new WeakReference<AbstractNode>(oldRoot);
+        childRefs[0] = btree.newRef(oldRoot);
 
         // #of entries from the old root _after_ the split.
         childEntryCounts[0] = oldRoot.getEntryCount();
         
 //        dirtyChildren.add(oldRoot);
 
-        oldRoot.parent = new WeakReference<Node>(this);
+        oldRoot.parent = btree.newRef(this);
 
         /*
          * The tree is deeper since we just split the root node.
@@ -329,7 +329,7 @@ public class Node extends AbstractNode implements INodeData {
 
         final int requiredQueueCapacity = 2 * (btree.height + 2);
         
-        if ( requiredQueueCapacity > btree.leafQueue.capacity()) {
+        if ( requiredQueueCapacity > btree.writeRetentionQueue.capacity()) {
             
             /*
              * FIXME Automatically extend the hard reference queue capacity such
@@ -368,8 +368,8 @@ public class Node extends AbstractNode implements INodeData {
              * patterns in the application.
              */
             
-            throw new UnsupportedOperationException("leafQueue: capacity="
-                    + btree.leafQueue.capacity() + ", but height="
+            throw new UnsupportedOperationException("writeRetentionQueue: capacity="
+                    + btree.writeRetentionQueue.capacity() + ", but height="
                     + btree.height);
             
         }
@@ -464,7 +464,7 @@ public class Node extends AbstractNode implements INodeData {
                 assert !child.isDirty();
 
                 // Steal the child.
-                child.parent = new WeakReference<Node>(this);
+                child.parent = btree.newRef(this);
 
 //                // Keep a reference to the clean child.
 //                childRefs[i] = new WeakReference<AbstractNode>(child);
@@ -594,13 +594,13 @@ public class Node extends AbstractNode implements INodeData {
                 childAddr[i] = NULL;
 
                 // Stash reference to the new child.
-                childRefs[i] = new WeakReference<AbstractNode>(newChild);
+                childRefs[i] = btree.newRef(newChild);
 
 //                // Add the new child to the dirty list.
 //                dirtyChildren.add(newChild);
 
                 // Set the parent on the new child.
-                newChild.parent = new WeakReference<Node>(this);
+                newChild.parent = btree.newRef(this);
 
                 return;
 
@@ -1146,7 +1146,7 @@ public class Node extends AbstractNode implements INodeData {
                  * Update its parent reference.
                  */
                 
-                tmp.parent = new WeakReference<Node>(rightSibling);
+                tmp.parent = btree.newRef(rightSibling);
                 
             }
 
@@ -1310,7 +1310,7 @@ public class Node extends AbstractNode implements INodeData {
             childEntryCounts[nkeys+1] = siblingChildCount;
             AbstractNode child = childRefs[nkeys+1]==null?null:childRefs[nkeys+1].get();
             if( child!=null ) {
-                child.parent = new WeakReference<Node>(this);
+                child.parent = btree.newRef(this);
 //                if( child.isDirty() ) {
 //                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
 //                    if(!dirtyChildren.add(child)) throw new AssertionError();
@@ -1374,7 +1374,7 @@ public class Node extends AbstractNode implements INodeData {
             childEntryCounts[0] = siblingChildCount;
             AbstractNode child = childRefs[0]==null?null:childRefs[0].get();
             if( child!=null ) {
-                child.parent = new WeakReference<Node>(this);
+                child.parent = btree.newRef(this);
 //                if(child.isDirty()) {
 //                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
 //                    if(!dirtyChildren.add(child)) throw new AssertionError();
@@ -1501,7 +1501,7 @@ public class Node extends AbstractNode implements INodeData {
             System.arraycopy(s.childEntryCounts, 0, this.childEntryCounts, nkeys, s.nkeys+1);
             
             // update parent on children
-            WeakReference<Node> weakRef = new WeakReference<Node>(this);
+            Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
@@ -1569,7 +1569,7 @@ public class Node extends AbstractNode implements INodeData {
             this.copyKey(s.nkeys, p.keys, index - 1);
             
             // update parent on children.
-            WeakReference<Node> weakRef = new WeakReference<Node>(this);
+            Reference<Node> weakRef = btree.newRef(this);
             for( int i=0; i<s.nkeys+1; i++ ) {
                 AbstractNode child = s.childRefs[i]==null?null:s.childRefs[i].get();
                 if( child!=null) {
@@ -1680,7 +1680,7 @@ public class Node extends AbstractNode implements INodeData {
         /*
          * Insert child at index+1.
          */
-        childRefs[childIndex + 1] = new WeakReference<AbstractNode>(child);
+        childRefs[childIndex + 1] = btree.newRef(child);
 
         childAddr[childIndex + 1] = NULL;
 
@@ -1698,7 +1698,7 @@ public class Node extends AbstractNode implements INodeData {
         
 //        dirtyChildren.add(child);
 
-        child.parent = new WeakReference<Node>(this);
+        child.parent = btree.newRef(this);
 
         nkeys++; keys.nkeys++;
 
@@ -2192,7 +2192,7 @@ public class Node extends AbstractNode implements INodeData {
         
         assert index >= 0 && index <= nkeys;
 
-        final WeakReference<AbstractNode> childRef = childRefs[index];
+        final Reference<AbstractNode> childRef = childRefs[index];
 
         AbstractNode child = childRef == null ? null : childRef.get();
 
@@ -2210,10 +2210,10 @@ public class Node extends AbstractNode implements INodeData {
             child = btree.readNodeOrLeaf( key );
 
             // patch parent reference since loaded from store.
-            child.parent = new WeakReference<Node>(this);
+            child.parent = btree.newRef(this);
 
             // patch the child reference.
-            childRefs[index] = new WeakReference<AbstractNode>(child);
+            childRefs[index] = btree.newRef(child);
 
         }
 
