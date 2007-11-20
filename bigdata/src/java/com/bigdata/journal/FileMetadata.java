@@ -259,8 +259,6 @@ public class FileMetadata {
 
         WormAddressManager.assertOffsetBits(offsetBits);
         
-//        this.segment = segmentId;
-        
         this.bufferMode = bufferMode;
 
         this.offsetBits = offsetBits;
@@ -641,9 +639,13 @@ public class FileMetadata {
             if (fileLock == null) {
 
                 try {
+
                     raf.close();
+                    
                 } catch (Throwable t) {
+                    
                     log.warn(t);
+                    
                 }
 
                 /*

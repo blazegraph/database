@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.PrintStream;
+import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 
@@ -152,7 +153,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * since they are no longer linked back to their old parents via their
      * parent reference.
      */
-    protected WeakReference<Node> parent = null;
+    protected Reference<Node> parent = null;
 
     /**
      * The #of times that this node is present on the {@link HardReferenceQueue} .

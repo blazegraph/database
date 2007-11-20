@@ -171,7 +171,8 @@ public class BackchainTypeResourceIterator implements ISPOIterator {
              * since it will then have all resources. If you backward chain some
              * of those rules, e.g., rdf1, then you MUST change this to read on
              * the ids index and skip anything that is marked as a literal using
-             * the low bit of the term identifier.
+             * the low bit of the term identifier but you will overgenerate for
+             * resources that are no longer in use by the KB.
              */
 
             resourceIds = db.getAccessPath(KeyOrder.SPO).distinctTermScan();

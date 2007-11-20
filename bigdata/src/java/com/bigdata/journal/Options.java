@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.FileDescriptor;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
@@ -34,6 +35,34 @@ import com.bigdata.rawstore.WormAddressManager;
 /**
  * Options for the {@link Journal}. Options are specified as property values to
  * the {@link Journal#Journal(Properties)} constructor.
+ * 
+ * <h2>Write Cache</h2>
+ * <p>
+ * Some operating systems, file systems, disk controllers, and disk drives may
+ * re-order writes, processing them in a different order from the sequence in
+ * which they are issued by the application, and may return from
+ * {@link FileChannel#force(boolean)} or {@link FileDescriptor#sync()} before
+ * the data are on stable media. This can have the consequence that the root
+ * blocks are laid down on the disk before the application data. In this
+ * situation a hard failure during (or after!) the write could result in the
+ * loss of application data since the root blocks representing the atomic commit
+ * point MIGHT be updated before the application data was successfully made
+ * stable on disk. Further, {@link IAtomicStore#commit()} MAY return before the
+ * data are stable on disk.
+ * </p>
+ * <p>
+ * Depending on your needs there are several steps which you can take to
+ * increase data security, including backups, media replication, etc. In terms
+ * of the {@link Journal} itself, you can use {@link #FORCE_WRITES} to request
+ * synchronous writes or disable the write cache on your platform. While
+ * {@link #FORCE_WRITES} is trivially specified as a configuration option,
+ * please note that the behavior of {@link #FORCE_WRITES} can vary from platform
+ * to platform and that disabling the write cache on your platform may give you
+ * a greater assurance that writes are neither being reordered nor returning
+ * before the data are on stable storage. Also note that some high end disk
+ * systems have battery backup for the on-disk write cache, in which case you
+ * may choose to leave the write cache on the disk enabled.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -74,8 +103,8 @@ public interface Options {
     /**
      * <code>writeCacheCapacity</code> - An integer property whose value
      * controls the size of the write cache (in bytes) used by the selected
-     * {@link BufferMode} (default <code>10</code>). A value of ZERO (0) will
-     * disable the write cache.
+     * {@link BufferMode} (default <code>10485760</code> bytes). A value of
+     * ZERO (0) will disable the write cache.
      * <p>
      * Note: This value is ignored by some {@link BufferMode}s.
      * 
@@ -209,6 +238,18 @@ public interface Options {
      * the loss of application data since the updated root blocks represent the
      * atomic commit point but not all application data was successfully made
      * stable on disk.
+     * 
+     * @deprecated This option does NOT provide a sufficient guarentee when a
+     *             write cache is in use by the operating system or the disk if
+     *             the layered write caches return before all data is safely on
+     *             disk (or in a battery powered cache). In order to protect
+     *             against this you MUST disable the write cache layers in the
+     *             operating system and the disk drive such that
+     *             {@link FileChannel#force(boolean)} will not return until the
+     *             data are in fact on stable storage. If you disable the OS and
+     *             disk write cache then you do NOT need to specify this option
+     *             since writes will be ordered and all data will be on disk
+     *             before we update the commit blocks.
      */
     public static final String DOUBLE_SYNC = "doubleSync";
 

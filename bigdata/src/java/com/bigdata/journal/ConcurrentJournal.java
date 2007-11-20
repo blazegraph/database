@@ -750,11 +750,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             final long elapsed = System.currentTimeMillis() - begin;
             
-            final long nextOffset = getBufferStrategy().getNextOffset();
+//            final long nextOffset = getBufferStrategy().getNextOffset();
 
-            return "status"
-                    + // txService (#active,#queued,#completed,poolSize)
-                    ": transactions=("
+            StringBuilder sb = new StringBuilder();
+            
+            // txService (#active,#queued,#completed,poolSize)
+            sb.append("transactions=("
                     + ((ThreadPoolExecutor) txWriteService).getQueue().size()
                     + ","
                     + ((ThreadPoolExecutor) txWriteService).getActiveCount()
@@ -764,9 +765,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ","
                     + ((ThreadPoolExecutor) txWriteService)
                             .getPoolSize()
-                    + ")"
-                    + // readService (#active,#queued,#completed,poolSize)
-                    ", readers=("
+                    + ")\n");
+            
+            // readService (#active,#queued,#completed,poolSize)
+            sb.append(
+                    "readers=("
                     + ((ThreadPoolExecutor) readService).getQueue().size()
                     + ","
                     + ((ThreadPoolExecutor) readService).getActiveCount()
@@ -776,9 +779,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ","
                     + ((ThreadPoolExecutor) readService)
                             .getPoolSize()
-                    + ")"
-                    + // writeService (#active,#queued,#completed,poolSize)
-                    ", writers=("
+                    + ")\n"
+                    );
+            
+            // writeService (#active,#queued,#completed,poolSize)
+            sb.append("writers=("
                     + ((ThreadPoolExecutor) writeService).getQueue().size()
                     + ","
                     + ((ThreadPoolExecutor) writeService).getActiveCount()
@@ -788,20 +793,30 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + ","
                     + ((ThreadPoolExecutor) writeService)
                             .getPoolSize()
-                    + ")"
-                    // commitCounter and related stats.
-                    + (commitCounter == -1 ? "" : ", commitCounter="
-                            + commitCounter)
+                    + ")\n"
+                    );
+            
+            // commitCounter and related stats.
+            sb.append(
+                      "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
                     + ", ncommits="+ writeService.getCommitCount()
                     + ", naborts=" + writeService.getAbortCount()
                     + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
                     + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
                     + ", maxRunning="+ writeService.getMaxRunning()
                     + ", maxPoolSize="+ writeService.getMaxPoolSize()
-                    + ", elapsed=" + elapsed+
-                    ", nextOffset=" + nextOffset
-                    ;
+                    + ", elapsed=" + elapsed
+                    + "\n"
+                    );
 
+            if(getBufferStrategy() instanceof DiskOnlyStrategy) {
+                
+                sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
+                
+            }
+            
+            return sb.toString();
+            
         }
 
     }

@@ -55,7 +55,7 @@ public class DefaultEvictionListener implements
      * True iff the {@link #log} level is DEBUG or less.
      */
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG.toInt();
-
+    
     public void evicted(HardReferenceQueue<PO> cache, PO ref) {
 
         AbstractNode node = (AbstractNode) ref;
@@ -69,9 +69,9 @@ public class DefaultEvictionListener implements
 
             final AbstractBTree btree = node.btree;
             
-            assert btree.ndistinctOnQueue > 0;
+            assert btree.ndistinctOnWriteRetentionQueue > 0;
 
-            btree.ndistinctOnQueue--;
+            btree.ndistinctOnWriteRetentionQueue--;
             
             if( node.deleted ) {
                 
@@ -116,6 +116,12 @@ public class DefaultEvictionListener implements
                 assert !ref.dirty;
                 assert ref.identity != PO.NULL;
 
+                if(btree.readRetentionQueue!=null) {
+                    
+                    btree.readRetentionQueue.append(ref);
+                    
+                }
+                
             }
 
         }
