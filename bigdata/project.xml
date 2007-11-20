@@ -24,7 +24,7 @@
   <!-- compatibility reasons, no leading/trailing newlines and -->
   <!-- 72 character length limit.                              -->
 
-  <shortDescription>bigdata</shortDescription>
+  <shortDescription>bigdata(R)</shortDescription>
 
   <description>
 
@@ -32,7 +32,7 @@
 
   <p>
 
-	  bigdata is a scale-out data and computing fabric designed for commodity hardware. 
+	  bigdata&reg; is a scale-out data and computing fabric designed for commodity hardware. 
 
   </p>
   <p>
