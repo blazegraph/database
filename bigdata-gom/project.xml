@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+  <id>bigdata-GOM</id>
+  <name>bigdata GOM</name>
+  <package>com.bigdata</package>
+  <extends>../bigdata-master-pom/project.xml</extends>
+  <groupId>bigdata</groupId>
+  <currentVersion>1.1-b3-dev</currentVersion>
+
+  <organization>
+    <name>SYSTAP, LLC</name>
+    <url>http://www.systap.com/</url>
+  </organization>
+
+  <!-- required per-POM metadata. -->
+  <inceptionYear>2006</inceptionYear>
+  <url>http://www.systap.com/</url>
+
+  <!-- The short description is used in the JAR manifest.  For -->
+  <!-- compatibility reasons, no leading/trailing newlines and -->
+  <!-- 72 character length limit.                              -->
+
+  <shortDescription>bigdata-GOM</shortDescription>
+
+  <description>
+
+<![CDATA[
+
+  <p> This project provides a native persistent implementation of the
+      Generic Object Model (GOM).  GOM is an OODBMS framework suitable
+      to a broad range of applications.
+
+  </p>
+
+  <p> Once the dependencies have been resolved, the GOM framework
+      can be used without further configuration.
+
+	  <pre>
+
+	  IObjectManager om = new ObjectManager( new Properties() );
+
+	  IGeneric g = om.makeObject();
+
+	  g.set( "name", "foo" );
+
+	  g.set( "father", om.makeObject() );
+
+	  </pre>
+
+	  The preferred manner to initialize the GOM framework is:
+
+	  <pre>
+
+	  Properties properties = new Properties();
+
+	  properties.setProperty
+		  ( ObjectManagerFactory.OBJECT_MANAGER_CLASSNAME,
+			ObjectManager.class.getName()
+            );
+
+	  IObjectManager om  = ObjectManagerFactory.INSTANCE.newInstance
+          ( properties
+            );
+
+	  </pre>
+	  
+	  <br>See the ObjectManager class for more configuration options.</br>
+	  <br>See the <a href="examples">examples</a> directory for code.</br>
+
+  </p>
+
+  <p> Note: bigdata has many configuration options.  Good
+      defaults for these options are choosen for you automatically by
+      the object manager.
+
+  </p>
+
+]]>
+
+  </description>
+
+  <versions>
+  
+  </versions>
+
+  <!-- copy down inheritance applies. -->
+  <siteAddress>www.cognitiveweb.org</siteAddress>
+  <siteDirectory>
+    /home/groups/c/cw/cweb/htdocs/technology/projects/${pom.artifactId}
+  </siteDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <distributionSite>www.sourceforge.net</distributionSite>
+  <distributionDirectory>/projects/cweb</distributionDirectory>
+
+  <!-- copy down inheritance applies. -->
+  <issueTrackingUrl>
+  http://jira.cognitiveweb.org/browse/GOMFORJDBM
+  </issueTrackingUrl>
+
+  <!-- copy down inheritance applies. -->
+  <repository>
+    <connection>
+    scm:cvs:pserver:anonymous@${maven.scm.cvs.host}:/cvsroot/cweb:gom-for-jdbm
+    </connection>
+    <developerConnection>
+    scm:cvs:ext:user@${maven.scm.cvs.host}:/cvsroot/cweb:gom-for-jdbm
+    </developerConnection>
+    <url>http://cweb.cvs.sourceforge.net/cweb/gom-for-jdbm</url>
+  </repository>
+
+  <!-- copy down inheritance applies. -->
+  <licenses>
+    <license>
+      <name>CognitiveWeb Open Source License</name>
+      <url>http://www.cognitiveweb.org/legal/license/</url>
+      <distribution>manual</distribution>
+    </license>
+  </licenses>
+
+  <!-- copy down inheritance applies. -->
+  <mailingLists>
+    <mailingList>
+      <name>Announce List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-announce
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=cweb-announce
+      </archive>
+    </mailingList>
+    <mailingList>
+      <name>Developer List</name>
+      <subscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+      </subscribe>
+      <unsubscribe>
+        http://lists.sourceforge.net/lists/listinfo/cweb-developer
+      </unsubscribe>
+      <archive>
+        http://sourceforge.net/mailarchive/forum.php?forum=cweb-developer
+      </archive>
+    </mailingList>
+  </mailingLists>
+
+  <!-- copy down inheritance applies. -->
+  <developers>
+
+    <developer>
+      <name>Bryan Thompson</name>
+      <id>bryan</id>
+      <email>thompsonbry@users.sourceforge.net</email>
+      <organization>SYSTAP, LLC</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+    <developer>
+      <name>Mike Personick</name>
+      <id>mrpersonick</id>
+      <email>mrpersonick@users.sourceforge.net</email>
+      <organization>SYSTAP, LLC</organization>
+      <!-- East coast. -->
+      <timezone>-5</timezone>
+    </developer>
+
+  </developers>
+
+  <contributors>
+    <!--
+    <contributor>
+      <name>...</name>
+      <id>...</id>
+      <email>...</email>
+      <organization>...</organization>
+    </contributor>
+    -->
+  </contributors>
+
+  <!-- project-specific data. -->
+  <dependencies>
+
+    <!-- log4j integration. -->
+    <dependency> 
+      <id>log4j</id> 
+      <version>1.2.8</version>
+      <url>http://logging.apache.org/</url>
+    </dependency>
+
+    <!-- Our junit extensions - for testing only. -->
+    <dependency> 
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-junit-ext</artifactId>
+      <version>1.1-b3-dev</version> 
+      <url>http://www.cognitiveweb.org/</url>
+    </dependency>
+
+    <!-- CWeb Commons. -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-commons</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.cognitiveweb.org/</url>
+    </dependency>
+
+    <!-- Generic object model API package. -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-generic-api</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.cognitiveweb.org/</url>
+    </dependency>
+
+    <!-- Test suite for the generic object model API. -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-generic-test</artifactId>
+      <version>1.1-b2-dev</version>
+      <url>http://www.cognitiveweb.org/</url>
+    </dependency>
+
+	<!-- Extensible Serialization framework. -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-extser</artifactId>
+	  <version>0.1-b3-dev</version>
+	  <url>http://www.cognitiveweb.org</url>
+    </dependency>
+
+	<!-- CWeb GOM Framework Layer. -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-generic-native</artifactId>
+	  <version>1.1-b3-dev</version>
+	  <url>http://www.cognitiveweb.org</url>
+    </dependency>
+
+	<!-- CWeb GOM Framework Layer (TestSuite). -->
+    <dependency>
+      <groupId>org.CognitiveWeb</groupId>
+      <artifactId>cweb-generic-native-test</artifactId>
+	  <version>1.1-b3-dev</version>
+	  <url>http://www.cognitiveweb.org</url>
+    </dependency>
+
+    <!-- Striterator support. -->
+    <!-- Note: The jar name reflects the date when I downloaded it -->
+    <!-- and makes it possible for me to rollback to historical CTC -->
+    <!-- versions.  Any recent "ctc_utils.jar" SHOULD work.  Just -->
+    <!-- extract the JAR and rename it. -->
+    <dependency>
+      <groupId>ctc</groupId>
+      <artifactId>utils</artifactId>
+      <jar>ctc_utils-5-4-2005.jar</jar>
+      <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
+    </dependency>
+
+    <dependency>
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+	  <version>0.1-b1-dev</version>
+      <url>http://sourceforge.net/projects/bigdata/</url>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <nagEmailAddress>
+      thompsonbry@users.sourceforge.net
+    </nagEmailAddress>
+
+    <sourceDirectory>${basedir}/src/java</sourceDirectory>
+   
+    <unitTestSourceDirectory>${basedir}/src/test</unitTestSourceDirectory>
+
+    <aspectSourceDirectory/>
+
+    <!-- Unit test cases -->
+
+    <unitTest>
+
+      <includes>
+
+        <!-- Note: There are some PerformanceTest.java classes -->
+		<!-- for ... performance testing.  They are NOT run as -->
+		<!-- part of the unit tests, but you can run them with -->
+		<!-- the JUnitRunner.                                  -->
+
+        <include>**/DefaultTestCase.java</include>
+
+      </includes>
+
+      <!-- Resources for test cases are declared here. -->
+
+      <resources>
+      <resource>
+        <directory>${basedir}/src/test</directory>
+        <includes>
+          <include>**/*.properties</include>
+        </includes>
+      </resource>
+      </resources>
+
+    </unitTest>
+              
+    <!-- J A R  R E S O U R C E S -->
+    <resources>
+      <resource>
+        <directory>${basedir}/src/resources/logging</directory>
+        <includes>
+          <include>log4j.properties</include>
+        </includes>
+      </resource>
+
+    </resources>
+
+    <jars>
+    </jars>
+
+  </build>
+
+</project>
