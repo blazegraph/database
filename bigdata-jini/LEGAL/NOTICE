@@ -1,0 +1,5 @@
+This project redistributes Jini 2.1.
+
+There is a dependency on the bigdata module.
+
+Other dependencies exist and are described in the bigdata module.
