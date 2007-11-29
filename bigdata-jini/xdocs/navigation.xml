@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
-<project name="bigdata">
+<project name="bigdata-jini">
 
   <!--                                                           -->
   <!-- This navigation model is merged into the generated site.  -->
@@ -16,7 +16,7 @@
 
   <properties>
      <author>thompsonbry@users.sourceforge.com</author>
-     <title>bigdata</title>
+     <title>bigdata-jini</title>
   </properties>
 
   <body>
