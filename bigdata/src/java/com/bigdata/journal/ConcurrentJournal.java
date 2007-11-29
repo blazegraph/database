@@ -328,6 +328,15 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      */
     final protected LockManager<String> lockManager;
 
+    /**
+     * Shutdown the journal (running tasks will run to completion, but no new
+     * tasks will start).
+     * <p>
+     * Note: You SHOULD use this method rather than {@link #close()} for normal
+     * shutdown of the journal.
+     * 
+     * @see #shutdownNow()
+     */
     public void shutdown() {
 
         assertOpen();
@@ -419,6 +428,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
     }
 
+    /**
+     * Immediate shutdown (running tasks are cancelled rather than being
+     * permitted to complete).
+     * 
+     * @see #shutdown()
+     */
     public void shutdownNow() {
 
         assertOpen();

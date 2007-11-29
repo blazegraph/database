@@ -497,7 +497,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         } catch (Exception ex) {
 
-            BigdataClient.log.error(ex);
+            log.error(ex);
 
             throw new RuntimeException(ex);
 
@@ -519,7 +519,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         } catch (Exception ex) {
 
-            BigdataClient.log.error(ex);
+            log.error(ex);
 
             throw new RuntimeException(ex);
 

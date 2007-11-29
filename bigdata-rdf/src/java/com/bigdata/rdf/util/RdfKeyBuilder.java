@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.util;
 
+import java.util.Locale;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -36,7 +38,6 @@ import org.openrdf.vocabulary.XmlSchema;
 
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.SPO;
@@ -59,10 +60,12 @@ public class RdfKeyBuilder {
      * Note: You can pass a {@link KeyBuilder} if you need a light-weight
      * instance of this class for generating keys for the ids index or the
      * statement indices. However, if you need to generate keys for the terms
-     * index then you MUST provide an appropriately configured instance of the
-     * {@link UnicodeKeyBuilder}.
+     * index then you MUST provide an instance of the {@link KeyBuilder}
+     * configured for Unicode as appropriate to your {@link Locale}.
      * 
      * @param keyBuilder
+     * 
+     * @see KeyBuilder
      */
     public RdfKeyBuilder(IKeyBuilder keyBuilder) {
         

@@ -39,7 +39,8 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
@@ -69,13 +70,13 @@ import com.bigdata.util.CSVReader;
  */
 public class TestSparseRowStore extends TestCase2 {
 
-    protected UnicodeKeyBuilder keyBuilder;
+    protected IKeyBuilder keyBuilder;
     protected IRawStore store;
     protected UnisolatedBTree btree;
     
     public void setUp() {
         
-        keyBuilder = new UnicodeKeyBuilder();
+        keyBuilder = KeyBuilder.newUnicodeInstance();
         
         store = new TemporaryRawStore();
         

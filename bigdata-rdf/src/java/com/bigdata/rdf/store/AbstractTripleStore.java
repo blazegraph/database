@@ -62,7 +62,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
@@ -157,9 +156,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo verify read after commit (restart safe) for large data sets (multiple
  *       index partitions for scale-out and overflow for scale-out/scale-up).
  * 
- * @todo test re-load rate for a data set and verify that no new statements are
- *       added when re-loading a data set.
- * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
  * 
@@ -224,16 +220,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends InferenceEngine.Options, com.bigdata.journal.Options {
-        
-        
+    public static interface Options extends InferenceEngine.Options,
+            com.bigdata.journal.Options, KeyBuilder.Options {
+
     }
     
     /**
      * 
      * @param properties
      * 
-     * @see Options.
+     * @see Options
      */    
     protected AbstractTripleStore(Properties properties) {
         
@@ -257,8 +253,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         addNamespace(OWL.NAMESPACE, "owl");
         addNamespace(XmlSchema.NAMESPACE, "xsd");
 
-        keyBuilder = new RdfKeyBuilder(new UnicodeKeyBuilder(createCollator(),
-                Bytes.kilobyte32));
+        keyBuilder = new RdfKeyBuilder(KeyBuilder
+                .newUnicodeInstance(properties));
         
     }
     
@@ -434,8 +430,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param numTerms
      *            The #of terms in that array.
      * 
-     * @see #createCollator()
-     * @see UnicodeKeyBuilder
+     * @see KeyBuilder
      */
     final public void generateSortKeys(RdfKeyBuilder keyBuilder,
             _Value[] terms, int numTerms) {

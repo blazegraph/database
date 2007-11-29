@@ -322,6 +322,12 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         final long addr2 = store.write(tmp2);
 //        final long addr2 = writeRandomData(store,Bytes.kilobyte32);
         
+        /*
+         * Note: The DiskOnly strategy has a write cache. You have to force it
+         * to disk before the new extent will show up.
+         */
+        bufferStrategy.force(false);
+        
         // verify extension of buffer.
         assertTrue("extent", extent + store.getByteCount(addr2) <= bufferStrategy.getExtent());
 

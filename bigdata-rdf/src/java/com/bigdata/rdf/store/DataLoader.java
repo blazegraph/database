@@ -40,6 +40,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.openrdf.sesame.constants.RDFFormat;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TMStatementBuffer;
@@ -456,12 +457,24 @@ public class DataLoader {
 
         if (rdfStream == null) {
 
-            // If we do not find as a Resource then try the file system.
-            rdfStream = new BufferedInputStream(new FileInputStream(resource));
+            /*
+             * If we do not find as a Resource then try the file system.
+             */
+            
+            rdfStream = new FileInputStream(resource);
+//            rdfStream = new BufferedInputStream(new FileInputStream(resource));
 
         }
 
-        Reader reader = new BufferedReader(new InputStreamReader(rdfStream));
+        /* 
+         * Obtain a buffered reader on the input stream.
+         */
+
+        // @todo reuse the backing buffer to minimize heap churn. 
+        Reader reader = new BufferedReader(
+                new InputStreamReader(rdfStream)
+//               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
+                );
         
         try {
             

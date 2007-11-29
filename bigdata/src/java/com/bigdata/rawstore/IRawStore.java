@@ -84,6 +84,15 @@ import com.bigdata.journal.AbstractJournal;
  *       is no longer required for data versions that can not be accessed by any
  *       current transaction (a gc strategy). This would make it possible for us
  *       to implement a scale up store based on a single monolithic file.
+ * 
+ * FIXME The use of the {@link ByteBuffer} in this API has become limiting. It
+ * would be nicer to specify a byte[] with optional offset and length
+ * parameters. This would make it easier to wrap the byte[] in different ways
+ * for reading and writing. The {@link ByteBuffer} has an advantage when reading
+ * since it allows us to return a read-only view of the record, but in practice
+ * that is only effective for an in-memory store (with or without a backing
+ * file). The byte[] is more flexible.  The caller is free to reuse the byte[]
+ * and the store always copies the data.
  */
 public interface IRawStore extends IAddressManager, IStoreSerializer {
     

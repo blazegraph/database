@@ -94,21 +94,8 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.concurrent.TestAll.suite() );
         suite.addTest( com.bigdata.journal.TestAll.suite() );
         suite.addTest( com.bigdata.scaleup.TestAll.suite() );
-
-        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
-                "false"))) {
-
-            /*
-             * Note: The service tests require that Jini is running, that you
-             * have specified a suitable security policy, and that the codebase
-             * parameter is set correctly. See the test suites for more detail
-             * on how to setup to run these tests.
-             */
-
-            suite.addTest(com.bigdata.service.TestAll.suite());
-            suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
-
-        }
+        suite.addTest( com.bigdata.service.TestAll.suite() );
+        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
 
         return suite;
         

@@ -34,6 +34,10 @@ import com.bigdata.journal.ForceEnum;
 import com.bigdata.service.EmbeddedBigdataClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
+import com.bigdata.service.mapred.AbstractMaster;
+import com.bigdata.service.mapred.EmbeddedMaster;
+import com.bigdata.service.mapred.MapReduceJob;
+import com.bigdata.service.mapred.jobs.CountKeywordJob;
 
 import junit.framework.TestCase;
 

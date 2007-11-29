@@ -172,8 +172,8 @@ public class OptimizedValueFactory implements ValueFactory {
     
     public BNode createBNode() {
 
-        return new _BNode(UUID.randomUUID().toString());
-
+        return new _BNode("_"+UUID.randomUUID());
+        
     }
 
     public BNode createBNode(String id) {

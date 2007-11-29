@@ -37,6 +37,12 @@ import junit.framework.TestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.EmbeddedBigdataClient;
 import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.mapred.AbstractJobAndTaskService;
+import com.bigdata.service.mapred.IJobAndTaskService;
+import com.bigdata.service.mapred.IJobMetadata;
+import com.bigdata.service.mapred.ITask;
+import com.bigdata.service.mapred.JobState;
+import com.bigdata.service.mapred.RemoteTaskRunner;
 
 /**
  * Test suite for {@link RemoteTaskRunner}.
@@ -299,8 +305,8 @@ public class TestRemoteTaskRunner extends TestCase {
             
         }
 
-        com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.JobState<M> jobState,
+        protected com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
+                com.bigdata.service.mapred.JobState<M> jobState,
                 T task) {
 
             return new MyTaskWorker(jobState, task);
@@ -316,7 +322,7 @@ public class TestRemoteTaskRunner extends TestCase {
          * @param <T>
          */
         class MyTaskWorker
-            extends com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
+            extends com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
 
             /**
              * @param jobState
@@ -330,7 +336,7 @@ public class TestRemoteTaskRunner extends TestCase {
 
             protected void run() throws Exception {
 
-                log.info("Running task: job="+jobState.uuid+", task="+task.getUUID());
+                log.info("Running task: job="+jobState.getUUID()+", task="+task.getUUID());
                 
                 if(task instanceof Runnable) {
 

@@ -40,9 +40,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.ibm.icu.text.RuleBasedCollator;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -59,13 +57,10 @@ import cutthecrap.utils.striterators.Striterator;
  * comparison of the variable length unsigned byte[] keys. Encoding Unicode keys
  * is support by an integration with ICU4J and applications may choose the
  * locale, strength, and other properties that govern the sort order of sort
- * keys generated from Unicode strings. Sort keys produces by different
- * {@link RuleBaseCollator}s are NOT compable and applications that use Unicode
- * data in their keys MUST make sure that they use a {@link RuleBasedCollator}
- * that imposes the same sort order each time they provision a
- * {@link UnicodeKeyBuilder}. ICU4J provides a version number that is changed
- * each time a software revision would result in a change in the generated sort
- * order.
+ * keys generated from Unicode strings. Sort keys produces by different collator
+ * objects are NOT compable and applications that use Unicode data in their keys
+ * MUST make sure that they use a collator that imposes the same sort order each
+ * time they provision a {@link KeyBuilder}.
  * </p>
  * <p>
  * The use of variable length unsigned byte[] keys makes it possible for the
@@ -81,10 +76,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  * 
  * @see KeyBuilder
- * @see UnicodeKeyBuilder
- * @see RuleBasedCollator
- * @see http://icu.sourceforge.net
- * @see http://icu.sourceforge.net/userguide/Collate_ServiceArchitecture.html#Versioning
  * 
  * @todo The B+Tree implementation does not support limits on the serialized
  *       size of a node or leaf. The design strategy is to allow flexible sizes
@@ -97,7 +88,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       before eviction if they would be likely to overflow the upper bound on
  *       the record size. Probably the node or leaf needs to be made immutable,
  *       the serialized size checked, and then a split operation invoked if the
- *       record would exceed the upper bound.  If this happens a lot, then the
+ *       record would exceed the upper bound. If this happens a lot, then the
  *       branching factor is too high for the data and would have to be lowered
  *       to regain performance.
  */
@@ -760,32 +751,6 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
 
     /**
-     * Used to unbox an application key. This is NOT safe for concurrent
-     * operations, but the mutable b+tree is only safe (and designed for) a
-     * single-threaded context.
-     * 
-     * @deprecated This is preserved solely to provide backward compatibility
-     *             for int keys passed into the non-batch api. It will disappear
-     *             as soon as I update the test suites.
-     */
-    private final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
-
-    /**
-     * Used to unbox an application key. This is NOT safe for concurrent
-     * operations, but the mutable b+tree is only safe (and designed for) a
-     * single-threaded context.
-     * 
-     * @deprecated This is preserved solely to provide backward compatibility
-     *             for int keys passed into the non-batch api. It will disappear
-     *             as soon as I update the test suites.
-     */
-    final protected byte[] unbox(Object key) {
-
-        return keyBuilder.reset().append(((Integer) key).intValue()).getKey();
-
-    }
-
-    /**
      * Returns the node or leaf to be used for search. This implementation is
      * aware of the {@link #finger} and will return it if the key lies within
      * the finger.
@@ -868,7 +833,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (!(key instanceof byte[])) {
 
-            key = unbox(key);
+            key = KeyBuilder.asSortKey(key);
 
         }
 
@@ -885,7 +850,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (!(key instanceof byte[])) {
 
-            key = unbox(key);
+            key = KeyBuilder.asSortKey(key);
 
         }
 
@@ -913,7 +878,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         if (!(key instanceof byte[])) {
 
-            key = unbox(key);
+            key = KeyBuilder.asSortKey(key);
 
         }
 

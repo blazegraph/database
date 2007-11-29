@@ -339,7 +339,7 @@ public class IndexSegment extends AbstractBTree {
 
             } else {
                 
-                _key = unbox(key);
+                _key = KeyBuilder.asSortKey(key);
 
             }
 

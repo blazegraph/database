@@ -36,12 +36,17 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Disk-based journal strategy.
@@ -64,8 +69,8 @@ import com.bigdata.rawstore.IRawStore;
  * http://mail-archives.apache.org/mod_mbox/db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
  * 
  * <pre>
- *   /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
- *   /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
+ *    /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
+ *    /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
  * </pre>
  * 
  * @todo The flush of the write cache could be made asynchronous if we had two
@@ -104,10 +109,17 @@ import com.bigdata.rawstore.IRawStore;
  *       the allocation blocks will need to be cached.
  *       <p>
  *       Currently, GC of nodes in the btree is driving reads.
+ *       <p>
+ *       Async read ahead should be explored for rangeIterators in the
+ *       {@link BTree}. This could reduce latency waiting on the disk to zero
+ *       for range scans.
  * 
  * FIXME Add lazy creation of the backing file so that we can use the
  * {@link DiskOnlyStrategy} for temporary stores as well. The backing file will
- * never be created unless the write cache overflows.
+ * never be created unless the write cache overflows. Since we write the root
+ * blocks when we create the file, we have to be careful and make sure that the
+ * store is initialized properly. Note that this will also mean that the temp
+ * store can support commits, which it does not really need to do.
  * 
  * @todo A separate read cache could be used for hot records, but the B+Tree
  *       implementations already buffer nodes and leaves so this is unlike to
@@ -184,47 +196,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     private long userExtent;
 
     /**
-     * The buffer used to absorb writes that are destined for the disk. Writes
-     * are simply appended into this buffer until it would overflow. On
-     * overflow, {@link #flushWriteCache()} is invoked to flush the data to the
-     * disk (without synchronizing the disk). If a record is too large to fit
-     * into this buffer, then the write cache is flushed and the record is
-     * written directly on the disk.
-     * <p>
-     * Note: We must clone the data since the
-     * {@link IRawStore#write(ByteBuffer)} contract says that the caller can
-     * reuse the buffer once we return. In order minimize heap churn we simply
-     * copy the data into {@link #writeCache}, a {@link ByteBuffer} that
-     * buffers recently written records. Writes are deferred until the buffer is
-     * would overflow and then all buffered are written at once onto the disk.
-     * <p>
-     * In order to ensure consistency we read through the {@link #writeCache} in
-     * {@link #read(long)}. Otherwise a {@link #write(ByteBuffer)} could return
-     * and a subsequent read on the record while it is in the
-     * {@link #writeCache} would "miss" causing us to read through to the disk
-     * (which would not have the correct data).
-     * <p>
-     * Note: The write cache design assumes an "append only" store. In
-     * particular, it assumes that the application data records are written in
-     * are purely sequential manner on the end of the file (the root blocks are
-     * outside of the application data). Either the write cache must be disabled
-     * or a different design must be used if you are using a store where records
-     * may be deleted and recycled.
-     * <p>
-     * The write cache offers a 27% performance gain when compared to the same
-     * condition without the write cache as measured by
-     * {@link AbstractMRMWTestCase}.
+     * Optional {@link WriteCache}.
      */
-    private ByteBuffer writeCache;
-    
-    /**
-     * An index into the write cache used for read through on the cache. The
-     * keys are the addresses that would be used to read the corresponding
-     * record. The values are the position in {@link #buffer} where that record
-     * is buffered. A cache miss means that you need to read the record from the
-     * disk.
-     */
-    final private Map<Long,Integer> writeCacheIndex;
+    private WriteCache writeCache = null;
     
     /**
      * The next offset at which data in the {@link #writeCache} will be written
@@ -236,6 +210,194 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     private long writeCacheOffset;
     
+    private class WriteCache {
+        
+        /**
+         * The buffer used to absorb writes that are destined for the disk. Writes
+         * are simply appended into this buffer until it would overflow. On
+         * overflow, {@link #flushWriteCache()} is invoked to flush the data to the
+         * disk (without synchronizing the disk). If a record is too large to fit
+         * into this buffer, then the write cache is flushed and the record is
+         * written directly on the disk.
+         * <p>
+         * Note: We must clone the data since the
+         * {@link IRawStore#write(ByteBuffer)} contract says that the caller can
+         * reuse the buffer once we return. In order minimize heap churn we simply
+         * copy the data into {@link #buf}, a {@link ByteBuffer} that
+         * buffers recently written records. Writes are deferred until the buffer is
+         * would overflow and then all buffered are written at once onto the disk.
+         * <p>
+         * In order to ensure consistency we read through the {@link #buf} in
+         * {@link #read(long)}. Otherwise a {@link #write(ByteBuffer)} could return
+         * and a subsequent read on the record while it is in the
+         * {@link #buf} would "miss" causing us to read through to the disk
+         * (which would not have the correct data).
+         * <p>
+         * Note: The write cache design assumes an "append only" store. In
+         * particular, it assumes that the application data records are written in
+         * are purely sequential manner on the end of the file (the root blocks are
+         * outside of the application data). Either the write cache must be disabled
+         * or a different design must be used if you are using a store where records
+         * may be deleted and recycled.
+         * <p>
+         * The write cache offers a 27% performance gain when compared to the same
+         * condition without the write cache as measured by
+         * {@link AbstractMRMWTestCase}.
+         */
+        private ByteBuffer buf;
+        
+        /**
+         * An index into the write cache used for read through on the cache. The
+         * keys are the addresses that would be used to read the corresponding
+         * record. The values are the position in {@link #buffer} where that record
+         * is buffered. A cache miss means that you need to read the record from the
+         * disk.
+         */
+        final private Map<Long,Integer> writeCacheIndex;
+        
+        /**
+         * The starting position in the buffer for data that has not been
+         * written to the disk.
+         * 
+         * FIXME not used yet.
+         * 
+         * @see Task
+         */
+        private int start = 0;
+        
+        public WriteCache(int capacity) {
+            
+            if(capacity<=0) throw new IllegalArgumentException();
+            
+            /*
+             * An estimate of the #of records that might fit within the write
+             * cache. This is based on an assumption that the "average" record
+             * is 4k. This is used solely to assign the initial capacity to the
+             * writeCacheIndex.
+             */
+            final int indexDefaultCapacity = capacity / (4 * Bytes.kilobyte32);
+
+            // allocate the write cache : @todo make using a direct buffer an
+            // option.
+            this.buf = ByteBuffer.allocate(capacity);
+
+            // allocate and initialize the write cache index.
+            writeCacheIndex = new ConcurrentHashMap<Long, Integer>(indexDefaultCapacity);
+
+        }
+        
+        /**
+         * The current position in the buffer.
+         */
+        final int position() {
+            
+            return buf.position();
+            
+        }
+
+        /**
+         * The capacity of the buffer.
+         */
+        final int capacity() {
+            
+            return buf.capacity();
+            
+        }
+        
+        void flush() {
+            
+            // #of bytes to write on the disk.
+            final int nbytes = buf.position();
+
+            if (nbytes == 0) return;
+
+            // limit := position; position := 0;
+            buf.flip();
+
+            // write the data on the disk file.
+            writeOnDisk(buf, writeCacheOffset);
+
+            // position := 0; limit := capacity.
+            buf.clear();
+
+            // clear the index since all records were flushed to disk.
+            writeCacheIndex.clear();
+            
+        }
+
+        /**
+         * Write the record on the cache.
+         * 
+         * @param addr
+         *            The address assigned to that record in the journal.
+         * 
+         * @param data
+         *            The record.
+         */
+        void write(long addr, ByteBuffer data) {
+
+            // the position() at which the record is cached.
+            final int position = buf.position();
+
+            // copy the record into the cache.
+            buf.put(data);
+
+            // add the record to the write cache index for read(addr).
+            writeCacheIndex.put(new Long(addr), new Integer(position));
+
+        }
+
+        /**
+         * Read a record from the write cache.
+         * 
+         * @param addr
+         *            The address assigned to that record in the journal.
+         * @param nbytes
+         *            The length of the record (decoded from the address by the
+         *            caller).
+         * 
+         * @return A view onto the record in the write cache buffer -or-
+         *         <code>null</code> iff the record does not lie within this
+         *         {@link WriteCache}.
+         *         <p>
+         *         Note: The caller MUST copy the data from the view since
+         *         concurrent operations may result in the write cache being
+         *         flushed and the view overwritten with new data.
+         */
+        ByteBuffer read(long addr,int nbytes) {
+                
+            /*
+             * The return value is the position in the writeCache where that
+             * record starts and [null] if the record is not in the writeCache.
+             */
+            final Integer writeCachePosition = writeCacheIndex.get(addr);
+
+            if (writeCachePosition == null) {
+                
+                // The record is not in this write cache.
+                
+                return null;
+                
+            }
+
+            // the start of the record in writeCache.
+            final int pos = writeCachePosition;
+
+            // view onto the writeCache with its own limit and position.
+            ByteBuffer tmp = buf.asReadOnlyBuffer();
+
+            // adjust the view to just the record of interest.
+            tmp.limit(pos + nbytes);
+            
+            tmp.position(pos);
+            
+            // return the view.
+            return tmp;
+
+        }
+        
+    }
+    
     /**
      * Writes the {@link #writeCache} through to the disk and its position is
      * reset to zero.
@@ -244,24 +406,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     void flushWriteCache() {
         
-        if(writeCache==null) return;
-        
-        // #of bytes to write on the disk.
-        final int nbytes = writeCache.position();
-        
-        if(nbytes==0) return;
+        if (writeCache == null) return;
 
-        // limit := position; position := 0;
-        writeCache.flip();
-        
-        // write the data on the disk file.
-        writeOnDisk(writeCache,writeCacheOffset);
-
-        // position := 0; limit := capacity.
-        writeCache.clear();
-        
-        // clear the index since all records were flushed to disk.
-        writeCacheIndex.clear();
+        writeCache.flush();
 
     }
     
@@ -324,6 +471,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * #of bytes read.
          */
         long bytesRead;
+
+        /**
+         * The size of the largest record read.
+         */
+        long maxReadSize;
         
         /**
          * Total elapsed time for reads.
@@ -350,6 +502,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * #of write requests that write through to the backing file.
          */
         long ndiskWrite;
+
+        /**
+         * The size of the largest record written.
+         */
+        long maxWriteSize;
         
         /**
          * #of bytes written.
@@ -365,6 +522,27 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * Total elapsed time for writing on the disk.
          */
         long elapsedDiskWriteNanos;
+        
+        /**
+         * #of times the data were forced to the disk.
+         */
+        long nforce;
+        
+        /**
+         * #of times the length of the file was changed (typically, extended).
+         */
+        long ntruncate;
+        
+        /**
+         * #of times the file has been reopened after it was closed by an
+         * interrupt.
+         */
+        long nreopen;
+        
+        /**
+         * #of times one of the root blocks has been written.
+         */
+        long nwriteRootBlock;
         
         /**
          * Human readable representation of the counters.
@@ -383,7 +561,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 sb.append("store(read): #read=" + commaFormat.format(nreads)
                         + ", bytesRead=" + commaFormat.format(bytesRead)
-                        + ", bytesPerSec=" + bytesReadPerSec + "\n");
+                        + ", bytesPerSec=" + bytesReadPerSec
+                        + ", maxRecordSize=" + commaFormat.format(maxReadSize)
+                        + "\n");
                 
                 long elapsedWriteSecs = (long) (elapsedWriteNanos / 1000000000.);
 
@@ -394,7 +574,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 sb.append("store(write): #write=" + commaFormat.format(nwrites)
                         + ", bytesWritten=" + commaFormat.format(bytesWritten)
-                        + ", bytesPerSec=" + bytesWrittenPerSec + "\n");
+                        + ", bytesPerSec=" + bytesWrittenPerSec  
+                        + ", maxRecordSize=" + commaFormat.format(maxWriteSize)
+                        + "\n");
                 
             }
 
@@ -407,12 +589,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 String cacheWriteRate = (nwrites == 0 ? "N/A" : ""
                         + percentFormat.format((double) ncacheWrite / nwrites));
 
-                sb.append("cache(read):" + cacheReadRate + " (cache="
-                        + ncacheRead + ", disk=" + ndiskRead + ", total="
+                sb.append("cache(read): " + cacheReadRate + " (#cache="
+                        + ncacheRead + ", #disk=" + ndiskRead + ", total="
                         + (ncacheRead + ndiskRead) + ")\n");
 
-                sb.append("cache(write):" + cacheWriteRate + " (cache="
-                        + ncacheWrite + ", disk=" + ndiskWrite + ", total="
+                sb.append("cache(write): " + cacheWriteRate + " (#cache="
+                        + ncacheWrite + ", #disk=" + ndiskWrite + ", total="
                         + (ncacheWrite + ndiskWrite) + ")\n");
                 
             }
@@ -446,6 +628,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                         + secondsFormat.format(elapsedDiskWriteSecs)
                         + "s, secs/write=" + writeLatency + "\n");
 
+                sb.append("disk(other): #force=" + nforce + ", #extend="
+                        + ntruncate + ", #reopen=" + nreopen + ", #rootBlocks="
+                        + nwriteRootBlock);
+                
             }
 
             return sb.toString();
@@ -533,33 +719,67 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             log.info("Enabling writeCache: capacity="+writeCacheCapacity);
 
+            writeCache = new WriteCache( writeCacheCapacity );
+            
             /*
-             * An estimate of the #of records that might fit within the write
-             * cache. This is based on an assumption that the "average" record
-             * is 4k. This is used solely to assign the initial capacity to the
-             * writeCacheIndex.
+             * Start a thread that will be used to asynchronously drive data in
+             * the write cache to the disk.
              */
-            final int indexDefaultCapacity = writeCacheCapacity / (4
-                    * Bytes.kilobyte32);
 
-            // allocate the write cache : @todo make using a direct buffer an option.
-            this.writeCache = ByteBuffer.allocate(writeCacheCapacity);
-
-            // allocate and initialize the write cache index.
-            writeCacheIndex = new ConcurrentHashMap<Long, Integer>(indexDefaultCapacity);
+            if(false) {
+                
+                writeService = Executors
+                        .newSingleThreadExecutor(DaemonThreadFactory
+                                .defaultThreadFactory());
+                
+            }
 
         } else {
-
-            // Disable the write cache.
             
-            this.writeCache = null;
-
-            writeCacheIndex = null;
-
+            writeCache = null;
+            
         }
 
         // the offset at which the next record would be written on the file.
         writeCacheOffset = fileMetadata.nextOffset;
+        
+    }
+    private ExecutorService writeService = null;
+
+    /**
+     * Writes all data in the {@link WriteCache} onto the disk file.
+     * 
+     * FIXME In order to be able to asynchronously drive data in the write cache
+     * to the disk we need to track the offset of the 1st byte in {@link #buf}
+     * that has not been written onto the disk. {@link #flush()} will have to be
+     * modified so that it awaits the current task writing out data (if any) and
+     * then synchronously writes out the remaining data itself.
+     * <P>
+     * We can submit a new task each time a record is written, but we do not
+     * want to have more than one task on the queue. Alternatively, just make
+     * the thread runnable and coordinate with a {@link Lock} and
+     * {@link Condition}s.
+     * 
+     * in order to handle the end of the buffer gracefully we might have to just
+     * and the application a new one when the current one is full. we can then
+     * trigger a write once the buffer is at least X% (or #M) and if the next
+     * record would cause an overflow in anycase. the write can be a partial
+     * write of the buffer or not.
+     * 
+     * using multiple buffers means that we have to search the chain of buffers
+     * still holding data as our write cache. if we make the buffer change over
+     * point synchronous then this will only be a single buffer. else a chain.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class Task implements Runnable {
+
+        public void run() {
+
+            throw new UnsupportedOperationException();
+            
+        }
         
     }
     
@@ -595,6 +815,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
         
+        counters.nforce++;
+        
     }
 
     /**
@@ -609,6 +831,30 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         super.close();
 
+        if (writeService != null) {
+            
+            /*
+             * Shutdown the write service.
+             */
+            
+            writeService.shutdownNow();
+            
+            try {
+            
+                if (!writeService.awaitTermination(2, TimeUnit.SECONDS)) {
+                
+                    log.warn("Timeout awaiting termination");
+                    
+                }
+                
+            } catch (InterruptedException ex) {
+                
+                log.warn("Interrupted awaiting termination: " + ex, ex);
+                
+            }
+            
+        }
+        
         // Release the write cache.
         writeCache = null;
         
@@ -727,50 +973,45 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         synchronized (this) {
 
+            if (nbytes > counters.maxReadSize) {
+
+                counters.maxReadSize = nbytes;
+
+            }
+            
             /*
-             * Check the write cache for this address. The return value is the
-             * position in the writeCache where that record starts and [null] if
-             * the record is not in the writeCache (or if the writeCache is
-             * disabled).
+             * Check the write cache for this address.
              */
 
-            final Integer writeCachePosition = writeCacheIndex != null ? writeCacheIndex
-                    .get(addr)
-                    : null;
-
-            if (writeCachePosition != null) {
-
-                /*
-                 * Copy the data into the newly allocated buffer.
-                 */
-
-                // the start of the record in writeCache.
-                final int pos = writeCachePosition;
-
-                // view onto the writeCache with its own limit and position.
-                ByteBuffer tmp = writeCache.asReadOnlyBuffer();
-
-                tmp.limit(pos+nbytes);
+            if (writeCache != null) {
                 
-                tmp.position(pos);
+                ByteBuffer tmp = writeCache.read(addr, nbytes);
                 
-                // copy the data into [dst].
-                dst.put(tmp);
+                if (tmp != null) {
+                 
+                    /*
+                     * Copy the data into the newly allocated buffer.
+                     */
 
-                // flip buffer for reading.
-                dst.flip();
+                    // copy the data into [dst].
+                    dst.put(tmp);
+
+                    // flip buffer for reading.
+                    dst.flip();
+
+                    /*
+                     * Update counters while synchronized.
+                     */
+                    counters.nreads++;
+                    counters.bytesRead+=nbytes;
+                    counters.ncacheRead++;
+                    counters.elapsedReadNanos+=(System.nanoTime()-begin);
+
+                    // return the new buffer.
+                    return dst;
+
+                }
                 
-                /*
-                 * Update counters while synchronized.
-                 */
-                counters.nreads++;
-                counters.bytesRead+=nbytes;
-                counters.ncacheRead++;
-                counters.elapsedReadNanos+=(System.nanoTime()-begin);
-
-                // return the new buffer.
-                return dst;
-
             }
 
             /*
@@ -888,7 +1129,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     synchronized private boolean reopenChannel() {
         
-        if(raf.getChannel().isOpen()) {
+        if (raf != null && raf.getChannel().isOpen()) {
             
             /* The channel is still open.  If you are allowing concurrent reads
              * on the channel, then this could indicate that two readers each 
@@ -921,6 +1162,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
 
+        counters.nreopen++;
+        
         return true;
         
     }
@@ -940,6 +1183,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         final long addr; // address in the store.
         synchronized(this) {
+            
+            if(nbytes > counters.maxWriteSize) {
+                
+                counters.maxWriteSize = nbytes;
+                
+            }
             
             /*
              * The offset at which the record will be written on the disk file
@@ -977,18 +1226,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     /*
                      * Queue up the write in the writeCache.
                      */
-
-                    // the position() at which the record is cached.
-                    final int position = writeCache.position();
-
-                    // copy the record into the cache.
-                    writeCache.put(data);
-
-                    // add the record to the write cache index for read(addr).
-                    writeCacheIndex.put(new Long(addr), new Integer(position));
+                    
+                    writeCache.write(addr, data);
 
                     counters.ncacheWrite++;
-                    
+
                 }
                 
             } else {
@@ -1142,6 +1384,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
+        counters.nwriteRootBlock++;
+        
     }
 
     synchronized public void truncate(long newExtent) {
@@ -1175,9 +1419,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * @todo an alternative would be to set a marker on the buffer such
              * that the next force() also forced the metadata to disk.
              */
+            
             force(true);
 
-            System.err.println("Disk file: newLength="+cf.format(newExtent));
+            counters.ntruncate++;
+            
+            log.warn("Disk file: newLength="+cf.format(newExtent));
                         
         } catch(IOException ex) {
             
