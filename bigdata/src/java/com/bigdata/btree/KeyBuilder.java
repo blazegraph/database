@@ -27,17 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.text.Collator;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.UUID;
 
-import com.ibm.icu.text.Collator;
-import com.ibm.icu.text.RawCollationKey;
-import com.ibm.icu.text.RuleBasedCollator;
+import org.apache.log4j.Logger;
 
 /**
  * A class that may be used to form multi-component keys but which does not
  * support Unicode. An instance of this class is quite light-weight and SHOULD
  * be used when Unicode support is not required.
+ * <p>
+ * Note: Avoid any dependencies within this class on the ICU libraries so that
+ * the code may run without those libraries when they are not required.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -46,7 +49,9 @@ import com.ibm.icu.text.RuleBasedCollator;
  *       refactoring the successor utilties into a base class and then isolating
  *       their test suite from that of the key builder.
  * 
- * @see UnicodeKeyBuilder
+ * @todo Integrate support for ICU versioning into the client and perhaps into
+ *       the index metadata so clients can discover which version and
+ *       configuration properties to use when generating keys for an index.
  * 
  * @see SuccessorUtil, which may be used to compute the successor of a value
  *      before encoding it as a component of a key.
@@ -54,11 +59,20 @@ import com.ibm.icu.text.RuleBasedCollator;
  * @see BytesUtil#successor(byte[]), which may be used to compute the successor
  *      of an encoded key.
  * 
+ * @todo introduce a mark and restore feature for generating multiple keys that
+ *       share some leading prefix. in general, this is as easy as resetting the
+ *       len field to the mark. keys with multiple components could benefit from
+ *       allowing multiple marks (the sparse row store is the main use case).
+ *       
  * @todo provide a synchronization factory for the keybuilder using a delegation
- *       model.  KeyBuilder.synchronizedKeyBuilder():KeyBuilder.
+ *       model. KeyBuilder.synchronizedKeyBuilder():KeyBuilder. Note that
+ *       {@link #asSortKey(Object)} already handles the most common use cases
+ *       and is thread-safe.
  */
 public class KeyBuilder implements IKeyBuilder {
 
+    protected static final Logger log = Logger.getLogger(KeyBuilder.class);
+    
     /**
      * The default capacity of the key buffer.
      */
@@ -77,43 +91,13 @@ public class KeyBuilder implements IKeyBuilder {
     protected byte[] buf;
     
     /**
-     * Used to encode unicode strings into compact unsigned byte[]s that have
-     * the same sort order (aka sort keys).
+     * The object used to generate sort keys from Unicode strings (optional).
      * <p>
      * Note: When <code>null</code> the IKeyBuilder does NOT support Unicode
      * and the optional Unicode methods will all throw an
      * {@link UnsupportedOperationException}.
      */
-    protected final RuleBasedCollator collator;
-
-//  /**
-//  * This class integrates with {@link RuleBasedCollator} for efficient
-//  * generation of compact sort keys.  Since {@link RawCollationKey} is
-//  * final, but its fields are public, we just set the fields directly
-//  * each time before we use this object.
-//  */
-// private RawCollationKey b2;
-
-    /**
-     * Throws exception unless the value is non-negative.
-     * 
-     * @param msg
-     *            The exception message.
-     * @param v
-     *            The value.
-     * 
-     * @return The value.
-     * 
-     * @exception IllegalArgumentException
-     *                unless the value is non-negative.
-     */
-    protected static int assertNonNegative(String msg,int v) {
-       
-        if(v<0) throw new IllegalArgumentException(msg);
-        
-        return v;
-        
-    }
+    protected final UnicodeSortKeyGenerator sortKeyGenerator;
     
     /**
      * Creates a key builder with an initial buffer capacity of
@@ -130,11 +114,38 @@ public class KeyBuilder implements IKeyBuilder {
      * 
      * @param initialCapacity
      *            The initial capacity of the internal byte[] used to construct
-     *            keys.
+     *            keys. When zero (0) the {@link #DEFAULT_INITIAL_CAPACITY} will
+     *            be used.
      */
     public KeyBuilder(int initialCapacity) {
         
-        this(0, new byte[assertNonNegative("initialCapacity", initialCapacity)]);
+        this(0, createBuffer(initialCapacity));
+        
+    }
+    
+    /**
+     * Create a buffer of the specified initial capacity.
+     * 
+     * @param initialCapacity
+     *            The initial size of the buffer.
+     * 
+     * @return The byte[] buffer.
+     * 
+     * @exception IllegalArgumentException
+     *                if the initial capacity is negative.
+     */
+    protected static byte[] createBuffer(int initialCapacity) {
+
+        if(initialCapacity<0) {
+            
+            throw new IllegalArgumentException("initialCapacity must be non-negative");
+            
+        }
+        
+        final int capacity = initialCapacity == 0 ? DEFAULT_INITIAL_CAPACITY
+                : initialCapacity;
+        
+        return new byte[capacity];
         
     }
     
@@ -148,7 +159,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    public KeyBuilder(int len, byte[] buf) {
+    /*public*/ KeyBuilder(int len, byte[] buf) {
 
         this( null /* no unicode support*/, len, buf );
         
@@ -158,23 +169,19 @@ public class KeyBuilder implements IKeyBuilder {
      * Creates a key builder using an existing buffer with some data (designated
      * constructor).
      * 
-     * @param collator
-     *            The collator used to encode Unicode strings (when
-     *            <code>null</code> Unicode collation support is disabled). If
-     *            you wish to use a non-default collation strength, then you
-     *            MUST set it explicitly on this collator object.
+     * @param sortKeyGenerator
+     *            The object used to generate sort keys from Unicode strings
+     *            (when <code>null</code> Unicode collation support is
+     *            disabled).
      * @param len
      *            The #of bytes of data in the provided buffer.
      * @param buf
      *            The buffer, with <i>len</i> pre-existing bytes of valid data.
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
-     * 
-     * @see RuleBasedCollator
-     * @see Collator#getInstance(Locale)
-     * @see Locale
      */
-    protected KeyBuilder(RuleBasedCollator collator, int len, byte[] buf) {
+    protected KeyBuilder(UnicodeSortKeyGenerator sortKeyGenerator, int len,
+            byte[] buf) {
         
         if (len < 0)
             throw new IllegalArgumentException("len");
@@ -189,13 +196,7 @@ public class KeyBuilder implements IKeyBuilder {
 
         this.buf = buf;
 
-        this.collator = collator; // MAY be null.
-        
-//        /*
-//         * Note: The bytes and size fields MUST be reset before each use of
-//         * this object!
-//         */
-//        this.b2 = new RawCollationKey(buf,len);
+        this.sortKeyGenerator = sortKeyGenerator; // MAY be null.
         
     }
     
@@ -316,57 +317,28 @@ public class KeyBuilder implements IKeyBuilder {
 
     private final void assertUnicodeEnabled() {
         
-        if (collator == null)
+        if (sortKeyGenerator == null)
             throw new UnsupportedOperationException();
         
     }
 
-    final public RuleBasedCollator getCollator() {
+    /**
+     * The object responsible for generating sort keys from Unicode strings.
+     * 
+     * The {@link UnicodeSortKeyGenerator} -or- <code>null</code> if Unicode
+     * is not supported by this {@link KeyBuilder} instance.
+     */
+    final public UnicodeSortKeyGenerator getSortKeyGenerator() {
         
-        return collator;
+        return sortKeyGenerator;
         
     }
 
     final public IKeyBuilder append(String s) {
         
         assertUnicodeEnabled();
-        
-//        set public fields on the RawCollationKey
-//        b2.bytes = this.buf;
-//        b2.size = this.len;
-//        collator.getRawCollationKey(s, b2);
-//        
-//        /*
-//         * take the buffer, which may have changed.
-//         * 
-//         * note: we do not take the last byte since it is always zero per
-//         * the ICU4J documentation. if you want null bytes between
-//         * components of a key you have to put them there yourself.
-//         */
-//        this.buf = b2.bytes;
-//        this.len = b2.size - 1;
 
-//        RawCollationKey raw = new RawCollationKey(this.buf, this.len);
-//        
-//        collator.getRawCollationKey(s, raw );
-//
-//        this.buf = raw.bytes;
-//        this.len = raw.size;
-
-        /*
-         * Note: This is the only invocation that appears to work reliably. The
-         * downside is that it grows a new byte[] each time we encode a unicode
-         * string rather than being able to leverage the existing array on our
-         * class.
-         * 
-         * @todo look into the source code for RawCollationKey and its base
-         * class, ByteArrayWrapper, and see if I can resolve this issue for
-         * better performance and less heap churn. Unfortunately the
-         * RawCollationKey class is final so we can not subclass it.
-         */
-        RawCollationKey raw = collator.getRawCollationKey(s, null);
-
-        append(0, raw.size - 1/* do not include the nul byte */, raw.bytes);
+        sortKeyGenerator.appendSortKey( this, s );
         
         return this;
         
@@ -586,6 +558,8 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     final public IKeyBuilder appendNul() {
+
+//        return append(0);
         
         // performance tweak.
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -601,6 +575,98 @@ public class KeyBuilder implements IKeyBuilder {
      * static helper methods.
      */
     
+    /**
+     * Used to unbox an application key (convert it to an unsigned byte[]).
+     */
+    static private final IKeyBuilder keyBuilder = newUnicodeInstance();
+
+    /**
+     * Utility method converts an application key to a sort key (an unsigned
+     * byte[] that imposes the same sort order).
+     * <p>
+     * Note: This method is thread-safe.
+     * <p>
+     * Note: Strings are Unicode safe for the default locale. See
+     * {@link Locale#getDefault()}. If you require a specific local or
+     * different locals at different times or for different indices then you
+     * MUST provision and apply your own {@link KeyBuilder}.
+     * 
+     * @param key
+     *            An application key.
+     * 
+     * @return The unsigned byte[] equivilent of that key. This will be
+     *         <code>null</code> iff the <i>key</i> is <code>null</code>.
+     *         If the <i>key</i> is a byte[], then the byte[] itself will be
+     *         returned.
+     */
+    public static final byte[] asSortKey(Object key) {
+        
+        if (key == null) {
+
+            return null;
+            
+        }
+
+        if (key instanceof byte[]) {
+
+            return (byte[]) key;
+            
+        }
+
+        /*
+         * Synchronize on the keyBuilder to avoid concurrent modification of its
+         * state.
+         */
+
+        synchronized (keyBuilder) {
+    
+            keyBuilder.reset();
+    
+            if (key instanceof Byte) {
+    
+                keyBuilder.append(((Byte) key).byteValue());
+    
+            } else if (key instanceof Character) {
+    
+                keyBuilder.append(((Character) key).charValue());
+    
+            } else if (key instanceof Short) {
+    
+                keyBuilder.append(((Short) key).shortValue());
+    
+            } else if (key instanceof Integer) {
+    
+                keyBuilder.append(((Integer) key).intValue());
+    
+            } else if (key instanceof Long) {
+    
+                keyBuilder.append(((Long) key).longValue());
+    
+            } else if (key instanceof Float) {
+    
+                keyBuilder.append(((Float) key).floatValue());
+    
+            } else if (key instanceof Double) {
+    
+                keyBuilder.append(((Double) key).doubleValue());
+    
+            } else if (key instanceof String) {
+    
+                keyBuilder.append((String) key);
+    
+            } else {
+    
+                throw new UnsupportedOperationException("Can not unbox key: "
+                        + key.getClass());
+    
+            }
+    
+            return keyBuilder.getKey();
+    
+        }
+    
+    }
+
     /**
      * Converts an unsigned byte into a signed byte.
      * 
@@ -727,6 +793,525 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
         return v;
+        
+    }
+
+    /**
+     * Interface allows us to encapsulate differences between the ICU and JDK
+     * libraries for generating sort keys from Unicode strings.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static interface UnicodeSortKeyGenerator {
+
+        public void appendSortKey(KeyBuilder keyBuilder, String s);
+        
+    }
+    
+    /**
+     * Type safe enumeration for the strength.
+     * <p>
+     * Note: ICU and the JDK use different integer constants for the
+     * #IDENTICAL strength
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static enum StrengthEnum {
+        
+        /**
+         * See {@link Collator#PRIMARY}.
+         */
+        Primary,
+        /**
+         * See {@link Collator#SECONDARY}.
+         */
+        Secondary,
+        /**
+         * See {@link Collator#TERTIARY}.
+         */
+        Tertiary,
+        /**
+         * Note: this option is NOT supported by the JDK.
+         */
+        Quaternary,
+        /**
+         * See {@link Collator#IDENTICAL}.
+         */
+        Identical;
+        
+    }
+    
+    /**
+     * Type safe enumeration for the decomposition mode.
+     * <p>
+     * Note: ICU and the JDK use different integer constants for the
+     * decomposition modes!
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static enum DecompositionEnum {
+        
+        /**
+         * See {@link Collator#NO_DECOMPOSITION}.
+         */
+        None,
+        /**
+         * See {@link Collator#FULL_DECOMPOSITION}.
+         */
+        Full,
+        /**
+         * See {@link Collator#CANONICAL_DECOMPOSITION}.
+         */
+        Canonical;
+        
+    }
+    
+    /**
+     * Implementation that uses the JDK library (does not support compressed
+     * sort keys).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
+
+        private final Collator collator;
+        
+        public JDKSortKeyGenerator(Locale locale, Object strength, DecompositionEnum mode) {
+            
+            if (locale == null)
+                throw new IllegalArgumentException();
+            
+            this.collator = Collator.getInstance(locale);
+
+            if (strength != null) {
+             
+                if (strength instanceof Integer) {
+
+                    collator.setStrength(((Integer) strength).intValue());
+
+                } else {
+
+                    StrengthEnum str = (StrengthEnum) strength;
+
+                    switch (str) {
+
+                    case Primary:
+                        collator.setStrength(Collator.PRIMARY);
+                        break;
+
+                    case Secondary:
+                        collator.setStrength(Collator.SECONDARY);
+                        break;
+
+                    case Tertiary:
+                        collator.setStrength(Collator.TERTIARY);
+                        break;
+
+//                    case Quaternary:
+//                        collator.setStrength(Collator.QUATERNARY);
+//                        break;
+
+                    case Identical:
+                        collator.setStrength(Collator.IDENTICAL);
+                        break;
+
+                    default:
+                        throw new UnsupportedOperationException("strength="
+                                + strength);
+
+                    }
+                    
+                }
+                
+            }
+            
+            if (mode != null) {
+
+                switch (mode) {
+
+                case None:
+                    collator.setDecomposition(Collator.NO_DECOMPOSITION);
+                    break;
+                
+                case Full:
+                    collator.setDecomposition(Collator.FULL_DECOMPOSITION);
+                    break;
+                
+                case Canonical:
+                    collator.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
+                    break;
+
+                default:
+                    throw new UnsupportedOperationException("mode=" + mode);
+                
+                }
+            
+            }
+            
+        }
+        
+        public void appendSortKey(KeyBuilder keyBuilder, String s) {
+
+            /*
+             * Note: the collation key is expressed as signed bytes since that
+             * is how the JDK normally compares byte[]s. Therefore append it
+             * into the key builder using the API that translates signed bytes
+             * to unsigned bytes.
+             */
+            
+            final byte[] sortKey = collator.getCollationKey(s).toByteArray();
+            
+            keyBuilder.append(sortKey);
+            
+        }
+        
+    }
+
+    public static IKeyBuilder newInstance() {
+
+        return newInstance(DEFAULT_INITIAL_CAPACITY);
+        
+    }
+    
+    public static IKeyBuilder newInstance(int capacity) {
+     
+        return newInstance(capacity, false/* unicode */, false/* icu */,
+                null/* locale */, null/* strength */, null/* decomposition mode */);
+        
+    }
+
+    /**
+     * Configuration options for the {@link KeyBuilder} factory methods. These
+     * options should be specified as System properties using
+     * <code>-Dproperty=value</code> on the command line.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options {
+       
+        /**
+         * Optional boolean property specifies whether or not the ICU library is
+         * required. When <code>true</code> the ICU library is required and
+         * MUST be available. When <code>false</code> the ICU library will NOT
+         * be used regardless of whether or not it is available. When this
+         * option is not specified the default behavior is to use the ICU
+         * library IFF it is available on the CLASSPATH.
+         * 
+         * @todo Add option to support the JNI integration of ICU (native code
+         *       for faster generation of sort keys).
+         */
+        public String ICU = "collator.icu";
+
+        /**
+         * Optional string -or- integer property whose value is the strength to
+         * be set on the collator. When specified, the value must be either one
+         * of the type-safe {@link StrengthEnum}s -or- one of those supported
+         * by the ICU or JDK library, as appropriate. The following values are
+         * shared by both libraries:
+         * <dl>
+         * <dt>0</dt>
+         * <dd>{@link Collator#PRIMARY}</dd>
+         * <dt>1</dt>
+         * <dd>{@link Collator#SECONDARY}</dd>
+         * <dt>2</dt>
+         * <dd>{@link Collator#TERTIARY}</dd>
+         * </dl>
+         * The ICU library also supports
+         * <dl>
+         * <dt>3</dt>
+         * <dd>Quaternary</dd>
+         * </dl>
+         * While both libraries define <strong>IDENTICAL</strong> they use
+         * different values for this strength, hence the use of the type safe
+         * enums is recommended.
+         */
+        public String STRENGTH = "collator.strength";
+
+        /**
+         * Optional string property whose value is one of the type safe
+         * {@link DecompositionEnum}s. The default decomposition mode will be
+         * overriden on the collator one is explicitly specified using this
+         * property.
+         * 
+         * @see DecompositionEnum
+         */
+        public String DECOMPOSITION = "collator.decomposition";
+
+        /**
+         * This is the pre-defined System property that determines the language
+         * for the default {@link Locale}.
+         * 
+         * @see Locale#setDefault(Locale)
+         * 
+         * @see <a
+         *      href="http://java.sun.com/developer/technicalArticles/J2SE/locale/">http://java.sun.com/developer/technicalArticles/J2SE/locale/</a>
+         */
+        public String USER_LANGUAGE = "user.language";
+        
+        /**
+         * This is the pre-defined System property that determines the country
+         * for the default {@link Locale}.
+         * 
+         * @see <a
+         *      href="http://java.sun.com/developer/technicalArticles/J2SE/locale/">http://java.sun.com/developer/technicalArticles/J2SE/locale/</a>
+         */
+        public String USER_COUNTRY = "user.country";
+        
+    }
+
+    /**
+     * Create a new Unicode capable instance configured using the
+     * {@link System#getProperties() System properties}. In particular, the
+     * {@link Locale} will be the value returned by {@link Locale#getDefault()}.
+     * 
+     * @see Options
+     * 
+     * @throws UnsupportedOperationException
+     *             <p>
+     *             The ICU library was required but was not located. Make sure
+     *             that the ICU JAR is on the classpath. See {@link Options#ICU}.
+     *             </p>
+     *             <p>
+     *             Note: If you are trying to use ICUJNI then that has to be
+     *             locatable as a native library. How you do this is different
+     *             for Windows and Un*x.
+     *             </p>
+     */
+    public static IKeyBuilder newUnicodeInstance() {
+
+        return newUnicodeInstance(null);
+        
+    }
+
+    static private String getProperty(Properties properties, String key) {
+        
+        return getProperty(properties,key,null);
+        
+    }
+
+    static private String getProperty(Properties properties, String key, String def) {
+        
+        if(properties==null) {
+        
+            return System.getProperty(key);
+            
+        } else {
+            
+            if(def==null) {
+                
+                def = System.getProperty(key);
+                
+            }
+            
+            return properties.getProperty(key,def);
+            
+        }
+
+    }
+    
+    /**
+     * Create a new Unicode capable instance configured according to the
+     * specified properties. Any properties NOT explicitly given will be
+     * defaulted from the {@link System#getProperties() System properties}.
+     * {@link Options#USER_LANGUAGE} and {@link Options#USER_COUNTRY} MAY be
+     * overriden in the given <i>properties</i> such that they differ from the
+     * values available from {@link System#getProperties()}.
+     * 
+     * @param properties
+     *            The properties to be used (optional). When <code>null</code>
+     *            the {@link System#getProperties() System properties} are used.
+     * 
+     * @see Options
+     * 
+     * @throws UnsupportedOperationException
+     *             <p>
+     *             The ICU library was required but was not located. Make sure
+     *             that the ICU JAR is on the classpath. See {@link Options#ICU}.
+     *             </p>
+     *             <p>
+     *             Note: If you are trying to use ICUJNI then that has to be
+     *             locatable as a native library. How you do this is different
+     *             for Windows and Un*x.
+     *             </p>
+     */
+    public static IKeyBuilder newUnicodeInstance(Properties properties) {
+     
+        final boolean icu_avail = isICUAvailable();
+        
+        /*
+         * Allow the caller to require the ICU library. The default depends on
+         * whether or not the ICU library is on the class path.
+         */
+        
+        final boolean icu = Boolean.parseBoolean(getProperty(properties,Options.ICU, ""
+                + icu_avail));
+        
+        if(icu && !icu_avail) {
+            
+            /*
+             * The ICU library was required but was not located. Make sure that
+             * the ICU JAR is on the classpath.
+             * 
+             * Note: If you are trying to use ICUJNI then that has to be
+             * locatable as a native library. How you do this is different for
+             * Windows and Un*x.
+             */
+            
+            throw new UnsupportedOperationException(ICU_NOT_AVAILABLE);
+            
+        }
+        
+        Object strength = null;
+        
+        if(getProperty(properties,Options.STRENGTH)!=null) {
+
+            String val = getProperty(properties,Options.STRENGTH);
+            
+            try {
+
+                strength = StrengthEnum.valueOf(val);
+                
+            } catch(RuntimeException ex) {
+
+                strength = Integer.parseInt(val);
+
+            }
+            
+            log.info(Options.STRENGTH+"="+strength);
+            
+        }
+        
+        DecompositionEnum mode = null;
+
+        if(getProperty(properties,Options.DECOMPOSITION)!=null) {
+            
+            mode = DecompositionEnum.valueOf(getProperty(properties,Options.DECOMPOSITION));
+
+            log.info(Options.DECOMPOSITION+"="+mode);
+            
+        }
+
+        return newInstance(DEFAULT_INITIAL_CAPACITY, true/* unicode */, icu,
+                null/* locale */, strength, mode);
+
+    }
+
+    /**
+     * Create a new instance that optionally supports Unicode sort keys.
+     * 
+     * @param capacity
+     *            The initial capacity of the buffer. When zero (0) the
+     *            {@link #DEFAULT_INITIAL_CAPACITY} will be used.
+     * @param unicode
+     *            When <code>true</code> Unicode sort keys will be supported.
+     * @param icu
+     *            When <code>true</code> the ICU library will be used.
+     * @param locale
+     *            When <code>null</code> the
+     *            {@link Locale#getDefault() default locale} will be used.
+     * @param strength
+     *            Either an {@link Integer} or a {@link StrengthEnum} specifying
+     *            the strength to be set on the collator object (optional). When
+     *            <code>null</code> the default strength of the collator will
+     *            not be overriden.
+     * @param mode
+     *            The decomposition mode to be set on the collator object
+     *            (optional). When <code>null</code> the default decomposition
+     *            mode of the collator will not be overriden.
+     * 
+     * @return The new instance.
+     * 
+     * @throws UnsupportedOperationException
+     *             <p>
+     *             The ICU library was required but was not located. Make sure
+     *             that the ICU JAR is on the classpath.
+     *             </p>
+     *             <p>
+     *             Note: If you are trying to use ICUJNI then that has to be
+     *             locatable as a native library. How you do this is different
+     *             for Windows and Un*x.
+     *             </p>
+     */
+    public static IKeyBuilder newInstance(int capacity, boolean unicode,
+            boolean icu, Locale locale, Object strength, DecompositionEnum mode) {
+        
+        if (unicode) {
+            
+            if (locale == null) {
+
+                locale = Locale.getDefault();
+
+                log.warn("Using default locale: " + locale.getDisplayName());
+
+            }
+
+            if (icu && !isICUAvailable()) {
+
+                throw new UnsupportedOperationException(ICU_NOT_AVAILABLE);
+
+            }
+            
+            // create the initial buffer.
+            final byte[] buf = createBuffer(capacity);
+            
+            // the buffer is initially empty.
+            final int len = 0;
+            
+            if(icu) {
+                
+                return new KeyBuilder(new ICUSortKeyGenerator(locale, strength,
+                        mode), len, buf);
+
+            } else {
+
+                return new KeyBuilder(new JDKSortKeyGenerator(locale, strength,
+                        mode), len, buf);
+                
+            }
+
+        } else {
+            
+            return new KeyBuilder(capacity);
+            
+        }
+       
+    }
+    
+    /**
+     * Text of the exception thrown when the ICU library is required but is not
+     * available.
+     */
+    final public static String ICU_NOT_AVAILABLE = "The ICU library is not available.";
+    
+    /**
+     * Figures out whether or not the ICU library is available.
+     * 
+     * @return <code>true</code> iff the ICU library is available.
+     */
+    public static boolean isICUAvailable() {
+        
+        boolean icu_avail;
+        
+        try {
+        
+            Class.forName("com.ibm.icu.text.RuleBasedCollator");
+            
+            icu_avail = true;
+            
+        } catch(Throwable t) {
+            
+            log.warn("ICU library is not available");
+            
+            icu_avail = false;
+            
+        }
+
+        return icu_avail;
         
     }
     

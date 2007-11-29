@@ -39,7 +39,7 @@ import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IValueSerializer;
-import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataOutputBuffer;
@@ -66,12 +66,6 @@ import com.bigdata.rawstore.WormAddressManager;
 public class Name2Addr extends BTree {
 
     protected static final Logger log = Logger.getLogger(Name2Addr.class);
-
-    /**
-     * @todo parameterize the {@link Locale} on the Journal and pass through to
-     * this class. this will make it easier to configure non-default locales.
-     */
-    private UnicodeKeyBuilder keyBuilder = new UnicodeKeyBuilder();
 
     /**
      * Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
@@ -305,7 +299,7 @@ public class Name2Addr extends BTree {
      */
     protected byte[] getKey(String name) {
 
-        return keyBuilder.reset().append(name).getKey();
+        return KeyBuilder.asSortKey(name);
 
     }
 

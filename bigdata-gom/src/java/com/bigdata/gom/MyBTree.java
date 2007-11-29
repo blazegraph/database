@@ -312,7 +312,7 @@ final public class MyBTree extends AbstractBTree {
         
         // append the object identifier.
 
-        final byte[] oidbytes = BTree.unbox(oid);
+        final byte[] oidbytes = KeyBuilder.asSortKey(oid);
         
         System.arraycopy(oidbytes, 0, out, in.length/*+1*/, oidbytes.length);
         

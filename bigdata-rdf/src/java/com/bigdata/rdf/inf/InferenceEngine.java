@@ -557,7 +557,17 @@ public class InferenceEngine extends RDFSHelper {
      * Set based on {@link Options#RDFS_ONLY}. When set, owl:sameAs and friends
      * are disabled and only the RDFS MT entailments are used.
      */
-    final protected boolean rdfsOnly; 
+    final protected boolean rdfsOnly;
+    
+    /**
+     * Set based on {@link Options#RDFS_ONLY}. When set, owl:sameAs and friends
+     * are disabled and only the RDFS MT entailments are used.
+     */
+    public final boolean isRdfsOnly() {
+        
+        return rdfsOnly;
+        
+    }
     
     /**
      * Set based on {@link Options#FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE}. When
@@ -732,34 +742,38 @@ public class InferenceEngine extends RDFSHelper {
          * @todo make sure that they are back-chained or add them in here.
          */
 
-        if(forwardChainOwlSameAsClosure) {
-            
-            rules.add(ruleOwlSameAs1);
+        if(!rdfsOnly) {
 
-            rules.add(ruleOwlSameAs1b);
-            
-            if(forwardChainOwlSameAsProperties) {
-                
-                rules.add(ruleOwlSameAs2);
-                
-                rules.add(ruleOwlSameAs3);
-                
+            if (forwardChainOwlSameAsClosure) {
+
+                rules.add(ruleOwlSameAs1);
+
+                rules.add(ruleOwlSameAs1b);
+
+                if (forwardChainOwlSameAsProperties) {
+
+                    rules.add(ruleOwlSameAs2);
+
+                    rules.add(ruleOwlSameAs3);
+
+                }
+
             }
-            
-        }
 
-        if(forwardChainOwlEquivalentProperty) {
-            
-            rules.add(ruleOwlEquivalentProperty);
-            
-        }
+            if (forwardChainOwlEquivalentProperty) {
 
-        if(forwardChainOwlEquivalentClass) {
-            
-            rules.add(ruleOwlEquivalentClass);
-            
-        }
+                rules.add(ruleOwlEquivalentProperty);
 
+            }
+
+            if (forwardChainOwlEquivalentClass) {
+
+                rules.add(ruleOwlEquivalentClass);
+
+            }
+
+        }
+        
         return rules.toArray(new Rule[rules.size()]);
 
     }
@@ -950,11 +964,13 @@ public class InferenceEngine extends RDFSHelper {
 //         */ 
 //        axiomModel.addAxioms();
         
-        // owl:equivalentProperty
-        if (forwardChainOwlEquivalentProperty) {
-            Rule.fixedPoint(closureStats,
-                    new Rule[] { ruleOwlEquivalentProperty }, justify,
-                    focusStore, database, buffer);
+        if(!rdfsOnly) {
+            // owl:equivalentProperty
+            if (forwardChainOwlEquivalentProperty) {
+                Rule.fixedPoint(closureStats,
+                        new Rule[] { ruleOwlEquivalentProperty }, justify,
+                        focusStore, database, buffer);
+            }
         }
 
         // 2. Compute P (the set of possible sub properties).
@@ -1001,14 +1017,16 @@ public class InferenceEngine extends RDFSHelper {
             // dependency.
         }
 
-        // owl:equivalentClass
-        if (forwardChainOwlEquivalentClass) {
-            Rule.fixedPoint(closureStats,
-                    new Rule[] { ruleOwlEquivalentClass }, justify, focusStore,
-                    database, buffer);
-            if (DEBUG)
-                log.debug("owlEquivalentClass: " + closureStats);
-
+        if(!rdfsOnly) {
+            // owl:equivalentClass
+            if (forwardChainOwlEquivalentClass) {
+                Rule.fixedPoint(closureStats,
+                        new Rule[] { ruleOwlEquivalentClass }, justify, focusStore,
+                        database, buffer);
+                if (DEBUG)
+                    log.debug("owlEquivalentClass: " + closureStats);
+    
+            }
         }
         
         // 7. (?x, C, ?y ) -> (?x, rdfs:subClassOf, ?y)
@@ -1157,6 +1175,7 @@ public class InferenceEngine extends RDFSHelper {
             buffer.flush();
         }
         
+        if(!rdfsOnly) {
         // owl:sameAs
         if(forwardChainOwlSameAsClosure) {
 
@@ -1207,6 +1226,7 @@ public class InferenceEngine extends RDFSHelper {
 
             }
 
+        }
         }
         
         /*

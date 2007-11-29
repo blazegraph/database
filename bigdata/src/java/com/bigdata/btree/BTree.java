@@ -223,6 +223,8 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
      * nodes (or leaves). The goal is to keep the read to write ratio down.
      * 
      * FIXME This is an experimental feature - it is disabled when set to zero.
+     * Note: There is an interaction with the branching factor which should be
+     * neutralized by a dynamic policy.
      */
     static public final int DEFAULT_READ_RETENTION_QUEUE_CAPACITY = 0;
 

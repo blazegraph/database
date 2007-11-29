@@ -76,7 +76,8 @@
   	  While other service fabric architectures are contemplated, bigdata services
   	  today use JINI 2.x to advertise themselves and do perform service discovery.
   	  This means that you must be running a JINI registrar in order for services to be
-  	  able to register themselves or discover other services.
+  	  able to register themselves or discover other services.  The JINI integration is
+  	  bundled in a separate module - see <strong>bigdata-jini</strong>.
   
   </p>
   
@@ -469,71 +470,10 @@
       <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
     </dependency>
 
-    <!--      -->
-    <!-- Jini -->
-    <!--      -->
-    <dependency> 
-      <groupId>com.sun.jini</groupId>
-	  <artifactId>jini-core</artifactId>
-      <version>2.1</version>
-      <jar>jini-core.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <dependency> 
-      <groupId>com.sun.jini</groupId>
-      <artifactId>jini-ext</artifactId> 
-      <version>2.1</version>
-	  <jar>jini-ext.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <dependency>
-      <groupId>com.sun.jini</groupId>
-      <artifactId>jsk-lib</artifactId> 
-      <version>2.1</version>
-	  <jar>jsk-lib.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <dependency> 
-      <groupId>com.sun.jini</groupId>
-      <artifactId>reggie</artifactId> 
-      <version>2.1</version>
-	  <jar>reggie.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <dependency> 
-      <groupId>com.sun.jini</groupId>
-      <artifactId>sun-util</artifactId> 
-      <version>2.1</version>
-	  <jar>sun-util.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <dependency> 
-      <groupId>com.sun.jini</groupId>
-      <artifactId>start</artifactId> 
-      <version>2.1</version>
-	  <jar>start.jar</jar>
-      <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-	<dependency>
-	  <groupId>com.sun.jini</groupId>
-	  <artifactId>classserver</artifactId>
-	  <version>2.1</version>
-	  <jar>classserver.jar</jar>
-	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-	<dependency>
-	  <groupId>com.sun.jini</groupId>
-	  <artifactId>tools</artifactId>
-	  <version>2.1</version>
-	  <jar>tools.jar</jar>
-	  <url>http://www.jini.org/wiki/Category:Jini_Starter_Kit</url>
-    </dependency>
-    <!-- end jini -->
-
     <!--     -->
 	<!-- ICU -->
     <!--     -->
-	<!-- Unicode support (compressed sort keys). -->
+	<!-- Optional support for compressed Unicode sort keys. -->
     <dependency>
       <groupId>icu</groupId>
       <artifactId>icu4j</artifactId> 

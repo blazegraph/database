@@ -1,1 +1,0 @@
-This package contains some sample configurations.

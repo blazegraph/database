@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sparse;
 
-import com.bigdata.btree.UnicodeKeyBuilder;
+import com.bigdata.btree.KeyBuilder;
 
 /**
  * A schema for a sparse row store defines. Note that more than one schema may
@@ -68,7 +68,7 @@ public class Schema {
         this.primaryKeyType = primaryKeyType;
 
         // one time encoding of the name of the schema.
-        schemaBytes = new UnicodeKeyBuilder().reset().append(name).getKey();
+        schemaBytes = KeyBuilder.asSortKey(name);
 
     }
 

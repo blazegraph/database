@@ -42,12 +42,14 @@ package com.bigdata.btree;
 public interface ICounter {
 
     /**
-     * The current value of the counter.
+     * The current value of the counter (initially zero).
      */
     public long get();
     
     /**
-     * Return and increment the current value of the counter. 
+     * Return and increment the current value of the counter.
+     * 
+     * @todo change semantics to incrementAndGet()?
      */
     public long inc();
     

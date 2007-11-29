@@ -66,7 +66,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBytesUtil.class );
         // test key encoding operations.
         suite.addTestSuite(TestKeyBuilder.class);
-        suite.addTestSuite(TestUnicodeKeyBuilder.class);
+        suite.addTestSuite(TestJDKUnicodeKeyBuilder.class);
+        suite.addTestSuite(TestICUUnicodeKeyBuilder.class);
         // test mutable key buffer.
         suite.addTestSuite(TestMutableKeyBuffer.class);
         // test immutable key buffer.

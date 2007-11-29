@@ -28,6 +28,7 @@ import java.io.FileDescriptor;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -301,6 +302,14 @@ public interface Options {
     public static final String TMP_DIR = "tmp.dir";
 
     /**
+     * <code>branchingFactor</code> - The branching factor for indices
+     * created with {@link IIndexManager#registerIndex(String)}.
+     * 
+     * @see #DEFAULT_BRANCHING_FACTOR
+     */
+    public static final String BRANCHING_FACTOR = "branchingFactor";
+    
+    /**
      * The default for the {@link #BUFFER_MODE}.
      */
     public final static BufferMode DEFAULT_BUFFER_MODE = BufferMode.Disk;
@@ -346,6 +355,9 @@ public interface Options {
     
     /**
      * The default for the {@link #FORCE_WRITES} option (writes are not forced).
+     * 
+     * @todo consider changing this default so that we normally request
+     *       synchronous writes.
      */
     public final static ForceEnum DEFAULT_FORCE_WRITES = ForceEnum.No;
     
@@ -376,6 +388,11 @@ public interface Options {
      */
     public final static boolean DEFAULT_CREATE_TEMP_FILE = false;
 
+    /**
+     * The default for the {@link #BRANCHING_FACTOR} option.
+     */
+    public final static String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
+    
     /**
      * The recommened extension for journal files.
      */

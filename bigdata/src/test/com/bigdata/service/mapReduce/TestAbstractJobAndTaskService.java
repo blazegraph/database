@@ -48,7 +48,14 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.EmbeddedBigdataClient;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.mapReduce.AbstractJobAndTaskService.Options;
+import com.bigdata.service.mapred.AbstractJobAndTaskService;
+import com.bigdata.service.mapred.IJobAndTaskService;
+import com.bigdata.service.mapred.IJobMetadata;
+import com.bigdata.service.mapred.ITask;
+import com.bigdata.service.mapred.JobState;
+import com.bigdata.service.mapred.Outcome;
+import com.bigdata.service.mapred.Status;
+import com.bigdata.service.mapred.AbstractJobAndTaskService.Options;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -644,8 +651,8 @@ public class TestAbstractJobAndTaskService extends TestCase {
             
         }
 
-        com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.JobState<M> jobState,
+        protected com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
+                com.bigdata.service.mapred.JobState<M> jobState,
                 T task) {
 
             return new MyTaskWorker(jobState, task);
@@ -661,7 +668,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
          * @param <T>
          */
         class MyTaskWorker
-            extends com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
+            extends com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
 
             /**
              * @param jobState
@@ -675,7 +682,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
 
             protected void run() throws Exception {
 
-                log.info("Running task: job="+jobState.uuid+", task="+task.getUUID());
+                log.info("Running task: job="+jobState.getUUID()+", task="+task.getUUID());
                 
             }
             
@@ -698,8 +705,8 @@ public class TestAbstractJobAndTaskService extends TestCase {
             super(properties);
         }
 
-        com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
-                com.bigdata.service.mapReduce.JobState<M> jobState,
+        protected com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M, T> newTaskWorker(
+                com.bigdata.service.mapred.JobState<M> jobState,
                 T task) {
 
             return new MySleepyTaskWorker(jobState, task);
@@ -715,7 +722,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
          * @param <T>
          */
         class MySleepyTaskWorker
-            extends com.bigdata.service.mapReduce.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
+            extends com.bigdata.service.mapred.AbstractJobAndTaskService.AbstractTaskWorker<M,T> {
 
             /**
              * @param jobState

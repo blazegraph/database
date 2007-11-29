@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import net.jini.core.lookup.ServiceID;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BatchContains;
@@ -1637,14 +1635,18 @@ public class ClientIndexView implements IIndex {
      */
     public IDataService getDataService(IPartitionMetadata pmd) {
 
-        ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
+
+        final UUID serviceID = pmd.getDataServices()[0];
+        //ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
 
         final IDataService dataService;
 
         try {
 
-            dataService = fed.getClient().getDataService(
-                    JiniUtil.serviceID2UUID(serviceID));
+            dataService = fed.getClient().getDataService(serviceID);
+
+//            dataService = fed.getClient().getDataService(
+//                    JiniUtil.serviceID2UUID(serviceID));
 
         } catch (Exception ex) {
 

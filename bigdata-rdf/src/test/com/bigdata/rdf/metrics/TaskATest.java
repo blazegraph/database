@@ -39,6 +39,7 @@ import org.openrdf.sesame.constants.RDFFormat;
 import org.openrdf.sesame.sail.RdfSchemaRepository;
 
 import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
 import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.rio.LoadStats;
@@ -231,6 +232,9 @@ public class TaskATest
 
         // after every set of resources loaded.
         properties.setProperty(DataLoader.Options.COMMIT,CommitEnum.Batch.toString());
+
+        // Note: this turns off sameAs processing.
+        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
 
         // generate justifications for TM.
         properties.setProperty(Options.JUSTIFY, "true");

@@ -43,8 +43,8 @@ import junit.framework.TestCase2;
  * Test suite for high level operations that build variable length _unsigned_
  * byte[] keys from various data types and unicode strings.
  * 
- * @see http://docs.hp.com/en/B3906-90004/ch02s02.html#d0e1095 for ranges on
- * negative float and double values.
+ * @see <a href="http://docs.hp.com/en/B3906-90004/ch02s02.html#d0e1095>ranges
+ *      on negative float and double values</a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,7 +81,7 @@ public class TestKeyBuilder extends TestCase2 {
         {
             KeyBuilder keyBuilder = new KeyBuilder(0);
             assertNotNull(keyBuilder.buf);
-            assertEquals(0,keyBuilder.buf.length);
+            assertEquals(KeyBuilder.DEFAULT_INITIAL_CAPACITY,keyBuilder.buf.length);
             assertEquals(0,keyBuilder.len);
         }
         
@@ -135,11 +135,13 @@ public class TestKeyBuilder extends TestCase2 {
     
     public void test_keyBuilder_ensureCapacity() {
         
-        KeyBuilder keyBuilder = new KeyBuilder(0);
+        final int initialCapacity = 1;
+        
+        KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
         assertEquals(0,keyBuilder.len);
         assertNotNull( keyBuilder.buf);
-        assertEquals(0,keyBuilder.buf.length);
+        assertEquals(initialCapacity,keyBuilder.buf.length);
 
         final byte[] originalBuffer = keyBuilder.buf;
         
@@ -153,20 +155,22 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue(originalBuffer==keyBuilder.buf); // same buffer.
         
         // no change.
-        keyBuilder.ensureCapacity(0);
+        keyBuilder.ensureCapacity(initialCapacity);
         assertEquals(0,keyBuilder.len);
         assertNotNull( keyBuilder.buf);
-        assertEquals(0,keyBuilder.buf.length);
+        assertEquals(initialCapacity,keyBuilder.buf.length);
         assertTrue(originalBuffer==keyBuilder.buf); // same buffer.
     }
     
     public void test_keyBuilder_ensureCapacity02() {
         
-        KeyBuilder keyBuilder = new KeyBuilder(0);
+        final int initialCapacity = 1;
+        
+        KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
         assertEquals(0,keyBuilder.len);
         assertNotNull( keyBuilder.buf);
-        assertEquals(0,keyBuilder.buf.length);
+        assertEquals(initialCapacity,keyBuilder.buf.length);
 
         final byte[] originalBuffer = keyBuilder.buf;
         
@@ -175,7 +179,7 @@ public class TestKeyBuilder extends TestCase2 {
         assertEquals(0,keyBuilder.len);
         assertNotNull( keyBuilder.buf);
         assertEquals(100,keyBuilder.buf.length);
-        assertTrue(originalBuffer!=keyBuilder.buf); // same buffer.
+        assertTrue(originalBuffer!=keyBuilder.buf); // different buffer.
     }
     
     /**
@@ -210,11 +214,13 @@ public class TestKeyBuilder extends TestCase2 {
 
     public void test_keyBuilder_ensureFree() {
         
-        KeyBuilder keyBuilder = new KeyBuilder(0);
+        final int initialCapacity = 1;
+        
+        KeyBuilder keyBuilder = new KeyBuilder(initialCapacity);
 
         assertEquals(0,keyBuilder.len);
         assertNotNull( keyBuilder.buf);
-        assertEquals(0,keyBuilder.buf.length);
+        assertEquals(initialCapacity,keyBuilder.buf.length);
     
         keyBuilder.ensureFree(2);
         

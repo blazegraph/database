@@ -326,6 +326,23 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     protected final long maximumExtent;
 
     /**
+     * The default branching factor for indices created using {@link #registerIndex(String)}.
+     */
+    private final int defaultBranchingFactor;
+    
+    /**
+     * The default branching factor for indices created using
+     * {@link #registerIndex(String)}.
+     * 
+     * @see Options#BRANCHING_FACTOR
+     */
+    public final int getDefaultBranchingFactor() {
+        
+        return defaultBranchingFactor;
+        
+    }
+    
+    /**
      * Create or open a journal.
      * 
      * @param properties
@@ -670,6 +687,22 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
             log.info(Options.DELETE_ON_EXIT+"="+deleteOnExit);
 
         }
+        
+        /*
+         * branchingFactor.
+         */
+        
+        this.defaultBranchingFactor = Integer.parseInt(properties.getProperty(
+                Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
+
+        if (defaultBranchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+
+            throw new IllegalArgumentException(Options.BRANCHING_FACTOR
+                    + " must be at least " + BTree.MIN_BRANCHING_FACTOR);
+            
+        }
+        
+        log.info(Options.BRANCHING_FACTOR+"="+defaultBranchingFactor);
         
         /*
          * "file"
@@ -1903,10 +1936,12 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
+     * 
+     * @see Options#BRANCHING_FACTOR
      */
     public IIndex registerIndex(String name) {
         
-        return registerIndex(name, new UnisolatedBTree(this, UUID.randomUUID()));
+        return registerIndex(name, new UnisolatedBTree(this, defaultBranchingFactor, UUID.randomUUID()));
         
     }
     

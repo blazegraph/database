@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+import java.util.Arrays;
+
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -167,26 +169,35 @@ public class SPO {
         
     }
     
-//    private int hashCode = 0;
-//    
-//    /**
-//     * @todo validate the manner in which we are combining the hash codes for
-//     *       the individual components of the triple (each component uses the
-//     *       same hash code algorithm as {@link Long#hashCode()}).
-//     */
-//    public int hashCode() {
-//        
-//        if(hashCode==0) {
-//
-//            // compute and cache.
-//            hashCode = (int) ((s ^ (s >>> 32)) | (p ^ (p >>> 32)) | (o ^ (o >>> 32))); 
-//            
-//        }
-//        
-//        return hashCode;
-//        
-//    }
-    
+    private int hashCode = 0;
+
+    /**
+     * Hash code for the SPO per {@link Arrays#hashCode(long[])}.
+     */
+    public int hashCode() {
+
+        if (hashCode == 0) {
+
+            // compute and cache.
+
+            long[] a = new long[]{s,p,o};
+            
+            int result = 1;
+            
+            for (long element : a) {
+            
+                int elementHash = (int) (element ^ (element >>> 32));
+                
+                result = 31 * result + elementHash;
+                
+            }
+
+        }
+
+        return hashCode;
+
+    }
+
     /**
      * Imposes s:p:o ordering based on termIds.
      * <p>

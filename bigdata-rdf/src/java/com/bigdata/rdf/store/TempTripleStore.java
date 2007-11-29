@@ -229,28 +229,32 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     private void createIndices() {
         
+        // @todo make this an Option on the TemporaryStore and use it here.
+//        final int branchingFactor = store.getDefaultBranchingFactor();
+        final int branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
+        
         ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                 TermIdSerializer.INSTANCE));
 
         ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                 RdfValueSerializer.INSTANCE));
 
         ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
         ndx_pos = (BTree)store.registerIndex(name_pos, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
         ndx_osp = (BTree)store.registerIndex(name_osp, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
         
         ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
-                BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                branchingFactor, UUID.randomUUID(),
                                     JustificationSerializer.INSTANCE));
 
     }

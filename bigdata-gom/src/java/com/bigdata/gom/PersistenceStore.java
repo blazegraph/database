@@ -86,7 +86,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.UnicodeKeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -596,7 +595,7 @@ public class PersistenceStore implements IPersistentStore
             
         } else {
             
-            name_ndx.insert(name, BTree.unbox(oid));
+            name_ndx.insert(name, KeyBuilder.asSortKey(oid));
             
         }
 
@@ -1092,7 +1091,7 @@ public class PersistenceStore implements IPersistentStore
 
         }
 
-        str_id_ndx.insert(s, BTree.unbox(tmp));
+        str_id_ndx.insert(s, KeyBuilder.asSortKey(tmp));
 
         id_str_ndx.insert((long) tmp, SerializerUtil.serialize(s));
 
@@ -1179,7 +1178,7 @@ public class PersistenceStore implements IPersistentStore
 
             final Long oid = new Long(propertyClass.getOID());
             
-            final Object oldValue = pcls_ndx.insert(property, BTree.unbox(oid));
+            final Object oldValue = pcls_ndx.insert(property, KeyBuilder.asSortKey(oid));
 
             if (oldValue != null) {
 
@@ -1235,8 +1234,8 @@ public class PersistenceStore implements IPersistentStore
      * "externalKey"s are accepted and used directly. In all other cases an
      * appropriate {@link Coercer} is applied to convert the "externalKey" into
      * an unsigned byte[] that produces the same total ordering as the original
-     * data type. See {@link KeyBuilder} and {@link UnicodeKeyBuilder} for
-     * forming keys for a variety of purposes.
+     * data type. See {@link KeyBuilder} for forming keys for a variety of
+     * purposes.
      * </p>
      * <p>
      * Since the "internalKey" is always an unsigned byte[], custom comparators
@@ -1258,7 +1257,7 @@ public class PersistenceStore implements IPersistentStore
      * @see LinkSetIndex#getValuePropertyClass()
      * @see PropertyClass#getType()
      * @see BTree
-     * @see BTree#unbox(Object)
+     * @see KeyBuilder#asSortKey(Object)
      * @see KeyBuilder
      * 
      * @throws UnsupportedOperationException
@@ -1395,7 +1394,7 @@ public class PersistenceStore implements IPersistentStore
 
     /**
      * Applies generic value conversion to String and then converts the String
-     * to an unsigned byte[] using {@link BTree#unbox(Object)}.
+     * to an unsigned byte[] using {@link KeyBuilder#asSortKey(Object)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -1423,11 +1422,11 @@ public class PersistenceStore implements IPersistentStore
 
             if (externalKey instanceof String)
                 
-                return BTree.unbox(externalKey);
+                return KeyBuilder.asSortKey(externalKey);
 
             try {
 
-                return BTree.unbox(new GValue(externalKey).getString());
+                return KeyBuilder.asSortKey(new GValue(externalKey).getString());
 
             }
 
@@ -1453,7 +1452,7 @@ public class PersistenceStore implements IPersistentStore
     }
 
     /**
-     * Applies {@link BTree#unbox(Object)} to convert the key into an unsigned
+     * Applies {@link KeyBuilder#asSortKey(Object)} to convert the key into an unsigned
      * byte[].
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -1477,7 +1476,7 @@ public class PersistenceStore implements IPersistentStore
         
         public Object coerce(Object externalKey) {
 
-            return BTree.unbox(externalKey);
+            return KeyBuilder.asSortKey(externalKey);
             
         }
 

@@ -132,7 +132,7 @@ public interface IKeyBuilder {
      *                if Unicode is not supported.
      * 
      * @see SuccessorUtil#successor(String)
-     * @see TestUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
+     * @see TestICUUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
      * 
      * @todo provide a more flexible interface for handling Unicode, including
      * the means to encode using a specified language family (such as could be

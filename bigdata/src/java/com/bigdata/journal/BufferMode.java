@@ -49,7 +49,7 @@ public enum BufferMode {
      * etc.
      * </p>
      */
-    Transient("Transient"),
+    Transient("Transient",false/*stable*/),
     
     /**
      * <p>
@@ -67,7 +67,7 @@ public enum BufferMode {
      * allows the journal to optimize IO operations.
      * </p>
      */
-    Direct("Direct"),
+    Direct("Direct",true/*stable*/),
     
     /**
      * <p>
@@ -86,7 +86,7 @@ public enum BufferMode {
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      */
-    Mapped("Mapped"),
+    Mapped("Mapped",true/*stable*/),
     
     /**
      * <p>
@@ -98,13 +98,26 @@ public enum BufferMode {
      * grow and the journal is NOT optimized for random reads (poor locality).
      * </p>
      */
-    Disk("Disk");
+    Disk("Disk",true/*stable*/);
     
     private final String name;
+    private final boolean stable;
     
-    BufferMode(String name) {
+    private BufferMode(String name, boolean stable) {
 
         this.name = name;
+        
+        this.stable = stable;
+        
+    }
+    
+    /**
+     * <code>true</code> iff this {@link BufferMode} uses a stable media
+     * (disk).
+     */
+    public boolean isStable() {
+       
+        return stable;
         
     }
     

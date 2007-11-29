@@ -95,7 +95,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             } else {
 
                 ndx_termId = ndx = store.registerIndex(name_termId, new BTree(
-                        store, BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                        store, store.getDefaultBranchingFactor(), UUID
                                 .randomUUID(), TermIdSerializer.INSTANCE));
             
             }
@@ -122,7 +122,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             } else {
 
                 ndx_idTerm = ndx = store.registerIndex(name_idTerm, new BTree(
-                        store, BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                        store, store.getDefaultBranchingFactor(), UUID
                                 .randomUUID(), RdfValueSerializer.INSTANCE));
 
             }
@@ -159,7 +159,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             } else {
 
                 ndx = store.registerIndex(name, new BTree(store,
-                        BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
+                        store.getDefaultBranchingFactor(), UUID.randomUUID(),
                         StatementSerializer.INSTANCE));
 
             }

@@ -71,7 +71,7 @@ public interface IJournal extends IMRMW, IAtomicStore, IIndexManager {
      * @param name
      *            The name of the index.
      * 
-     * @return The unisolated index or <code>null</code> iff there is no index
+     * @return The named index or <code>null</code> iff there is no index
      *         registered with that name.
      * 
      * @exception IllegalArgumentException

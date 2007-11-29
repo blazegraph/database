@@ -23,10 +23,11 @@
 
 	<target name="compile" depends="prepare">
 		<mkdir dir="${build.dir}" />
-		<javac destdir="${build.dir}" classpathref="build.classpath" debug="on">
+		<javac destdir="${build.dir}" classpathref="build.classpath" debug="${debug}" debuglevel="${debuglevel}">
 			<src path="${bigdata.dir}/src/java" />
-			<!-- @todo do not bundle the tests in the jar. -->
+			<!-- @todo do not bundle the tests in the jar. 
 			<src path="${bigdata.dir}/src/test" />
+			-->
 		</javac>
 	</target>
 
@@ -41,9 +42,11 @@
 	<target name="jar" depends="compile">
 		<jar destfile="${jar.name}">
 			<fileset dir="${build.dir}" />
+			<!--
 			<fileset dir="${bigdata.dir}/src">
 				<include name="resources/config/**"/>
-				</fileset>
+			</fileset>
+			-->
 			<manifest>
 				<!-- @todo could be main routine for services startup, or perhaps
 				     a standalone instance startup. -->
@@ -150,11 +153,12 @@
 	<target name="deploy" depends="jar">
 		<copy toDir="${deploy.dir}">
 			<fileset dir="${bigdata.dir}/lib">
-				<!-- review necessar jini dependencies for deployment. -->
+				<!-- review necessar jini dependencies for deployment. 
 			    <exclude name="reggie.jar" />
 				<exclude name="sun-util.jar" />
 				<exclude name="jini-core.jar" />
 				<exclude name="jini-ext.jar" />
+				-->
 				<!-- ICU4JNI is not a supported configuration at this time. -->
 				<exclude name="**/icu4jni.jar" />
 				<exclude name="**/icu*.dll" />

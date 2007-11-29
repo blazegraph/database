@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -245,11 +246,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
          */
         Iterator<Future<Object>> itr = results.iterator();
         
-        int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
-//        int naborted = 0; // #of transactions that choose to abort rather than commit.
+        int nfailed = 0; // #of tasks that failed.
+        int nretry = 0; // #of tasks that threw RetryException
         int ninterrupt = 0; // #of interrupted tasks.
-        int ncommitted = 0; // #of transactions that successfully committed.
-        int nuncommitted = 0; // #of transactions that did not complete in time.
+        int ncommitted = 0; // #of tasks that successfully committed.
+        int nuncommitted = 0; // #of tasks that did not complete in time.
         
         while(itr.hasNext()) {
 
@@ -283,8 +284,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                     ninterrupt++;
                     
                 } else if(isInnerCause(ex, SpuriousException.class)) {
-                
+                    
                     nfailed++;
+                    
+                } else if(isInnerCause(ex, RetryException.class)) {
+                    
+                    nretry++;
                     
                 } else {
                 
@@ -314,6 +319,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         Result ret = new Result();
         
         // these are the results.
+        ret.put("nfailed",""+nfailed);
+        ret.put("nretry",""+nretry);
         ret.put("ncommitted",""+ncommitted);
         ret.put("ninterrupt",""+ninterrupt);
         ret.put("nuncommitted", ""+nuncommitted);

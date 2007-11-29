@@ -43,11 +43,8 @@ import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.sesame.constants.RDFFormat;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.rdf.store.DataLoader.CommitEnum;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -598,24 +595,37 @@ public class TestMetrics extends AbstractMetricsTestCase {
     long totalToldTriples = 0L;
 
     private DataLoader dataLoader;
-    
+
+    /**
+     * Sets up the store.
+     * <p>
+     * Note: since this is run as a proxy test case you have to specify
+     * properties on the command line using -Dproperty=value. Default properties
+     * are inherited from the class specified by the required -DtestClass=...
+     * property.
+     * 
+     * <pre>
+     * 
+     * // Note: this turns off sameAs processing.
+     * properties.setProperty(InferenceEngine.Options.RDFS_ONLY, &quot;true&quot;);
+     * 
+     * // Note: this turns off the justification chains (useful for estimating benefit of magic sets).
+     * properties.setProperty(InferenceEngine.Options.JUSTIFY, &quot;false&quot;);
+     * 
+     * // Note: this turns off truth maintenance during data load (see tearDown for database at once closure).
+     * properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
+     * 
+     * // Note: this turns off commit - useful for guaging the uninterrupted write rate and effects of group commit.
+     * properties.setProperty(DataLoader.Options.COMMIT, CommitEnum.None.toString());
+     * 
+     * </pre>
+     */
     public void setUp() throws Exception
     {
         
         super.setUp();
 
-        Properties properties = new Properties(getProperties());
-        
-        // Note: this turns off sameAs processing.
-        properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
-        
-        // Note: this turns off inference.
-        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
-
-        // Note: this turns off commit - useful for guaging the uninterrupted write rate.
-        properties.setProperty(DataLoader.Options.COMMIT, CommitEnum.None.toString());
-
-        dataLoader = new DataLoader(properties, store );
+        dataLoader = store.getDataLoader();
         
         writeMetricsLogHeaders();
         
@@ -623,8 +633,17 @@ public class TestMetrics extends AbstractMetricsTestCase {
     
     public void tearDown() throws Exception
     {
+
+        if(true) {
+
+            log.warn("Computing closure of the database.");
+            
+            log.warn("database at once closure:\n"
+                    + store.getInferenceEngine().computeClosure(null));
+            
+        }
         
-        System.err.println(store.usage());
+        log.warn("Final usage:\n"+store.usage());
         
         super.tearDown();
 
@@ -1083,10 +1102,15 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         try {
 
+            // load the data files.
             testMetrics.loadFiles();
+            
+            // final commit on the store.
+            testMetrics.store.commit();
             
         } finally {
             
+            // tear down the test.
             testMetrics.tearDown();
             
         }

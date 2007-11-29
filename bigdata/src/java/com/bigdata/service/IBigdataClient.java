@@ -29,8 +29,6 @@ package com.bigdata.service;
 
 import java.util.UUID;
 
-import net.jini.core.lookup.ServiceID;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.CommitRecordIndex.Entry;
