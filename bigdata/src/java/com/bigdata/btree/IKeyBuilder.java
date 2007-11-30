@@ -28,9 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Properties;
 import java.util.UUID;
-
-import com.ibm.icu.text.Collator;
 
 /**
  * <p>
@@ -44,6 +43,11 @@ import com.ibm.icu.text.Collator;
  * Note: In order to provide for lightweight implementations, not all
  * implementations support the Unicode operations defined by this interface.
  * </p>
+ * 
+ * @see KeyBuilder#asSortKey(Object)
+ * @see KeyBuilder#newInstance()
+ * @see KeyBuilder#newUnicodeInstance()
+ * @see KeyBuilder#newUnicodeInstance(Properties)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -96,33 +100,33 @@ public interface IKeyBuilder {
      */
     
     /**
-     * Encodes a unicode string using the rules of the {@link #collator} and
-     * appends the resulting sort key to the buffer (without a trailing nul
-     * byte) (optional operation).
+     * Encodes a unicode string using the default collation rules configured for
+     * the {@link IKeyBuilder} instance and appends the resulting sort key to
+     * the buffer (without a trailing nul byte) (optional operation).
      * <p>
      * Note: The {@link SuccessorUtil#successor(String)} of a string is formed
      * by appending a trailing <code>nul</code> character. However, since
-     * {@link Collator#IDENTICAL} appears to be required to differentiate
-     * between a string and its successor (with the trailing <code>nul</code>
+     * <code>IDENTICAL</code> appears to be required to differentiate between
+     * a string and its successor (with the trailing <code>nul</code>
      * character), you MUST form the sort key first and then its successor (by
      * appending a trailing <code>nul</code>). Failure to follow this pattern
      * will lead to the successor of the key comparing as EQUAL to the key. For
      * example,
      * 
      * <pre>
-     *         
-     *         IKeyBuilder keyBuilder = ...;
-     *         
-     *         String s = &quot;foo&quot;;
-     *         
-     *         byte[] fromKey = keyBuilder.reset().append( s );
-     *         
-     *         // right.
-     *         byte[] toKey = keyBuilder.reset().append( s ).appendNul();
-     *         
-     *         // wrong!
-     *         byte[] toKey = keyBuilder.reset().append( s+&quot;\0&quot; );
-     *         
+     *           
+     *           IKeyBuilder keyBuilder = ...;
+     *           
+     *           String s = &quot;foo&quot;;
+     *           
+     *           byte[] fromKey = keyBuilder.reset().append( s );
+     *           
+     *           // right.
+     *           byte[] toKey = keyBuilder.reset().append( s ).appendNul();
+     *           
+     *           // wrong!
+     *           byte[] toKey = keyBuilder.reset().append( s+&quot;\0&quot; );
+     *           
      * </pre>
      * 
      * @param s
@@ -135,8 +139,8 @@ public interface IKeyBuilder {
      * @see TestICUUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
      * 
      * @todo provide a more flexible interface for handling Unicode, including
-     * the means to encode using a specified language family (such as could be
-     * identified with an <code>xml:lang</code> attribute).
+     *       the means to encode using a specified language family (such as
+     *       could be identified with an <code>xml:lang</code> attribute).
      */
     public IKeyBuilder append(String s);
 
@@ -149,19 +153,6 @@ public interface IKeyBuilder {
      *                if Unicode is not supported.
      */
     public IKeyBuilder append(char[] v);
-
-    /**
-     * Encodes a character as a unicode sort key by first converting it to a
-     * unicode string of length 1 and then encoding it using
-     * {@link #append(String)} (optional operation).
-     * 
-     * @param v
-     *            The character.
-     * 
-     * @exception UnsupportedOperationException
-     *                if Unicode is not supported.
-     */
-    public IKeyBuilder append(char v);
 
     /*
      * Required operations.
@@ -248,6 +239,20 @@ public interface IKeyBuilder {
      * then appending it into the buffer as 2 bytes using a big-endian order.
      */
     public IKeyBuilder append(short v);
+
+    /**
+     * Encodes a character as a 16-bit unsigned integer.
+     * <p>
+     * Note: Characters are encoded as unsigned integers rather than as Unicode
+     * values since the semantics of Unicode collation sequences often violate
+     * the semantics of the character code points, even for ASCII. For example,
+     * the character 'z' has the successor '{', but Unicode collation would
+     * place order the string "{" BEFORE the string "z".
+     * 
+     * @param v
+     *            The character.
+     */
+    public IKeyBuilder append(char v);
 
     /**
      * Converts the signed byte to an unsigned byte and appends it to the key.

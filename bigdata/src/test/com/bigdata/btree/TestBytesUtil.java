@@ -259,13 +259,29 @@ public class TestBytesUtil extends TestCase2 {
         assertTrue(BytesUtil.compareBytes(new byte[]{}, new byte[]{0})<0);
         assertTrue(BytesUtil.compareBytes(new byte[]{1}, new byte[]{1,0})<0);
         assertTrue(BytesUtil.compareBytes(new byte[]{1,0}, new byte[]{2})<0);
+
+        assertTrue(BytesUtil.compareBytes(new byte[]{minSignedByte}, new byte[]{0})>0);
+        assertTrue(BytesUtil.compareBytes(new byte[]{maxSignedByte}, new byte[]{0})>0);
+
+        {
+            byte[] zero = new byte[] { 0 };
+            byte[] a = new byte[1];
+            for (int i = minSignedByte; i <= maxSignedByte; i++) {
+                
+                a[0] = (byte) (i & 0xff);
+
+                if(a[0]==zero[0]) continue; // skip over zero.
+                
+                assertTrue(BytesUtil.compareBytes(a, zero) > 0);
+
+            }
+        }
         
         // successor of an empty byte[].
         assertEquals(new byte[]{0}, BytesUtil.successor(new byte[]{}));
         
         // successor of a non-empty byte[].
         assertEquals(new byte[]{1,3,1,0}, BytesUtil.successor(new byte[]{1,3,1}));
-
 
     }
 

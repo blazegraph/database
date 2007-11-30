@@ -181,7 +181,9 @@ import com.bigdata.service.ClientIndexView;
  *       However, we can use smaller branching factors for btrees in the journal
  *       and use a separate implementation for bulk generating and reading
  *       "perfect" read-only key range segments.
- * 
+ *       
+ * @todo prior/next key on entry iterator?  prior/next leaf on leaf iterator?
+ *
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
  * 
