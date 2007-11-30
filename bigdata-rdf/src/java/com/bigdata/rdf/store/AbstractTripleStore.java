@@ -96,6 +96,8 @@ import cutthecrap.utils.striterators.Striterator;
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
  * interface that is invariant across the choice of the backing store.
+ *
+ * @todo explore possible uses of bitmap indices
  * 
  * @todo Refactor to support transactions and concurrent load/query and test
  *       same.

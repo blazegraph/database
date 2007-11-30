@@ -82,32 +82,7 @@ public class UnsignedByteArraySuccessor implements Successor, Serializable,
             
         }
         
-        {
-            
-            final byte[] key = (byte[]) coercedKey;
-            
-            final int keylen = key.length;
-
-            byte[] tmp = new byte[keylen + 1];
-
-            System.arraycopy(key, 0, tmp, 0, keylen);
-            /*
-             * Append the signed byte -128, which is the signed equivilent of an
-             * unsigned zero (0) byte.
-             * 
-             * FIXME verify that we are also computing the composite key
-             * correctly and cross check the index order semantics some more
-             * then back port to sparse, KeyBuilder, and anyone else who was
-             * using a signed nul vs an unsigned nul and recheck all of the test
-             * suites. Write more tests that catch this problem!
-             */
-            tmp[keylen] = (byte) (0x80 & 0xff);
-            
-            return tmp;
-
-        }
-
-//        return BytesUtil.successor((byte[])coercedKey);
+        return BytesUtil.successor((byte[])coercedKey);
         
     }
 

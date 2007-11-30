@@ -369,13 +369,13 @@ public class BytesUtil {
     }
     
     /**
-     * Computes the successor of a variable length byte array by appending
-     * a zero(0) byte to the end of the array.
+     * Computes the successor of a variable length byte array by appending a
+     * unsigned zero(0) byte to the end of the array.
      * 
      * @param key
      *            A variable length unsigned byte array.
      * 
-     * @return A new byte[] that is the successor of the key.
+     * @return A new unsigned byte[] that is the successor of the key.
      */
     public final static byte[] successor(byte[] key) {
 

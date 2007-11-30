@@ -35,6 +35,8 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo reconcile with the GOM SuccessorUtil.
+ * 
  * @see BytesUtil#successor(byte[]), which computes the successor of a variable
  *      length unsigned byte[].
  */

@@ -45,29 +45,43 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo update successor tests for GOM index helper classes, perhaps by
- *       refactoring the successor utilties into a base class and then isolating
- *       their test suite from that of the key builder.
- * 
- * @todo Integrate support for ICU versioning into the client and perhaps into
- *       the index metadata so clients can discover which version and
- *       configuration properties to use when generating keys for an index.
- * 
  * @see SuccessorUtil, which may be used to compute the successor of a value
  *      before encoding it as a component of a key.
  * 
  * @see BytesUtil#successor(byte[]), which may be used to compute the successor
  *      of an encoded key.
  * 
+ * FIXME In order to support multi-part keys for GOM or the sparse row store
+ * where non-terminal parts of the key are variable length Unicode it appears
+ * that I will have to allow custom comparators again in the BTree. This needs
+ * to get into the BTree metadata record and I need to draw together all of the
+ * places where key comparison is done using {@link BytesUtil}, including
+ * classes that wrap its byte[] comparation methods, such that a user-defined
+ * comparator may be substituted.  This will definately be slower since keys
+ * will have to be copied into a per-comparator buffer when they are stored as
+ * prefix+tail in an immutable node.  The basic approach for the comparator is
+ * that it needs to store the length of the variable field, read that length but
+ * NOT consider it for comparison, and then compare field by field.  Any run of
+ * fixed length fields can be compared as unsigned byte[]s, but you can not do
+ * that for a variable length field.
+ * 
+ * @todo update successor tests for GOM index helper classes, perhaps by
+ *       refactoring the successor utilties into a base class and then isolating
+ *       their test suite from that of the key builder.
+ * 
  * @todo introduce a mark and restore feature for generating multiple keys that
  *       share some leading prefix. in general, this is as easy as resetting the
  *       len field to the mark. keys with multiple components could benefit from
  *       allowing multiple marks (the sparse row store is the main use case).
- *       
+ * 
+ * @todo Integrate support for ICU versioning into the client and perhaps into
+ *       the index metadata so clients can discover which version and
+ *       configuration properties to use when generating keys for an index.
+ * 
  * @todo provide a synchronization factory for the keybuilder using a delegation
- *       model. KeyBuilder.synchronizedKeyBuilder():KeyBuilder. Note that
+ *       model. KeyBuilder.synchronizedKeyBuilder():KeyBuilder? (Note that
  *       {@link #asSortKey(Object)} already handles the most common use cases
- *       and is thread-safe.
+ *       and is thread-safe.)
  */
 public class KeyBuilder implements IKeyBuilder {
 
@@ -350,12 +364,6 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(char v) {
-
-        return append("" + v);
-                    
-    }
-
     /*
      * Non-optional operations.
      */
@@ -387,7 +395,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     final public IKeyBuilder append(byte[] a) {
         
-        return append(0,a.length,a);
+        return append(0, a.length, a);
         
     }
     
@@ -531,6 +539,21 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
+    final public IKeyBuilder append(char v) {
+
+        /*
+         * Note: converting to String first produces significantly larger keys
+         * which, more important, violate the sort order expectations for
+         * characters. For example, successor in the value space of 'z' is '{'.
+         * However, the sort key generated from the String representation of the
+         * character '{' is NOT ordered after the sort key generated from the
+         * String representation of the character 'z'.  Unicode wierdness.
+         */
+
+        return append((short) v);
+        
+    }
+
     final public IKeyBuilder append(final byte v) {
 
         // performance tweak
@@ -869,108 +892,6 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    /**
-     * Implementation that uses the JDK library (does not support compressed
-     * sort keys).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
-
-        private final Collator collator;
-        
-        public JDKSortKeyGenerator(Locale locale, Object strength, DecompositionEnum mode) {
-            
-            if (locale == null)
-                throw new IllegalArgumentException();
-            
-            this.collator = Collator.getInstance(locale);
-
-            if (strength != null) {
-             
-                if (strength instanceof Integer) {
-
-                    collator.setStrength(((Integer) strength).intValue());
-
-                } else {
-
-                    StrengthEnum str = (StrengthEnum) strength;
-
-                    switch (str) {
-
-                    case Primary:
-                        collator.setStrength(Collator.PRIMARY);
-                        break;
-
-                    case Secondary:
-                        collator.setStrength(Collator.SECONDARY);
-                        break;
-
-                    case Tertiary:
-                        collator.setStrength(Collator.TERTIARY);
-                        break;
-
-//                    case Quaternary:
-//                        collator.setStrength(Collator.QUATERNARY);
-//                        break;
-
-                    case Identical:
-                        collator.setStrength(Collator.IDENTICAL);
-                        break;
-
-                    default:
-                        throw new UnsupportedOperationException("strength="
-                                + strength);
-
-                    }
-                    
-                }
-                
-            }
-            
-            if (mode != null) {
-
-                switch (mode) {
-
-                case None:
-                    collator.setDecomposition(Collator.NO_DECOMPOSITION);
-                    break;
-                
-                case Full:
-                    collator.setDecomposition(Collator.FULL_DECOMPOSITION);
-                    break;
-                
-                case Canonical:
-                    collator.setDecomposition(Collator.CANONICAL_DECOMPOSITION);
-                    break;
-
-                default:
-                    throw new UnsupportedOperationException("mode=" + mode);
-                
-                }
-            
-            }
-            
-        }
-        
-        public void appendSortKey(KeyBuilder keyBuilder, String s) {
-
-            /*
-             * Note: the collation key is expressed as signed bytes since that
-             * is how the JDK normally compares byte[]s. Therefore append it
-             * into the key builder using the API that translates signed bytes
-             * to unsigned bytes.
-             */
-            
-            final byte[] sortKey = collator.getCollationKey(s).toByteArray();
-            
-            keyBuilder.append(sortKey);
-            
-        }
-        
-    }
-
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);
@@ -1098,7 +1019,7 @@ public class KeyBuilder implements IKeyBuilder {
         
         if(properties==null) {
         
-            return System.getProperty(key);
+            return System.getProperty(key,def);
             
         } else {
             
@@ -1142,14 +1063,18 @@ public class KeyBuilder implements IKeyBuilder {
     public static IKeyBuilder newUnicodeInstance(Properties properties) {
      
         final boolean icu_avail = isICUAvailable();
+
+        log.warn("ICU library is" + (icu_avail ? "" : "not ") + " available.");
         
         /*
          * Allow the caller to require the ICU library. The default depends on
          * whether or not the ICU library is on the class path.
          */
         
-        final boolean icu = Boolean.parseBoolean(getProperty(properties,Options.ICU, ""
-                + icu_avail));
+        final boolean icu_explicit = getProperty(properties, Options.ICU) != null;
+
+        final boolean icu = Boolean.parseBoolean(getProperty(properties,
+                    Options.ICU, "" + icu_avail));
         
         if(icu && !icu_avail) {
             
@@ -1163,6 +1088,18 @@ public class KeyBuilder implements IKeyBuilder {
              */
             
             throw new UnsupportedOperationException(ICU_NOT_AVAILABLE);
+            
+        }
+        
+        if (!icu_explicit) {
+
+            /*
+             * Issue warning since the choice was made by default rather than
+             * explicitly specified by a property.
+             */
+            
+            log.warn("Defaulting to the " + (icu ? "ICU" : "JDK")
+                    + " library for Unicode sort keys.");
             
         }
         

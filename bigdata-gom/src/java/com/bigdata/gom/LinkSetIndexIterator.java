@@ -56,6 +56,7 @@ import org.CognitiveWeb.generic.core.LinkSetIndex;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.KeyBuilder;
 
 /**
  * <p>
@@ -143,8 +144,15 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
 
         m_btree = (BTree) linkSetIndex.getBTree().getNativeBTree();
 
-        // iterator visits only entries in the desired key range.
-        itr = m_btree.rangeIterator((byte[]) fromKey, (byte[]) toKey);
+        /*
+         * Obtain an iterator that visits only entries in the desired key range.
+         * 
+         * Note: Explicitly convert keys as necessary to byte[]s.
+         */
+        itr = m_btree.rangeIterator //
+            ( KeyBuilder.asSortKey(fromKey),//
+              KeyBuilder.asSortKey(toKey)//
+              );
         
         m_linkSetIndex = linkSetIndex;
 

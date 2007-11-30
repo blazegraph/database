@@ -148,7 +148,8 @@ final public class MyBTree extends AbstractBTree {
             throw new IllegalArgumentException();
             
         }
-        
+
+        // Note: implicit conversion to byte[].
         final Long recid = (Long) getBTree().lookup(key);
 
         if (recid == null) {
@@ -183,8 +184,10 @@ final public class MyBTree extends AbstractBTree {
          * The index entry value is always the object identifier of the indexed
          * generic object.
          */
+        
         final Object val = new Long(oid);
         
+        // Note: implicit conversion of the key to byte[].
         final Long oldValue = (Long) getBTree().insert(internalKey, val);
 
         if (oldValue != null) {
@@ -210,7 +213,11 @@ final public class MyBTree extends AbstractBTree {
 
     public long remove(final Object internalKey) {
 
-        // remove, returning the old value under that key.
+        /*
+         * Remove, returning the old value under that key.
+         * 
+         * Note: implicit conversion of the key to byte[].
+         */
         final Long oid = (Long) getBTree().remove(internalKey);
 
         if(oid ==null) {
@@ -299,8 +306,18 @@ final public class MyBTree extends AbstractBTree {
      *       is the object identifier!
      */
     public Object newCompositeKey(Object coercedKey, long oid) {
+        
+        /*
+         * Note: force conversion of the key to a byte[].
+         */
 
-        final byte[] in = (byte[]) coercedKey;
+        return newCompositeKey(KeyBuilder.asSortKey(coercedKey), oid);
+        
+    }
+
+    public static byte[] newCompositeKey(byte[] in,long oid) {
+
+        if(in==null) throw new IllegalArgumentException();
         
         final byte[] out = new byte[in.length /*+ 1*/ + Bytes.SIZEOF_LONG];
 
@@ -317,9 +334,9 @@ final public class MyBTree extends AbstractBTree {
         System.arraycopy(oidbytes, 0, out, in.length/*+1*/, oidbytes.length);
         
         return out;
-        
-    }
 
+    }
+    
     /**
      * Serializers are specific to a class and are not automatically inherited
      * by subclasses therefore this serializer extends the {@link AbstractBTree}

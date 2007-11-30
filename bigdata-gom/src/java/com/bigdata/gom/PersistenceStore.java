@@ -49,7 +49,6 @@ package com.bigdata.gom;
 
 import java.io.DataInput;
 import java.io.IOException;
-import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -59,15 +58,21 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.IExtensibleSerializer;
 import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.Stateless;
 import org.CognitiveWeb.generic.IPropertyClass;
 import org.CognitiveWeb.generic.core.AbstractBTree;
 import org.CognitiveWeb.generic.core.IBlob;
 import org.CognitiveWeb.generic.core.LinkSetIndex;
 import org.CognitiveWeb.generic.core.PropertyClass;
+import org.CognitiveWeb.generic.core.ndx.ByteSuccessor;
+import org.CognitiveWeb.generic.core.ndx.CharacterSuccessor;
 import org.CognitiveWeb.generic.core.ndx.Coercer;
 import org.CognitiveWeb.generic.core.ndx.DefaultUnicodeCoercer;
-import org.CognitiveWeb.generic.core.ndx.ICompositeKey;
+import org.CognitiveWeb.generic.core.ndx.DoubleSuccessor;
+import org.CognitiveWeb.generic.core.ndx.FloatSuccessor;
+import org.CognitiveWeb.generic.core.ndx.IntegerSuccessor;
+import org.CognitiveWeb.generic.core.ndx.LongSuccessor;
+import org.CognitiveWeb.generic.core.ndx.ShortSuccessor;
+import org.CognitiveWeb.generic.core.ndx.StringSuccessor;
 import org.CognitiveWeb.generic.core.ndx.Successor;
 import org.CognitiveWeb.generic.core.om.BaseObject;
 import org.CognitiveWeb.generic.core.om.IPersistentStore;
@@ -77,8 +82,6 @@ import org.CognitiveWeb.generic.core.om.cache.ICacheEntry;
 import org.CognitiveWeb.generic.core.om.cache.ICacheListener;
 import org.CognitiveWeb.generic.core.om.cache.LRUCache;
 import org.CognitiveWeb.generic.core.om.cache.WeakValueCache;
-import org.CognitiveWeb.generic.gql.ConversionError;
-import org.CognitiveWeb.generic.gql.GValue;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
@@ -96,9 +99,6 @@ import com.bigdata.journal.Options;
 
 /**
  * Integration for bigdata.
- * 
- * FIXME some unit tests will break when duplicate keys are allowed since we
- * form the key as an unsigned byte[] rather than using an {@link ICompositeKey}.
  * 
  * FIXME integrate extSer. use unisolated reads and writes on the extSer index.
  * 
@@ -286,11 +286,6 @@ public class PersistenceStore implements IPersistentStore
      */
     transient private BTree id_str_ndx;
 
-//    /**
-//     * Used for form keys for the {@link #name_ndx} and the {@link #str_id_ndx}.
-//     */
-//    transient private KeyBuilder keyBuilder = new UnicodeKeyBuilder();
-    
     /**
      * Returns the underlying {@link IJournal} object.
      *
@@ -1209,7 +1204,7 @@ public class PersistenceStore implements IPersistentStore
 
     /**
      * <p>
-     * Creates an returns a btree configured for the specified
+     * Creates and returns a btree configured for the specified
      * {@link LinkSetIndex}.
      * </p>
      * <p>
@@ -1284,7 +1279,8 @@ public class PersistenceStore implements IPersistentStore
         /*
          * The coerced keys are always unsigned byte[]s. 
          */
-        final Successor successor = UnsignedByteArraySuccessor.INSTANCE;
+//        final Successor successor = UnsignedByteArraySuccessor.INSTANCE;
+        final Successor successor;
 
         /*
          * The values are always object identifiers.
@@ -1308,13 +1304,15 @@ public class PersistenceStore implements IPersistentStore
             /*
              * The key class is unconstrained. Different keys instances may have
              * different types. Generic value type conversion rules are applied
-             * to coerce the value to a {@link String}. If duplicate keys are
-             * not allowed then (a) we use a {@link StringSerializer} since the
-             * keys are strongly typed, and (b) key compression is enabled.
+             * to coerce the value to a {@link String}.
              */
             
-            coercer = GenericUnsignedByteArrayCoercer.INSTANCE;
+//            coercer = GenericUnsignedByteArrayCoercer.INSTANCE;
             
+            coercer = new DefaultUnicodeCoercer(); // coerce to String.
+            
+            successor = new StringSuccessor();
+
         } else if (type == Byte.class   || type == Character.class
                 || type == Short.class  || type == Integer.class
                 || type == Long.class   || type == Float.class
@@ -1324,7 +1322,46 @@ public class PersistenceStore implements IPersistentStore
              * Simple conversion rules are applied for all of these cases.
              */
             
-            coercer = DefaultUnsignedByteArrayCoercer.INSTANCE;
+//            coercer = DefaultUnsignedByteArrayCoercer.INSTANCE;
+            coercer = null;
+            
+            if (type == Byte.class) {
+                
+                successor = new ByteSuccessor();
+                
+            } else if (type == Character.class) {
+                
+                successor = new CharacterSuccessor();
+                
+            } else if (type == Short.class) {
+                
+                successor = new ShortSuccessor();
+                
+            } else if (type == Integer.class) {
+                
+                successor = new IntegerSuccessor();
+                
+            } else if (type == Long.class) {
+                
+                successor = new LongSuccessor();
+                
+            } else if (type == Float.class) {
+                
+                successor = new FloatSuccessor();
+                
+            } else if (type == Double.class) {
+                
+                successor = new DoubleSuccessor();
+                
+            } else if (type == String.class) {
+                
+                successor = new StringSuccessor();
+                
+            } else {
+                
+                throw new AssertionError();
+                
+            }
 
         } else if (type == Array.class && type.getComponentType() == Byte.class) {
 
@@ -1333,6 +1370,8 @@ public class PersistenceStore implements IPersistentStore
              */
             
             coercer = null; // no coercion required.
+           
+            successor = UnsignedByteArraySuccessor.INSTANCE;
             
         } else {
             
@@ -1392,101 +1431,101 @@ public class PersistenceStore implements IPersistentStore
         
     }
 
-    /**
-     * Applies generic value conversion to String and then converts the String
-     * to an unsigned byte[] using {@link KeyBuilder#asSortKey(Object)}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class GenericUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
+//    /**
+//     * Applies generic value conversion to String and then converts the String
+//     * to an unsigned byte[] using {@link KeyBuilder#asSortKey(Object)}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class GenericUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 7049935096462503728L;
+//
+//        public static transient final Coercer INSTANCE = new GenericUnsignedByteArrayCoercer();
+//
+//        /**
+//         * Deserialiation constructor.
+//         */
+//        public GenericUnsignedByteArrayCoercer() {
+//            
+//        }
+//        
+//        public Object coerce(Object externalKey) {
+//
+//            if (externalKey == null)
+//                return null;
+//
+//            if (externalKey instanceof String)
+//                
+//                return KeyBuilder.asSortKey(externalKey);
+//
+//            try {
+//
+//                return KeyBuilder.asSortKey(new GValue(externalKey).getString());
+//
+//            }
+//
+//            catch (ConversionError ex) {
+//
+//                // Keep this at a low logging level since this is the
+//                // declared behavior of this coercer.
+//
+//                LinkSetIndex.log.debug("Could not convert to unicode", ex);
+//
+//                return null;
+//
+//            }
+//
+//        }
+//
+//        public boolean equals(Object obj) {
+//
+//            return this == obj || obj instanceof GenericUnsignedByteArrayCoercer;
+//
+//        }
+//        
+//    }
 
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 7049935096462503728L;
-
-        public static transient final Coercer INSTANCE = new GenericUnsignedByteArrayCoercer();
-
-        /**
-         * Deserialiation constructor.
-         */
-        public GenericUnsignedByteArrayCoercer() {
-            
-        }
-        
-        public Object coerce(Object externalKey) {
-
-            if (externalKey == null)
-                return null;
-
-            if (externalKey instanceof String)
-                
-                return KeyBuilder.asSortKey(externalKey);
-
-            try {
-
-                return KeyBuilder.asSortKey(new GValue(externalKey).getString());
-
-            }
-
-            catch (ConversionError ex) {
-
-                // Keep this at a low logging level since this is the
-                // declared behavior of this coercer.
-
-                LinkSetIndex.log.debug("Could not convert to unicode", ex);
-
-                return null;
-
-            }
-
-        }
-
-        public boolean equals(Object obj) {
-
-            return this == obj || obj instanceof GenericUnsignedByteArrayCoercer;
-
-        }
-        
-    }
-
-    /**
-     * Applies {@link KeyBuilder#asSortKey(Object)} to convert the key into an unsigned
-     * byte[].
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class DefaultUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -4037329969828272398L;
-
-        public static transient final Coercer INSTANCE = new DefaultUnsignedByteArrayCoercer();
-
-        /**
-         * Deserialiation constructor.
-         */
-        public DefaultUnsignedByteArrayCoercer() {
-            
-        }
-        
-        public Object coerce(Object externalKey) {
-
-            return KeyBuilder.asSortKey(externalKey);
-            
-        }
-
-        public boolean equals(Object obj) {
-
-            return this == obj || obj instanceof DefaultUnsignedByteArrayCoercer;
-
-        }
-
-    }
+//    /**
+//     * Applies {@link KeyBuilder#asSortKey(Object)} to convert the key into an unsigned
+//     * byte[].
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class DefaultUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = -4037329969828272398L;
+//
+//        public static transient final Coercer INSTANCE = new DefaultUnsignedByteArrayCoercer();
+//
+//        /**
+//         * Deserialiation constructor.
+//         */
+//        public DefaultUnsignedByteArrayCoercer() {
+//            
+//        }
+//        
+//        public Object coerce(Object externalKey) {
+//
+//            return KeyBuilder.asSortKey(externalKey);
+//            
+//        }
+//
+//        public boolean equals(Object obj) {
+//
+//            return this == obj || obj instanceof DefaultUnsignedByteArrayCoercer;
+//
+//        }
+//
+//    }
 
     /**
      * The value is a <code>long</code> integer that is the term identifier.
