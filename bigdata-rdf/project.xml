@@ -287,6 +287,12 @@
       <version>0.1-b1-dev</version>
       <url>http://www.sourceforge.net/projects/bigdata</url>
     </dependency>
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata-jini</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
 
 	<!-- cweb utility classes. -->
     <dependency> 

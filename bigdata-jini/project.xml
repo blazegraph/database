@@ -347,10 +347,15 @@
     </dependency>
     <!-- end jini -->
 
-    <!--     -->
-	<!-- ICU -->
-    <!--     -->
-	<!-- Unicode support (compressed sort keys). -->
+	<!-- bigdata -->
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
+
+	<!-- ICU provides optional support for compressed Unicode sort keys. -->
     <dependency>
       <groupId>icu</groupId>
       <artifactId>icu4j</artifactId> 

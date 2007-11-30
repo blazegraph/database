@@ -470,10 +470,7 @@
       <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
     </dependency>
 
-    <!--     -->
-	<!-- ICU -->
-    <!--     -->
-	<!-- Optional support for compressed Unicode sort keys. -->
+	<!-- ICU provides optional support for compressed Unicode sort keys. -->
     <dependency>
       <groupId>icu</groupId>
       <artifactId>icu4j</artifactId> 
