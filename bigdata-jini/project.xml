@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <project>
-  <id>bigdata</id>
+  <id>bigdata-jini</id>
   <name>bigdata-jini</name>
   <package>com.bigdata</package>
   <extends>../bigdata-master-pom/project.xml</extends>
