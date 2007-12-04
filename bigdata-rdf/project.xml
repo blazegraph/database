@@ -49,7 +49,7 @@
   64-bit long integers using forward (terms:ids) and a reverse
   (ids:terms) indices. The presence of a key in a statement index
   indicates that the statement is asserted on the database while its
-  absence indicates that the statemetn is not asserted on the
+  absence indicates that the statement is not asserted on the
   database.  In addition, each statement index associates the key for
   a given access path with whether the statement is explicit,
   inferred, or an axiom.
@@ -68,7 +68,7 @@
   
   <dt>incremental</dt><dd> Truth maintenance is performed as each data
   set is loaded (or as statements are retracted).  The best
-  performance will be released with documents of at least modest size.
+  performance will be realized with documents of at least modest size.
   If you are loading a lot of small documents, then consider
   "batching" them.</dd>
 
@@ -89,7 +89,7 @@
   operations throughout.  The underlying bigdata architecture uses
   MVCC to allow concurrent readers and provides the maximum possible
   interleaving for writers on resources (indices).  The scale-out RDF
-  database is a client of the bigdata federation.  At present is uses
+  database is a client of the bigdata federation.  At present it uses
   range partitioned indices running on data services.  Since the
   indices are range partitioned resource contention is limited to
   unisolated operations running on an index partition.  In general,

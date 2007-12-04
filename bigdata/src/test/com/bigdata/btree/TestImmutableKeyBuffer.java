@@ -36,7 +36,7 @@ import java.util.Arrays;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestImmutableKeyBuffer extends TestAbstractKeyBuffer {
+public class TestImmutableKeyBuffer extends AbstractKeyBufferTestCase {
 
     /**
      * 

@@ -46,6 +46,7 @@ Modifications:
  */
 package com.bigdata.gom;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.NoSuchElementException;
 
@@ -57,6 +58,8 @@ import org.CognitiveWeb.generic.core.ndx.Successor;
 import org.CognitiveWeb.generic.core.om.BaseObject;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.IJournal;
 import com.bigdata.rawstore.Bytes;
@@ -65,6 +68,58 @@ import com.bigdata.rawstore.Bytes;
  * Persistent object wrapping a persistent {@link BTree} together with the
  * {@link Coercer}, {@link Successor}, and {@link Comparator} objects for use
  * with that btree.
+ * <h2>Implementation notes</h2>
+ * <p>
+ * The current approach uses an unnamed {@link BTree} and explicitly manages the
+ * BTree on the journal. In particular, methods that change the state of the
+ * BTree cause this object to be {@link #update() marked as dirty} so that we
+ * will flush the {@link BTree} to the journal in {@link #saveBTree()} and have
+ * the current {@link BTreeMetadata} record on hand when this object is
+ * serialized. This works fine until we start using partitioned indices in the
+ * journal - the problem in that case is that the low-level integration will not
+ * be able to keep track of the partitioned indices.
+ * </p>
+ * <p>
+ * An alternative approach is to use named scale-out indices for the link set
+ * indices. A scale-out index is created for each link set index family (the
+ * association property plus a value property). The keys for the scale-out index
+ * are formed as:
+ * </p>
+ * 
+ * <pre>
+ *            [linkSetOid][attribute]([oid])?
+ * </pre>
+ * 
+ * <p>
+ * The [linkSetOid] is used as the prefix for the keys stored in the scale-out
+ * index. In this manner the scale-out index is automatically broken down into
+ * key ranges for each distinct link set.
+ * </p>
+ * <p>
+ * The scale-out indices would be named by the concatenation of the association
+ * class and value property class for the link set family. Either the object
+ * identifiers for those property classes or the names of the property classes
+ * may be used for this purpose. E.g., "___employee___name" might be the name of
+ * the scale-out index for the association class "employee" and the value
+ * property "name".
+ * </p>
+ * <p>
+ * When using scale-out indices in this manner the add, rebuild, and drop index
+ * operations will need to be modified such that they operation only on the
+ * entries in the scale-out index which correspond to the link set for which the
+ * operation was requested.
+ * </p>
+ * <p>
+ * Note: the reason not to use a distinct named scale-out indices for each link
+ * set index is that the total number of resulting link set indices could be
+ * quite large. This would not be a problem for something like rdf-generic but
+ * it could be a problem if there were 10k+ link set indices on a single journal
+ * all of which were quite small. If those link set indices correspond to named
+ * scale-out indices then each one needs to be examine when we overflow the
+ * journal. It might be fine...but it might be a problem. Also, the named
+ * indices would (of course) need to be placed within their own name space to
+ * avoid, which is not a problem.
+ * </p>
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -204,10 +259,20 @@ final public class MyBTree extends AbstractBTree {
             // operation is broken.
 
             throw new IllegalStateException(
-                    "Index already contains this entry" + ": index=" + this
-                            + ", key='" + internalKey + "'" + ", oid=" + oid);
+                    "Index already contains this entry"
+                    + ": index=" + this + ", key='"
+                    + Arrays.toString((byte[]) internalKey) + "'" + ", oid="
+                    + oid);
 
         }
+        
+        /*
+         * Note: We have to mark this object as dirty since the btree will need
+         * to be flushed to disk so that we can write out the new address of the
+         * btree record when this object is serialized.
+         */
+
+        update();
 
     }
 
@@ -220,14 +285,22 @@ final public class MyBTree extends AbstractBTree {
          */
         final Long oid = (Long) getBTree().remove(internalKey);
 
-        if(oid ==null) {
+        if (oid == null) {
 
             // nothing found under that key.
             
-            throw new IllegalStateException();
+            throw new IllegalStateException("key="+Arrays.toString((byte[])internalKey));
             
         }
         
+        /*
+         * Note: We have to mark this object as dirty since the btree will need
+         * to be flushed to disk so that we can write out the new address of the
+         * btree record when this object is serialized.
+         */
+
+        update();
+
         return oid.longValue();
         
     }
@@ -270,9 +343,21 @@ final public class MyBTree extends AbstractBTree {
 
     public void remove() {
 
-        BTree tmp = (BTree) getNativeBTree();
+        if (false) {
         
-        tmp.removeAll();
+            /*
+             * Note: We do NOT need to actually delete the entries in the BTree
+             * since it will no longer be accessible and the journal is a write
+             * only store. However, if we switch this class over to use a named
+             * scale-out index then the appropriate key range of that index MUST
+             * be cleared here!
+             */
+            
+            BTree tmp = (BTree) getNativeBTree();
+
+            tmp.removeAll();
+            
+        }
         
         btree = null; // clear reference.
         
@@ -293,7 +378,8 @@ final public class MyBTree extends AbstractBTree {
      * Forms the composite key as an unsigned byte[]. The coercedKey appears
      * first in the composite key. The object identifier is converted to an
      * unsigned byte[] and appended in order to break ties based on solely the
-     * coercedKey.
+     * coercedKey.  Keys that are coerced to Strings are handled specially 
+     * using {@link IKeyBuilder#appendText(String, boolean, boolean)}.
      * 
      * @todo In the current implementation object identifiers are always 64-bit
      *       integers. Therefore you can extract the object identifier by
@@ -306,35 +392,86 @@ final public class MyBTree extends AbstractBTree {
      *       is the object identifier!
      */
     public Object newCompositeKey(Object coercedKey, long oid) {
-        
-        /*
-         * Note: force conversion of the key to a byte[].
-         */
 
-        return newCompositeKey(KeyBuilder.asSortKey(coercedKey), oid);
+        return _newCompositeKey(KeyBuilder.asSortKey(coercedKey), oid);
         
     }
+    
+    // @todo should be a configurable instance, probably on the PersistenceStore or the OM.
+    private static final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(); 
 
-    public static byte[] newCompositeKey(byte[] in,long oid) {
+    public static byte[] _newCompositeKey(Object coercedKey,long oid) {
 
-        if(in==null) throw new IllegalArgumentException();
-        
-        final byte[] out = new byte[in.length /*+ 1*/ + Bytes.SIZEOF_LONG];
+        if (coercedKey == null) {
 
-        // copy the coerced key
-        System.arraycopy(in, 0, out, 0, in.length);
-        
-//        // nul delimiter.
-//        out[out.length] = '\0';
-        
-        // append the object identifier.
+            throw new IllegalArgumentException();
+            
+        }
 
-        final byte[] oidbytes = KeyBuilder.asSortKey(oid);
-        
-        System.arraycopy(oidbytes, 0, out, in.length/*+1*/, oidbytes.length);
-        
-        return out;
+        if(coercedKey instanceof String) {
 
+            synchronized(keyBuilder) {
+                
+                final String text = (String) coercedKey;
+                
+                keyBuilder.reset();
+                
+                keyBuilder.appendText(text, true/*unicode*/, false/*successor*/);
+                
+                keyBuilder.append(oid);
+                
+                final byte[] out = keyBuilder.getKey();
+                
+                return out;
+                
+            }
+            
+        } else {
+        
+            final byte[] in = KeyBuilder.asSortKey(coercedKey);
+            
+            final byte[] out = new byte[in.length /* + 1 */+ Bytes.SIZEOF_LONG];
+
+            // copy the coerced key
+            System.arraycopy(in, 0, out, 0, in.length);
+
+            // // nul delimiter.
+            // out[out.length] = '\0';
+
+            // append the object identifier.
+
+            final byte[] oidbytes = KeyBuilder.asSortKey(oid);
+
+            System.arraycopy(oidbytes, 0, out, in.length/* +1 */,
+                    oidbytes.length);
+
+            return out;
+
+        }
+
+    }
+
+    /**
+     * Note: unnamed bigdata {@link BTree} objects needs to be explicitly
+     * written on the store since they will not not otherwise participate in the
+     * commit protocol. This method invokes {@link BTree#handleCommit()} to
+     * flush the {@link BTree} state to the store and obtain the address of the
+     * new metadata record from which the btree's state may be reloaded.
+     */
+    protected void saveBTree() {
+
+        if (btree != null) {
+
+            final long oldAddress = _nativeBTreeId;
+            
+            _nativeBTreeId = btree.handleCommit();
+            
+            log.info("Saving BTree: " + this + ", old address="
+                    + oldAddress + ", new address=" + _nativeBTreeId + "\n"
+                    + btree.getStatistics());
+
+        }
+        
     }
     
     /**

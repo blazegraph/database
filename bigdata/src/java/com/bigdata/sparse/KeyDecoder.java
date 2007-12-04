@@ -26,30 +26,37 @@ package com.bigdata.sparse;
 
 import java.io.UnsupportedEncodingException;
 
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 
 /**
- * A utility class that can decode a key in the sparse row store returning
- * the column name, and the timestamp.
+ * A utility class that can decode a key in the sparse row store returning the
+ * column name, and the timestamp.
  * <p>
- * Note: There is a nul byte following the schema name and then another nul
- * byte following the primary key. The schema name MAY NOT contain nuls, but
- * the primary key MAY so you MUST know the {@link Schema} in order to know
- * how many bytes are used by the primary key. The column name follows the
- * primary key (and does not allow embedded nuls) and is followed by another
- * nul byte. Finally, the timestamp is 8 bytes and is always interpreted as
- * a long integer. Both the schema name and the column name are Unicode.
- * They are converted to bytes using <code>UTF-8</code> and MAY NOT have
- * embedded nuls. In order to provide loss less decoding, neither the schema
- * name nor the column name is NOT compressed using a Unicode collator to
- * generate an order preserving sort key.
+ * Note: There is a nul byte following the schema name and then another nul byte
+ * following the primary key. The schema name MAY NOT contain nuls, but the
+ * primary key MAY so you MUST know the {@link Schema} in order to know how many
+ * bytes are used by the primary key. The column name follows the primary key
+ * (and does not allow embedded nuls) and is followed by another nul byte.
+ * Finally, the timestamp is 8 bytes and is always interpreted as a long
+ * integer. Both the schema name and the column name are Unicode. They are
+ * converted to bytes using <code>UTF-8</code> and MAY NOT have embedded nuls.
+ * In order to provide loss less decoding, neither the schema name nor the
+ * column name is compressed using a Unicode collator to generate an order
+ * preserving sort key.
+ * 
+ * FIXME revisit this class in the context of
+ * {@link IKeyBuilder#appendText(String, boolean, boolean)}. Write unit tests
+ * to explore edge conditions and verify that all necessary fields in the key
+ * can be decoded. If we do not require the ability to decode certain fields
+ * then let's not kill ourselves over that.
  * 
  * @todo add decoding of the schema name, possibly in a subclass.
  * 
- * @todo add decoding of the primary key, possibly in a subclass. You can
- *       figure out which bytes are the primary key using the nul delimiters
- *       but you need the {@link Schema} to known how to decode the primary
- *       key into an application object.
+ * @todo add decoding of the primary key, possibly in a subclass. You can figure
+ *       out which bytes are the primary key using the nul delimiters but you
+ *       need the {@link Schema} to known how to decode the primary key into an
+ *       application object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

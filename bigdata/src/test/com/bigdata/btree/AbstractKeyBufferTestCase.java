@@ -33,18 +33,18 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAbstractKeyBuffer extends TestCase2 {
+public class AbstractKeyBufferTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public TestAbstractKeyBuffer() {
+    public AbstractKeyBufferTestCase() {
     }
 
     /**
      * @param name
      */
-    public TestAbstractKeyBuffer(String name) {
+    public AbstractKeyBufferTestCase(String name) {
         super(name);
     }
 

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -320,6 +319,14 @@ public class TestKeyBuilder extends TestCase2 {
      * successors around zero is correctly defined by the resulting key.
      */
 
+    /**
+     * Note: The {@link KeyBuilder} uses an order preserving transfrom from
+     * signed bytes to unsigned bytes. This transform preserves the order of
+     * values in the signed space by translating them such that the minimum
+     * signed value (-128) is represented by an unsigned 0x00. For example, zero
+     * (signed) becomes 0x80 (unsigned) while -1 (signed) is becomes to 0x79
+     * (0x79 LT 0x80).
+     */
     public void test_keyBuilder_byte_key() {
         
         IKeyBuilder keyBuilder = new KeyBuilder();
@@ -564,51 +571,13 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
-    public void test_keyBuilder_unicode_String_key() {
-        
-        IKeyBuilder keyBuilder = new KeyBuilder();
-        
-        try {
-            keyBuilder.reset().append("a");
-            fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }        
-
-    }
-
-    public void test_keyBuilder_unicode_char_key() {
-        
-        IKeyBuilder keyBuilder = new KeyBuilder();
-        
-        try {
-            keyBuilder.reset().append('a');
-            fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }        
-
-    }
-    
-    public void test_keyBuilder_unicode_chars_key() {
-        
-        IKeyBuilder keyBuilder = new KeyBuilder();
-        
-        try {
-            keyBuilder.reset().append(new char[]{'a'});
-            fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }        
-
-    }
-
     /**
-     * Tests encoding of characters assumed to be US-ASCII. For each character,
-     * this method simply chops of the high byte and converts the low byte to an
-     * unsigned byte.
+     * Test ordering imposed by encoding a single ASCII key.
+     * 
+     * @todo test ability to decode an ASCII field in a non-terminal position of
+     *       a multi-field key.
      */
-    public void test_encodeASCII() throws UnsupportedEncodingException {
+    public void test_keyBuilder_ascii() {
         
         IKeyBuilder keyBuilder = new KeyBuilder();
             
@@ -634,17 +603,336 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue(BytesUtil.compareBytes(key1, key2)>0);
         assertTrue(BytesUtil.compareBytes(key2, key3)<0);
         
-//        /* verify that we can convert back to Unicode.
-//         * 
-//         * Note: to do this we have to convert from unsigned to signed bytes
-//         * before invoking the string constructor.
-//         */
-//        assertEquals("abc",new String(key1,"UTF-8"));
-//        assertEquals("ABC",new String(key1,"UTF-8"));
-//        assertEquals("Abc",new String(key1,"UTF-8"));
+    }
+
+    /**
+     * Test of the ability to normalize trailing pad characters.
+     */
+    public void test_keyBuilder_normalizeTrailingPadCharacters() {
+        
+        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+        
+        assertEquals(//
+                keyBuilder.normalizeText(""),//
+                keyBuilder.normalizeText(" ")//
+                );
+        assertEquals(//
+                keyBuilder.normalizeText(""),//
+                keyBuilder.normalizeText("  ")//
+                );
+        assertEquals(//
+                keyBuilder.normalizeText(""),//
+                keyBuilder.normalizeText("      ")//
+                );
+        assertEquals(//
+                keyBuilder.normalizeText(" "),//
+                keyBuilder.normalizeText("      ")//
+                );
+        assertEquals(//
+                keyBuilder.normalizeText("abc"),//
+                keyBuilder.normalizeText("abc      ")//
+                );
+        assertEquals(//
+                keyBuilder.normalizeText("   abc"),//
+                keyBuilder.normalizeText("   abc      ")//
+                );
+        assertNotSame(//
+                keyBuilder.normalizeText("abc"),//
+                keyBuilder.normalizeText("   abc      ")//
+                );
         
     }
     
+    /**
+     * Test verifies that very long strings are truncated.
+     * 
+     * @todo verify that trailing whitespace is removed after truncation rather
+     *       than before truncation.
+     */
+    public void test_keyBuilder_normalizeTruncatesVeryLongStrings() {
+
+        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+
+        final String text = getMaximumLengthText();
+
+        assertEquals(//
+                keyBuilder.normalizeText(text),//
+                keyBuilder.normalizeText(text+"abc")//
+                );
+        
+    }
+    
+    /**
+     * <p>
+     * Test that lexiographic order is maintain when a variable length ASCII
+     * field is followed by another field. This test works by comparing the
+     * original multi-field key with the multi-field key formed from the
+     * successor of the ASCII field followed by the other field:
+     * </p>
+     * 
+     * <pre>
+     *  
+     *  [text][nextValue] LT [successor(text)][nextValue]
+     *  
+     * </pre>
+     */
+    public void test_keyBuilder_multiField_ascii_long() {
+
+        doMultiFieldTests(false/*unicode*/);
+        
+    }
+    
+    /**
+     * <p>
+     * Test that lexiographic order is maintain when a variable length Unicode
+     * field is followed by another field. This test works by comparing the
+     * original multi-field key with the multi-field key formed from the
+     * successor of the Unicode field followed by the other field:
+     * </p>
+     * 
+     * <pre>
+     *   
+     *   [text][nextValue] LT [successor(text)][nextValue]
+     *   
+     * </pre>
+     */
+    public void test_keyBuilder_multiField_unicode() {
+        
+        doMultiFieldTests(true/*unicode*/);
+
+        /*
+         * Now test some strings that contain code points outside of the 8-bit
+         * range.
+         */
+        
+        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+                .newUnicodeInstance();
+
+        final boolean unicode = true;
+        {
+            
+            // Note: This is "Japanese" in kanji.
+            String text = "\u65E5\u672C\u8A9E / \u306B\u307B\u3093\u3054";
+            
+            doMultiFieldTest(keyBuilder, unicode, text, (byte) 0);
+            doMultiFieldTest(keyBuilder, unicode, text, (byte) 1);
+            doMultiFieldTest(keyBuilder, unicode, text, (byte) -1);
+            doMultiFieldTest(keyBuilder, unicode, text, Byte.MIN_VALUE);
+            doMultiFieldTest(keyBuilder, unicode, text, Byte.MAX_VALUE);
+        }
+
+    }
+    
+    /**
+     * Test helper.
+     * 
+     * @param unicode
+     *            When <code>true</code> tests Unicode semantics. Otherwise
+     *            tests ASCII semantics.
+     */
+    private void doMultiFieldTests(boolean unicode) {
+        
+        final KeyBuilder keyBuilder = (KeyBuilder) (unicode ? KeyBuilder
+                .newUnicodeInstance() : KeyBuilder.newInstance());
+
+        /*
+         * example: zero length string will be padded.
+         */
+        doMultiFieldTest(keyBuilder,unicode,"", (byte)0);
+        doMultiFieldTest(keyBuilder,unicode,"", (byte)1);
+        doMultiFieldTest(keyBuilder,unicode,"", (byte)-1);
+        doMultiFieldTest(keyBuilder,unicode,"", Byte.MIN_VALUE);
+        doMultiFieldTest(keyBuilder,unicode,"", Byte.MAX_VALUE);
+
+
+        /*
+         * example: middle length string will be padded.
+         */
+        doMultiFieldTest(keyBuilder,unicode,"abc", (byte)0);
+        doMultiFieldTest(keyBuilder,unicode,"abc", (byte)1);
+        doMultiFieldTest(keyBuilder,unicode,"abc", (byte)-1);
+        doMultiFieldTest(keyBuilder,unicode,"abc", Byte.MIN_VALUE);
+        doMultiFieldTest(keyBuilder,unicode,"abc", Byte.MAX_VALUE);
+
+        /*
+         * example: maximum length string.
+         * 
+         * Note: For cases such as this one the encoded key is actually larger
+         * than the original text since we have to encode a zero-length sequence
+         * of the pad bytes using the order-preserving encoding method.
+         */
+        {
+            
+            String text = getMaximumLengthText();
+            
+            doMultiFieldTest(keyBuilder,unicode,text,(byte)0);
+            doMultiFieldTest(keyBuilder,unicode,text,(byte)1);
+            doMultiFieldTest(keyBuilder,unicode,text,(byte)-1);
+            doMultiFieldTest(keyBuilder,unicode,text, Byte.MIN_VALUE);
+            doMultiFieldTest(keyBuilder,unicode,text, Byte.MAX_VALUE);
+            
+        }
+
+        /*
+         * Test for all possible next values (or stress test for large value
+         * space).
+         */
+        {
+            
+            for(int i=Byte.MIN_VALUE; i<=Byte.MAX_VALUE; i++) {
+
+                Byte nextValue = (byte)i;
+                
+                doMultiFieldTest(keyBuilder,unicode,"abc", nextValue);
+                
+            }
+            
+        }
+        
+        {
+            
+            for(int i=Short.MIN_VALUE; i<=Short.MAX_VALUE; i++) {
+
+                Short nextValue = (short)i;
+                
+                doMultiFieldTest(keyBuilder,unicode,"abc", nextValue);
+                
+            }
+            
+        }
+        
+        {
+            
+            Random r = new Random();
+            
+            final int LIMIT = 100000;
+            
+            for(int i=0; i<LIMIT; i++) {
+
+                Long nextValue = r.nextLong();
+                
+                doMultiFieldTest(keyBuilder,unicode,"abc", nextValue);
+                
+            }
+            
+        }
+
+    }
+
+    /**
+     * Return a string consisting of a repeating sequence of the digits zero
+     * through nine whose length is {@link IKeyBuilder#maxlen}.
+     */
+    private String getMaximumLengthText() {
+
+        final int len = IKeyBuilder.maxlen;
+
+        StringBuilder sb = new StringBuilder(len);
+
+        char[] data = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8',
+                '9' };
+
+        for (int i = 0; i < len; i++) {
+
+            sb.append(data[i % 10]);
+
+        }
+
+        String text = sb.toString();
+        
+        return text;
+
+    }
+    
+    /**
+     * Test helper forms two keys and verifies succesor semantics:
+     * <pre>
+     *  
+     *  [text][nextValue] LT [successor(text)][nextValue]
+     *  
+     * </pre> 
+     * 
+     * @param unicode
+     *            When <code>true</code> the text will be encoded as Unicode
+     *            using the default collator. Otherwise the text will be encoded
+     *            as ASCII.
+     * @param text
+     *            The text to be encoded into the 1st field of the key.
+     * @param nextValue
+     *            The value to be encoded into the next field of the key.
+     */
+    private void doMultiFieldTest(KeyBuilder keyBuilder, final boolean unicode,
+            final String text, final Object nextValue) {
+ 
+        // form a key from [text][nextValue].
+        keyBuilder.reset();
+        final byte[] k1 = keyBuilder
+                .appendText(text, unicode, false/* successor */).append(
+                        nextValue).getKey();
+
+        // form a key from [successor(text)][nextValue].
+        keyBuilder.reset();
+        final byte[] k2 = keyBuilder
+                .appendText(text, unicode, true/* successor */).append(
+                        nextValue).getKey();
+
+        if(false && text.length()<200) {
+            System.err.println("-----\n");
+            System.err.println("text=[" + text + "]");
+//        if (nextValue instanceof Number) {
+//            int i = ((Number) nextValue).intValue();
+//            System.err.println("nextValue=" + nextValue + ", signed(0x"
+//                    + Integer.toHexString(i) + "), unsigned(0x"
+//                    + Integer.toHexString(KeyBuilder.encode(i)) + ")");
+//        }
+            System.err.println("k1=" + Arrays.toString(k1));
+            System.err.println("k2=" + Arrays.toString(k2));
+        }
+        
+        // verify the ordering.
+        assertTrue(BytesUtil.compareBytes(k1, k2)<0);
+
+    }
+    
+    public void test_keyBuilder_unicode_String_key() {
+        
+        IKeyBuilder keyBuilder = new KeyBuilder();
+        
+        try {
+            keyBuilder.reset().append("a");
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            System.err.println("Ignoring expected exception: "+ex);
+        }        
+
+    }
+
+//    public void test_keyBuilder_unicode_char_key() {
+//        
+//        IKeyBuilder keyBuilder = new KeyBuilder();
+//        
+//        try {
+//            keyBuilder.reset().append('a');
+//            fail("Expecting: "+UnsupportedOperationException.class);
+//        } catch(UnsupportedOperationException ex) {
+//            System.err.println("Ignoring expected exception: "+ex);
+//        }        
+//
+//    }
+    
+//    public void test_keyBuilder_unicode_chars_key() {
+//        
+//        IKeyBuilder keyBuilder = new KeyBuilder();
+//        
+//        try {
+//            keyBuilder.reset().append(new char[]{'a'});
+//            fail("Expecting: "+UnsupportedOperationException.class);
+//        } catch(UnsupportedOperationException ex) {
+//            System.err.println("Ignoring expected exception: "+ex);
+//        }        
+//
+//    }
+
     /*
      * verify that the ordering of floating point values when converted to
      * unsigned byte[]s is maintained.

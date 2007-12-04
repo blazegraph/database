@@ -87,6 +87,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
@@ -107,7 +108,7 @@ import com.bigdata.journal.Options;
  * @todo variant of extSer that supports even more compact serialization using
  *       mg4j bit output streams and bit coding of long identifiers using
  *       hu-tucker or non-alpha variant of hu-tucker.
- * 
+ *       
  * @todo extser integration that supports scale-out.
  * 
  * @todo split distributed cache
@@ -1220,30 +1221,29 @@ public class PersistenceStore implements IPersistentStore
      * <p>
      * Note: The bigdata integration only supports the case where the attribute
      * is part of the key - it does not allow the dynamic resolution of the
-     * attribute value from the object identifier. Indirection through the
-     * object identifier is an enormous performance penalty.
+     * attribute value from the object identifier (storeOidOnly must be false).
+     * Indirection through the object identifier is an enormous performance
+     * penalty. Further bigdata requires that all keys are unsigned byte[]s and
+     * does not allow the use of custom comparators. In order to achieve the
+     * same effect, you should use a computed property as the attribute on which
+     * the index is ordered. For example, you can perform case-folding or
+     * reorder the components of a URI in the computed property.
      * </p>
      * <p>
      * Note: All keys for bigdata indices are encoded as unsigned byte[]s.
-     * Therefore the "internalKey" is always an unsigned byte[]. byte[]
-     * "externalKey"s are accepted and used directly. In all other cases an
-     * appropriate {@link Coercer} is applied to convert the "externalKey" into
-     * an unsigned byte[] that produces the same total ordering as the original
-     * data type. See {@link KeyBuilder} for forming keys for a variety of
-     * purposes.
-     * </p>
-     * <p>
-     * Since the "internalKey" is always an unsigned byte[], custom comparators
-     * are not supported and the comparator will always be <code>null</code>.
-     * In order to achieve the same effect, you should use a computed property
-     * as the attribute on which the index is ordered. For example, you can
-     * perform case-folding or reorder the components of a URI in the computed
-     * attribute.
+     * However {@link KeyBuilder#asSortKey(Object)} transparently converts
+     * application keys into unsigned byte[]s. Therefore the coercer is only
+     * used when the property value is not strongly typed and we need to apply
+     * generic value conversion. See {@link KeyBuilder} for forming keys for a
+     * variety of purposes.
      * </p>
      * <p>
      * When duplicate keys are allowed in the link set index the composite key
      * is an unsigned byte[] formed by appending the object identifier to the
-     * coerced key. See {@link MyBTree#newCompositeKey(Object, long)}.
+     * coerced key. How this is done depends on whether or not the coerced key
+     * is a String. String are handled using
+     * {@link IKeyBuilder#appendText(String, boolean, boolean)}. See
+     * {@link MyBTree#newCompositeKey(Object, long)}.
      * </p>
      * 
      * @todo Other kinds of arrays of Java primitives: int[], long[], etc. are
@@ -1252,12 +1252,14 @@ public class PersistenceStore implements IPersistentStore
      * @see LinkSetIndex#getValuePropertyClass()
      * @see PropertyClass#getType()
      * @see BTree
-     * @see KeyBuilder#asSortKey(Object)
-     * @see KeyBuilder
+     * @see IKeyBuilder
      * 
      * @throws UnsupportedOperationException
      *             if the type constraint on the value property is not
-     *             supported.
+     *             supported. In particular {@link Character} is NOT supported
+     *             since its semantics are ambiguous (Unicode vs signed
+     *             integer). Instead use String for Unicode or Short for signed
+     *             2 byte integers.
      * @throws UnsupportedOperationException
      *             if the value property specifies a custom comparator - use a
      *             computed attribute instead.
@@ -1276,10 +1278,6 @@ public class PersistenceStore implements IPersistentStore
         final PropertyClass valuePropertyClass = (PropertyClass) ndx
                 .getValuePropertyClass();
 
-        /*
-         * The coerced keys are always unsigned byte[]s. 
-         */
-//        final Successor successor = UnsignedByteArraySuccessor.INSTANCE;
         final Successor successor;
 
         /*
@@ -1307,8 +1305,6 @@ public class PersistenceStore implements IPersistentStore
              * to coerce the value to a {@link String}.
              */
             
-//            coercer = GenericUnsignedByteArrayCoercer.INSTANCE;
-            
             coercer = new DefaultUnicodeCoercer(); // coerce to String.
             
             successor = new StringSuccessor();
@@ -1322,8 +1318,21 @@ public class PersistenceStore implements IPersistentStore
              * Simple conversion rules are applied for all of these cases.
              */
             
-//            coercer = DefaultUnsignedByteArrayCoercer.INSTANCE;
-            coercer = null;
+            if (type == Character.class) {
+             
+                /*
+                 * Note: Characters are ordered as signed short integers (eg.,
+                 * according to their code points rather than to their
+                 * interpretation by a Unicode collator).
+                 */
+                throw new UnsupportedOperationException(
+                        "Character is not allowed as a type restriction.  Use String for Unicode semantics or Short for a signed two byte integer.");
+
+            } else {
+
+                coercer = null;
+                
+            }
             
             if (type == Byte.class) {
                 
@@ -1408,18 +1417,28 @@ public class PersistenceStore implements IPersistentStore
 
         }
 
-        String name = ndx.getLinkPropertyClass().identity();
-
-        BTree btree = (BTree) m_journal.getIndex(name);
+        /*
+         * Note: we are not registering the btree as a named index at this 
+         * time.  That might be changed later - see the javadoc above and
+         * on MyBTree for notes on the issues here. 
+         */
         
-        if(btree==null) {
+//        String name = ndx.getLinkPropertyClass().identity();
+
+        BTree btree;
+//        btree = (BTree) m_journal.getIndex(name);
+        
+//        if(btree==null) {
         
             btree = new BTree(m_journal, m_journal.getDefaultBranchingFactor(),
                     UUID.randomUUID(), valueSerializer);
-
-            m_journal.registerIndex(name, btree);
             
-        }
+            // force the btree to the store so that we can get its metadata record.
+            btree.write();
+
+//            m_journal.registerIndex(name, btree);
+            
+//        }
 
         return new MyBTree(ndx, btree, coercer, successor, null/*comparator*/);
 
@@ -1430,102 +1449,6 @@ public class PersistenceStore implements IPersistentStore
         return (MyBTree) om.fetch(oid);
         
     }
-
-//    /**
-//     * Applies generic value conversion to String and then converts the String
-//     * to an unsigned byte[] using {@link KeyBuilder#asSortKey(Object)}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class GenericUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = 7049935096462503728L;
-//
-//        public static transient final Coercer INSTANCE = new GenericUnsignedByteArrayCoercer();
-//
-//        /**
-//         * Deserialiation constructor.
-//         */
-//        public GenericUnsignedByteArrayCoercer() {
-//            
-//        }
-//        
-//        public Object coerce(Object externalKey) {
-//
-//            if (externalKey == null)
-//                return null;
-//
-//            if (externalKey instanceof String)
-//                
-//                return KeyBuilder.asSortKey(externalKey);
-//
-//            try {
-//
-//                return KeyBuilder.asSortKey(new GValue(externalKey).getString());
-//
-//            }
-//
-//            catch (ConversionError ex) {
-//
-//                // Keep this at a low logging level since this is the
-//                // declared behavior of this coercer.
-//
-//                LinkSetIndex.log.debug("Could not convert to unicode", ex);
-//
-//                return null;
-//
-//            }
-//
-//        }
-//
-//        public boolean equals(Object obj) {
-//
-//            return this == obj || obj instanceof GenericUnsignedByteArrayCoercer;
-//
-//        }
-//        
-//    }
-
-//    /**
-//     * Applies {@link KeyBuilder#asSortKey(Object)} to convert the key into an unsigned
-//     * byte[].
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class DefaultUnsignedByteArrayCoercer implements Coercer, Serializable, Stateless {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = -4037329969828272398L;
-//
-//        public static transient final Coercer INSTANCE = new DefaultUnsignedByteArrayCoercer();
-//
-//        /**
-//         * Deserialiation constructor.
-//         */
-//        public DefaultUnsignedByteArrayCoercer() {
-//            
-//        }
-//        
-//        public Object coerce(Object externalKey) {
-//
-//            return KeyBuilder.asSortKey(externalKey);
-//            
-//        }
-//
-//        public boolean equals(Object obj) {
-//
-//            return this == obj || obj instanceof DefaultUnsignedByteArrayCoercer;
-//
-//        }
-//
-//    }
 
     /**
      * The value is a <code>long</code> integer that is the term identifier.

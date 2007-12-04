@@ -37,7 +37,7 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestKeyBufferSerializer extends TestAbstractKeyBuffer {
+public class TestKeyBufferSerializer extends AbstractKeyBufferTestCase {
 
     /**
      * 
