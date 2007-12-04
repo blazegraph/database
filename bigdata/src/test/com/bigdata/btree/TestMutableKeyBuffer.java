@@ -32,7 +32,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMutableKeyBuffer extends TestAbstractKeyBuffer {
+public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
 
     /**
      * 

@@ -45,29 +45,10 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see SuccessorUtil, which may be used to compute the successor of a value
- *      before encoding it as a component of a key.
+ * @see SuccessorUtil Compute the successor of a value before encoding it as a
+ *      component of a key.
  * 
- * @see BytesUtil#successor(byte[]), which may be used to compute the successor
- *      of an encoded key.
- * 
- * FIXME In order to support multi-part keys for GOM or the sparse row store
- * where non-terminal parts of the key are variable length Unicode it appears
- * that I will have to allow custom comparators again in the BTree. This needs
- * to get into the BTree metadata record and I need to draw together all of the
- * places where key comparison is done using {@link BytesUtil}, including
- * classes that wrap its byte[] comparation methods, such that a user-defined
- * comparator may be substituted.  This will definately be slower since keys
- * will have to be copied into a per-comparator buffer when they are stored as
- * prefix+tail in an immutable node.  The basic approach for the comparator is
- * that it needs to store the length of the variable field, read that length but
- * NOT consider it for comparison, and then compare field by field.  Any run of
- * fixed length fields can be compared as unsigned byte[]s, but you can not do
- * that for a variable length field.
- * 
- * @todo update successor tests for GOM index helper classes, perhaps by
- *       refactoring the successor utilties into a base class and then isolating
- *       their test suite from that of the key builder.
+ * @see BytesUtil#successor(byte[]) Compute the successor of an encoded key.
  * 
  * @todo introduce a mark and restore feature for generating multiple keys that
  *       share some leading prefix. in general, this is as easy as resetting the
@@ -220,6 +201,23 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * Sets the position to any non-negative length less than the current
+     * capacity of the buffer.
+     */
+    final public void position(int pos) {
+        
+        if (len < 0 || len > buf.length) {
+
+            throw new IndexOutOfBoundsException("pos=" + pos
+                    + ", but capacity=" + buf.length);
+            
+        }
+
+        len = pos;
+        
+    }
+    
     final public IKeyBuilder append(int off, int len, byte[] a) {
         
         ensureFree(len);
@@ -336,6 +334,14 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    final public boolean isUnicodeSupported() {
+
+        if (sortKeyGenerator == null) return false;
+
+        return true;
+        
+    }
+    
     /**
      * The object responsible for generating sort keys from Unicode strings.
      * 
@@ -358,23 +364,19 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(char[] v) {
-
-        return append(new String(v));
-        
-    }
+    /*
+     * Note: Dropped from the API to minimize confusion.
+     */
+//    final public IKeyBuilder append(char[] v) {
+//
+//        return append(new String(v));
+//        
+//    }
     
     /*
      * Non-optional operations.
      */
     
-    /**
-     * @todo This could be written using {@link String#toCharArray()} or {@link
-     *       String#getBytes(int, int, byte[], int)} with a post-processing
-     *       fixup of the bytes into ones complement values. The latter method
-     *       would doubtless be the fastest approach but it is deprecated in the
-     *       {@link String} api.
-     */
     public IKeyBuilder appendASCII(String s) {
         
         int len = s.length();
@@ -393,6 +395,159 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * The default pad character (a space).
+     * <p>
+     * Note: Any character may be choosen as the pad character as long as it has
+     * a one byte representation. In practice this means you can choose 0x20 (a
+     * space) or 0x00 (a nul). This limit arises in
+     * {@link #appendText(String, boolean, boolean)} which assumes that it can
+     * write a pad character (or its successor) in one byte. 0xff will NOT work
+     * since its successor is not defined within an bit string of length 8.
+     * 
+     * @todo make this a configuration option? if so then verify that the choice
+     *       (and its successor) fit in 8 bits.
+     */
+    final public byte pad = 0x20;
+
+    /**
+     * Normalize the text by truncating to no more than {@link #maxlen}
+     * characters and then stripping off trailing {@link #pad} characters.
+     */
+    /*public*/ String normalizeText(String text) {
+
+        if (text.length() > maxlen) {
+
+            /*
+             * Truncate the encoded text field to maxlen characters to prevent
+             * overflow. While the number of bytes generated by the resulting
+             * encoding is variable, the order semantics will respect only the
+             * 1st maxlen characters _regardless_ of how many bytes are required
+             * to encode those characters.
+             */
+
+            text = text.substring(0, maxlen);
+
+        }
+
+        /*
+         * Strip trailing pad "characters" from the text. This helps to ensure a
+         * canonical representation. If we did not do this then text with
+         * trailing pad characters would be encoded differently from text
+         * without trailing pad characters - even though they are supposed to be
+         * the "same".
+         */
+        {
+            int npadded = 0;
+            for (int i = text.length() - 1; i >= 0; i--) {
+                if (text.charAt(i) == pad) {
+                    npadded++;
+                    continue;
+                }
+                break;
+            }
+            if (npadded > 0) {
+                int begin = 0;
+                int end = text.length() - npadded;
+                text = text.substring(begin,end);
+            }
+        }
+
+        return text;
+
+    }
+    
+    public IKeyBuilder appendText(String text, final boolean unicode,
+            final boolean successor) {
+
+        // current length of the encoded key.
+        final int pos = this.len;
+
+        /*
+         * Normalize the text by truncating to no more than [maxlen] characters
+         * and then stripping off trailing pad characters.
+         */
+        
+        text = normalizeText( text );
+        
+        /*
+         * Encode the text as ASCII or Unicode as appropriate.
+         */
+        
+        if(unicode) {
+
+            append(text);
+            
+        } else {
+            
+            appendASCII(text);
+            
+        }
+
+        // #of bytes in the encoded text field.
+        final int encoded_len = this.len - pos;
+
+        // #of characters (not bytes) in the text.
+        final int textlen;
+        
+        if(successor) {
+
+            if (encoded_len == 0) {
+
+                /*
+                 * Note: The successor of an empty string is not defined since
+                 * it maps to an empty byte[] (an empty value space). However an
+                 * empty string is semantically equivilent to all pad characters
+                 * so we use the successor of a string containing a single pad
+                 * character, which is equivilent to a string containing a
+                 * single byte whose value is pad+1.
+                 */
+                
+                append((byte)(pad+1));
+                
+                textlen = 1;
+                
+            } else {
+
+                /*
+                 * Note: This generates the successor of the encoded text by
+                 * treading the encoded byte[] as a fixed length bit string and
+                 * finding the successor of that bit-string. The bytes in the
+                 * buffer are modified as a side-effect. A runtime exception is
+                 * thrown if there is no successor to the bit string (this is
+                 * not a plausible scenario for either ASCII or Unicode text as
+                 * the encoding would have to be all 0xff bytes for the
+                 * successor to not be defined).
+                 */
+
+                SuccessorUtil.successor(buf, pos, encoded_len);
+                
+                textlen = text.length();
+                
+            }
+            
+        } else {
+            
+            textlen = text.length();
+            
+        }
+
+        if (textlen < maxlen) {
+
+            // append a single pad byte.
+            append(pad);
+            
+            // append the run length for the trailing pad characters.
+            final int runLength = maxlen - textlen;
+
+            append((short) runLength);
+            
+        }
+
+        return this;
+        
+    }
+    
     final public IKeyBuilder append(byte[] a) {
         
         return append(0, a.length, a);
@@ -484,6 +639,32 @@ public class KeyBuilder implements IKeyBuilder {
         return this;
         
     }
+    
+    /**
+     * Return the value that will impose the lexiographic ordering as an
+     * unsigned long integer.
+     * 
+     * @param v
+     *            The signed long integer.
+     * 
+     * @return The value that will impose the lexiograph ordering as an unsigned
+     *         long integer.
+     */
+    static final /*public*/ long encode(long v) {
+
+        if (v < 0) {
+            
+            v = v - 0x8000000000000000L;
+
+        } else {
+            
+            v = v + 0x8000000000000000L;
+            
+        }
+
+        return v;
+        
+    }
 
     final public IKeyBuilder append(int v) {
 
@@ -539,20 +720,26 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(char v) {
-
-        /*
-         * Note: converting to String first produces significantly larger keys
-         * which, more important, violate the sort order expectations for
-         * characters. For example, successor in the value space of 'z' is '{'.
-         * However, the sort key generated from the String representation of the
-         * character '{' is NOT ordered after the sort key generated from the
-         * String representation of the character 'z'.  Unicode wierdness.
-         */
-
-        return append((short) v);
-        
-    }
+    /*
+     * Note: this method has been dropped from the API to reduce the
+     * possibility of confusion.  If you want Unicode semantics then use
+     * append(String).  If you want ASCII semantics then use appendASCII().
+     * If you want signed integer semantics then use append(short).
+     */
+//    final public IKeyBuilder append(char v) {
+//
+//        /*
+//         * Note: converting to String first produces significantly larger keys
+//         * which, more important, violate the sort order expectations for
+//         * characters. For example, successor in the value space of 'z' is '{'.
+//         * However, the sort key generated from the String representation of the
+//         * character '{' is NOT ordered after the sort key generated from the
+//         * String representation of the character 'z'.  Unicode wierdness.
+//         */
+//
+//        return append((short) v);
+//        
+//    }
 
     final public IKeyBuilder append(final byte v) {
 
@@ -580,6 +767,36 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * Return the value that will impose the lexiographic ordering as an
+     * unsigned byte.
+     * 
+     * @param v
+     *            The signed byte.
+     * 
+     * @return The value that will impose the lexiographic ordering as an
+     *         unsigned byte.
+     */
+    final static /*public*/ byte encode(byte v) {
+
+        int i = v;
+        
+        if (i < 0) {
+
+            i = i - 0x80;
+
+        } else {
+            
+            i = i + 0x80;
+            
+        }
+        
+        byte tmp = (byte)(i & 0xff);
+        
+        return tmp;
+        
+    }
+    
     final public IKeyBuilder appendNul() {
 
 //        return append(0);
@@ -601,7 +818,7 @@ public class KeyBuilder implements IKeyBuilder {
     /**
      * Used to unbox an application key (convert it to an unsigned byte[]).
      */
-    static private final IKeyBuilder keyBuilder = newUnicodeInstance();
+    static private final IKeyBuilder _keyBuilder = newUnicodeInstance();
 
     /**
      * Utility method converts an application key to a sort key (an unsigned
@@ -641,55 +858,80 @@ public class KeyBuilder implements IKeyBuilder {
          * state.
          */
 
-        synchronized (keyBuilder) {
+        synchronized (_keyBuilder) {
     
-            keyBuilder.reset();
-    
-            if (key instanceof Byte) {
-    
-                keyBuilder.append(((Byte) key).byteValue());
-    
-            } else if (key instanceof Character) {
-    
-                keyBuilder.append(((Character) key).charValue());
-    
-            } else if (key instanceof Short) {
-    
-                keyBuilder.append(((Short) key).shortValue());
-    
-            } else if (key instanceof Integer) {
-    
-                keyBuilder.append(((Integer) key).intValue());
-    
-            } else if (key instanceof Long) {
-    
-                keyBuilder.append(((Long) key).longValue());
-    
-            } else if (key instanceof Float) {
-    
-                keyBuilder.append(((Float) key).floatValue());
-    
-            } else if (key instanceof Double) {
-    
-                keyBuilder.append(((Double) key).doubleValue());
-    
-            } else if (key instanceof String) {
-    
-                keyBuilder.append((String) key);
-    
-            } else {
-    
-                throw new UnsupportedOperationException("Can not unbox key: "
-                        + key.getClass());
-    
-            }
-    
-            return keyBuilder.getKey();
+            _keyBuilder.reset();
+
+            _keyBuilder.append( key );
+
+            return _keyBuilder.getKey();
     
         }
     
     }
 
+    public IKeyBuilder append(Object val) {
+        
+        if (val == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+
+        if(val instanceof byte[]) {
+
+            append((byte[])val);
+
+        } else if (val instanceof Byte) {
+            
+            append(((Byte) val).byteValue());
+
+        } else if (val instanceof Character) {
+
+            // append(((Character) val).charValue());
+
+            throw new UnsupportedOperationException(
+                    "Character is not supported.  Use Short or String depending on the semantics that you want.");
+
+        } else if (val instanceof Short) {
+
+            append(((Short) val).shortValue());
+
+        } else if (val instanceof Integer) {
+
+            append(((Integer) val).intValue());
+
+        } else if (val instanceof Long) {
+
+            append(((Long) val).longValue());
+
+        } else if (val instanceof Float) {
+
+            append(((Float) val).floatValue());
+
+        } else if (val instanceof Double) {
+
+            append(((Double) val).doubleValue());
+
+        } else if (val instanceof String) {
+
+            append((String) val);
+
+        } else if (val instanceof UUID) {
+
+            append(((UUID) val));
+
+        } else {
+
+            throw new UnsupportedOperationException("Can not encode key: "
+                    + val.getClass());
+
+        }
+
+        return this;
+        
+    }
+    
     /**
      * Converts an unsigned byte into a signed byte.
      * 

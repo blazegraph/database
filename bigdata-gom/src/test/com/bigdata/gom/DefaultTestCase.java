@@ -213,7 +213,7 @@ public class DefaultTestCase extends GenericAbstractTestCase {
 
         try {
 
-            MyBTree.newCompositeKey(null, 0L);
+            MyBTree._newCompositeKey(null, 0L);
 
             fail("Expecting: " + IllegalArgumentException.class);
 
@@ -238,7 +238,7 @@ public class DefaultTestCase extends GenericAbstractTestCase {
         byte[] expected = KeyBuilder.newInstance().append(in).append(oid)
                 .getKey();
 
-        byte[] actual = MyBTree.newCompositeKey(in, oid);
+        byte[] actual = MyBTree._newCompositeKey(in, oid);
 
         assertEquals(expected, actual);
 
@@ -376,11 +376,37 @@ public class DefaultTestCase extends GenericAbstractTestCase {
         
         doSuccessorCompositeKeyTest(-1L, 0L, 12L/*oid*/);
 
-        doSuccessorCompositeKeyTest('a', 'b', 12L/*oid*/);
+        /*
+         * Note: 'char' is not supported. Use String for Unicode or Short for
+         * signed 2 byte integers.
+         */
+//        doSuccessorCompositeKeyTest('a', 'b', 12L/*oid*/);
 
-        doSuccessorCompositeKeyTest("", "\0", 12L/*oid*/);
+        /*
+         * Note: the string will be normalized by truncating to no more than 64k
+         * characters and stripping off trailing pad characters.
+         * 
+         * Note: String successors are formed quite specially when they are
+         * embedded in multi-field keys. Basically they are treated as fixed
+         * length-bit strings. In addition, since an empty string and any string
+         * formed entirely of pad characters are semantically the same the
+         * successor for these strings is also an edge case.
+         * 
+         * Note: The successor of an empty string or the successor of a string
+         * that is entirely pad characters (0x20 aka space) is formed as a
+         * string containing a single byte whose value is 0x20 + 1.
+         * 
+         * Note: The successor of any non-empty string (after normalization) is
+         * formed by treating its lexiographic encoding (e.g., as produced by
+         * the Unicode collator) as a fixed-length bit string and then adding
+         * one to that string with bit carry.
+         */
+        
+        doSuccessorCompositeKeyTest("", ""+(char)(0x20+1), 12L/*oid*/);
 
-        doSuccessorCompositeKeyTest("abc", "abc\0", 12L/*oid*/);
+        doSuccessorCompositeKeyTest(" ", ""+(char)(0x20+1), 12L/*oid*/);
+
+        doSuccessorCompositeKeyTest("abc", "abd", 12L/*oid*/);
            
     }
     
@@ -393,9 +419,9 @@ public class DefaultTestCase extends GenericAbstractTestCase {
         // sort keys are in the correct order.
         assertTrue(BytesUtil.compareBytes(key, key1) < 0);
 
-        final byte[] compositeKey = MyBTree.newCompositeKey(key,oid); // composite key for k
+        final byte[] compositeKey = MyBTree._newCompositeKey(key,oid); // composite key for k
         
-        final byte[] compositeKey1 = MyBTree.newCompositeKey(key1,oid); // composite key for successor(k).
+        final byte[] compositeKey1 = MyBTree._newCompositeKey(key1,oid); // composite key for successor(k).
 
         // composite sort keys are in the correct order.
         assertTrue(BytesUtil.compareBytes(compositeKey, compositeKey1) < 0);

@@ -29,11 +29,15 @@ package com.bigdata.btree;
  * is followed by the remainder of each key in key order.
  * <p>
  * Note: This class needs to know the maximum #of keys as well as the #of keys
- * so that the branching factor of a node or leaf does not change as a result
- * of serializing an immutable key buffer and then converting it to a mutable
- * key buffer.  It is essential that we maintain this information since the
- * branching factor of all nodes in a given level of the tree must be the same
- * in order for the btree split and join operations to work correctly.
+ * so that the branching factor of a node or leaf does not change as a result of
+ * serializing an immutable key buffer and then converting it to a mutable key
+ * buffer. It is essential that we maintain this information since the branching
+ * factor of all nodes in a given level of the tree must be the same in order
+ * for the btree split and join operations to work correctly.
+ * 
+ * @todo use a delta from key to key specifying how much to be reused - works
+ *       well if deserializing keys or for a linear key scan, but not for binary
+ *       search on the raw node/leaf record.
  * 
  * @todo verify that keys are monotonic during constructor from mutable keys and
  *       during de-serialization.
@@ -45,10 +49,9 @@ package com.bigdata.btree;
  * 
  * @todo even more compact serialization of sorted byte[]s is doubtless
  *       possible, perhaps as a patricia tree, trie, or other recursive
- *       decomposition of the prefixes.  figure out what decomposition
- *       is the most compact, easy to compute from sorted byte[]s, and
- *       supports fast search on the keys to identify the corresponding
- *       values.
+ *       decomposition of the prefixes. figure out what decomposition is the
+ *       most compact, easy to compute from sorted byte[]s, and supports fast
+ *       search on the keys to identify the corresponding values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

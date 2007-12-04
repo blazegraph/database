@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
+import java.util.Random;
+
+import com.bigdata.rawstore.Bytes;
+
 import junit.framework.TestCase2;
 
 /**
@@ -408,8 +413,7 @@ public class TestSuccessorUtil extends TestCase2 {
     /**
      * Verifies that there is no successor for positive infinity.
      */
-
-    public void test_GValue_successor_Number_Float_positiveInfinity()
+    public void test_keyBuilder_successor_float_positiveInfinity()
     {
 
         try {
@@ -426,4 +430,160 @@ public class TestSuccessorUtil extends TestCase2 {
 
     }
 
+    /**
+     * Test computation of the successor of a fixed length bit string.
+     */
+    public void test_bitString_successor() {
+        
+        // simplest case
+        {
+            
+            // original data.
+            byte[] b = new byte[]{0x00};
+            
+            // successor.
+            byte[] s = SuccessorUtil.successor(b.clone());
+            
+            // expected successor.
+            byte[] e = new byte[]{0x01};
+            
+            assertEquals(e,s);
+            
+        }
+
+        // successor of the smallest value.
+        {
+            
+            // original data.
+            byte[] b = new byte[]{Byte.MIN_VALUE};
+            
+            // successor.
+            byte[] s = SuccessorUtil.successor(b.clone());
+            
+            // expected successor.
+            byte[] e = new byte[]{Byte.MIN_VALUE+1};
+            
+            assertEquals(e,s);
+            
+        }
+
+        // handle overflow in the 1st byte.
+        {
+
+            // original data.
+//            byte[] b = new byte[]{0x00,Byte.MAX_VALUE};
+            byte[] b = new byte[]{0x00,-1};
+            
+            // successor.
+            byte[] s = SuccessorUtil.successor(b.clone());
+            
+            System.err.println("b: "+Arrays.toString(b));
+            System.err.println("s: "+Arrays.toString(s));
+            
+            // expected successor.
+//            byte[] e = new byte[]{0x01,Byte.MIN_VALUE};
+            byte[] e = new byte[]{0x01,0x00};
+            
+            assertEquals(e,s);
+            
+        }
+
+        // no successor - byte[0].
+        {
+
+            // original data.
+            byte[] b = new byte[]{};
+            
+            // successor.
+            try {
+                SuccessorUtil.successor(b.clone());
+                fail("Expecting: " + NoSuccessorException.class);
+            } catch (NoSuccessorException ex) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+
+        }
+
+        // no successor - byte[1].
+        {
+
+            // original data.
+//            byte[] b = new byte[]{Byte.MAX_VALUE};
+            byte[] b = new byte[]{-1};
+            
+            // successor.
+            try {
+                SuccessorUtil.successor(b.clone());
+                fail("Expecting: " + NoSuccessorException.class);
+            } catch (NoSuccessorException ex) {
+                System.err.println("Ignoring expected exception: "+ex);
+            }
+            
+        }
+        
+        // compare behavior with (int+1)
+        {
+        
+//            Random r = new Random();
+            
+//            int LIMIT = 100000;
+//            int LIMIT = 1;
+            
+//            System.err.println("-1: " + Integer.toBinaryString(-1));
+//            System.err.println("MAX_BYTE: " + Integer.toBinaryString(Byte.MAX_VALUE));
+//            System.err.println("MIN_BYTE: " + Integer.toBinaryString(Byte.MIN_VALUE));
+            
+            for(int i=Short.MIN_VALUE; i<=Short.MAX_VALUE; i++) {
+
+//                int v = r.nextInt();
+//                int v = 1197420429;
+//                int v = -1950493185;
+
+                short v = (short)i;
+                
+//                short v = -1;
+                
+                // original data.
+                byte[] b = KeyBuilder.asSortKey(v);
+
+                if(true){
+                boolean allones = true;
+                for(int k=0;k<b.length;k++) {
+                    if(b[k]!=-1) allones = false;
+                }
+                if(allones) {
+                    System.err.println("short "+v+" is all ones.");
+                }}
+                if (v == Short.MAX_VALUE) {
+                    // no successor.
+                    try {
+//                        b = KeyBuilder.asSortKey(v); // @todo remove.
+                        SuccessorUtil.successor(b.clone());
+                        fail("Expecting: " + NoSuccessorException.class);
+                    } catch (NoSuccessorException ex) {
+                        System.err
+                                .println("Ignoring expected exception: " + ex);
+                    }
+                } else {
+                    // expected successor.
+                    byte[] e = KeyBuilder.asSortKey((short) (v + 1));
+
+                    // successor.
+                    byte[] s = SuccessorUtil.successor(b.clone());
+
+                    if (false) {
+                        System.err.println("v = " + v);
+                        System.err.println("b: " + Arrays.toString(b));
+                        System.err.println("s: " + Arrays.toString(s));
+                        System.err.println("e: " + Arrays.toString(e));
+                    }
+
+                    assertEquals(e, s);
+                }
+            }
+            
+        }
+        
+    }
+    
 }

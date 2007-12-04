@@ -37,6 +37,11 @@ package com.bigdata.btree;
  * 
  * @todo reconcile with the GOM SuccessorUtil.
  * 
+ * @todo There is no successor method for UUID. This should be treated as a
+ *       special case of a fixed length field. Handle as two longs. add 1 to the
+ *       low order bits. on overflow add one to the high order bits. on overflow
+ *       of the high order bits there is no successor.
+ * 
  * @see BytesUtil#successor(byte[]), which computes the successor of a variable
  *      length unsigned byte[].
  */
@@ -478,4 +483,79 @@ public class SuccessorUtil {
 
     }
 
+    /**
+     * Modifies a byte[] as a side-effect so that it represents its successor
+     * when interpreted as a fixed length bit string. The successor is formed by
+     * adding ONE (1) to the low byte and handling overflow.
+     * 
+     * @param b
+     * 
+     * @return b, which has been modified as a side-effect.
+     * 
+     * @throws NoSuccessorException
+     *             If all bytes overflow.
+     * @throws NoSuccessorException
+     *             If the byte[] has zero length.
+     */
+    static public byte[] successor(byte[] b) {
+        
+        return successor(b, 0, b.length);
+        
+    }
+    
+    /**
+     * Modifies a byte[] as a side-effect so that it represents its successor
+     * when interpreted as a fixed length bit string. The successor is formed by
+     * adding ONE (1) to the low byte and handling overflow.
+     * 
+     * @param b
+     *            The byte[].
+     * @param off
+     *            The offset of the start of the bitstring in the byte[].
+     * @param len
+     *            The #of bytes in the bit string within the byte[].
+     * 
+     * @return b, which has been modified as a side-effect.
+     * 
+     * @throws NoSuccessorException
+     *             If all bytes overflow.
+     * @throws NoSuccessorException
+     *             If the byte[] has zero length.
+     */
+    static public byte[] successor(byte[] b, int off, int len) {
+
+        if (len == 0) {
+
+            throw new NoSuccessorException();
+            
+        }
+        
+        boolean overflow = false;
+
+        for (int i = len - 1; i >= off; i--) {
+
+//            overflow = b[i] == Byte.MAX_VALUE;
+            overflow = b[i] == (byte)-1; // Note: largest 8-bit value == 1111 1111
+            
+            b[i]++;
+            
+            if(!overflow) return b;
+            
+//            int tmp = ((int)b[i]) + 1;
+//            
+//            /*
+//             * Negative integers will be sign extended so we onlyStrip off the sign bit when checking overflow so that the sign
+//             * bit does not get extended to a large negative integer.
+//             */
+//            overflow = b[i] > 0 && tmp > Byte.MAX_VALUE;
+            
+//            b[i] = (byte)(tmp & 0xff);
+            
+        }
+        
+        // overflow for the entire bit string.
+        throw new NoSuccessorException();
+        
+    }
+    
 }
