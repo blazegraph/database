@@ -1307,7 +1307,16 @@ public class PersistenceStore implements IPersistentStore
             
             coercer = new DefaultUnicodeCoercer(); // coerce to String.
             
-            successor = new StringSuccessor();
+//            successor = new StringSuccessor();
+            
+            /*
+             * FIXME We need to use special successor semantics both for generic
+             * type conversion and for indices that are explicitly typed as
+             * having String attributes. The correct successor semantics are
+             * available using IKeyBuilder#appendText(...) and specifying
+             * successor := true.
+             */
+            successor = null;
 
         } else if (type == Byte.class   || type == Character.class
                 || type == Short.class  || type == Integer.class
@@ -1364,7 +1373,8 @@ public class PersistenceStore implements IPersistentStore
                 
             } else if (type == String.class) {
                 
-                successor = new StringSuccessor();
+//                successor = new StringSuccessor();
+                successor = null;
                 
             } else {
                 
@@ -1413,7 +1423,7 @@ public class PersistenceStore implements IPersistentStore
             log.debug("duplicateKeys=" + ndx.getDuplicateKeys());
             log.debug("coercer="
                     + (coercer == null ? "N/A" : coercer.getClass().getName()));
-            log.debug("successor=" + successor.getClass().getName());
+            log.debug("successor=" + (successor==null?"N/A":successor.getClass().getName()));
 
         }
 

@@ -51,6 +51,7 @@ import java.util.Comparator;
 import java.util.NoSuchElementException;
 
 import org.CognitiveWeb.generic.core.AbstractBTree;
+import org.CognitiveWeb.generic.core.Generic;
 import org.CognitiveWeb.generic.core.ILinkSetIndexIterator;
 import org.CognitiveWeb.generic.core.LinkSetIndex;
 import org.CognitiveWeb.generic.core.ndx.Coercer;
@@ -59,6 +60,7 @@ import org.CognitiveWeb.generic.core.om.BaseObject;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.IJournal;
@@ -372,6 +374,126 @@ final public class MyBTree extends AbstractBTree {
 
         return new LinkSetIndexIterator(ndx, fromKey, toKey, resolve);
 
+    }
+
+    /**
+     * Note: this is overriden completely since we need to handle the successor
+     * of a String value in a special manner using
+     * {@link IKeyBuilder#appendText(String, boolean, boolean)}.
+     */
+    protected Object getInternalKey(//
+            final boolean indexEverything,//
+            final boolean duplicateKeys,//
+            final boolean coerce,//
+            final boolean successor,//
+            /*final*/ Object key,//
+            final Generic what//
+            ) {
+        
+        if (successor && _successor != null) {
+
+            /*
+             * Note: take the successor before we do anything else (but not for
+             * keys that coerce to String which have special successor semantics
+             * are are handled below).
+             */
+
+            key = _successor.successor(key);
+            
+        }
+
+        final Object coercedKey = ( coerce && _coercer != null ? _coercer.coerce(key) : key );
+
+        if (coercedKey == null && !indexEverything) {
+
+            /*
+             * Note: Unless we are indexing everything we will drop out keys
+             * that coerce to [null].
+             */
+
+            return null;
+
+        }
+
+        Object internalKey = coercedKey;
+
+        if (duplicateKeys) {
+
+            /*
+             * Note: If we are permitting duplicate external keys, then we
+             * always wrap the coerced key as a composite key. This let's us
+             * impose a total ordering over the index even when the external
+             * (and coerced) keys are not unique.
+             */
+
+//            internalKey = newCompositeKey(coercedKey, (what == null ? 0L : what
+//                    .getOID()));
+
+            final long oid = (what == null ? 0L : what.getOID());
+            
+            if(coercedKey instanceof String) {
+
+                synchronized(keyBuilder) {
+                    
+                    final String text = (String) coercedKey;
+                    
+                    keyBuilder.reset();
+                    
+                    // Note: handles successor of a String.
+                    keyBuilder.appendText(text, true/*unicode*/, successor );
+                    
+                    keyBuilder.append(oid);
+                    
+                    final byte[] out = keyBuilder.getKey();
+                    
+                    return out;
+                    
+                }
+                
+            } else {
+            
+                final byte[] in = KeyBuilder.asSortKey(coercedKey);
+                
+                final byte[] out = new byte[in.length /* + 1 */+ Bytes.SIZEOF_LONG];
+
+                // copy the coerced key
+                System.arraycopy(in, 0, out, 0, in.length);
+
+                // // nul delimiter.
+                // out[out.length] = '\0';
+
+                // append the object identifier.
+
+                final byte[] oidbytes = KeyBuilder.asSortKey(oid);
+
+                System.arraycopy(oidbytes, 0, out, in.length/* +1 */,
+                        oidbytes.length);
+
+                return out;
+
+            }
+
+        } else if(successor && _successor == null) {
+            
+            /*
+             * Normally a string key is transparently converted to a byte[] by
+             * the index access methods on the bigdata BTree object. However in
+             * the case where we need to compute the successor of the key we
+             * explicitly convert the String to a byte[] and form the successor
+             * by appending a nul byte.
+             */
+            
+            // convert to byte[] using collator.
+            byte[] out = KeyBuilder.asSortKey((String)coercedKey);
+            
+            out = BytesUtil.successor(out);
+            
+            internalKey = out;
+            
+        }
+
+        return internalKey;
+        
     }
 
     /**
