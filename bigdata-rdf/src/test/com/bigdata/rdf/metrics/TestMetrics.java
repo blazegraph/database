@@ -49,17 +49,8 @@ import com.bigdata.rdf.store.DataLoader;
 /**
  * Test harness for loading randomly generated files into a repository.
  * 
- * FIXME modify to collect explicitly the time for inference (it may already be
- * in one of the fields) and to get the #of entailments, etc. out of bigdata.
- * Several columns are zeros.
- * 
  * @todo Modidy to permit running as load N then close vs load+close for each of
  *       N?
- * 
- * @todo Modify to permit processing N documents (where N might be all) without
- *       explicitly flushing the buffers to the store after each document.  This
- *       may be important given the use of UUIDs in the sample data in order for
- *       the ordered writes to remain effective as the size of the store grows.
  * 
  * @todo Support concurrent query against the repository. Concurrent query
  *       should begin after some number of files or triples have been loaded.
@@ -727,9 +718,17 @@ public class TestMetrics extends AbstractMetricsTestCase {
         File[] files = dir.listFiles();
         
         for( int i=0; i<files.length; i++ ) {
+
+            /*
+             * FIXME This means that we will limit the data to what can fit
+             * easily into Excel.
+             * 
+             * This should be an option rather than hardwired into the code.
+             */
+            if(filesLoaded>60000) return;
             
             File file = files[ i ];
-            
+    
             if( file.isHidden() ) continue;
             
             if( file.isDirectory() ) {
