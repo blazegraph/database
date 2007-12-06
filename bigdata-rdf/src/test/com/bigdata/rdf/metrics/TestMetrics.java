@@ -471,7 +471,11 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             metricsWriter.flush();
             
-            ResourceManager.log.warn(store.usage());
+            String usage = store.usage();
+            
+            System.err.println(usage);
+            
+            ResourceManager.log.warn(usage);
         
         }
         
