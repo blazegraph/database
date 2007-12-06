@@ -470,12 +470,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
              */
 
             metricsWriter.flush();
-            
-            String usage = store.usage();
-            
-            System.err.println(usage);
-            
-            ResourceManager.log.warn(usage);
+
+            usage();
         
         }
         
@@ -688,9 +684,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         // final commit on the store.
         store.commit();
-        
-        log.warn("Final usage:\n"+store.usage());
 
+        usage();
+        
         try {
         
             metricsWriter.flush();
@@ -709,6 +705,20 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
     }
 
+    /**
+     * Writes information about the store and the indices on stderr and the
+     * {@link ResourceManager#log}.
+     */
+    private void usage() {
+        
+        String usage = store.usage();
+        
+        System.err.println(usage);
+        
+        ResourceManager.log.warn(usage);
+
+    }
+    
     /**
      * Load files in the documents directory.
      */
