@@ -141,8 +141,11 @@ public class TMStatementBuffer implements IStatementBuffer {
 
             Properties properties = database.getProperties();
             
-            // turn off justifications for the tempStore.
-            properties.setProperty(Options.JUSTIFY, "false");
+//            // turn off justifications for the tempStore.
+//            properties.setProperty(Options.JUSTIFY, "false");
+        
+            // turn off the lexicon since we will only use the statement indices.
+            properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON, "false");
             
             tempStore = new TempTripleStore(properties);
             
@@ -330,7 +333,15 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         if (tempStore != null && tempStore.getBackingStore().isOpen()) {
 
-            tempStore.close();
+            try {
+
+                tempStore.close();
+                
+            } catch (Throwable t) {
+             
+                log.warn("Problem closing temp store: " + t);
+                
+            }
 
         }
 

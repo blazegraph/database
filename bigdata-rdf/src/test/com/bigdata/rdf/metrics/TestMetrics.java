@@ -56,6 +56,11 @@ import com.bigdata.rdf.store.DataLoader;
  * @todo Modidy to permit running as load N then close vs load+close for each of
  *       N?
  * 
+ * @todo Modify to permit processing N documents (where N might be all) without
+ *       explicitly flushing the buffers to the store after each document.  This
+ *       may be important given the use of UUIDs in the sample data in order for
+ *       the ordered writes to remain effective as the size of the store grows.
+ * 
  * @todo Support concurrent query against the repository. Concurrent query
  *       should begin after some number of files or triples have been loaded.
  *       The query concurrency should be a parameter so that we can test both
@@ -362,7 +367,6 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * @throws IOException
      *             If there is a problem writing on the metrics log.
      */
-
     protected void logMetrics(Trial t) throws IOException {
         
         filesLoaded++;
@@ -371,6 +375,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
         totalCommitTime += t.commitTime;
         totalTransactionTime += t.transactionTime;
         totalToldTriples += t.toldTriples;
+        totalInferenceCount += t.inferencesAdded;
+        totalProofCount += t.proofsAdded;
         
         // filesLoaded
         metricsWriter.write(""+filesLoaded+", ");
@@ -392,11 +398,11 @@ public class TestMetrics extends AbstractMetricsTestCase {
         // toldTriples
         metricsWriter.write(""+t.toldTriples+", ");
         // toldTriplesPerSec1 (excluding commit processing)
-        metricsWriter.write(nf.format(getUnitsPerSecond(t.toldTriples,
-                t.loadTime))+", ");
+        metricsWriter.write((t.loadTime==0?"0":nf.format(getUnitsPerSecond(t.toldTriples,
+                t.loadTime)))+", ");
         // toldTriplesPerSec2 (including commit processing)
-        metricsWriter.write(nf.format(getUnitsPerSecond(t.toldTriples,
-                t.transactionTime))+", ");
+        metricsWriter.write((t.transactionTime==0?"0":nf.format(getUnitsPerSecond(t.toldTriples,
+                t.transactionTime)))+", ");
 //        metricsWriter.write(""
 //                + ((toldTriplesLoaded == 0 || elapsedLoadTime == 0) ? 0
 //                        : (toldTriplesLoaded / ((elapsedLoadTime < 1000 ? 1000
@@ -433,8 +439,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
         metricsWriter.write(""+t.literalsAdded+", " );
         metricsWriter.write(""+totalToldTriples+", "); // available for all stores.
         metricsWriter.write(""+t.statementCount1+", ");
-        metricsWriter.write(""+t.inferenceCount1+", ");
-        metricsWriter.write(""+t.proofCount1+", ");
+        metricsWriter.write(""+totalInferenceCount+", ");
+        metricsWriter.write(""+totalProofCount+", ");
         metricsWriter.write(""+t.uriCount1+", ");
         metricsWriter.write(""+t.bnodeCount1+", ");
         metricsWriter.write(""+t.literalCount1+", ");
@@ -445,13 +451,37 @@ public class TestMetrics extends AbstractMetricsTestCase {
         metricsWriter.write(""+(t.error == null?"Ok":t.error.getMessage())+", ");
         // filename
         metricsWriter.write(""+t.file+"\n");
-        /*
-         * Note: this may slow things down but it makes the data safe and you
-         * can tail the log to see what is happening.
-         */
-        metricsWriter.flush();
-        System.err.println("files loaded: "+filesLoaded+", file="+t.file);
-//        System.err.println("Loaded "+toldTriples+" told triples from file: " + file);
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("#loaded=" + filesLoaded
+//                + ", told="+t.toldTriples
+                + ", told="+ totalToldTriples
+                + ", inf="+totalInferenceCount
+                + ", proofs="+totalProofCount
+//                + ")"
+                + " in "
+                + t.transactionTime
+                + "(ms): average stmts/sec="+ fpf.format(getUnitsPerSecond((totalToldTriples+totalInferenceCount),elapsedLoadTime))
+//                + ", file=" + t.file
+                );
+    
+        System.err.println(sb.toString());
+        
+        if (filesLoaded % 1000 == 0) {
+
+            /*
+             * Note: this will slow things down a bit since it will sync the
+             * disk but it makes the data safe and you can tail the log to see
+             * what is happening.
+             */
+
+            metricsWriter.flush();
+            
+            log.warn(store.usage());
+        
+        }
+        
     }
 
     /**
@@ -593,6 +623,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * since triples may dupicate one another).
      */
     long totalToldTriples = 0L;
+    long totalInferenceCount = 0L;
+    long totalProofCount = 0L;
 
     private DataLoader dataLoader;
 
@@ -627,6 +659,14 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
         dataLoader = store.getDataLoader();
         
+        /*
+         * Note: disables auto-flush of the statement buffer after each document
+         * allowing the data loader to approximate the behavior of a load
+         * document load.
+         */
+
+        dataLoader.setFlush(false);
+        
         writeMetricsLogHeaders();
         
     }
@@ -634,6 +674,12 @@ public class TestMetrics extends AbstractMetricsTestCase {
     public void tearDown() throws Exception
     {
 
+        if(!dataLoader.getFlush()) {
+            
+            dataLoader.flush();
+            
+        }
+        
         if(true) {
 
             log.warn("Computing closure of the database.");
@@ -643,46 +689,26 @@ public class TestMetrics extends AbstractMetricsTestCase {
             
         }
         
+        // final commit on the store.
+        store.commit();
+        
         log.warn("Final usage:\n"+store.usage());
+
+        try {
+        
+            metricsWriter.flush();
+
+            metricsWriter.close();
+
+        } catch (Throwable t) {
+            
+            log.warn("Problem closing/flushing metrics file: " + t, t);
+            
+        }
         
         super.tearDown();
 
-        // After shutdown.
-        writeStatistics();
-
         dataLoader = null;
-        
-    }
-
-    /**
-     * Write general statistics (includes access path data).
-     */
-    public void writeStatistics()
-    {
-
-//        File file = statisticsFile;
-//        
-//        System.err.println( "Writing: "+file );
-//        
-//        try {
-//
-//            Writer w = new FileWriter( file );
-//        
-//            m_stats.writeOn( w );
-//            
-//            w.flush();
-//            
-//            w.close();
-//            
-//            System.err.println( "Wrote: "+file );
-//            
-//        }
-//
-//        catch( IOException ex ) {
-//            
-//            log.error( "Could not write: "+file, ex );
-//            
-//        }
         
     }
 
@@ -869,10 +895,10 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             // #of statements in the repository (before the trial).
             final int statementCount0 = store.getStatementCount();
-            // @todo inference count.
-            final int inferenceCount0 = 0;
+//            // @todo inference count.
+//            final int inferenceCount0 = 0;
             // proof count.
-            final int proofCount0 = 0;
+            final int proofCount0 = store.getJustificationCount();
             // uri count.
             final int uriCount0 = store.getURICount();
             // bnode count.
@@ -951,10 +977,10 @@ public class TestMetrics extends AbstractMetricsTestCase {
             
             // total statement count (axioms + inferences + told triples)
             statementCount1 = store.getStatementCount();
-            // @todo inference count.
-            inferenceCount1 = 0;
+//            // @todo inference count.
+//            inferenceCount1 = 0;
             // proof count.
-            proofCount1 = 0;
+            proofCount1 = store.getJustificationCount();
             // uri count.
             uriCount1 = store.getURICount();
             // bnode count.
@@ -963,7 +989,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
             literalCount1 = store.getLiteralCount();
 
             statementsAdded = statementCount1 - statementCount0;
-            inferencesAdded = inferenceCount1 - inferenceCount0;
+//            inferencesAdded = inferenceCount1 - inferenceCount0;
+            inferencesAdded = loadStats.closureStats.nentailments;
 //            int explicitAdded   = statementsAdded - inferencesAdded;
             proofsAdded     = proofCount1 - proofCount0;
             urisAdded       = uriCount1 - uriCount0;
@@ -971,33 +998,10 @@ public class TestMetrics extends AbstractMetricsTestCase {
             literalsAdded   = literalCount1 - literalCount0;
             
             if(error!=null) {
+                
                 error.printStackTrace(System.err);
-            } else {
-            
-            System.err.println("Loaded "+toldTriples+" told triples from file: " + file);
-            System.err
-                    .println("New   statements="
-                            + statementsAdded
-                            + " (told="
-                            + toldTriples
-                            + "+inferred="
-                            + inferencesAdded
-                            + "), proofs="
-                            + proofsAdded
-                            + " in "
-                            + transactionTime
-                            + "(ms): stmts/sec="
-                            + getUnitsPerSecond(statementsAdded, transactionTime)
-//                            + ((statementsAdded == 0 || transactionTime == 0) ? 0
-//                                    : (statementsAdded / ((transactionTime < 1000 ? 1000
-//                                            : transactionTime) / 1000)))
-                                            );
-            System.err
-                    .println("Total statements=" + statementCount1
-                            + ", inferences=" + inferenceCount1 + ", proofs="
-                            + proofCount1);
-            
-        }
+                
+            }
 
         }
         
@@ -1104,9 +1108,6 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             // load the data files.
             testMetrics.loadFiles();
-            
-            // final commit on the store.
-            testMetrics.store.commit();
             
         } finally {
             

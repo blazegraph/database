@@ -99,7 +99,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
     public IIndex registerIndex(String name) {
     
         return registerIndex(name, new BTree(this,
-                BTree.DEFAULT_BRANCHING_FACTOR,
+                BTree.DEFAULT_BRANCHING_FACTOR, // @todo configurable.
                 UUID.randomUUID(),
                 ByteArrayValueSerializer.INSTANCE));
         

@@ -73,6 +73,7 @@ import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.inf.SPOJustificationIterator;
+import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -185,7 +186,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * This is used to conditionally enable the logic to retract justifications
      * when the corresponding statements is retracted.
      */
-    final private boolean justify;
+    final protected boolean justify;
+
+    /**
+     * This is used to conditionally disable the lexicon support, principally in
+     * conjunction with a {@link TempTripleStore}.
+     */
+    final protected boolean lexicon;
     
     /**
      * Used to generate the compressed sort keys for the
@@ -225,6 +232,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     public static interface Options extends InferenceEngine.Options,
             com.bigdata.journal.Options, KeyBuilder.Options {
 
+        /**
+         * Boolean option (default <code>true</code>) enables support for the
+         * lexicon (the forward and backward term indices). When
+         * <code>false</code>, this option disables Unicode support for the
+         * {@link RdfKeyBuilder} and causes the lexicon indices to not be
+         * registered. This can be safely turned off for the
+         * {@link TempTripleStore} when only the statement indices are to be
+         * used.
+         */
+        public static final String LEXICON = "lexicon"; 
+
+        public static final String DEFAULT_LEXICON = "true"; 
+        
     }
     
     /**
@@ -249,14 +269,28 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 Options.JUSTIFY,
                 Options.DEFAULT_JUSTIFY));
 
+        log.info(Options.JUSTIFY+"="+justify);
+
+        this.lexicon = Boolean.parseBoolean(properties.getProperty(
+                Options.LEXICON,
+                Options.DEFAULT_LEXICON));
+
+        log.info(Options.LEXICON+"="+lexicon);
+
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
         addNamespace(OWL.NAMESPACE, "owl");
         addNamespace(XmlSchema.NAMESPACE, "xsd");
-
-        keyBuilder = new RdfKeyBuilder(KeyBuilder
-                .newUnicodeInstance(properties));
+        
+        if (lexicon) {
+            // unicode enabled.
+            keyBuilder = new RdfKeyBuilder(KeyBuilder
+                    .newUnicodeInstance(properties));
+        } else {
+            // no unicode support.
+            keyBuilder = new RdfKeyBuilder(KeyBuilder.newInstance());
+        }
         
     }
     
@@ -488,6 +522,18 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     final public int getStatementCount() {
         
         return getSPOIndex().rangeCount(null,null);
+        
+    }
+    
+    final public int getJustificationCount() {
+        
+        if(justify) {
+            
+            return getJustificationIndex().rangeCount(null, null);
+            
+        }
+        
+        return 0;
         
     }
     
@@ -2110,7 +2156,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             // task will write justifications on the justifications index.
             AtomicInteger nwrittenj = new AtomicInteger();
-            {
+            if(justify) {
 
                 IJustificationIterator jitr = new JustificationIterator(
                         getJustificationIndex(), 0/* capacity */, true/* async */);
@@ -2128,7 +2174,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 futures = writeService.invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
-                elapsed_JST = futures.get(1).get();
+                if(justify) {
+                    elapsed_JST = futures.get(1).get();
+                } else {
+                    elapsed_JST = 0;
+                }
 
             } catch(InterruptedException ex) {
                 
@@ -2140,9 +2190,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             }
 
-            log.info("Copy wrote " + nwritten + " statements in " + elapsed_SPO
-                    + "ms and " + nwrittenj + " justifications in "
-                    + elapsed_JST + "ms");
+            log.info("Copied "
+                    + nwritten
+                    + " statements in "
+                    + elapsed_SPO
+                    + "ms"
+                    + (justify ? (" and " + nwrittenj + " justifications in "
+                            + elapsed_JST + "ms") : ""));
             
             return nwritten.get();
             
@@ -2600,11 +2654,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 tasks.add(new IndexWriter(true/* clone */, KeyOrder.OSP,
                         filter));
 
-                if(numStmts>1000) {
-
-                    log.info("Writing " + numStmts + " statements...");
-                    
-                }
+//                if(numStmts>1000) {
+//
+//                    log.info("Writing " + numStmts + " statements...");
+//                    
+//                }
 
                 final List<Future<Long>> futures;
                 final long elapsed_SPO;
@@ -2633,10 +2687,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 if (numStmts > 1000) {
                 
-                    log.info("in " + elapsed + "ms; sort=" + sortTime
-                        + "ms, keyGen+insert=" + insertTime + "ms; spo="
-                        + elapsed_SPO + "ms, pos=" + elapsed_POS + "ms, osp="
-                        + elapsed_OSP + "ms");
+                    log.info("Wrote " + numStmts + " statements in " + elapsed
+                            + "ms; sort=" + sortTime + "ms, keyGen+insert="
+                            + insertTime + "ms; spo=" + elapsed_SPO
+                            + "ms, pos=" + elapsed_POS + "ms, osp="
+                            + elapsed_OSP + "ms");
                     
                 }
 

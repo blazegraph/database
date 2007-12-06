@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -40,12 +39,11 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.openrdf.sesame.constants.RDFFormat;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.TMStatementBuffer;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
-import com.bigdata.rdf.rio.IRioLoader;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
@@ -54,7 +52,7 @@ import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
 
 /**
- * A utility class to facility loading RDF data into an
+ * A utility class to efficiently load RDF data into an
  * {@link AbstractTripleStore} without using Sesame API.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -103,15 +101,76 @@ public class DataLoader {
     }
     
     /**
-     * Used to buffer writes. This will be a {@link TMStatementBuffer} iff we are
-     * using {@link ClosureEnum#Incremental} and a {@link StatementBuffer}
+     * Used to buffer writes. This will be a {@link TMStatementBuffer} iff we
+     * are using {@link ClosureEnum#Incremental} and a {@link StatementBuffer}
      * otherwise.
+     * <p>
+     * Note: The same {@link #buffer} is reused by each loader so that we can on
+     * the one hand minimize heap churn and on the other hand disable auto-flush
+     * when loading a series of small documents.
+     * <p>
+     * Note: When truth maintenance is enabled the {@link #buffer} will write
+     * onto a local {@link TemporaryStore} and writes will be accumulated until
+     * the {@link #doClosure()} is invoked, which will update the database as
+     * appropriate. Otherwise the {@link #buffer} will write onto the database.
      */
-    private final IStatementBuffer buffer;
+    protected final IStatementBuffer buffer;
     
     private final CommitEnum commitEnum;
     
     private final ClosureEnum closureEnum;
+    
+    private boolean flush = true;
+    
+    public boolean setFlush(boolean newValue) {
+        
+        boolean ret = this.flush;
+        
+        this.flush = newValue;
+        
+        return ret;
+        
+    }
+    
+    /**
+     * When <code>true</code> (the default) the {@link IStatementBuffer} is
+     * flushed by each {@link #loadData(String, String, RDFFormat)} or
+     * {@link #loadData(String[], String[], RDFFormat[])} operation and when
+     * {@link #doClosure()} is requested. When <code>false</code> the caller
+     * is responsible for flushing the {@link #buffer}.
+     * <p>
+     * This behavior MAY be disabled if you want to chain load a bunch of small
+     * documents without flushing to the backing store after each document and
+     * {@link #loadData(String[], String[], RDFFormat[])} is not well-suited to
+     * your purposes. This can be much more efficient, approximating the
+     * throughput for large document loads. However, the caller MUST invoke
+     * {@link #flush()} once all documents are loaded successfully. If an error
+     * occurs during the processing of one or more documents then the entire
+     * data load should be discarded.
+     * 
+     * @return The current value.
+     */
+    public boolean getFlush() {
+        
+        return flush;
+        
+    }
+    
+    /**
+     * Flush the {@link IStatementBuffer} to the backing store.
+     * <p>
+     * Note: If you disable auto-flush AND you are not using truth maintenance
+     * then you MUST explicitly invoke this method once you are done loading
+     * data sets in order to flush the last chunk of data to the store. In all
+     * other conditions you do NOT need to call this method. However it is
+     * always safe to invoke this method - if the buffer is empty the method
+     * will be a NOP.
+     */
+    public void flush() {
+
+        buffer.flush();
+        
+    }
     
     /**
      * How the {@link DataLoader} will maintain closure on the database.
@@ -398,6 +457,13 @@ public class DataLoader {
             
         }
 
+        if(flush) {
+            /*
+             * Flush the buffer after the document(s) have been loaded.
+             */
+            buffer.flush();
+        }
+        
         if (commitEnum==CommitEnum.Batch) {
 
             log.info("Commit after batch of "+resource.length+" resources");
@@ -435,8 +501,11 @@ public class DataLoader {
         
         log.info( "loading: " + resource );
         
-        IRioLoader loader = new PresortRioLoader(buffer);
+        PresortRioLoader loader = new PresortRioLoader(buffer);
 
+        // disable auto-flush - caller will handle flush of the buffer.
+        loader.setFlush(false);
+        
         loader.addRioLoaderListener( new RioLoaderListener() {
             
             public void processingNotification( RioLoaderEvent e ) {
@@ -525,6 +594,16 @@ public class DataLoader {
             return stats;
             
         } catch ( Exception ex ) {
+
+            /*
+             * Note: discard anything in the buffer in case auto-flush is
+             * disabled. This prevents the buffer from retaining data after a
+             * failed load operation. The caller must still handle the thrown
+             * exception by discarding the writes already on the backing store
+             * (that is, by calling abort()).
+             */
+
+            buffer.clear();
             
             throw new RuntimeException("While loading: "+resource, ex);
             
@@ -543,6 +622,9 @@ public class DataLoader {
      * @see #removeEntailments()
      */
     public ClosureStats doClosure() {
+        
+        // flush anything in the buffer.
+        buffer.flush();
         
         final ClosureStats stats;
         
