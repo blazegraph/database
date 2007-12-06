@@ -554,26 +554,27 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // IRawStore statistics.
             {
 
-                long elapsedReadSecs = (long) (elapsedReadNanos / 1000000000.);
+                final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
 
-                String bytesReadPerSec = (elapsedReadSecs == 0L ? "N/A" : ""
+                final String bytesReadPerSec = (elapsedReadSecs == 0L ? "N/A" : ""
                         + commaFormat.format(bytesRead / elapsedReadSecs));
 
                 sb.append("store(read): #read=" + commaFormat.format(nreads)
                         + ", bytesRead=" + commaFormat.format(bytesRead)
+                        + ", secs="+secondsFormat.format(elapsedReadSecs)
                         + ", bytesPerSec=" + bytesReadPerSec
                         + ", maxRecordSize=" + commaFormat.format(maxReadSize)
                         + "\n");
                 
-                long elapsedWriteSecs = (long) (elapsedWriteNanos / 1000000000.);
+                final double elapsedWriteSecs = (elapsedWriteNanos / 1000000000.);
 
-                String bytesWrittenPerSec = (elapsedWriteSecs == 0. ? "N/A"
-                        : ""
-                                + commaFormat.format(bytesWritten
+                final String bytesWrittenPerSec = (elapsedWriteSecs == 0. ? "N/A"
+                        : ""+ commaFormat.format(bytesWritten
                                         / elapsedWriteSecs));
 
                 sb.append("store(write): #write=" + commaFormat.format(nwrites)
                         + ", bytesWritten=" + commaFormat.format(bytesWritten)
+                        + ", secs="+secondsFormat.format(elapsedWriteSecs)
                         + ", bytesPerSec=" + bytesWrittenPerSec  
                         + ", maxRecordSize=" + commaFormat.format(maxWriteSize)
                         + "\n");
@@ -619,12 +620,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                         : secondsFormat.format(elapsedDiskWriteSecs/ndiskWrite));
 
                 sb.append("disk(read): #read=" + ndiskRead + ", bytesPerRead="
-                        + bytesPerDiskRead + ", elapsed="
+                        + bytesPerDiskRead + ", secs="
                         + secondsFormat.format(elapsedDiskReadSecs)
                         + "s, secs/read=" + readLatency + "\n");
 
                 sb.append("disk(write): #write=" + ndiskWrite
-                        + ", bytesPerWrite=" + bytesPerDiskWrite + ", elapsed="
+                        + ", bytesPerWrite=" + bytesPerDiskWrite + ", secs="
                         + secondsFormat.format(elapsedDiskWriteSecs)
                         + "s, secs/write=" + writeLatency + "\n");
 
@@ -1425,7 +1426,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             counters.ntruncate++;
             
             log.warn("Disk file: newLength="+cf.format(newExtent));
-                        
+            
+            log.info(getStatistics());
+            
         } catch(IOException ex) {
             
             throw new RuntimeException(ex);

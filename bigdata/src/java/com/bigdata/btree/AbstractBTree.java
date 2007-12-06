@@ -41,6 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.ClientIndexView;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -316,6 +317,46 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     static public final int MIN_BRANCHING_FACTOR = 3;
 
+    /**
+     * Return some "statistics" about the btree.
+     * 
+     * @todo add this method to {@link IIndex}? ({@link ClientIndexView} can
+     *       return client side information.)
+     */
+    public String getStatistics() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append( ": #entries=" + getEntryCount());
+        sb.append( ", branchingFactor="+getBranchingFactor());
+        sb.append( ", height=" + getHeight());
+        sb.append( ", #nodes=" + getNodeCount() );
+        sb.append( ", #leaves=" + getLeafCount() );
+        sb.append( ", #(nodes+leaves)=" + (getNodeCount() + getLeafCount()));
+        sb.append( ", #distinctOnQueue=" + getWriteRetentionQueueDistinctCount());
+        sb.append( ", queueCapacity=" + getWriteRetentionQueueCapacity() );
+        sb.append( ", isolatable="+isIsolatable());
+        sb.append( ", class="+getClass().getName());
+
+        sb.append(counters.toString());
+
+        /*
+         * @todo report on soft vs weak refs.
+         * 
+         * @todo report on readRetentionQueue iff used. track #distinct.
+         * 
+         * @todo track life time of nodes and leaves and #of touches during life
+         * time.
+         * 
+         * @todo estimate heap requirements for nodes and leaves based on their
+         * state (keys, values, and other arrays). report estimated heap
+         * consumption here.
+         */
+        
+        return sb.toString();
+              
+    }
+    
     /**
      * @param store
      *            The persistence store.
@@ -1327,26 +1368,41 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             node.assertInvariants();
 
         final ByteBuffer buf;
+        {
+            
+            final long begin = System.nanoTime();
+            
+            if (node.isLeaf()) {
 
-        if (node.isLeaf()) {
+                buf = nodeSer.putLeaf((Leaf) node);
 
-            buf = nodeSer.putLeaf((Leaf) node);
+                counters.leavesWritten++;
 
-            counters.leavesWritten++;
+            } else {
 
-        } else {
+                buf = nodeSer.putNode((Node) node);
 
-            buf = nodeSer.putNode((Node) node);
+                counters.nodesWritten++;
 
-            counters.nodesWritten++;
+            }
+            
+            counters.serializeTimeNanos += System.nanoTime() - begin;
+            
+        }
+        
+        // write the serialized node or leaf onto the store.
+        final long addr;
+        {
+
+            final long begin = System.nanoTime();
+            
+            addr = store.write(buf);
+
+            counters.writeTimeNanos += System.nanoTime() - begin;
+    
+            counters.bytesWritten += store.getByteCount(addr);
 
         }
-
-        // write the serialized node or leaf onto the store.
-
-        final long addr = store.write(buf);
-
-        counters.bytesWritten += store.getByteCount(addr);
 
         /*
          * The node or leaf now has a persistent identity and is marked as
@@ -1382,6 +1438,10 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected AbstractNode readNodeOrLeaf(long addr) {
 
+        final ByteBuffer tmp;
+        {
+            final long begin = System.nanoTime();
+            
         // /*
         // * offer the node serializer's buffer to the IRawStore. it will be
         // used
@@ -1389,17 +1449,34 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         // * read-only slice.
         // */
         // ByteBuffer tmp = store.read(addr, nodeSer._buf);
-        ByteBuffer tmp = store.read(addr);
-        assert tmp.position() == 0;
-        assert tmp.limit() == store.getByteCount(addr);
 
-        final int bytesRead = tmp.limit();
+            tmp = store.read(addr);
+            
+            assert tmp.position() == 0;
+            
+            assert tmp.limit() == store.getByteCount(addr);
 
-        counters.bytesRead += bytesRead;
+            counters.readTimeNanos += System.nanoTime() - begin;
+            
+            final int bytesRead = tmp.limit();
 
-        // extract the node from the buffer.
-        AbstractNode node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr,
-                tmp);
+            counters.bytesRead += bytesRead;
+            
+        }
+
+        /* 
+         * Extract the node from the buffer.
+         */
+        final AbstractNode node;
+        {
+
+            final long begin = System.nanoTime();
+            
+            node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
+
+            counters.deserializeTimeNanos += System.nanoTime() - begin;
+            
+        }
 
         node.setDirty(false);
 

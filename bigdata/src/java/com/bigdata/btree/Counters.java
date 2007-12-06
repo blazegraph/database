@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.text.NumberFormat;
+
 /**
  * A helper class that collects statistics on an {@link AbstractBTree}.
  * 
@@ -40,7 +42,7 @@ package com.bigdata.btree;
  */
 public class Counters {
 
-    protected final AbstractBTree btree;
+    private final AbstractBTree btree;
     
     public Counters(AbstractBTree btree) {
         
@@ -71,6 +73,13 @@ public class Counters {
     int leavesWritten = 0;
     long bytesRead = 0L;
     long bytesWritten = 0L;
+    /*
+     * Note: The nano time fields are for nodes+leaves.
+     */
+    long serializeTimeNanos = 0;
+    long deserializeTimeNanos = 0;
+    long writeTimeNanos = 0;
+    long readTimeNanos = 0;
     
     /**
      * The #of nodes written on the backing store.
@@ -108,23 +117,55 @@ public class Counters {
         
     }
 
-    // @todo consider changing to logging so that the format will be nicer
-    // or just improve the formatting.
     public String toString() {
+
+        /*
+         * @todo find/insert/remove times?
+         * 
+         * @todo range iterator times? (must aggregate across hasNext() and next())
+         * 
+         * @todo key search times?
+         * 
+         * @todo data copy times?
+         */
         
+        /*
+         * store read/write times.
+         */
+        final double readTimeSecs = (readTimeNanos / 1000000000.);
+
+        final String bytesReadPerSec = (readTimeSecs == 0L ? "N/A" : ""
+                + commaFormat.format(bytesRead / readTimeSecs));
+
+        final double writeTimeSecs = (writeTimeNanos / 1000000000.);
+
+        final String bytesWrittenPerSec = (writeTimeSecs == 0. ? "N/A"
+                : ""+ commaFormat.format(bytesWritten
+                                / writeTimeSecs));
+        
+        /*
+         * node/leaf (de-)serialization times.
+         */
+        final double serializeTimeSecs = (serializeTimeNanos / 1000000000.);
+
+        final String serializePerSec = (serializeTimeSecs == 0L ? "N/A" : ""
+                + commaFormat.format((nodesWritten+leavesWritten)/ serializeTimeSecs));
+
+        final double deserializeTimeSecs = (deserializeTimeNanos / 1000000000.);
+
+        final String deserializePerSec = (deserializeTimeSecs == 0. ? "N/A"
+                : ""+ commaFormat.format((nodesRead+leavesRead)
+                                / deserializeTimeSecs));
+
         return 
-        "height="+btree.getHeight()+
-        ", #nodes="+btree.getNodeCount()+
-        ", #leaves="+btree.getLeafCount()+
-        ", #entries="+btree.getEntryCount()+
-        ", #find="+nfinds+
+        "\n#find="+nfinds+
         ", #bloomRejects="+nbloomRejects+
         ", #insert="+ninserts+
         ", #remove="+nremoves+
         ", #indexOf="+nindexOf+
         ", #getKey="+ngetKey+
         ", #getValue="+ngetValue+
-        ", #roots split="+rootsSplit+
+        "\n#roots split="+rootsSplit+
         ", #roots joined="+rootsJoined+
         ", #nodes split="+nodesSplit+
         ", #nodes joined="+nodesJoined+
@@ -132,9 +173,37 @@ public class Counters {
         ", #leaves joined="+leavesJoined+
         ", #nodes copyOnWrite="+nodesCopyOnWrite+
         ", #leaves copyOnWrite="+leavesCopyOnWrite+
-        ", read ("+nodesRead+" nodes, "+leavesRead+" leaves, "+bytesRead+" bytes)"+
-        ", wrote ("+nodesWritten+" nodes, "+leavesWritten+" leaves, "+bytesWritten+" bytes)"
+        "\nread ("
+                + nodesRead + " nodes, " + leavesRead + " leaves, "
+                + commaFormat.format(bytesRead) + " bytes" + ", readSeconds="
+                + secondsFormat.format(readTimeSecs) + ", bytes/sec="
+                + bytesReadPerSec + ", deserializeSeconds="
+                + secondsFormat.format(deserializeTimeSecs)
+                + ", deserialized/sec=" + deserializePerSec + ")" +
+        "\nwrote ("
+                + nodesWritten + " nodes, " + leavesWritten + " leaves, "
+                + commaFormat.format(bytesWritten) + " bytes"
+                + ", writeSeconds=" + secondsFormat.format(writeTimeSecs)
+                + ", bytes/sec=" + bytesWrittenPerSec + ", serializeSeconds="
+                + secondsFormat.format(serializeTimeSecs) + ", serialized/sec="
+                + serializePerSec + ")" +
+        "\n----"
         ;
+        
+    }
+
+    static private final NumberFormat commaFormat = NumberFormat.getInstance();
+    static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
+    static private final NumberFormat secondsFormat = NumberFormat.getInstance();
+    
+    static
+    {
+
+        commaFormat.setGroupingUsed(true);
+        commaFormat.setMaximumFractionDigits(0);
+        
+        secondsFormat.setMinimumFractionDigits(3);
+        secondsFormat.setMaximumFractionDigits(3);
         
     }
 

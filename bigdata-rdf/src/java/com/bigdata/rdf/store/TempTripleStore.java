@@ -142,26 +142,42 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
          */
         
         if(false) {
-            
-            ndx_termId.removeAll();
-            ndx_idTerm.removeAll();
+
+            if(lexicon) {
+
+                ndx_termId.removeAll();
+                ndx_idTerm.removeAll();
+                
+            }
     
             ndx_spo.removeAll();
             ndx_pos.removeAll();
             ndx_osp.removeAll();
             
-            ndx_just.removeAll();
+            if(justify) {
+
+                ndx_just.removeAll();
+                
+            }
             
         } else {        
-        
-            store.dropIndex(name_idTerm); ndx_termId = null;
-            store.dropIndex(name_termId); ndx_idTerm = null;
+
+            if(lexicon) {
+            
+                store.dropIndex(name_idTerm); ndx_termId = null;
+                store.dropIndex(name_termId); ndx_idTerm = null;
+                
+            }
             
             store.dropIndex(name_spo); ndx_spo = null;
             store.dropIndex(name_pos); ndx_pos = null;
             store.dropIndex(name_osp); ndx_osp = null;
             
-            store.dropIndex(name_just); ndx_just = null;
+            if(justify) {
+
+                store.dropIndex(name_just); ndx_just = null;
+                
+            }
             
             createIndices();
             
@@ -232,14 +248,17 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         // @todo make this an Option on the TemporaryStore and use it here.
 //        final int branchingFactor = store.getDefaultBranchingFactor();
         final int branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
-        
-        ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
+
+        if(lexicon) {
+
+            ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                 TermIdSerializer.INSTANCE));
 
-        ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
+            ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                 RdfValueSerializer.INSTANCE));
+        }
 
         ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
@@ -252,10 +271,13 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         ndx_osp = (BTree)store.registerIndex(name_osp, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
+
+        if(justify) {
         
-        ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
+            ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                                     JustificationSerializer.INSTANCE));
+        }
 
     }
     

@@ -40,7 +40,6 @@ import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -626,7 +625,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         if(numTerms>1000) {
 
-            log.info("wrote " + numTerms + " in " + elapsed + "ms; keygen="
+            log.info("Wrote " + numTerms + " in " + elapsed + "ms; keygen="
                     + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
                     + insertTime + "ms");
             

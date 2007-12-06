@@ -211,7 +211,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
                 ndx_just = ndx = store
                         .registerIndex(name_just, new BTree(store,
-                                BTree.DEFAULT_BRANCHING_FACTOR, UUID
+                                store.getDefaultBranchingFactor(), UUID
                                         .randomUUID(),
                                 JustificationSerializer.INSTANCE));
 
@@ -245,7 +245,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         log.info("commit: commit latency="+elapsed+"ms");
 
-        if(INFO) log.info(usage());
+        if(INFO) log.info("\n"+usage());
         
     }
 

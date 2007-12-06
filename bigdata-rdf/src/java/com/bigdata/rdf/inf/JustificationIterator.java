@@ -246,7 +246,7 @@ public class JustificationIterator implements IJustificationIterator {
     }
 
     /**
-     * Reads from the statement index, filling the {@link SPOIterator#buffer}.
+     * Reads from the statement index, filling the {@link #buffer}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

@@ -322,48 +322,6 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
     protected long counter;
 
     /**
-     * Return some "statistics" about the btree.
-     * 
-     * @todo add this method to {@link IIndex}. refactor part of the method
-     *       into the base class. {@link ClientIndexView} can return client side
-     *       information.
-     * 
-     * FIXME reconcile with {@link AbstractBTree#counters}.
-     */
-    public String getStatistics() {
-        
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append("#entries=" + nentries);
-        sb.append( ", height=" + height );
-        sb.append( ", #nodes=" + nnodes );
-        sb.append( ", #leaves=" + nleaves );
-        sb.append( ", #(nodes+leaves)=" + (nnodes + nleaves));
-        sb.append( ", #distinctOnQueue=" + getWriteRetentionQueueDistinctCount());
-        sb.append( ", queueCapacity=" + getWriteRetentionQueueCapacity() );
-        sb.append( ", isolatable="+isIsolatable());
-
-        /*
-         * @todo report on soft vs weak refs.
-         * 
-         * @todo report on readRetentionQueue iff used. track #distinct.
-         * 
-         * @todo track life time of nodes and leaves and #of touches during life
-         * time.
-         * 
-         * @todo estimate heap requirements for nodes and leaves based on their
-         * state (keys, values, and other arrays). report estimated heap
-         * consumption here.
-         * 
-         * @todo use nanotime on read, write, and (de-)serialization and report
-         * those costs here.
-         */
-        
-        return sb.toString();
-              
-    }
-    
-    /**
      * Constructor for a new B+Tree with a default hard reference queue policy
      * and no record compression.
      * 
