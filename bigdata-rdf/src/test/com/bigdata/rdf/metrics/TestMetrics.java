@@ -446,6 +446,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         StringBuilder sb = new StringBuilder();
 
         sb.append("#loaded=" + filesLoaded
+                +", elapsed="+elapsedLoadTime
 //                + ", told="+t.toldTriples
                 + ", told="+ totalToldTriples
                 + ", inf="+totalInferenceCount
