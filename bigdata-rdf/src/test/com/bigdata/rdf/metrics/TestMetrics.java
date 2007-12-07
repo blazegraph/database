@@ -98,7 +98,20 @@ public class TestMetrics extends AbstractMetricsTestCase {
          */
         public static final String DOCUMENTS_ONTOLOGY = "documents.ontology";
         
-//        public static final String OUTPUT_DIRECTORY = "output.directory";
+        /**
+         * Optional property specifying the maximum #of files to be loaded. When
+         * zero (0) all files will be loaded (default 0).
+         */
+        public static final String MAX_FILES = "maxFiles";
+        
+        public static final String DEFAULT_MAX_FILES = "0";
+
+        /**
+         * The name of the output file (defaults to <code>TestMetrics-metrics.csv</code>).
+         */
+        public static final String METRICS_FILE = "metricsFile";
+        
+        public static final String DEFAULT_METRICS_FILE = TestMetrics.class.getSimpleName()+"-metrics.csv";
         
     }
     
@@ -106,12 +119,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
     final File metricsFile;
     final File documentOntology;
     final File documentDir;
+    final int maxFiles;
     final Writer metricsWriter;
-    
-    /**
-     * When true use a validating parser for RDF/XML.
-     */
-    final boolean validate = false;
     
     long elapsedLoadTime = 0l;
     
@@ -176,81 +185,97 @@ public class TestMetrics extends AbstractMetricsTestCase {
         /*
          * Where to load the ontology (optional).
          */
-        String documentOntologyName = properties.getProperty(RuntimeOptions.DOCUMENTS_ONTOLOGY);
-        
-//        if( documentOntologyName == null ) {
-//            throw new RuntimeException(RuntimeOptions.DOCUMENTS_ONTOLOGY+" : not defined.");
-//        }
+        {
+         
+            final String documentOntologyName = properties
+                    .getProperty(RuntimeOptions.DOCUMENTS_ONTOLOGY);
 
-        if (documentOntologyName != null) {
+            if (documentOntologyName != null) {
 
-            documentOntology = new File(documentOntologyName);
+                log.info(RuntimeOptions.DOCUMENTS_ONTOLOGY+"="+documentOntologyName);
 
-            if (!documentOntology.isFile()) {
+                documentOntology = new File(documentOntologyName);
 
-                throw new RuntimeException("Ontology file not found: "
-                        + documentOntology);
+                if (!documentOntology.isFile()) {
+
+                    throw new RuntimeException("Ontology file not found: "
+                            + documentOntology);
+
+                }
+
+            } else {
+
+                documentOntology = null;
 
             }
-
-        } else {
-
-            documentOntology = null;
             
         }
 
         /*
          * Where to load the documents files.
          */
-        String documentDirName = properties
-                .getProperty(RuntimeOptions.DOCUMENTS_DIRECTORY);
+        {
 
-        if (documentDirName == null) {
+            final String documentDirName = properties
+                    .getProperty(RuntimeOptions.DOCUMENTS_DIRECTORY);
 
-            throw new RuntimeException(RuntimeOptions.DOCUMENTS_DIRECTORY
-                    + " : not defined.");
+            if (documentDirName == null) {
+
+                throw new RuntimeException(RuntimeOptions.DOCUMENTS_DIRECTORY
+                        + " : not defined.");
+
+            }
+
+            log.info(RuntimeOptions.DOCUMENTS_DIRECTORY+"="+documentDirName);
+
+            documentDir = new File(documentDirName);
+
+            if (!documentDir.isDirectory()) {
+
+                throw new RuntimeException("Document directory not found: "
+                        + documentDir);
+
+            }
 
         }
-
-        documentDir = new File(documentDirName);
-
-        if (!documentDir.isDirectory()) {
-
-            throw new RuntimeException("Document directory not found: "
-                    + documentDir);
-
-        }
-
-        //        /*
-//         * Statistics file.
-//         */
-//        
-//        statisticsFile = new File( getName()+"-stats.csv" );
-//
-//        deleteFile( ""+statisticsFile );
 
         /*
          * Open the metrics file and write the column headers.
          * 
-         * @todo If the file already exists then it is first deleted - is that
-         * wise?
+         * Note: If the file already exists then it is deleted 1st.
          */
+        {
+
+            final String filename = properties.getProperty(
+                    RuntimeOptions.METRICS_FILE,
+                    RuntimeOptions.DEFAULT_METRICS_FILE);
+
+            log.info(RuntimeOptions.METRICS_FILE+"="+filename);
+            
+            metricsFile = new File( filename );
+    
+            deleteFile( ""+metricsFile );
+    
+            metricsWriter = new BufferedWriter( new FileWriter(metricsFile));
+
+        }
+
+        {
+            
+            maxFiles = Integer
+                    .parseInt(properties.getProperty(RuntimeOptions.MAX_FILES,
+                            RuntimeOptions.DEFAULT_MAX_FILES));
+
+            log.info(RuntimeOptions.MAX_FILES+"="+maxFiles);
+            
+            if(maxFiles<0) {
+                
+                throw new RuntimeException(RuntimeOptions.MAX_FILES+" must be non-negative");
+                
+            }
+            
+        }
         
-        metricsFile = new File( getName()+"-metrics.csv" );
-
-        deleteFile( ""+metricsFile );
-
-        metricsWriter = new BufferedWriter( new FileWriter(metricsFile));
-
-//        /*
-//         * When true use a validating RDF/XML parser.
-//         */
-//        validate = new Boolean( properties.getProperty
-//                ( RuntimeOptions.VALIDATE,
-//                  RuntimeOptions.VALIDATE_DEFAULT
-//                  ) ).booleanValue()
-//                  ;
-                    
     }
 
     /**
@@ -588,7 +613,6 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * @return Units/seconds, e.g., the #of triples loaded per second. If <i>ms</i>
      *         is zero(0) then this method returns zero.
      */
-
     public double getUnitsPerSecond(long units,long ms) {
     
         if( ms == 0 ) return 0d;
@@ -722,9 +746,9 @@ public class TestMetrics extends AbstractMetricsTestCase {
     }
     
     /**
-     * Load files in the documents directory.
+     * Load files in the documents directory (recursively scanning
+     * subdirectories).
      */
-    
     public void loadFiles() throws IOException {
         
         loadFilesInDirectory( documentDir );
@@ -738,12 +762,13 @@ public class TestMetrics extends AbstractMetricsTestCase {
         for( int i=0; i<files.length; i++ ) {
 
             /*
-             * FIXME This means that we will limit the data to what can fit
-             * easily into Excel.
-             * 
-             * This should be an option rather than hardwired into the code.
+             * When non-zero this will limit #of files loaded.
              */
-            if(filesLoaded>60000) return;
+            if (maxFiles != 0 && filesLoaded >= maxFiles) {
+
+                return;
+                
+            }
             
             File file = files[ i ];
     
