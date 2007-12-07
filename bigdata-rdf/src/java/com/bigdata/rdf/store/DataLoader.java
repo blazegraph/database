@@ -120,7 +120,7 @@ public class DataLoader {
     
     private final ClosureEnum closureEnum;
     
-    private boolean flush = true;
+    private final boolean flush;
     
 //    public boolean setFlush(boolean newValue) {
 //        
@@ -415,6 +415,11 @@ public class DataLoader {
             
         }
         
+        flush = Boolean.parseBoolean(properties.getProperty(
+                Options.FLUSH, Options.DEFAULT_FLUSH));
+        
+        log.info(Options.FLUSH+"="+flush);
+        
     }
 
     /**
@@ -641,6 +646,8 @@ public class DataLoader {
         } finally {
             
             reader.close();
+            
+            rdfStream.close();
             
         }
 
