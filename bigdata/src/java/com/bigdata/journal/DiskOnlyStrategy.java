@@ -668,6 +668,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             commaFormat.setGroupingUsed(true);
             commaFormat.setMaximumFractionDigits(0);
             
+            percentFormat.setMinimumFractionDigits(2);
+            
             secondsFormat.setMinimumFractionDigits(3);
             secondsFormat.setMaximumFractionDigits(3);
             
