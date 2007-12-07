@@ -122,15 +122,15 @@ public class DataLoader {
     
     private boolean flush = true;
     
-    public boolean setFlush(boolean newValue) {
-        
-        boolean ret = this.flush;
-        
-        this.flush = newValue;
-        
-        return ret;
-        
-    }
+//    public boolean setFlush(boolean newValue) {
+//        
+//        boolean ret = this.flush;
+//        
+//        this.flush = newValue;
+//        
+//        return ret;
+//        
+//    }
     
     /**
      * When <code>true</code> (the default) the {@link IStatementBuffer} is
@@ -168,6 +168,8 @@ public class DataLoader {
      */
     public void flush() {
 
+        log.info("");
+        
         buffer.flush();
         
     }
@@ -318,6 +320,35 @@ public class DataLoader {
         public static final String CLOSURE = "dataLoader.closure";
         
         public static final String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
+        
+        /**
+         * 
+         * When <code>true</code> (the default) the {@link IStatementBuffer}
+         * is flushed by each
+         * {@link DataLoader#loadData(String, String, RDFFormat)} or
+         * {@link DataLoader#loadData(String[], String[], RDFFormat[])}
+         * operation and when {@link DataLoader#doClosure()} is requested. When
+         * <code>false</code> the caller is responsible for flushing the
+         * {@link #buffer}.
+         * <p>
+         * This behavior MAY be disabled if you want to chain load a bunch of
+         * small documents without flushing to the backing store after each
+         * document and
+         * {@link DataLoader#loadData(String[], String[], RDFFormat[])} is not
+         * well-suited to your purposes. This can be much more efficient,
+         * approximating the throughput for large document loads. However, the
+         * caller MUST invoke {@link DataLoader#flush()} (or
+         * {@link DataLoader#doClosure()} if appropriate) once all documents are
+         * loaded successfully. If an error occurs during the processing of one
+         * or more documents then the entire data load should be discarded (this
+         * is always true).
+         */
+        public static final String FLUSH = "dataLoader.flush";
+        
+        /**
+         * The default value (<code>true</code>) for {@link #FLUSH}.
+         */
+        public static final String DEFAULT_FLUSH = "true";
         
     }
 

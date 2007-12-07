@@ -483,6 +483,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         long elapsedReadNanos;
 
         /**
+         * Total elapsed time checking the disk write cache for records to be
+         * read.
+         */
+        long elapsedCacheReadNanos;
+        
+        /**
          * Total elapsed time for reading on the disk.
          */
         long elapsedDiskReadNanos;
@@ -517,7 +523,14 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * Total elapsed time for writes.
          */
         long elapsedWriteNanos;
-
+        
+        /**
+         * Total elapsed time writing records into the cache (does not count
+         * time to flush the cache when it is full or to write records that do
+         * not fit in the cache directly to the disk).
+         */
+        long elapsedCacheWriteNanos;
+        
         /**
          * Total elapsed time for writing on the disk.
          */
@@ -584,39 +597,45 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             // cache statisitics.
             if (ncacheRead > 0 || ncacheWrite > 0) {
 
-                String cacheReadRate = (nreads == 0 ? "N/A" : ""
+                final String cacheReadRate = (nreads == 0 ? "N/A" : ""
                         + percentFormat.format((double) ncacheRead / nreads));
 
-                String cacheWriteRate = (nwrites == 0 ? "N/A" : ""
+                final double elapsedCacheReadSecs = (elapsedCacheReadNanos / 1000000000.);
+
+                final String cacheWriteRate = (nwrites == 0 ? "N/A" : ""
                         + percentFormat.format((double) ncacheWrite / nwrites));
+
+                final double elapsedCacheWriteSecs = (elapsedCacheWriteNanos / 1000000000.);
 
                 sb.append("cache(read): " + cacheReadRate + " (#cache="
                         + ncacheRead + ", #disk=" + ndiskRead + ", total="
-                        + (ncacheRead + ndiskRead) + ")\n");
+                        + (ncacheRead + ndiskRead) + ", secs="
+                        + secondsFormat.format(elapsedCacheReadSecs) + ")\n");
 
                 sb.append("cache(write): " + cacheWriteRate + " (#cache="
                         + ncacheWrite + ", #disk=" + ndiskWrite + ", total="
-                        + (ncacheWrite + ndiskWrite) + ")\n");
+                        + (ncacheWrite + ndiskWrite) + ", secs="
+                        + secondsFormat.format(elapsedCacheWriteSecs) + ")\n");
                 
             }
             
             // disk statistics.
             {
             
-                String bytesPerDiskRead = (ndiskRead == 0 ? "N/A" : commaFormat
+                final String bytesPerDiskRead = (ndiskRead == 0 ? "N/A" : commaFormat
                         .format(bytesRead / ndiskRead));
 
-                String bytesPerDiskWrite = (ndiskWrite == 0 ? "N/A"
+                final String bytesPerDiskWrite = (ndiskWrite == 0 ? "N/A"
                         : commaFormat.format(bytesWritten / ndiskWrite));
 
-                double elapsedDiskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                final double elapsedDiskReadSecs = (elapsedDiskReadNanos / 1000000000.);
 
-                double elapsedDiskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                final double elapsedDiskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
 
-                String readLatency = (elapsedDiskReadSecs == 0 ? "N/A"
+                final String readLatency = (elapsedDiskReadSecs == 0 ? "N/A"
                         : secondsFormat.format(elapsedDiskReadSecs/ndiskRead));
 
-                String writeLatency = (elapsedDiskWriteSecs == 0 ? "N/A"
+                final String writeLatency = (elapsedDiskWriteSecs == 0 ? "N/A"
                         : secondsFormat.format(elapsedDiskWriteSecs/ndiskWrite));
 
                 sb.append("disk(read): #read=" + ndiskRead + ", bytesPerRead="
@@ -934,7 +953,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * Note: we do this even if we are reading from the writeCache since the
          * writeCache may be flushed and re-written while the caller is holding
          * onto the returned buffer. If the buffer were a view onto the
-         * writeCache, then this would cause the data in returned view to
+         * writeCache, then this would cause the data in the returned view to
          * change!
          */
 
@@ -985,6 +1004,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              */
 
             if (writeCache != null) {
+
+                final long beginCache = System.nanoTime();
                 
                 ByteBuffer tmp = writeCache.read(addr, nbytes);
                 
@@ -1011,6 +1032,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     // return the new buffer.
                     return dst;
 
+                } else {
+                    
+                    counters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
+                    
                 }
                 
             }
@@ -1228,9 +1253,13 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                      * Queue up the write in the writeCache.
                      */
                     
+                    final long beginCache = System.nanoTime();
+                    
                     writeCache.write(addr, data);
 
                     counters.ncacheWrite++;
+
+                    counters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
 
                 }
                 
