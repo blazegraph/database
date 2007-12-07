@@ -327,7 +327,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         
         StringBuilder sb = new StringBuilder();
         
-        sb.append( ": #entries=" + getEntryCount());
+        sb.append(   "#entries=" + getEntryCount());
         sb.append( ", branchingFactor="+getBranchingFactor());
         sb.append( ", height=" + getHeight());
         sb.append( ", #nodes=" + getNodeCount() );
@@ -1242,6 +1242,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected void writeNodeRecursive(AbstractNode node) {
 
+        final long begin = System.currentTimeMillis();
+        
         assert root != null; // i.e., isOpen().
         assert node != null;
         assert node.dirty;
@@ -1301,9 +1303,29 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         }
 
-        log.info("write: " + ndirty + " dirty nodes (" + nleaves
-                + " leaves), addrRoot=" + node.getIdentity());
+        {
 
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            final int nnodes = ndirty - nleaves;
+            
+            final String s = "wrote: " + ndirty + " records (#nodes=" + nnodes
+                    + ", #leaves=" + nleaves + ") in " + elapsed
+                    + "ms : addrRoot=" + node.getIdentity();
+            
+            if (elapsed > 500/*ms*/) {
+
+                // log at warning level when significant latency results.
+                log.warn(s);
+
+            } else {
+            
+                log.info(s);
+                
+            }
+            
+        }
+        
     }
 
     /**

@@ -2078,7 +2078,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             BTree btree = (BTree) ndx;
 
-            return name+btree.getStatistics();
+            return name+" : "+btree.getStatistics();
             
         } else {
 

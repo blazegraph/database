@@ -631,17 +631,27 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * 
      * <pre>
      * 
-     * // Note: this turns off sameAs processing.
+     * Note: this turns off sameAs processing.
+     * 
      * properties.setProperty(InferenceEngine.Options.RDFS_ONLY, &quot;true&quot;);
      * 
-     * // Note: this turns off the justification chains (useful for estimating benefit of magic sets).
+     * Note: this turns off the justification chains (useful for estimating benefit of magic sets).
+     * 
      * properties.setProperty(InferenceEngine.Options.JUSTIFY, &quot;false&quot;);
      * 
-     * // Note: this turns off truth maintenance during data load (see tearDown for database at once closure).
+     * Note: this turns off truth maintenance during data load (see tearDown for database at once closure).
+     * 
      * properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
      * 
-     * // Note: this turns off commit - useful for guaging the uninterrupted write rate and effects of group commit.
+     * Note: this turns off commit - useful for guaging the uninterrupted write rate and effects of group commit.
+     * 
      * properties.setProperty(DataLoader.Options.COMMIT, CommitEnum.None.toString());
+     * 
+     * Note: disables auto-flush of the statement buffer after each document
+     * allowing the data loader to approximate the behavior of a large document
+     * load.
+     * 
+     * properties.setProperty(DataLoader.Options.FLUSH, "false");
      * 
      * </pre>
      */
@@ -651,15 +661,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         super.setUp();
 
         dataLoader = store.getDataLoader();
-        
-        /*
-         * Note: disables auto-flush of the statement buffer after each document
-         * allowing the data loader to approximate the behavior of a load
-         * document load.
-         */
-
-        dataLoader.setFlush(false);
-        
+                
         writeMetricsLogHeaders();
         
     }
