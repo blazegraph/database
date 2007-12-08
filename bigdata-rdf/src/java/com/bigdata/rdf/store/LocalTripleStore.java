@@ -36,6 +36,7 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ReadCommittedIndex;
@@ -389,6 +390,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         return super.usage()  
         +("\nfile="+store.getBufferStrategy().getFile())
         +("\nbyteCount="+store.getBufferStrategy().getNextOffset())
+        // @todo expose getStatistics on all buffer strategies.
+        +(store.getBufferStrategy() instanceof DiskOnlyStrategy
+                ?(((DiskOnlyStrategy)store.getBufferStrategy()).getStatistics())
+                        :"")
         ;
         
     }
