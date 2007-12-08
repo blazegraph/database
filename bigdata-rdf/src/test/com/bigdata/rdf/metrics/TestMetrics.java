@@ -709,8 +709,13 @@ public class TestMetrics extends AbstractMetricsTestCase {
         }
         
         // final commit on the store.
+        
+        log.warn("Final commit on the store.");
+        
         store.commit();
 
+        log.warn("Statistics after final commit on the store.");
+        
         usage();
         
         try {
