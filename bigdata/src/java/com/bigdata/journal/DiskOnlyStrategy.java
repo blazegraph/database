@@ -473,6 +473,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         long bytesRead;
 
         /**
+         * #of bytes that have been read from the disk.
+         */
+        long bytesReadFromDisk;
+        
+        /**
          * The size of the largest record read.
          */
         long maxReadSize;
@@ -518,6 +523,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * #of bytes written.
          */
         long bytesWritten;
+        
+        /**
+         * #of bytes that have been written on the disk.
+         */
+        long bytesWrittenOnDisk;
         
         /**
          * Total elapsed time for writes.
@@ -632,21 +642,33 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 final double elapsedDiskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
 
+                final String bytesReadPerSec = (elapsedDiskReadSecs == 0L ? "N/A" : ""
+                    + commaFormat.format(bytesReadFromDisk / elapsedDiskReadSecs));
+
+                final String bytesWrittenPerSec = (elapsedDiskWriteSecs == 0L ? "N/A" : ""
+                    + commaFormat.format(bytesWrittenOnDisk / elapsedDiskWriteSecs));
+
                 final String readLatency = (elapsedDiskReadSecs == 0 ? "N/A"
                         : secondsFormat.format(elapsedDiskReadSecs/ndiskRead));
 
                 final String writeLatency = (elapsedDiskWriteSecs == 0 ? "N/A"
                         : secondsFormat.format(elapsedDiskWriteSecs/ndiskWrite));
 
-                sb.append("disk(read): #read=" + ndiskRead + ", bytesPerRead="
-                        + bytesPerDiskRead + ", secs="
-                        + secondsFormat.format(elapsedDiskReadSecs)
-                        + "s, secs/read=" + readLatency + "\n");
+                sb.append("disk(read): #read=" + ndiskRead
+                        + ", bytesRead="+ commaFormat.format(bytesReadFromDisk)
+                        + ", bytesPerRead=" + bytesPerDiskRead
+                        + ", secs="+ secondsFormat.format(elapsedDiskReadSecs)+ "s"
+                        + ", bytesPerSec=" + bytesReadPerSec
+                        + ", secs/read=" + readLatency
+                        + "\n");
 
                 sb.append("disk(write): #write=" + ndiskWrite
-                        + ", bytesPerWrite=" + bytesPerDiskWrite + ", secs="
-                        + secondsFormat.format(elapsedDiskWriteSecs)
-                        + "s, secs/write=" + writeLatency + "\n");
+                        + ", bytesWritten="+ commaFormat.format(bytesWrittenOnDisk)
+                        + ", bytesPerWrite=" + bytesPerDiskWrite
+                        + ", secs="+ secondsFormat.format(elapsedDiskWriteSecs)+ "s"
+                        + ", bytesPerSec=" + bytesWrittenPerSec
+                        + ", secs/write=" + writeLatency
+                        + "\n");
 
                 sb.append("disk(other): #force=" + nforce + ", #extend="
                         + ntruncate + ", #reopen=" + nreopen + ", #rootBlocks="
@@ -1125,6 +1147,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              */
             counters.nreads++;
             counters.bytesRead+=nbytes;
+            counters.bytesReadFromDisk+=nbytes;
             counters.ndiskRead++;
             counters.elapsedReadNanos+=(System.nanoTime()-begin);
             counters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
@@ -1377,6 +1400,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         writeCacheOffset += nbytes;
                 
         counters.ndiskWrite++;
+        counters.bytesWrittenOnDisk+=nbytes;
         counters.elapsedDiskWriteNanos+=(System.nanoTime()-begin);
 
     }
