@@ -99,8 +99,19 @@ public class TestMetrics extends AbstractMetricsTestCase {
         public static final String DOCUMENTS_ONTOLOGY = "documents.ontology";
         
         /**
+         * Optional property specifying the maximum #of told triples to be
+         * loaded. When zero (0) no limit will be imposed (default 0).
+         * <p>
+         * Note: processing will stop on the 1st file boundary after this limit
+         * has been satisified.
+         */
+        public static final String MAX_TRIPLES = "maxTriples";
+        
+        public static final String DEFAULT_MAX_TRIPLES= "0";
+
+        /**
          * Optional property specifying the maximum #of files to be loaded. When
-         * zero (0) all files will be loaded (default 0).
+         * zero (0) no limit will be imposed (default 0).
          */
         public static final String MAX_FILES = "maxFiles";
         
@@ -119,6 +130,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
     final File metricsFile;
     final File documentOntology;
     final File documentDir;
+    final int maxTriples;
     final int maxFiles;
     final Writer metricsWriter;
     
@@ -271,6 +283,22 @@ public class TestMetrics extends AbstractMetricsTestCase {
             if(maxFiles<0) {
                 
                 throw new RuntimeException(RuntimeOptions.MAX_FILES+" must be non-negative");
+                
+            }
+            
+        }
+        
+        {
+            
+            maxTriples = Integer
+                    .parseInt(properties.getProperty(RuntimeOptions.MAX_TRIPLES,
+                            RuntimeOptions.DEFAULT_MAX_TRIPLES));
+
+            log.info(RuntimeOptions.MAX_TRIPLES+"="+maxTriples);
+            
+            if(maxTriples<0) {
+                
+                throw new RuntimeException(RuntimeOptions.MAX_TRIPLES+" must be non-negative");
                 
             }
             
@@ -772,6 +800,15 @@ public class TestMetrics extends AbstractMetricsTestCase {
              * When non-zero this will limit #of files loaded.
              */
             if (maxFiles != 0 && filesLoaded >= maxFiles) {
+
+                return;
+                
+            }
+            
+            /*
+             * When non-zero this will limit #of told triples loaded.
+             */
+            if (maxTriples != 0 && totalToldTriples >= maxTriples) {
 
                 return;
                 
