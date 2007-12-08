@@ -703,6 +703,8 @@ public class TestMetrics extends AbstractMetricsTestCase {
 
             log.warn("Computing closure of the database.");
             
+            usage();
+            
             log.warn("database at once closure:\n"
                     + store.getInferenceEngine().computeClosure(null));
             
