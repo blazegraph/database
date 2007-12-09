@@ -71,12 +71,22 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
         
     }
     
+    // @todo move config option into this class.
+    boolean deleteAfter = true;
+    
     public void tearDown() throws Exception {
-
         
         if(store!=null) {
-            
-            store.closeAndDelete();
+           
+            if(deleteAfter) {
+
+                store.closeAndDelete();
+                
+            } else {
+                
+                store.close();
+                
+            }
          
             store = null;
             

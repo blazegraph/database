@@ -138,6 +138,15 @@ public class TestMetrics extends AbstractMetricsTestCase {
         public static final String DATABASE_AT_ONCE = "databaseAtOnce";
         
         public static final String DEFAULT_DATABASE_AT_ONCE = "true";
+
+        /**
+         * When <code>true</code> (default <code>true</code>) the database
+         * is deleted after a successful run (a run that does not result in the
+         * test aborting).
+         */
+        public static final String DELETE_AFTER = "deleteAfter";
+
+        public static final String DEFAULT_DELETE_AFTER = "true";
         
     }
     
@@ -327,6 +336,16 @@ public class TestMetrics extends AbstractMetricsTestCase {
                     RuntimeOptions.DEFAULT_DATABASE_AT_ONCE));
 
             log.info(RuntimeOptions.DATABASE_AT_ONCE+"="+databaseAtOnce);
+
+        }
+        
+        {
+            
+            deleteAfter = Boolean.parseBoolean(properties.getProperty(
+                    RuntimeOptions.DELETE_AFTER,
+                    RuntimeOptions.DEFAULT_DELETE_AFTER));
+
+            log.info(RuntimeOptions.DELETE_AFTER+"="+deleteAfter);
 
         }
         
