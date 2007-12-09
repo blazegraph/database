@@ -46,6 +46,7 @@ import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -124,6 +125,20 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         public static final String DEFAULT_METRICS_FILE = TestMetrics.class.getSimpleName()+"-metrics.csv";
         
+        /**
+         * Boolean option governs whether the closure of the entire database is
+         * computed after all data have been loaded from files (default
+         * <code>true</code>). When <code>true</code> the closure of the
+         * database will be computed. When <code>false</code> the closure of
+         * the database will not be computed.
+         * <p>
+         * Note: This option only has effect when
+         * {@link DataLoader.Options#CLOSURE} is {@link ClosureEnum#None}.
+         */
+        public static final String DATABASE_AT_ONCE = "databaseAtOnce";
+        
+        public static final String DEFAULT_DATABASE_AT_ONCE = "true";
+        
     }
     
 //    final File statisticsFile;
@@ -133,6 +148,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
     final int maxTriples;
     final int maxFiles;
     final Writer metricsWriter;
+    final boolean databaseAtOnce;
     
     long elapsedLoadTime = 0l;
     
@@ -302,6 +318,16 @@ public class TestMetrics extends AbstractMetricsTestCase {
                 
             }
             
+        }
+
+        {
+            
+            databaseAtOnce = Boolean.parseBoolean(properties.getProperty(
+                    RuntimeOptions.DATABASE_AT_ONCE,
+                    RuntimeOptions.DEFAULT_DATABASE_AT_ONCE));
+
+            log.info(RuntimeOptions.DATABASE_AT_ONCE+"="+databaseAtOnce);
+
         }
         
     }
@@ -727,12 +753,17 @@ public class TestMetrics extends AbstractMetricsTestCase {
             
         }
         
-        if(true) {
+        if(dataLoader.getClosureEnum()==ClosureEnum.None && databaseAtOnce) {
 
             log.warn("Commit before computing closure.");
             
             store.commit();
 
+            /*
+             * @todo move the btree stats dump into the abstract journal for
+             * named indices so that it is always available on commit and
+             * possibly for truncate and overflow operations as well.
+             */
             usage();
 
             log.warn("Computing closure of the database.");
