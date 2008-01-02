@@ -44,12 +44,28 @@ class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
 
     private final Collator collator;
 
+    /**
+     * The {@link Locale} used to configure this object.
+     */
+    private final Locale locale;
+    
+    /**
+     * The {@link Locale} used to configure this object.
+     */
+    public Locale getLocale() {
+        
+        return locale;
+        
+    }
+    
     public JDKSortKeyGenerator(Locale locale, Object strength,
             DecompositionEnum mode) {
 
         if (locale == null)
             throw new IllegalArgumentException();
 
+        this.locale = locale;
+        
         this.collator = Collator.getInstance(locale);
 
         if (strength != null) {

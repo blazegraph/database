@@ -25,6 +25,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -58,7 +60,16 @@ public class TestReopen extends AbstractBTreeTestCase {
      */
     public void test_reopen01() {
 
-        BTree btree = getBTree(3);
+//        BTree btree = getBTree(3);
+
+        final IRawStore store = new SimpleMemoryRawStore();
+
+        final UUID indexUUID = UUID.randomUUID();
+        
+        /*
+         * The btree under test.
+         */
+        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
         assertTrue(btree.isOpen());
 
@@ -80,12 +91,66 @@ public class TestReopen extends AbstractBTreeTestCase {
     }
 
     /**
+     * Test with a btree containing both branch nodes and leaves.
+     */
+    public void test_reopen02() {
+     
+        final IRawStore store = new SimpleMemoryRawStore();
+
+        final UUID indexUUID = UUID.randomUUID();
+        
+        /*
+         * The btree under test.
+         */
+        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+
+        btree.insert(1, new SimpleEntry(1));
+        btree.insert(2, new SimpleEntry(2));
+        btree.insert(3, new SimpleEntry(3));
+        btree.insert(4, new SimpleEntry(4));
+        
+        // verify that the root was split.
+        assertEquals("height",1,btree.getHeight());
+        assertEquals("#entries",4,btree.getEntryCount());
+        assertEquals("#nodes",1,btree.getNodeCount());
+        assertEquals("#leaves",2,btree.getLeafCount());
+        
+        // dump after inserts.
+        System.out.println("Dump of final btree:");
+        btree.dump(Level.DEBUG,System.out);
+        
+        // force close.
+        btree.close();
+        
+        // force reopen.
+        assertNotNull(btree.getRoot());
+        assertTrue(btree.isOpen());
+        
+        // force materialization of the leaves.
+        btree.lookup(1);
+        btree.lookup(2);
+        btree.lookup(3);
+        btree.lookup(4);
+
+        // dump after re-open.
+        System.out.println("Dump after reopen:");
+        btree.dump(Level.DEBUG,System.out);
+
+        // reload the tree from the store.
+        final BTree btree2 = BTree.load(store, btree.getMetadata().getMetadataAddr());
+
+        // verify same data.
+        assertSameBTree(btree, btree2);
+        
+    }
+    
+    /**
      * Stress test comparison with ground truth btree when {@link BTree#close()}
      * is randomly invoked during mutation operations.
      */
-    public void test_reopen02() {
+    public void test_reopen03() {
 
-        IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new SimpleMemoryRawStore();
 
         final UUID indexUUID = UUID.randomUUID();
         
@@ -96,7 +161,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          * be forced when this tree is closed (node evictions are not permitted
          * by the default fixture factory).
          */
-        BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
         /*
          * The btree used to maintain ground truth.
@@ -105,7 +170,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          * eventually overflow the hard reference queue and begin evicting nodes
          * and leaves onto the store.
          */
-        BTree groundTruth = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+        final BTree groundTruth = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
         final int limit = 10000;
         final int keylen = 6;
@@ -115,13 +180,16 @@ public class TestReopen extends AbstractBTreeTestCase {
             int n = r.nextInt(100);
 
             if (n < 5) {
+                // periodically force a close of the btree.
                 if(btree.isOpen()) btree.close();
             } else if (n < 20) {
+                // remove an entry.
                 byte[] key = new byte[keylen];
                 r.nextBytes(key);
                 btree.remove(key);
                 groundTruth.remove(key);
             } else {
+                // add an entry.
                 byte[] key = new byte[keylen];
                 r.nextBytes(key);
                 SimpleEntry value = new SimpleEntry(i);

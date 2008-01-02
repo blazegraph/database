@@ -237,7 +237,8 @@ public class TaskATest
         properties.setProperty(InferenceEngine.Options.RDFS_ONLY, "true");
 
         // generate justifications for TM.
-        properties.setProperty(Options.JUSTIFY, "true");
+//        properties.setProperty(Options.JUSTIFY, "true");
+        properties.setProperty(Options.JUSTIFY, "false");
 
         // forward chain (x rdf:type rdfs:Resource)
 //        properties.setProperty(
@@ -265,7 +266,7 @@ public class TaskATest
         
         loadStats = dataLoader.loadData(resource, baseURL, rdfFormat);
         
-        if(dataLoader.getClosureEnum()==ClosureEnum.None) {
+        if(false && dataLoader.getClosureEnum()==ClosureEnum.None) {
             
             /*
              * When None is selected above we compute the full closure of the
@@ -384,15 +385,15 @@ public class TaskATest
          * 
          * -server -Xmx500m -DtestClass=com.bigdata.rdf.store.TestLocalTripleStore
          */ 
-         // Very large data set with large ontology.
-//          "Uniprot Protein Sequence Taxonomy",
-//          "taxonomy",
-//          "-rdf ../rdf-data/taxonomy.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
+//          Very large data set with large ontology.
+          "Uniprot Protein Sequence Taxonomy",
+          "taxonomy",
+          "-rdf ../rdf-data/taxonomy.rdf", // http://www.isb-sib.ch/%7Eejain/rdf/data/taxonomy.rdf.gz
             
 //          // cyc has a lot of subClassOf stuff.
-//          "OpenCyc",
-//          "cyc",
-//          "-rdf ../rdf-data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
+          "OpenCyc",
+          "cyc",
+          "-rdf ../rdf-data/cyc.xml http://www.cyc.com/2004/06/04/cyc",
 
     };
 

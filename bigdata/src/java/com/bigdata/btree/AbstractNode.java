@@ -746,9 +746,16 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         }
 
+        /**
+         * @todo getKey(), getValue() and getTuple() should throw
+         *       IllegalStateException if nothing has been visited. We can
+         *       probably do that by overriding {@link Striterator#next()} to
+         *       note whether or not next() has been called (or the #of entries
+         *       processed) but I want to verify that is correct first.
+         */
         public byte[] getKey() {
             
-            return tuple.key;
+            return tuple.getKey();
             
         }
 
@@ -758,6 +765,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
             
         }
         
+        public final ITuple getTuple() {
+            
+            return tuple;
+            
+        }
+
     }
     
 //    /**

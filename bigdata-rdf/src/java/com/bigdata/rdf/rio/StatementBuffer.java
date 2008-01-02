@@ -72,12 +72,16 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link Statement} duplication. Hence we pay an unnecessary overhead if we try
  * to make the statements distinct in the buffer.
  * <p>
- * Note: This also provides an explanation for why the {@link SPOAssertionBuffer} does
- * not do better when "distinct" is turned on - the "Value" objects in that case
- * are only represented by long integers and duplication in their values does
- * not impose a burden on either the heap or the index writers. In contrast, the
- * duplication of {@link Value}s in the {@link StatementBuffer} imposes a
- * burden on both the heap and the index writers.
+ * Note: This also provides an explanation for why neither this class nor the
+ * {@link SPOAssertionBuffer} do better when "distinct" statements is turned on -
+ * the "Value" objects in that case are only represented by long integers and
+ * duplication in their values does not impose a burden on either the heap or
+ * the index writers. In contrast, the duplication of {@link Value}s in the
+ * {@link StatementBuffer} imposes a burden on both the heap and the index
+ * writers.
+ * 
+ * @todo try retaining the top N most frequent terms across resets of the buffer
+ *       in order to reduce time on the terms indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -118,13 +122,6 @@ public class StatementBuffer implements IStatementBuffer {
      */
     final private Map<_Value, _Value> distinctTermMap;
 
-    /**
-     * Map used to filter out duplicate statements.
-     * 
-     * @deprecated this is not efficient and will be discarded.
-     */
-    final Map<_Statement,_Statement> distinctStmtMap;
-    
     private final AbstractTripleStore statementStore;
 
     /**
@@ -237,8 +234,6 @@ public class StatementBuffer implements IStatementBuffer {
             
             distinctTermMap = null;
             
-            distinctStmtMap = null;
-            
             return;
             
         }
@@ -260,15 +255,10 @@ public class StatementBuffer implements IStatementBuffer {
              */
             
             distinctTermMap = new HashMap<_Value, _Value>(capacity * IRawTripleStore.N);
-
-            distinctStmtMap = null;
-//            distinctStmtMap = new HashMap<_Statement, _Statement>(capacity);
             
         } else {
             
             distinctTermMap = null;
-
-            distinctStmtMap = null;
             
         }
         
@@ -299,12 +289,6 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
         
-        if(distinctStmtMap!=null) {
-            
-            distinctStmtMap.clear();
-            
-        }
-    
         haveKeys = false;
         
         sorted = false;
@@ -532,42 +516,42 @@ public class StatementBuffer implements IStatementBuffer {
         
     }
     
-    /**
-     * Uniquify a statement.
-     * 
-     * @param stmt
-     * 
-     * @return Either the statement or the pre-existing statement in the buffer
-     *         with the same data.
-     */
-    protected _Statement getDistinctStatement(_Statement stmt) {
-
-        assert distinctStmtMap != null;
-        
-        _Statement existingStmt = distinctStmtMap.get(stmt);
-        
-        if(existingStmt!= null) {
-            
-            // return the pre-existing statement.
-            
-            return existingStmt;
-            
-        } else {
-
-            // put the new statement in the map.
-            
-            if(distinctStmtMap.put(stmt, stmt)!=null) {
-                
-                throw new AssertionError();
-                
-            }
-
-            // return the new statement.
-            return stmt;
-            
-        }
-        
-    }
+//    /**
+//     * Uniquify a statement.
+//     * 
+//     * @param stmt
+//     * 
+//     * @return Either the statement or the pre-existing statement in the buffer
+//     *         with the same data.
+//     */
+//    protected _Statement getDistinctStatement(_Statement stmt) {
+//
+//        assert distinctStmtMap != null;
+//        
+//        _Statement existingStmt = distinctStmtMap.get(stmt);
+//        
+//        if(existingStmt!= null) {
+//            
+//            // return the pre-existing statement.
+//            
+//            return existingStmt;
+//            
+//        } else {
+//
+//            // put the new statement in the map.
+//            
+//            if(distinctStmtMap.put(stmt, stmt)!=null) {
+//                
+//                throw new AssertionError();
+//                
+//            }
+//
+//            // return the new statement.
+//            return stmt;
+//            
+//        }
+//        
+//    }
     
     /**
      * Adds the values and the statement into the buffer.
@@ -666,23 +650,23 @@ public class StatementBuffer implements IStatementBuffer {
         _Statement stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o,
                 type);
         
-        if (distinctStmtMap != null) {
-
-            _Statement tmp = getDistinctStatement(stmt);
-
-            if(tmp.count++ == 0){
-           
-                stmts[numStmts++] = tmp;
-              
-                // increment usage counts on terms IFF the statement is added to
-                // the buffer.
-                ((_Value)s).count++;
-                ((_Value)p).count++;
-                ((_Value)o).count++;
-
-            }
-          
-        } else {
+//        if (distinctStmtMap != null) {
+//
+//            _Statement tmp = getDistinctStatement(stmt);
+//
+//            if(tmp.count++ == 0){
+//           
+//                stmts[numStmts++] = tmp;
+//              
+//                // increment usage counts on terms IFF the statement is added to
+//                // the buffer.
+//                ((_Value)s).count++;
+//                ((_Value)p).count++;
+//                ((_Value)o).count++;
+//
+//            }
+//          
+//        } else {
 
             stmts[numStmts++] = stmt;
 
@@ -692,7 +676,7 @@ public class StatementBuffer implements IStatementBuffer {
             ((_Value)p).count++;
             ((_Value)o).count++;
 
-        }
+//        }
 
     }
 
@@ -734,471 +718,4 @@ public class StatementBuffer implements IStatementBuffer {
 
     }
     
-    /**
-     * Visits URIs, Literals, and BNodes marked as {@link _Value#known unknown}
-     * in their current sorted order.
-     * 
-     * @deprecated Only used by the unit tests.
-     */
-    public static class UnknownTermIterator implements IEntryIterator {
-        
-        private final IStriterator src;
-        private _Value current = null;
-        
-        public UnknownTermIterator(StatementBuffer buffer) {
-
-            src = new Striterator(new TermIterator(buffer)).addFilter(new Filter(){
-
-                private static final long serialVersionUID = 1L;
-
-                protected boolean isValid(Object arg0) {
-                    
-                    _Value term = (_Value)arg0;
-                    
-                    return 
-//                    term.duplicate == false &&
-                    term.known == false;
-                }
-                
-            }
-            );
-            
-        }
-
-        public byte[] getKey() {
-            
-            return current.key;
-            
-        }
-
-        public Object getValue() {
-            
-            return current;
-            
-        }
-
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        public Object next() {
-            
-            current = (_Value) src.next();
-            
-            return current;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-    
-    /**
-     * Visits all URIs, Literals, and BNodes in their current order.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TermIterator implements IEntryIterator {
-
-        private final IStriterator src;
-        
-        private _Value current = null;
-
-        public TermIterator(StatementBuffer buffer) {
-
-            src = new Striterator(new TermArrayIterator(buffer.values,
-                    buffer.numValues));
-            
-        }
-
-        public byte[] getKey() {
-
-            if (current == null)
-                throw new IllegalStateException();
-
-            return current.key;
-            
-        }
-
-        public Object getValue() {
-
-            if (current == null)
-                throw new IllegalStateException();
-
-            return current;
-            
-        }
-
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        public Object next() {
-            
-            current = (_Value) src.next();
-            
-            return current;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
-    /**
-     * Visits the term identifier for all URIs, Literals, and BNodes in their
-     * current order.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class TermIdIterator implements IEntryIterator {
-
-        private final IStriterator src;
-        
-        private int nvisited = 0;
-        private _Value current = null;
-
-        public TermIdIterator(StatementBuffer buffer) {
-            
-            src = new Striterator(new TermArrayIterator(buffer.values,
-                    buffer.numValues));
-            
-        }
-
-        public byte[] getKey() {
-
-            if (current == null)
-                throw new IllegalStateException();
-
-            return current.key;
-            
-        }
-
-        public Object getValue() {
-
-            if (current == null)
-                throw new IllegalStateException();
-
-            return current.termId;
-            
-        }
-
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        public Object next() {
-            
-            try {
-
-                current = (_Value) src.next();
-                
-                nvisited++;
-                
-            } catch(NoSuchElementException ex) {
-                
-                log.error("*** Iterator exhausted after: "+nvisited+" elements", ex);
-                
-                throw ex;
-                
-            }
-            
-            assert current.termId != IRawTripleStore.NULL;
-            
-            return current.termId;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
-    /**
-     * Visits all terms in their current order.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class TermArrayIterator implements IEntryIterator {
-
-        private int lastVisited = -1;
-        private int index = 0;
-
-        private final _Value[] terms;
-        private final int nterms;
-        
-        public TermArrayIterator(_Value[] terms,int nterms) {
-            
-            this.terms = terms;
-            
-            this.nterms = nterms;
-
-        }
-
-        public byte[] getKey() {
-            
-            if( lastVisited == -1 ) {
-                
-                throw new IllegalStateException();
-                
-            }
-            
-            return terms[lastVisited].key;
-            
-        }
-
-        public Object getValue() {
-            
-            if( lastVisited == -1 ) {
-                
-                throw new IllegalStateException();
-                
-            }
-            
-            return terms[lastVisited];
-            
-        }
-
-        public boolean hasNext() {
-            
-            return index < nterms;
-            
-        }
-
-        public Object next() {
-            
-            if (index >= nterms) {
-                
-                throw new NoSuccessorException();
-                
-            }
-
-            lastVisited = index++;
-
-            return terms[lastVisited];
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
-    /**
-     * Visits all statements in their current order.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class StatementIterator implements IEntryIterator {
-
-        private final KeyOrder keyOrder;
-        private final RdfKeyBuilder keyBuilder;
-        private final _Statement[] stmts;
-        private final int numStmts;
-        
-        private int lastVisited = -1;
-        private int index = 0;
-
-        public StatementIterator(KeyOrder keyOrder,StatementBuffer buffer) {
-            
-            this(keyOrder, buffer.database.getKeyBuilder(), buffer.stmts,
-                    buffer.numStmts);
-            
-        }
-        
-        public StatementIterator(KeyOrder keyOrder,RdfKeyBuilder keyBuilder,_Statement[] stmts,int numStmts) {
-            
-            this.keyOrder = keyOrder;
-            
-            this.keyBuilder = keyBuilder;
-            
-            this.stmts = stmts;
-            
-            this.numStmts = numStmts;
-            
-        }
-
-        public byte[] getKey() {
-
-            if (lastVisited == -1) {
-
-                throw new IllegalStateException();
-
-            }
-
-            _Statement stmt = stmts[lastVisited];
-
-            switch (keyOrder) {
-            case SPO:
-                return keyBuilder.statement2Key(stmt.s.termId,
-                        stmt.p.termId, stmt.o.termId);
-            case POS:
-                return keyBuilder.statement2Key(stmt.p.termId,
-                        stmt.o.termId, stmt.s.termId);
-            case OSP:
-                return keyBuilder.statement2Key(stmt.o.termId,
-                        stmt.s.termId, stmt.p.termId);
-            default:
-                throw new UnsupportedOperationException();
-            }
-            
-        }
-
-        public Object getValue() {
-            if( lastVisited == -1 ) {
-                
-                throw new IllegalStateException();
-                
-            }
-            return stmts[lastVisited];
-        }
-
-        public boolean hasNext() {
-            
-            return index < numStmts;
-            
-        }
-
-        public Object next() {
-            
-            if(!hasNext()) {
-                
-                throw new NoSuccessorException();
-                
-            }
-
-            lastVisited = index++;
-
-            return stmts[lastVisited];
-            
-        }
-
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-        
-    }
-
-    /**
-     * Visits statements in the buffer in their current sorted order that are
-     * not found in the statement index as indicated by the
-     * {@link _Statement#known} flag.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class UnknownStatementIterator implements IEntryIterator {
-
-        private final KeyOrder keyOrder;
-        private final RdfKeyBuilder keyBuilder;
-        private final IStriterator src;
-        private _Statement current;
-        
-        public UnknownStatementIterator(KeyOrder keyOrder, StatementBuffer buffer) {
-        
-            this.keyOrder = keyOrder;
-            
-            this.keyBuilder = buffer.database.getKeyBuilder();
-            
-            src = new Striterator(new StatementIterator(keyOrder,buffer))
-                    .addFilter(new Filter() {
-
-                        private static final long serialVersionUID = 1L;
-
-                        protected boolean isValid(Object arg0) {
-
-                            _Statement stmt = (_Statement) arg0;
-
-                            return !stmt.known;
-
-                        }
-
-                    });
-            
-        }
-        
-        public byte[] getKey() {
-
-            if (current == null) {
-
-                throw new IllegalStateException();
-
-            }
-
-            _Statement stmt = current;
-
-            switch (keyOrder) {
-            case SPO:
-                return keyBuilder.statement2Key(stmt.s.termId, stmt.p.termId,
-                        stmt.o.termId);
-            case POS:
-                return keyBuilder.statement2Key(stmt.p.termId, stmt.o.termId,
-                        stmt.s.termId);
-            case OSP:
-                return keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
-                        stmt.p.termId);
-            default:
-                throw new UnsupportedOperationException();
-            }
-
-        }
-
-        public Object getValue() {
-
-            if (current == null) {
-
-                throw new IllegalStateException();
-
-            }
-
-            return current;
-            
-        }
-
-        public boolean hasNext() {
-            
-            return src.hasNext();
-            
-        }
-
-        public Object next() {
-
-            current = (_Statement) src.next();
-            
-            return current;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-
 }

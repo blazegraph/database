@@ -36,7 +36,6 @@ import java.util.Properties;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.MutableKeyBuffer;
 import com.bigdata.btree.MutableValueBuffer;
@@ -47,7 +46,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
-import com.bigdata.rdf.rio.BulkRioLoader;
 import com.bigdata.rdf.util.AddIds;
 import com.bigdata.rdf.util.AddTerms;
 import com.bigdata.service.BigdataFederation;
@@ -114,10 +112,7 @@ import com.bigdata.service.ClientIndexView.Split;
  *       and closure exists). this will prevent partial reads of data during
  *       data load.
  * 
- * @todo Very large bulk data load (using the {@link BulkRioLoader} to load
- *       {@link IndexSegment} directly). Reconcile as of the commit time of the
- *       bulk insert and you get to do that using efficient compacting
- *       sort-merges of "perfect" bulk index segments.
+ * @todo Very large bulk data load.
  * 
  * @todo write utility class to create and pre-partition a federated store.
  * 
@@ -645,5 +640,23 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         return 100000;
         
     }
-    
+
+    /**
+     * FIXME Implement for the scale-out index (might be an identical
+     * implementation).
+     * 
+     * FIXME This needs to get invoked by both the batch and non-batch
+     * term insert methods.
+     */
+    protected void indexTermText(_Value[] terms, int numTerms) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    public IIndex getFullTextIndex() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
+    }
+
 }

@@ -71,6 +71,7 @@ public class TestAll extends TestCase {
         /*
          * test fast DataOutput and DataInput implementations.
          */
+        suite.addTestSuite(TestByteArrayBuffer.class);
         suite.addTestSuite(TestDataOutputBuffer.class);
         suite.addTestSuite(TestShortPacker.class);
         suite.addTestSuite(TestLongPacker.class);

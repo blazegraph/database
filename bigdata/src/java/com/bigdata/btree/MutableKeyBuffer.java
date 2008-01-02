@@ -371,7 +371,9 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
 //        return new MutableKeyBuffer(capacity,this);
         
-        return new MutableKeyBuffer(this);
+//        return new MutableKeyBuffer(this);
+        
+        return this;
         
     }
     

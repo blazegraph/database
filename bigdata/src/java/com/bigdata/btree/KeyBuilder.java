@@ -383,12 +383,28 @@ public class KeyBuilder implements IKeyBuilder {
         
         ensureFree(len);
         
-        for(int i=0; i<len; i++) {
+        for(int j=0; j<len; j++) {
             
-            char ch = s.charAt(i);
+            char ch = s.charAt(j);
             
-            append((byte)(ch & 0xff));
+//            append((byte)(ch & 0xff));
+
+            // lexiographic ordering as unsigned byte.
             
+            int v = (byte)ch;
+            
+            if (v < 0) {
+
+                v = v - 0x80;
+
+            } else {
+                
+                v = v + 0x80;
+                
+            }
+            
+            buf[this.len++] = (byte)(v & 0xff);
+
         }
         
         return this;
@@ -1068,8 +1084,21 @@ public class KeyBuilder implements IKeyBuilder {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static interface UnicodeSortKeyGenerator {
+    public static interface UnicodeSortKeyGenerator {
+        
+        /**
+         * The {@link Locale} used to configure this object.
+         */
+        public Locale getLocale();
 
+        /**
+         * Append a Unicode sort key to the {@link KeyBuilder}.
+         * 
+         * @param keyBuilder
+         *            The {@link KeyBuilder}.
+         * @param s
+         *            The Unicode string.
+         */
         public void appendSortKey(KeyBuilder keyBuilder, String s);
         
     }

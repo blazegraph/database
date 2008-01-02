@@ -876,7 +876,7 @@ public class IndexSegmentMerger {
 
         public byte[] getKey() {
             
-            return tuple.key;
+            return tuple.getKey();
             
         }
 
@@ -885,12 +885,22 @@ public class IndexSegmentMerger {
             return tuple.val;
             
         }
+        
+        public ITuple getTuple() {
+            
+            return tuple;
+            
+        }
 
     }
     
     /**
-     * Visits the values of a {@link Leaf} in the external key ordering. There is
-     * exactly one value per key for a leaf node.
+     * Visits the values of a {@link Leaf} in the external key ordering. There
+     * is exactly one value per key for a leaf node.
+     * <p>
+     * Note: keep this up to data with changes to {@link EntryIterator}.
+     * However this class always visits keys and values while the
+     * {@link EntryIterator} is configurable.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -898,6 +908,8 @@ public class IndexSegmentMerger {
     private static class LeafDataEntryIterator implements IEntryIterator {
 
         private final LeafData leaf;
+
+        private final EntryFilter filter = null;
 
         private final Tuple tuple;
 
@@ -917,7 +929,7 @@ public class IndexSegmentMerger {
         
         public LeafDataEntryIterator(LeafData leaf) {
 
-            this( leaf, null );
+            this( leaf, new Tuple() );
             
         }
 
@@ -930,9 +942,9 @@ public class IndexSegmentMerger {
         /**
          * 
          * @param leaf
-         *            The leaf whose entries will be traversed.
+         *            The leaf whose entries will be traversed (required).
          * @param tuple
-         *            Used to hold the output values.
+         *            Used to hold the output values (required).
          * @param fromKey
          *            The first key whose entry will be visited or <code>null</code>
          *            if the lower bound on the key traversal is not constrained.
@@ -948,9 +960,11 @@ public class IndexSegmentMerger {
 
             assert leaf != null;
 
+            assert tuple != null;
+            
             this.leaf = leaf;
             
-            this.tuple = tuple; // MAY be null.
+            this.tuple = tuple;
 
 //            this.fromKey = fromKey; // may be null (no lower bound).
 //            
@@ -1031,21 +1045,66 @@ public class IndexSegmentMerger {
 
             lastVisited = index++;
             
-            if( tuple != null ) {
+            // #of entries visited by the iterator.
+            tuple.nvisited++;
 
-                /*
-                 * eagerly set the key/value on the tuple for a side-effect style
-                 * return.
-                 */
-                tuple.key = leaf.keys.getKey(lastVisited);
+            if (tuple.needKeys) {
+
+                // tuple.key = leaf.keys.getKey(lastVisited);
+
+                if (leaf.keys instanceof MutableKeyBuffer) {
+
+                    // reference to the current key.
+                    final byte[] key = ((MutableKeyBuffer) leaf.keys).keys[lastVisited];
+
+                    // copy the key data into the buffer.
+                    tuple.kbuf.reset().put(key);
+
+                } else {
+
+                    final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
+
+                    // rewind to the end of the shared key prefix.
+                    tuple.kbuf.rewind();
+
+                    // copy the data for the remainder of the current key.
+                    tuple.kbuf.put(keys.buf, keys.offsets[lastVisited], keys
+                            .getRemainderLength(lastVisited));
+
+                }
+
+            }
+
+            if (tuple.needVals) {
+
+                // the current value.
+                final Object val = filter == null ? leaf.vals[lastVisited] : filter
+                        .resolve(leaf.vals[lastVisited]); 
                 
-                tuple.val = leaf.vals[lastVisited];
+                tuple.val = val;
                 
-                return tuple.val;
+                return val;
                 
             }
             
-            return leaf.vals[lastVisited];
+            // Note: if values not requested then next() always returns null.
+            return null;
+            
+//            if( tuple != null ) {
+//
+//                /*
+//                 * eagerly set the key/value on the tuple for a side-effect style
+//                 * return.
+//                 */
+//                tuple.key = leaf.keys.getKey(lastVisited);
+//                
+//                tuple.val = leaf.vals[lastVisited];
+//                
+//                return tuple.val;
+//                
+//            }
+//            
+//            return leaf.vals[lastVisited];
             
         }
 
@@ -1057,7 +1116,15 @@ public class IndexSegmentMerger {
                 
             }
             
-            return leaf.vals[lastVisited];
+            if(!tuple.needVals) {
+                
+                throw new UnsupportedOperationException();
+                
+            }
+            
+            return tuple.val;
+            
+//          return leaf.vals[lastVisited];
             
         }
         
@@ -1069,7 +1136,28 @@ public class IndexSegmentMerger {
                 
             }
             
-            return leaf.keys.getKey(lastVisited);
+
+            if(!tuple.needKeys) {
+                
+                throw new UnsupportedOperationException();
+                
+            }
+
+            return tuple.getKey();
+                
+//            return leaf.keys.getKey(lastVisited);
+            
+        }
+        
+        public ITuple getTuple() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+   
+            return tuple;
             
         }
         

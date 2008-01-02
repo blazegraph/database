@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
@@ -36,6 +38,7 @@ import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
+import com.sun.org.apache.xerces.internal.util.URI;
 
 /**
  * Low-level API directly using long term identifiers rather than an RDF Value
@@ -63,6 +66,46 @@ public interface IRawTripleStore extends ITripleStore {
     public static final int N = 3;
 
     /**
+     * The bit mask that is bit-wise ANDed with a term identifier in order to
+     * reveal the term code.
+     * 
+     * @see #CODE_URI
+     * @see #CODE_BNODE
+     * @see #CODE_LITERAL
+     * @see #CODE_STATEMENT
+     */
+    static final public long TERMID_CODE_MASK = 0x03L;
+    
+    /**
+     * The bit value used to indicate that a term identifier stands for a
+     * {@link URI}.
+     * <p>
+     * Note: The lower two bits of a term identifier are reserved to indicate
+     * the type of thing for which the term identifier stands {URI, Literal,
+     * BNode, or Statement}. This is used to avoid lookup of the term in the
+     * {@link #name_idTerm} index when we only need to determine the term class.
+     */
+    static final public long CODE_URI = 0x00L;
+
+    /**
+     * The bit value used to indicate that a term identifier stands for a
+     * {@link BNode}.
+     */
+    static final public long CODE_BNODE = 0x01L;
+
+    /**
+     * The bit value used to indicate that a term identifier stands for a
+     * {@link Literal}.
+     */
+    static final public long CODE_LITERAL = 0x02L;
+
+    /**
+     * The bit value used to indicate that a term identifier stands for a
+     * statement (when support for statement identifiers is enabled).
+     */
+    static final public long CODE_STATEMENT = 0x03L;
+    
+    /**
      * The name of the index mapping terms to term identifiers.
      */
     static final public String name_termId = "terms";
@@ -72,6 +115,11 @@ public interface IRawTripleStore extends ITripleStore {
      */
     static final public String name_idTerm = "ids";
 
+    /**
+     * The name of the index providing full text lookup for terms.
+     */
+    static final public String name_freeText = "text";
+    
     /*
      * The names of the various statement indices. 
      */

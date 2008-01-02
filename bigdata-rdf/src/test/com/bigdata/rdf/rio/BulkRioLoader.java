@@ -215,15 +215,15 @@ public class BulkRioLoader extends BasicRioLoader implements IRioLoader, Stateme
      */
     public static class Indices {
     
-        List<File> terms = new ArrayList<File>();
+        public List<File> terms = new ArrayList<File>();
 
-        List<File> ids = new ArrayList<File>();
+        public List<File> ids = new ArrayList<File>();
 
-        List<File> spo = new ArrayList<File>();
+        public List<File> spo = new ArrayList<File>();
 
-        List<File> pos = new ArrayList<File>();
+        public List<File> pos = new ArrayList<File>();
 
-        List<File> osp = new ArrayList<File>();
+        public List<File> osp = new ArrayList<File>();
 
         public Indices() {
             

@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import java.io.IOException;
 import java.util.NoSuchElementException;
 
 
@@ -60,7 +61,7 @@ public class EntryIterator implements IEntryIterator {
     
     public EntryIterator(Leaf leaf) {
 
-        this(leaf, null, null, null, null);
+        this(leaf, new Tuple(), null, null, null);
 
     }
 
@@ -79,9 +80,9 @@ public class EntryIterator implements IEntryIterator {
     /**
      * 
      * @param leaf
-     *            The leaf whose entries will be traversed.
+     *            The leaf whose entries will be traversed (required).
      * @param tuple
-     *            Used to hold the output values.
+     *            Used to hold the output values (required).
      * @param fromKey
      *            The first key whose entry will be visited or <code>null</code>
      *            if the lower bound on the key traversal is not constrained.
@@ -101,9 +102,11 @@ public class EntryIterator implements IEntryIterator {
 
         assert leaf != null;
 
+        assert tuple != null;
+
         this.leaf = leaf;
         
-        this.tuple = tuple; // MAY be null.
+        this.tuple = tuple;
 
 //        this.fromKey = fromKey; // may be null (no lower bound).
 //        
@@ -168,6 +171,31 @@ public class EntryIterator implements IEntryIterator {
         // starting index is the lower bound.
         index = fromIndex;
         
+        if (tuple != null && tuple.needKeys
+                && leaf.keys instanceof ImmutableKeyBuffer) {
+
+            /*
+             * Immutable key buffers break the key into a shared prefix and a
+             * per-key remainder. We copy the shared prefix into the buffer and
+             * set the mark on the buffer. We then rewind to the mark for each
+             * visited key and append the remainder such that the full key is
+             * materialized in the buffer without doing any allocations on the
+             * heap.
+             */
+
+            final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
+
+            // reset the buffer.
+            tuple.kbuf.reset();
+
+            // copy the shared prefix into the buffer.
+            tuple.kbuf.put(keys.buf, 0, keys.getPrefixLength());
+            
+            // set the mark - we will reuse the shared prefix for each visited key.
+            tuple.kbuf.mark();
+                
+        }
+        
     }
 
     public boolean hasNext() {
@@ -203,24 +231,50 @@ public class EntryIterator implements IEntryIterator {
         }
 
         lastVisited = index++;
-        
-        if( tuple != null ) {
 
-            /*
-             * eagerly set the key/value on the tuple for a side-effect style
-             * return.
-             */
-            tuple.key = leaf.keys.getKey(lastVisited);
+        // #of entries visited by the iterator.
+        tuple.nvisited++;
+
+        if (tuple.needKeys) {
+
+            // tuple.key = leaf.keys.getKey(lastVisited);
+            if (leaf.keys instanceof MutableKeyBuffer) {
+
+                // reference to the current key.
+                final byte[] key = ((MutableKeyBuffer) leaf.keys).keys[lastVisited];
+
+                // copy the key data into the buffer.
+                tuple.kbuf.reset().put(key);
+
+            } else {
+
+                final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
+
+                // rewind to the end of the shared key prefix.
+                tuple.kbuf.rewind();
+
+                // copy the data for the remainder of the current key.
+                tuple.kbuf.put(keys.buf, keys.offsets[lastVisited], keys
+                        .getRemainderLength(lastVisited));
+
+            }
+
+        }
+
+        if (tuple.needVals) {
+
+            // the current value.
+            final Object val = filter == null ? leaf.values[lastVisited] : filter
+                    .resolve(leaf.values[lastVisited]); 
             
-            tuple.val = filter == null ? leaf.values[lastVisited] : filter
-                    .resolve(leaf.values[lastVisited]);
+            tuple.val = val;
             
-            return tuple.val;
+            return val;
             
         }
         
-        return filter == null ? leaf.values[lastVisited] : filter
-                .resolve(leaf.values[lastVisited]);
+        // Note: if values not requested then next() always returns null.
+        return null;
         
     }
 
@@ -232,8 +286,25 @@ public class EntryIterator implements IEntryIterator {
             
         }
         
-        return filter == null ? leaf.values[lastVisited] : filter
-                .resolve(leaf.values[lastVisited]);
+        if(!tuple.needVals) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        return tuple.val;
+        
+    }
+    
+    public ITuple getTuple() {
+        
+        if( lastVisited == -1 ) {
+            
+            throw new IllegalStateException();
+            
+        }
+
+        return tuple;
         
     }
     
@@ -244,8 +315,22 @@ public class EntryIterator implements IEntryIterator {
             throw new IllegalStateException();
             
         }
+
+        if(!tuple.needKeys) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
         
-        return leaf.keys.getKey(lastVisited);
+//        if(tuple != null && tuple.needKeys) {
+        
+            // return the key from the tuple.
+            
+            return tuple.getKey();
+            
+//        }
+//        
+//        return leaf.keys.getKey(lastVisited);
         
     }
     

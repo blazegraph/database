@@ -35,6 +35,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.NOPSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IJournal;
@@ -70,6 +71,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      */
     private IIndex ndx_termId;
     private IIndex ndx_idTerm;
+    private IIndex ndx_freeText;
     private IIndex ndx_spo;
     private IIndex ndx_pos;
     private IIndex ndx_osp;
@@ -83,6 +85,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     
     final public IIndex getTermIdIndex() {
 
+        if(!lexicon) return null;
+        
         if(ndx_termId!=null) return ndx_termId;
         
         IIndex ndx = store.getIndex(name_termId);
@@ -109,6 +113,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     final public IIndex getIdTermIndex() {
 
+        if(!lexicon) return null;
+
         if (ndx_idTerm != null)
             return ndx_idTerm;
 
@@ -132,6 +138,34 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         return ndx;
 
+    }
+
+    final public IIndex getFullTextIndex() {
+
+        if(!textIndex) return null;
+
+        if(ndx_freeText!=null) return ndx_freeText;
+        
+        IIndex ndx = store.getIndex(name_freeText);
+        
+        if(ndx==null && textIndex) {
+            
+            if (isolatableIndices) {
+
+                ndx_freeText = ndx = store.registerIndex(name_freeText);
+
+            } else {
+
+                ndx_freeText = ndx = store.registerIndex(name_freeText, new BTree(
+                        store, store.getDefaultBranchingFactor(), UUID
+                                .randomUUID(), NOPSerializer.INSTANCE));
+            
+            }
+            
+        }
+        
+        return ndx;
+        
     }
 
     /**
@@ -264,6 +298,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         ndx_termId = null;
         ndx_idTerm = null;
+        ndx_freeText = null;
         ndx_spo = null;
         ndx_pos = null;
         ndx_osp = null;
@@ -281,6 +316,11 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         store.dropIndex(name_idTerm); ndx_termId = null;
         store.dropIndex(name_termId); ndx_idTerm = null;
+        if(store.getIndex(name_freeText)!=null) {
+            
+            store.dropIndex(name_freeText); ndx_freeText = null;
+            
+        }
         
         store.dropIndex(name_spo); ndx_spo = null;
         store.dropIndex(name_pos); ndx_pos = null;
@@ -379,6 +419,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         // clear hard references to named indices.
         ndx_termId = null;
         ndx_idTerm = null;
+        ndx_freeText = null;
         ndx_spo = null;
         ndx_pos = null;
         ndx_osp = null;
@@ -532,6 +573,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         private IIndex ndx_termId;
         private IIndex ndx_idTerm;
+        private IIndex ndx_freeText;
         private IIndex ndx_spo;
         private IIndex ndx_pos;
         private IIndex ndx_osp;
@@ -559,6 +601,18 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
             return ndx_idTerm;
 
+        }
+
+        public IIndex getFullTextIndex() {
+            
+            if(ndx_freeText==null && textIndex) {
+                
+                ndx_freeText= new ReadCommittedIndex(db.store,name_freeText);
+                
+            }
+            
+            return ndx_freeText;
+            
         }
 
         public IIndex getSPOIndex() {

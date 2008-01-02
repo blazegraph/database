@@ -31,18 +31,24 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.TokenStream;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.service.ClientIndexView;
@@ -71,6 +77,10 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
     /**
      * Handles both unisolatable and isolatable indices.
+     * 
+     * FIXME Why not just invoke the batch API for this method? We almost never
+     * do single term at a time processing and this would simplify the code
+     * maintenance.
      */
     public long addTerm(Value value) {
 
@@ -116,9 +126,11 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             /*
              * Assign the termId.
              * 
-             * Note: We set the low bit iff the term is a
-             * literals so that we can tell at a glance whether
-             * a term identifier is a literal or not.
+             * Note: We set the low two bits to indicate whether
+             * a term is a literal, bnode, URI, or statement so
+             * that we can tell at a glance (without lookup up
+             * the term in the index) what "kind" of thing the
+             * term identifier stands for.
              * 
              * FIXME back port to the scale-out version as well.
              * 
@@ -127,11 +139,25 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
              * does not allow negative integers. a different
              * pack routine would allow us all bits.
              */
-            val.termId = counter.inc()<<1;
+            val.termId = counter.inc()<<2;
             
             if(val instanceof Literal) {
                 
-                val.termId |= 0x01L;
+                val.termId |= CODE_LITERAL;
+                
+            } else if(val instanceof URI) {
+                
+                val.termId |= CODE_URI;
+                
+            } else if(val instanceof BNode) {
+                
+                val.termId |= CODE_BNODE;
+                
+            } else {
+                
+                throw new AssertionError(
+                        "Unknown term class: class="
+                                + val.getClass());
                 
             }
 
@@ -218,6 +244,17 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
             }
 
+        }
+
+        if(textIndex) {
+
+            /*
+             * Populate the free text index from the terms when that feature is
+             * enabled.
+             */
+            
+            indexTermText(new _Value[] { val }, 1);
+            
         }
 
         val.known = true;
@@ -456,9 +493,11 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                             /*
                              * Assign the termId.
                              * 
-                             * Note: We set the low bit iff the term is a
-                             * literals so that we can tell at a glance whether
-                             * a term identifier is a literal or not.
+                             * Note: We set the low two bits to indicate whether
+                             * a term is a literal, bnode, URI, or statement so
+                             * that we can tell at a glance (without lookup up
+                             * the term in the index) what "kind" of thing the
+                             * term identifier stands for.
                              * 
                              * FIXME back port to the scale-out version as well.
                              * 
@@ -467,11 +506,25 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                              * does not allow negative integers. a different
                              * pack routine would allow us all bits.
                              */
-                            term.termId = counter.inc()<<1;
+                            term.termId = counter.inc()<<2;
                             
                             if(term instanceof Literal) {
                                 
-                                term.termId |= 0x01L;
+                                term.termId |= CODE_LITERAL;
+                                
+                            } else if(term instanceof URI) {
+                                
+                                term.termId |= CODE_URI;
+                                
+                            } else if(term instanceof BNode) {
+                                
+                                term.termId |= CODE_BNODE;
+                                
+                            } else {
+                                
+                                throw new AssertionError(
+                                        "Unknown term class: class="
+                                                + term.getClass());
                                 
                             }
 
@@ -630,7 +683,84 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                     + insertTime + "ms");
             
         }
+
+        if(textIndex) {
+
+            /*
+             * Populate the free text index from the terms when that feature is
+             * enabled.
+             */
+            
+            indexTermText( terms, numTerms );
+            
+        }
         
+    }
+
+    /**
+     * FIXME Optimize the insert order (sort by the key before insert).
+     * 
+     * @todo isolate method to return the 1st 2/3 characters of the language
+     *       code (without any embedded whitespace).
+     */
+    protected void indexTermText(_Value[] terms, int numTerms) {
+
+        final IIndex ndx = getFullTextIndex();
+
+        final IKeyBuilder keyBuilder = this.keyBuilder.keyBuilder;
+        
+        for(int i=0; i<numTerms; i++) {
+            
+            _Value val = terms[i];
+
+            if(!(val instanceof Literal)) continue;
+
+            // do not index datatype literals in this manner.
+            if(((_Literal)val).datatype!=null) continue;
+            
+            final String languageCode = ((_Literal)val).language;
+            
+            // Note: May be null (we will index plain literals).
+//            if(languageCode==null) continue;
+            
+            final String text = ((_Literal)val).term;
+
+            // tokenize.
+            final TokenStream tokenStream = getTokenStream(languageCode,text);
+            
+            Token token = null;
+            
+            /*
+             * @todo modify to accept the current token for reuse (only in the
+             * current nightly build). Also, termText() is deprecated in the
+             * nightly build.
+             * 
+             * @todo this would be a good example for a mark/reset feature on
+             * the KeyBuilder.
+             */
+            try {
+
+                while ((token = tokenStream.next(/* token */)) != null) {
+
+                    final byte[] key = getTokenKey(token,
+                            false/* successor */, val.termId);
+                    
+                    if (!ndx.contains(key)) {
+
+                        ndx.insert(key, null/* no value */);
+                        
+                    }
+
+                }
+         
+            } catch (IOException ex) {
+                
+                throw new RuntimeException("Tokenization problem: " + val, ex);
+                
+            }
+
+        }
+
     }
 
 }

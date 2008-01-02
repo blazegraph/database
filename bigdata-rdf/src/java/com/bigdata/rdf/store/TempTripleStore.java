@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.NOPSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
@@ -62,6 +63,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     private BTree ndx_termId;
     private BTree ndx_idTerm;
+    private BTree ndx_freeText;
 
     private BTree ndx_spo;
     private BTree ndx_pos;
@@ -107,6 +109,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
 
+    final public IIndex getFullTextIndex() {
+
+        return ndx_freeText;
+        
+    }
+
     final public IIndex getJustificationIndex() {
         
         return ndx_just;
@@ -148,11 +156,23 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 ndx_termId.removeAll();
                 ndx_idTerm.removeAll();
                 
+                if(textIndex) {
+                    
+                    ndx_freeText.removeAll();
+                    
+                }
+                
             }
     
             ndx_spo.removeAll();
-            ndx_pos.removeAll();
-            ndx_osp.removeAll();
+            
+            if(!oneAccessPath) {
+             
+                ndx_pos.removeAll();
+                
+                ndx_osp.removeAll();
+                
+            }
             
             if(justify) {
 
@@ -167,11 +187,22 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 store.dropIndex(name_idTerm); ndx_termId = null;
                 store.dropIndex(name_termId); ndx_idTerm = null;
                 
+                if(textIndex) {
+                    
+                    store.dropIndex(name_freeText); ndx_freeText = null;
+                }
+                
             }
             
             store.dropIndex(name_spo); ndx_spo = null;
-            store.dropIndex(name_pos); ndx_pos = null;
-            store.dropIndex(name_osp); ndx_osp = null;
+            
+            if(!oneAccessPath) {
+            
+                store.dropIndex(name_pos); ndx_pos = null;
+             
+                store.dropIndex(name_osp); ndx_osp = null;
+                
+            }
             
             if(justify) {
 
@@ -222,6 +253,10 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
      * transactional isolation and purge of historical data). This offers a
      * significant performance boost when you do not need transactions or the
      * ability to purge historical data versions from the store as they age.
+     * <p>
+     * Note: Users of the {@link TempTripleStore} may find it worthwhile to turn
+     * off a variety of options in order to minimize the time and space burden
+     * of the temporary store depending on the use which will be made of it.
      * 
      * @param properties
      *            See {@link Options}.
@@ -258,20 +293,33 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
             ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                 RdfValueSerializer.INSTANCE));
+            
+            if(textIndex) {
+
+                ndx_freeText = (BTree)store.registerIndex(name_freeText, new BTree(store,
+                        branchingFactor, UUID.randomUUID(),
+                        NOPSerializer.INSTANCE));
+
+            }
+            
         }
 
         ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
                 StatementSerializer.INSTANCE));
-        
-        ndx_pos = (BTree)store.registerIndex(name_pos, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-                StatementSerializer.INSTANCE));
-        
-        ndx_osp = (BTree)store.registerIndex(name_osp, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-                StatementSerializer.INSTANCE));
 
+        if(!oneAccessPath) {
+        
+            ndx_pos = (BTree) store.registerIndex(name_pos, new BTree(store,
+                    branchingFactor, UUID.randomUUID(),
+                    StatementSerializer.INSTANCE));
+
+            ndx_osp = (BTree) store.registerIndex(name_osp, new BTree(store,
+                    branchingFactor, UUID.randomUUID(),
+                    StatementSerializer.INSTANCE));
+            
+        }
+        
         if(justify) {
         
             ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,

@@ -32,22 +32,33 @@ import it.unimi.dsi.mg4j.util.BloomFilter;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.btree.NoSuccessorException;
 import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.RecordCompressor;
 import com.bigdata.rdf.model.OptimizedValueFactory.OSPComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.POSComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory.SPOComparator;
+import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.BulkRioLoader.Indices;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.util.KeyOrder;
+import com.bigdata.rdf.util.RdfKeyBuilder;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Implementation specialized to support bulk index load operations (not ready
@@ -393,6 +404,476 @@ public class BulkLoaderBuffer extends StatementBuffer {
     protected File getNextOutFile(String name, int batchId) throws IOException {
 
         return File.createTempFile(name + "-" + batchId, ".seg", new File("."));
+        
+    }
+
+    /**
+     * Visits statements in the buffer in their current sorted order that are
+     * not found in the statement index as indicated by the
+     * {@link _Statement#known} flag.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class UnknownStatementIterator implements IEntryIterator {
+
+        private final KeyOrder keyOrder;
+        private final RdfKeyBuilder keyBuilder;
+        private final IStriterator src;
+        private _Statement current;
+        
+        public UnknownStatementIterator(KeyOrder keyOrder, StatementBuffer buffer) {
+        
+            this.keyOrder = keyOrder;
+            
+            this.keyBuilder = buffer.getDatabase().getKeyBuilder();
+            
+            src = new Striterator(new StatementIterator(keyOrder,buffer))
+                    .addFilter(new Filter() {
+
+                        private static final long serialVersionUID = 1L;
+
+                        protected boolean isValid(Object arg0) {
+
+                            _Statement stmt = (_Statement) arg0;
+
+                            return !stmt.known;
+
+                        }
+
+                    });
+            
+        }
+        
+        public byte[] getKey() {
+
+            if (current == null) {
+
+                throw new IllegalStateException();
+
+            }
+
+            _Statement stmt = current;
+
+            switch (keyOrder) {
+            case SPO:
+                return keyBuilder.statement2Key(stmt.s.termId, stmt.p.termId,
+                        stmt.o.termId);
+            case POS:
+                return keyBuilder.statement2Key(stmt.p.termId, stmt.o.termId,
+                        stmt.s.termId);
+            case OSP:
+                return keyBuilder.statement2Key(stmt.o.termId, stmt.s.termId,
+                        stmt.p.termId);
+            default:
+                throw new UnsupportedOperationException();
+            }
+
+        }
+
+        public Object getValue() {
+
+            if (current == null) {
+
+                throw new IllegalStateException();
+
+            }
+
+            return current;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
+        public Object next() {
+
+            current = (_Statement) src.next();
+            
+            return current;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits all URIs, Literals, and BNodes in their current order.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TermIterator implements IEntryIterator {
+
+        private final IStriterator src;
+        
+        private _Value current = null;
+
+        public TermIterator(StatementBuffer buffer) {
+
+            src = new Striterator(new TermArrayIterator(buffer.values,
+                    buffer.numValues));
+            
+        }
+
+        public byte[] getKey() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current.key;
+            
+        }
+
+        public Object getValue() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
+        public Object next() {
+            
+            current = (_Value) src.next();
+            
+            return current;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits the term identifier for all URIs, Literals, and BNodes in their
+     * current order.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TermIdIterator implements IEntryIterator {
+
+        private final IStriterator src;
+        
+        private int nvisited = 0;
+        private _Value current = null;
+
+        public TermIdIterator(StatementBuffer buffer) {
+            
+            src = new Striterator(new TermArrayIterator(buffer.values,
+                    buffer.numValues));
+            
+        }
+
+        public byte[] getKey() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current.key;
+            
+        }
+
+        public Object getValue() {
+
+            if (current == null)
+                throw new IllegalStateException();
+
+            return current.termId;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
+        public Object next() {
+            
+            try {
+
+                current = (_Value) src.next();
+                
+                nvisited++;
+                
+            } catch(NoSuchElementException ex) {
+                
+                log.error("*** Iterator exhausted after: "+nvisited+" elements", ex);
+                
+                throw ex;
+                
+            }
+            
+            assert current.termId != IRawTripleStore.NULL;
+            
+            return current.termId;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits URIs, Literals, and BNodes marked as {@link _Value#known unknown}
+     * in their current sorted order.
+     * 
+     * @deprecated Only used by the unit tests.
+     */
+    public static class UnknownTermIterator implements IEntryIterator {
+        
+        private final IStriterator src;
+        private _Value current = null;
+        
+        public UnknownTermIterator(StatementBuffer buffer) {
+
+            src = new Striterator(new TermIterator(buffer)).addFilter(new Filter(){
+
+                private static final long serialVersionUID = 1L;
+
+                protected boolean isValid(Object arg0) {
+                    
+                    _Value term = (_Value)arg0;
+                    
+                    return 
+//                    term.duplicate == false &&
+                    term.known == false;
+                }
+                
+            }
+            );
+            
+        }
+
+        public byte[] getKey() {
+            
+            return current.key;
+            
+        }
+
+        public Object getValue() {
+            
+            return current;
+            
+        }
+
+        public boolean hasNext() {
+            
+            return src.hasNext();
+            
+        }
+
+        public Object next() {
+            
+            current = (_Value) src.next();
+            
+            return current;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits all terms in their current order.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class TermArrayIterator implements IEntryIterator {
+
+        private int lastVisited = -1;
+        private int index = 0;
+
+        private final _Value[] terms;
+        private final int nterms;
+        
+        public TermArrayIterator(_Value[] terms,int nterms) {
+            
+            this.terms = terms;
+            
+            this.nterms = nterms;
+
+        }
+
+        public byte[] getKey() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return terms[lastVisited].key;
+            
+        }
+
+        public Object getValue() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return terms[lastVisited];
+            
+        }
+
+        public boolean hasNext() {
+            
+            return index < nterms;
+            
+        }
+
+        public Object next() {
+            
+            if (index >= nterms) {
+                
+                throw new NoSuccessorException();
+                
+            }
+
+            lastVisited = index++;
+
+            return terms[lastVisited];
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+
+    /**
+     * Visits all statements in their current order.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class StatementIterator implements IEntryIterator {
+
+        private final KeyOrder keyOrder;
+        private final RdfKeyBuilder keyBuilder;
+        private final _Statement[] stmts;
+        private final int numStmts;
+        
+        private int lastVisited = -1;
+        private int index = 0;
+
+        public StatementIterator(KeyOrder keyOrder,StatementBuffer buffer) {
+            
+            this(keyOrder, buffer.getDatabase().getKeyBuilder(), buffer.stmts,
+                    buffer.numStmts);
+            
+        }
+        
+        public StatementIterator(KeyOrder keyOrder,RdfKeyBuilder keyBuilder,_Statement[] stmts,int numStmts) {
+            
+            this.keyOrder = keyOrder;
+            
+            this.keyBuilder = keyBuilder;
+            
+            this.stmts = stmts;
+            
+            this.numStmts = numStmts;
+            
+        }
+
+        public byte[] getKey() {
+
+            if (lastVisited == -1) {
+
+                throw new IllegalStateException();
+
+            }
+
+            _Statement stmt = stmts[lastVisited];
+
+            switch (keyOrder) {
+            case SPO:
+                return keyBuilder.statement2Key(stmt.s.termId,
+                        stmt.p.termId, stmt.o.termId);
+            case POS:
+                return keyBuilder.statement2Key(stmt.p.termId,
+                        stmt.o.termId, stmt.s.termId);
+            case OSP:
+                return keyBuilder.statement2Key(stmt.o.termId,
+                        stmt.s.termId, stmt.p.termId);
+            default:
+                throw new UnsupportedOperationException();
+            }
+            
+        }
+
+        public Object getValue() {
+            
+            if( lastVisited == -1 ) {
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return stmts[lastVisited];
+            
+        }
+
+        public boolean hasNext() {
+            
+            return index < numStmts;
+            
+        }
+
+        public Object next() {
+            
+            if(!hasNext()) {
+                
+                throw new NoSuccessorException();
+                
+            }
+
+            lastVisited = index++;
+
+            return stmts[lastVisited];
+            
+        }
+
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
         
     }
 

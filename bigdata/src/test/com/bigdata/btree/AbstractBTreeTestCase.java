@@ -1747,6 +1747,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
             Object val = btree.lookup(key);
             
+            if(val==null && true) {
+                
+                // Note: This exists only as a debug point.
+                
+                btree.lookup(key);
+                
+            }
+            
             Object expectedVal = vals[entryIndex];
 
             assertEquals(expectedVal,val);

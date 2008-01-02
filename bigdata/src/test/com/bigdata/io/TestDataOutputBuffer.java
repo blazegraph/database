@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.io.IOException;
-import java.util.Random;
 
 import junit.framework.TestCase2;
 
@@ -117,96 +116,10 @@ public class TestDataOutputBuffer extends TestCase2
 
     }
 
-    public void test_ensureCapacity() {
-
-        DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
-
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertEquals(0, DataOutputBuffer.buf.length);
-
-        final byte[] originalBuffer = DataOutputBuffer.buf;
-
-        // correct rejection.
-        try {
-            DataOutputBuffer.ensureCapacity(-1);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: " + ex);
-        }
-        assertTrue(originalBuffer == DataOutputBuffer.buf); // same buffer.
-
-        // no change.
-        DataOutputBuffer.ensureCapacity(0);
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertEquals(0, DataOutputBuffer.buf.length);
-        assertTrue(originalBuffer == DataOutputBuffer.buf); // same buffer.
-    }
-
-    public void test_ensureCapacity02() {
-
-        DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
-
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertEquals(0, DataOutputBuffer.buf.length);
-
-        final byte[] originalBuffer = DataOutputBuffer.buf;
-
-        // extends buffer.
-        DataOutputBuffer.ensureCapacity(100);
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertEquals(100, DataOutputBuffer.buf.length);
-        assertTrue(originalBuffer != DataOutputBuffer.buf); // same buffer.
-    }
-
-    /**
-     * verify that existing data is preserved if the capacity is extended.
+    /*
+     * DataOutput API tests.
      */
-    public void test_ensureCapacity03() {
-
-        Random r = new Random();
-        byte[] expected = new byte[20];
-        r.nextBytes(expected);
-
-        DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(20, expected);
-
-        assertEquals(20, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertTrue(expected == DataOutputBuffer.buf);
-
-        DataOutputBuffer.ensureCapacity(30);
-        assertEquals(20, DataOutputBuffer.len);
-        assertTrue(DataOutputBuffer.buf.length >= 30);
-
-        assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
-                expected.length, expected, 0, expected.length,
-                DataOutputBuffer.buf));
-
-        for (int i = 21; i < 30; i++) {
-            assertEquals(0, DataOutputBuffer.buf[i]);
-        }
-
-    }
-
-    public void test_ensureFree() {
-
-        DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(0);
-
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertEquals(0, DataOutputBuffer.buf.length);
-
-        DataOutputBuffer.ensureFree(2);
-
-        assertEquals(0, DataOutputBuffer.len);
-        assertNotNull(DataOutputBuffer.buf);
-        assertTrue(DataOutputBuffer.buf.length >= 2);
-
-    }
-
+    
     /**
      * Tests ability to append to the buffer, including with overflow of the
      * buffer capacity.

@@ -45,6 +45,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.ITuple;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
@@ -1009,6 +1010,16 @@ public class ClientIndexView implements IIndex {
          *                Always.
          */
         public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * FIXME Implement this method. We need to expose the appropriate data
+         * from the result set in a manner designed to minimize heap allocation.
+         */
+        public ITuple getTuple() {
             
             throw new UnsupportedOperationException();
             

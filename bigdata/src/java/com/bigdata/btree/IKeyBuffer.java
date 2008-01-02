@@ -31,7 +31,7 @@ package com.bigdata.btree;
  * Interface for operations on an ordered set of keys. Each key is a variable
  * length unsigned byte[]. Keys are considered to be <em>immutable</em>,
  * though this is NOT enforced. Several aspects of the code assume that a byte[]
- * key is NOT modified once it has been created. This makes it possible to copu
+ * key is NOT modified once it has been created. This makes it possible to copy
  * references to keys rather than allocating new byte[]s and copying the data.
  * There are mutable and immutable implementations of this interface.
  * 
@@ -73,8 +73,8 @@ public interface IKeyBuffer {
     public byte[] getKey(int index);
 
     /**
-     * Return a new mutable instance. When possible, the new instance will share
-     * references to the same keys.
+     * Return a mutable instance. If the instance is mutable, returns
+     * <code>this</code>.
      * 
      * @exception IllegalArgumentException
      *                if the capacity is less than the #of defined keys.

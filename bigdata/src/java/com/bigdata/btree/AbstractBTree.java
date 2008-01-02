@@ -77,21 +77,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  * 
  * @see KeyBuilder
- * 
- * @todo The B+Tree implementation does not support limits on the serialized
- *       size of a node or leaf. The design strategy is to allow flexible sizes
- *       for serialized node and leaf records since larger branching factors and
- *       continuous IO are cheaper and nothing in particular requires the use of
- *       fixed size records when accessing disk. However, it would still be
- *       useful to be able to place an upper bound on the serialized size of a
- *       node or leaf. Nodes and leaves are only serialized on eviction, so this
- *       would require the ability to split nodes and/or leaves immediately
- *       before eviction if they would be likely to overflow the upper bound on
- *       the record size. Probably the node or leaf needs to be made immutable,
- *       the serialized size checked, and then a split operation invoked if the
- *       record would exceed the upper bound. If this happens a lot, then the
- *       branching factor is too high for the data and would have to be lowered
- *       to regain performance.
  */
 abstract public class AbstractBTree implements IIndex, ILinearList {
 

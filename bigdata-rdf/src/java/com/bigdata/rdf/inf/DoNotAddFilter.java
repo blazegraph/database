@@ -27,6 +27,7 @@ package com.bigdata.rdf.inf;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Filter keeps matched triple patterns generated OUT of the database.
@@ -67,7 +68,7 @@ public class DoNotAddFilter implements ISPOFilter {
 
     public boolean isMatch(SPO spo) {
 
-        if((spo.s & 0x01L) == 1L) {
+        if((spo.s & IRawTripleStore.CODE_LITERAL) != 0L) {
             
             /*
              * Note: Explicitly toss out entailments that would place a

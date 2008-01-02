@@ -48,7 +48,6 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -419,6 +418,35 @@ abstract public class AbstractTestCase
             System.err.println("termOrder : "+itr.next());
             
         }
+        
+        /**
+         * Dumps the full text index.
+         */
+        if(((AbstractTripleStore)store).textIndex) {
+            
+            System.err.println("full text index");
+
+            IIndex ndx = store.getFullTextIndex();
+
+            IEntryIterator itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                // next value (we only need the key).
+                itr.next();
+                
+                /*
+                 * The sort key
+                 * 
+                 * FIXME decode the languageCode, token, and term identifier.
+                 */
+                byte[] key = itr.getKey();
+                
+                System.err.println(BytesUtil.toString(key));
+
+            }
+                        
+        }
 
     }
     
@@ -731,9 +759,7 @@ abstract public class AbstractTestCase
                 
             }
 
-            final Object val = itr.next();
-
-            final SPO actualSPO = new SPO(keyOrderActual, itr.getKey(), val);
+            final SPO actualSPO = new SPO(keyOrderActual, itr);
 
             if (!expectedSPO.equals(actualSPO)) {
 

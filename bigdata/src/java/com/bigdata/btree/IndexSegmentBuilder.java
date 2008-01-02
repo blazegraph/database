@@ -715,6 +715,13 @@ public class IndexSegmentBuilder {
                         
                     }
 
+                    /*
+                     * @todo modify to copy the key using the tuple once the
+                     * internal leaf data structure offers us a place into which
+                     * we can copy the data - for now we need to do an
+                     * allocation to obtain a new reference or just reuse the
+                     * reference on the source leaf if it happens to be mutable.
+                     */
                     keys.keys[keys.nkeys] = entryIterator.getKey();
 
                     if( bloomFilter != null ) {
