@@ -33,18 +33,18 @@ import org.openrdf.vocabulary.RDFS;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.rdf.rio.StatementBuffer.StatementIterator;
-import com.bigdata.rdf.rio.StatementBuffer.TermArrayIterator;
-import com.bigdata.rdf.rio.StatementBuffer.TermIterator;
-import com.bigdata.rdf.rio.StatementBuffer.UnknownStatementIterator;
-import com.bigdata.rdf.rio.StatementBuffer.UnknownTermIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
 
 /**
  * Test suite for {@link StatementBuffer}.
+ * 
+ * FIXME This test suite should really be rewritten. The implementation has
+ * evolved and the test suite has not kept up with that evolution. Right now,
+ * most real testing of {@link StatementBuffer} is currently in terms of its
+ * application - loading RDF and verifying that the loaded RDF agrees with the
+ * source RDF.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -126,8 +126,8 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify term class (URI, Literal or BNode) iterators.
              */
-            assertSameIterator(new Object[] { /*uris*/s1, p1, o1 },
-                    new TermArrayIterator(buffer.values, buffer.numValues));
+//            assertSameIterator(new Object[] { /*uris*/s1, p1, o1 },
+//                    new TermArrayIterator(buffer.values, buffer.numValues));
             
 //            assertSameIterator(new Object[] { s1, p1, o1 },
 //                    new TermClassIterator(buffer.uris, buffer.numURIs));
@@ -141,14 +141,14 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify all terms iterator.
              */
-            assertSameIterator(new Object[] { s1, p1, o1 },
-                    new TermIterator(buffer));
+//            assertSameIterator(new Object[] { s1, p1, o1 },
+//                    new TermIterator(buffer));
     
             /*
              * verify statement iterator.
              */
-            assertSameIterator(new Object[] { buffer.stmts[0] },
-                    new StatementIterator(KeyOrder.SPO, buffer));
+//            assertSameIterator(new Object[] { buffer.stmts[0] },
+//                    new StatementIterator(KeyOrder.SPO, buffer));
             
             /*
              * add another statement.
@@ -176,8 +176,8 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
              * verify term class (URI, Literal or BNode) iterators.
              */
             // Note: s2 was a duplicate.
-            assertSameIterator(new Object[] { /*uris*/s1, p1, o1, /*s2,*/ p2, /*literals*/o2 },
-                    new TermArrayIterator(buffer.values, buffer.numValues));
+//            assertSameIterator(new Object[] { /*uris*/s1, p1, o1, /*s2,*/ p2, /*literals*/o2 },
+//                    new TermArrayIterator(buffer.values, buffer.numValues));
 
 //            assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2 }, // s2 was a duplicate.
 //                    new TermClassIterator(buffer.uris, buffer.numURIs));
@@ -191,14 +191,14 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             /*
              * verify all terms iterator.
              */
-            assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2, o2 },
-                    new TermIterator(buffer));
+//            assertSameIterator(new Object[] { s1, p1, o1, /*s2,*/ p2, o2 },
+//                    new TermIterator(buffer));
             
             /*
              * verify statement iterator.
              */
-            assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
-                    new StatementIterator(KeyOrder.SPO, buffer));
+//            assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1] },
+//                    new StatementIterator(KeyOrder.SPO, buffer));
     
             /*
              * add a duplicate statement.
@@ -256,21 +256,21 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
              */
             buffer.sortTermsBySortKeys();
     
-            /* verify iterator before filtering.
-             * 
-             * Note: order URIs<Literals<BNodes.
-             * 
-             * Note: Arrays.sort() is stable.
-             * 
-             * Note: The sort order depends on the sort keys.  If you use an ASCII
-             * sort keys then the sort order is different from treating the strings
-             * as US-English Unicode data.  So this test can flunk depending on how
-             * you are encoding unicode strings to keys. 
-             */
-            assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
-                    new TermIterator(buffer));
-            assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
-                    new UnknownTermIterator(buffer));
+//            /* verify iterator before filtering.
+//             * 
+//             * Note: order URIs<Literals<BNodes.
+//             * 
+//             * Note: Arrays.sort() is stable.
+//             * 
+//             * Note: The sort order depends on the sort keys.  If you use an ASCII
+//             * sort keys then the sort order is different from treating the strings
+//             * as US-English Unicode data.  So this test can flunk depending on how
+//             * you are encoding unicode strings to keys. 
+//             */
+//            assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
+//                    new TermIterator(buffer));
+//            assertSameIterator(new Object[] { s1, /*s2,*/ p1, p2, o1, o2 },
+//                    new UnknownTermIterator(buffer));
     
     //        s1.duplicate = true;
     //        p1.known = true;
@@ -304,12 +304,12 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
     //        assertSameIterator(new Object[] { s1, p1, o1, p2, o2 },
     //                new UnknownTermIterator(buffer));
             
-            /*
-             * 
-             */
-            assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1],
-                    buffer.stmts[2], buffer.stmts[3] },
-                    new UnknownStatementIterator(KeyOrder.SPO, buffer));
+//            /*
+//             * 
+//             */
+//            assertSameIterator(new Object[] { buffer.stmts[0], buffer.stmts[1],
+//                    buffer.stmts[2], buffer.stmts[3] },
+//                    new UnknownStatementIterator(KeyOrder.SPO, buffer));
 
         } finally {
 
@@ -318,5 +318,5 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         }
         
     }
-        
+            
 }

@@ -474,10 +474,10 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new Object[]{v3,v5,v7},btree.rangeIterator(null,null));
 
         // visit everything in the root leaf using an explicit EntryIterator ctor.
-        assertSameIterator(new Object[]{v3,v5,v7},new EntryIterator(a,null,null,null,null));
+        assertSameIterator(new Object[]{v3,v5,v7},new EntryIterator(a,new Tuple(),null,null,null));
         
         // visit everything exception v3.
-        assertSameIterator(new Object[]{v5,v7},new EntryIterator(a,null,null,null,new EntryFilter() {
+        assertSameIterator(new Object[]{v5,v7},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
             private static final long serialVersionUID = 1L;
             public boolean isValid(Object value) {
                         if (value.equals(v3))
@@ -487,7 +487,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         }));
         
         // visit everything exception v5.
-        assertSameIterator(new Object[]{v3,v7},new EntryIterator(a,null,null,null,new EntryFilter() {
+        assertSameIterator(new Object[]{v3,v7},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
             private static final long serialVersionUID = 1L;
             public boolean isValid(Object value) {
                         if (value.equals(v5))
@@ -497,7 +497,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         }));
         
         // visit everything exception v7.
-        assertSameIterator(new Object[]{v3,v5},new EntryIterator(a,null,null,null,new EntryFilter() {
+        assertSameIterator(new Object[]{v3,v5},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
             private static final long serialVersionUID = 1L;
             public boolean isValid(Object value) {
                         if (value.equals(v7))

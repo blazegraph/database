@@ -27,244 +27,331 @@ package com.bigdata.btree;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
+import com.bigdata.io.IByteArrayBuffer;
+
 /**
-     * Provides a read-only view of the source {@link IEntryIterator}s that
-     * maintains the order of the visited entries.
+ * Provides a read-only view of the source {@link IEntryIterator}s that
+ * maintains the order of the visited entries.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class FusedEntryIterator implements IEntryIterator {
+
+    private final IEntryIterator[] itrs;
+
+    //        private final boolean[] available;
+    private final boolean[] exhausted;
+
+    /**
+     * The current key from each source and <code>null</code> if we need
+     * to get the next key from that source.
+     */
+    private final byte[][] keys;
+
+    /**
+     * Index of the iterator that returned the last value and -1 if no
+     * iterator has returned a value yet.
+     */
+    private int current = -1;
+
+    /**
+     * Implementation aggregates the visited counter across the source streams.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class FusedEntryIterator implements IEntryIterator {
+    private static class Tuple implements ITuple {
 
-        private final IEntryIterator[] itrs;
-        
-//        private final boolean[] available;
-        private final boolean[] exhausted;
-
-        /**
-         * The current key from each source and <code>null</code> if we need
-         * to get the next key from that source.
-         */
-        private final byte[][] keys;
+        private final boolean keysRequested = true;
+        private final boolean valsRequested = true;
         
         /**
-         * Index of the iterator that returned the last value and -1 if no
-         * iterator has returned a value yet.
+         * Aggregated across the source iterators.
          */
-        private int current = -1;
+        long nvisited = 0;
         
-        public FusedEntryIterator(AbstractBTree[] srcs,byte[] fromKey, byte[] toKey) {
+        /**
+         * The current {@link Tuple} from the source iterator that for the
+         * last visited entry (updated each time by next()).  
+         */
+        ITuple current;
+        
+        public Tuple() {
             
-            assert srcs != null;
+        }
+        
+        public boolean getKeysRequested() {
             
-            assert srcs.length > 0;
-            
-            itrs = new IEntryIterator[srcs.length];
-
-            for( int i=0; i<itrs.length; i++) {
-                
-                itrs[i] = srcs[i].rangeIterator(fromKey, toKey);
-                
-            }
-            
-//            available = new boolean[srcs.length];
-//            
-//            Arrays.fill(available,true);
-
-            keys = new byte[itrs.length][];
-            
-            exhausted = new boolean[srcs.length];
-            
-            Arrays.fill(exhausted,false);
+            return keysRequested;
             
         }
 
-        public FusedEntryIterator(IEntryIterator[] srcs) {
-        
-            assert srcs != null;
+        public boolean getValuesRequested() {
             
-            assert srcs.length > 0;            
-            
-            for( int i=0; i<srcs.length; i++) {
-                
-                assert srcs[i] != null;
-                
-            }
-            
-            this.itrs = srcs;
-            
-//            available = new boolean[srcs.length];
-//            
-//            Arrays.fill(available,true);
-
-            keys = new byte[itrs.length][];
-            
-            exhausted = new boolean[srcs.length];
-            
-            Arrays.fill(exhausted,false);
+            return valsRequested;
             
         }
 
+        public long getVisitCount() {
+            
+            return nvisited;
+            
+        }
+        
         public byte[] getKey() {
             
-            if(current == -1) throw new IllegalStateException();
-            
-            return itrs[current].getKey();
+            return current.getKey();
             
         }
 
-        public Object getValue() {
-            
-            if(current == -1) throw new IllegalStateException();
-            
-            return itrs[current].getValue();
+        public IByteArrayBuffer getKeyBuffer() {
+
+            return current.getKeyBuffer();
             
         }
 
-        public boolean hasNext() {
-
-            // @todo this could use advanceKeyStreams() instead.
-            for( int i=0; i<itrs.length; i++ ) {
-                
-                if (!exhausted[i] && keys[i]!= null || itrs[i].hasNext()) {
-
-                    return true;
-                    
-                }
-                
-            }
-            
-            return false;
-            
-        }
-
-        /**
-         * Make sure that we have the current key for each key stream. If we
-         * already have a key for that stream then we use it.
-         * 
-         * @return The #of key streams with an available key in {@link #keys}.
-         *         When zero(0), all key streams are exhausted.
-         */
-        private int advanceKeyStreams() {
-            
-            // #of key streams with a key for us to examine.
-            int navailable = 0;
-            
-            for(int i=0; i<itrs.length; i++) {
-                
-                if (exhausted[i])
-                    continue;
-                
-                if (keys[i] == null) {
-
-                    if (itrs[i].hasNext()) {
-
-                        itrs[i].next();
-
-                        keys[i] = itrs[i].getKey();
-
-                        navailable++;
-
-                    } else {
-                        
-                        exhausted[i] = true;
-                        
-                    }
-                    
-                } else {
-                    
-                    navailable++;
-                    
-                }
-                
-            }
-
-            return navailable;
-            
-        }
-        
-        /**
-         * We are presented with an ordered set of key streams. Each key stream
-         * delivers its keys in order. For a given key, we always choose the
-         * first stream having that key. Once a key is found, all subsequent key
-         * streams are then advanced until their next key is greater than the
-         * current key (this can only cause the same key to be skipped).
-         * <p>
-         * 
-         * Each invocation of this method advances one key in the union of the
-         * key streams. We test the current key for each stream on each pass and
-         * choose the key that orders first across all key streams.
-         * <p>
-         * 
-         * In the simple case with two streams we examine the current
-         * {@link #keys key} on each stream, fetching the next key iff there is
-         * no key available on that stream and otherwise using the current key
-         * from that stream. If the keys are the same, then we choose the first
-         * stream and also clear the current {@link #keys key} for the other
-         * stream so that we will skip the current entry on that key stream. If
-         * the keys differ, then we choose the stream with the lessor key and
-         * clear the {@link #keys key} for that stream to indicate that it has
-         * been consumed. In any case we set the index of the choosen stream on
-         * {@link #current} so that the other methods on this api will use the
-         * corresponding key and value from that stream and return the current
-         * value for the choosen stream.
-         * 
-         * @todo generalize to N>2 key streams.
-         */
-        public Object next() {
-
-            assert itrs.length == 2;
-
-            int navailable = advanceKeyStreams();
-
-            if(navailable == 0) {
-                
-                throw new NoSuchElementException();
-                
-            }
-            
-            /*
-             * Generalization to N streams might sort {key,order,itr} tuples.
-             * The choice of the stream with the lessor key is then the first
-             * entry in sorted tuples if the comparator pays attention to the
-             * stream [order] in addition to the keys.
-             * 
-             * if a stream is exhausted then we no longer consider it as a key
-             * source.
-             */
-            
-            final int cmp = (keys[0] == null ? 1 : keys[1] == null ? -1
-                    : BytesUtil.compareBytes(keys[0], keys[1]));
-            
-            if( cmp == 0 ) {
-
-                // Choose the first stream in a tie.
-                
-                current = 0;
-                
-                // The current key on each stream tied in 1st place is consumed.
-                
-                keys[0] = keys[1] = null;  
-                
-            } else {
-                
-                // Choose the stream with the lessor key.
-                
-                current = cmp < 0 ? 0 : 1;
-
-                keys[current] = null; // this key was consumed.
-
-            }
-
-            // Return the current object on the choosen stream.
-            Object value = itrs[current].getValue();  return value;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
     }
+    
+    private final Tuple tuple;
+    
+    public FusedEntryIterator(AbstractBTree[] srcs, byte[] fromKey, byte[] toKey) {
+
+        assert srcs != null;
+
+        assert srcs.length > 0;
+
+        itrs = new IEntryIterator[srcs.length];
+
+        for (int i = 0; i < itrs.length; i++) {
+
+            itrs[i] = srcs[i].rangeIterator(fromKey, toKey);
+
+        }
+
+        //            available = new boolean[srcs.length];
+        //            
+        //            Arrays.fill(available,true);
+
+        keys = new byte[itrs.length][];
+
+        exhausted = new boolean[srcs.length];
+
+        Arrays.fill(exhausted, false);
+        
+        // @todo pass in caller's request for keys/vals.
+        tuple = new Tuple();
+
+    }
+
+    public FusedEntryIterator(IEntryIterator[] srcs) {
+
+        assert srcs != null;
+
+        assert srcs.length > 0;
+
+        for (int i = 0; i < srcs.length; i++) {
+
+            assert srcs[i] != null;
+
+        }
+
+        this.itrs = srcs;
+
+        //            available = new boolean[srcs.length];
+        //            
+        //            Arrays.fill(available,true);
+
+        keys = new byte[itrs.length][];
+
+        exhausted = new boolean[srcs.length];
+
+        Arrays.fill(exhausted, false);
+        
+        // @todo pass in caller's request for keys/vals.
+        tuple = new Tuple();
+
+    }
+
+    public byte[] getKey() {
+
+        if (current == -1)
+            throw new IllegalStateException();
+
+        return itrs[current].getKey();
+
+    }
+
+    public Object getValue() {
+
+        if (current == -1)
+            throw new IllegalStateException();
+
+        return itrs[current].getValue();
+
+    }
+
+    public ITuple getTuple() {
+
+        if (current == -1)
+            throw new IllegalStateException();
+
+        return tuple;
+
+    }
+
+    public boolean hasNext() {
+
+        // @todo this could use advanceKeyStreams() instead.
+        for (int i = 0; i < itrs.length; i++) {
+
+            if (!exhausted[i] && keys[i] != null || itrs[i].hasNext()) {
+
+                return true;
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Make sure that we have the current key for each key stream. If we
+     * already have a key for that stream then we use it.
+     * 
+     * @return The #of key streams with an available key in {@link #keys}.
+     *         When zero(0), all key streams are exhausted.
+     */
+    private int advanceKeyStreams() {
+
+        // #of key streams with a key for us to examine.
+        int navailable = 0;
+
+        for (int i = 0; i < itrs.length; i++) {
+
+            if (exhausted[i])
+                continue;
+
+            if (keys[i] == null) {
+
+                if (itrs[i].hasNext()) {
+
+                    itrs[i].next();
+
+                    keys[i] = itrs[i].getKey();
+
+                    navailable++;
+
+                } else {
+
+                    exhausted[i] = true;
+
+                }
+
+            } else {
+
+                navailable++;
+
+            }
+
+        }
+
+        return navailable;
+
+    }
+
+    /**
+     * We are presented with an ordered set of key streams. Each key stream
+     * delivers its keys in order. For a given key, we always choose the
+     * first stream having that key. Once a key is found, all subsequent key
+     * streams are then advanced until their next key is greater than the
+     * current key (this can only cause the same key to be skipped).
+     * <p>
+     * 
+     * Each invocation of this method advances one key in the union of the
+     * key streams. We test the current key for each stream on each pass and
+     * choose the key that orders first across all key streams.
+     * <p>
+     * 
+     * In the simple case with two streams we examine the current
+     * {@link #keys key} on each stream, fetching the next key iff there is
+     * no key available on that stream and otherwise using the current key
+     * from that stream. If the keys are the same, then we choose the first
+     * stream and also clear the current {@link #keys key} for the other
+     * stream so that we will skip the current entry on that key stream. If
+     * the keys differ, then we choose the stream with the lessor key and
+     * clear the {@link #keys key} for that stream to indicate that it has
+     * been consumed. In any case we set the index of the choosen stream on
+     * {@link #current} so that the other methods on this api will use the
+     * corresponding key and value from that stream and return the current
+     * value for the choosen stream.
+     * 
+     * @todo generalize to N>2 key streams.
+     */
+    public Object next() {
+
+        assert itrs.length == 2;
+
+        int navailable = advanceKeyStreams();
+
+        if (navailable == 0) {
+
+            throw new NoSuchElementException();
+
+        }
+
+        /*
+         * Generalization to N streams might sort {key,order,itr} tuples.
+         * The choice of the stream with the lessor key is then the first
+         * entry in sorted tuples if the comparator pays attention to the
+         * stream [order] in addition to the keys.
+         * 
+         * if a stream is exhausted then we no longer consider it as a key
+         * source.
+         */
+
+        final int cmp = (keys[0] == null ? 1 : keys[1] == null ? -1 : BytesUtil
+                .compareBytes(keys[0], keys[1]));
+
+        if (cmp == 0) {
+
+            // Choose the first stream in a tie.
+
+            current = 0;
+
+            // The current key on each stream tied in 1st place is consumed.
+
+            keys[0] = keys[1] = null;
+
+        } else {
+
+            // Choose the stream with the lessor key.
+
+            current = cmp < 0 ? 0 : 1;
+
+            keys[current] = null; // this key was consumed.
+
+        }
+
+        // aggregates across the source streams.
+        tuple.nvisited++;
+        
+        // set the tuple object for the choosen source iterator.
+        tuple.current = itrs[current].getTuple();
+        
+        // Return the current object on the choosen stream.
+        Object value = itrs[current].getValue();
+        
+        return value;
+
+    }
+
+    public void remove() {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+}

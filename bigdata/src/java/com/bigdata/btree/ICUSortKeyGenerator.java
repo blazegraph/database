@@ -93,11 +93,27 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
      */
     private final RuleBasedCollator collator;
 
+    /**
+     * The {@link Locale} used to configure this object.
+     */
+    private final Locale locale;
+    
+    /**
+     * The {@link Locale} used to configure this object.
+     */
+    public Locale getLocale() {
+        
+        return locale;
+        
+    }
+    
     ICUSortKeyGenerator(Locale locale, Object strength, DecompositionEnum mode) {
 
         if (locale == null)
             throw new IllegalArgumentException();
 
+        this.locale = locale;
+        
         this.collator = (RuleBasedCollator) Collator.getInstance(locale);
 
         if (strength != null) {
@@ -166,43 +182,18 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         }
 
     }
+    
+    /**
+     * Buffer is reused for each {@link String} from which a sort key is
+     * derived.
+     */
+    private RawCollationKey raw = new RawCollationKey(128);
 
     public void appendSortKey(KeyBuilder keyBuilder, String s) {
 
-        //          set public fields on the RawCollationKey
-        //          b2.bytes = this.buf;
-        //          b2.size = this.len;
-        //          collator.getRawCollationKey(s, b2);
-        //          
-        //          /*
-        //           * take the buffer, which may have changed.
-        //           * 
-        //           * note: we do not take the last byte since it is always zero per
-        //           * the ICU4J documentation. if you want null bytes between
-        //           * components of a key you have to put them there yourself.
-        //           */
-        //          this.buf = b2.bytes;
-        //          this.len = b2.size - 1;
-
-        //          RawCollationKey raw = new RawCollationKey(this.buf, this.len);
-        //          
-        //          collator.getRawCollationKey(s, raw );
-        //
-        //          this.buf = raw.bytes;
-        //          this.len = raw.size;
-
-        /*
-         * Note: This is the only invocation that appears to work reliably. The
-         * downside is that it grows a new byte[] each time we encode a unicode
-         * string rather than being able to leverage the existing array on our
-         * class.
-         * 
-         * @todo look into the source code for RawCollationKey and its base
-         * class, ByteArrayWrapper, and see if I can resolve this issue for
-         * better performance and less heap churn. Unfortunately the
-         * RawCollationKey class is final so we can not subclass it.
-         */
-        RawCollationKey raw = collator.getRawCollationKey(s, null);
+//        RawCollationKey raw = collator.getRawCollationKey(s, null);
+        
+        collator.getRawCollationKey(s, raw);
 
         keyBuilder.append(0, raw.size - 1/* do not include the nul byte */,
                 raw.bytes);

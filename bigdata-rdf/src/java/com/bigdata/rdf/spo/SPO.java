@@ -25,6 +25,8 @@ package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
 
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -93,43 +95,71 @@ public class SPO {
      *            Indicates the permutation of the subject, predicate and object
      *            used by the key.
      * 
-     * @param key
-     *            The key from the index entry.
-     * 
-     * @param val
-     *            The value from the index entry.
+     * @param itr
+     *            The iterator that is visiting the entries in a statement
+     *            index. The next entry will fetched from the iterator and
+     *            decoded into an {@link SPO}.
      * 
      * @see RdfKeyBuilder#key2Statement(byte[], long[])
+     * 
+     * @todo If we kept and recycled the SPO instances then we could further
+     *       reduce the heap churn for the SPO (this will require that the
+     *       fields are no longer declared final).
+     * 
+     * @todo This decodes the key directly. It {@link RdfKeyBuilder} is to
+     *       decode the key then the fields on this class can not be final.
      */
-    public SPO(KeyOrder keyOrder, byte[] key, Object val) {
+    public SPO(KeyOrder keyOrder, IEntryIterator itr) {
         
         assert keyOrder != null;
-        assert key != null;
-        assert val != null;
+        assert itr != null;
+
+        // fetch the next entry, obtain the value.
+        final Object val = itr.next();
+
+//      // clone of the key.
+//      final byte[] key = itr.getKey();
+      
+        // copy of the key in a reused buffer.
+        final byte[] key = itr.getTuple().getKeyBuffer().array(); 
+
+//        long[] ids = new long[IRawTripleStore.N];
         
-        long[] ids = new long[3];
+//      code = RdfKeyBuilder.key2Statement(key, ids); 
         
-        code = RdfKeyBuilder.key2Statement(key, ids); 
+        /*
+         * Note: GTE since the key is typically a reused buffer which may be
+         * larger than the #of bytes actually holding valid data.
+         */
+        assert key.length >= 8 * IRawTripleStore.N + 1;
+//      assert key.length == 8 * IRawTripleStore.N + 1;
+        
+        code = KeyBuilder.decodeByte(key[0]);
+        
+        final long _0 = KeyBuilder.decodeLong(key, 1);
+      
+        final long _1 = KeyBuilder.decodeLong(key, 1+8);
+      
+        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
         
         switch (keyOrder) {
 
         case SPO:
-            s = ids[0];
-            p = ids[1];
-            o = ids[2];
-
+            s = _0;
+            p = _1;
+            o = _2;
             break;
+            
         case POS:
-            p = ids[0];
-            o = ids[1];
-            s = ids[2];
-
+            p = _0;
+            o = _1;
+            s = _2;
             break;
+            
         case OSP:
-            o = ids[0];
-            s = ids[1];
-            p = ids[2];
-
+            o = _0;
+            s = _1;
+            p = _2;
             break;
 
         default:

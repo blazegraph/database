@@ -45,7 +45,6 @@ package com.bigdata.btree;
  */
 public abstract class AbstractKeyBuffer implements IKeyBuffer {
 
-
     /**
      * Test the search key against the leading prefix shared by all bytes in the
      * key buffer.

@@ -33,6 +33,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
+import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
 
 /**
@@ -45,8 +47,10 @@ import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
  * @todo if unisolated or read-committed, then we may need to re-assess the
  *       toIndex during the query.
  * 
- * @todo this is derived from {@link PartitionedRangeQueryIterator} and needs its own
- *       test suite.
+ * @todo this is derived from {@link PartitionedRangeQueryIterator} and needs
+ *       its own test suite. In fact, the {@link PartitionedRangeQueryIterator}
+ *       should be refactored to make use of this class for within partition
+ *       range queries.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -422,6 +426,16 @@ public class RangeQueryIterator implements IEntryIterator {
     }
 
     /**
+     * FIXME Implement this method. We need to expose the appropriate data from
+     * the result set in a manner designed to minimize heap allocation.
+     */
+    public ITuple getTuple() {
+       
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
      * This operation is not supported.
      * 
      * @exception UnsupportedOperationException
@@ -432,5 +446,5 @@ public class RangeQueryIterator implements IEntryIterator {
         throw new UnsupportedOperationException();
         
     }
-
+    
 }

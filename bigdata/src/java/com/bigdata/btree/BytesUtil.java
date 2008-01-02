@@ -420,17 +420,12 @@ public class BytesUtil {
      * propagated through the tree.
      * </p>
      * <p>
-     * There are several cases to consider:
+     * The rules are simple enough:
      * <ol>
-     * <li>When the two keys differ only in the last byte of the <i>givenKey</i>
-     * then we return the <i>givenKey</i> since no shorter separator key
-     * exists.</li>
-     * <li>Otherwise the prefix MUST be at least two bytes shorter than the
-     * givenKey. If the givenKey[prefixLen] - priorKey[prefixLen] GT one (1)
-     * then the separator key is formed by adding one to the last byte in the
-     * prefix.</li>
-     * <li>Otherwise the separator key is formed by appending a nul byte to the
-     * prefix.</li>
+     * <li>The separator contains all bytes in the shared prefix (if any) plus
+     * the 1st byte at which the given key differs from the prior key.</li>
+     * <li>If the separator key would equal the given key by value then return
+     * the reference to the given key.</li>
      * </ol>
      * </p>
      * 
@@ -446,183 +441,65 @@ public class BytesUtil {
      * 
      * @see http://portal.acm.org/citation.cfm?doid=320521.320530
      * 
-     * @throws IllegalArgumentException if either key is <code>null</code>.
-     * 
-     * FIXME implement shortest key logic. this returns the givenKey, which is
-     * always legal.
+     * @throws IllegalArgumentException
+     *             if either key is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if both keys are the same reference.
      */
+//    * @throws IllegalArgumentException
+//    *             if the keys are equal.
+//    * @throws IllegalArgumentException
+//    *             if the keys are out of order.
     final public static byte[] getSeparatorKey(byte[] givenKey, byte[] priorKey) {
 
-        if(givenKey==null) throw new IllegalArgumentException();
+        if (givenKey == null)
+            throw new IllegalArgumentException();
 
-        if(priorKey==null) throw new IllegalArgumentException();
+        if (priorKey == null)
+            throw new IllegalArgumentException();
+
+        if (givenKey == priorKey)
+            throw new IllegalArgumentException();
         
-        return givenKey;
+        final int prefixLen = getPrefixLength(givenKey, priorKey);
         
-//        final int givenKeyLen = givenKey.length;
-//
-//        final int priorKeyLen = priorKey.length;
-//
-//        int i;
-//
-//        for (i = 0; i < givenKeyLen && i < priorKeyLen; i++) {
-//
-//            // promotes to signed integers in [0:255] for comaprison.
-//            int ret = (givenKey[i] & 0xff) - (priorKey[i] & 0xff);
-//            
-//            if (ret != 0) {
-//                
-//                throw new UnsupportedOperationException();
-//
-//            }
-//
-//        }
-//        
-//        if( priorKey.length > i ) {
-//            
-//            throw new IllegalArgumentException("keys out of order.");
-//            
-//        }
-//
-//        throw new UnsupportedOperationException();
+        if (prefixLen == givenKey.length - 1) {
+
+            /*
+             * The given key is the shortest separator.  Examples would include:
+             * 
+             * given: 0 1 2
+             * prior: 0 1
+             * 
+             * or
+             * 
+             * given: 0 1 2
+             * prior: 0 1 1
+             * 
+             * or
+             * 
+             * given: 0 1 2
+             * prior: 0 1 1 2
+             */
+            
+            return givenKey;
+            
+        }
+
+        /*
+         * The separator includes all bytes in the shared prefix plus the next
+         * byte from the given key.
+         */
+
+        // allocate to right size.
+        byte[] tmp = new byte[prefixLen+1];
+        
+        // copy shared prefix plus the following byte.
+        System.arraycopy(givenKey, 0, tmp, 0, prefixLen+1);
+        
+        return tmp;
         
     }
-    
-//    final public static byte[] getSeparatorKey(byte[] givenKey, byte[] priorKey) {
-//        
-//        /*
-//         * error checking.
-//         */
-//        
-//        if( givenKey == null || priorKey == null ) {
-//            
-//            throw new IllegalArgumentException("null key");
-//            
-//        }
-//        
-//        if( givenKey == priorKey ) {
-//            
-//            throw new IllegalArgumentException("same key object");
-//            
-//        }
-//        
-//        /* #of leading bytes in common.
-//         * 
-//         * given [2,3]   and [1,2]   ==> 0
-//         * given [1,2,3] and [1,2]   ==> 2
-//         * given [1,2,3] and [1,3]   ==> 1
-//         * given [1,2,3] and [0,2]   ==> 0
-//         * given [1,2,3] and [1,2,2] ==> 2
-//         */
-//        final int prefixLength = getPrefixLength(givenKey, priorKey);
-//
-//        /*
-//         * more error checking.
-//         */
-//        
-//        /*
-//         * If both arrays define the byte at position prefixLength then it MUST
-//         * be true that givenKey[prefixLength] GT priorKey[prefixLength]
-//         * otherwise the parameters are out of order.
-//         * 
-//         * Otherwise it MUST be true that priorKey.length LT givenKey.length.
-//         * 
-//         * given [1,2,3] and [1,2]    , prefixLength=2 -- ok.
-//         * given [1,2,3] and [1,2,2]  , prefixLength=2 -- ok.
-//         * given [1,2,3] and [1,2,2,3], prefixLength=2 -- ok.
-//         * given [1,2,3] and [1,2,3]  , prefixLength=3 -- keys out of order.
-//         * given [1,2,3] and [1,2,4]  , prefixLength=2 -- keys out of order.
-//         * given [1,3]   and [1,2,4]  , prefixLength=1 -- ok.
-//         */
-//        
-//        if( priorKey.length > prefixLength && givenKey.length > prefixLength ) {
-//            
-//            if( (givenKey[prefixLength] & 0xff) <= (priorKey[prefixLength] & 0xff) ) {
-//                
-//                throw new IllegalArgumentException("parameters are out of order");
-//                
-//            }
-//            
-//        } else {
-//            
-//            if( priorKey.length >= givenKey.length ) {
-//                
-//                throw new IllegalArgumentException("parameters are out of order");
-//                
-//            }
-//            
-//        }
-//
-//        if( prefixLength == givenKey.length - 1 ) {
-//
-//            /*
-//             * two keys differ only in the last byte of the givenKey so
-//             * separator key exists that is shorter than the given key.
-//             * 
-//             * given [1,2,3] and [1,2,2] => [1,2,3]
-//             * 
-//             * This also handles cases when the priorKey is shorter than the
-//             * given key by one byte and the entire priorKey forms the prefix.
-//             * 
-//             * given [1,2,3] and [1,2] => [1,2,3]
-//             * 
-//             * This does NOT handle cases where the prefix is less than the
-//             * length of the givenKey by two or more bytes.
-//             */
-//            
-//            return givenKey;
-//            
-//        }
-//
-//        /*
-//         * Since the two keys do not differ in the last byte of the givenKey the
-//         * prefix MUST be at least two bytes shorter than the givenKey.
-//         * 
-//         * If the givenKey[prefixLen] - priorKey[prefixLen] GT one (1) then the
-//         * separator key is formed by adding one to the last byte in the prefix.
-//         * 
-//         * given [1,2,3] and [1] => [1,0]
-//         * given [2,2,3] and [1] => [1,0]
-//         */
-//        
-//        if( priorKey.length >= prefixLength ) {
-//            
-//            // priorKey[prefixLength] is defined.
-//            
-//            int diff = (givenKey[prefixLength] & 0xff) - (priorKey[prefixLength] & 0xff);
-//            
-//            if( diff > 1 ) {
-//                
-//                byte[] separatorKey = new byte[prefixLength];
-//                
-//                System.arraycopy(givenKey, 0, separatorKey, 0, prefixLength);
-//                
-//                separatorKey[prefixLength]++; // @todo validate unsigned math.
-//                
-//                return separatorKey;                
-//                
-//            }
-//            
-//        }
-//
-//        /*
-//         * 
-//         * Otherwise the separator key is formed by appending a nul byte to the
-//         * prefix.
-//         * 
-//         * given [3,2,3] and [1] => [2]
-//         * 
-//         * allocate one extra byte which will remain zero and hence form the
-//         * successor of the prefix.
-//         */
-//
-//        byte[] separatorKey = new byte[prefixLength + 1];
-//        
-//        System.arraycopy(givenKey, 0, separatorKey, 0, prefixLength);
-//        
-//        return separatorKey;
-//
-//    }
     
     /**
      * Formats a key as a series of comma delimited unsigned bytes.

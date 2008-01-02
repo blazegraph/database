@@ -34,7 +34,6 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.ClientIndexView;
 
 /**
  * <p>
@@ -65,6 +64,54 @@ import com.bigdata.service.ClientIndexView;
  * incoherent traversal whether or not they result in addition or removal of
  * nodes in the tree.
  * </p>
+ * 
+ * @todo consider also tracking the #of deleted entries in a key range (parallel
+ *       to how we track the #of entries in a key range) so that we can report
+ *       the exact #of non-deleted entries when the btree supports isolation
+ *       (right now you have to do a key range scan and count the #of
+ *       non-deleted entries).
+ * 
+ * @todo Choose the split point in the branch nodes within a parameterized
+ *       region such that we choose the shortest separator keys to promote to
+ *       the parent. This is a bit more tricky for the
+ *       {@link IndexSegmentBuilder}.
+ * 
+ * @todo reuse a buffer when copying keys and values out of the index, e.g., for
+ *       the {@link IEntryIterator}, in order to minimize heap churn.
+ * 
+ * @todo The B+Tree implementation does not support limits on the serialized
+ *       size of a node or leaf. The design strategy is to allow flexible sizes
+ *       for serialized node and leaf records since larger branching factors and
+ *       continuous IO are cheaper and nothing in particular requires the use of
+ *       fixed size records when accessing disk. However, it would still be
+ *       useful to be able to place an upper bound on the serialized size of a
+ *       node or leaf. Nodes and leaves are only serialized on eviction, so this
+ *       would require the ability to split nodes and/or leaves immediately
+ *       before eviction if they would be likely to overflow the upper bound on
+ *       the record size. Probably the node or leaf needs to be made immutable,
+ *       the serialized size checked, and then a split operation invoked if the
+ *       record would exceed the upper bound. If this happens a lot, then the
+ *       branching factor is too high for the data and would have to be lowered
+ *       to regain performance.
+ *       <p>
+ *       Another use case for limits on the size of a node/leaf is maintaining
+ *       the data in a serialized form. This can have several benefits,
+ *       including reducing heap churn by copying keys and values (not their
+ *       references) into the record structure, and reducing (eliminating)
+ *       deserialization costs (which are substantially more expensive than
+ *       serialization). This can be approached using new implementations of the
+ *       key buffer and a value buffer implementation (one that can be used for
+ *       nodes or for leaves). If an object implements both then it is a small
+ *       additional step towards using it for the entire serialized record
+ *       (minus some header/tailer).
+ *       <p>
+ *       Adaptive packed memory arrays can be used in this context to minimize
+ *       the amount of copying that needs to be performed on mutation of a node
+ *       or leaf.
+ *       <p>
+ *       Leading key compression is intrinsically part of how the key buffer
+ *       maintains its representation so, for example, a micro-index would have
+ *       to be maintained as part of the key buffer.
  * 
  * @todo create ring buffers to track the serialized size of the last 50 nodes
  *       and leaves so that we can estimate the serialized size of the total
@@ -181,9 +228,9 @@ import com.bigdata.service.ClientIndexView;
  *       However, we can use smaller branching factors for btrees in the journal
  *       and use a separate implementation for bulk generating and reading
  *       "perfect" read-only key range segments.
- *       
- * @todo prior/next key on entry iterator?  prior/next leaf on leaf iterator?
- *
+ * 
+ * @todo prior/next key on entry iterator? prior/next leaf on leaf iterator?
+ * 
  * @todo derive a string index that uses patricia trees in the leaves per
  *       several published papers.
  * 

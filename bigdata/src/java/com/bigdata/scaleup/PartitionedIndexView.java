@@ -43,6 +43,7 @@ import com.bigdata.btree.EmptyEntryIterator;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IFusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.journal.ICommitter;
@@ -663,6 +664,16 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
             throw new UnsupportedOperationException();
 
+        }
+
+        /**
+         * @todo this method has not been implemented.  the scaleup package
+         * is more or less redundent with the services package so I will see
+         * whether or not this class gets dropped before implementing this
+         * method.
+         */
+        public ITuple getTuple() {
+            throw new UnsupportedOperationException();
         }
 
     }

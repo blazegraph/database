@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -48,6 +50,22 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.LowerCaseFilter;
+import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.br.BrazilianAnalyzer;
+import org.apache.lucene.analysis.cjk.CJKAnalyzer;
+import org.apache.lucene.analysis.cn.ChineseAnalyzer;
+import org.apache.lucene.analysis.cz.CzechAnalyzer;
+import org.apache.lucene.analysis.de.GermanAnalyzer;
+import org.apache.lucene.analysis.el.GreekAnalyzer;
+import org.apache.lucene.analysis.fr.FrenchAnalyzer;
+import org.apache.lucene.analysis.nl.DutchAnalyzer;
+import org.apache.lucene.analysis.ru.RussianAnalyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.th.ThaiAnalyzer;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -61,6 +79,8 @@ import org.openrdf.vocabulary.XmlSchema;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.ConcurrentJournal;
@@ -73,13 +93,13 @@ import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.inf.SPOJustificationIterator;
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.IChunkedIterator;
+import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
@@ -97,7 +117,31 @@ import cutthecrap.utils.striterators.Striterator;
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
  * interface that is invariant across the choice of the backing store.
- *
+ * 
+ * FIXME Modify the code to minimize allocation using {@link ITuple} and copying
+ * the keys rather than having them be reallocated all the time. This will
+ * especially help with the statement indices since all that we do there is read
+ * the keys.
+ * 
+ * FIXME Write and benchmark a distributed bulk RDF data loader. Work through
+ * the search for equal "size" partitions for the statement indices. Note that
+ * the actual size of the statement indices will vary by access path since
+ * leading key compression will have different results for each access path.
+ * Ideally the generated index partitions can be index segments, in which case
+ * we of course need a metadata index that can be used to query them coherently.
+ * It is easy to generate that MDI.
+ * <p>
+ * The terms indices will be scale-out indices, so initially they should be
+ * pre-partitioned.
+ * <p>
+ * As an alternative to indexing the locally loaded data, we could just fill
+ * {@link StatementBuffer}s, convert to {@link ISPOBuffer}s (using the
+ * distributed terms indices), and then write out the long[3] data into a raw
+ * file. Once the local data have been converted to long[]s we can sort them
+ * into total SPO order (by chunks if necessary) and build the scale-out SPO
+ * index. The same process could then be done for each of the other access paths
+ * (OSP, POS).
+ * 
  * @todo explore possible uses of bitmap indices
  * 
  * @todo Refactor to support transactions and concurrent load/query and test
@@ -195,6 +239,28 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     final protected boolean lexicon;
     
     /**
+     * This is used to conditionally disable the free text index
+     * for literals.
+     */
+    final protected boolean textIndex;
+
+    /**
+     * This is used to conditionally disable all but a single statement index
+     * (aka access path).
+     */
+    final protected boolean oneAccessPath;
+
+    /**
+     * When <code>true</code> the database will support statement identifiers.
+     * A statement identifier is a unique 64-bit integer taken from the same
+     * space as the term identifiers and which uniquely identifiers a statement
+     * in the database regardless of the graph in which that statement appears.
+     * The purpose of statement identifiers is to allow statements about
+     * statements without recourse to RDF style reification.
+     */
+    final protected boolean statementIdentifiers;
+    
+    /**
      * Used to generate the compressed sort keys for the
      * {@link #getTermIdIndex()}.
      */
@@ -244,6 +310,67 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         public static final String LEXICON = "lexicon"; 
 
         public static final String DEFAULT_LEXICON = "true"; 
+
+        /**
+         * Boolean option (default <code>false</code>) disables all but a
+         * single statement index (aka access path).
+         * <p>
+         * Note: The main purpose of the option is to make it possible to turn
+         * off the other access paths for special bulk load purposes. The use of
+         * this option is NOT compatible with either the application of the
+         * {@link InferenceEngine} or high-level query.
+         */
+        public static final String ONE_ACCESS_PATH = "oneAccessPath";
+
+        public static final String DEFAULT_ONE_ACCESS_PATH = "false";
+        
+        /**
+         * Boolean option (default <code>false</code>) enables support for a
+         * full text index that may be used to lookup literals by tokens found
+         * in the text of those literals.
+         */
+        public static final String TEXT_INDEX = "textIndex";
+
+        public static final String DEFAULT_TEXT_INDEX = "false";
+
+        /**
+         * Boolean option (default <code>false</code>) enables support for
+         * statement identifiers. A statement identifier is unique to a
+         * <em>triple</em> (regardless of the graph in which that triple may
+         * be found). Statement identifiers may be used to make statements about
+         * statements without using RDF style reification.
+         * 
+         * FIXME This is a work in progress. There are two basic ways in which
+         * we are considering extending the platform to make statement
+         * identifiers useful.
+         * <ol>
+         * <li>Transparently convert ontology and data that uses RDF style
+         * reification such that it uses statement identifiers instead. There
+         * are a few drawbacks with this approach. One is that you still have to
+         * write high level queries in terms of RDF style reification, which
+         * means that we have not reduced the burden on the user significantly.
+         * There is also the possibility that the change would effect the
+         * semantics of RDF containers, or at least the relationship between the
+         * semantics of RDF containers and RDF style reification. The plus side
+         * of this approach is that the change could be completely transparent,
+         * but I am not sure that keeping RDF reification in any form - and
+         * especially in the queries - is a good idea.</li>
+         * <li>The other approach is to provide an extension of RDF/XML in
+         * which statements may be made and a high-level query language
+         * extension in which statement identifiers may be exploited to
+         * efficiently recover statements about statements. This approach has
+         * the advantage of being completely decoupled from the RDF reification
+         * semantics - it is a pure superset of the RDF data model and query
+         * language. Also, in this approach we can guarentee that the statement
+         * identifiers are purely an internal convenience of the database - much
+         * like blank nodes. In fact, statement identifiers can be created
+         * lazily - when there is a need to actually make a statement about a
+         * specific statement. </li>
+         * </ol>
+         */
+        public static final String STATEMENT_IDENTIFIERS = "statementIdentifiers";
+
+        public static final String DEFAULT_STATEMENT_IDENTIFIERS = "false";
         
     }
     
@@ -276,6 +403,32 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 Options.DEFAULT_LEXICON));
 
         log.info(Options.LEXICON+"="+lexicon);
+
+        // Note: the full text index is allowed iff the lexicon is enabled.
+        if(lexicon) {
+            
+            this.textIndex = Boolean.parseBoolean(properties.getProperty(
+                    Options.TEXT_INDEX, Options.DEFAULT_TEXT_INDEX));
+            
+        } else {
+
+            this.textIndex = false;
+            
+        }
+
+        log.info(Options.TEXT_INDEX+"="+textIndex);
+
+        this.oneAccessPath = Boolean.parseBoolean(properties.getProperty(
+                Options.ONE_ACCESS_PATH,
+                Options.DEFAULT_ONE_ACCESS_PATH));
+
+        log.info(Options.ONE_ACCESS_PATH+"="+oneAccessPath);
+
+        this.statementIdentifiers = Boolean.parseBoolean(properties.getProperty(
+                Options.STATEMENT_IDENTIFIERS,
+                Options.DEFAULT_STATEMENT_IDENTIFIERS));
+
+        log.info(Options.STATEMENT_IDENTIFIERS+"="+statementIdentifiers);
 
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
@@ -1412,14 +1565,14 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         final SPO[] a;
 
-                        /*
-                         * Private key builder.
-                         * 
-                         * Note: This capacity estimate is based on N longs per SPO, one head,
-                         * and 2-3 SPOs in the tail. The capacity will be extended automatically
-                         * if necessary.
-                         */
-                        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
+//                        /*
+//                         * Private key builder.
+//                         * 
+//                         * Note: This capacity estimate is based on N longs per SPO, one head,
+//                         * and 2-3 SPOs in the tail. The capacity will be extended automatically
+//                         * if necessary.
+//                         */
+//                        KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3) * Bytes.SIZEOF_LONG);
 
                         JustificationWriter(boolean clone) {
                             
@@ -1496,8 +1649,14 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
                     tasks.add(new IndexWriter(KeyOrder.SPO, false/* clone */));
-                    tasks.add(new IndexWriter(KeyOrder.POS, true/* clone */));
-                    tasks.add(new IndexWriter(KeyOrder.OSP, true/* clone */));
+                    
+                    if(!oneAccessPath) {
+
+                        tasks.add(new IndexWriter(KeyOrder.POS, true/* clone */));
+                        
+                        tasks.add(new IndexWriter(KeyOrder.OSP, true/* clone */));
+                        
+                    }
                     
                     if(justify) {
 
@@ -1520,12 +1679,29 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         futures = writeService.invokeAll(tasks);
 
                         elapsed_SPO = futures.get(0).get();
-                        elapsed_POS = futures.get(1).get();
-                        elapsed_OSP = futures.get(2).get();
-                        if(justify) {
-                            elapsed_JST = futures.get(3).get();
+                        
+                        if(!oneAccessPath) {
+                        
+                            elapsed_POS = futures.get(1).get();
+                            
+                            elapsed_OSP = futures.get(2).get();
+                            
                         } else {
+                            
+                            elapsed_POS = 0;
+                            
+                            elapsed_OSP = 0;
+                            
+                        }
+                        
+                        if(justify) {
+                        
+                            elapsed_JST = futures.get(3).get();
+                            
+                        } else {
+                            
                             elapsed_JST = 0;
+                            
                         }
 
                     } catch (InterruptedException ex) {
@@ -1609,16 +1785,24 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
             
-            long[] tmp = new long[IRawTripleStore.N];
+//            long[] tmp = new long[IRawTripleStore.N];
             
             while(itr.hasNext()) {
                 
                 itr.next();
                 
+                // clone of the key.
+//                final byte[] key = itr.getKey();
+                
+                // copy of the key in a reused buffer.
+                final byte[] key = itr.getTuple().getKeyBuffer().array();
+                
                 // extract the term ids from the key. 
-                RdfKeyBuilder.key2Statement(itr.getKey(), tmp); 
-
-                final long id = tmp[0];
+//                RdfKeyBuilder.key2Statement( key , tmp);
+//                
+//                final long id = tmp[0];
+                
+                final long id = KeyBuilder.decodeLong( key, 1);
                 
                 // append tmp[0] to the output list.
                 ids.add(id);
@@ -1688,7 +1872,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * Return true iff the term identifier is associated with a RDF Literal in
      * the database.
      * <p>
-     * Note: This simply examines the low bit of the term identifier, which
+     * Note: This simply examines the low bits of the term identifier, which
      * marks whether or not the term identifier is a literal.
      * <p>
      * Note: Some entailments require the ability to filter based on whether or
@@ -1705,10 +1889,37 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public boolean isLiteral( long termId ) {
         
-        return (termId & 0x01L) == 1L;
+        return (termId & TERMID_CODE_MASK) == CODE_LITERAL;
         
     }
-    
+
+    final public boolean isBNode( long termId ) {
+        
+        return (termId & TERMID_CODE_MASK) == CODE_BNODE;
+        
+    }
+
+    final public boolean isURI( long termId ) {
+        
+        return (termId & TERMID_CODE_MASK) == CODE_URI;
+        
+    }
+
+    /**
+     * Return true iff the term identifier identifies a statement (this feature
+     * is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
+     * 
+     * @param termId
+     *            The term identifier.
+     *            
+     * @return <code>true</code> iff the term identifier identifies a statement.
+     */
+    final public boolean isStatement( long termId ) {
+        
+        return (termId & TERMID_CODE_MASK) == CODE_STATEMENT;
+        
+    }
+
     /**
      * Specialize the return to {@link _Value}. This keeps the
      * {@link ITripleStore} interface cleaner while imposes the actual semantics
@@ -1854,9 +2065,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             while (itr.hasNext()) {
 
-                Object val = itr.next();
-
-                SPO spo = new SPO(KeyOrder.SPO, itr.getKey(), val);
+                final SPO spo = new SPO(KeyOrder.SPO, itr);
 
                 switch (spo.type) {
 
@@ -2074,6 +2283,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public String usage(String name,IIndex ndx) {
         
+        if (ndx == null) {
+            
+            return name+" : not used";
+            
+        }
+        
         if (ndx instanceof BTree) {
 
             BTree btree = (BTree) ndx;
@@ -2156,6 +2371,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             // task will write justifications on the justifications index.
             AtomicInteger nwrittenj = new AtomicInteger();
+            
             if(justify) {
 
                 IJustificationIterator jitr = new JustificationIterator(
@@ -2174,10 +2390,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 futures = writeService.invokeAll( tasks );
 
                 elapsed_SPO = futures.get(0).get();
+                
                 if(justify) {
+                
                     elapsed_JST = futures.get(1).get();
+                    
                 } else {
+
                     elapsed_JST = 0;
+                    
                 }
 
             } catch(InterruptedException ex) {
@@ -2866,6 +3087,700 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         log.info("Retracted " + n + " statements in " + elapsed + " ms");
 
         return n;
+
+    }
+
+    /**
+     * <p>
+     * Add the terms to the full text index so that we can do fast lookup of the
+     * corresponding term identifiers. Literals that have a language code
+     * property are parsed using a tokenizer appropriate for the specified
+     * language family. Other literals and URIs are tokenized using the default
+     * {@link Locale}.
+     * </p>
+     * 
+     * @see #textSearch(String, String)
+     * @see #getFullTextIndex()
+     */
+    abstract protected void indexTermText(_Value[] terms, int numTerms);
+    
+    /**
+     * Return the token analyzer to be used for the given language code.
+     * 
+     * @param languageCode
+     *            The language code from a {@link Literal}.
+     *            <p>
+     *            Note: When the language code is not explicitly stated on a
+     *            literal the configured {@link Locale} for the database should
+     *            be used.
+     * 
+     * @return The token analyzer best suited to the indicated language family.
+     */
+    protected Analyzer getAnalyzer(String languageCode) {
+        
+        Map<String,Analyzer> map = getAnalyzers();
+        
+        Analyzer a = null;
+        
+        if(languageCode==null) {
+            
+            // The configured local for the database.
+            Locale locale = ((KeyBuilder)keyBuilder.keyBuilder).getSortKeyGenerator().getLocale();
+            
+            // The analyzer for that locale.
+            a = getAnalyzer(locale.getLanguage());
+            
+        } else {
+            
+            /*
+             * Check the declared analyzers. We first check the three letter
+             * language code. If we do not have a match there then we check the
+             * 2 letter language code.
+             */
+            
+            String code = languageCode;
+
+            if (code.length() > 3) {
+
+                code = code.substring(0, 2);
+
+                a = map.get(languageCode);
+
+            }
+
+            if (a == null && code.length() > 2) {
+
+                code = code.substring(0, 1);
+
+                a = map.get(languageCode);
+                
+            }
+            
+        }
+        
+        if (a == null) {
+
+            // request the default analyzer.
+            
+            a = map.get("");
+            
+            if (a == null) {
+
+                throw new IllegalStateException("No entry for empty string?");
+                
+            }
+            
+        }
+
+        return a;
+        
+    }
+    
+    /**
+     * A map containing instances of the various kinds of analyzers that we know
+     * about.
+     * <p>
+     * Note: There MUST be an entry under the empty string (""). This entry will
+     * be requested when there is no entry for the specified language code.
+     */
+    private Map<String,Analyzer> analyzers;
+    
+    /**
+     * Initializes the various kinds of analyzers that we know about.
+     * <p>
+     * Note: Each {@link Analyzer} is registered under both the 3 letter and the
+     * 2 letter language codes. See <a
+     * href="http://www.loc.gov/standards/iso639-2/php/code_list.php">ISO 639-2</a>.
+     * 
+     * @todo get some informed advice on which {@link Analyzer}s map onto which
+     *       language codes.
+     * 
+     * @todo thread safety? Analyzers produce token processors so maybe there is
+     *       no problem here once things are initialized. If so, maybe this
+     *       could be static.
+     * 
+     * @todo configuration. Could be configured by a file containing a class
+     *       name and a list of codes that are handled by that class.
+     * 
+     * @todo strip language code down to 2/3 characters during lookup.
+     * 
+     * @todo There are a lot of pidgins based on french, english, and other
+     *       languages that are not being assigned here.
+     */
+    protected Map<String,Analyzer> getAnalyzers() {
+        
+        if (analyzers != null) {
+
+            return analyzers;
+            
+        }
+
+        analyzers = new HashMap<String, Analyzer>();
+
+        {
+            Analyzer a = new BrazilianAnalyzer();
+            analyzers.put("por", a);
+            analyzers.put("pt", a);
+        }
+
+        /*
+         * Claims to handle Chinese. Does single character extraction. Claims to
+         * produce smaller indices as a result.
+         * 
+         * Note: you can not tokenize with the Chinese analyzer and the do
+         * search using the CJK analyzer and visa versa.
+         * 
+         * Note: I have no idea whether this would work for Japanese and Korean
+         * as well. I expect so, but no real clue.
+         */
+        {
+            Analyzer a = new ChineseAnalyzer();
+            analyzers.put("zho", a);
+            analyzers.put("chi", a);
+            analyzers.put("zh", a);
+        }
+        
+        /*
+         * Claims to handle Chinese, Japanese, Korean. Does double character
+         * extraction with overlap.
+         */
+        {
+            Analyzer a = new CJKAnalyzer();
+//            analyzers.put("zho", a);
+//            analyzers.put("chi", a);
+//            analyzers.put("zh", a);
+            analyzers.put("jpn", a);
+            analyzers.put("ja", a);
+            analyzers.put("jpn", a);
+            analyzers.put("kor",a);
+            analyzers.put("ko",a);
+        }
+
+        {
+            Analyzer a = new CzechAnalyzer();
+            analyzers.put("ces",a);
+            analyzers.put("cze",a);
+            analyzers.put("cs",a);
+        }
+
+        {
+            Analyzer a = new DutchAnalyzer();
+            analyzers.put("dut",a);
+            analyzers.put("nld",a);
+            analyzers.put("nl",a);
+        }
+        
+        {  
+            Analyzer a = new FrenchAnalyzer();
+            analyzers.put("fra",a); 
+            analyzers.put("fre",a); 
+            analyzers.put("fr",a);
+        }
+
+        /*
+         * Note: There are a lot of language codes for German variants that
+         * might be useful here.
+         */
+        {  
+            Analyzer a = new GermanAnalyzer();
+            analyzers.put("deu",a); 
+            analyzers.put("ger",a); 
+            analyzers.put("de",a);
+        }
+        
+        // Note: ancient greek has a different code (grc).
+        {  
+            Analyzer a = new GreekAnalyzer();
+            analyzers.put("gre",a); 
+            analyzers.put("ell",a); 
+            analyzers.put("el",a);
+        }        
+
+        // @todo what about other Cyrillic scripts?
+        {  
+            Analyzer a = new RussianAnalyzer();
+            analyzers.put("rus",a); 
+            analyzers.put("ru",a); 
+        }        
+        
+        {
+            Analyzer a = new ThaiAnalyzer();
+            analyzers.put("tha",a); 
+            analyzers.put("th",a); 
+        }
+
+        // English
+        {
+            Analyzer a = new StandardAnalyzer();
+            analyzers.put("eng", a);
+            analyzers.put("en", a);
+            /*
+             * Note: There MUST be an entry under the empty string (""). This
+             * entry will be requested when there is no entry for the specified
+             * language code.
+             */
+            analyzers.put("", a);
+        }
+
+        return analyzers;
+        
+    }
+    
+    /**
+     * Models a document frequency vector (the set of document identifiers
+     * having some token in common). In this context a document is something in
+     * the terms index. Each document is broken down into a series of tokens by
+     * an {@link Analyzer}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @deprecated Less deprecated than not used yet.
+     */
+    protected static final class DFV {
+        
+        private final String token;
+        
+        /*
+         * @todo could just manage a long[] directly using an insertion sort.
+         * the frequency data could be tracked in a co-ordered array.
+         */
+        private final ArrayList<Long> data = new ArrayList<Long>();
+
+        public String getToken() {
+            
+            return token;
+            
+        }
+        
+        public DFV(String token) {
+        
+            if(token==null) throw new IllegalArgumentException();
+            
+            this.token = token;
+        
+        }
+        
+        // @todo track the frequency count.
+        public void add(long docId) {
+
+            data.add(docId);
+            
+        }
+        
+        public long[] toArray() {
+            
+            long[] a = new long[data.size()];
+            
+            for(int i=0; i<a.length; i++) {
+                
+                a[i] = data.get(i);
+                
+            }
+            
+            return a;
+            
+        }
+        
+    }
+    
+    /**
+     * Return the optional index used to associate term identifiers with tokens
+     * parsed from literals.
+     * <p>
+     * 
+     * Full text information retrieval for RDF essentially treats the lexical
+     * terms in the RDF database (plain and language code {@link Literal}s and
+     * possibly {@link URI}s) as "documents." In what follows you should
+     * understand the items in the terms index as "documents" that are broken
+     * down into "token"s to obtain a "token frequency distribution" for that
+     * document. As in standard IR, the frequency distributions may be
+     * normalized to account for a varient of effects producing "term weights".
+     * For example, normalizing for document length or relative frequency of a
+     * term in the overall collection. Therefore the logical model is:
+     * 
+     * <pre>
+     *                                             
+     *             token : {docId, freq?, weight?}+
+     *                                             
+     * </pre>
+     * 
+     * where docId happens to be the term identifier as assigned by the terms
+     * index. The freq and weight are optional values that are representative of
+     * the kinds of statistical data that are kept on a per-token-document
+     * basis. The freq is the token frequency (the frequency of occurrence of
+     * the token in the document). The weight is generally a normalized token
+     * frequency weight for the token in that document in the context of the
+     * overall collection.
+     * <p>
+     * In fact, we actually represent the data as follows:
+     * 
+     * <pre>
+     *        
+     *         {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
+     *                 
+     * </pre>
+     * 
+     * That is, there is a distinct entry in the full text B+Tree for each field
+     * in each document in which a given token was recognized. The text of the
+     * token is not stored in the key, just the Unicode sort key generated from
+     * the token text. The value associated with the B+Tree entry is optional -
+     * it is simply not used unless we are storing statistics for the
+     * token-document pair. The advantages of this approach are: (a) it reuses
+     * the existing B+Tree data structures efficiently; (b) we are never faced
+     * with the possibility overflow when a token is used in a large number of
+     * documents. The entries for the token will simply be spread across several
+     * leaves in the B+Tree; (c) leading key compression makes the resulting
+     * B+Tree very efficient; and (d) in a scale-out range partitioned index we
+     * can load balance the resulting index partitions by choosing the partition
+     * based on an even token boundary.
+     * <p>
+     * A field is any pre-identified text container within a document. Field
+     * identifiers are integers, so there are <code>32^2</code> distinct
+     * possible field identifiers. It is possible to manage the field identifers
+     * through a secondary index, but that has no direct bearing on the
+     * structure of the full text index itself. Field identifies appear after
+     * the token in the key so that queries may be expressed that will be
+     * matched against any field in the document. Likewise, field identifiers
+     * occur before the document identifier in the key since we always search
+     * across documents (the document identifier is always 0L in the search
+     * keys). There are many applications for fields: for example, distinct
+     * fields may be used for the title, abstract, and full text of a document
+     * or for the CDATA section of each distinct element in documents
+     * corresponding to some DTD. The application is responsible for recognizing
+     * the fields in the document and producing the appropriate token stream,
+     * each of which must be tagged by the field.
+     * <p>
+     * A query is tokenized, producing a (possibly normalized) token-frequency
+     * vector identifical. The relevance of documents to the query is generally
+     * taken as the cosine between the query's and each document's (possibly
+     * normalized) token-frequency vectors. The main effort of search is
+     * assembling a token frequency vector for just those documents with which
+     * there is an overlap with the query. This is done using a key range scan
+     * for each token in the query against the full text index.
+     * 
+     * <pre>
+     *             fromKey := token, 0L
+     *             toKey   := successor(token), 0L
+     * </pre>
+     * 
+     * and extracting the appropriate token frequency, normalized token weight,
+     * or other statistic. When no value is associated with the entry we follow
+     * the convention of assuming a token frequency of ONE (1) for each document
+     * in which the token appears.
+     * <p>
+     * Tokenization is informed by the language code for a {@link Literal} (when
+     * declared) and by the configured {@link Locale} for the database
+     * otherwise. An appropriate {@link Analyzer} is choosen based on the
+     * language code or {@link Locale} and the "document" is broken into a
+     * token-frequency distribution (alternatively a set of tokens). The same
+     * process is used to tokenize queries, and the API allows the caller to
+     * specify the language code used to select the {@link Analyzer} to tokenize
+     * the query.
+     * <p>
+     * Once the tokens are formed the language code / {@link Locale} used to
+     * produce the token is discarded (it is not represented in the index). The
+     * reason for this is that we never utilize the total ordering of the full
+     * text index, merely the manner in which it groups tokens that map onto the
+     * same Unicode sort key together. Further, we use only a single Unicode
+     * collator configuration regardless of the language family in which the
+     * token was originally expressed. Unlike the collator used by the terms
+     * index (which often is set at IDENTICAL strength), the collector used by
+     * the full text index should be choosen such that it makes relatively few
+     * distinctions in order to increase recall (e.g., set at PRIMARY strength).
+     * Since a total order over the full text index is not critical from the
+     * perspective of its IR application, the {@link Locale} for the collator is
+     * likewise not critical and PRIMARY strength will produce significantly
+     * shorter Unicode sort keys.
+     * <p>
+     * A map from tokens extracted from {@link Literal}s to the term
+     * identifiers of the literals from which those tokens were extracted.
+     * 
+     * The term frequency within that literal is an optional property associated
+     * with each term identifier, as is the computed weight for the token in the
+     * term.
+     * <p>
+     * Note: {@link Literal}s should be tokenized using an {@link Analyzer}
+     * appropriate for their declared language code (if any). However, once
+     * tokenizer, the language code is discarded and we perform search purely on
+     * the Unicode sort keys resulting from the extracted tokens. Those sort
+     * keys are generated in a batch once all tokens for are on hand.
+     * 
+     * @todo verify that PRIMARY US English is an acceptable choice for the full
+     *       text index collator regardless of the language family in which the
+     *       terms were expressed and in which search is performed. I.e., that
+     *       the specific implementations retain some distinction among
+     *       characters regardless of their code points
+     *       (http://unicode.org/reports/tr10/#Legal_Code_Points indicates that
+     *       they SHOULD).
+     * 
+     * @todo we will get relatively little compression on the fldId or docId
+     *       component in the key using just leading key compression. A
+     *       Hu-Tucker encoding of those components would be much more compact.
+     *       Note that the encoding must be reversable since we need to be able
+     *       to read the docId out of the key in order to retrieve the document.
+     * 
+     * @todo refactor the full text index into a general purpose bigdata service
+     * 
+     * @todo support normalization passes over the index in which the weights
+     *       are updated based on aggregated statistics.
+     * 
+     * @return The index or <code>null</code> iff the index is not being
+     *         maintained.
+     */
+    abstract public IIndex getFullTextIndex();
+
+    /**
+     * Tokenize text using an {@link Analyzer} that is appropriate to the
+     * specified language family.
+     * 
+     * @param languageCode
+     *            The language code (an empty string will be interpreted as
+     *            the default {@link Locale}).
+     * 
+     * @param text
+     *            The text to be tokenized.
+     * 
+     * @return The extracted token stream.
+     * 
+     * @todo there should be a configuration option to strip out stopwords and
+     *       another to enable stemming. how we do that should depend on the
+     *       language family. Likewise, there should be support for language
+     *       family specific stopword lists and language family specific
+     *       exclusions.
+     */
+    protected TokenStream getTokenStream(String languageCode,String text) {
+
+        /*
+         * @todo is this stripping out stopwords by default regardless of
+         * the language family and yet in a language family specific manner?
+         */
+        final Analyzer a = getAnalyzer(languageCode);
+        
+        TokenStream tokenStream = a.tokenStream(null/*field*/, new StringReader(text));
+        
+        // force to lower case.
+        tokenStream = new LowerCaseFilter(tokenStream);
+        
+        return tokenStream;
+        
+    }
+    
+    /**
+     * Create a key for the {@link #getFullTextIndex()} from a token extracted
+     * from some text.
+     * 
+     * @param token
+     *            The token whose key will be formed.
+     * @param successor
+     *            When <code>true</code> the successor of the token's text
+     *            will be encoded into the key. This is useful when forming the
+     *            <i>toKey</i> in a search.
+     * @param termId
+     *            The term identifier - use {@link #NULL} when forming a search
+     *            key.
+     * 
+     * @return The key.
+     */
+    protected byte[] getTokenKey(Token token, boolean successor, long termId) {
+        
+        IKeyBuilder keyBuilder = getFullTextKeyBuilder();
+        
+        final String tokenText = token.termText();
+        
+        keyBuilder.reset();
+
+        // the token text (or its successor as desired).
+        keyBuilder
+                .appendText(tokenText, true/* unicode */, successor);
+        
+        // the term identifier.
+        keyBuilder.append(termId);
+        
+        final byte[] key = keyBuilder.getKey();
+
+        if (INFO) {
+
+            log.info("[" + tokenText + "][" + termId + "]");
+            
+        }
+
+        return key;
+
+    }
+    
+    /**
+     * The {@link IKeyBuilder} used to form the keys for the
+     * {@link #getFullTextIndex()}.
+     * 
+     * @todo thread-safety for the returned object (as well as its allocation).
+     */
+    protected final IKeyBuilder getFullTextKeyBuilder() {
+        
+        if(fullTextKeyBuilder==null) {
+        
+            Properties properties = new Properties();
+            
+            /*
+             * Use primary strength only to increase retrieval with little
+             * impact on precision.
+             */
+            
+            properties.setProperty(KeyBuilder.Options.STRENGTH,
+                    KeyBuilder.StrengthEnum.Primary.toString());
+
+            /*
+             * Note: The choice of the language and country for the collator
+             * should not matter much for this purpose.
+             * 
+             * @todo consider explicit configuration of this in any case so that
+             * the configuration may be stable rather than relying on the default
+             * locale?  Of course, you can just explicitly specify the locale
+             * on the command line!
+             */
+            
+            fullTextKeyBuilder = KeyBuilder.newUnicodeInstance(properties);
+            
+        }
+        
+        return fullTextKeyBuilder;
+        
+    }
+    private IKeyBuilder fullTextKeyBuilder;
+    
+    /**
+     * Performs a full text search against literals returning the term
+     * identifiers of literals containing tokens parsed from the query. Those
+     * term identifiers may be used to join against the statement indices in
+     * order to bring back appropriate results.
+     * <p>
+     * Note: If you want to discover a data typed value, then form the
+     * appropriate data typed {@link Literal} and use
+     * {@link IRawTripleStore#getTermId(Value)}. Likewise, that method is also
+     * more appropriate when you want to lookup a specific {@link URI}.
+     * </p>
+     * 
+     * @param languageCode
+     *            The language code that should be used when tokenizing the
+     *            query (an empty string will be interpreted as the default
+     *            {@link Locale}).
+     * @param text
+     *            The query (it will be parsed into tokens).
+     * 
+     * @return An iterator that visits each term in the lexicon in which one or
+     *         more of the extracted tokens has been found.
+     * 
+     * @todo the returned iterator should be a chunked iterator. The same
+     *       requirement exists for the iterator returned by
+     *       {@link AccessPath#distinctTermScan()}.
+     * 
+     * @todo introduce basic normalization for free text indexing and search
+     *       (e.g., of term frequencies in the collection, document length,
+     *       etc).
+     * 
+     * @todo consider other kinds of queries that we might write here. For
+     *       example, full text search should support AND OR NOT operators for
+     *       tokens. Filtering by {@link Value} type, language code, data type
+     *       attributes, or role played in {@link Statement}s is done once you
+     *       have the search results.
+     */
+    public Iterator<Long> textSearch(String languageCode,String text) {
+       
+        if (languageCode == null)
+            throw new IllegalArgumentException();
+        
+        if (text == null)
+            throw new IllegalArgumentException();
+        
+        log.info("languageCode=["+languageCode+"], text=["+text+"]");
+        
+        final IIndex ndx = getFullTextIndex(); 
+        
+        final TokenStream tokenStream = getTokenStream(languageCode, text);
+        
+        /*
+         * @todo modify to accept the current token for reuse (only in the
+         * current nightly build). Also, termText() is deprecated in the nightly
+         * build.
+         * 
+         * @todo this would be a good example for a mark/reset feature on the
+         * KeyBuilder.
+         *
+         * @todo thread-safety for the keybuilder.
+         */
+        
+        final Vector<Vector<Long>> termVectors = new Vector<Vector<Long>>();
+        
+        try {
+
+            Token token = null;
+            
+            while ((token = tokenStream.next(/* token */)) != null) {
+
+                final byte[] fromKey = getTokenKey(token,
+                        false/* successor */, NULL);
+
+                final byte[] toKey = getTokenKey(token, true/* successor */,
+                        NULL);
+
+                // @todo capacity and growth policy? native long[]?
+                final Vector<Long> v = new Vector<Long>();
+
+                /*
+                 * Extract the term identifier for each entry in the key range
+                 * for the current token.
+                 */
+                
+                final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+                
+                while(itr.hasNext()) {
+                    
+                    // next entry (value is ignored).
+                    itr.next();
+                    
+                    // the key contains the term identifier.
+                    final byte[] key = itr.getKey();
+                    
+                    // decode the term identifier (aka docId).
+                    final long termId = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);
+
+                    // add to this term vector.
+                    v.add( termId );
+                    
+                }
+
+                if(!v.isEmpty()) {
+
+                    log.info("token: ["+token.termText()+"]("+languageCode+") : termIds="+v);
+                    
+                    termVectors.add( v );
+                    
+                } else {
+                    
+                    log.info("Not found: token=["+token.termText()+"]("+languageCode+")");
+                    
+                }
+                
+            }
+
+            if(termVectors.isEmpty()) {
+                
+                log.warn("No tokens found in index: languageCode=["
+                        + languageCode + "], text=[" + text + "]");
+                
+            }
+            
+            // rank order the terms based on the idss.
+            log.error("Rank order and return term ids");
+            
+            return null;
+            
+        } catch (IOException ex) {
+
+            throw new RuntimeException("Tokenization problem: languageCode=["
+                    + languageCode + "], text=[" + text + "]", ex);
+
+        }
 
     }
 

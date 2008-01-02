@@ -895,7 +895,19 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                 MergedLeafIterator mergeItr = new IndexSegmentMerger(mseg2,
                         testData, seg).merge();
 
-                // verify #of entries that are passed on by the merge.
+                /*
+                 * verify #of entries that are passed on by the merge.
+                 * 
+                 * @todo this assertion is failing. the problem may have been
+                 * pre-existing, or it may have been introduced by the changes
+                 * in the IEntryIterator and ITuple API in IndexSegmentMerger. I
+                 * certainly do not recall seeing this problem before I made
+                 * those changes.
+                 * 
+                 * The problem is that it is over-reporting the #of entries.
+                 * 
+                 * junit.framework.AssertionFailedError: entryCount expected:<29894>
+                 */
                 assertEquals("entryCount",expectedEntryCount,mergeItr.nentries);
                 
                 // build the merged index segment.

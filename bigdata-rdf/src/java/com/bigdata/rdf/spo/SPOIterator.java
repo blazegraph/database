@@ -329,9 +329,7 @@ public class SPOIterator implements ISPOIterator {
        
             while (src.hasNext()) {
 
-                Object val = src.next();
-
-                SPO spo = new SPO(keyOrder, src.getKey(), val);
+                final SPO spo = new SPO(keyOrder, src);
 
                 if (filter != null && !filter.isMatch(spo)) {
 
@@ -413,9 +411,7 @@ public class SPOIterator implements ISPOIterator {
 
                 }
 
-                Object val = src.next();
-
-                SPO spo = new SPO(keyOrder, src.getKey(), val);
+                final SPO spo = new SPO(keyOrder, src);
 
                 if(filter != null && !filter.isMatch(spo)) {
                     

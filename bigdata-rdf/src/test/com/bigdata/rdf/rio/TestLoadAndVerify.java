@@ -272,9 +272,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                 
                             }
 
-                            final Object val = itr.next();
-
-                            final SPO actualSPO = new SPO(keyOrder, itr.getKey(), val);
+                            final SPO actualSPO = new SPO(keyOrder, itr);
 
                             if (!expectedSPO.equals(actualSPO)) {
 

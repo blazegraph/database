@@ -504,6 +504,14 @@ public class RdfKeyBuilder {
      * @return The byte code indicating whether the key was a
      *         {@link #CODE_STMT statement}, {@link #CODE_PRED predicate}, or
      *         {@link #CODE_RULE} rule.
+     * 
+     * @see SPO#SPO(KeyOrder, byte[], Object)
+     * 
+     * @deprecated The logic for this is now in
+     *             {@link SPO#SPO(KeyOrder, byte[], Object)}. This way we do
+     *             not have to pass in the ids[].  The distinct term scan code
+     *             also does this itself in order to get the 1st term id out of
+     *             the key.
      */
     static public byte key2Statement(byte[] key, long[] ids) {
         

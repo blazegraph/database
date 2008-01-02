@@ -213,9 +213,7 @@ public class SPOArrayIterator implements ISPOIterator {
 
         while (itr.hasNext() && i < n) {
 
-            Object val = itr.next();
-
-            SPO spo = new SPO(keyOrder, itr.getKey(), val);
+            SPO spo = new SPO(keyOrder, itr);
             
             if (filter != null && !filter.isMatch(spo)) {
 

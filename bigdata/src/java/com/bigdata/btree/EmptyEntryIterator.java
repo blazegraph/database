@@ -60,5 +60,9 @@ public class EmptyEntryIterator implements IEntryIterator {
     public Object getValue() {
         throw new IllegalStateException();
     }
-    
+
+    public ITuple getTuple() {
+        throw new IllegalStateException();
+    }
+
 }
