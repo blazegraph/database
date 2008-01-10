@@ -34,9 +34,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Properties;
 
-import org.openrdf.sesame.admin.UpdateException;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.RdfSchemaRepository;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.InferenceEngine;
@@ -200,7 +198,7 @@ public class TaskATest
      * 
      * @return The elasped time to load the data and perform closure.
      */
-    public long loadData() throws IOException, UpdateException {
+    public long loadData() throws IOException {
 
         /*
          * Configure the DataLoader and InferenceEngine.
@@ -335,11 +333,6 @@ public class TaskATest
             "Could_have_been",
             "-rdf ../rdf-data/Could_have_been.rdf http://www.arches.uga.edu/~vstaub/GlobalInfoSys/project/ontology/Could_have_been.rdf",
             
-//            @todo can not find RDF version.
-//            "REIS Technical Manual from the Data Consortium",
-//            "REISDocuments",
-//            "-rdf /REISDocuments.rdf http://www.dataconsortium.org/REISDocuments.rdf",
-            
             "IPTC Subject Reference",
             "iptc-srs",
             "-rdf ../rdf-data/iptc-srs.rdfs http://nets.ii.uam.es/neptuno/iptc/iptc-srs.rdfs",
@@ -359,7 +352,7 @@ public class TaskATest
             "Alibaba v4.1",
             "alibaba_v41",
             "-rdf ../rdf-data/alibaba_v41.rdf",
-            
+
 //            @todo this is gone, get the NLM mesh data instead?
 //            "Medical Subject Headings",
 //            "mesh",

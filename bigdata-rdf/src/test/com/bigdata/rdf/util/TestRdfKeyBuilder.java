@@ -30,7 +30,7 @@ package com.bigdata.rdf.util;
 import junit.framework.TestCase2;
 
 import org.openrdf.model.Value;
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IKeyBuilder;
@@ -139,7 +139,7 @@ public class TestRdfKeyBuilder extends TestCase2 {
     
     public void test_datatypeLiteral_xsd_int() {
         
-        String datatype = XmlSchema.INTEGER;
+        String datatype = XMLSchema.INTEGER.toString();
         
         // Note: leading zeros are ignored in the xsd:int value space.
         String lit1 = "-4";
@@ -244,13 +244,13 @@ public class TestRdfKeyBuilder extends TestCase2 {
 
         long[] ids = new long[3];
         
-        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k1, ids));
+        fixture.key2Statement(k1, ids);
         assertEquals(new long[]{1,2,3},ids);
         
-        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k2, ids));
+        fixture.key2Statement(k2, ids);
         assertEquals(new long[]{2,2,3},ids);
 
-        assertEquals(RdfKeyBuilder.CODE_STMT,fixture.key2Statement(k3, ids));
+        fixture.key2Statement(k3, ids);
         assertEquals(new long[]{2,2,4},ids);
         
     }

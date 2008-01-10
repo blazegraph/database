@@ -178,7 +178,7 @@ public abstract class AbstractTask implements Callable<Object> {
     protected AbstractTask(ConcurrentJournal journal, long startTime,
             boolean readOnly, String resource) {
         
-        this(journal,startTime,readOnly,new String[]{resource});
+        this(journal, startTime, readOnly, new String[] { resource });
         
     }
     

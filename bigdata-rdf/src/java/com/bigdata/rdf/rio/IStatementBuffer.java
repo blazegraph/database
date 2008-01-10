@@ -76,12 +76,22 @@ public interface IStatementBuffer {
     public void flush();
 
     /**
-     * Add an "explicit" statement to the buffer.
+     * Add an "explicit" statement to the buffer with a "null" context.
      * 
      * @param s
      * @param p
      * @param o
      */
     public void add(Resource s, URI p, Value o);
+    
+    /**
+     * Add an "explicit" statement to the buffer.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     */
+    public void add(Resource s, URI p, Value o, Resource c);
 
 }

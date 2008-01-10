@@ -91,6 +91,17 @@ public class TestLocalTripleStore extends AbstractTestCase {
         
     }
 
+    public Properties getProperties() {
+
+        /*
+         * Note: nothing needs to be overriden.  This test corresponds to the
+         * default configuration for the LocalTripleStore.
+         */
+        
+        return super.getProperties();
+        
+    }
+    
     protected AbstractTripleStore getStore() {
         
         return new LocalTripleStore( getProperties() );

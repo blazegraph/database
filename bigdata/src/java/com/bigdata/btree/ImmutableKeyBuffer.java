@@ -147,6 +147,39 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      */
     public ImmutableKeyBuffer(int nkeys, int maxKeys, byte[][] keys) {
         
+        this(0, nkeys, maxKeys, keys);
+        
+    }
+
+    /**
+     * Variant when the 1st key does not start at offset zero (0) in the
+     * caller's array.
+     * 
+     * @param offset
+     *            The offset into <i>keys</i> of the 1st key.
+     * @param nkeys
+     *            The #of keys in <i>keys</i> that are currenty defined
+     *            (indices [offset:(offset+nkeys)-1] are defined).
+     * @param maxKeys
+     *            The maximum #of keys that would be allowed into the keys
+     *            buffer if the keys buffer were mutable. (This information is
+     *            required in order to preserve the branching factor of nodes
+     *            and leaves as their keys are converted to immutable form and
+     *            then back to mutable form. The split and join operations for
+     *            the btree require all nodes in the same level to have the same
+     *            branching factor, so it is essential to maintain this
+     *            information.)
+     * @param keys
+     *            An array of variable length byte[] keys in sorted order.
+     */
+    public ImmutableKeyBuffer(int offset, int nkeys, int maxKeys, byte[][] keys) {
+        
+        if (offset < 0) {
+
+            throw new IllegalArgumentException("offset negative");
+            
+        }
+        
         if (nkeys < 0) {
 
             throw new IllegalArgumentException("nkeys negative");
@@ -167,7 +200,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
         // assert nkeys >= (AbstractBTree.MIN_BRANCHING_FACTOR+1)/2;
         assert keys != null;
-        assert keys.length >= nkeys;
+        assert keys.length >= nkeys + offset;
 
         // the #of defined keys.
         this.nkeys = nkeys;
@@ -176,8 +209,8 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         this.maxKeys = maxKeys;
         
         // length of the shared prefix.
-        int prefixLength = nkeys == 0 ? 0 : BytesUtil.getPrefixLength(keys[0],
-                keys[nkeys - 1]);
+        final int prefixLength = nkeys == 0 ? 0 : BytesUtil.getPrefixLength(
+                keys[offset], keys[offset + nkeys - 1]);
         
         // offsets into the key buffer.
         this.offsets = new int[nkeys];
@@ -190,7 +223,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
             // offset to the remainder of the ith key in the buffer.
             offsets[i] = bufsize;
             
-            int remainder = keys[i].length - prefixLength;
+            int remainder = keys[offset + i].length - prefixLength;
             
             assert remainder >= 0;
             
@@ -198,24 +231,27 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
             
         }
         
-        /* allocate buffer and copy in the prefix followed by the remainder
-         * of each key in turn.
+        /*
+         * allocate buffer and copy in the prefix followed by the remainder of
+         * each key in turn.
          */
         buf = new byte[bufsize];
 
         if (nkeys > 0) {
 
-            System.arraycopy(keys[0], 0, buf, 0, prefixLength);
+            System.arraycopy(keys[offset], 0, buf, 0, prefixLength);
 
-            int offset = prefixLength;
+            int _offset = prefixLength;
 
             for (int i = 0; i < nkeys; i++) {
 
-                int remainder = keys[i].length - prefixLength;
+                byte[] key = keys[offset + i];
+                
+                int remainder = key.length - prefixLength;
 
-                System.arraycopy(keys[i], prefixLength, buf, offset, remainder);
+                System.arraycopy(key, prefixLength, buf, _offset, remainder);
 
-                offset += remainder;
+                _offset += remainder;
 
             }
             

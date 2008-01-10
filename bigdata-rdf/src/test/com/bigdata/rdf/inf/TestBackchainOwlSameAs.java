@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.OWL;
+import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.inf.Rule.IConstraint;
 import com.bigdata.rdf.inf.Rule.Var;
@@ -92,7 +92,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             {
                 IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
 
-                buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+                buffer.add(X, OWL.SAMEAS, Y);
                 buffer.add(X, A, Z);
 
                 // write on the store.
@@ -100,7 +100,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             }
             
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
@@ -182,7 +182,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             {
                 IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
 
-                buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+                buffer.add(X, OWL.SAMEAS, Y);
                 
 //              owl:sameAs2: (x owl:sameAs y), (x a z) -&gt; (y a z).
                 
@@ -197,7 +197,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
             }
             
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertTrue(store.hasStatement(Z, A, X));
             assertEquals(3,store.getStatementCount());
@@ -268,14 +268,14 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, OWL.SAMEAS, Y);
             buffer.add(X, A, Z);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
@@ -330,14 +330,14 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, OWL.SAMEAS, Y);
             buffer.add(X, A, Z);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
@@ -477,7 +477,7 @@ public class TestBackchainOwlSameAs extends AbstractInferenceEngineTestCase {
              *  #bingo owl:sameAs #boingo -&gt; #boingo owl:sameAs #bingo
              */
             URI link = new URIImpl("http://www.bigdata.com/link");
-            URI sameAs = new URIImpl(OWL.SAMEAS);
+            URI sameAs = OWL.SAMEAS;
             URI foo = new URIImpl("http://www.bigdata.com/foo");
             URI bar = new URIImpl("http://www.bigdata.com/bar");
             URI baz = new URIImpl("http://www.bigdata.com/baz");

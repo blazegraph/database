@@ -27,18 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.util.KeyOrder;
-import com.sun.org.apache.xerces.internal.util.URI;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * Low-level API directly using long term identifiers rather than an RDF Value
@@ -51,7 +50,7 @@ import com.sun.org.apache.xerces.internal.util.URI;
  *       realize non-Sesame integrations by layering an appropriate interface
  *       over this one.
  */
-public interface IRawTripleStore extends ITripleStore {
+public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     
     /**
      * Value used for a "NULL" term identifier.
@@ -65,46 +64,6 @@ public interface IRawTripleStore extends ITripleStore {
      */
     public static final int N = 3;
 
-    /**
-     * The bit mask that is bit-wise ANDed with a term identifier in order to
-     * reveal the term code.
-     * 
-     * @see #CODE_URI
-     * @see #CODE_BNODE
-     * @see #CODE_LITERAL
-     * @see #CODE_STATEMENT
-     */
-    static final public long TERMID_CODE_MASK = 0x03L;
-    
-    /**
-     * The bit value used to indicate that a term identifier stands for a
-     * {@link URI}.
-     * <p>
-     * Note: The lower two bits of a term identifier are reserved to indicate
-     * the type of thing for which the term identifier stands {URI, Literal,
-     * BNode, or Statement}. This is used to avoid lookup of the term in the
-     * {@link #name_idTerm} index when we only need to determine the term class.
-     */
-    static final public long CODE_URI = 0x00L;
-
-    /**
-     * The bit value used to indicate that a term identifier stands for a
-     * {@link BNode}.
-     */
-    static final public long CODE_BNODE = 0x01L;
-
-    /**
-     * The bit value used to indicate that a term identifier stands for a
-     * {@link Literal}.
-     */
-    static final public long CODE_LITERAL = 0x02L;
-
-    /**
-     * The bit value used to indicate that a term identifier stands for a
-     * statement (when support for statement identifiers is enabled).
-     */
-    static final public long CODE_STATEMENT = 0x03L;
-    
     /**
      * The name of the index mapping terms to term identifiers.
      */
@@ -147,7 +106,8 @@ public interface IRawTripleStore extends ITripleStore {
     /**
      * Return the statement index identified by the {@link KeyOrder}.
      * 
-     * @param keyOrder The key order.
+     * @param keyOrder
+     *            The key order.
      * 
      * @return The statement index for that access path.
      */
@@ -163,6 +123,29 @@ public interface IRawTripleStore extends ITripleStore {
      * @return The assigned term identifier.
      */
     public long addTerm(Value value);
+
+    /**
+     * Batch insert of terms into the database.
+     * 
+     * @param keyBuilder
+     *            Used to generate the compressed sort keys for the
+     *            {@link #getTermIdIndex()}.
+     * @param terms
+     *            An array whose elements [0:nterms-1] will be inserted.
+     * @param numTerms
+     *            The #of terms to insert.
+     * 
+     * @todo add a Iterator<_Value> getTerms( Value[] terms ) that can be used
+     *       to efficiently resolve one or more terms in parallel without having
+     *       a side effect in which the terms become defined (the termId remains
+     *       NULL if the term is not known). Alternatively add a boolean flag to
+     *       this {@link #addTerms(_Value[], int)} indicating whether or not
+     *       terms that are not found should be defined. Either approach would
+     *       let us reduce the latency for resolving multiple terms without side
+     *       effects (note that an LRU term cache is already being used to
+     *       reduce latency).
+     */
+    public void addTerms(RdfKeyBuilder keyBuilder,_Value[] terms, int numTerms);
 
     /**
      * Return the RDF {@link Value} given a term identifier (non-batch api).

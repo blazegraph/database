@@ -29,7 +29,7 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.OWL;
+import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -75,13 +75,13 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(A, new URIImpl(OWL.EQUIVALENTCLASS), B);
+            buffer.add(A, OWL.EQUIVALENTCLASS, B);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(A, new URIImpl(OWL.EQUIVALENTCLASS), B));
+            assertTrue(store.hasStatement(A, OWL.EQUIVALENTCLASS, B));
             assertEquals(1,store.getStatementCount());
 
             RDFSHelper inf = new RDFSHelper(store);
@@ -96,10 +96,10 @@ public class TestRuleOwlEquivalentClass extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(A, new URIImpl(OWL.EQUIVALENTCLASS), B));
+            assertTrue(store.hasStatement(A, OWL.EQUIVALENTCLASS, B));
 
             // entailed
-            assertTrue(store.hasStatement(B, new URIImpl(OWL.EQUIVALENTCLASS), A));
+            assertTrue(store.hasStatement(B, OWL.EQUIVALENTCLASS, A));
 
             // final #of statements in the store.
             assertEquals(2,store.getStatementCount());

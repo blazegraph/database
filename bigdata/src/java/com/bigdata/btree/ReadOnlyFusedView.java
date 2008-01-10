@@ -146,9 +146,27 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
     }
     
     public UUID getIndexUUID() {
+       
         return srcs[0].getIndexUUID();
+        
     }
-    
+
+    public String getStatistics() {
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(getClass().getSimpleName());
+        
+        for(AbstractBTree ndx : srcs ) {
+        
+            sb.append("\n"+ndx.getStatistics());
+            
+        }
+        
+        return sb.toString();
+        
+    }
+
     /**
      * Write operations are not supported on the view.
      */

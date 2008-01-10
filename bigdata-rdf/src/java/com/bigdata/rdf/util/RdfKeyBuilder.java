@@ -33,8 +33,8 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
@@ -42,6 +42,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.ITermIndexCodes;
 
 /**
  * Helper class for building unsigned byte[] keys for RDF {@link Value}s and
@@ -52,7 +53,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfKeyBuilder {
+public class RdfKeyBuilder implements ITermIndexCodes {
 
     public final IKeyBuilder keyBuilder;
     
@@ -74,77 +75,6 @@ public class RdfKeyBuilder {
     }
     
     /**
-     * The length of a key for one of the statement indices.  This is one byte
-     * for the code followed by 3 long integers.
-     */
-    final public static int stmtKeyLen = 1 + 8 * 3;
-    
-    /*
-     * Define bytes indicating whether a key in a statement index is a
-     * statement, predicate (rule without a body), or a rule with a body. This
-     * distinction makes it possible to mix together rules and data in the
-     * statement indices.
-     */
-    
-    /** indicates a statement. */
-    final public static byte CODE_STMT = 0x01;
-    /** indicates a predicate (value is null). */
-    final public static byte CODE_PRED = 0x02;
-    /** indicates a rule (value is the rule body). */
-    final public static byte CODE_RULE = 0x03;
-    
-    /*
-     * Define bytes indicating the type of a term in the term index.
-     * 
-     * Note: when these signed bytes get encoded as unsigned bytes in a key
-     * their values change. For example, 2 becomes 130.
-     */
-    
-    /** indicates a URI. */
-    final public static byte CODE_URI = 0x01;
-
-    /** indicates a plain literal. */
-    final public static byte CODE_LIT = 0x02;
-
-    /** indicates a literal with a language code. */
-    final public static byte CODE_LCL = 0x03;
-
-    /** indicates a literal with a data type URI. */
-    final public static byte CODE_DTL = 0x04;
-
-//    /** indicates a XML literal. */
-//    final public static byte CODE_XML = 0x05;
-
-    /** indicates a blank node. */
-    final public static byte CODE_BND = 0x06;
-
-    /**
-     * When true all strings will be <em>assumed</em> to contain 7-bit clean
-     * US-ASCII characters and {@link IKeyBuilder#appendASCII(String)} will be
-     * used in place of {@link IKeyBuilder#append(String)}.
-     * <p>
-     * Note: These two processing modes produce incompatible keys and MUST NOT
-     * be mixed for an index. The US-ASCII assumption is significantly faster
-     * since it avoids all use of unicode aware collation rules and also
-     * produces shorter keys.
-     */
-    final public boolean assumeUSASCII = false;
-    
-    protected final IKeyBuilder appendString(String s) {
-        
-        if(assumeUSASCII) {
-            
-            return keyBuilder.appendASCII(s);
-            
-        } else {
-            
-            return keyBuilder.append(s);
-            
-        }
-        
-    }
-    
-    /**
      * Returns the sort key for the URI.
      * 
      * @param uri
@@ -154,28 +84,25 @@ public class RdfKeyBuilder {
      */
     public byte[] uri2key(String uri) {
         
-        keyBuilder.reset().append(CODE_URI);
-        return appendString(uri).getKey();
+        return keyBuilder.reset().append(TERM_CODE_URI).append(uri).getKey();
         
     }
     
-    public byte[] uriStartKey() {
-        
-        return keyBuilder.reset().append(CODE_URI).getKey();
-        
-    }
-
-    public byte[] uriEndKey() {
-        
-        return keyBuilder.reset().append(CODE_LIT).getKey();
-        
-    }
+//    public byte[] uriStartKey() {
+//        
+//        return keyBuilder.reset().append(TERM_CODE_URI).getKey();
+//        
+//    }
+//
+//    public byte[] uriEndKey() {
+//        
+//        return keyBuilder.reset().append(TERM_CODE_LIT).getKey();
+//        
+//    }
 
     public byte[] plainLiteral2key(String text) {
         
-        keyBuilder.reset().append(CODE_LIT);
-        
-        return appendString(text).getKey();
+        return keyBuilder.reset().append(TERM_CODE_LIT).append(text).getKey();
         
     }
     
@@ -195,11 +122,11 @@ public class RdfKeyBuilder {
         
         assert languageCode.length() > 0;
         
-        keyBuilder.reset().append(CODE_LCL);
+        keyBuilder.reset().append(TERM_CODE_LCL);
         
         keyBuilder.appendASCII(languageCode.toUpperCase()).appendNul();
         
-        return appendString(text).getKey();
+        return keyBuilder.append(text).getKey();
         
     }
 
@@ -222,33 +149,31 @@ public class RdfKeyBuilder {
      */
     public byte[] datatypeLiteral2key(String datatype, String value) {
         
-        keyBuilder.reset().append(CODE_DTL);
+        keyBuilder.reset().append(TERM_CODE_DTL).append(datatype).appendNul();
 
-        appendString(datatype).appendNul();
-
-        if(datatype.equals(XmlSchema.INT) || datatype.equals(XmlSchema.INTEGER)) {
+        if(datatype.equals(XMLSchema.INT) || datatype.equals(XMLSchema.INTEGER)) {
             
             keyBuilder.append(Integer.parseInt(value));
             
-        } else if(datatype.equals(XmlSchema.LONG)) {
+        } else if(datatype.equals(XMLSchema.LONG)) {
                 
             keyBuilder.append(Long.parseLong(value));
                 
-        } else if(datatype.equals(XmlSchema.FLOAT)) {
+        } else if(datatype.equals(XMLSchema.FLOAT)) {
             
             keyBuilder.append(Float.parseFloat(value));
 
-        } else if(datatype.equals(XmlSchema.DOUBLE)) {
+        } else if(datatype.equals(XMLSchema.DOUBLE)) {
                 
                 keyBuilder.append(Double.parseDouble(value));
             
         } else if(datatype.equals(RDF.XMLLITERAL)) {
             
-            appendString(value);
+            keyBuilder.append(value);
             
         } else {
             
-            appendString(value);
+            keyBuilder.append(value);
             
         }
         
@@ -256,31 +181,29 @@ public class RdfKeyBuilder {
         
     }
 
-    /**
-     * The key corresponding to the start of the literals section of the
-     * terms index.
-     */
-    public byte[] litStartKey() {
-        
-        return keyBuilder.reset().append(CODE_LIT).getKey();
-        
-    }
-
-    /**
-     * The key corresponding to the first key after the literals section of the
-     * terms index.
-     */
-    public byte[] litEndKey() {
-        
-        return keyBuilder.reset().append(CODE_BND).getKey();
-        
-    }
+//    /**
+//     * The key corresponding to the start of the literals section of the
+//     * terms index.
+//     */
+//    public byte[] litStartKey() {
+//        
+//        return keyBuilder.reset().append(TERM_CODE_LIT).getKey();
+//        
+//    }
+//
+//    /**
+//     * The key corresponding to the first key after the literals section of the
+//     * terms index.
+//     */
+//    public byte[] litEndKey() {
+//        
+//        return keyBuilder.reset().append(TERM_CODE_BND).getKey();
+//        
+//    }
 
     public byte[] blankNode2Key(String id) {
         
-        keyBuilder.reset().append(CODE_BND);
-        
-        return appendString(id).getKey();
+        return keyBuilder.reset().append(TERM_CODE_BND).append(id).getKey();
         
     }
 
@@ -302,7 +225,7 @@ public class RdfKeyBuilder {
 
             URI uri = (URI) value;
 
-            String term = uri.getURI();
+            String term = uri.toString();
 
             return uri2key(term);
 
@@ -328,7 +251,7 @@ public class RdfKeyBuilder {
                 /*
                  * datatype literal.
                  */
-                return datatypeLiteral2key(datatypeUri.getURI(), text);
+                return datatypeLiteral2key(datatypeUri.toString(), text);
                 
             } else {
                 
@@ -422,8 +345,7 @@ public class RdfKeyBuilder {
      */
     public byte[] statement2Key(long id1, long id2, long id3) {
         
-        return keyBuilder.reset().append(CODE_STMT).append(id1).append(id2)
-                .append(id3).getKey();
+        return keyBuilder.reset().append(id1).append(id2).append(id3).getKey();
         
     }
     
@@ -477,19 +399,19 @@ public class RdfKeyBuilder {
 //
 //    }
     
-    public byte[] pred2Key(long id1, long id2, long id3) {
-        
-        return keyBuilder.reset().append(CODE_PRED).append(id1).append(id2)
-                .append(id3).getKey();
-        
-    }
-    
-    public byte[] rule2Key(long id1, long id2, long id3) {
-        
-        return keyBuilder.reset().append(CODE_RULE).append(id1).append(id2)
-                .append(id3).getKey();
-        
-    }
+//    public byte[] pred2Key(long id1, long id2, long id3) {
+//        
+//        return keyBuilder.reset().append(CODE_PRED).append(id1).append(id2)
+//                .append(id3).getKey();
+//        
+//    }
+//    
+//    public byte[] rule2Key(long id1, long id2, long id3) {
+//        
+//        return keyBuilder.reset().append(CODE_RULE).append(id1).append(id2)
+//                .append(id3).getKey();
+//        
+//    }
     
     /**
      * Decodes a statement key.
@@ -513,22 +435,29 @@ public class RdfKeyBuilder {
      *             also does this itself in order to get the 1st term id out of
      *             the key.
      */
-    static public byte key2Statement(byte[] key, long[] ids) {
+    static public void key2Statement(byte[] key, long[] ids) {
         
         assert key != null;
         assert ids != null;
-        assert key.length == 8 * 3 + 1;
+//        assert key.length == 8 * 3 + 1;
+        assert key.length == 8 * 3;
         assert ids.length == 3;
         
-        byte code = KeyBuilder.decodeByte(key[0]);
-
-        ids[0] = KeyBuilder.decodeLong(key, 1);
+//        byte code = KeyBuilder.decodeByte(key[0]);
+//
+//        ids[0] = KeyBuilder.decodeLong(key, 1);
+//        
+//        ids[1] = KeyBuilder.decodeLong(key, 1+8);
+//        
+//        ids[2] = KeyBuilder.decodeLong(key, 1+8+8);
         
-        ids[1] = KeyBuilder.decodeLong(key, 1+8);
+        ids[0] = KeyBuilder.decodeLong(key, 0);
         
-        ids[2] = KeyBuilder.decodeLong(key, 1+8+8);
+        ids[1] = KeyBuilder.decodeLong(key, 8);
         
-        return code;
+        ids[2] = KeyBuilder.decodeLong(key, 8+8);
+        
+//        return code;
         
     }
     

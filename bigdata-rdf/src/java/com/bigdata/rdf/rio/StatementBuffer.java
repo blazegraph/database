@@ -31,15 +31,12 @@ import java.beans.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.NoSuccessorException;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
@@ -50,16 +47,10 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
-import com.bigdata.rdf.rio.MultiThreadedPresortRioLoader.ConsumerThread;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
-
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.IStriterator;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other
@@ -89,6 +80,8 @@ import cutthecrap.utils.striterators.Striterator;
 public class StatementBuffer implements IStatementBuffer {
 
     protected static final Logger log = Logger.getLogger(StatementBuffer.class);
+    
+    protected final RdfKeyBuilder keyBuilder;
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -159,8 +152,14 @@ public class StatementBuffer implements IStatementBuffer {
      */
     protected final boolean distinct = true;
     
+    /**
+     * @deprecated not used and to be removed.
+     */
     boolean haveKeys = false;
     
+    /**
+     * @deprecated not used and to be removed.
+     */
     boolean sorted = false;
     
     public boolean isEmpty() {
@@ -220,6 +219,9 @@ public class StatementBuffer implements IStatementBuffer {
         if (capacity < 0)
             throw new IllegalArgumentException();
 
+        // private instance to remove threading constraints.
+        this.keyBuilder = database.getKeyBuilder();
+        
         this.statementStore = statementStore; // MAY be null.
         
         this.database = database;
@@ -384,7 +386,7 @@ public class StatementBuffer implements IStatementBuffer {
          * insert terms (batch operation).
          */
         
-        database.insertTerms(values, numValues, haveKeys, sorted);
+        database.addTerms(keyBuilder, values, numValues);
 
         /*
          * insert statements (batch operation).
@@ -408,8 +410,6 @@ public class StatementBuffer implements IStatementBuffer {
      * 
      * @param stmts
      *            An array of statements
-     * 
-     * @see #insertTerms(_Value[], int, boolean, boolean)
      * 
      * @return The #of statements written on the database.
      */
@@ -557,24 +557,32 @@ public class StatementBuffer implements IStatementBuffer {
      * Adds the values and the statement into the buffer.
      * 
      * @param s
+     *            The subject.
      * @param p
+     *            The predicate.
      * @param o
+     *            The object.
+     * @param c
+     *            The context (may be null).
      * @param type
+     *            The statement type.
      * 
      * @exception IndexOutOfBoundsException
      *                if the bufferQueue overflows.
      * 
      * @see #nearCapacity()
      */
-    public void handleStatement( Resource s, URI p, Value o, StatementEnum type ) {
+    public void handleStatement( Resource s, URI p, Value o, Resource c, StatementEnum type ) {
 
         s = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(s);
         p = (URI)      OptimizedValueFactory.INSTANCE.toNativeValue(p);
         o =            OptimizedValueFactory.INSTANCE.toNativeValue(o);
+        c = (Resource) OptimizedValueFactory.INSTANCE.toNativeValue(c);
         
         boolean duplicateS = false;
         boolean duplicateP = false;
         boolean duplicateO = false;
+        boolean duplicateC = false;
         
         if (distinct) {
             {
@@ -600,6 +608,14 @@ public class StatementBuffer implements IStatementBuffer {
                     duplicateO = true;
                 }
                 o = (Value) tmp;
+            }
+            if(c!=null) {
+                _Value tmp = getDistinctTerm((_Value) c);
+//                if (tmp != o) {
+                if(tmp.count>0) {
+                    duplicateC = true;
+                }
+                c = (Resource) tmp;
             }
         }
 
@@ -647,8 +663,24 @@ public class StatementBuffer implements IStatementBuffer {
             
         }
 
+        if (c != null && !duplicateC) {
+
+            values[numValues++] = (_Value)c;
+            
+            if (c instanceof _URI) {
+
+                numURIs++;
+
+            } else {
+
+                numBNodes++;
+
+            }
+            
+        }
+
         _Statement stmt = new _Statement((_Resource) s, (_URI) p, (_Value) o,
-                type);
+                (_Resource) c, type);
         
 //        if (distinctStmtMap != null) {
 //
@@ -675,13 +707,15 @@ public class StatementBuffer implements IStatementBuffer {
             ((_Value)s).count++;
             ((_Value)p).count++;
             ((_Value)o).count++;
+            if(c!=null) ((_Value)c).count++;
 
 //        }
 
     }
 
     /**
-     * Add an "explicit" statement to the buffer (flushes on overflow).
+     * Add an "explicit" statement to the buffer (flushes on overflow, no
+     * context).
      * 
      * @param s
      * @param p
@@ -689,7 +723,21 @@ public class StatementBuffer implements IStatementBuffer {
      */
     public void add(Resource s, URI p, Value o) {
         
-        add(s, p, o, StatementEnum.Explicit);
+        add(s, p, o, null, StatementEnum.Explicit);
+        
+    }
+    
+    /**
+     * Add an "explicit" statement to the buffer (flushes on overflow).
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     */
+    public void add(Resource s, URI p, Value o, Resource c) {
+        
+        add(s, p, o, c, StatementEnum.Explicit);
         
     }
     
@@ -701,7 +749,7 @@ public class StatementBuffer implements IStatementBuffer {
      * @param o
      * @param type
      */
-    public void add(Resource s, URI p, Value o, StatementEnum type) {
+    public void add(Resource s, URI p, Value o, Resource c, StatementEnum type) {
         
         if (nearCapacity()) {
 
@@ -714,7 +762,7 @@ public class StatementBuffer implements IStatementBuffer {
         }
         
         // add to the buffer.
-        handleStatement(s, p, o, type);
+        handleStatement(s, p, o, c, type);
 
     }
     

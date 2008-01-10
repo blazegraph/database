@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -80,7 +80,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             URI U = new _URI("http://www.foo.org/U");
             URI Y = new _URI("http://www.foo.org/Y");
     
-            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B);
             store.addStatement(U, A, Y);
@@ -139,7 +139,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             URI U2 = new _URI("http://www.foo.org/U2");
             URI Y2 = new _URI("http://www.foo.org/Y2");
     
-            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B);
             store.addStatement(U1, A, Y1);
@@ -206,7 +206,7 @@ public class TestRuleRdfs07 extends AbstractRuleTestCase {
             URI U = new _URI("http://www.foo.org/U");
             URI Y = new _URI("http://www.foo.org/Y");
     
-            URI rdfsSubPropertyOf = new _URI(RDFS.SUBPROPERTYOF);
+            URI rdfsSubPropertyOf = RDFS.SUBPROPERTYOF;
     
             store.addStatement(A, rdfsSubPropertyOf, B1);
             store.addStatement(A, rdfsSubPropertyOf, B2);

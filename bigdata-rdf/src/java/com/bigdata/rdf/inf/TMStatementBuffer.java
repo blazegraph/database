@@ -36,7 +36,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -208,6 +207,12 @@ public class TMStatementBuffer implements IStatementBuffer {
      * @param o
      */
     public void add(Resource s, URI  p, Value o) {
+    
+        add(s,p,o,null);
+        
+    }
+
+    public void add(Resource s, URI  p, Value o,Resource c) {
         
         if(buffer==null) {
             
@@ -215,7 +220,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
         
-        buffer.add(s, p, o);
+        buffer.add(s, p, o, c);
         
     }
     

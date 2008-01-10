@@ -49,6 +49,11 @@ public interface IIndex extends ISimpleBTree, IBatchBTree {
     public UUID getIndexUUID();
 
     /**
+     * Interesting statistics about the index.
+     */
+    public String getStatistics();
+    
+    /**
      * Return <code>true</code> iff the index supports isolation.
      * <p>
      * Note: This is declared as a method since the {@link IIsolatableIndex}

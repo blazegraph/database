@@ -216,6 +216,25 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     }
 
     /**
+     * Returns data services known to the client at the time of this request.
+     */
+    public UUID[] getDataServiceUUIDs(int maxCount) {
+        
+        ServiceItem[] items = dataServiceMap.getServiceItems(maxCount);
+        
+        UUID[] uuids = new UUID[items.length];
+        
+        for(int i=0; i<items.length; i++) {
+            
+            uuids[i] = JiniUtil.serviceID2UUID(items[i].serviceID);
+            
+        }
+
+        return uuids;
+        
+    }
+    
+    /**
      * Resolve the {@link ServiceID} to an {@link IDataService} using a local
      * cache.
      * 

@@ -95,7 +95,17 @@ abstract class BaseAxioms implements Axioms {
 //        defineAxioms();
         
     }
-    
+
+    protected void addAxiom
+    ( URI s,
+      URI p,
+      URI o
+      ) {
+        
+        addAxiom(s.toString(), p.toString(), o.toString());
+        
+    }
+
     protected void addAxiom
         ( String s,
           String p,
@@ -151,14 +161,14 @@ abstract class BaseAxioms implements Axioms {
         
     }
 
-    public boolean isAxiom( Statement statement )
+    public boolean isAxiom( Statement stmt )
     {
         
-        Resource subj = statement.getSubject();
+        Resource subj = stmt.getSubject();
         
-        URI pred = statement.getPredicate();
+        URI pred = stmt.getPredicate();
         
-        Value obj = statement.getObject();
+        Value obj = stmt.getObject();
         
         if ( subj instanceof URI && obj instanceof URI ) {
             
@@ -194,7 +204,7 @@ abstract class BaseAxioms implements Axioms {
     public boolean isInVocabulary( URI uri )
     {
         
-        return vocabulary.contains( uri.getURI() );
+        return vocabulary.contains( uri.toString() );
         
     }
     
@@ -215,11 +225,12 @@ abstract class BaseAxioms implements Axioms {
             this.s = s;
             this.p = p;
             this.o = o;
-            
+
+            // Note: context is ignored for axiom comparisons.
             hashCode = 
-                ( s.getURI() + "|" + 
-                  p.getURI() + "|" + 
-                  o.getURI()
+                ( s.stringValue() + "|" + 
+                  p.stringValue() + "|" + 
+                  o.stringValue()
                   ).hashCode();
             
         }
@@ -249,13 +260,14 @@ abstract class BaseAxioms implements Axioms {
             ( Object obj
               )
         {
-         
+
+            // Note: context is ignored for axiom comparisons.
             return 
                 ( obj != null &&
                   obj instanceof Triple &&
-                  s.getURI().equals( ( ( Triple ) obj ).getS().getURI() ) &&
-                  p.getURI().equals( ( ( Triple ) obj ).getP().getURI() ) &&
-                  o.getURI().equals( ( ( Triple ) obj ).getO().getURI() )
+                  s.equals( ((Triple)obj).getS() ) &&
+                  p.equals( ((Triple)obj).getP() ) &&
+                  o.equals( ((Triple)obj).getO() )
                   );
             
         }
@@ -311,7 +323,11 @@ abstract class BaseAxioms implements Axioms {
             
             URI o = triple.getO();
             
-            buffer.add( s, p, o, StatementEnum.Axiom );
+            /*
+             * FIXME axioms need to go into the appropriate context based on
+             * whatever CONOPS we have for contexts.
+             */
+            buffer.add( s, p, o, null, StatementEnum.Axiom );
             
         }
 

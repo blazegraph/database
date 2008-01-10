@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -70,7 +70,7 @@ public class TestRuleRdfs11 extends AbstractRuleTestCase {
             URI B = new _URI("http://www.foo.org/B");
             URI C = new _URI("http://www.foo.org/C");
 
-            URI rdfsSubClassOf = new _URI(RDFS.SUBCLASSOF);
+            URI rdfsSubClassOf = RDFS.SUBCLASSOF;
 
             store.addStatement(A, rdfsSubClassOf, B);
             store.addStatement(B, rdfsSubClassOf, C);

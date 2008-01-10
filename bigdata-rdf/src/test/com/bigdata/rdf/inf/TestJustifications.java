@@ -158,11 +158,11 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                 
                 while(itr.hasNext()) {
                     
-                    // nothing store in the value under the key.
+                    // index only stores keys, not values.
                     assertNull( itr.next() );
                     
                     // get the key from the index.
-                    byte[] key = itr.getKey();
+                    final byte[] key = itr.getKey();
                     
                     // verify that we are reading back the same key that we should have written.
                     assertEquals(jst.getKey(new KeyBuilder()),key);

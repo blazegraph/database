@@ -55,6 +55,12 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         return src.getIndexUUID();
         
     }
+    
+    public String getStatistics() {
+        
+        return getClass().getSimpleName() + " : "+ src.getStatistics();
+        
+    }
 
     public ICounter getCounter() {
         

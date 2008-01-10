@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -52,6 +53,7 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.isolation.ReadOnlyIsolatedIndex;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -299,6 +301,11 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     /*private*/ CommitRecordIndex _commitRecordIndex;
 
+    /**
+     * True iff the journal was opened in a read-only mode.
+     */
+    protected final boolean readOnly;
+    
     /**
      * Option controls whether the journal forces application data to disk
      * before updating the root blocks.
@@ -611,6 +618,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
             log.info(Options.READ_ONLY+"="+readOnly);
 
         }
+        
+        this.readOnly = readOnly;
 
         /*
          * "forceWrites"
@@ -973,6 +982,50 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
 
+    /**
+     * Statistics describing the journal including IO, indices, etc.
+     * 
+     * @todo expose getStatistics on all buffer strategies.
+     */
+    public String getStatistics() {
+
+        StringBuilder sb = new StringBuilder();
+
+        if(_bufferStrategy instanceof DiskOnlyStrategy) {
+        
+            sb.append(((DiskOnlyStrategy)_bufferStrategy).getStatistics());
+            
+        } else {
+
+            sb.append("\nfile="+getFile());
+            
+            sb.append("\nbyteCount="+getBufferStrategy().getNextOffset());
+
+        }
+        
+        /*
+         * Report on the registered indices.
+         */
+        synchronized(name2Addr) {
+            
+            Iterator itr = name2Addr.entryIterator();
+
+            while (itr.hasNext()) {
+
+                Entry entry = (Entry) itr.next();
+                
+                IIndex ndx = name2Addr.get(entry.name);
+                
+                sb.append("\nindex: name="+entry.name+" : "+ndx.getStatistics());
+                
+            }
+            
+        }
+
+        return sb.toString();
+        
+    }
+    
     public File getFile() {
         
         return _bufferStrategy.getFile();
@@ -1088,6 +1141,12 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
 
+    public boolean isReadOnly() {
+        
+        return readOnly;
+        
+    }
+    
     public boolean isStable() {
 
         return _bufferStrategy.isStable();

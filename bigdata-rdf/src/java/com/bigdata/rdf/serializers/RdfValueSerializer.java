@@ -124,19 +124,19 @@ public class RdfValueSerializer implements IValueSerializer {
             final String term = readUTF(is); 
             
             switch(code) {
-            case RdfKeyBuilder.CODE_URI:
+            case RdfKeyBuilder.TERM_CODE_URI:
                 val = new _URI(term);
                 break;
-            case RdfKeyBuilder.CODE_LIT:
+            case RdfKeyBuilder.TERM_CODE_LIT:
                 val = new _Literal(term);
                 break;
-            case RdfKeyBuilder.CODE_LCL:
+            case RdfKeyBuilder.TERM_CODE_LCL:
                 val = new _Literal(term,readUTF(is));
                 break;
-            case RdfKeyBuilder.CODE_DTL:
+            case RdfKeyBuilder.TERM_CODE_DTL:
                 val = new _Literal(term,new _URI(readUTF(is)));
                 break;
-            case RdfKeyBuilder.CODE_BND:
+            case RdfKeyBuilder.TERM_CODE_BND:
                 val = new _BNode(term);
                 break;
             default: throw new AssertionError("Unknown code="+code);
@@ -164,15 +164,15 @@ public class RdfValueSerializer implements IValueSerializer {
             writeUTF(os,value.term);
             
             switch(code) {
-            case RdfKeyBuilder.CODE_URI: break;
-            case RdfKeyBuilder.CODE_LIT: break;
-            case RdfKeyBuilder.CODE_LCL:
+            case RdfKeyBuilder.TERM_CODE_URI: break;
+            case RdfKeyBuilder.TERM_CODE_LIT: break;
+            case RdfKeyBuilder.TERM_CODE_LCL:
                 writeUTF(os,((_Literal)value).language);
                 break;
-            case RdfKeyBuilder.CODE_DTL:
+            case RdfKeyBuilder.TERM_CODE_DTL:
                 writeUTF(os,((_Literal)value).datatype.term);
                 break;
-            case RdfKeyBuilder.CODE_BND: break;
+            case RdfKeyBuilder.TERM_CODE_BND: break;
             default: throw new AssertionError("Unknown code="+code);
             }
 

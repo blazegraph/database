@@ -148,6 +148,10 @@ public class DataServer extends AbstractServer {
     /**
      * Adds jini administration interfaces to the basic {@link DataService}.
      * 
+     * @todo if there is a jini initialization problem then this class should
+     *       not cause a (new) journal to be left behind when the server startup
+     *       fails.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */

@@ -30,7 +30,7 @@ package com.bigdata.rdf.rio;
 import java.io.Reader;
 
 import org.apache.log4j.Logger;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.rio.RDFFormat;
 
 /**
  * Interface for parsing RDF data using the Sesame RIO parser.

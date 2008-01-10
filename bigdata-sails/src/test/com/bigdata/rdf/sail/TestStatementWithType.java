@@ -33,8 +33,7 @@ package com.bigdata.rdf.sail;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sail.SailUpdateException;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -71,7 +70,7 @@ public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase 
      * 
      * @throws SailInitializationException 
      */
-    public void test_addInferredExplicitAxiom() throws SailInitializationException {
+    public void test_addInferredExplicitAxiom() throws SailException {
 
         final long NULL = IRawTripleStore.NULL;
         
@@ -154,7 +153,7 @@ public class TestStatementWithType extends AbstractBigdataRdfRepositoryTestCase 
      * @throws SailInitializationException
      * @throws SailUpdateException
      */
-    public void test_addStatements() throws SailInitializationException, SailUpdateException {
+    public void test_addStatements() throws SailException {
 
         AbstractTripleStore store = repo.getDatabase();
 

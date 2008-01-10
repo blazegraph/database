@@ -37,7 +37,7 @@ import java.util.Arrays;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.rdf.inf.ClosureStats;
@@ -267,7 +267,7 @@ public class DataLoader {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class Options {
+    public static interface Options {
         
         /**
          * Optional boolean property may be used to turn on data verification in

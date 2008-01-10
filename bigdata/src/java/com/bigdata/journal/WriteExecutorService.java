@@ -121,13 +121,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             .getLogger(WriteExecutorService.class);
 
     /**
-     * Turns on some stuff on stderr.
-     * 
-     * @release Set this false.
-     */
-    protected boolean trace = true;
-    
-    /**
      * True iff the {@link #log} level is INFO or less.
      */
     final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
@@ -782,7 +775,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     
                     // Don't wait any longer.
                     
-                    if(trace) System.err.println("Not waiting any longer: nwaits="
+                    if(INFO) log.info("Not waiting any longer: nwaits="
                             + nwaits + ", elapsed=" + elapsedWait
                             + "ms, queueSize=" + queueSize + ", nrunning="
                             + nrunning + ", nwrites=" + nwrites
@@ -1018,7 +1011,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             ncommits++;
             
-            if(trace) System.err.println("commit: #writes="+nwrites);
+            if(INFO) log.info("commit: #writes="+nwrites);
             
             return true;
 

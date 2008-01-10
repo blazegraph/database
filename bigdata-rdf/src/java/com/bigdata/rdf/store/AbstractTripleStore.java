@@ -70,18 +70,23 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.sesame.sail.StatementIterator;
-import org.openrdf.vocabulary.OWL;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.OWL;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.sail.SailException;
+
+import sun.misc.Cache;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IProcedure;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.Procedure;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Tx;
@@ -107,6 +112,9 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.AutoSplitProcedure;
+import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.ClientIndexView.Split;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -117,11 +125,6 @@ import cutthecrap.utils.striterators.Striterator;
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
  * interface that is invariant across the choice of the backing store.
- * 
- * FIXME Modify the code to minimize allocation using {@link ITuple} and copying
- * the keys rather than having them be reallocated all the time. This will
- * especially help with the statement indices since all that we do there is read
- * the keys.
  * 
  * FIXME Write and benchmark a distributed bulk RDF data loader. Work through
  * the search for equal "size" partitions for the statement indices. Note that
@@ -185,7 +188,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       need to go back and think this one through some more and figure out
  *       whether or not we need to abort a transaction in this case.
  * 
- * @todo bnodes do not need to be store in the terms or ids indices if we
+ * @todo bnodes do not need to be stored in the terms or ids indices if we
  *       presume that an unknown identifier is a bnode. however, we still need
  *       to ensure that bnode identifiers are distinct or the same when and
  *       where appropriate, so we need to assign identifiers to bnodes in a
@@ -199,9 +202,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       Since statement indices are so cheap, it is probably worth implementing
  *       them now, even if only as a configuration option. (There may be reasons
  *       to maintain both versions.)
- * 
- * @todo verify read after commit (restart safe) for large data sets (multiple
- *       index partitions for scale-out and overflow for scale-out/scale-up).
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
@@ -261,12 +261,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     final protected boolean statementIdentifiers;
     
     /**
-     * Used to generate the compressed sort keys for the
-     * {@link #getTermIdIndex()}.
-     */
-    final protected RdfKeyBuilder keyBuilder;
-    
-    /**
      * A copy of properties used to configure the {@link ITripleStore}.
      */
     final protected Properties properties;
@@ -296,7 +290,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @version $Id$
      */
     public static interface Options extends InferenceEngine.Options,
-            com.bigdata.journal.Options, KeyBuilder.Options {
+            com.bigdata.journal.Options, KeyBuilder.Options, DataLoader.Options {
 
         /**
          * Boolean option (default <code>true</code>) enables support for the
@@ -434,16 +428,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
         addNamespace(OWL.NAMESPACE, "owl");
-        addNamespace(XmlSchema.NAMESPACE, "xsd");
-        
-        if (lexicon) {
-            // unicode enabled.
-            keyBuilder = new RdfKeyBuilder(KeyBuilder
-                    .newUnicodeInstance(properties));
-        } else {
-            // no unicode support.
-            keyBuilder = new RdfKeyBuilder(KeyBuilder.newInstance());
-        }
+        addNamespace(XMLSchema.NAMESPACE, "xsd");
         
     }
     
@@ -511,22 +496,48 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     abstract public boolean isStable();
 
     /**
-     * Return the shared {@link RdfKeyBuilder} instance for this client. The
-     * object will be compatible with the Unicode preferences that are in effect
-     * for the {@link ITripleStore}.
+     * Return a newly allocated {@link RdfKeyBuilder} instance for this client.
+     * The object will be compatible with the Unicode preferences that are in
+     * effect for the {@link ITripleStore}.
      * <p>
      * Note: This object is NOT thread-safe.
      * 
-     * @todo Consider making this a {@link ThreadLocal} to avoid hassels with
+     * @todo Consider making this a {@link ThreadLocal} to avoid hassles with
      *       access by multiple threads. Note however that only the term:id
      *       index requires Unicode support.
      */
     final public RdfKeyBuilder getKeyBuilder() {
+     
+        RdfKeyBuilder keyBuilder = (RdfKeyBuilder)threadLocalKeyBuilder.get();
+        
+        if(keyBuilder==null) {
+            
+            throw new AssertionError();
+            
+        }
         
         return keyBuilder;
-        
+
     }
     
+    // Note: not static since we need configuration properties.
+    private ThreadLocal threadLocalKeyBuilder = new ThreadLocal() {
+
+        protected synchronized Object initialValue() {
+
+            if (lexicon) {
+                // unicode enabled.
+                return new RdfKeyBuilder(KeyBuilder
+                        .newUnicodeInstance(properties));
+            } else {
+                // no unicode support
+                return new RdfKeyBuilder(KeyBuilder.newInstance());
+            }
+
+        }
+
+    };
+
     /**
      * Create and return a new collator object responsible for encoding unicode
      * strings into sort keys.
@@ -638,25 +649,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    /**
-     * Batch insert of terms into the database.
-     * 
-     * @param terms
-     *            An array whose elements [0:nterms-1] will be inserted.
-     * @param numTerms
-     *            The #of terms to insert.
-     * @param haveKeys
-     *            True if the terms already have their sort keys.
-     * @param sorted
-     *            True if the terms are already sorted by their sort keys (in
-     *            the correct order for a batch insert).
-     * 
-     * @exception IllegalArgumentException
-     *                if <code>!haveKeys && sorted</code>.
-     */
-    abstract public void insertTerms(_Value[] terms, int numTerms,
-            boolean haveKeys, boolean sorted);
-
     final public IIndex getStatementIndex(KeyOrder keyOrder) {
 
         switch (keyOrder) {
@@ -698,11 +690,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     final public int getURICount() {
         
-        byte[] fromKey = keyBuilder.keyBuilder.reset().append(
-                RdfKeyBuilder.CODE_URI).getKey();
+        byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_URI) };
 
-        byte[] toKey = keyBuilder.keyBuilder.reset().append(
-                RdfKeyBuilder.CODE_LIT).getKey();
+        byte[] toKey = new byte[] { KeyBuilder.encodeByte((byte)(RdfKeyBuilder.TERM_CODE_URI+1))};
         
         return getTermIdIndex().rangeCount(fromKey,toKey);
         
@@ -710,26 +700,179 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     
     final public int getLiteralCount() {
         
-        byte[] fromKey = keyBuilder.keyBuilder.reset().append(
-                RdfKeyBuilder.CODE_LIT).getKey();
+        // Note: the first of the kinds of literals (plain).
+        byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_LIT) };
 
-        byte[] toKey = keyBuilder.keyBuilder.reset().append(
-                RdfKeyBuilder.CODE_BND).getKey();
-        
+        // Note: spans the last of the kinds of literals.
+        byte[] toKey = new byte[] { KeyBuilder.encodeByte((byte)(RdfKeyBuilder.TERM_CODE_DTL+1))};
+                
         return getTermIdIndex().rangeCount(fromKey,toKey);
         
     }
     
     final public int getBNodeCount() {
         
-        byte[] fromKey = keyBuilder.keyBuilder.reset().append(
-                RdfKeyBuilder.CODE_BND).getKey();
+        byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_BND) };
 
-        byte[] toKey = keyBuilder.keyBuilder.reset().append(
-                (byte) (RdfKeyBuilder.CODE_BND + 1)).getKey();
-        
+        byte[] toKey = new byte[] { KeyBuilder.encodeByte((byte)(RdfKeyBuilder.TERM_CODE_BND+1))};
+                
         return getTermIdIndex().rangeCount(fromKey,toKey);
         
+    }
+
+    /*
+     * term index
+     */
+
+    /**
+     * Delegates to the batch API.
+     */
+    public long addTerm(Value value) {
+
+        final _Value[] terms = new _Value[] {//
+                
+             OptimizedValueFactory.INSTANCE.toNativeValue(value) //
+
+        };
+    
+        addTerms(getKeyBuilder(), terms, 1);
+            
+        return terms[0].termId;
+            
+    }
+    
+    /**
+     * Recently resolved term identifers are cached to improve performance when
+     * externalizing statements.
+     * 
+     * @todo consider using this cache in the batch API as well or simply modify
+     *       the {@link StatementBuffer} to use a term {@link Cache} in order to
+     *       minimize the #of terms that it has to resolve against the indices -
+     *       this especially matters for the scale-out implementation.
+     */
+    protected LRUCache<Long, _Value> termCache = new LRUCache<Long, _Value>(10000);
+       
+    /**
+     * Note: This specializes the return to {@link _Value}. This keeps the
+     * {@link ITripleStore} interface cleaner while imposes the actual semantics
+     * on all implementation of this class.
+     * <p>
+     * Note: Handles both unisolatable and isolatable indices.
+     * <P>
+     * Note: Sets {@link _Value#termId} and {@link _Value#known} as
+     * side-effects.
+     */
+    final public _Value getTerm(long id) {
+
+        _Value value = termCache.get(id);
+        
+        if (value != null) {
+
+            return value;
+            
+        }
+        
+        final IIndex ndx = getIdTermIndex();
+        
+        final boolean isolatableIndex = ndx.isIsolatable();
+        
+        KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+        
+        // Note: shortcut for keyBuilder.id2key(id)
+        final byte[] key = keyBuilder.reset().append(id).getKey();
+        
+        final Object data = ndx.lookup( key );
+
+        if (data == null) {
+
+            return null;
+            
+        }
+
+        value = (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
+        
+        termCache.put(id, value, false/*dirty*/);
+        
+        // @todo modify unit test to verify that these fields are being set.
+
+        value.termId = id;
+        
+        value.known = true;
+        
+        return value;
+
+    }
+    
+    /**
+     * Note: Handles both unisolatable and isolatable indices.
+     * <p>
+     * Note: If {@link _Value#key} is set, then that key is used. Otherwise the
+     * key is computed and set as a side effect.
+     * <p>
+     * Note: If {@link _Value#termId} is set, then returns that value
+     * immediately. Otherwise looks up the termId in the index and sets
+     * {@link _Value#termId} as a side-effect.
+     */
+    final public long getTermId(Value value) {
+
+        if (value == null) {
+
+            return IRawTripleStore.NULL;
+            
+        }
+        
+        final _Value val = (_Value) OptimizedValueFactory.INSTANCE
+                .toNativeValue(value);
+        
+        if (val.termId != IRawTripleStore.NULL) {
+
+            return val.termId;
+            
+        }
+
+        final IIndex ndx = getTermIdIndex();
+        
+        final boolean isolatableIndex = ndx.isIsolatable();
+
+        if (val.key == null) {
+
+            // generate key iff not on hand.
+            val.key = getKeyBuilder().value2Key(val);
+            
+        }
+        
+        // lookup in the forward index.
+        final Object tmp = ndx.lookup(val.key);
+        
+        if (tmp == null) {
+
+            return IRawTripleStore.NULL;
+            
+        }
+        
+        if (isolatableIndex) {
+            
+            try {
+
+                val.termId = new DataInputBuffer((byte[])tmp).unpackLong();
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+            
+        } else {
+
+            val.termId = (Long) tmp;
+
+        }
+
+        // was found in the forward mapping.
+        val.known = true;
+        
+        return val.termId;
+
     }
 
     /*
@@ -872,7 +1015,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param o
      * @return
      */
-    public StatementWithType getStatement(Resource s, URI p, Value o) {
+    public StatementWithType getStatement(Resource s, URI p, Value o) throws SailException {
 
         if(s == null || p == null || o == null) {
             
@@ -880,8 +1023,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
         
-        StatementIterator itr = getStatements(s, p, o);
-
+        final StatementIterator itr = getStatements(s, p, o);
+        
         try {
 
             if (!itr.hasNext()) {
@@ -1110,6 +1253,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         final long s, p, o;
         
         final KeyOrder keyOrder;
+
+        /**
+         * A private key builder for thread-safety whose initial capacity is
+         * sufficient for the statement index keys.
+         */
+        final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder(N
+                * Bytes.SIZEOF_LONG));
         
         final byte[] fromKey;
         
@@ -1761,7 +1911,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          *       parallelized. The only possibility for conflict is when the
          *       last distinct term identifier is read from one index before the
          *       right sibling index partition has reported its first distinct
-         *       term identifier.
+         *       term identifier.  We could withhold the first result from each
+         *       partition until the partition that proceeds it in the metadata
+         *       index has completed, which would give nearly full parallelism.
          *       <p>
          *       If the indices are range partitioned and distinct + ordered is
          *       required, then the operation can not be parallelized, or if it
@@ -1802,7 +1954,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 //                
 //                final long id = tmp[0];
                 
-                final long id = KeyBuilder.decodeLong( key, 1);
+                final long id = KeyBuilder.decodeLong( key, 0);
                 
                 // append tmp[0] to the output list.
                 ids.add(id);
@@ -1861,7 +2013,76 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         return Collections.unmodifiableMap(uriToPrefix);
         
     }
+    
+    /**
+     * Return the namespace for the given prefix.
+     * 
+     * @param prefix
+     *            The prefix.
+     *            
+     * @return The associated namespace -or- <code>null</code> if no namespace
+     *         was mapped to that prefix.
+     */
+    final public String getNamespace(String prefix) {
 
+        // Note: this is not an efficient operation.
+        Iterator<Map.Entry<String/*namespace*/,String/*prefix*/>> itr = uriToPrefix.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            Map.Entry<String/*namespace*/,String/*prefix*/> entry = itr.next();
+            
+            if(entry.getValue().equals(prefix)) {
+                
+                return entry.getKey();
+                
+            }
+            
+        }
+        
+        return null;
+
+    }
+    
+    /**
+     * Removes the namespace associated with the prefix.
+     * 
+     * @param prefix
+     *            The prefix.
+     * @return The namespace associated with that prefic (if any) and
+     *         <code>null</code> otherwise.
+     */
+    final public String removeNamespace(String prefix) {
+        
+        Iterator<Map.Entry<String/*namespace*/,String/*prefix*/>> itr = uriToPrefix.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            Map.Entry<String/*namespace*/,String/*prefix*/> entry = itr.next();
+            
+            if(entry.getValue().equals(prefix)) {
+                
+                itr.remove();
+                
+                return entry.getKey();
+                
+            }
+            
+        }
+        
+        return null;
+        
+    }
+
+    /**
+     * Clears the namespace map.
+     */
+    final public void clearNamespaces() {
+        
+        uriToPrefix.clear();
+        
+    }
+    
     final public String toString( long s, long p, long o ) {
         
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o) +" >");
@@ -1889,19 +2110,19 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public boolean isLiteral( long termId ) {
         
-        return (termId & TERMID_CODE_MASK) == CODE_LITERAL;
+        return (termId & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
         
     }
 
     final public boolean isBNode( long termId ) {
         
-        return (termId & TERMID_CODE_MASK) == CODE_BNODE;
+        return (termId & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
         
     }
 
     final public boolean isURI( long termId ) {
         
-        return (termId & TERMID_CODE_MASK) == CODE_URI;
+        return (termId & TERMID_CODE_MASK) == TERMID_CODE_URI;
         
     }
 
@@ -1916,22 +2137,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final public boolean isStatement( long termId ) {
         
-        return (termId & TERMID_CODE_MASK) == CODE_STATEMENT;
+        return (termId & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
         
     }
-
-    /**
-     * Specialize the return to {@link _Value}. This keeps the
-     * {@link ITripleStore} interface cleaner while imposes the actual semantics
-     * on all implementation of this class.
-     * 
-     * @todo Add getTerm(s,p,o) or getTerm(SPO) returning _Value[] to batch each
-     *       statement lookup so that we do less RPCs in a distributed system.
-     *       <p>
-     *       Note: Implementations of {@link #getTerm(long)} are already supposed
-     *       to be caching recently resolved terms.
-     */
-    abstract public _Value getTerm(long id);
 
     final public String toString( long termId ) {
 
@@ -1955,7 +2163,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     final private String abbrev( URI uri ) {
         
-        String uriString = uri.getURI();
+        String uriString = uri.toString();
         
 //        final int index = uriString.lastIndexOf('#');
 //        
@@ -2260,13 +2468,15 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     public String usage() {
 
-        return usage(name_termId, getTermIdIndex())
+        return "usage summary: class="+getClass().getSimpleName()+"\n"+
+               "\nsummary by index::\n"
+                + "\n"+usage(name_termId, getTermIdIndex())
                 + "\n"+usage(name_idTerm, getIdTermIndex())
                 + "\n"+usage(name_spo, getSPOIndex())
                 + "\n"+usage(name_pos, getPOSIndex())
                 + "\n"+usage(name_osp, getOSPIndex())
-                + "\n"+usage(name_just, getJustificationIndex()
-                        );
+                + "\n"+usage(name_just, getJustificationIndex())
+        ;
         
     }
 
@@ -2289,20 +2499,22 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
         
-        if (ndx instanceof BTree) {
-
-            BTree btree = (BTree) ndx;
-
-            return name+" : "+btree.getStatistics();
-            
-        } else {
-
-            // Note: this is only an estimate if the index is a view.
-            final int nentries = ndx.rangeCount(null, null);
-
-            return (name+": #entries(est)="+nentries);
-            
-        }
+        return name + " : "+ndx.getStatistics();
+        
+//        if (ndx instanceof BTree) {
+//
+//            BTree btree = (BTree) ndx;
+//
+//            return name+" : "+btree.getStatistics();
+//            
+//        } else {
+//
+//            // Note: this is only an estimate if the index is a view.
+//            final int nentries = ndx.rangeCount(null, null);
+//
+//            return (name+": #entries(est)="+nentries);
+//            
+//        }
         
     }
 
@@ -2489,7 +2701,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     public static class JustificationWriter implements Callable<Long>{
 
-        /**The database on which to write the justifications. */
+        /**
+         * The database on which to write the justifications.
+         */
         private final AbstractTripleStore dst;
 
         /**
@@ -2557,7 +2771,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
-    public int addStatements(ISPOIterator itr, ISPOFilter filter) {
+    public int addStatements(ISPOIterator itr, final ISPOFilter filter) {
 
         try {
         
@@ -2593,9 +2807,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 final AtomicLong insertTime = new AtomicLong(0);
 
                 /**
-                 * Writes on one of the statement indices.
-                 * 
-                 * @return The elapsed time for the operation.
+                 * Writes an {@link SPO}[] on one of the statement indices.
                  * 
                  * @author <a
                  *         href="mailto:thompsonbry@users.sourceforge.net">Bryan
@@ -2612,18 +2824,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     private final KeyOrder keyOrder;
 
-                    private final ISPOFilter filter;
-
-                    /*
+                    /**
                      * Private key builder for the SPO, POS, or OSP keys (one
                      * instance per thread).
                      */
                     private final RdfKeyBuilder keyBuilder = new RdfKeyBuilder(
                             new KeyBuilder(N * Bytes.SIZEOF_LONG));
-
-                    private final byte[][] keys;
-
-                    // private final byte[][] vals;
 
                     /**
                      * Writes statements on a statement index (batch api).
@@ -2664,20 +2870,24 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         this.ndx = getStatementIndex(keyOrder);
 
-                        this.keys = new byte[numStmts][];
+//                        this.keys = new byte[numStmts][];
 
                         // this.vals = new byte[numStmts][];
 
                         this.keyOrder = keyOrder;
 
-                        this.filter = filter;
-
                     }
 
                     /**
+                     * Write the statements on the appropriate statement index.
+                     * <p>
+                     * Note: This method is designed to NOT write on the index
+                     * unless either the statement is new or the value
+                     * associated with the statement has been changed. This
+                     * helps to keep down the IO costs associated with index
+                     * writes when the data are already in the index.
                      * 
-                     * Note: Changes here MUST also be made to the IndexWriter
-                     * class for Sesame model Statements.
+                     * @return The elapsed time for the operation.
                      */
                     public Long call() throws Exception {
 
@@ -2685,7 +2895,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         { // sort
 
-                            long _begin = System.currentTimeMillis();
+                            final long _begin = System.currentTimeMillis();
 
                             Arrays.sort(stmts, 0, numStmts, comparator);
 
@@ -2694,165 +2904,143 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         }
 
-                        { // load
+                        /*
+                         * Generate keys for the statements to be added.
+                         * 
+                         * Note: This also filters out duplicate statements
+                         * (since the data are sorted duplicates will be grouped
+                         * together) and, if a filter has been specified, that
+                         * filter is used to filter out any matching statements.
+                         * 
+                         * The outcome is that both keys[] and vals[] are dense
+                         * and encode only the statements to be written on the
+                         * index. Only the 1st [numToAdd] entries in those
+                         * arrays contain valid data.
+                         * 
+                         * @todo write a unit test in which we verify: (a) the
+                         * correct elimination of duplicate statements; (b) the
+                         * correct filtering of statements; and (c) the correct
+                         * application of the override flag.
+                         */
 
-                            long _begin = System.currentTimeMillis();
+                        int numToAdd = 0;
 
-                            int numToAdd = 0;
+                        SPO last = null;
+
+                        final byte[][] keys = new byte[numStmts][];
+
+                        final byte[][] vals = new byte[numStmts][];
+
+                        for (int i = 0; i < numStmts; i++) {
+
+                            final SPO spo = stmts[i];
+
+                            // skip statements that match the filter.
+                            if (filter != null && filter.isMatch(spo))
+                                continue;
+
+                            // skip duplicate records.
+                            if (last != null && last.equals(spo))
+                                continue;
+
+                            // generate key for the index.
+                            keys[numToAdd] = keyBuilder.statement2Key(keyOrder, spo);
                             
-                            int writeCount = 0;
-
-                            SPO last = null;
-
-                            for (int i = 0; i < numStmts; i++) {
-
-                                final SPO spo = stmts[i];
-
-                                // skip statements that match the filter.
-                                if (filter != null && filter.isMatch(spo))
-                                    continue;
-
-                                // skip duplicate records.
-                                if (last != null && last.equals(spo))
-                                    continue;
-
-                                keys[numToAdd] = keyBuilder.statement2Key(
-                                        keyOrder, spo);
-
-                                last = spo;
-
-                                numToAdd++;
-
+                            // generate value for the index.
+                            vals[numToAdd] = spo.type.serialize();
+                            
+                            if(spo.override) {
+                                
+                                // set the override bit on the value.
+                                vals[numToAdd][0] |= StatementEnum.MASK_OVERRIDE;
+                                
                             }
 
-                            if (false) {
+                            last = spo;
+
+                            numToAdd++;
+
+                        }
+                        
+                        /*
+                         * Run the batch insert/update logic as a procedure.
+                         * 
+                         * @todo use efficient compression on the serialized
+                         * form when the index is remote (bit coded longs based
+                         * on frequency, e.g., hamming or hu-tucker).
+                         */
+                        final int writeCount;
+                        {
+                            
+                            final long _begin = System.currentTimeMillis();
+
+                            if(ndx instanceof ClientIndexView ) {
 
                                 /*
-                                 * @todo allow client to send null for the
-                                 * values when (a) they are inserting [null]
-                                 * values under the keys; and (b) they do not
-                                 * need the old values back.
-                                 * 
-                                 * FIXME This needs to be a custom batch
-                                 * operation using a conditional insert so that
-                                 * we do not write on the index when the data
-                                 * would not be changed. Once this is working
-                                 * again consider switching the embedded system
-                                 * over to the same custom batch operation but
-                                 * do some tests to figure out if it is
-                                 * essentially the same cost for the embedded
-                                 * database scenario.
-                                 * 
-                                 * @todo Also modify to write the StatementEnum
-                                 * flags, which need to be upgraded to the max
-                                 * of the old and new values when the statement
-                                 * is pre-existing, e.g., a custom batch
-                                 * operation.
+                                 * The index is remote so we use a procedure
+                                 * that knows how to transparently break down
+                                 * the operation by index partition and
+                                 * aggregate the results (the write count) across
+                                 * the partitions.
                                  */
-
-                                // BatchInsert op = new BatchInsert(numToAdd, keys, vals);
-                                //
-                                // ndx.insert(op);
                                 
-                            } else {
+                                final AutoSplitProcedure proc = new AutoSplitProcedure<Integer>(
+                                        numToAdd, keys, vals) {
 
-                                /*
-                                 * This approach is fine for an embedded
-                                 * database but it is no good for a distributed
-                                 * system since it will make [n] RPCs.
-                                 */
+                                    private static final long serialVersionUID = 6443391265516358978L;
 
-                                for (int i = 0; i < numToAdd; i++) {
-
-                                    SPO spo = stmts[i];
+                                    private AtomicInteger nwritten = new AtomicInteger(0);
                                     
-                                    byte[] oldval = (byte[]) ndx
-                                            .lookup(keys[i]);
-
-                                    if (oldval == null) {
-
-                                        /*
-                                         * Statement is NOT pre-existing.
-                                         */
+                                    protected IProcedure newProc(Split split) {
                                         
-                                        ndx.insert(keys[i], spo.type
-                                                .serialize());
+                                        return new IndexWriteProc(
+                                                split.ntuples, split.fromIndex,
+                                                keys, vals);
 
-                                        writeCount++;
-
-                                    } else {
-
-                                        /* 
-                                         * Statement is pre-existing.
-                                         */
+                                    }
+                                    
+                                    protected void aggregate(Integer result, Split split) {
                                         
-                                        // old statement type.
-                                        StatementEnum oldType = StatementEnum
-                                                .deserialize(oldval);
-
-                                        if (spo.override) {
-                                            
-                                            if (oldType != spo.type) {
-                                                
-                                                /*
-                                                 * We are downgrading a
-                                                 * statement from explicit to
-                                                 * inferred during TM
-                                                 */
-                                                
-                                                ndx.insert(keys[i], spo.type
-                                                        .serialize());
-
-                                                writeCount++;
-
-                                            }
-                                                                                
-                                        } else {
-
-                                            // proposed statement type.
-                                            StatementEnum newType = spo.type;
-
-                                            // choose the max of the old and the
-                                            // proposed.
-                                            StatementEnum maxType = StatementEnum
-                                                    .max(oldType, newType);
-
-                                            if (oldType != maxType) {
-
-                                                /*
-                                                 * write on the index iff the
-                                                 * type was actually changed.
-                                                 */
-
-                                                ndx.insert(keys[i], maxType
-                                                        .serialize());
-
-                                                writeCount++;
-
-                                            }
-
-                                        }
+                                        nwritten.addAndGet(result.intValue());
                                         
                                     }
-
-                                }
-
-                            }
-
-                            insertTime.addAndGet(System.currentTimeMillis()
-                                    - _begin);
-
-                            if (keyOrder == KeyOrder.SPO) {
-
+                                    
+                                    protected Object getResult() {
+                                        
+                                        return Integer.valueOf(nwritten.get());
+                                        
+                                    }
+                                    
+                                };
+                                
+                                writeCount = (Integer) proc.apply(ndx);
+                                
+                            } else {
+                                
                                 /*
-                                 * One task takes responsibility for reporting
-                                 * the #of statements that were written on the
-                                 * indices.
+                                 * The index is local.
                                  */
 
-                                numWritten.addAndGet(writeCount);
-
+                                writeCount = (Integer) new IndexWriteProc(
+                                        numToAdd, 0 /*offset */, keys, vals)
+                                        .apply((IIndexWithCounter) ndx);
+                                
                             }
+                        
+                            insertTime.addAndGet(System.currentTimeMillis()
+                                - _begin);
+                            
+                        }
+
+                        if (keyOrder == KeyOrder.SPO) {
+
+                            /*
+                             * One task takes responsibility for reporting
+                             * the #of statements that were written on the
+                             * indices.
+                             */
+
+                            numWritten.addAndGet(writeCount);
 
                         }
 
@@ -2862,8 +3050,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     }
 
-                }
-
+                } // class IndexWriter
+                
                 List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
                 tasks.add(new IndexWriter(false/* clone */, KeyOrder.SPO,
@@ -2927,6 +3115,156 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
 
     }
+    
+    /**
+     * Procedure for batch index on a single statement index (or index
+     * partition).
+     * <p>
+     * The key for each statement encodes the {s:p:o} of the statement in the
+     * order that is appropriate for the index (SPO, POS, OSP, etc).
+     * <p>
+     * The value for each statement is a single byte that encodes the
+     * {@link StatementEnum} and also encodes whether or not the "override" flag
+     * is set.  See {@link SPO#override}.
+     * <p>
+     * Note: This needs to be a custom batch operation using a conditional
+     * insert so that we do not write on the index when the data would not be
+     * changed.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class IndexWriteProc extends Procedure {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3969394126242598370L;
+
+        protected AbstractCompression getCompression() {
+            
+            return FastRDFCompression.INSTANCE;
+            
+        }
+        
+        /**
+         * De-serialization constructor.
+         */
+        public IndexWriteProc() {
+            
+        }
+        
+        public IndexWriteProc(int n, int offset, byte[][] keys, byte[][] vals) {
+            
+            super( n, offset, keys, vals );
+            
+            assert vals != null;
+            
+        }
+
+        /**
+         * 
+         * @return The #of statements actually written on the index as an
+         *         {@link Integer}.
+         */
+        public Object apply(IIndex ndx) {
+
+            // #of statements actually written on the index partition.
+            int writeCount = 0;
+
+            final int n = getKeyCount();
+            
+            for (int i = 0; i < n; i++) {
+
+                // the key encodes the {s:p:o} of the statement.
+                final byte[] key = getKey(i);
+                assert key != null;
+
+                // the value encodes the statement type.
+                final byte[] val = getValue(i);
+                assert val != null;
+                assert val.length == 1;
+
+                // figure out if the override bit is set.
+                final boolean override = StatementEnum.isOverride(val[0]);
+
+                /*
+                 * Decode the new (proposed) statement type (override bit is
+                 * masked off).
+                 */
+                final StatementEnum newType = StatementEnum.decode(val[0]);
+
+                /*
+                 * The current statement type in this index partition (iff the
+                 * stmt is defined.
+                 */
+                final byte[] oldval = (byte[]) ndx.lookup(key);
+
+                if (oldval == null) {
+
+                    /*
+                     * Statement is NOT pre-existing.
+                     */
+
+                    ndx.insert(key, newType.serialize());
+
+                    writeCount++;
+
+                } else {
+
+                    /*
+                     * Statement is pre-existing.
+                     */
+
+                    // old statement type.
+                    final StatementEnum oldType = StatementEnum
+                            .deserialize(oldval);
+
+                    if (override) {
+
+                        if (oldType != newType) {
+
+                            /*
+                             * We are downgrading a statement from explicit to
+                             * inferred during TM
+                             */
+
+                            ndx.insert(key, newType.serialize());
+
+                            writeCount++;
+
+                        }
+
+                    } else {
+
+                        // choose the max of the old and the proposed type.
+                        final StatementEnum maxType = StatementEnum.max(
+                                oldType, newType);
+
+                        if (oldType != maxType) {
+
+                            /*
+                             * write on the index iff the type was actually
+                             * changed.
+                             */
+
+                            ndx.insert(key, maxType.serialize());
+
+                            writeCount++;
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            return Integer.valueOf(writeCount);
+
+        }
+        
+    } // class IndexWriteProcedure
 
     /**
      * Adds justifications to the store.
@@ -2946,6 +3284,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       an inference. Since writing the justification chains is such a
      *       source of latency, SLD/magic sets will translate into an immediate
      *       performance boost for data load.
+     * 
+     * FIXME We need to use a batch procedure to write the justifications when
+     * running against scale-out indices.
      */
     public int addJustifications(IChunkedIterator<Justification> itr) {
 
@@ -2965,30 +3306,90 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3)
                     * Bytes.SIZEOF_LONG);
 
-            IIndex ndx = getJustificationIndex();
-
             int nwritten = 0;
 
             while (itr.hasNext()) {
 
-                Justification[] a = itr.nextChunk();
+                final Justification[] a = itr.nextChunk();
+
+                final int n = a.length;
 
                 // sort into their natural order.
                 Arrays.sort(a);
+                
+                final byte[][] keys = new byte[n][];
+                
+                for (int i=0; i<n; i++) {
 
-                for (Justification jst : a) {
-
-                    byte[] key = jst.getKey(keyBuilder);
-
-                    if (!ndx.contains(key)) {
-
-                        ndx.insert(key, null);
-
-                        nwritten++;
-
-                    }
+                    final Justification jst = a[i];
+                    
+                    keys[i] = jst.getKey(keyBuilder);
 
                 }
+
+                /*
+                 * sort into their natural order.
+                 * 
+                 * @todo is it faster to sort the Justification[] or the keys[]?
+                 * See above for the alternative.
+                 */
+//                Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
+
+                final IIndex ndx = getJustificationIndex();
+
+                if(ndx instanceof ClientIndexView) {
+                
+                    final AutoSplitProcedure<Integer> proc = new AutoSplitProcedure<Integer>(
+                            n, keys, null/*vals*/) {
+
+                        AtomicInteger nwritten = new AtomicInteger(0);
+                        
+                        protected IProcedure newProc(Split split) {
+                            
+                            return new WriteJustificationsProc(split.ntuples,
+                                    split.fromIndex, keys);
+                            
+                        }
+                        
+                        protected void aggregate(Integer result,Split split) {
+                            
+                            nwritten.addAndGet(result);
+                            
+                        }
+                        
+                        protected Object getResult() {
+                            
+                            return Integer.valueOf(nwritten.get());
+                            
+                        }
+                        
+                    };
+                    
+                    nwritten += ((Integer)proc.apply(ndx)).intValue();
+                    
+                } else {
+                    
+                    // minor optimization.
+                    
+                    final Procedure proc = new WriteJustificationsProc(n,0,keys);
+
+                    nwritten += ((Integer)proc.apply(ndx)).intValue();
+                    
+                }
+                
+//                for (Justification jst : a) {
+//
+//                    byte[] key = jst.getKey(keyBuilder);
+//
+//                    if (!ndx.contains(key)) {
+//
+//                        ndx.insert(key, null/*no value*/);
+//
+//                        nwritten++;
+//
+//                    }
+//
+//                }
 
             }
 
@@ -3007,6 +3408,65 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
+    /**
+     * Procedure for writing {@link Justification}s on an index or index
+     * partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class WriteJustificationsProc extends Procedure {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -7469842097766417950L;
+
+        /**
+         * De-serialization constructor.
+         *
+         */
+        public WriteJustificationsProc() {
+            
+            super();
+            
+        }
+        
+        public WriteJustificationsProc(int n, int offset, byte[][] keys) {
+            
+            super(n, offset, keys, null/* vals */);
+            
+        }
+        
+        /**
+         * @return The #of justifications actually written on the index.
+         */
+        public Object apply(IIndex ndx) {
+
+            int nwritten = 0;
+            
+            int n = getKeyCount();
+            
+            for (int i=0; i<n; i++) {
+
+                byte[] key = getKey( i );
+
+                if (!ndx.contains(key)) {
+
+                    ndx.insert(key, null/* no value */);
+
+                    nwritten++;
+
+                }
+
+            }
+            
+            return Integer.valueOf(nwritten);
+            
+        }
+        
+    }
+    
     /**
      * Return true iff there is a grounded justification chain in the database
      * for the {@link SPO}.
@@ -3116,7 +3576,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    protected Analyzer getAnalyzer(String languageCode) {
+    protected Analyzer getAnalyzer(KeyBuilder keyBuilder,String languageCode) {
         
         Map<String,Analyzer> map = getAnalyzers();
         
@@ -3125,10 +3585,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if(languageCode==null) {
             
             // The configured local for the database.
-            Locale locale = ((KeyBuilder)keyBuilder.keyBuilder).getSortKeyGenerator().getLocale();
+            Locale locale = keyBuilder.getSortKeyGenerator().getLocale();
             
             // The analyzer for that locale.
-            a = getAnalyzer(locale.getLanguage());
+            a = getAnalyzer(keyBuilder,locale.getLanguage());
             
         } else {
             
@@ -3555,7 +4015,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          * @todo is this stripping out stopwords by default regardless of
          * the language family and yet in a language family specific manner?
          */
-        final Analyzer a = getAnalyzer(languageCode);
+        final Analyzer a = getAnalyzer((KeyBuilder)getKeyBuilder().keyBuilder,languageCode);
         
         TokenStream tokenStream = a.tokenStream(null/*field*/, new StringReader(text));
         

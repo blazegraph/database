@@ -32,7 +32,7 @@ import java.util.Set;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -154,7 +154,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             URI MyRange = new URIImpl("http://www.foo.org/MyRange");
 
-            buffer.add(A, URIImpl.RDFS_RANGE, B);
+            buffer.add(A, RDFS.RANGE, B);
             
             buffer.add(C, MyRange, D);
             
@@ -163,7 +163,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             
             // verify the database.
             
-            assertTrue(store.hasStatement(A,URIImpl.RDFS_RANGE,B));
+            assertTrue(store.hasStatement(A,RDFS.RANGE,B));
             
             assertTrue(store.hasStatement(C,MyRange,D));
 
@@ -180,7 +180,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
             Set<Long> R = new HashSet<Long>();
             
-            R.add(store.getTermId(URIImpl.RDFS_RANGE));
+            R.add(store.getTermId(RDFS.RANGE));
             
             R.add(store.getTermId(MyRange));
 
@@ -196,7 +196,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
             // told.
             
-            assertTrue(store.hasStatement(A, URIImpl.RDFS_RANGE, B));
+            assertTrue(store.hasStatement(A, RDFS.RANGE, B));
 
             assertTrue(store.hasStatement(C, MyRange, D));
 
@@ -210,7 +210,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
              * entail itself.
              */
 
-            assertTrue(store.hasStatement(C, URIImpl.RDFS_RANGE, D));
+            assertTrue(store.hasStatement(C, RDFS.RANGE, D));
             
         } finally {
             

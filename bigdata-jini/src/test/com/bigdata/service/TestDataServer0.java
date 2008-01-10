@@ -32,7 +32,8 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
-import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IProcedure;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IResourceMetadata;
 
@@ -299,7 +300,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
 
         }
 
-        public Object apply(IIndexWithCounter ndx) {
+        public Object apply(IIndex ndx) {
 
             return new Integer(ndx.rangeCount(null, null));
 

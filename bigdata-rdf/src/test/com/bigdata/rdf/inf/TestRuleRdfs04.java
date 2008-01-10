@@ -33,8 +33,8 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPOFilter;
@@ -89,8 +89,8 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             URI U = new URIImpl("http://www.foo.org/U");
             URI A = new URIImpl("http://www.foo.org/A");
             URI X = new URIImpl("http://www.foo.org/X");
-            URI rdfType = new URIImpl(RDF.TYPE);
-            URI rdfsResource = new URIImpl(RDFS.RESOURCE);
+            URI rdfType = RDF.TYPE;
+            URI rdfsResource = RDFS.RESOURCE;
 
             store.addStatement(U, A, X);
 
@@ -135,8 +135,8 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
             URI U = new URIImpl("http://www.foo.org/U");
             URI A = new URIImpl("http://www.foo.org/A");
             URI V = new URIImpl("http://www.foo.org/V");
-            URI rdfType = new URIImpl(RDF.TYPE);
-            URI rdfsResource = new URIImpl(RDFS.RESOURCE);
+            URI rdfType = RDF.TYPE;
+            URI rdfsResource = RDFS.RESOURCE;
 
             store.addStatement(U, A, V);
 
@@ -182,8 +182,8 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
             URI A = new URIImpl("http://www.foo.org/A");
             Literal C = new LiteralImpl("C");
-            URI rdfType = new URIImpl(RDF.TYPE);
-            URI rdfsResource = new URIImpl(RDFS.RESOURCE);
+            URI rdfType = RDF.TYPE;
+            URI rdfsResource = RDFS.RESOURCE;
 
             store.addStatement(A, rdfType, C);
 

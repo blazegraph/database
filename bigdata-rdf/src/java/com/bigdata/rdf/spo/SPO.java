@@ -45,12 +45,12 @@ public class SPO {
     
     private transient static final long NULL = IRawTripleStore.NULL;
     
-    /**
-     * @see RdfKeyBuilder#CODE_STMT
-     * @see RdfKeyBuilder#CODE_PRED
-     * @see RdfKeyBuilder#CODE_RULE
-     */
-    public final byte code;
+//    /**
+//     * @see RdfKeyBuilder#CODE_STMT
+//     * @see RdfKeyBuilder#CODE_PRED
+//     * @see RdfKeyBuilder#CODE_RULE
+//     */
+//    public final byte code;
     public final long s;
     public final long p;
     public final long o;
@@ -81,7 +81,7 @@ public class SPO {
      */
     public SPO(long s, long p, long o, StatementEnum type) {
         assert type != null;
-        this.code = RdfKeyBuilder.CODE_STMT;
+//        this.code = RdfKeyBuilder.CODE_STMT;
         this.s = s;
         this.p = p;
         this.o = o;
@@ -131,16 +131,22 @@ public class SPO {
          * Note: GTE since the key is typically a reused buffer which may be
          * larger than the #of bytes actually holding valid data.
          */
-        assert key.length >= 8 * IRawTripleStore.N + 1;
+        assert key.length >= 8 * IRawTripleStore.N;
 //      assert key.length == 8 * IRawTripleStore.N + 1;
         
-        code = KeyBuilder.decodeByte(key[0]);
+//        code = KeyBuilder.decodeByte(key[0]);
+//        
+//        final long _0 = KeyBuilder.decodeLong(key, 1);
+//      
+//        final long _1 = KeyBuilder.decodeLong(key, 1+8);
+//      
+//        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
         
-        final long _0 = KeyBuilder.decodeLong(key, 1);
+        final long _0 = KeyBuilder.decodeLong(key, 0);
+        
+        final long _1 = KeyBuilder.decodeLong(key, 8);
       
-        final long _1 = KeyBuilder.decodeLong(key, 1+8);
-      
-        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
+        final long _2 = KeyBuilder.decodeLong(key, 8+8);
         
         switch (keyOrder) {
 
@@ -250,13 +256,11 @@ public class SPO {
          * Note: logic avoids possible overflow of [long] by not computing the
          * difference between two longs.
          */
-        int ret;
+//        int ret = stmt1.code - stmt2.code;
 
-        ret = stmt1.code - stmt2.code;
+//        if (ret == 0) {
 
-        if (ret == 0) {
-
-            ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
+            int ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
 
             if (ret == 0) {
 
@@ -270,7 +274,7 @@ public class SPO {
 
             }
 
-        }
+//        }
 
         return ret;
 
@@ -287,7 +291,8 @@ public class SPO {
         if (stmt2 == this)
             return true;
 
-        return this.code == stmt2.code && //
+        return
+//              this.code == stmt2.code && //
                 this.s == stmt2.s && //
                 this.p == stmt2.p && //
                 this.o == stmt2.o && //

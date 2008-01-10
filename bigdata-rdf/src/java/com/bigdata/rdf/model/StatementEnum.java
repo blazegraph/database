@@ -88,23 +88,68 @@ public enum StatementEnum {
         }
         
     }
+
+    /**
+     * Decode a byte into a {@link StatementEnum}.
+     * <p>
+     * Note: The override bit is masked off during this operation.
+     * 
+     * @param b
+     *            The byte.
+     *            
+     * @return The {@link StatementEnum} value.
+     */
+    static public StatementEnum decode(byte b) {
+
+        switch (b & ~MASK_OVERRIDE) {
+
+        case 0: return Explicit;
+        
+        case 1: return Axiom;
+        
+        case 2: return Inferred;
+        
+        default:
+            throw new RuntimeException("Unexpected byte: " + b);
+        
+        }
+
+    }
     
     static public StatementEnum deserialize(byte[] val) {
+        
         if(val.length!=1) {
+        
             throw new RuntimeException("Expecting one byte, not "+val.length);
+            
         }
-        switch(val[0]) {
-        case 0: return Explicit;
-        case 1: return Axiom;
-        case 2: return Inferred;
-        default: throw new RuntimeException("Unexpected byte: "+val[0]);
-        }
+        
+        return decode(val[0]);
         
     }
 
     public byte[] serialize() {
 
         return new byte[]{code};
+        
+    }
+
+    /**
+     * A bit mask used to isolate the bit that indicates that the existing
+     * statement type should be overriden thereby allowing the downgrade of a
+     * statement from explicit to inferred.
+     */
+    public static final int MASK_OVERRIDE = 0x1<<3;
+
+    /**
+     * Return <code>true</code> iff the override bit is set.
+     * 
+     * @param b
+     *            The byte.
+     */
+    public static boolean isOverride(byte b) {
+        
+        return (b & StatementEnum.MASK_OVERRIDE) == 1;
         
     }
     

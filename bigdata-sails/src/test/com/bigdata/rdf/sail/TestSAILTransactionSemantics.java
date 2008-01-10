@@ -62,7 +62,7 @@ public class TestSAILTransactionSemantics extends AbstractBigdataRdfRepositoryTe
     public void test_commit() {
 
         // 2nd SAIL wrapping a read-committed view of the same database.
-        BigdataRdfRepository view = repo.asReadCommittedView();
+        BigdataSailConnection view = repo.asReadCommittedView();
 
         repo.startTransaction();
         

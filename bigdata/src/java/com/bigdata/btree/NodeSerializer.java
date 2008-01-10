@@ -42,7 +42,6 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.ByteBufferOutputStream;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumError;
@@ -735,7 +734,7 @@ public class NodeSerializer {
         final int nbytes = buf.position() - pos0;
         assert nbytes > SIZEOF_NODE_HEADER;
         
-        ByteBuffer buf2 = ByteBuffer.wrap(buf.buf,0,nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(buf.array(),0,nbytes);
 
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
@@ -1068,7 +1067,7 @@ public class NodeSerializer {
         final int nbytes = buf.position() - pos0;
         assert nbytes > SIZEOF_LEAF_HEADER;
 
-        ByteBuffer buf2 = ByteBuffer.wrap(buf.buf,0,nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(buf.array(),0,nbytes);
         
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);

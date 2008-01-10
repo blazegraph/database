@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -41,9 +40,11 @@ import org.apache.log4j.MDC;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.StatementIterator;
-import org.openrdf.vocabulary.OWL;
+import org.openrdf.model.vocabulary.OWL;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.isolation.Value;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
@@ -55,7 +56,9 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.SesameStatementIterator;
+import com.bigdata.rdf.store.StatementIterator;
 import com.bigdata.rdf.store.StatementWithType;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
@@ -200,7 +203,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
             URI V = new URIImpl("http://www.bigdata.com/V");
             URI X = new URIImpl("http://www.bigdata.com/X");
 
-            URI rdfsSubClassOf = URIImpl.RDFS_SUBCLASSOF;
+            URI rdfsSubClassOf = RDFS.SUBCLASSOF;
 
             assertionBuffer.add(U, rdfsSubClassOf, V);
             assertionBuffer.add(V, rdfsSubClassOf, X);
@@ -246,7 +249,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         URI V = new URIImpl("http://www.bigdata.com/V");
         URI X = new URIImpl("http://www.bigdata.com/X");
 
-        URI rdfsSubClassOf = URIImpl.RDFS_SUBCLASSOF;
+        URI rdfsSubClassOf = RDFS.SUBCLASSOF;
 
         AbstractTripleStore store = getStore();
         
@@ -374,14 +377,14 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      * <p>
      * Delete a and verify that c is NOT gone since it is an explicit statement.
      */
-    public void test_retractWhenStatementSupportsExplicitStatement() {
+    public void test_retractWhenStatementSupportsExplicitStatement() throws SailException {
      
         URI user = new URIImpl("http://www.bigdata.com/user");
         URI currentGraph = new URIImpl("http://www.bigdata.com/currentGraph");
         URI foo = new URIImpl("http://www.bigdata.com/foo");
         URI graph = new URIImpl("http://www.bigdata.com/Graph");
-        URI rdftype = URIImpl.RDF_TYPE;
-        URI rdfsRange = URIImpl.RDFS_RANGE;
+        URI rdftype = RDF.TYPE;
+        URI rdfsRange = RDFS.RANGE;
 
         AbstractTripleStore store = getStore();
         
@@ -482,7 +485,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         URI b = new URIImpl("http://www.bigdata.com/b");
         URI c = new URIImpl("http://www.bigdata.com/c");
 //        URI d = new URIImpl("http://www.bigdata.com/d");
-        URI sco = URIImpl.RDFS_SUBCLASSOF;
+        URI sco = RDFS.SUBCLASSOF;
 
         AbstractTripleStore store = getStore();
         
@@ -570,8 +573,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         URI a = new URIImpl("http://www.bigdata.com/a");
         URI b = new URIImpl("http://www.bigdata.com/b");
         URI entity = new URIImpl("http://www.bigdata.com/Entity");
-        URI sameAs = new URIImpl( OWL.SAMEAS );
-        URI rdfType = URIImpl.RDF_TYPE;
+        URI sameAs = OWL.SAMEAS;
+        URI rdfType = RDF.TYPE;
 
         AbstractTripleStore store = getStore();
         
@@ -672,6 +675,12 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
         try {
             
+            if(store instanceof ScaleOutTripleStore) {
+                
+                fail("Waiting on distributed procedure for distinct term scan");
+                
+            }
+            
             /*
              * Note: overrides properties to make sure that entailments are
              * not computed on load.
@@ -716,7 +725,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 //            // very stressful.
 //            doStressTest(tmp, inf, 100/*ntrials*/, 10/*depth*/, 20/*nstmts*/);
             
-        } catch(IOException ex) {
+        } catch(Exception ex) {
             
             fail("Not expecting: "+ex, ex);
             
@@ -761,7 +770,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      *            retracted on each recursive pass.
      */
     public void doStressTest(TempTripleStore tmp, InferenceEngine inf,
-            int ntrials, int D, int N) {
+            int ntrials, int D, int N) throws SailException {
 
         AbstractTripleStore store = inf.database;
         
@@ -820,7 +829,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      * 
      */
     private void retractAndAssert(InferenceEngine inf, AbstractTripleStore db,
-            int depth, final int D, final int N) {
+            int depth, final int D, final int N) throws SailException {
 
         assert depth >= 0;
         assert depth < D;

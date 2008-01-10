@@ -39,7 +39,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
 import com.bigdata.service.ClientIndexView.Split;
 
 /**

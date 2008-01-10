@@ -29,27 +29,22 @@ package com.bigdata.rdf.store;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Properties;
-
-import org.openrdf.model.Value;
+import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IProcedure;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.MutableKeyBuffer;
-import com.bigdata.btree.MutableValueBuffer;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
-import com.bigdata.rdf.util.AddIds;
-import com.bigdata.rdf.util.AddTerms;
+import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.AutoSplitProcedure;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ClientIndexView.Split;
@@ -84,6 +79,23 @@ import com.bigdata.service.ClientIndexView.Split;
  * executed as part of a map-reduce job.
  * <p>
  * 
+ * FIXME refactor to run against either the concurrent journal API or the data
+ * service API and verify that load, inference, and query work correctly and
+ * that the memory cap on inference has been removed. Examine implementation for
+ * hidden performance costs (there should be no new performance hits when
+ * compared to the current scale-out version) and examine ways to reduce costs
+ * and increase parallelism -- if this works out nicely then we can converge the
+ * scale-out and local implementations! Test 1st on an embedded federation. Note
+ * that we will want to turn off auto-commit and index check points for index
+ * operations in order to be competitive with the bulk scale-out of the local
+ * implementation.
+ * 
+ * @todo test with indices split into more than one partition and with parallel
+ *       processing of batch operation and procedure splits using a thread pool.
+ * 
+ * @todo test with concurrent threads running load of many small files, such as
+ *       LUBM.
+ * 
  * @todo provide a mechanism to make document loading robust to client failure.
  *       When loads are unisolated, a client failure can result in the
  *       statements being loaded into only a subset of the statement indices.
@@ -94,6 +106,17 @@ import com.bigdata.service.ClientIndexView.Split;
  * @todo run various tests against all implementations and tune up the network
  *       protocol. Examine dictinary and hamming codes and parallelization of
  *       operations. Write a distributed join.
+ * 
+ * @todo write a stress test with concurrent threads inserting terms and having
+ *       occasional failures between the insertion into terms and the insertion
+ *       into ids and verify that the resulting mapping is always fully
+ *       consistent because the client verifies that the term is in the ids
+ *       mapping on each call to addTerm().
+ * 
+ * @todo write a performance test with (a) a single client thread; and (b)
+ *       concurrent clients/threads loaded terms into the KB and use it to tune
+ *       the batch load operations (there is little point to tuning the single
+ *       term load operations).
  * 
  * @todo Each unisolated write results in a commit. This means that a single
  *       client will run more slowly since it must perform more commits when
@@ -126,53 +149,222 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     /**
      * 
      */
-    public ScaleOutTripleStore(IBigdataFederation fed) {
+    public ScaleOutTripleStore(IBigdataFederation fed, Properties properties) {
 
-        // @todo pass in the Unicode configuration.
-        super(new Properties());
+        super( properties );
 
         if (fed == null)
             throw new IllegalArgumentException();
 
+        // @todo throw ex if client not connected to the federation.
+        
         this.fed = fed;
 
-        // @todo create indices iff necessary.
-        //
-        // createIndices();
+        /*
+         * Conditionally register the necessary indices.
+         * 
+         * @todo right now they are created when the federation is created.
+         */
+//        registerIndices();
         
     }
 
     /**
      * Register the indices.
      * 
-     * @todo this should be atomic and iff they do not exist.
+     * @todo default allocation of the terms, statements, and justifications
+     *       index (the latter iff justifications are configured). The default
+     *       allocation scheme should be based on expectations of data volume
+     *       written or read, the benefits of locality for the indices, and the
+     *       concurrency of read or write operations on those indices.
+     * 
+     * @todo handle exception if the index already exists.
+     * 
+     * @todo you should not be able to turn off the lexicon for the scale-out
+     *       triple store (or for the local triple store). That option only
+     *       makes sense for the {@link TempTripleStore}.
+     * 
+     * @todo registration of indices should be atomic. this can be achieved
+     *       using a procedure that runs once it has a lock on the resource
+     *       corresponding to each required scale-out index. At that point the
+     *       indices either will or will not exist and we can create them or
+     *       accept their pre-existence atomically.
      */
-    final private void createIndices() {
-        
-         fed.registerIndex(name_termId);
-         fed.registerIndex(name_idTerm);
+    final public void registerIndices() {
 
-         fed.registerIndex(name_spo);
-         fed.registerIndex(name_pos);
-         fed.registerIndex(name_osp);
-         
-         fed.registerIndex(name_just);
+        final IBigdataClient client = fed.getClient();
+        
+        // all known data service UUIDs.
+        final UUID[] uuids = client.getDataServiceUUIDs(0);
+    
+        if (false && uuids.length == 2 && lexicon && !oneAccessPath) {
+
+            /*
+             * Special case for (2) data services attempts to balance the write
+             * volume and concurrent write load for the indices.
+             * 
+             * dataService0: terms, spo
+             * 
+             * dataService1: ids, pos, osp, just (if used)
+             * 
+             * @todo This appears to slow things down slightly when loading
+             * Thesaurus.owl. Try again with a concurrent load scenario and see
+             * what interaction may be occurring with group commit. Also look at
+             * the effect of check pointing indices (rather than doing a commit)
+             * and of either check pointing nor committing groups (a special
+             * procedure could be used to do a commit) in order to simulate the
+             * best case scenario for continuous index load. (Both check point
+             * and commit may help to keep down GC since they will limit the
+             * life span of a mutable btree node, but they will mean more IO
+             * unless we retain nodes on a read retention queue for the index
+             * and in any case it will mean more conversion of immutable nodes
+             * back to mutable nodes.)
+             */
+
+            log.warn("Special case allocation for two data services");
+            
+            fed.registerIndex(name_termId, new byte[][] { new byte[] {} },
+                    new UUID[] { uuids[0] });
+            
+            fed.registerIndex(name_idTerm, new byte[][] { new byte[] {} },
+                    new UUID[] { uuids[1] });
+            
+            if(justify) {
+                /*
+                 * @todo review this decision when tuning the scale-out store
+                 * for inference.  also, consider the use of bloom filters for
+                 * inference since there appears to be a large number of queries
+                 * resulting in small result sets (0 to 5 statements).
+                 */
+                fed.registerIndex(name_just, new byte[][] { new byte[] {} },
+                        new UUID[] { uuids[1] });
+            }
+            
+            /*
+             * @todo could pre-partition based on the expected #of statements
+             * for the store. If we want on the order of 20M statements per
+             * partition and we expect at least 2B statements then we can
+             * compute the #of required partitions. Since this is static
+             * partitioning it will not be exact. This means that you can have
+             * more statements in some partitions than in others - and this will
+             * vary across the different access paths. It also means that the
+             * last partition will absorb all statements beyond the expected
+             * maximum.
+             * 
+             * The separator keys would be formed from the term identifiers that
+             * would be assigned as [id:NULL:NULL]. We can use the same
+             * separator keys for each of the statement indices.
+             * 
+             * Note: The term identifiers will be strictly incremental up to ~30
+             * bits per index partition for the term:ids index (the index that
+             * assigns the term identifiers). If there are multiple partitions
+             * of the terms:ids index then the index partition identifier will
+             * be non-zero after the first terms:ids index partition and the
+             * logic to compute the ids for forming the statement index
+             * separator keys would have to be changed.
+             */
+            
+            fed.registerIndex(name_spo,new byte[][] { new byte[] {} },
+                    new UUID[] { uuids[0] });
+            
+            fed.registerIndex(name_pos, new byte[][] { new byte[] {} },
+                    new UUID[] { uuids[1] });
+            
+            fed.registerIndex(name_osp, new byte[][] { new byte[] {} },
+                    new UUID[] { uuids[1] });
+            
+            return;
+            
+        }
+        
+        /*
+         * Allocation of index partitions to data services is governed by the
+         * metadata service.
+         */
+        
+        if(lexicon) {
+
+            fed.registerIndex(name_termId);
+        
+            fed.registerIndex(name_idTerm);
+
+        }
+
+        if (oneAccessPath) {
+
+            fed.registerIndex(name_spo);
+            
+        } else {
+            
+            fed.registerIndex(name_spo);
+            
+            fed.registerIndex(name_pos);
+            
+            fed.registerIndex(name_osp);
+            
+        }
+
+        if(justify) {
+
+            fed.registerIndex(name_just);
+            
+        }
 
     }
     
-    /** @todo this should be an atomic drop/add. */
+    /**
+     * @todo this must be an atomic drop/add or concurrent clients will not have
+     *       a coherent view of the database during a {@link #clear()}. That
+     *       could be achieved using a procedure that runs on the metadata
+     *       service and which handles the drop/add while holding a lock on the
+     *       resources corresponding to the indices to be dropped/added.
+     */
     final public void clear() {
 
-        fed.dropIndex(name_idTerm); ids = null;
-        fed.dropIndex(name_termId); terms = null;
+        if(true) {
+            
+            /*
+             * FIXME we need to drop the indices from the federation!
+             * 
+             * Right now the logic has not been implemented to drop the mdi and
+             * partitions for a scale-out index!
+             */
+
+            log.warn("request ignored!");
+            
+            return;
         
-        fed.dropIndex(name_spo); spo = null;
-        fed.dropIndex(name_pos); pos = null;
-        fed.dropIndex(name_osp); osp = null;
+        }
+
+        if (lexicon) {
+         
+            fed.dropIndex(name_idTerm); ids = null;
+            
+            fed.dropIndex(name_termId); terms = null;
+        
+        }
+        
+        if(oneAccessPath) {
+            
+            fed.dropIndex(name_spo); spo = null;
+            
+        } else {
+            
+            fed.dropIndex(name_spo); spo = null;
+            
+            fed.dropIndex(name_pos); pos = null;
+            
+            fed.dropIndex(name_osp); osp = null;
+            
+        }
     
-        fed.dropIndex(name_just); just = null;
+        if(justify) {
+
+            fed.dropIndex(name_just); just = null;
+            
+        }
         
-        createIndices();
+        registerIndices();
         
     }
     
@@ -180,74 +372,74 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      * The terms index.
      */
     private ClientIndexView terms;
-    
+
     /**
      * The ids index.
      */
     private ClientIndexView ids;
-    
+
     /**
      * The statement indices for a triple store.
      */
     private ClientIndexView spo, pos, osp;
-    
+
     private ClientIndexView just;
-    
+
     final public IIndex getTermIdIndex() {
-        
-        if(terms!=null) {
-        
-            terms = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
-                    name_termId);
+
+        if (terms == null) {
+
+            terms = (ClientIndexView) fed.getIndex(
+                    IBigdataFederation.UNISOLATED, name_termId);
 
         }
-        
+
         return terms;
-        
+
     }
 
     final public IIndex getIdTermIndex() {
 
-        if(ids!=null) {
-            
+        if (ids == null) {
+
             ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
                     name_idTerm);
 
         }
-        
+
         return ids;
-        
+
     }
-    
+
     final public IIndex getSPOIndex() {
-        
-        if(spo!=null) {
-            
+
+        if (spo == null) {
+
             spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
                     name_spo);
 
         }
-        
+
         return spo;
-        
+
     }
-    
+
     final public IIndex getPOSIndex() {
-        
-        if(pos!=null) {
-            
+
+        if (pos == null) {
+
             pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
                     name_pos);
 
         }
-        
+
         return pos;
-        
+
     }
 
     final public IIndex getOSPIndex() {
 
-        if (osp != null) {
+        if (osp == null) {
 
             osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
                     name_osp);
@@ -260,104 +452,97 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getJustificationIndex() {
 
-        if (just != null) {
+        if (just == null) {
 
             just = (ClientIndexView) fed.getIndex(
                     IBigdataFederation.UNISOLATED, name_just);
 
         }
-        
+
         return just;
         
     }
 
-    /**
-     * Add a term into the term:id index and the id:term index, returning the
-     * assigned term identifier (non-batch API).
-     * 
-     * @param value
-     *            The term.
-     * 
-     * @return The assigned term identifier.
+    /*
+     * terms index.
      */
-    public long addTerm(Value value) {
-
-        final _Value[] terms = new _Value[]{(_Value)value};
-        
-        insertTerms(terms, 1, false, false);
-        
-        return terms[0].termId;
-        
-    }
-
-    final public _Value getTerm(long id) {
-
-        byte[] data = (byte[])getIdTermIndex().lookup(keyBuilder.id2key(id));
-
-        if (data == null)
-            return null;
-
-        return _Value.deserialize(data);
-
-    }
-
-    final public long getTermId(Value value) {
-
-        if(value==null) return IRawTripleStore.NULL;
-        
-        _Value val = (_Value) OptimizedValueFactory.INSTANCE
-                .toNativeValue(value);
-        
-        if( val.termId != IRawTripleStore.NULL ) return val.termId; 
-
-        Object tmp = getTermIdIndex().lookup(keyBuilder.value2Key(value));
-        
-        if (tmp == null)
-            return IRawTripleStore.NULL;
-
-        try {
-
-            val.termId = new DataInputBuffer((byte[]) tmp).unpackLong();
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        return val.termId;
-
-    }
-
+    
+// final public _Value getTerm(long id) {
+//
+// byte[] data = (byte[])getIdTermIndex().lookup(keyBuilder.id2key(id));
+//
+//        if (data == null)
+//            return null;
+//
+//        return _Value.deserialize(data);
+//
+//    }
+//
+//    final public long getTermId(Value value) {
+//
+//        if(value==null) return IRawTripleStore.NULL;
+//        
+//        _Value val = (_Value) OptimizedValueFactory.INSTANCE
+//                .toNativeValue(value);
+//        
+//        if( val.termId != IRawTripleStore.NULL ) return val.termId; 
+//
+//        Object tmp = getTermIdIndex().lookup(keyBuilder.value2Key(value));
+//        
+//        if (tmp == null)
+//            return IRawTripleStore.NULL;
+//
+//        try {
+//
+//            val.termId = new DataInputBuffer((byte[]) tmp).unpackLong();
+//
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        return val.termId;
+//
+//    }
+    
     /**
      * This implementation is designed to use unisolated batch writes on the
      * terms and ids index that guarentee consistency.
      * 
-     * @todo can we refactor the split support out of this method so that the
-     *       code can be reused for the scale-up as well as scale-out indices?
+     * FIXME parallelize processing against index partitions in
+     * {@link ClientIndexView} and {@link AutoSplitProcedure}
+     * 
+     * FIXME make writing justifications a batch process.
+     * 
+     * @todo if the auto-split of a procedure can be made efficient enough then
+     *       we can use the same code for the embedded and scale-out versions.
+     * 
+     * @todo "known" terms should be filtered out of this operation.
+     *       <p>
+     *       A term is marked as "known" within a client if it was successfully
+     *       asserted against both the terms and ids index (or if it was
+     *       discovered on lookup against the ids index).
+     *       <p>
+     *       We should also check the {@link AbstractTripleStore#termCache} for
+     *       known terms.
      */
-    public void insertTerms(_Value[] terms, int numTerms, boolean haveKeys,
-            boolean sorted) {
-
+    public void addTerms(RdfKeyBuilder keyBuilder,final _Value[] terms, final int numTerms) {
+        
         if (numTerms == 0)
             return;
 
-        if (!haveKeys && sorted)
-            throw new IllegalArgumentException("sorted requires keys");
-        
         long begin = System.currentTimeMillis();
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
         long insertTime = 0; // time to insert terms into the forward and reverse index.
         
-        System.err.print("Writing "+numTerms+" terms ("+terms.getClass().getSimpleName()+")...");
-
         {
 
             /*
              * First make sure that each term has an assigned sort key.
              */
-            if(!haveKeys) {
+            {
 
                 long _begin = System.currentTimeMillis();
                 
@@ -370,14 +555,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
             /*
              * Sort terms by their assigned sort key. This places them into the
              * natural order for the term:id index.
-             * 
-             * @todo "known" terms should be filtered out of this operation. A
-             * term is marked as "known" within a client if it was successfully
-             * asserted against both the terms and ids index (or if it was
-             * discovered on lookup against the ids index).
              */
-
-            if (!sorted ) {
+            {
             
                 long _begin = System.currentTimeMillis();
                 
@@ -391,66 +570,59 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * For each term that does not have a pre-assigned term identifier,
              * execute a remote unisolated batch operation that assigns the term
              * identifier.
-             * 
-             * @todo parallelize operations across index partitions?
              */
             {
                 
-                long _begin = System.currentTimeMillis();
+                final long _begin = System.currentTimeMillis();
 
-                ClientIndexView termId = (ClientIndexView)getTermIdIndex();
+                final ClientIndexView termIdIndex = (ClientIndexView)getTermIdIndex();
 
                 /*
                  * Create a key buffer holding the sort keys. This does not
                  * allocate new storage for the sort keys, but rather aligns the
                  * data structures for the call to splitKeys().
                  */
-                byte[][] termKeys = new byte[numTerms][];
-                
+                final byte[][] keys = new byte[numTerms][];
                 {
                     
                     for(int i=0; i<numTerms; i++) {
                         
-                        termKeys[i] = terms[i].key;
+                        keys[i] = terms[i].key;
                         
                     }
                     
                 }
-
-                // split up the keys by the index partitions.
-                List<Split> splits = termId.splitKeys(numTerms, termKeys);
-
-                // for each split.
-                Iterator<Split> itr = splits.iterator();
                 
-                while(itr.hasNext()) {
+                final AutoSplitProcedure proc = new AutoSplitProcedure<AddTerms.Result>(
+                        numTerms, keys, null/* vals */) {
 
-                    Split split = itr.next();
-                    
-                    byte[][] keys = new byte[split.ntuples][];
-                    
-                    for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
+                    private static final long serialVersionUID = -3159579576628729679L;
+
+                    protected IProcedure newProc(Split split) {
                         
-                        keys[j] = terms[i].key;
+                        return new AddTerms(split.ntuples,split.fromIndex,keys);
                         
                     }
                     
-                    // create batch operation for this partition.
-                    AddTerms op = new AddTerms(new MutableKeyBuffer(
-                            split.ntuples, keys));
+                    /**
+                     * Copy the assigned/discovered term identifiers onto the
+                     * corresponding elements of the terms[].
+                     */
+                    protected void aggregate(AddTerms.Result result, Split split) {
+                        
+                        for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
+                            
+                            terms[i].termId = result.ids[j];
+                            
+                        }
 
-                    // submit batch operation.
-                    AddTerms.Result result = (AddTerms.Result) termId.submit(
-                            split.pmd, op);
-                    
-                    // copy the assigned/discovered term identifiers.
-                    for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
-                        
-                        terms[i].termId = result.ids[j];
-                        
                     }
                     
-                }
+                };
+
+                // run the procedure on the partitioned index.
+
+                proc.apply(termIdIndex);
                 
                 insertTime += System.currentTimeMillis() - _begin;
                 
@@ -488,78 +660,69 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * would cause those terms to remain undefined in the reverse index.
              */
             
-            long _begin = System.currentTimeMillis();
+            final long _begin = System.currentTimeMillis();
             
-            ClientIndexView idTerm = (ClientIndexView)getIdTermIndex();
+            final ClientIndexView idTermIndex = (ClientIndexView)getIdTermIndex();
 
             /*
              * Create a key buffer to hold the keys generated from the term
              * identifers and then generate those keys. The terms are already in
              * sorted order by their term identifiers from the previous step.
              */
-            byte[][] idKeys = new byte[numTerms][];
+            final byte[][] keys = new byte[numTerms][]; // @todo use long[] instead
+            final byte[][] vals = new byte[numTerms][];
             
             {
 
                 // Private key builder removes single-threaded constraint.
-                KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG); 
+                final KeyBuilder tmp = new KeyBuilder(Bytes.SIZEOF_LONG); 
+
+                // buffer is reused for each serialized term.
+                final DataOutputBuffer out = new DataOutputBuffer();
                 
                 for(int i=0; i<numTerms; i++) {
                     
-                    idKeys[i] = keyBuilder.reset().append(terms[i].termId).getKey();
+                    keys[i] = tmp.reset().append(terms[i].termId).getKey();
                     
+                    // Serialize the term.
+                    vals[i] = terms[i].serialize(out.reset());                    
+
                 }
                 
             }
 
-            // split up the keys by the index partitions.
-            List<Split> splits = idTerm.splitKeys(numTerms, idKeys);
+            final AutoSplitProcedure proc = new AutoSplitProcedure(numTerms,
+                    keys, vals) {
 
-            // for each split.
-            Iterator<Split> itr = splits.iterator();
+                private static final long serialVersionUID = -2484002926793236065L;
 
-            // StatementBuffer is reused for each serialized term.
-            DataOutputBuffer out = new DataOutputBuffer();
-            
-            while(itr.hasNext()) {
+                protected IProcedure newProc(Split split) {
 
-                Split split = itr.next();
-                
-                byte[][] keys = new byte[split.ntuples][];
-                
-                byte[][] vals = new byte[split.ntuples][];
-                
-                for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
-                    
-                    // Encode the term identifier as an unsigned long integer.
-                    keys[j] = idKeys[i];
-                    
-                    // Serialize the term.
-                    vals[j] = terms[i].serialize(out.reset());
-                    
+                    return new AddIds(split.ntuples, split.fromIndex, keys, vals);
+
                 }
                 
-                // create batch operation for this partition.
-                AddIds op = new AddIds(
-                        new MutableKeyBuffer(split.ntuples, keys),
-                        new MutableValueBuffer(split.ntuples, vals));
-
-                // submit batch operation (result is "null").
-                idTerm.submit(split.pmd, op);
-                
-                /*
-                 * Iff the unisolated write succeeds then this client knows that
+                /**
+                 * Since the unisolated write succeeded the client knows that
                  * the term is now in both the forward and reverse indices. We
                  * codify that knowledge by setting the [known] flag on the
                  * term.
                  */
-                for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
+                protected void aggregate(Object result, Split split) {
                     
-                    terms[i].known = true;
+                    for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
+                        
+                        terms[i].known = true;
 
+                    }
+                    
                 }
                 
-            }
+            };
+            
+            // run the procedure on the partitioned index.
+            
+            proc.apply(idTermIndex);
             
             insertTime += System.currentTimeMillis() - _begin;
 
@@ -567,8 +730,65 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("in " + elapsed + "ms; keygen=" + keyGenTime
-                + "ms, sort=" + sortTime + "ms, insert=" + insertTime + "ms");
+        if (numTerms > 1000 || elapsed > 3000) {
+
+            log.info("Wrote " + numTerms + " in " + elapsed + "ms; keygen="
+                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
+                    + insertTime + "ms");
+            
+        }
+        
+    }
+
+    /**
+     * FIXME Implement for the scale-out index (might be an identical
+     * implementation).
+     */
+    protected void indexTermText(_Value[] terms, int numTerms) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    /** TODO Auto-generated method stub */
+    public IIndex getFullTextIndex() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Adds reporting by data service to the usage summary.
+     */
+    public String usage(){
+        
+        StringBuilder sb = new StringBuilder( super.usage() );
+        
+        sb.append("\nsummary by dataService::\n");
+        
+        IBigdataClient client = fed.getClient();
+        
+        UUID[] dataServiceIds = client.getDataServiceUUIDs(0);
+        
+        for(int i=0; i<dataServiceIds.length; i++) {
+            
+            UUID serviceId = dataServiceIds[ i ];
+            
+            IDataService dataService = client.getDataService(serviceId);
+            
+            sb.append("\n");
+            
+            try {
+            
+                sb.append( dataService.getStatistics() );
+                
+            } catch (IOException e) {
+                
+                sb.append( "Could not get statistics for data service: uuid="+serviceId);
+                
+            }
+            
+        }
+        
+        return sb.toString();
         
     }
 
@@ -600,6 +820,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     final public boolean isStable() {
         
         return true;
+        
+    }
+    
+    final public boolean isReadOnly() {
+        
+        return false;
         
     }
     
@@ -639,24 +865,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         return 100000;
         
-    }
-
-    /**
-     * FIXME Implement for the scale-out index (might be an identical
-     * implementation).
-     * 
-     * FIXME This needs to get invoked by both the batch and non-batch
-     * term insert methods.
-     */
-    protected void indexTermText(_Value[] terms, int numTerms) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    public IIndex getFullTextIndex() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
     }
 
 }

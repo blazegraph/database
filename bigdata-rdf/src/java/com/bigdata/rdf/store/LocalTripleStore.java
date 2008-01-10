@@ -37,7 +37,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.NOPSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ReadCommittedIndex;
@@ -47,6 +46,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.serializers.RdfValueSerializer;
 import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.serializers.TermIdSerializer;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
@@ -312,6 +312,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
     
+    final public boolean isReadOnly() {
+        
+        return store.isReadOnly();
+        
+    }
+
     final public void clear() {
         
         store.dropIndex(name_idTerm); ndx_termId = null;
@@ -380,6 +386,8 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
                         Options.ISOLATABLE_INDICES,
                         Options.DEFAULT_ISOLATABLE_INDICES));
 
+        log.info(Options.ISOLATABLE_INDICES+"="+isolatableIndices);
+        
         registerIndices();
         
     }
@@ -428,14 +436,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     public String usage(){
         
-        return super.usage()  
-        +("\nfile="+store.getBufferStrategy().getFile())
-        +("\nbyteCount="+store.getBufferStrategy().getNextOffset())
-        // @todo expose getStatistics on all buffer strategies.
-        +(store.getBufferStrategy() instanceof DiskOnlyStrategy
-                ?(((DiskOnlyStrategy)store.getBufferStrategy()).getStatistics())
-                        :"")
-        ;
+        return super.usage() + store.getStatistics();
         
     }
 
@@ -481,7 +482,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class ReadCommittedTripleStore extends AbstractLocalTripleStore {
+    public static class ReadCommittedTripleStore extends AbstractLocalTripleStore {
 
         private final LocalTripleStore db;
         
@@ -508,6 +509,16 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
         }
 
+        /**
+         * The view is read-only, but it is updated each time there is a commit
+         * against the database (read-committed semantics).
+         */
+        public boolean isReadOnly() {
+            
+            return true;
+            
+        }
+        
         /**
          * @throws UnsupportedOperationException always.
          */
@@ -565,9 +576,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
          * @throws UnsupportedOperationException
          *             if there is an attempt to write on an index.
          */
-        public void insertTerms(_Value[] terms, int numTerms, boolean haveKeys, boolean sorted) {
+        public void addTerms(RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
 
-            super.insertTerms(terms, numTerms, haveKeys, sorted);
+            super.addTerms(keyBuilder, terms, numTerms);
             
         }
 

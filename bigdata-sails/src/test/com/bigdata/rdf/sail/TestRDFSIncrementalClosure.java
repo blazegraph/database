@@ -34,8 +34,7 @@ package com.bigdata.rdf.sail;
 import java.io.File;
 import java.util.Properties;
 
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.RdfRepository;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;

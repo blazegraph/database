@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.jini.core.lookup.ServiceID;
@@ -140,6 +142,40 @@ public class ServiceCache implements ServiceDiscoveryListener {
     public int getServiceCount() {
         
         return serviceIdMap.size();
+        
+    }
+
+    /**
+     * Return an array of cached service items.
+     * 
+     * @param maxCount
+     *            The maximum #of service items to be returned. When zero (0)
+     *            all known service items will be returned.
+     * 
+     * @return An array of {@link ServiceItem}s.
+     */
+    public ServiceItem[] getServiceItems(int maxCount) {
+
+        if (maxCount < 0)
+            throw new IllegalArgumentException();
+
+        final int n = maxCount == 0 ? getServiceCount() : maxCount;
+        
+        Vector<ServiceItem> v = new Vector<ServiceItem>( n );
+        
+        Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+            
+            Map.Entry<ServiceID, ServiceItem> entry = itr.next();
+            
+            ServiceItem item = entry.getValue();
+
+            v.add(item);
+            
+        }
+        
+        return v.toArray(new ServiceItem[v.size()]);
         
     }
     

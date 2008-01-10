@@ -32,6 +32,8 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.KeyBuilder.Options;
+
 /**
  * <p>
  * Interface for building up variable <code>unsigned byte[]</code> keys from
@@ -62,6 +64,12 @@ import java.util.UUID;
  * compressed sort keys. The resulting sort keys are therefore (a) incompatible
  * with those produced by the ICU library and (b) much larger than those
  * produced by the ICU library.
+ * </p>
+ * <p>
+ * Support for Unicode MAY be disabled using {@link Options#COLLATOR}, by using
+ * {@link KeyBuilder#newInstance()} or another factory method that does not
+ * enable Unicode support, or by using one of the {@link KeyBuilder}
+ * constructors that does not support Unicode.
  * </p>
  * <h2>Multi-field keys with variable length fields</h2>
  * <p>
@@ -135,9 +143,9 @@ public interface IKeyBuilder {
      */
     
     /**
-     * Encodes a unicode string using the default collation rules configured for
-     * the {@link IKeyBuilder} instance and appends the resulting sort key to
-     * the buffer (without a trailing nul byte) (optional operation).
+     * Encodes a Unicode string using the configured {@link Options#COLLATOR}
+     * and appends the resulting sort key to the buffer (without a trailing nul
+     * byte).
      * <p>
      * Note: The {@link SuccessorUtil#successor(String)} of a string is formed
      * by appending a trailing <code>nul</code> character. However, since
@@ -149,26 +157,26 @@ public interface IKeyBuilder {
      * example,
      * 
      * <pre>
-     *           
-     *           IKeyBuilder keyBuilder = ...;
-     *           
-     *           String s = &quot;foo&quot;;
-     *           
-     *           byte[] fromKey = keyBuilder.reset().append( s );
-     *           
-     *           // right.
-     *           byte[] toKey = keyBuilder.reset().append( s ).appendNul();
-     *           
-     *           // wrong!
-     *           byte[] toKey = keyBuilder.reset().append( s+&quot;\0&quot; );
-     *           
+     *            
+     *            IKeyBuilder keyBuilder = ...;
+     *            
+     *            String s = &quot;foo&quot;;
+     *            
+     *            byte[] fromKey = keyBuilder.reset().append( s );
+     *            
+     *            // right.
+     *            byte[] toKey = keyBuilder.reset().append( s ).appendNul();
+     *            
+     *            // wrong!
+     *            byte[] toKey = keyBuilder.reset().append( s+&quot;\0&quot; );
+     *            
      * </pre>
      * 
      * @param s
      *            A string.
      * 
      * @throws UnsupportedOperationException
-     *                if Unicode is not supported.
+     *             if Unicode is not supported.
      * 
      * @return <i>this</i>
      * 
@@ -176,7 +184,8 @@ public interface IKeyBuilder {
      * @see SuccessorUtil#successor(byte[])
      * @see TestICUUnicodeKeyBuilder#test_keyBuilder_unicode_trailingNuls()
      * 
-     * FIXME update the javadoc further to speak to handling of multi-field keys.
+     * FIXME update the javadoc further to speak to handling of multi-field
+     * keys.
      * 
      * @todo provide a more flexible interface for handling Unicode, including
      *       the means to encode using a specified language family (such as
@@ -217,14 +226,14 @@ public interface IKeyBuilder {
      * end of the "text" field:
      * 
      * <pre>
-     *    ab cd | 12
+     *     ab cd | 12
      * </pre>
      * 
      * if you compute the successor by appending a nul byte to the text field
      * you get
      * 
      * <pre>
-     *    ab cd | 00 12
+     *     ab cd | 00 12
      * </pre>
      * 
      * which is ordered before the original key!
@@ -232,8 +241,9 @@ public interface IKeyBuilder {
      * @param text
      *            The text.
      * @param unicode
-     *            When true the text is interpreted as Unicode. Otherwise it is
-     *            interpreted as ASCII.
+     *            When true the text is interpreted as Unicode according to the
+     *            {@link Options#COLLATOR} option. Otherwise it is interpreted
+     *            as ASCII.
      * @param successor
      *            When true, the successor of the text will be encoded.
      *            Otherwise the text will be encoded.
@@ -269,7 +279,8 @@ public interface IKeyBuilder {
      */
     
     /**
-     * Return <code>true</code> iff Unicode is supported by this object.
+     * Return <code>true</code> iff Unicode is supported by this object
+     * (returns <code>false</code> if only ASCII support is configured).
      */
     public boolean isUnicodeSupported();
     

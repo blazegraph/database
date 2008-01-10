@@ -29,7 +29,7 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.OWL;
+import org.openrdf.model.vocabulary.OWL;
 
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -87,13 +87,13 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, OWL.SAMEAS, Y);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertEquals(1,store.getStatementCount());
 
             RDFSHelper inf = new RDFSHelper(store);
@@ -108,10 +108,10 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
 
             // entailed
-            assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), X));
+            assertTrue(store.hasStatement(Y, OWL.SAMEAS, X));
 
             // final #of statements in the store.
             assertEquals(2,store.getStatementCount());
@@ -143,15 +143,15 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
-            buffer.add(Y, new URIImpl(OWL.SAMEAS), Z);
+            buffer.add(X, OWL.SAMEAS, Y);
+            buffer.add(Y, OWL.SAMEAS, Z);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
-            assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), Z));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
+            assertTrue(store.hasStatement(Y, OWL.SAMEAS, Z));
             assertEquals(2,store.getStatementCount());
 
             RDFSHelper inf = new RDFSHelper(store);
@@ -166,11 +166,11 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
-            assertTrue(store.hasStatement(Y, new URIImpl(OWL.SAMEAS), Z));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
+            assertTrue(store.hasStatement(Y, OWL.SAMEAS, Z));
 
             // entailed
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Z));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Z));
 
             // final #of statements in the store.
             assertEquals(3,store.getStatementCount());
@@ -206,14 +206,14 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, OWL.SAMEAS, Y);
             buffer.add(X, A, Z);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
             assertEquals(2,store.getStatementCount());
 
@@ -229,7 +229,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(X, A, Z));
 
             // entailed
@@ -269,14 +269,14 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
             IStatementBuffer buffer = new StatementBuffer(store, 100/* capacity */);
             
-            buffer.add(X, new URIImpl(OWL.SAMEAS), Y);
+            buffer.add(X, OWL.SAMEAS, Y);
             buffer.add(Z, A, X);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(Z, A, X));
             assertEquals(2,store.getStatementCount());
 
@@ -292,7 +292,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(X, new URIImpl(OWL.SAMEAS), Y));
+            assertTrue(store.hasStatement(X, OWL.SAMEAS, Y));
             assertTrue(store.hasStatement(Z, A, X));
 
             // entailed

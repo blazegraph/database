@@ -36,9 +36,10 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -108,13 +109,13 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         try {
 
             doAddTermTest(store, new _Literal("abc"));
-            doAddTermTest(store, new _Literal("abc", new _URI(XmlSchema.DECIMAL)));
+            doAddTermTest(store, new _Literal("abc", new _URI(XMLSchema.DECIMAL)));
             doAddTermTest(store, new _Literal("abc", "en"));
     
             doAddTermTest(store, new _URI("http://www.bigdata.com"));
             doAddTermTest(store, new _URI(RDF.TYPE));
             doAddTermTest(store, new _URI(RDFS.SUBCLASSOF));
-            doAddTermTest(store, new _URI(XmlSchema.DECIMAL));
+            doAddTermTest(store, new _URI(XMLSchema.DECIMAL));
     
             doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
             doAddTermTest(store, new _BNode("a12"));
@@ -129,7 +130,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertTrue(store.isLiteral(store.getTermId(new _Literal("abc"))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XmlSchema.DECIMAL)))));
+            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
             
             assertTrue(store.isLiteral(store.getTermId(new _Literal("abc", "en"))));
 
@@ -164,17 +165,17 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
                     new _URI(RDF.TYPE),//
                     new _URI(RDFS.SUBCLASSOF),//
-                    new _URI(XmlSchema.DECIMAL),//
+                    new _URI(XMLSchema.DECIMAL),//
     
                     new _Literal("abc"),//
-                    new _Literal("abc", new _URI(XmlSchema.DECIMAL)),//
+                    new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
                     new _Literal("abc", "en"),//
     
                     new _BNode(UUID.randomUUID().toString()),//
                     new _BNode("a12") //
             };
     
-            store.insertTerms(terms, terms.length, false/* haveKeys */, false/* sorted */);
+            store.addTerms(store.getKeyBuilder(), terms, terms.length);
     
             store.commit();
             
@@ -211,7 +212,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertTrue(store.isLiteral(store.getTermId(new _Literal("abc"))));
             
-            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XmlSchema.DECIMAL)))));
+            assertTrue(store.isLiteral(store.getTermId(new _Literal("abc",new _URI(XMLSchema.DECIMAL)))));
             
             assertTrue(store.isLiteral(store.getTermId(new _Literal("abc", "en"))));
 
@@ -246,10 +247,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 //
 ////                new _URI(RDF.TYPE),//
 ////                new _URI(RDFS.SUBCLASSOF),//
-////                new _URI(XmlSchema.DECIMAL),//
+////                new _URI(XMLSchema.DECIMAL),//
 ////
 ////                new _Literal("abc"),//
-////                new _Literal("abc", new _URI(XmlSchema.DECIMAL)),//
+////                new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
 ////                new _Literal("abc", "en"),//
 ////
 ////                new _BNode(UUID.randomUUID().toString()),//
@@ -581,8 +582,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store,100);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
-            buffer.add(A, URIImpl.RDF_TYPE, C);
+            buffer.add(A, RDF.TYPE, B);
+            buffer.add(A, RDF.TYPE, C);
             
             buffer.flush();
 
@@ -590,10 +591,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
-                            .getTermId(URIImpl.RDF_TYPE), store.getTermId(B),
+                            .getTermId(RDF.TYPE), store.getTermId(B),
                             StatementEnum.Explicit),
                     new SPO(store.getTermId(A), store
-                            .getTermId(URIImpl.RDF_TYPE), store.getTermId(C),
+                            .getTermId(RDF.TYPE), store.getTermId(C),
                             StatementEnum.Explicit), },
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
@@ -611,7 +612,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             assertSameSPOs(new SPO[] {
                     new SPO(store.getTermId(A), store
-                            .getTermId(URIImpl.RDF_TYPE), store.getTermId(C),
+                            .getTermId(RDF.TYPE), store.getTermId(C),
                             StatementEnum.Explicit), },
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
@@ -667,7 +668,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      * Test the ability to add and remove statements using both fully bound and
      * partly bound triple patterns using the Sesame compatible API.
      */
-    public void test_addRemove_sesameAPI() {
+    public void test_addRemove_sesameAPI() throws SailException {
         
         AbstractTripleStore store = getStore();
         
@@ -683,14 +684,14 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store,100);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
-            buffer.add(A, URIImpl.RDF_TYPE, C);
+            buffer.add(A, RDF.TYPE, B);
+            buffer.add(A, RDF.TYPE, C);
             
             buffer.flush();
 
             assertSameStatements(new Statement[]{
-                    new StatementImpl(A,URIImpl.RDF_TYPE,B),
-                    new StatementImpl(A,URIImpl.RDF_TYPE,C),
+                    new StatementImpl(A,RDF.TYPE,B),
+                    new StatementImpl(A,RDF.TYPE,C),
                     },
                     store.getStatements(null,null,null)
                     );
@@ -702,7 +703,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             store.dumpStore();
             
             assertSameStatements(new Statement[]{
-                    new StatementImpl(A,URIImpl.RDF_TYPE,C),
+                    new StatementImpl(A,RDF.TYPE,C),
                     },
                     store.getStatements(null,null,null)
                     );

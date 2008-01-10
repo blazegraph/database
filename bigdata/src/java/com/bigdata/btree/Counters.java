@@ -187,7 +187,7 @@ public class Counters {
                 + ", bytes/sec=" + bytesWrittenPerSec + ", serializeSeconds="
                 + secondsFormat.format(serializeTimeSecs) + ", serialized/sec="
                 + serializePerSec + ")" +
-        "\n----"
+        "\n"
         ;
         
     }

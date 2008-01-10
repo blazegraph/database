@@ -56,19 +56,19 @@ public class TestAll extends TestCase {
         
     }
 
-
-
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
+     * 
+     * @todo write tests for {@link RangeQueryIterator}
+     * @todo write tests for {@link PartitionedRangeQueryIterator}
+     * @todo write tests for embedded services (w/o jini).
      */
     public static Test suite()
     {
 
         TestSuite suite = new TestSuite("embedded services");
 
-        // FIXME write tests for embedded services.
-        
 //        suite.addTestSuite(TestAbstractJobAndTaskService.class);
         
         return suite;

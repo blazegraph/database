@@ -46,6 +46,7 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
@@ -58,6 +59,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.scaleup.ResourceState;
 
 /**
@@ -70,6 +72,19 @@ import com.bigdata.scaleup.ResourceState;
  * @version $Id$
  * 
  * @see DataServer, which is used to start this service.
+ * 
+ * FIXME All methods declared by the {@link IDataService} need to operate at the
+ * abstraction where an index may comprise both a mutable {@link BTree} and
+ * immutable {@link IndexSegment}s - in fact it may make sense to introduce
+ * that abstraction at a layer under the {@link ConcurrentJournal}.  See {@link PartitionedIndexView}
+ * for an earlier attempt.
+ * <p>
+ * Regardless, the data service needs to keep all resources locally for a given
+ * index partition. In general, that includes the mutable {@link BTree} on the
+ * journal plus zero or more {@link IndexSegment}s. A full compacting merge
+ * reduces this to an empty {@link BTree} and a single {@link IndexSegment}.
+ * Overflow can introduce a dependency on an old {@link Journal} until data on
+ * the old journal can be exported into {@link IndexSegment}s.
  * 
  * @todo RPC requests are currently made via RPC using JERI. While you can elect
  *       to use the TCP/NIO server via configuration options (see
@@ -335,6 +350,20 @@ abstract public class DataService implements IDataService,
         
     }
 
+    public String getStatistics() throws IOException {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("dataService: uuid=" + getServiceUUID());
+
+        sb.append("\n");
+
+        sb.append(journal.getStatistics());
+        
+        return sb.toString();
+        
+    }
+
     /**
      * Sets up the {@link MDC} logging context. You should do this on every
      * client facing point of entry and then call {@link #clearLoggingContext()}
@@ -509,6 +538,30 @@ abstract public class DataService implements IDataService,
             }
             
             return ndx.isIsolatable();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+        
+    }
+
+    public String getStatistics(String name) throws IOException {
+
+        setupLoggingContext();
+        
+        try {
+
+            final IIndex ndx = journal.getIndex(name);
+            
+            if(ndx == null) {
+                
+                throw new NoSuchIndexException(name);
+                
+            }
+            
+            return ((BTree)ndx).getStatistics();
             
         } finally {
             

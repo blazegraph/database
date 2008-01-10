@@ -894,18 +894,19 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
     
-    public void test_keyBuilder_unicode_String_key() {
-        
-        IKeyBuilder keyBuilder = new KeyBuilder();
-        
-        try {
-            keyBuilder.reset().append("a");
-            fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }        
-
-    }
+    // Note: this is now allowed and interprets the data as ASCII.
+//    public void test_keyBuilder_unicode_String_key() {
+//        
+//        IKeyBuilder keyBuilder = new KeyBuilder();
+//        
+//        try {
+//            keyBuilder.reset().append("a");
+//            fail("Expecting: "+UnsupportedOperationException.class);
+//        } catch(UnsupportedOperationException ex) {
+//            System.err.println("Ignoring expected exception: "+ex);
+//        }        
+//
+//    }
 
 //    public void test_keyBuilder_unicode_char_key() {
 //        

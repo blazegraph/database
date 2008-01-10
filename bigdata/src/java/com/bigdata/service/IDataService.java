@@ -29,8 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IKeyBuffer;
-import com.bigdata.btree.IValueBuffer;
+import com.bigdata.btree.IProcedure;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
@@ -62,12 +61,6 @@ import com.bigdata.scaleup.JournalMetadata;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo modify the API to NOT use partitionId. Clients should just form the
- *       name of the index partition using
- *       {@link DataService#getIndexPartitionName(String, int)}. That makes all
- *       of these methods equally useful for partitioned and unpartitioned
- *       indices without having to worry about whether partitionId == -1.
  * 
  * @todo add support for triggers. unisolated triggers must be asynchronous if
  *       they will take actions with high latency (such as writing on a
@@ -116,12 +109,19 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @throws IOException
      */
     public JournalMetadata getJournalMetadata() throws IOException;
+
+    /**
+     * Statistics describing the data service, including IO, indices, etc.
+     * 
+     * @throws IOException
+     */
+    public String getStatistics() throws IOException;
     
     /**
-     * Register a named mutable B+Tree on the {@link DataService} (unisolated).
-     * The keys will be variable length unsigned byte[]s. The values will be
-     * variable length byte[]s. The B+Tree will support version counters and
-     * delete markers (it will be compatible with the use of transactions for
+     * Register a named mutable B+Tree on the {@link DataService}. The keys
+     * will be variable length unsigned byte[]s. The values will be variable
+     * length byte[]s. The B+Tree will support version counters and delete
+     * markers (it will be compatible with the use of transactions for
      * concurrency control).
      * 
      * @param name
@@ -171,8 +171,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
             ExecutionException;
 
     /**
-     * Return the unique index identifier for the named index (synchronous,
-     * unisolated).
+     * Return the unique index identifier for the named index.
      * 
      * @param name
      *            The index name.
@@ -184,6 +183,18 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      */
     public UUID getIndexUUID(String name) throws IOException;
 
+    /**
+     * Return various statistics about the named index.
+     * 
+     * @param name
+     *            The index name.
+     *            
+     * @return Statistics about the named index.
+     * 
+     * @throws IOException
+     */
+    public String getStatistics(String name) throws IOException;
+    
     /**
      * Return <code>true</code> iff the named index exists and supports
      * transactional isolation.
@@ -202,7 +213,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
     public boolean isIsolatable(String name) throws IOException;
     
     /**
-     * Drops the named index (unisolated).
+     * Drops the named index.
      * <p>
      * Note: In order to drop a partition of an index you must form the name of
      * the index partition using
@@ -221,8 +232,7 @@ public interface IDataService extends IRemoteTxCommitProtocol {
 
     /**
      * <p>
-     * Used by the client to submit a batch operation on a named B+Tree
-     * (synchronous).
+     * Used by the client to submit a batch operation on a named B+Tree.
      * </p>
      * <p>
      * Unisolated operations SHOULD be used to achieve "auto-commit" semantics.
@@ -276,14 +286,14 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      * 
-     * @todo modify to use {@link IKeyBuffer} and {@link IValueBuffer} so that
-     *       we can get good compression for the wire. Note that on the wire
-     *       compression could be different from in the index compression and
-     *       could take advantage of application knowledge.
-     *       
      * @todo javadoc update.
      * 
-     * @todo support extension operations (read or mutable).
+     * @todo modify the API to NOT use partitionId. Clients should just form the
+     *       name of the index partition using
+     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
+     *       all of these methods equally useful for partitioned and
+     *       unpartitioned indices without having to worry about whether
+     *       partitionId == -1.
      */
     public byte[][] batchInsert(long tx, String name, int partitionId,
             int ntuples, byte[][] keys, byte[][] values, boolean returnOldValues)
@@ -349,6 +359,13 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *       selected for a single row of a sparse row store.
      * 
      * @todo provide for optional filter.
+     * 
+     * @todo modify the API to NOT use partitionId. Clients should just form the
+     *       name of the index partition using
+     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
+     *       all of these methods equally useful for partitioned and
+     *       unpartitioned indices without having to worry about whether
+     *       partitionId == -1.
      */
     public ResultSet rangeQuery(long tx, String name, int partitionId,
             byte[] fromKey, byte[] toKey, int capacity, int flags)
@@ -432,46 +449,15 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException
+     * 
+     * @todo modify the API to NOT use partitionId. Clients should just form the
+     *       name of the index partition using
+     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
+     *       all of these methods equally useful for partitioned and
+     *       unpartitioned indices without having to worry about whether
+     *       partitionId == -1.
      */
-    public Object submit(long tx, String name, int partitionId, IProcedure proc) throws InterruptedException,
-            ExecutionException, IOException;
-
-//  /**
-//  * Maps a <em>new</em> index partition onto the data service. This method
-//  * must be invoked before a client will be permitted to access the key range
-//  * for the index partition on the data service.
-//  * 
-//  * @param name
-//  *            The name of the scale-out index.
-//  * @param pmd
-//  *            The partition metadata.
-//  * 
-//  * @see #unmapPartition(String, int)
-//  * 
-//  * @todo When a new partition is created or destroyed that is a sibling of
-//  *       this partition then the data service needs to be notified so that
-//  *       it will update the partition definition.
-//  */
-// public void mapPartition(String name, PartitionMetadataWithSeparatorKeys pmd)
-//         throws IOException, InterruptedException, ExecutionException;
-// 
-// /**
-//  * Unmaps an index partition from the data service. This method is invoked
-//  * under two circumstances: (1) the index partition is being deleted
-//  * following a join of two index partitions; and (2) the index partition is
-//  * being shed by the data service.
-//  * 
-//  * @param name
-//  *            The index name.
-//  * @param partitionId
-//  *            The partition identifier (must be zero for an unpartitioned
-//  *            index).
-//  * 
-//  * @todo Review state machine for unmapping an index partition for (a) an
-//  *       index partition join; and (b) shedding an index partition (it must
-//  *       be picked up by a different data service).
-//  */
-// public void unmapPartition(String name, int partitionId)
-//         throws IOException, InterruptedException, ExecutionException;
+    public Object submit(long tx, String name, int partitionId, IProcedure proc)
+            throws InterruptedException, ExecutionException, IOException;
  
 }

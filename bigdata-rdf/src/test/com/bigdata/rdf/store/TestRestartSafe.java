@@ -31,8 +31,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;

@@ -36,21 +36,18 @@ import org.apache.lucene.analysis.TokenStream;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
-import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
+import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.ClientIndexView;
 
 /**
@@ -74,311 +71,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
         super(properties);
         
     }
-
-    /**
-     * Handles both unisolatable and isolatable indices.
-     * 
-     * FIXME Why not just invoke the batch API for this method? We almost never
-     * do single term at a time processing and this would simplify the code
-     * maintenance.
-     */
-    public long addTerm(Value value) {
-
-        final _Value val = OptimizedValueFactory.INSTANCE.toNativeValue(value);
-        
-        if(val.known) {
-            
-            assert val.termId != IRawTripleStore.NULL;
-            
-            return val.termId;
-
-        }
-
-        /*
-         * The forward mapping assigns the identifier.
-         * 
-         * Note: this code tests for existance based on the foward mapping so
-         * that we can avoid the use of the reverse mapping if we know that the
-         * term exists.
-         */
-
-        final IIndexWithCounter terms = (IIndexWithCounter) getTermIdIndex();
-
-        final boolean isolatableIndex = terms.isIsolatable();
-        
-        // formulate key from the RDF value.
-        final byte[] termKey = keyBuilder.value2Key(val);
-
-        // Lookup in the forward index.
-        final Object tmp = terms.lookup(termKey);
-
-        if (tmp == null) { // not found.
-
-            final ICounter counter = terms.getCounter();
-            
-            if(counter.get()==IRawTripleStore.NULL) {
-                
-                // Never assign NULL as a term identifier!
-                counter.inc();
-                
-            }
-
-            /*
-             * Assign the termId.
-             * 
-             * Note: We set the low two bits to indicate whether
-             * a term is a literal, bnode, URI, or statement so
-             * that we can tell at a glance (without lookup up
-             * the term in the index) what "kind" of thing the
-             * term identifier stands for.
-             * 
-             * FIXME back port to the scale-out version as well.
-             * 
-             * @todo we could use negative term identifiers
-             * except that we pack the termId in a manner that
-             * does not allow negative integers. a different
-             * pack routine would allow us all bits.
-             */
-            val.termId = counter.inc()<<2;
-            
-            if(val instanceof Literal) {
-                
-                val.termId |= CODE_LITERAL;
-                
-            } else if(val instanceof URI) {
-                
-                val.termId |= CODE_URI;
-                
-            } else if(val instanceof BNode) {
-                
-                val.termId |= CODE_BNODE;
-                
-            } else {
-                
-                throw new AssertionError(
-                        "Unknown term class: class="
-                                + val.getClass());
-                
-            }
-
-            /*
-             * Insert into forward mapping from serialized term to packed term
-             * identifier.
-             */
-            if(isolatableIndex) {
-               
-                // used to serialize term identifers.
-                final DataOutputBuffer idbuf = new DataOutputBuffer(
-                        Bytes.SIZEOF_LONG);
-
-                // format the term identifier as a packed long integer.
-                try {
-                
-                    idbuf.reset().packLong(val.termId);
-                    
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(ex);
-                    
-                }
-
-                if (terms.insert(termKey, idbuf.toByteArray()) != null) {
-
-                    throw new AssertionError();
-
-                }
-                
-            } else {
-
-                if (terms.insert(termKey, new Long(val.termId)) != null) {
-
-                    throw new AssertionError();
-
-                }
-
-            }
-
-            /*
-             * Insert into the reverse mapping from the term identifier to
-             * serialized term.
-             */
-            {
-
-                final IIndex ids = getIdTermIndex();
-
-                final boolean isolatableIndex2 = ids.isIsolatable();
-                
-                // form the key from the term identifier.
-                final byte[] idKey = keyBuilder.id2key(val.termId);
-
-                // insert the serialized term under that key.
-                if (ids.insert(idKey, (isolatableIndex2?val.serialize():val)) != null) {
-
-                    throw new AssertionError();
-
-                }
-                
-            }
-
-        } else { // found.
-
-            /*
-             * the term was found on the forward lookup, so we are done.
-             */
-
-            if (isolatableIndex) {
-                
-                try {
-
-                    val.termId = new DataInputBuffer((byte[]) tmp).unpackLong();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-                
-            } else {
-
-                val.termId = (Long) tmp;
-
-            }
-
-        }
-
-        if(textIndex) {
-
-            /*
-             * Populate the free text index from the terms when that feature is
-             * enabled.
-             */
-            
-            indexTermText(new _Value[] { val }, 1);
-            
-        }
-
-        val.known = true;
-        
-        return val.termId;
-
-    }
-
-    /**
-     * Note: Handles both unisolatable and isolatable indices.
-     * <P>
-     * Note: Sets {@link _Value#termId} and {@link _Value#known} as
-     * side-effects.
-     */
-    final public _Value getTerm(long id) {
-
-        _Value value = null;
-        
-        value = termCache.get(id);
-        
-        if(value!=null) return value;
-        
-        IIndex ndx = getIdTermIndex();
-        
-        final boolean isolatableIndex = ndx.isIsolatable();
-        
-        Object data = ndx.lookup(keyBuilder.id2key(id));
-
-        if (data == null) {
-
-            return null;
-            
-        }
-
-        value = (isolatableIndex?_Value.deserialize((byte[])data):(_Value)data);
-        
-        termCache.put(id, value, false/*dirty*/);
-        
-        // @todo modify unit test to verify that these fields are being set.
-
-        value.termId = id;
-        
-        value.known = true;
-        
-        return value;
-
-    }
     
-    /**
-     * Recently resolved term identifers are cached to improve performance when
-     * externalizing statements.
-     * 
-     * FIXME backport to scale-out version.
-     */
-    protected LRUCache<Long, _Value> termCache = new LRUCache<Long, _Value>(10000);
-       
-    /**
-     * Note: Handles both unisolatable and isolatable indices.
-     * <p>
-     * Note: If {@link _Value#key} is set, then that key is used. Otherwise the
-     * key is computed and set as a side effect.
-     * <p>
-     * Note: If {@link _Value#termId} is set, then returns that value
-     * immediately. Otherwise looks up the termId in the index and sets
-     * {@link _Value#termId} as a side-effect.
-     */
-    final public long getTermId(Value value) {
-
-        if(value==null) return IRawTripleStore.NULL;
-        
-        _Value val = (_Value) OptimizedValueFactory.INSTANCE
-                .toNativeValue(value);
-        
-        if (val.termId != IRawTripleStore.NULL) {
-
-            return val.termId;
-            
-        }
-
-        IIndex ndx = getTermIdIndex();
-        
-        final boolean isolatableIndex = ndx.isIsolatable();
-
-        if (val.key == null) {
-
-            // generate key iff not on hand.
-            val.key = keyBuilder.value2Key(val);
-            
-        }
-        
-        // lookup in the forward index.
-        Object tmp = ndx.lookup(val.key);
-        
-        if (tmp == null) {
-
-            return IRawTripleStore.NULL;
-            
-        }
-        
-        if (isolatableIndex) {
-            
-            try {
-
-                val.termId = new DataInputBuffer((byte[])tmp).unpackLong();
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-            
-        } else {
-
-            val.termId = (Long) tmp;
-
-        }
-
-        // was found in the reverse mapping.
-        val.known = true;
-        
-        return val.termId;
-
-    }
-
     /**
      * 
      * @todo This could use two threads to write on the indices if we divide the
@@ -396,14 +89,11 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      *       its writes, but {@link ClientIndexView} can add transparent
      *       parallelism in that case.
      */
-    public void insertTerms( _Value[] terms, int numTerms, boolean haveKeys, boolean sorted ) {
+    public void addTerms( RdfKeyBuilder keyBuilder, _Value[] terms, int numTerms) {
 
         if (numTerms == 0)
             return;
 
-        if (!haveKeys && sorted)
-            throw new IllegalArgumentException("sorted requires keys");
-        
         long begin = System.currentTimeMillis();
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
@@ -414,7 +104,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             /*
              * First make sure that each term has an assigned sort key.
              */
-            if (!haveKeys) {
+            {
 
                 long _begin = System.currentTimeMillis();
                 
@@ -428,8 +118,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
              * Sort terms by their assigned sort key.  This places them into
              * the natural order for the term:id index.
              */
-
-            if (!sorted ) {
+            {
             
                 long _begin = System.currentTimeMillis();
                 
@@ -499,8 +188,6 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                              * the term in the index) what "kind" of thing the
                              * term identifier stands for.
                              * 
-                             * FIXME back port to the scale-out version as well.
-                             * 
                              * @todo we could use negative term identifiers
                              * except that we pack the termId in a manner that
                              * does not allow negative integers. a different
@@ -510,15 +197,15 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
                             
                             if(term instanceof Literal) {
                                 
-                                term.termId |= CODE_LITERAL;
+                                term.termId |= TERMID_CODE_LITERAL;
                                 
                             } else if(term instanceof URI) {
                                 
-                                term.termId |= CODE_URI;
+                                term.termId |= TERMID_CODE_URI;
                                 
                             } else if(term instanceof BNode) {
                                 
-                                term.termId |= CODE_BNODE;
+                                term.termId |= TERMID_CODE_BNODE;
                                 
                             } else {
                                 
@@ -676,7 +363,7 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         long elapsed = System.currentTimeMillis() - begin;
 
-        if(numTerms>1000) {
+        if (numTerms > 1000 || elapsed > 3000) {
 
             log.info("Wrote " + numTerms + " in " + elapsed + "ms; keygen="
                     + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
@@ -707,8 +394,6 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
 
         final IIndex ndx = getFullTextIndex();
 
-        final IKeyBuilder keyBuilder = this.keyBuilder.keyBuilder;
-        
         for(int i=0; i<numTerms; i++) {
             
             _Value val = terms[i];

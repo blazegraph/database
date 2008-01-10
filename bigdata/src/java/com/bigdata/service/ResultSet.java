@@ -32,6 +32,7 @@ import java.io.ObjectOutput;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
@@ -46,6 +47,8 @@ import com.bigdata.btree.IIndex;
  * @version $Id$
  */
 public class ResultSet implements Externalizable {
+    
+    protected static final Logger log = Logger.getLogger(ResultSet.class);
     
     /**
      * 
@@ -181,6 +184,10 @@ public class ResultSet implements Externalizable {
         
         this.exhausted = ! itr.hasNext();
         
+        log.info("ntuples=" + ntuples + ", capacity=" + capacity
+                + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
+                + ", sendVals=" + sendVals);
+        
     }
 
     protected static short VERSION0 = 0x0;
@@ -191,23 +198,23 @@ public class ResultSet implements Externalizable {
         
         if (version != VERSION0)
             throw new IOException("Unknown version=" + version);
-        
+
         rangeCount = (int) LongPacker.unpackLong(in);
-        ntuples = (int)LongPacker.unpackLong(in);
+        ntuples = (int) LongPacker.unpackLong(in);
         exhausted = in.readBoolean();
         final boolean haveKeys = in.readBoolean();
         final boolean haveVals = in.readBoolean();
-        final int lastKeySize = (int)LongPacker.unpackLong(in);
-        if(lastKeySize!=0) {
+        final int lastKeySize = (int) LongPacker.unpackLong(in);
+        if (lastKeySize != 0) {
             lastKey = new byte[lastKeySize];
             in.readFully(lastKey);
         } else {
             lastKey = null;
         }
-        if(haveKeys) {
+        if (haveKeys) {
             keys = new byte[ntuples][];
-            for(int i=0;i<ntuples;i++) {
-                int size = (int)LongPacker.unpackLong(in);
+            for (int i = 0; i < ntuples; i++) {
+                int size = (int) LongPacker.unpackLong(in);
                 byte[] tmp = new byte[size];
                 in.readFully(tmp);
                 keys[i] = tmp;
@@ -215,13 +222,17 @@ public class ResultSet implements Externalizable {
         } else {
             keys = null;
         }
-        if(haveVals) {
+        if (haveVals) {
             vals = new byte[ntuples][];
-            for(int i=0;i<ntuples;i++) {
-                int size = (int)LongPacker.unpackLong(in);
-                byte[] tmp = new byte[size];
-                in.readFully(tmp);
-                vals[i] = tmp;
+            for (int i = 0; i < ntuples; i++) {
+                // when lenPlus == 0 the value is null (vs byte[0]).
+                final int lenPlus1 = (int) LongPacker.unpackLong(in);
+                if (lenPlus1 > 0) {
+                    byte[] tmp = new byte[lenPlus1 - 1];
+                    in.readFully(tmp);
+                    vals[i] = tmp;
+                } else
+                    vals[i] = null;
             }
         } else {
             vals = null;
@@ -241,28 +252,34 @@ public class ResultSet implements Externalizable {
 
         ShortPacker.packShort(dos, VERSION0);
         LongPacker.packLong(dos, rangeCount);
-        LongPacker.packLong(dos,ntuples);
+        LongPacker.packLong(dos, ntuples);
         dos.writeBoolean(exhausted);
-        dos.writeBoolean(keys!=null);
-        dos.writeBoolean(vals!=null);
-        LongPacker.packLong(dos,lastKey==null?0:lastKey.length);
-        if(lastKey!=null) {
+        dos.writeBoolean(keys != null);
+        dos.writeBoolean(vals != null);
+        LongPacker.packLong(dos, lastKey == null ? 0 : lastKey.length);
+        if (lastKey != null) {
             dos.write(lastKey);
         }
-        if(keys!=null) {
-            for(int i=0; i<ntuples; i++) {
+        if (keys != null) {
+            for (int i = 0; i < ntuples; i++) {
+                // keys are never null.
                 LongPacker.packLong(dos, keys[i].length);
                 dos.write(keys[i]);
             }
         }
-        if(vals!=null) {
-            for(int i=0; i<ntuples; i++) {
-                LongPacker.packLong(dos, vals[i].length);
-                dos.write(vals[i]);
+        if (vals != null) {
+            for (int i = 0; i < ntuples; i++) {
+                final byte[] val = vals[i];
+                // this differentiates a null value from an empty byte[].
+                final int lenPlus1 = val == null ? 0 : val.length + 1;
+                LongPacker.packLong(dos, lenPlus1);
+                if (val != null) {
+                    dos.write(val);
+                }
             }
         }
-        
-//        out.write(baos.toByteArray());
+
+        // out.write(baos.toByteArray());
     }
 
 }

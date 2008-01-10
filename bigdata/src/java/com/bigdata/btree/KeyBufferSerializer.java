@@ -283,7 +283,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             counters.nserialized++;
 
             // offset into buffer before writing the data.
-            final int pos = os.len;
+            final int pos = os.position();
             
             os.packShort(VERSION0);
             
@@ -300,7 +300,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             }
 
             // #of bytes written.
-            counters.bytesWritten += (os.len - pos);
+            counters.bytesWritten += (os.position() - pos);
             
             return;
             
@@ -326,7 +326,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             
         }
 
-        counters.bytesWritten += temp_baos.len;
+        counters.bytesWritten += temp_baos.position();
         
 //        /*
 //         * If the key buffer is long enough, then apply compression.
@@ -377,7 +377,7 @@ public class KeyBufferSerializer implements IKeySerializer {
 
         os.packShort(VERSION0);
         
-        os.write(temp_baos.buf,0,temp_baos.len);
+        os.write(temp_baos.array(),0,temp_baos.position());
 
     }
     

@@ -126,8 +126,19 @@
 
   </p><p>
 
-  A related project bundles a Sesame 1.x integration.
+  A related project bundles a Sesame 2.x integration.
 
+  </p>
+  
+  <p>
+  
+  Interesting links include:
+  
+  <dl>
+  <dt>http://www.openrdf.org/</dt><dd>Open RDF and the Sesame 2.x platform.</dd>
+  <dt>http://iris-reasoner.org/</dt><dd>An open source reasoner supporting stratified datalog and magic sets.</dd>
+  </dl>
+  
   </p>
 
   <h2>License</h2>

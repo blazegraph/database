@@ -40,7 +40,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 
 import org.CognitiveWeb.util.PropertyUtil;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Bytes;

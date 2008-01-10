@@ -26,7 +26,6 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
-import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.spo.ISPOIterator;
 
@@ -75,6 +74,15 @@ public class SesameStatementIterator implements StatementIterator {
     public Statement next() {
 
         return db.asStatement( src.next() );
+        
+    }
+
+    /**
+     * @throws UnsupportedOperationException
+     */
+    public void remove() {
+        
+        throw new UnsupportedOperationException();
         
     }
     

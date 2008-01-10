@@ -173,7 +173,7 @@ public class ValueBufferSerializer {
             
         }
         
-        return new MutableValueBuffer(n,vals);
+        return new MutableValueBuffer(n, 0/*offset*/,vals);
         
     }
     
