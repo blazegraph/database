@@ -150,11 +150,12 @@ public class TestByteArrayValueSerializer extends TestCase2 {
                 
                 DataOutputBuffer dos = new DataOutputBuffer();
 
-            ser.putValues(dos, values, values.length);
+                ser.putValues(dos, values, values.length);
             
 //            dos.flush();
             
-            data = dos.buf;
+                data = dos.array();
+            
             }
 
             byte[][] actual = new byte[values.length][];

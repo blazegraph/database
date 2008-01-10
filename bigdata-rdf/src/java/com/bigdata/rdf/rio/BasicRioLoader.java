@@ -27,16 +27,13 @@ import java.io.Reader;
 import java.util.Iterator;
 import java.util.Vector;
 
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
+import org.openrdf.model.Statement;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.rio.Parser;
-import org.openrdf.rio.StatementHandler;
-import org.openrdf.rio.ntriples.NTriplesParser;
-import org.openrdf.rio.rdfxml.RdfXmlParser;
-import org.openrdf.rio.turtle.TurtleParser;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandler;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.Rio;
 
 import com.bigdata.rdf.model.OptimizedValueFactory;
 
@@ -124,30 +121,11 @@ public class BasicRioLoader implements IRioLoader {
      * 
      * @todo reuse parser instances for the same {@link RDFFormat}?
      */
-    final protected Parser getParser(RDFFormat rdfFormat) {
+    final protected RDFParser getParser(RDFFormat rdfFormat) {
 
         final ValueFactory valFactory = OptimizedValueFactory.INSTANCE;
         
-        final Parser parser;
-        
-        if (RDFFormat.RDFXML.equals(rdfFormat)) {
-            
-            parser = new RdfXmlParser(valFactory);
-            
-        } else if (RDFFormat.NTRIPLES.equals(rdfFormat)) {
-            
-            parser = new NTriplesParser(valFactory);
-            
-        } else if (RDFFormat.TURTLE.equals(rdfFormat)) {
-            
-            parser = new TurtleParser(valFactory);
-            
-        } else {
-            
-            throw new IllegalArgumentException("Format not supported: "
-                    + rdfFormat);
-            
-        }
+        final RDFParser parser = Rio.createParser(rdfFormat, valFactory);
         
         return parser;
 
@@ -189,11 +167,11 @@ public class BasicRioLoader implements IRioLoader {
         
         log.info("format="+rdfFormat+", verify="+verifyData);
         
-        Parser parser = getParser(rdfFormat);
+        final RDFParser parser = getParser(rdfFormat);
         
         parser.setVerifyData( verifyData );
         
-        parser.setStatementHandler( newStatementHandler() );
+        parser.setRDFHandler( newRDFHandler() );
     
         // Note: reset to that rates reflect load times not clock times.
         insertStart = System.currentTimeMillis();
@@ -258,37 +236,44 @@ public class BasicRioLoader implements IRioLoader {
     
     /**
      * Note: YOU MUST override this method to install a different
-     * {@link StatementHandler}. The default is the
-     * {@link BasicStatementHandler} which does NOTHING.
+     * {@link RDFHandler}. The default is the {@link BasicRDFHandler} which
+     * does NOTHING.
      */
-    public StatementHandler newStatementHandler() {
+    public RDFHandler newRDFHandler() {
         
-        return new BasicStatementHandler();
+        return new BasicRDFHandler();
         
     }
     
-    private class BasicStatementHandler implements StatementHandler
+    private class BasicRDFHandler implements RDFHandler
     {
 
-        public BasicStatementHandler() {
+        public BasicRDFHandler() {
+            
+        }
+
+        public void endRDF() throws RDFHandlerException {
+            
+        }
+
+        public void handleComment(String arg0) throws RDFHandlerException {
+
+        }
+
+        public void handleNamespace(String arg0, String arg1) throws RDFHandlerException {
             
         }
 
         /**
          * Counts the #of statements.
          */
-        public void handleStatement( Resource s, URI p, Value o ) {
+        public void handleStatement(Statement arg0) throws RDFHandlerException {
             
-//            if ( s instanceof BNode || 
-//                 p instanceof BNode || 
-//                 o instanceof BNode ) 
-//                return;
+            stmtsAdded++;           
             
-            // log.info( s + ", " + p + ", " + o );
-            
-            // store.addStatement( s, p, o );
-            
-            stmtsAdded++;
+        }
+
+        public void startRDF() throws RDFHandlerException {
             
         }
         

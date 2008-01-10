@@ -32,7 +32,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
@@ -129,7 +129,7 @@ public class TestSerialization extends TestCase2 {
      */
     public void test_dataTypeLiterals() {
 
-        _Literal a = new _Literal("bigdata",new _URI(XmlSchema.INT));
+        _Literal a = new _Literal("bigdata",new _URI(XMLSchema.INT));
         
         assertEquals(a, roundTrip_externalizable(a));
         assertEquals(a, roundTrip_tuned(a));

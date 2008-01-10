@@ -33,12 +33,13 @@ package com.bigdata.rdf.sail;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sail.SailUpdateException;
-import org.openrdf.sesame.sail.StatementIterator;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.StatementIterator;
 import com.bigdata.rdf.store.StatementWithType;
 
 /**
@@ -71,7 +72,7 @@ public class TestEntailments extends AbstractBigdataRdfSchemaRepositoryTestCase 
      * @throws SailInitializationException
      * @throws SailUpdateException
      */
-    public void test_addStatements() throws SailInitializationException, SailUpdateException {
+    public void test_addStatements() throws SailException {
 
         AbstractTripleStore store = repo.getDatabase();
 
@@ -116,8 +117,8 @@ public class TestEntailments extends AbstractBigdataRdfSchemaRepositoryTestCase 
             {
 
                 StatementIterator itr = 
-                    repo.getStatements(S3, URIImpl.RDF_TYPE,
-                            URIImpl.RDFS_RESOURCE);
+                    repo.getStatements(S3, RDF.TYPE,
+                            RDFS.RESOURCE);
 
                 try {
                 

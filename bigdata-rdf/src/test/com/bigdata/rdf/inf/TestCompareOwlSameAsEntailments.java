@@ -31,12 +31,13 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.StatementIterator;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.store.AbstractTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.StatementIterator;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
@@ -67,7 +68,7 @@ public class TestCompareOwlSameAsEntailments extends
         super(name);
     }
 
-    public void test_compareEntailments() throws IOException {
+    public void test_compareEntailments() throws IOException, SailException {
         
         String[] resource = new String[]{"/com/bigdata/rdf/inf/testOwlSameAs.rdf"};
         String[] baseURL = new String[]{""};
@@ -88,7 +89,7 @@ public class TestCompareOwlSameAsEntailments extends
      * @param format
      * @throws IOException
      */
-    protected void doCompareEntailments(String resource[], String baseURL[], RDFFormat[] format) throws IOException {
+    protected void doCompareEntailments(String resource[], String baseURL[], RDFFormat[] format) throws IOException, SailException {
         
         final AbstractTripleStore store1;
         final AbstractTripleStore store2;
@@ -152,7 +153,7 @@ public class TestCompareOwlSameAsEntailments extends
      * logic is not present in the rest of the test suite.
      */
     public static boolean modelsEqual(AbstractTripleStore expected,
-            AbstractTripleStore actual) {
+            AbstractTripleStore actual) throws SailException {
 
         int actualSize = 0; 
         boolean sameStatements1 = true;

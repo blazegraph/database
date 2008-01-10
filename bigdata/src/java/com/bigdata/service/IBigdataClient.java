@@ -66,6 +66,18 @@ public interface IBigdataClient {
     public void terminate();
 
     /**
+     * Return an array UUIDs for {@link IDataService}s.
+     * 
+     * @param maxCount
+     *            The maximum #of data services whose UUIDs will be returned.
+     *            When zero (0) the UUID for all known data services will be
+     *            returned.
+     * 
+     * @return An array of {@link UUID}s for data services.
+     */
+    public UUID[] getDataServiceUUIDs(int maxCount);
+    
+    /**
      * Resolve the service identifier to an {@link IDataService}.
      * <p>
      * Note: Whether the returned object is a proxy or the service

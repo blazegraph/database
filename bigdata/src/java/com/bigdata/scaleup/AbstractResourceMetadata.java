@@ -36,6 +36,8 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.sun.org.apache.bcel.internal.generic.GETSTATIC;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -172,4 +174,18 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
     }
 
+    /**
+     * A human readable representation of the resource metadata.
+     */
+    public String toString() {
+        
+        return getClass().getSimpleName()+
+        "{ size="+size()+
+        ", state="+state()+
+        ", filename="+getFile()+
+        ", uuid="+getUUID()+
+        "}";
+        
+    }
+    
 }

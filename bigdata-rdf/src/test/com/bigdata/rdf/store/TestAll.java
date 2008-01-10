@@ -65,8 +65,6 @@ public class TestAll extends TestCase {
         /*
          * Run each of the kinds of triple stores through both their specific
          * and shared unit tests.
-         * 
-         * @todo the scale out triple store using the proxied test suite.
          */
 
         suite.addTest( com.bigdata.rdf.store.TestTempTripleStore.suite() );
@@ -74,6 +72,25 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStore.suite() );
 
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );
+
+        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
+                        .suite());
+
+        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
+                "false"))) {
+
+            /*
+             * Test scale-out RDF database.
+             * 
+             * Note: This test suite sets up a local bigdata federation for each
+             * test. See the test suite for more information about required Java
+             * properties.
+             */
+
+            suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation
+                    .suite());
+
+        }
 
         return suite;
         

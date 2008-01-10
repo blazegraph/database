@@ -29,17 +29,20 @@ package com.bigdata.btree;
 
 public class MutableValueBuffer implements IValueBuffer {
 
-    private int nvals; 
-    private final byte[][] vals;
+    private int nvals;
+    private int offset;
+    final byte[][] vals;
     
-    public MutableValueBuffer(int nvals, byte[][] vals) {
+    public MutableValueBuffer(int nvals, int offset, byte[][] vals) {
         
         assert nvals >= 0;
+        assert offset >= 0;
         assert vals != null;
-        assert vals.length > 0;
-        assert nvals <= vals.length;
+        assert vals.length >= offset + nvals;
         
         this.nvals = nvals;
+
+        this.offset = offset;
         
         this.vals = vals;
         
@@ -47,19 +50,19 @@ public class MutableValueBuffer implements IValueBuffer {
     
     final public int capacity() {
         
-        return vals.length;
+        return nvals;
         
     }
     
     final public byte[] getValue(int index) {
         
-        if (index >= nvals) {
-
-            throw new IndexOutOfBoundsException();
-            
-        }
+//        if (index >= nvals) {
+//
+//            throw new IndexOutOfBoundsException();
+//            
+//        }
         
-        return vals[index];
+        return vals[offset + index];
 
     }
 

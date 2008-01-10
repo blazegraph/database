@@ -503,9 +503,11 @@ abstract public class MetadataService extends DataService implements
          *            sorted order.
          * @param dataServiceUUIDs
          *            The array of data services onto which each partition
-         *            defined by a separator key will be mapped. The #of entries
-         *            in this array MUST agree with the #of entries in the
-         *            <i>separatorKeys</i> array.
+         *            defined by a separator key will be mapped (optional). The
+         *            #of entries in this array MUST agree with the #of entries
+         *            in the <i>separatorKeys</i> array. When <code>null</code>,
+         *            the index paritions will be auto-assigned to data
+         *            services.
          */
         public RegisterMetadataIndexWithPartitionsTask(
                 ConcurrentJournal journal, String name, byte[][] separatorKeys,
@@ -519,14 +521,37 @@ abstract public class MetadataService extends DataService implements
             if (separatorKeys.length == 0)
                 throw new IllegalArgumentException();
 
-            if (dataServiceUUIDs == null)
-                throw new IllegalArgumentException();
-            
-            if (dataServiceUUIDs.length == 0)
-                throw new IllegalArgumentException();
-            
-            if( separatorKeys.length != dataServiceUUIDs.length )
-                throw new IllegalArgumentException();
+            if (dataServiceUUIDs != null) {
+
+                if (dataServiceUUIDs.length == 0)
+                    throw new IllegalArgumentException();
+
+                if (separatorKeys.length != dataServiceUUIDs.length)
+                    throw new IllegalArgumentException();
+
+            } else {
+                
+                /*
+                 * Auto-assign the index partitions to data services.
+                 */
+                
+                dataServiceUUIDs = new UUID[separatorKeys.length];
+                
+                for( int i=0; i<separatorKeys.length; i++) {
+                    
+                    try {
+
+                        dataServiceUUIDs[i] = getUnderUtilizedDataService();
+                    
+                    } catch(IOException ex) {
+                        
+                        throw new RuntimeException(ex);
+                        
+                    }
+                    
+                }
+                
+            }
 
             this.name = name;
             
@@ -644,9 +669,8 @@ abstract public class MetadataService extends DataService implements
                     managedIndexUUID, name);
 
             /*
-             * Register the metadata index with the metadata service.
-             * 
-             * @todo review how the index is registered here.
+             * Register the metadata index with the metadata service. This
+             * registration will not be restart safe until the task commits.
              */
             journal.registerIndex(metadataName, mdi);
 

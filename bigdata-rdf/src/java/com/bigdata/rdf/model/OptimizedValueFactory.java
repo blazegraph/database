@@ -33,12 +33,15 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.UUID;
 
+import javax.xml.datatype.XMLGregorianCalendar;
+
 import org.CognitiveWeb.extser.ShortPacker;
 import org.openrdf.model.BNode;
-import org.openrdf.model.GraphException;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -48,7 +51,6 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.DataInputBuffer;
@@ -190,7 +192,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
     public Literal createLiteral(String label, URI datatype) {
 
-        return new _Literal(label, (_URI)datatype);
+        return new _Literal(label, (_URI) INSTANCE.toNativeValue(datatype));
 
     }
 
@@ -205,11 +207,25 @@ public class OptimizedValueFactory implements ValueFactory {
      */
     public Statement createStatement(Resource s, URI p, Value o) {
 
-        return new _Statement((_Resource) s, (_URI) p, (_Value) o,
-                StatementEnum.Explicit);
+        return createStatement(s, p, o, null);
 
     }
 
+    public Statement createStatement(Resource s, URI p, Value o, Resource c) {
+
+        s = (Resource) toNativeValue(s);
+        
+        p = (URI) toNativeValue(p);
+        
+        o = toNativeValue(o);
+        
+        c = (Resource) toNativeValue(c);
+        
+        return new _Statement((_Resource) s, (_URI) p, (_Value) o, (_Resource)c,
+                StatementEnum.Explicit);
+        
+    }
+    
     public URI createURI(String namespace, String localName) {
 
         return createURI(namespace + localName);
@@ -337,12 +353,6 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
-        public StatementIterator getObjectStatements() throws GraphException {
-
-            throw new UnsupportedOperationException();
-            
-        }
-
         /**
          * Return the term code as defined by {@link RdfKeyBuilder} for this
          * type of term. This is used to places URIs, different types of
@@ -397,6 +407,12 @@ public class OptimizedValueFactory implements ValueFactory {
 
             return term.hashCode();
 
+        }
+
+        public String stringValue() {
+            
+            return term;
+            
         }
 
         public String toString() {
@@ -510,7 +526,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
                 switch (termCode) {
 
-                case RdfKeyBuilder.CODE_URI: {
+                case RdfKeyBuilder.TERM_CODE_URI: {
 
                     _URI tmp = new _URI();
 
@@ -520,9 +536,9 @@ public class OptimizedValueFactory implements ValueFactory {
 
                 }
 
-                case RdfKeyBuilder.CODE_LIT:
-                case RdfKeyBuilder.CODE_LCL:
-                case RdfKeyBuilder.CODE_DTL: {
+                case RdfKeyBuilder.TERM_CODE_LIT:
+                case RdfKeyBuilder.TERM_CODE_LCL:
+                case RdfKeyBuilder.TERM_CODE_DTL: {
 
                     _Literal tmp = new _Literal();
 
@@ -532,7 +548,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
                 }
 
-                case RdfKeyBuilder.CODE_BND: {
+                case RdfKeyBuilder.TERM_CODE_BND: {
 
                     _BNode tmp = new _BNode();
 
@@ -664,14 +680,6 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
-        public void addProperty(URI arg0, Value arg1) throws GraphException {
-            throw new UnsupportedOperationException();
-        }
-
-        public StatementIterator getSubjectStatements() throws GraphException {
-            throw new UnsupportedOperationException();
-        }
-
     }
 
     final public static class _BNode extends _Resource implements BNode {
@@ -703,11 +711,11 @@ public class OptimizedValueFactory implements ValueFactory {
         }
 
         /**
-         * @return {@link RdfKeyBuilder#CODE_BND}.
+         * @return {@link RdfKeyBuilder#TERM_CODE_BND}.
          */
         public byte getTermCode() {
             
-            return RdfKeyBuilder.CODE_BND;
+            return RdfKeyBuilder.TERM_CODE_BND;
             
         }
 
@@ -725,20 +733,20 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
             
-            deserialize(VERSION0, RdfKeyBuilder.CODE_BND, in);
+            deserialize(VERSION0, RdfKeyBuilder.TERM_CODE_BND, in);
             
         }
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            serialize(VERSION0, RdfKeyBuilder.CODE_BND, out);
+            serialize(VERSION0, RdfKeyBuilder.TERM_CODE_BND, out);
             
         }
 
         protected void serialize(short version, byte termCode, DataOutput out)
                 throws IOException {
             
-            assert termCode == RdfKeyBuilder.CODE_BND;
+            assert termCode == RdfKeyBuilder.TERM_CODE_BND;
             
             out.writeUTF(term);
             
@@ -750,7 +758,7 @@ public class OptimizedValueFactory implements ValueFactory {
          */
         protected void deserialize(short version, byte termCode, DataInput in) throws IOException {
 
-            assert termCode == RdfKeyBuilder.CODE_BND;
+            assert termCode == RdfKeyBuilder.TERM_CODE_BND;
 
             term = in.readUTF();
             
@@ -774,9 +782,9 @@ public class OptimizedValueFactory implements ValueFactory {
          * One of the values defined by {@link RdfKeyBuilder} to identify the
          * distinct kinds of RDF literal:
          * <ul>
-         * <li>{@link RdfKeyBuilder#CODE_LIT plain literal}</li>
-         * <li>{@link RdfKeyBuilder#CODE_LCL language code literal}</li>
-         * <li>{@link RdfKeyBuilder#CODE_DTL datatype literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_LIT plain literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_LCL language code literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_DTL datatype literal}</li>
          * </ul>
          * Note that the code places each kind of term (Literal, URI, or BNode)
          * into a distinct region of the value space for terms.
@@ -812,9 +820,9 @@ public class OptimizedValueFactory implements ValueFactory {
          * One of the values defined by {@link RdfKeyBuilder} to identify the
          * distinct kinds of RDF literal:
          * <ul>
-         * <li>{@link RdfKeyBuilder#CODE_LIT plain literal}</li>
-         * <li>{@link RdfKeyBuilder#CODE_LCL language code literal}</li>
-         * <li>{@link RdfKeyBuilder#CODE_DTL datatype literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_LIT plain literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_LCL language code literal}</li>
+         * <li>{@link RdfKeyBuilder#TERM_CODE_DTL datatype literal}</li>
          * </ul>
          * Note that the code places each kind of term (Literal, URI, or BNode)
          * into a distinct region of the value space for terms.
@@ -838,7 +846,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
             super(label);
             
-            this.code = RdfKeyBuilder.CODE_LIT;
+            this.code = RdfKeyBuilder.TERM_CODE_LIT;
 
             this.language = null;
             
@@ -858,7 +866,7 @@ public class OptimizedValueFactory implements ValueFactory {
             
             if (language.length() == 0) {
 
-                this.code = RdfKeyBuilder.CODE_LIT;
+                this.code = RdfKeyBuilder.TERM_CODE_LIT;
 
                 this.language = null;
                 
@@ -866,7 +874,7 @@ public class OptimizedValueFactory implements ValueFactory {
 
             } else {
 
-                this.code = RdfKeyBuilder.CODE_LCL;
+                this.code = RdfKeyBuilder.TERM_CODE_LCL;
 
                 this.language = language;
 
@@ -886,7 +894,7 @@ public class OptimizedValueFactory implements ValueFactory {
                 
             }
             
-            this.code = RdfKeyBuilder.CODE_DTL;
+            this.code = RdfKeyBuilder.TERM_CODE_DTL;
 
             this.language = null;
             
@@ -926,16 +934,16 @@ public class OptimizedValueFactory implements ValueFactory {
             // wrong label.
             if(!term.equals(oval.term)) return false;
             
-            if(code==RdfKeyBuilder.CODE_LIT) {
+            if(code==RdfKeyBuilder.TERM_CODE_LIT) {
                 
                 return true;
                 
-            } else if(code==RdfKeyBuilder.CODE_LCL) {
+            } else if(code==RdfKeyBuilder.TERM_CODE_LCL) {
 
                 // check language code.
                 return language.equals(oval.language);
                 
-            } else if(code==RdfKeyBuilder.CODE_DTL) {
+            } else if(code==RdfKeyBuilder.TERM_CODE_DTL) {
 
                 // check datatype.
                 return datatype.equals(oval.datatype);
@@ -973,11 +981,11 @@ public class OptimizedValueFactory implements ValueFactory {
             
             switch (termCode) {
             
-            case RdfKeyBuilder.CODE_LIT:
+            case RdfKeyBuilder.TERM_CODE_LIT:
                 
                 break;
             
-            case RdfKeyBuilder.CODE_LCL:
+            case RdfKeyBuilder.TERM_CODE_LCL:
                 
                 assert language != null;
 
@@ -991,7 +999,7 @@ public class OptimizedValueFactory implements ValueFactory {
                 
                 break;
             
-            case RdfKeyBuilder.CODE_DTL:
+            case RdfKeyBuilder.TERM_CODE_DTL:
                 
                 assert datatype != null;
                 
@@ -1019,11 +1027,11 @@ public class OptimizedValueFactory implements ValueFactory {
             
             switch (code) {
             
-            case RdfKeyBuilder.CODE_LIT:
+            case RdfKeyBuilder.TERM_CODE_LIT:
                 
                 break;
             
-            case RdfKeyBuilder.CODE_LCL:
+            case RdfKeyBuilder.TERM_CODE_LCL:
                 
                 language = in.readUTF();
 
@@ -1031,7 +1039,7 @@ public class OptimizedValueFactory implements ValueFactory {
                 
                 break;
             
-            case RdfKeyBuilder.CODE_DTL:
+            case RdfKeyBuilder.TERM_CODE_DTL:
             
                 datatype = new _URI(in.readUTF());
                 
@@ -1049,6 +1057,61 @@ public class OptimizedValueFactory implements ValueFactory {
             
             assert term != null;
             
+        }
+
+        /*
+         * FIXME datatype aware methods are not implemented.  frankly, I do not
+         * think that we will need them for the RIO integration.
+         */
+        
+        public boolean booleanValue() {
+            // TODO Auto-generated method stub
+            return false;
+        }
+
+        public byte byteValue() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public XMLGregorianCalendar calendarValue() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public BigDecimal decimalValue() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public double doubleValue() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public float floatValue() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public int intValue() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public BigInteger integerValue() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public long longValue() {
+            // TODO Auto-generated method stub
+            return 0;
+        }
+
+        public short shortValue() {
+            // TODO Auto-generated method stub
+            return 0;
         }
         
     }
@@ -1075,13 +1138,19 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        public _URI(URI uri) {
+
+            super(uri.toString());
+
+        }
+
         public _URI(String namespace, String localName) {
 
             super(namespace + localName);
 
         }
 
-        public String getURI() {
+        public String toString() {
 
             return term;
 
@@ -1116,20 +1185,11 @@ public class OptimizedValueFactory implements ValueFactory {
         }
 
         /**
-         * Not supported.
-         */
-        public StatementIterator getPredicateStatements() throws GraphException {
-
-            throw new UnsupportedOperationException();
-            
-        }
-
-        /**
-         * @return {@link RdfKeyBuilder#CODE_URI}.
+         * @return {@link RdfKeyBuilder#TERM_CODE_URI}.
          */
         public byte getTermCode() {
 
-            return RdfKeyBuilder.CODE_URI;
+            return RdfKeyBuilder.TERM_CODE_URI;
             
         }
 
@@ -1147,13 +1207,13 @@ public class OptimizedValueFactory implements ValueFactory {
 
         public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
             
-            deserialize(VERSION0, RdfKeyBuilder.CODE_URI, in);
+            deserialize(VERSION0, RdfKeyBuilder.TERM_CODE_URI, in);
             
         }
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            serialize(VERSION0, RdfKeyBuilder.CODE_URI, out);
+            serialize(VERSION0, RdfKeyBuilder.TERM_CODE_URI, out);
             
         }
         
@@ -1163,7 +1223,7 @@ public class OptimizedValueFactory implements ValueFactory {
         protected void serialize(short version, byte termCode, DataOutput out)
                 throws IOException {
             
-            assert termCode == RdfKeyBuilder.CODE_URI;
+            assert termCode == RdfKeyBuilder.TERM_CODE_URI;
             
             // Serialize as UTF.
             out.writeUTF(term);
@@ -1173,7 +1233,7 @@ public class OptimizedValueFactory implements ValueFactory {
         protected void deserialize(short version, byte termCode, DataInput in)
             throws IOException {
 
-            assert termCode == RdfKeyBuilder.CODE_URI;
+            assert termCode == RdfKeyBuilder.TERM_CODE_URI;
 
             term = in.readUTF();
             
@@ -1181,6 +1241,12 @@ public class OptimizedValueFactory implements ValueFactory {
         
     }
 
+    /**
+     * A statement with optional context (a quad).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     public static class _Statement implements Statement {
 
         /**
@@ -1193,6 +1259,8 @@ public class OptimizedValueFactory implements ValueFactory {
         public final _URI p;
 
         public final _Value o;
+
+        public final _Resource c;
 
         /**
          * The #of times this statement is encountered within a
@@ -1236,9 +1304,10 @@ public class OptimizedValueFactory implements ValueFactory {
          * @param s
          * @param p
          * @param o
+         * @param c
          * @param type
          */
-        public _Statement(_Resource s, _URI p, _Value o, StatementEnum type) {
+        public _Statement(_Resource s, _URI p, _Value o, _Resource c, StatementEnum type) {
 
             assert type != null;
             
@@ -1247,7 +1316,9 @@ public class OptimizedValueFactory implements ValueFactory {
             this.p = p;
 
             this.o = o;
-
+            
+            this.c = c;
+            
             this.type = type;
             
         }
@@ -1270,6 +1341,12 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+        public Resource getContext() {
+            
+            return c;
+            
+        }
+        
         /**
          * Note: {@link StatementBuffer} relies on this method returning true
          * iff the term identifiers and the {@link #type} are all equals in
@@ -1472,6 +1549,51 @@ public class OptimizedValueFactory implements ValueFactory {
 
         }
 
+    }
+
+    /*
+     * FIXME datatyped literal methods are not implemented - I don't know that
+     * we will need them on this value factory.
+     */
+    
+    public Literal createLiteral(boolean arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(byte arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(short arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(int arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(long arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(float arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(double arg0) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Literal createLiteral(XMLGregorianCalendar arg0) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

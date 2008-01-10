@@ -93,8 +93,6 @@ public interface IMetadataService extends IDataService {
     /**
      * Register and statically partition a scale-out index.
      * 
-     * Create and statically partition a scale-out index.
-     * 
      * @param name
      *            The name of the scale-out index.
      * @param separatorKeys
@@ -103,10 +101,13 @@ public interface IMetadataService extends IDataService {
      *            empty byte[]. The entries MUST be in sorted order.
      * @param dataServiceUUIDs
      *            The array of data services onto which each partition defined
-     *            by a separator key will be mapped. The #of entries in this
-     *            array MUST agree with the #of entries in the <i>separatorKeys</i>
-     *            array.
+     *            by a separator key will be mapped (optional). The #of entries
+     *            in this array MUST agree with the #of entries in the
+     *            <i>separatorKeys</i> array. When <code>null</code>, the
+     *            index paritions will be auto-assigned to data services.
+     * 
      * @return The UUID of the scale-out index.
+     * 
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException

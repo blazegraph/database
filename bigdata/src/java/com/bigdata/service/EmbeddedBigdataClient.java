@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -74,7 +75,7 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     }
 
-    private IBigdataFederation fed = null;
+    private EmbeddedBigdataFederation fed = null;
 
     public void terminate() {
 
@@ -83,6 +84,37 @@ public class EmbeddedBigdataClient implements IBigdataClient {
             fed.disconnect();
             
         }
+        
+    }
+
+    /**
+     * Returns UUIDs for embedded {@link IDataService}s.
+     */
+    public UUID[] getDataServiceUUIDs(int maxCount) {
+
+        if (maxCount < 0)
+            throw new IllegalArgumentException();
+        
+        final int n = maxCount == 0 ? fed.ndataServices : Math.min(maxCount,
+                fed.ndataServices);
+        
+        final UUID[] uuids = new UUID[ n ];
+        
+        for(int i=0; i<n; i++) {
+            
+            try {
+            
+                uuids[i] = fed.getDataService( i ).getServiceUUID();
+            
+            } catch (IOException e) {
+                
+                throw new RuntimeException( e );
+                
+            }
+            
+        }
+        
+        return uuids;
         
     }
 
@@ -96,7 +128,7 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
         assertConnected();
 
-        return ((EmbeddedBigdataFederation)fed).getDataService(serviceUUID);
+        return fed.getDataService(serviceUUID);
         
     }
 
@@ -107,7 +139,7 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
         assertConnected();
         
-        return ((EmbeddedBigdataFederation)fed).getMetadataService();
+        return fed.getMetadataService();
         
     }
 

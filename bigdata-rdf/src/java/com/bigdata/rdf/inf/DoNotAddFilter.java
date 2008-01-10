@@ -68,7 +68,7 @@ public class DoNotAddFilter implements ISPOFilter {
 
     public boolean isMatch(SPO spo) {
 
-        if((spo.s & IRawTripleStore.CODE_LITERAL) != 0L) {
+        if((spo.s & IRawTripleStore.TERMID_CODE_LITERAL) != 0L) {
             
             /*
              * Note: Explicitly toss out entailments that would place a

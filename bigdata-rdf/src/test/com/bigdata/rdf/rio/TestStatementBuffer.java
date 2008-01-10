@@ -27,8 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -110,9 +110,10 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             
             _URI s1 = new _URI("http://www.foo.org");
             _URI p1 = new _URI( RDF.TYPE);
-            _URI o1 =  new _URI(RDFS.RESOURCE);
+            _URI o1 = new _URI(RDFS.RESOURCE);
+            _URI c1 = null; // no context.
     
-            buffer.handleStatement(s1, p1, o1, StatementEnum.Explicit );
+            buffer.handleStatement(s1, p1, o1, c1, StatementEnum.Explicit );
             
             assertEquals(3,buffer.numURIs);
             assertEquals(0,buffer.numLiterals);
@@ -157,8 +158,10 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             _URI s2 = new _URI("http://www.foo.org"); // duplicate term!
             _URI p2 = new _URI( RDFS.LABEL);
             _Literal o2 =  new _Literal("test uri.");
+//            _URI c2 = new _URI("http://www.foo.org/myGraph");
+            _URI c2 = null;
             
-            buffer.handleStatement(s2, p2, o2, StatementEnum.Explicit );
+            buffer.handleStatement(s2, p2, o2, c2, StatementEnum.Explicit );
     
             assertEquals(4,buffer.numURIs); // only 4 since one is a duplicate.
             assertEquals(1,buffer.numLiterals);
@@ -171,6 +174,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             assertEquals(0,s2.count);
             assertEquals(1,p2.count);
             assertEquals(1,o2.count);
+//            assertEquals(1,c2.count);
     
             /*
              * verify term class (URI, Literal or BNode) iterators.
@@ -207,8 +211,10 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             _URI s3 = new _URI("http://www.foo.org"); // duplicate term!
             _URI p3 = new _URI( RDFS.LABEL);
             _Literal o3 =  new _Literal("test uri.");
+//            _URI c3 = new _URI("http://www.foo.org/myGraph");
+            _URI c3 = null;
             
-            buffer.handleStatement(s3, p3, o3, StatementEnum.Explicit );
+            buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit );
     
             assertEquals(4,buffer.numURIs);
             assertEquals(1,buffer.numLiterals);
@@ -224,12 +230,13 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             assertEquals(0,s3.count);
             assertEquals(0,p3.count);
             assertEquals(0,o3.count);
+//            assertEquals(2,c3.count);
     
             /*
              * add a duplicate statement using the _same_ term objects.
              */
             
-            buffer.handleStatement(s3, p3, o3, StatementEnum.Explicit );
+            buffer.handleStatement(s3, p3, o3, c3, StatementEnum.Explicit );
     
             assertEquals(4,buffer.numURIs);
             assertEquals(1,buffer.numLiterals);

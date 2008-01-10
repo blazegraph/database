@@ -141,6 +141,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
     }
     
+    final public boolean isReadOnly() {
+        
+        return false;
+        
+    }
+    
     final public void clear() {
         
         /*

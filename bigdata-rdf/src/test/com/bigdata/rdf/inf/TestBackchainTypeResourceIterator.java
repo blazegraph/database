@@ -29,6 +29,8 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -87,8 +89,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
-            buffer.add(B, URIImpl.RDF_TYPE, C);
+            buffer.add(A, RDF.TYPE, B);
+            buffer.add(B, RDF.TYPE, C);
             
             buffer.flush();
 
@@ -106,14 +108,14 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     
                     new SPO(//
                             store.getTermId(A),//
-                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(RDF.TYPE),//
                             store.getTermId(B),//
                             StatementEnum.Explicit),
                             
                     new SPO(//
                             store.getTermId(A), //
-                            store.getTermId(URIImpl.RDF_TYPE), //
-                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
                             StatementEnum.Inferred)
                     },
                     
@@ -157,11 +159,11 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
+            buffer.add(A, RDF.TYPE, B);
 
-            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_RESOURCE);
+            buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
 
-            buffer.add(B, URIImpl.RDF_TYPE, C);
+            buffer.add(B, RDF.TYPE, C);
             
             buffer.flush();
 
@@ -179,14 +181,14 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     
                     new SPO(//
                             store.getTermId(A),//
-                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(RDF.TYPE),//
                             store.getTermId(B),//
                             StatementEnum.Explicit),
                             
                     new SPO(//
                             store.getTermId(A), //
-                            store.getTermId(URIImpl.RDF_TYPE), //
-                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
                             StatementEnum.Explicit)
                     },
                 
@@ -231,11 +233,11 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
+            buffer.add(A, RDF.TYPE, B);
             
-            buffer.add(A, URIImpl.RDF_TYPE, URIImpl.RDFS_RESOURCE);
+            buffer.add(A, RDF.TYPE, RDFS.RESOURCE);
             
-            buffer.add(B, URIImpl.RDF_TYPE, C);
+            buffer.add(B, RDF.TYPE, C);
             
             buffer.flush();
 
@@ -251,26 +253,26 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
 
                     new SPO(//
                             store.getTermId(A),//
-                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(RDF.TYPE),//
                             store.getTermId(B),//
                             StatementEnum.Explicit),
 
                     new SPO(//
                             store.getTermId(B),//
-                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(RDF.TYPE),//
                             store.getTermId(C),//
                             StatementEnum.Explicit),
                     
                     new SPO(//
                             store.getTermId(A), //
-                            store.getTermId(URIImpl.RDF_TYPE), //
-                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
                             StatementEnum.Explicit),
                     
                     new SPO(//
                             store.getTermId(B), //
-                            store.getTermId(URIImpl.RDF_TYPE), //
-                            store.getTermId(URIImpl.RDFS_RESOURCE), //
+                            store.getTermId(RDF.TYPE), //
+                            store.getTermId(RDFS.RESOURCE), //
                             StatementEnum.Inferred)
                     
             },
@@ -312,8 +314,8 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             
             IStatementBuffer buffer = new StatementBuffer(store, 100/*capacity*/);
             
-            buffer.add(A, URIImpl.RDF_TYPE, B);
-            buffer.add(B, URIImpl.RDF_TYPE, C);
+            buffer.add(A, RDF.TYPE, B);
+            buffer.add(B, RDF.TYPE, C);
             
             buffer.flush();
 
@@ -335,7 +337,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     
                     new SPO(//
                             store.getTermId(A),//
-                            store.getTermId(URIImpl.RDF_TYPE),//
+                            store.getTermId(RDF.TYPE),//
                             store.getTermId(B),//
                             StatementEnum.Explicit)
                     

@@ -47,7 +47,7 @@ public class DataInputBuffer implements DataInput {
     /**
      * The buffer whose contents are being read.
      */
-    final protected byte[] buf;
+    protected byte[] buf;
     
     /**
      * The current offset in the buffer.  This is incremented each time
@@ -58,7 +58,7 @@ public class DataInputBuffer implements DataInput {
     /**
      * The index of the last byte in the buffer having valid data.
      */
-    final protected int len;
+    protected int len;
     
     /**
      * Prepare for reading from the byte[].
@@ -104,6 +104,25 @@ public class DataInputBuffer implements DataInput {
         this.off = off;
         
         this.len = len;
+        
+    }
+
+    /**
+     * Replaces the buffer and resets the offset to zero (0).
+     * 
+     * @param buf
+     *            The new buffer.
+     */
+    public void setBuffer(byte[] buf) {
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+
+        this.buf = buf;
+        
+        this.off = 0;
+        
+        this.len = buf.length;
         
     }
     

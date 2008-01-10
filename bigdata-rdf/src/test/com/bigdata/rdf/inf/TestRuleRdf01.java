@@ -27,12 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
-import java.util.Properties;
-
 import org.openrdf.model.URI;
-import org.openrdf.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.rdf.inf.InferenceEngine.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -75,8 +72,8 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             URI B = new _URI("http://www.foo.org/B");
             URI C = new _URI("http://www.foo.org/C");
     
-            URI rdfType = new _URI(RDF.TYPE);
-            URI rdfProperty = new _URI(RDF.PROPERTY);
+            URI rdfType = RDF.TYPE;
+            URI rdfProperty = RDF.PROPERTY;
     
             store.addStatement(A, B, C);
     
@@ -119,8 +116,8 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
             URI D = new _URI("http://www.foo.org/D");
             URI E = new _URI("http://www.foo.org/E");
 
-            URI rdfType = new _URI(RDF.TYPE);
-            URI rdfProperty = new _URI(RDF.PROPERTY);
+            URI rdfType = RDF.TYPE;
+            URI rdfProperty = RDF.PROPERTY;
 
             /*
              * Three statements that will trigger the rule, but two statements

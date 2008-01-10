@@ -35,10 +35,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.openrdf.sesame.admin.UpdateException;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.RdfRepository;
-import org.openrdf.sesame.sail.SailInitializationException;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.InferenceEngine.ForwardClosureEnum;
@@ -86,7 +84,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * @throws IOException
      * @throws UpdateException
      */
-    public void testClosure01_full() throws SailInitializationException, IOException, UpdateException {
+    public void testClosure01_full() throws SailException, IOException {
         
         Properties properties = new Properties(getProperties());
 
@@ -100,7 +98,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         
     }
 
-    public void testClosure01_fast() throws SailInitializationException, IOException, UpdateException {
+    public void testClosure01_fast() throws SailException, IOException {
         
         Properties properties = new Properties(getProperties());
 
@@ -121,7 +119,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      * @throws IOException
      * @throws UpdateException
      */
-    public void testAlibaba_v41_full() throws SailInitializationException, IOException, UpdateException {
+    public void testAlibaba_v41_full() throws SailException, IOException {
 
         String resource = "../rdf-data/alibaba_v41.rdf";
         
@@ -146,7 +144,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
         
     }
 
-    public void testAlibaba_v41_fast() throws SailInitializationException, IOException, UpdateException {
+    public void testAlibaba_v41_fast() throws SailException, IOException {
 
         String resource = "../rdf-data/alibaba_v41.rdf";
         
@@ -190,8 +188,7 @@ public class TestRDFSClosure extends AbstractInferenceEngineTestCase {
      */
     protected void assertCorrectClosure(Properties properties, String resource,
             String baseURL, RDFFormat format) throws IOException,
-            SailInitializationException,
-            UpdateException {
+            SailException {
 
         RdfRepository groundTruth = getGroundTruth(resource, baseURL, format);
 

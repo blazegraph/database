@@ -29,6 +29,8 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -80,13 +82,13 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             IStatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */);
             
-            buffer.add(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
+            buffer.add(U, RDF.TYPE, RDFS.CLASS);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U, RDF.TYPE, RDFS.CLASS));
             assertEquals(1,store.getStatementCount());
 
             Rule r = new RuleRdfs10(new RDFSHelper(store));
@@ -99,10 +101,10 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(U, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U, RDF.TYPE, RDFS.CLASS));
             
             // entailed
-            assertTrue(store.hasStatement(U, URIImpl.RDFS_SUBCLASSOF, U));
+            assertTrue(store.hasStatement(U, RDFS.SUBCLASSOF, U));
 
             // final #of statements in the store.
             assertEquals(2,store.getStatementCount());
@@ -135,15 +137,15 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
             IStatementBuffer buffer = new StatementBuffer(store,
                     100/* capacity */);
             
-            buffer.add(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
-            buffer.add(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS);
+            buffer.add(U1, RDF.TYPE, RDFS.CLASS);
+            buffer.add(U2, RDF.TYPE, RDFS.CLASS);
 
             // write on the store.
             buffer.flush();
 
             // verify statement(s).
-            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
-            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U1, RDF.TYPE, RDFS.CLASS));
+            assertTrue(store.hasStatement(U1, RDF.TYPE, RDFS.CLASS));
             assertEquals(2,store.getStatementCount());
 
             Rule r = new RuleRdfs10(new RDFSHelper(store));
@@ -156,12 +158,12 @@ public class TestRuleRdfs10 extends AbstractRuleTestCase {
              */
 
             // told
-            assertTrue(store.hasStatement(U1, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
-            assertTrue(store.hasStatement(U2, URIImpl.RDF_TYPE, URIImpl.RDFS_CLASS));
+            assertTrue(store.hasStatement(U1, RDF.TYPE, RDFS.CLASS));
+            assertTrue(store.hasStatement(U2, RDF.TYPE, RDFS.CLASS));
             
             // entailed
-            assertTrue(store.hasStatement(U1, URIImpl.RDFS_SUBCLASSOF, U1));
-            assertTrue(store.hasStatement(U2, URIImpl.RDFS_SUBCLASSOF, U2));
+            assertTrue(store.hasStatement(U1, RDFS.SUBCLASSOF, U1));
+            assertTrue(store.hasStatement(U2, RDFS.SUBCLASSOF, U2));
 
             // final #of statements in the store.
             assertEquals(4,store.getStatementCount());

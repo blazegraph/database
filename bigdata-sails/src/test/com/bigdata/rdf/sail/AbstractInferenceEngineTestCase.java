@@ -44,21 +44,17 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 import org.openrdf.model.Statement;
-import org.openrdf.sesame.admin.RdfAdmin;
-import org.openrdf.sesame.admin.StdOutAdminListener;
-import org.openrdf.sesame.admin.UpdateException;
-import org.openrdf.sesame.constants.RDFFormat;
-import org.openrdf.sesame.sail.RdfRepository;
-import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.sesame.sail.SailUtil;
-import org.openrdf.sesame.sail.StatementIterator;
-import org.openrdf.sesame.sailimpl.memory.RdfSchemaRepository;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.sail.SailException;
+import org.openrdf.sail.helpers.SailUtil;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.inf.InferenceEngine;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.store.StatementIterator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -96,7 +92,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
                         "false");
 
         properties.setProperty(
-                com.bigdata.rdf.sail.BigdataRdfRepository.Options.STORE_CLASS,
+                com.bigdata.rdf.sail.BigdataSail.Options.STORE_CLASS,
                 LocalTripleStore.class.getName());
 
         /*
@@ -130,13 +126,13 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
      * how the models differ.
      */
     public boolean modelsEqual(RdfRepository expected, InferenceEngine inf)
-            throws SailInitializationException {
+            throws SailException {
 
-        BigdataRdfRepository repo = new BigdataRdfRepository(inf.database);
+        BigdataSailConnection repo = new BigdataSailConnection(inf.database);
         
         Properties properties = new Properties(getProperties());
         
-        properties.setProperty(BigdataRdfRepository.Options.TRUTH_MAINTENANCE,
+        properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
                 "" + true);
         
         repo.initialize( properties );
@@ -162,7 +158,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
      *       in a manner that handles bnodes.
      */
     public static boolean modelsEqual(RdfRepository expected,
-            BigdataRdfRepository actual) {
+            BigdataSailConnection actual) {
 
         Collection<Statement> expectedRepo = getStatements(expected);
 
@@ -281,8 +277,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
      * @throws UpdateException
      */
     protected RdfRepository getGroundTruth(String resource, String baseURL,
-            RDFFormat format) throws SailInitializationException, IOException,
-            UpdateException {
+            RDFFormat format) throws SailException, IOException {
 
         return getGroundTruth(new String[] { resource },
                 new String[] { baseURL }, new RDFFormat[] { format });
@@ -303,8 +298,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
      * @throws UpdateException
      */
     protected RdfRepository getGroundTruth(String[] resource, String[] baseURL,
-            RDFFormat[] format) throws SailInitializationException, IOException,
-            UpdateException {
+            RDFFormat[] format) throws SailException, IOException {
 
         assert resource.length == baseURL.length;
         
@@ -329,7 +323,7 @@ abstract public class AbstractInferenceEngineTestCase extends TestCase {
      */
     protected void upload(RdfRepository repo, String resource, String baseURL,
             RDFFormat format)
-            throws IOException, UpdateException {
+            throws IOException {
 
         InputStream rdfStream = getClass().getResourceAsStream(resource);
 

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -70,16 +70,16 @@ public class TestAxiomModel extends AbstractInferenceEngineTestCase {
             // store is still empty (on demand assertion of axioms).
             assertEquals(0,store.getStatementCount());
 
-            assertTrue(axioms.isAxiom(new StatementImpl(URIImpl.RDF_TYPE,
-                    URIImpl.RDF_TYPE, URIImpl.RDF_PROPERTY)));
+            assertTrue(axioms.isAxiom(new StatementImpl(RDF.TYPE,
+                    RDF.TYPE, RDF.PROPERTY)));
             
             // We have to do this explicitly so that the identifiers for the
             // axioms are defined.
             axioms.addAxioms();
             
-            assertTrue(axioms.isAxiom(store.getTermId(URIImpl.RDF_TYPE), store
-                    .getTermId(URIImpl.RDF_TYPE), store
-                    .getTermId(URIImpl.RDF_PROPERTY)));
+            assertTrue(axioms.isAxiom(store.getTermId(RDF.TYPE), store
+                    .getTermId(RDF.TYPE), store
+                    .getTermId(RDF.PROPERTY)));
             
         } finally {
             

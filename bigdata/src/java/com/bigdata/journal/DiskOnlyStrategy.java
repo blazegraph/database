@@ -672,7 +672,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 sb.append("disk(other): #force=" + nforce + ", #extend="
                         + ntruncate + ", #reopen=" + nreopen + ", #rootBlocks="
-                        + nwriteRootBlock);
+                        + nwriteRootBlock+"\n");
                 
             }
 

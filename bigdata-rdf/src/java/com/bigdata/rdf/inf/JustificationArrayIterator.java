@@ -29,8 +29,6 @@ package com.bigdata.rdf.inf;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.rdf.spo.IChunkedIterator;
-
 /**
  * Visits {@link Justification}s from a backing array.
  * 

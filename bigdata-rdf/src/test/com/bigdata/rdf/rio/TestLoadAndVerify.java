@@ -38,10 +38,9 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.rio.StatementHandler;
-import org.openrdf.rio.StatementHandlerException;
-import org.openrdf.sesame.constants.RDFFormat;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandler;
+import org.openrdf.rio.helpers.RDFHandlerBase;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.util.KeyOrder;
 
@@ -95,6 +95,16 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
         
+        if(store instanceof ScaleOutTripleStore) {
+
+            /*
+             * FIXME The test needs to use the batch API to verify the
+             * statements in the scale-out triple store.
+             */
+            fail("Test needs batch verification method for scale-out version.");
+            
+        }
+        
         try {
     
         // avoid modification of the properties.
@@ -129,12 +139,11 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             
             BasicRioLoader loader = new BasicRioLoader() {
 
-                public StatementHandler newStatementHandler() {
+                public RDFHandler newRDFHandler() {
 
-                    return new StatementHandler() {
+                    return new RDFHandlerBase() {
 
-                        public void handleStatement(Resource s, URI p,
-                                Value o) throws StatementHandlerException {
+                        public void handleStatement(Statement stmt) {
 
                             if (nerrs.get() > 20) {
 
@@ -142,19 +151,24 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                 
                             }
                             
+                            Resource s = stmt.getSubject();
+                            URI p = stmt.getPredicate();
+                            Value o = stmt.getObject();
+                            Resource c = stmt.getContext();
+                            
                             // convert to Sesame objects.
                             s = (Resource) db.asValue(s);
                             p = (URI) db.asValue(p);
                             o = (Value) db.asValue(o);
+                            c = (Resource) db.asValue(c);
                             
-                            long _s = assertTerm(s);
-                            long _p = assertTerm(p);
-                            long _o = assertTerm(o);
+                            final long _s = assertTerm(s);
+                            final long _p = assertTerm(p);
+                            final long _o = assertTerm(o);
+                            final long _c = (c==null?NULL:assertTerm(c)); // FIXME consider context in asserts.
                             
                             if (_s != NULL && _p != NULL && _o != NULL) {
                             
-                                Statement stmt = new StatementImpl(s,p,o);
-                                
                                 assertStatement(db, KeyOrder.SPO, _s, _p, _o,
                                         stmt );
                                 
@@ -189,7 +203,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
                             if (termId == NULL) {
                             
-                                System.err.println("Term not in forward index: "+v);
+                                log.error("Term not in forward index: "+v);
                                 
                                 nerrs.incrementAndGet();
                                 
@@ -202,7 +216,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                 
                                 if(v2 == null) {
 
-                                    System.err.println("Term not in reverse index: "+v);
+                                    log.error("Term not in reverse index: "+v);
 
                                     nerrs.incrementAndGet();
                                     
@@ -211,7 +225,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 //                                } else if(v.compareTo(v2)!=0) {
                                 } else if(!v.equals(v2)) {
 
-                                    System.err.println("Wrong term in reverse index: expected="+v+", but actual="+v2);
+                                    log.error("Wrong term in reverse index: expected="+v+", but actual="+v2);
 
                                     nerrs.incrementAndGet();
                                     
@@ -262,7 +276,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                  * statement in the index.
                                  */
                                 
-                                System.err.println("Statement not found"
+                                log.error("Statement not found"
                                             + ": index=" + keyOrder + ", stmt="
                                             + stmt + expectedSPO);
                             
@@ -281,8 +295,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
                                  * index but there is a successor of the
                                  * statement in the index.
                                  */
-                                System.err
-                                        .println("Statement not found"
+                                log.error("Statement not found"
                                                 + ": index=" + keyOrder
                                                 + ", stmt=" + stmt
                                                 + ", expected="

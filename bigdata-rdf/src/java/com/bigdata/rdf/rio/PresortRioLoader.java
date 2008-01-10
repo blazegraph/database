@@ -27,7 +27,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.rio.StatementHandler;
+import org.openrdf.rio.RDFHandler;
+import org.openrdf.rio.RDFHandlerException;
 
 import com.bigdata.rdf.store.ITripleStore;
 
@@ -38,7 +39,7 @@ import com.bigdata.rdf.store.ITripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PresortRioLoader extends BasicRioLoader implements IRioLoader, StatementHandler
+public class PresortRioLoader extends BasicRioLoader implements IRioLoader, RDFHandler
 {
 
     /**
@@ -121,16 +122,16 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, Stat
 //
 //    }
 
-    public StatementHandler newStatementHandler() {
+    public RDFHandler newRDFHandler() {
         
         return this;
         
     }
 
-    public void handleStatement( Resource s, URI p, Value o ) {
+    public void handleStatement( Statement stmt ) {
 
         // buffer the write (handles overflow).
-        buffer.add(s, p, o);
+        buffer.add( stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), stmt.getContext() );
 
         stmtsAdded++;
         
@@ -139,6 +140,22 @@ public class PresortRioLoader extends BasicRioLoader implements IRioLoader, Stat
             notifyListeners();
             
         }
+        
+    }
+
+    public void endRDF() throws RDFHandlerException {
+        
+    }
+
+    public void handleComment(String arg0) throws RDFHandlerException {
+        
+    }
+
+    public void handleNamespace(String arg0, String arg1) throws RDFHandlerException {
+        
+    }
+
+    public void startRDF() throws RDFHandlerException {
         
     }
     

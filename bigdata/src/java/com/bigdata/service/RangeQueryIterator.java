@@ -34,8 +34,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
+import com.bigdata.io.ByteArrayBufferWithPosition;
 import com.bigdata.io.IByteArrayBuffer;
-import com.bigdata.service.ClientIndexView.PartitionedRangeQueryIterator;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -425,13 +425,62 @@ public class RangeQueryIterator implements IEntryIterator {
         
     }
 
-    /**
-     * FIXME Implement this method. We need to expose the appropriate data from
-     * the result set in a manner designed to minimize heap allocation.
-     */
     public ITuple getTuple() {
        
-        throw new UnsupportedOperationException();
+        return tuple;
+        
+    }
+
+    private final Tuple tuple = new Tuple();
+
+    /**
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class Tuple implements ITuple {
+
+        // begin with an empty buffer.
+        private ByteArrayBufferWithPosition buf = new ByteArrayBufferWithPosition(0);
+        
+        public byte[] getKey() {
+
+            return RangeQueryIterator.this.getKey();
+            
+        }
+
+        public IByteArrayBuffer getKeyBuffer() {
+
+            /*
+             * @todo if the keys are compressed in the ResultSet then the
+             * ResultSet should copy them into [buf] to avoid an allocation.
+             */
+            final byte[] key = RangeQueryIterator.this.getKey();
+            
+            // copy the key into the buffer.
+            buf.reset().put(key);
+            
+            return buf;
+            
+        }
+
+        public boolean getKeysRequested() {
+
+            return (flags & IDataService.KEYS) == 1;
+            
+        }
+
+        public boolean getValuesRequested() {
+            
+            return (flags & IDataService.VALS) == 1;
+            
+        }
+
+        public long getVisitCount() {
+
+            return nvisited;
+            
+        }
         
     }
     
@@ -446,5 +495,5 @@ public class RangeQueryIterator implements IEntryIterator {
         throw new UnsupportedOperationException();
         
     }
-    
+        
 }

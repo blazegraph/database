@@ -32,9 +32,9 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.openrdf.vocabulary.OWL;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.OWL;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -148,7 +148,7 @@ public class RDFSHelper {
                 
         };
         
-        store.insertTerms(terms, terms.length, false/*haveKeys*/, false/*sorted*/);
+        store.addTerms(store.getKeyBuilder(),terms, terms.length);
 
         this.rdfType = new Id(rdfType.termId);
         this.rdfProperty = new Id(rdfProperty.termId);

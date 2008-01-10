@@ -450,12 +450,18 @@ abstract public class ConcurrentJournal extends AbstractJournal {
 
         // final status message.
         statusTask.run();
-        System.err.println(statusTask.status());
+//        System.err.println(statusTask.status());
 
         super.shutdownNow();
 
     }
 
+//    public String getStatistics() {
+//        
+//        return super.getStatistics() + "\n" + statusTask.status();
+//        
+//    }
+    
     /**
      * (Re-)open a journal supporting concurrent operations.
      * 
@@ -824,11 +830,11 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                     + "\n"
                     );
 
-            if(getBufferStrategy() instanceof DiskOnlyStrategy) {
-                
-                sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
-                
-            }
+//            if(getBufferStrategy() instanceof DiskOnlyStrategy) {
+//                
+//                sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
+//                
+//            }
             
             return sb.toString();
             

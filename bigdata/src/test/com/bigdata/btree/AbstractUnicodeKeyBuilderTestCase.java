@@ -58,16 +58,6 @@ abstract public class AbstractUnicodeKeyBuilderTestCase extends TestCase2 {
         super(arg0);
     }
 
-    public void test_keyBuilder_unicode_char_key() {
-        
-        fail("write test");
-    }
-    
-    public void test_keyBuilder_unicode_chars_key() {
-        
-        fail("write test");
-    }
-
     /**
      * Test ability to encode unicode data into a variable length byte[] that
      * allows direct byte-by-byte comparisons which maintain the local-specific

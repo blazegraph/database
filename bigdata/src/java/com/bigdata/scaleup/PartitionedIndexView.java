@@ -350,7 +350,18 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         return mdi.getManagedIndexUUID();
         
     }
-    
+
+    public String getStatistics() {
+        
+        /*
+         * @todo should be reporting statistics on all index partitions and on
+         * each resource in each partition.
+         */ 
+        
+        return getClass().getSimpleName() + " : "+ mdi.getStatistics();
+        
+    }
+
     /*
      * Non-batch API.
      * 

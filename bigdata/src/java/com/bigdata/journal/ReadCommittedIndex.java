@@ -151,11 +151,21 @@ public class ReadCommittedIndex implements IIndexWithCounter {
     }
     
     public UUID getIndexUUID() {
+
         return getIndex().getIndexUUID();
+        
     }
     
+    public String getStatistics() {
+        
+        return getClass().getSimpleName() + " : "+ getIndex().getStatistics();
+        
+    }
+
     public boolean contains(byte[] key) {
+        
         return getIndex().contains(key);
+        
     }
 
     /**

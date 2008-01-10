@@ -305,8 +305,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * Return some "statistics" about the btree.
      * 
-     * @todo add this method to {@link IIndex}? ({@link ClientIndexView} can
-     *       return client side information.)
+     * @todo fold in {@link #getUtilization()} here.
      */
     public String getStatistics() {
         

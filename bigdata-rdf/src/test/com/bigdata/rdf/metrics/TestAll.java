@@ -57,8 +57,7 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("metrics");
 
-        suite.addTestSuite( TestReferenceLoad.class);
-
+        // @todo nothing is run automatically in this test suite.
         
         return suite;
         

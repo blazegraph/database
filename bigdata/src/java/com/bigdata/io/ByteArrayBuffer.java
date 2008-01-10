@@ -83,7 +83,7 @@ public class ByteArrayBuffer {
      * 
      * @todo make this protected?
      */
-    public byte[] buf;
+    protected byte[] buf;
 
     /**
      * The backing byte[] buffer. This is re-allocated whenever the capacity of
@@ -137,14 +137,17 @@ public class ByteArrayBuffer {
 
     /**
      * @param buf
-     *            The buffer, with <i>len</i> pre-existing bytes of valid data.
-     *            The buffer reference is used directly rather than making a
-     *            copy of the data.
+     *            The buffer, which may have pre-existing data. The buffer
+     *            reference is used directly rather than making a copy of the
+     *            data.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>buf</i> is <code>null</code>.
      */
     public ByteArrayBuffer(final byte[] buf) {
 
         if (buf == null)
-            throw new IllegalArgumentException("buf");
+            throw new IllegalArgumentException();
 
         this.buf = buf;
 

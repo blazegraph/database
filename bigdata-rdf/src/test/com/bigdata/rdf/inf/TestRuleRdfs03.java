@@ -31,8 +31,8 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -77,8 +77,8 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
             URI U = new URIImpl("http://www.foo.org/U");
             Literal V1 = new LiteralImpl("V1"); // a literal.
             URI V2 = new URIImpl("http://www.foo.org/V2"); // not a literal.
-            URI rdfRange = new URIImpl(RDFS.RANGE);
-            URI rdfType = new URIImpl(RDF.TYPE);
+            URI rdfRange = RDFS.RANGE;
+            URI rdfType = RDF.TYPE;
 
             store.addStatement(A, rdfRange, X);
             store.addStatement(U, A, V1);
@@ -132,9 +132,9 @@ public class TestRuleRdfs03 extends AbstractRuleTestCase {
         
             URI A = new URIImpl("http://www.foo.org/A");
             URI B = new URIImpl("http://www.foo.org/B");
-            URI rdfsRange = new URIImpl(RDFS.RANGE);
-            URI rdfsClass= new URIImpl(RDFS.CLASS);
-            URI rdfType = new URIImpl(RDF.TYPE);
+            URI rdfsRange = RDFS.RANGE;
+            URI rdfsClass= RDFS.CLASS;
+            URI rdfType = RDF.TYPE;
 
             store.addStatement(A, rdfType, B);
             store.addStatement(rdfType, rdfsRange, rdfsClass);

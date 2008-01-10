@@ -33,7 +33,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.sesame.sail.StatementIterator;
 
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.model.StatementEnum;
@@ -264,5 +263,10 @@ public interface ITripleStore {
      * remote database, then only the connection is closed.
      */
     public void close();
-    
+
+    /**
+     * True iff the database view is read-only.
+     */
+    public boolean isReadOnly();
+
 }

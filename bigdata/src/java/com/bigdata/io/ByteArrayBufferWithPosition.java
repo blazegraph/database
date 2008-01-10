@@ -31,15 +31,9 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.TestReopen;
-
 /**
  * Adds the concept of a position in the buffer, methods that write at the
  * current position, and a mark/rewind facility.
- * 
- * FIXME There is some apparently problem in round trips that emerges in
- * {@link TestReopen} and some of the index segment test suites in the btree
- * package.
  * 
  * @todo consider introducing a limit concept and perhaps a non-zero base
  *       concept.
@@ -54,7 +48,7 @@ public class ByteArrayBufferWithPosition extends ByteArrayBuffer implements
      * A non-negative integer specifying the #of bytes of data in the buffer
      * that contain valid data starting from position zero(0).
      */
-    public int len;
+    protected int len;
     
     /**
      * An optional mark to which the buffer can be rewound and <code>0</code>

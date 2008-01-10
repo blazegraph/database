@@ -31,9 +31,9 @@ import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.openrdf.vocabulary.RDF;
-import org.openrdf.vocabulary.RDFS;
-import org.openrdf.vocabulary.XmlSchema;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
@@ -182,7 +182,7 @@ public class TestFullTextIndex extends AbstractTestCase {
 
             doAddTermTest(store, new _Literal("abc"));
             doAddTermTest(store, new _Literal("abc",
-                    new _URI(XmlSchema.DECIMAL)));
+                    new _URI(XMLSchema.DECIMAL)));
             doAddTermTest(store, new _Literal("abc", "en"));
             doAddTermTest(store, new _Literal("good day", "en"));
             doAddTermTest(store, new _Literal("gutten tag", "de"));
@@ -192,7 +192,7 @@ public class TestFullTextIndex extends AbstractTestCase {
             doAddTermTest(store, new _URI("http://www.bigdata.com"));
             doAddTermTest(store, new _URI(RDF.TYPE));
             doAddTermTest(store, new _URI(RDFS.SUBCLASSOF));
-            doAddTermTest(store, new _URI(XmlSchema.DECIMAL));
+            doAddTermTest(store, new _URI(XMLSchema.DECIMAL));
 
             doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
             doAddTermTest(store, new _BNode("a12"));

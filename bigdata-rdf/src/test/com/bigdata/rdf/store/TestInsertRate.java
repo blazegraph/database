@@ -35,6 +35,7 @@ import org.openrdf.model.ValueFactory;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory;
+import com.bigdata.rdf.rio.StatementBuffer;
 
 /**
  * A test for measuring the possible insert rate for a triple store based on a
@@ -434,6 +435,8 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
         
         int index = 0, index2 = 0;
         
+        StatementBuffer sbuf = new StatementBuffer(store,10000);
+        
         for( int i=0; i<cspace.length; i++ ) {
             
             for( int j=0; j<pspace.length; j++ ) {
@@ -451,7 +454,7 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
 //                        o
 //                        );
 
-                    store.addStatement( s, p, o );
+                    sbuf.add( s, p, o );
 
                     // Progress marker and incremental statistics.
 
@@ -460,8 +463,6 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
                         System.err.print( "." );
 
                         if( index % 100000 == 0 ) {
-
-//                    commit(); // @todo restore use of incremental commit?
 
                     long now = System.currentTimeMillis();
 
@@ -499,6 +500,8 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
             }
             
         }
+        
+        sbuf.flush();
         
         long elapsed = System.currentTimeMillis() - begin;
 
