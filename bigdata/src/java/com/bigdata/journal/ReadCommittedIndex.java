@@ -39,6 +39,7 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.ReadOnlyCounter;
+import com.bigdata.service.Split;
 
 /**
  * Light-weight implementation of a read-committed index view.
@@ -214,6 +215,15 @@ public class ReadCommittedIndex implements IIndexWithCounter {
      */
     public void remove(BatchRemove op) {
         throw new UnsupportedOperationException();
+    }
+
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(getIndex());
+        
+        aggregator.aggregate(result, new Split(null,0,n));
+
     }
 
     public ICounter getCounter() {

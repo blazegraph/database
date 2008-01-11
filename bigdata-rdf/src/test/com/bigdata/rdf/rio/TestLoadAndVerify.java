@@ -49,6 +49,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.LocalTripleStoreWithEmbeddedDataService;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.util.KeyOrder;
@@ -95,13 +96,13 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
         
-        if(store instanceof ScaleOutTripleStore) {
+        if(store instanceof ScaleOutTripleStore || store instanceof LocalTripleStoreWithEmbeddedDataService) {
 
             /*
              * FIXME The test needs to use the batch API to verify the
              * statements in the scale-out triple store.
              */
-            fail("Test needs batch verification method for scale-out version.");
+            fail("Test needs batch verification method for data service versions.");
             
         }
         

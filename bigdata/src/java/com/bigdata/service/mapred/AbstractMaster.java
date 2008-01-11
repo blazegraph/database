@@ -33,8 +33,10 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.service.BTreeConstructor;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
@@ -485,7 +487,10 @@ public abstract class AbstractMaster {
                     String className = UnisolatedBTree.class.getName();
                     Object config = null;
                     client.getDataService(dataServices[i]).registerIndex(
-                            name, reduceTasks[i], className, config);
+                            name,
+                            reduceTasks[i],
+                            new BTreeConstructor(
+                                    ByteArrayValueSerializer.INSTANCE));
                 } catch (Exception e) {
                     log.warn("Could not create intermediate store: " + e);
                 }

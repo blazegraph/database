@@ -323,8 +323,6 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getTermIdIndex();
 
-            final boolean isolatableIndex = ndx.isIsolatable();
-
             IEntryIterator itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
@@ -342,10 +340,10 @@ abstract public class AbstractTestCase
                  * deserialize the term identifier (packed long integer).
                  */
                 final long id;
+                
                 try {
 
-                    id = (isolatableIndex ? new DataInputBuffer((byte[]) val)
-                            .unpackLong() : (Long) val);
+                    id = new DataInputBuffer((byte[]) val).unpackLong();
 
                 } catch (IOException ex) {
 
@@ -368,8 +366,6 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getIdTermIndex();
 
-            final boolean isolatableIndex = ndx.isIsolatable();
-
             IEntryIterator itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
@@ -383,8 +379,7 @@ abstract public class AbstractTestCase
                 // decode the term identifier from the sort key.
                 final long id = KeyBuilder.decodeLong(key, 0);
 
-                _Value term = (isolatableIndex ? _Value
-                        .deserialize((byte[]) val) : (_Value) val);
+                _Value term = _Value.deserialize((byte[]) val);
 
                 System.err.println(id + ":" + term);
 

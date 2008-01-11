@@ -28,26 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IProcedure;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
-import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
-import com.bigdata.rdf.util.RdfKeyBuilder;
-import com.bigdata.service.AutoSplitProcedure;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ClientIndexView.Split;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of a
@@ -506,250 +495,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 //
 //    }
     
-    /**
-     * This implementation is designed to use unisolated batch writes on the
-     * terms and ids index that guarentee consistency.
-     * 
-     * FIXME parallelize processing against index partitions in
-     * {@link ClientIndexView} and {@link AutoSplitProcedure}
-     * 
-     * FIXME make writing justifications a batch process.
-     * 
-     * @todo if the auto-split of a procedure can be made efficient enough then
-     *       we can use the same code for the embedded and scale-out versions.
-     * 
-     * @todo "known" terms should be filtered out of this operation.
-     *       <p>
-     *       A term is marked as "known" within a client if it was successfully
-     *       asserted against both the terms and ids index (or if it was
-     *       discovered on lookup against the ids index).
-     *       <p>
-     *       We should also check the {@link AbstractTripleStore#termCache} for
-     *       known terms.
-     */
-    public void addTerms(RdfKeyBuilder keyBuilder,final _Value[] terms, final int numTerms) {
-        
-        if (numTerms == 0)
-            return;
-
-        long begin = System.currentTimeMillis();
-        long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
-        long sortTime = 0; // time to sort terms by assigned byte[] keys.
-        long insertTime = 0; // time to insert terms into the forward and reverse index.
-        
-        {
-
-            /*
-             * First make sure that each term has an assigned sort key.
-             */
-            {
-
-                long _begin = System.currentTimeMillis();
-                
-                generateSortKeys(keyBuilder, terms, numTerms);
-                
-                keyGenTime = System.currentTimeMillis() - _begin;
-
-            }
-            
-            /*
-             * Sort terms by their assigned sort key. This places them into the
-             * natural order for the term:id index.
-             */
-            {
-            
-                long _begin = System.currentTimeMillis();
-                
-                Arrays.sort(terms, 0, numTerms, _ValueSortKeyComparator.INSTANCE);
-
-                sortTime += System.currentTimeMillis() - _begin;
-                
-            }
-
-            /*
-             * For each term that does not have a pre-assigned term identifier,
-             * execute a remote unisolated batch operation that assigns the term
-             * identifier.
-             */
-            {
-                
-                final long _begin = System.currentTimeMillis();
-
-                final ClientIndexView termIdIndex = (ClientIndexView)getTermIdIndex();
-
-                /*
-                 * Create a key buffer holding the sort keys. This does not
-                 * allocate new storage for the sort keys, but rather aligns the
-                 * data structures for the call to splitKeys().
-                 */
-                final byte[][] keys = new byte[numTerms][];
-                {
-                    
-                    for(int i=0; i<numTerms; i++) {
-                        
-                        keys[i] = terms[i].key;
-                        
-                    }
-                    
-                }
-                
-                final AutoSplitProcedure proc = new AutoSplitProcedure<AddTerms.Result>(
-                        numTerms, keys, null/* vals */) {
-
-                    private static final long serialVersionUID = -3159579576628729679L;
-
-                    protected IProcedure newProc(Split split) {
-                        
-                        return new AddTerms(split.ntuples,split.fromIndex,keys);
-                        
-                    }
-                    
-                    /**
-                     * Copy the assigned/discovered term identifiers onto the
-                     * corresponding elements of the terms[].
-                     */
-                    protected void aggregate(AddTerms.Result result, Split split) {
-                        
-                        for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
-                            
-                            terms[i].termId = result.ids[j];
-                            
-                        }
-
-                    }
-                    
-                };
-
-                // run the procedure on the partitioned index.
-
-                proc.apply(termIdIndex);
-                
-                insertTime += System.currentTimeMillis() - _begin;
-                
-            }
-            
-        }
-        
-        {
-            
-            /*
-             * Sort terms based on their assigned termId (when interpreted as
-             * unsigned long integers).
-             */
-
-            long _begin = System.currentTimeMillis();
-
-            Arrays.sort(terms, 0, numTerms, TermIdComparator.INSTANCE);
-
-            sortTime += System.currentTimeMillis() - _begin;
-
-        }
-        
-        {
-        
-            /*
-             * Add terms to the reverse index, which is the index that we use to
-             * lookup the RDF value by its termId to serialize some data as
-             * RDF/XML or the like.
-             * 
-             * Note: Every term asserted against the forward mapping [terms]
-             * MUST be asserted against the reverse mapping [ids] EVERY time.
-             * This is required in order to assure that the reverse index
-             * remains complete and consistent. Otherwise a client that writes
-             * on the terms index and fails before writing on the ids index
-             * would cause those terms to remain undefined in the reverse index.
-             */
-            
-            final long _begin = System.currentTimeMillis();
-            
-            final ClientIndexView idTermIndex = (ClientIndexView)getIdTermIndex();
-
-            /*
-             * Create a key buffer to hold the keys generated from the term
-             * identifers and then generate those keys. The terms are already in
-             * sorted order by their term identifiers from the previous step.
-             */
-            final byte[][] keys = new byte[numTerms][]; // @todo use long[] instead
-            final byte[][] vals = new byte[numTerms][];
-            
-            {
-
-                // Private key builder removes single-threaded constraint.
-                final KeyBuilder tmp = new KeyBuilder(Bytes.SIZEOF_LONG); 
-
-                // buffer is reused for each serialized term.
-                final DataOutputBuffer out = new DataOutputBuffer();
-                
-                for(int i=0; i<numTerms; i++) {
-                    
-                    keys[i] = tmp.reset().append(terms[i].termId).getKey();
-                    
-                    // Serialize the term.
-                    vals[i] = terms[i].serialize(out.reset());                    
-
-                }
-                
-            }
-
-            final AutoSplitProcedure proc = new AutoSplitProcedure(numTerms,
-                    keys, vals) {
-
-                private static final long serialVersionUID = -2484002926793236065L;
-
-                protected IProcedure newProc(Split split) {
-
-                    return new AddIds(split.ntuples, split.fromIndex, keys, vals);
-
-                }
-                
-                /**
-                 * Since the unisolated write succeeded the client knows that
-                 * the term is now in both the forward and reverse indices. We
-                 * codify that knowledge by setting the [known] flag on the
-                 * term.
-                 */
-                protected void aggregate(Object result, Split split) {
-                    
-                    for(int i=split.fromIndex, j=0; i<split.toIndex; i++, j++) {
-                        
-                        terms[i].known = true;
-
-                    }
-                    
-                }
-                
-            };
-            
-            // run the procedure on the partitioned index.
-            
-            proc.apply(idTermIndex);
-            
-            insertTime += System.currentTimeMillis() - _begin;
-
-        }
-
-        long elapsed = System.currentTimeMillis() - begin;
-        
-        if (numTerms > 1000 || elapsed > 3000) {
-
-            log.info("Wrote " + numTerms + " in " + elapsed + "ms; keygen="
-                    + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
-                    + insertTime + "ms");
-            
-        }
-        
-    }
-
-    /**
-     * FIXME Implement for the scale-out index (might be an identical
-     * implementation).
-     */
-    protected void indexTermText(_Value[] terms, int numTerms) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
     /** TODO Auto-generated method stub */
     public IIndex getFullTextIndex() {
         throw new UnsupportedOperationException();
@@ -854,17 +599,27 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
     }
 
+//    /**
+//     * @todo this is temporarily overriden in order to experiment with buffer
+//     *       capacity vs data transfer size for batch operations vs data
+//     *       compaction techniques for client-service RPC vs breaking down
+//     *       within index partition operations to no more than n megabytes per
+//     *       operation.
+//     */
+//    protected int getDataLoadBufferCapacity() {
+//        
+//        return 100000;
+//        
+//    }
+
     /**
-     * @todo this is temporarily overriden in order to experiment with buffer
-     *       capacity vs data transfer size for batch operations vs data
-     *       compaction techniques for client-service RPC vs breaking down
-     *       within index partition operations to no more than n megabytes per
-     *       operation.
+     * This store is safe for concurrent operations (but it only supports
+     * read operations).
      */
-    protected int getDataLoadBufferCapacity() {
-        
-        return 100000;
+    public boolean isConcurrent() {
+
+        return true;
         
     }
-
+    
 }

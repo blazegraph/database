@@ -63,14 +63,20 @@ public interface ITermIndexCodes {
     /** indicates a literal with a data type URI. */
     final public static byte TERM_CODE_DTL = 0x04;
 
-    /**
-     * indicates a statement identifier (used for statements about
-     * statements where the statement identifier is used in any of the
-     * subject, predicate, or object positions).
-     */
-    final public static byte TERM_CODE_STMT = 0x05;
-
     /** indicates a blank node. */
-    final public static byte TERM_CODE_BND = 0x06;
+    final public static byte TERM_CODE_BND = 0x05;
+    
+    /**
+     * Indicates a statement identifier (used for statements about statements
+     * where the statement identifier is used in any of the subject, predicate,
+     * or object positions).
+     * <p>
+     * Note: Statement identifiers are assigned the highest code so that they
+     * will be processed last when doing an ordered write of terms on the terms
+     * index. This allows us to ensure that the component term identifiers in
+     * the statement have been resolved before the statement itself is written
+     * into the terms index.
+     */
+    final public static byte TERM_CODE_STMT = 0x06;
 
 }

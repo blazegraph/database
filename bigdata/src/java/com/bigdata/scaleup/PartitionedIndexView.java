@@ -507,6 +507,14 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
     }
 
+    // FIXME submit(proc)
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        throw new UnsupportedOperationException();
+
+    }
+    
     /**
      * An iterator that visits all key/value entries in a specified key range
      * across one or more partitions.

@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.bigdata.service.Split;
+
 
 /**
  * A fly-weight wrapper that does not permit write operations and reads
@@ -118,6 +120,15 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         throw new UnsupportedOperationException();
     }
 
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
+        
+        aggregator.aggregate(result, new Split(null,0,n));
+        
+    }
+    
     public boolean isIsolatable() {
         
         return src.isIsolatable();

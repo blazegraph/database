@@ -34,18 +34,15 @@ import java.util.UUID;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.NOPSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ReadCommittedIndex;
-import com.bigdata.rdf.inf.JustificationSerializer;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.serializers.RdfValueSerializer;
-import com.bigdata.rdf.serializers.StatementSerializer;
-import com.bigdata.rdf.serializers.TermIdSerializer;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
@@ -101,7 +98,11 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
                 ndx_termId = ndx = store.registerIndex(name_termId, new BTree(
                         store, store.getDefaultBranchingFactor(), UUID
-                                .randomUUID(), TermIdSerializer.INSTANCE));
+                                .randomUUID(), 
+//                                TermIdSerializer.INSTANCE
+                                ByteArrayValueSerializer.INSTANCE
+                                )
+                );
             
             }
             
@@ -130,7 +131,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
                 ndx_idTerm = ndx = store.registerIndex(name_idTerm, new BTree(
                         store, store.getDefaultBranchingFactor(), UUID
-                                .randomUUID(), RdfValueSerializer.INSTANCE));
+                                .randomUUID(),
+//                                RdfValueSerializer.INSTANCE
+                                ByteArrayValueSerializer.INSTANCE
+                ));
 
             }
 
@@ -195,7 +199,9 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
                 ndx = store.registerIndex(name, new BTree(store,
                         store.getDefaultBranchingFactor(), UUID.randomUUID(),
-                        StatementSerializer.INSTANCE));
+//                        StatementSerializer.INSTANCE
+                        ByteArrayValueSerializer.INSTANCE
+                        ));
 
             }
 
@@ -248,7 +254,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
                         .registerIndex(name_just, new BTree(store,
                                 store.getDefaultBranchingFactor(), UUID
                                         .randomUUID(),
-                                JustificationSerializer.INSTANCE));
+                                NOPSerializer.INSTANCE));
 
             }
 
@@ -467,6 +473,15 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     }
     
     /**
+     * This store is NOT safe for concurrent operations.
+     */
+    public boolean isConcurrent() {
+
+        return false;
+        
+    }
+
+    /**
      * A read-committed view of a read-write triple store. Data committed on the
      * read-write triple store will become visible in this view. The view does
      * NOT support any mutation operations.
@@ -674,6 +689,16 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         }
 
+        /**
+         * This store is safe for concurrent operations (but it only supports
+         * read operations).
+         */
+        public boolean isConcurrent() {
+
+            return true;
+            
+        }
+        
     }
 
 }

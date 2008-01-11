@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.bigdata.service.Split;
+
 /**
  * <p>
  * A fused view providing read-only operations on multiple B+-Trees mapping
@@ -294,6 +296,15 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
         
     }
     
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
+        
+        aggregator.aggregate(result, new Split(null,0,n));
+        
+    }
+
     /**
      * <code>true</code> iff all sources support isolation.
      */

@@ -73,6 +73,8 @@ public class TestAll extends TestCase {
 
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );
 
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithEmbeddedDataService.suite() );
+
         suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
                         .suite());
 

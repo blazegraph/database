@@ -37,11 +37,10 @@ import org.CognitiveWeb.extser.ShortPacker;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.Procedure;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
@@ -104,7 +103,7 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddTerms extends Procedure {
+public class AddTerms extends IndexProcedure {
 
     /**
      * 
@@ -142,12 +141,6 @@ public class AddTerms extends Procedure {
 
         final IIndexWithCounter ndx = (IIndexWithCounter)_ndx;
 
-        /*
-         * When true, we serialize the values as byte[]s.  When false, the
-         * btree has a serializer that will accept Long values.
-         */
-        final boolean isUnisolatedBTree = ndx instanceof UnisolatedBTree;
-        
         final int numTerms = getKeyCount();
         
         assert numTerms > 0 : "numTerms="+numTerms;
@@ -166,8 +159,7 @@ public class AddTerms extends Procedure {
         }
         
         // used to serialize term identifers.
-        final DataOutputBuffer idbuf = (isUnisolatedBTree ?new DataOutputBuffer(
-                Bytes.SIZEOF_LONG) : null);
+        final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
         
         for (int i = 0; i < numTerms; i++) {
 
@@ -217,22 +209,18 @@ public class AddTerms extends Procedure {
                 termId = id;
                 
                 // format as packed long integer.
-                if(isUnisolatedBTree) {
+                try {
                     
-                    try {
-                        
-                        idbuf.reset().packLong(termId);
-                        
-                    } catch(IOException ex) {
-                        
-                        throw new RuntimeException(ex);
-                        
+                    idbuf.reset().packLong(termId);
+                    
+                } catch(IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
                     }
-                    
-                }
 
                 // insert into index.
-                if (ndx.insert(key, (isUnisolatedBTree?idbuf.toByteArray():Long.valueOf(termId))) != null) {
+                if (ndx.insert(key, idbuf.toByteArray()) != null) {
 
                     throw new AssertionError();
 
@@ -240,24 +228,16 @@ public class AddTerms extends Procedure {
 
             } else { // found.
 
-                if(isUnisolatedBTree) {
-
-                    try {
-                        
-                        termId = new DataInputBuffer((byte[]) tmp).unpackLong();
-                        
-                    } catch (IOException ex) {
-                        
-                        throw new RuntimeException(ex);
-                        
-                    }
-                   
-                } else {
-                
-                    termId = (Long)tmp;
-
+                try {
+                    
+                    termId = new DataInputBuffer((byte[]) tmp).unpackLong();
+                    
+                } catch (IOException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
                 }
-
+                   
             }
 
             ids[i] = termId;

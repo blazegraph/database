@@ -313,7 +313,7 @@ abstract public class MapService
 
             }
 
-            ds.batchInsert(ITx.UNISOLATED, name, -1, ntuples, keys, vals,
+            ds.batchInsert(ITx.UNISOLATED, name/*unpartitioned*/, ntuples, keys, vals,
                             false /* returnOldValues */);
 
             log.info("Wrote " + ntuples + " tuples on dataService="

@@ -43,6 +43,7 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.NoSuchIndexException;
@@ -382,8 +383,11 @@ public class ClientIndexView implements IIndex {
         
         try {
 
-            ret = dataService.batchContains(tx, name, pmd.getPartitionId(), 1,
-                    new byte[][] { key });
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(this.name,
+                    pmd.getPartitionId());
+
+            ret = dataService.batchContains(tx, name, 1, new byte[][] { key });
             
         } catch(Exception ex) {
             
@@ -407,7 +411,11 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchInsert(tx, name, pmd.getPartitionId(), 1,
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(this.name,
+                    pmd.getPartitionId());
+
+            ret = dataService.batchInsert(tx, name, 1,
                     new byte[][] { (byte[]) key },
                     new byte[][] { (byte[]) value }, returnOldValues);
 
@@ -431,7 +439,11 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchLookup(tx, name, pmd.getPartitionId(), 1,
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(this.name,
+                    pmd.getPartitionId());
+
+            ret = dataService.batchLookup(tx, name, 1,
                     new byte[][] { (byte[]) key });
 
         } catch (Exception ex) {
@@ -456,7 +468,11 @@ public class ClientIndexView implements IIndex {
         
         try {
             
-            ret = dataService.batchRemove(tx, name, pmd.getPartitionId(), 1,
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(this.name,
+                    pmd.getPartitionId());
+
+            ret = dataService.batchRemove(tx, name, 1,
                     new byte[][] { (byte[]) key }, returnOldValues );
 
         } catch (Exception ex) {
@@ -544,10 +560,11 @@ public class ClientIndexView implements IIndex {
                 final byte[] _toKey = (index == toIndex ? toKey : pmd
                         .getRightSeparatorKey());
                 
-                final int partitionId = pmd.getPartitionId();
-                
-                count += dataService.rangeCount(tx, name, partitionId,
-                        _fromKey, _toKey);
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(this.name,
+                        pmd.getPartitionId());
+
+                count += dataService.rangeCount(tx, name, _fromKey, _toKey);
                 
             } catch(Exception ex) {
 
@@ -615,8 +632,11 @@ public class ClientIndexView implements IIndex {
             
             try {
 
-                _vals = dataService.batchContains(tx, name, split.pmd
-                        .getPartitionId(), split.ntuples, _keys);
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(this.name,
+                        split.pmd.getPartitionId());
+
+                _vals = dataService.batchContains(tx, name, split.ntuples, _keys);
                 
             } catch (Exception ex) {
                 
@@ -654,8 +674,11 @@ public class ClientIndexView implements IIndex {
             
             try {
 
-                _vals = dataService.batchLookup(tx, name, split.pmd
-                        .getPartitionId(), split.ntuples, _keys);
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(this.name,
+                        split.pmd.getPartitionId());
+
+                _vals = dataService.batchLookup(tx, name, split.ntuples, _keys);
                 
             } catch (Exception ex) {
                 
@@ -697,9 +720,12 @@ public class ClientIndexView implements IIndex {
             
             try {
 
-                oldVals = dataService.batchInsert(tx, name, split.pmd
-                        .getPartitionId(), split.ntuples, _keys, _vals,
-                        returnOldValues);
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(this.name,
+                        split.pmd.getPartitionId());
+
+                oldVals = dataService.batchInsert(tx, name, split.ntuples,
+                        _keys, _vals, returnOldValues);
                 
             } catch (Exception ex) {
                 
@@ -743,9 +769,12 @@ public class ClientIndexView implements IIndex {
             
             try {
 
-                oldVals = dataService.batchRemove(tx, name, split.pmd
-                        .getPartitionId(), split.ntuples, _keys, 
-                        returnOldValues);
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(this.name,
+                        split.pmd.getPartitionId());
+
+                oldVals = dataService.batchRemove(tx, name, split.ntuples,
+                        _keys, returnOldValues);
                 
             } catch (Exception ex) {
                 
@@ -764,6 +793,69 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /**
+     * The procedure will be transparently broken down and executed against each
+     * index partitions spanned by its keys.
+     * 
+     * @return The aggregated result of applying the procedure to the relevant
+     *         index partitions.
+     */
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        if (ctor == null) {
+
+            throw new IllegalArgumentException();
+        
+        }
+        
+        if (aggregator == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+        
+        /*
+         * Run the procedure remotely.
+         * 
+         * @todo add counters for the #of procedures run and the execution time
+         * for those procedures. add counters for the #of splits and the #of
+         * tuples in each split, as well as the total #of tuples.
+         */
+
+        final List<Split> splits = splitKeys(n, keys);
+
+        final Iterator<Split> itr = splits.iterator();
+
+        while (itr.hasNext()) {
+
+            final Split split = itr.next();
+
+            final IDataService dataService = getDataService(split.pmd);
+
+            final IIndexProcedure proc = ctor.newInstance(split.ntuples,
+                    split.fromIndex, keys, vals);
+
+            try {
+
+                // the name of the index partition.
+                final String name = DataService.getIndexPartitionName(
+                        this.name, split.pmd.getPartitionId());
+
+                final Object result = dataService.submit(tx, name, proc);
+
+                aggregator.aggregate(result, split);
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+
+    }
+    
     /**
      * Utility method to split a set of ordered keys into partitions based the
      * index partitions defined for a scale-out index.
@@ -870,89 +962,6 @@ public class ClientIndexView implements IIndex {
 
     }
 
-    /**
-     * Describes a "split" of keys for a batch operation that are spanned by the
-     * same index partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class Split {
-        
-        /**
-         * The index partition that spans the keys in this split.
-         */
-        public final IPartitionMetadata pmd;
-
-        /**
-         * Index of the first key in this split.
-         */
-        public final int fromIndex;
-        
-        /**
-         * Index of the first key NOT included in this split.
-         */
-        public final int toIndex;
-
-        /**
-         * The #of keys in this split (toIndex - fromIndex).
-         */
-        public final int ntuples;
-        
-        /**
-         * Create a representation of a split point.
-         * 
-         * @param pmd
-         *            The metadata for the index partition within which the keys
-         *            in this split lie.
-         * @param fromIndex
-         *            The index of the first key that will enter that index
-         *            partition (inclusive lower bound).
-         * @param toIndex
-         *            The index of the first key that will NOT enter that index
-         *            partition (exclusive upper bound).
-         */
-        public Split(IPartitionMetadata pmd,int fromIndex,int toIndex) {
-            
-            assert pmd != null;
-            assert fromIndex >= 0;
-            assert toIndex >= fromIndex;
-            
-            this.pmd = pmd;
-            
-            this.fromIndex = fromIndex;
-            
-            this.toIndex = toIndex;
-            
-            this.ntuples = toIndex - fromIndex;
-            
-        }
-        
-        /**
-         * Hash code is based on the {@link IPartitionMetadata} hash code.
-         */
-        public int hashCode() {
-            
-            return pmd.hashCode();
-            
-        }
-
-        public boolean equals(Split o) {
-            
-            if( fromIndex != o.fromIndex ) return false;
-
-            if( toIndex != o.toIndex ) return false;
-            
-            if( ntuples != o.ntuples ) return false;
-            
-            if( ! pmd.equals(o.pmd)) return false;
-            
-            return true;
-            
-        }
-        
-    }
-    
     /**
      * 
      * @param tx

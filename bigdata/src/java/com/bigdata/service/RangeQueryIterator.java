@@ -235,8 +235,8 @@ public class RangeQueryIterator implements IEntryIterator {
                     + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey));
             
-            rset = dataService.rangeQuery(tx, name, -1 /*unpartitioned*/,
-                    fromKey, toKey, capacity, flags);
+            rset = dataService.rangeQuery(tx, name /* unpartitioned */, fromKey,
+                    toKey, capacity, flags);
             
             // reset index into the ResultSet.
             lastVisited = -1;
@@ -277,7 +277,7 @@ public class RangeQueryIterator implements IEntryIterator {
                     + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(toKey));
             
-            rset = dataService.rangeQuery(tx, name, -1/*unpartitioned*/,
+            rset = dataService.rangeQuery(tx, name /* unpartitioned */,
                     _fromKey, toKey, capacity, flags);
             
             // reset index into the ResultSet.
