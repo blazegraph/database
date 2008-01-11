@@ -31,15 +31,12 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.NOPSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.inf.JustificationSerializer;
-import com.bigdata.rdf.serializers.RdfValueSerializer;
-import com.bigdata.rdf.serializers.StatementSerializer;
-import com.bigdata.rdf.serializers.TermIdSerializer;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -294,11 +291,15 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
             ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
-                TermIdSerializer.INSTANCE));
+//                TermIdSerializer.INSTANCE
+                ByteArrayValueSerializer.INSTANCE
+                ));
 
             ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
-                RdfValueSerializer.INSTANCE));
+//                RdfValueSerializer.INSTANCE
+                ByteArrayValueSerializer.INSTANCE
+                ));
             
             if(textIndex) {
 
@@ -312,17 +313,23 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
-                StatementSerializer.INSTANCE));
+//                StatementSerializer.INSTANCE
+                ByteArrayValueSerializer.INSTANCE
+                ));
 
         if(!oneAccessPath) {
         
             ndx_pos = (BTree) store.registerIndex(name_pos, new BTree(store,
                     branchingFactor, UUID.randomUUID(),
-                    StatementSerializer.INSTANCE));
+//                    StatementSerializer.INSTANCE
+                    ByteArrayValueSerializer.INSTANCE
+                    ));
 
             ndx_osp = (BTree) store.registerIndex(name_osp, new BTree(store,
                     branchingFactor, UUID.randomUUID(),
-                    StatementSerializer.INSTANCE));
+//                    StatementSerializer.INSTANCE
+                    ByteArrayValueSerializer.INSTANCE
+                    ));
             
         }
         
@@ -330,7 +337,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         
             ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
                 branchingFactor, UUID.randomUUID(),
-                                    JustificationSerializer.INSTANCE));
+                                    NOPSerializer.INSTANCE));
         }
 
     }
@@ -341,6 +348,15 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         ("\nfile="+store.getBufferStrategy().getFile())+
         ("\nbyteCount="+store.getBufferStrategy().getNextOffset())
         ;
+        
+    }
+    
+    /**
+     * This store is NOT safe for concurrent operations.
+     */
+    public boolean isConcurrent() {
+
+        return false;
         
     }
     

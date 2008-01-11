@@ -33,39 +33,36 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.journal.Options;
 
 /**
- * Proxy test suite for {@link LocalTripleStore} when the backing indices are
- * {@link BTree}s. This configuration does NOT support transactions since the
- * various indices are NOT isolatable.
+ * Proxy test suite for {@link LocalTripleStoreWithEmbeddedDataService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLocalTripleStore extends AbstractTestCase {
+public class TestLocalTripleStoreWithEmbeddedDataService extends AbstractTestCase {
 
     /**
      * 
      */
-    public TestLocalTripleStore() {
+    public TestLocalTripleStoreWithEmbeddedDataService() {
     }
 
-    public TestLocalTripleStore(String name) {
+    public TestLocalTripleStoreWithEmbeddedDataService(String name) {
         super(name);
     }
     
     public static Test suite() {
 
-        final TestLocalTripleStore delegate = new TestLocalTripleStore(); // !!!! THIS CLASS !!!!
+        final TestLocalTripleStoreWithEmbeddedDataService delegate = new TestLocalTripleStoreWithEmbeddedDataService(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
          */
 
         ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "Local Triple Store Test Suite");
+                "Local Triple Store With Embedded Data Service Test Suite");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -74,10 +71,10 @@ public class TestLocalTripleStore extends AbstractTestCase {
         // ...
         
         /*
-         * Proxied test suite for use only with the LocalTripleStore.
+         * Proxied test suite for use only with the LocalConcurrentTripleStore.
          */
 
-        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
+//        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
 
         /*
          * Pickup the basic triple store test suite. This is a proxied test
@@ -104,7 +101,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
     
     protected AbstractTripleStore getStore() {
         
-        return new LocalTripleStore( getProperties() );
+        return new LocalTripleStoreWithEmbeddedDataService( getProperties() );
         
     }
  
@@ -139,14 +136,14 @@ public class TestLocalTripleStore extends AbstractTestCase {
         properties.setProperty(Options.CREATE_TEMP_FILE,"false");
         
         // The backing file that we need to re-open.
-        File file = ((LocalTripleStore) store).store.getFile();
+        File file = ((LocalTripleStoreWithEmbeddedDataService)store).getFile();
         
         assertNotNull(file);
         
         // Set the file property explictly.
         properties.setProperty(Options.FILE,file.toString());
         
-        return new LocalTripleStore( properties );
+        return new LocalTripleStoreWithEmbeddedDataService( properties );
         
     }
 

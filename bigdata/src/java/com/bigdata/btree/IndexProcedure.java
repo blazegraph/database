@@ -50,11 +50,11 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.ResultSet;
-import com.bigdata.service.ClientIndexView.Split;
+import com.bigdata.service.Split;
 
 /**
  * Abstract base class supports compact serialization and compression for remote
- * {@link IProcedure} execution (procedures may be executed on a local index,
+ * {@link IIndexProcedure} execution (procedures may be executed on a local index,
  * but they are only (de-)serialized when executed on a remote index).
  * 
  * FIXME efficient (de-)serialization. There is a high impedence right now in
@@ -94,6 +94,8 @@ import com.bigdata.service.ClientIndexView.Split;
  * 
  * @todo reconcile with {@link ResultSet}.
  * 
+ * @todo support prefix scan (distinct term scan).
+ * 
  * @todo reconcile with the batch operations - {@link BatchInsert},
  *       {@link BatchRemove}, {@link BatchContains}, and {@link BatchLookup}.
  *       Those operations should all accept an [offset] so that they can be used
@@ -102,7 +104,7 @@ import com.bigdata.service.ClientIndexView.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class Procedure implements IProcedure, Externalizable {
+abstract public class IndexProcedure implements IIndexProcedure, Externalizable {
 
     /**
      * #of keys/values.
@@ -182,7 +184,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
      * techniques.
      * 
      * @todo this is not a very nice way to handle extensibility - it is here
-     *       really as a placeholder while I experiment with {@link Procedure}
+     *       really as a placeholder while I experiment with {@link IndexProcedure}
      *       specific compression techniques.  the choice of the compression
      *       technique is static (per procedure implementation) but it really
      *       needs to be (a) broken down into key vs value compression methods;
@@ -228,7 +230,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
     /**
      * De-serialization constructor.
      */
-    protected Procedure() {
+    protected IndexProcedure() {
         
     }
 
@@ -295,7 +297,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
      *            The values (optional, must be co-indexed with {@link #keys}
      *            when non-<code>null</code>).
      */
-    protected Procedure(int n, int offset, byte[][] keys, byte[][] vals) {
+    protected IndexProcedure(int n, int offset, byte[][] keys, byte[][] vals) {
 
         assert n > 0;
 
@@ -324,7 +326,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
     /**
      * Interface for alternative serialization and compression schemes.
      * 
-     * @todo subclasses will need to be able to access {@link Procedure#keys}.
+     * @todo subclasses will need to be able to access {@link IndexProcedure#keys}.
      *       The only way to really do this is to have the serialization classes
      *       be inner classes on the Procedure implementation classes - just
      *       like extSer.
@@ -337,9 +339,9 @@ abstract public class Procedure implements IProcedure, Externalizable {
         protected static final Logger log = Logger
                 .getLogger(AbstractCompression.class);
         
-        abstract public void write(DataOutput out, Procedure proc) throws IOException;
+        abstract public void write(DataOutput out, IndexProcedure proc) throws IOException;
 
-        abstract public void read(DataInput in, Procedure proc) throws IOException;
+        abstract public void read(DataInput in, IndexProcedure proc) throws IOException;
         
     }
     
@@ -418,7 +420,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
 
         public final static AbstractCompression INSTANCE = new NoCompression();
         
-        public void read(DataInput in, Procedure proc) throws IOException {
+        public void read(DataInput in, IndexProcedure proc) throws IOException {
             
             final int n = (int) LongPacker.unpackLong(in);
             proc.n = n;
@@ -455,7 +457,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
 
         }
 
-        public void write(DataOutput out, Procedure proc) throws IOException {
+        public void write(DataOutput out, IndexProcedure proc) throws IOException {
 
             final int n = proc.n;
             final int offset = proc.offset;
@@ -499,7 +501,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
 
         public final static AbstractCompression INSTANCE = new BTreeCompression();
 
-        public void read(DataInput in, Procedure proc) throws IOException {
+        public void read(DataInput in, IndexProcedure proc) throws IOException {
             
             /*
              * Read the entire input stream into a buffer.
@@ -534,7 +536,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
            
         }
 
-        public void write(DataOutput out, Procedure proc) throws IOException {
+        public void write(DataOutput out, IndexProcedure proc) throws IOException {
             
             DataOutputBuffer buf = new DataOutputBuffer();
             
@@ -668,7 +670,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
             
         }
         
-        public void write(DataOutput out, Procedure proc) throws IOException {
+        public void write(DataOutput out, IndexProcedure proc) throws IOException {
 
             final int nkeys = proc.n;
             final int offset = proc.offset;
@@ -826,7 +828,7 @@ abstract public class Procedure implements IProcedure, Externalizable {
             
         }
 
-        public void read(DataInput in, Procedure proc) throws IOException {
+        public void read(DataInput in, IndexProcedure proc) throws IOException {
 
             /*
              * @todo this relies on being able to cast to an input stream. in

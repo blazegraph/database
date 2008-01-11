@@ -34,29 +34,31 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.Options;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.service.EmbeddedDataService;
 
 /**
- * Variant of {@link TestTripleStoreLoadRateWithJiniFederation} that tests with an
- * embedded bigdata federation and therefore does not incur costs for network
- * IO.
+ * Variant that tests with an {@link EmbeddedDataService} and therefore does not
+ * incur costs for network IO.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore {
+public class TestTripleStoreLoadRateLocalConcurrent extends TestLocalTripleStoreWithEmbeddedDataService {
 
     /**
      * 
      */
-    public TestTripleStoreLoadRateLocalUnisolated() {
+    public TestTripleStoreLoadRateLocalConcurrent() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestTripleStoreLoadRateLocalUnisolated(String arg0) {
+    public TestTripleStoreLoadRateLocalConcurrent(String arg0) {
         super(arg0);
     }
 
@@ -66,6 +68,8 @@ public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore
         
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+        
+        properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.gigabyte*2);
         
         return properties;
         
@@ -89,13 +93,13 @@ public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore
 
         // compute the database at once closure.
         store.getInferenceEngine().computeClosure(null/*focusStore*/);
-        
+
         } finally {
-            
+
             store.closeAndDelete();
-            
+
         }
-        
+
     }
 
     public void test_U1() {
@@ -104,8 +108,7 @@ public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore
 
         try {
 
-            // Note: Store does not support concurrent data load.
-            new ConcurrentDataLoader(store, 1/*nthreads*/, 10000 /*bufferCapacity*/, 
+            new ConcurrentDataLoader(store, 3/*nthreads*/, 10000 /*bufferCapacity*/, 
                     new File("../rdf-data/lehigh/U1"), new FilenameFilter() {
 
                         public boolean accept(File dir, String name) {
@@ -130,14 +133,36 @@ public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore
 
         try {
 
-            // Note: Store does not support concurrent data load.
-            new ConcurrentDataLoader(store, 1/*nthreads*/, 10000 /*bufferCapacity*/,  new File(
+            new ConcurrentDataLoader(store, 20/*nthreads*/, 10000 /*bufferCapacity*/,  new File(
                     "../rdf-data/lehigh/U10"), new FilenameFilter() {
 
                 public boolean accept(File dir, String name) {
                     if (name.endsWith(".owl"))
                         return true;
                     return false;
+                }
+
+            });
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_smallDocuments() {
+
+        AbstractTripleStore store = getStore();
+
+        try {
+
+            new ConcurrentDataLoader(store, 20/*nthreads*/, 10000 /*bufferCapacity*/,  new File(
+                    "../rdf-data/smallDocuments"), new FilenameFilter() {
+
+                public boolean accept(File dir, String name) {
+                    return true;
                 }
 
             });

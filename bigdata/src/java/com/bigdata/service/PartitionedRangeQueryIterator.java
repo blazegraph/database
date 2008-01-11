@@ -298,8 +298,11 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
                     + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             
-            rset = dataService.rangeQuery(tx, ndx.getName(), partitionId,
-                    _fromKey, _toKey, capacity, flags);
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
+            
+            rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
+                    flags);
             
             // reset index into the ResultSet.
             lastVisited = -1;
@@ -367,8 +370,12 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
                     + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             
-            rset = dataService.rangeQuery(tx, ndx.getName(), partitionId,
-                    _fromKey, _toKey, capacity, flags);
+            // the name of the index partition.
+            final String name = DataService.getIndexPartitionName(
+                    ndx.getName(), partitionId);
+            
+            rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
+                    flags);
             
             // reset index into the ResultSet.
             lastVisited = -1;

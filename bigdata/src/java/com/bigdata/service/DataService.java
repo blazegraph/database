@@ -45,11 +45,10 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexWithCounter;
-import com.bigdata.btree.IProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.DropIndexTask;
@@ -413,64 +412,23 @@ abstract public class DataService implements IDataService,
         
     }
 
-    public void registerIndex(String name, UUID indexUUID, String className,
-            Object config) throws IOException, InterruptedException,
+    public void registerIndex(String name, UUID indexUUID,
+            IIndexConstructor ctor) throws IOException, InterruptedException,
             ExecutionException {
 
         setupLoggingContext();
-        
+
         try {
-            
+
             if (indexUUID == null)
                 throw new IllegalArgumentException();
-    
-            if( className == null)
+
+            if (ctor == null)
                 throw new IllegalArgumentException();
-            
-            final Class cls;
-            
-            try {
-    
-                cls = Class.forName(className);
-                
-            } catch(Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-            if (!BTree.class.isAssignableFrom(cls)) {
-    
-                throw new IllegalArgumentException("Class does not extend: "
-                        + BTree.class);
-                
-            }
-            
-            final BTree btree;
-            
-            if(cls.equals(UnisolatedBTree.class)) {
-    
-                btree = new UnisolatedBTree(journal, indexUUID);
-                
-            } else if(cls.equals(UnisolatedBTreePartition.class)) {
-    
-                UnisolatedBTreePartition.Config tmp = (UnisolatedBTreePartition.Config) config;
-    
-                btree = new UnisolatedBTreePartition(journal, indexUUID, tmp);
-                
-            } else {
-                
-                /*
-                 * @todo Don't know how to configure this kind of btree.  The
-                 * registration should be based on the configuration object.
-                 */
-                throw new UnsupportedOperationException();
-                
-            }
+
+            BTree btree = ctor.newInstance(journal, indexUUID);
 
             journal.submit(new RegisterIndexTask(journal, name, btree)).get();
-        
-//            journal.registerIndex(name, btree);
         
         } finally {
             
@@ -575,7 +533,7 @@ abstract public class DataService implements IDataService,
      * @todo modify to allow vals[] as null when index does not use values to
      *       save on network IO.
      */
-    public byte[][] batchInsert(long tx, String name, int partitionId, int ntuples,
+    public byte[][] batchInsert(long tx, String name, int ntuples,
             byte[][] keys, byte[][] vals, boolean returnOldValues)
             throws IOException, InterruptedException, ExecutionException {
 
@@ -585,7 +543,7 @@ abstract public class DataService implements IDataService,
 
             BatchInsert op = new BatchInsert(ntuples, keys, vals);
     
-            batchOp(tx, name, partitionId, op);
+            batchOp(tx, name, op);
     
             return returnOldValues ? (byte[][]) op.values : null;
 
@@ -597,8 +555,9 @@ abstract public class DataService implements IDataService,
             
     }
 
-    public boolean[] batchContains(long tx, String name, int partitionId, int ntuples,
-            byte[][] keys) throws IOException, InterruptedException, ExecutionException {
+    public boolean[] batchContains(long tx, String name, int ntuples,
+            byte[][] keys) throws IOException, InterruptedException,
+            ExecutionException {
 
         setupLoggingContext();
         
@@ -606,7 +565,7 @@ abstract public class DataService implements IDataService,
 
             BatchContains op = new BatchContains(ntuples, keys, new boolean[ntuples]);
             
-            batchOp( tx, name, partitionId, op );
+            batchOp( tx, name, op );
     
             return op.contains;
             
@@ -618,7 +577,7 @@ abstract public class DataService implements IDataService,
         
     }
     
-    public byte[][] batchLookup(long tx, String name, int partitionId, int ntuples, byte[][] keys)
+    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
             throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -627,7 +586,7 @@ abstract public class DataService implements IDataService,
 
             BatchLookup op = new BatchLookup(ntuples,keys,new byte[ntuples][]);
             
-            batchOp(tx, name, partitionId, op);
+            batchOp(tx, name, op);
             
             return (byte[][])op.values;
 
@@ -639,9 +598,9 @@ abstract public class DataService implements IDataService,
 
     }
     
-    public byte[][] batchRemove(long tx, String name, int partitionId, int ntuples,
-            byte[][] keys, boolean returnOldValues)
-            throws IOException, InterruptedException, ExecutionException {
+    public byte[][] batchRemove(long tx, String name, int ntuples,
+            byte[][] keys, boolean returnOldValues) throws IOException,
+            InterruptedException, ExecutionException {
         
         setupLoggingContext();
         
@@ -649,7 +608,7 @@ abstract public class DataService implements IDataService,
         
             BatchRemove op = new BatchRemove(ntuples,keys,new byte[ntuples][]);
             
-            batchOp(tx, name, partitionId, op);
+            batchOp(tx, name, op);
             
             return returnOldValues ? (byte[][])op.values : null;
         
@@ -680,7 +639,7 @@ abstract public class DataService implements IDataService,
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      */
-    protected void batchOp(long tx, String name, int partitionId, IBatchOperation op)
+    protected void batchOp(long tx, String name, IBatchOperation op)
             throws InterruptedException, ExecutionException {
         
         if( name == null ) throw new IllegalArgumentException();
@@ -694,12 +653,11 @@ abstract public class DataService implements IDataService,
 
         // submit the task and wait for it to complete.
 
-        journal.submit(new BatchTask(journal, tx, readOnly, DataService
-                .getIndexPartitionName(name, partitionId), op)).get();
+        journal.submit(new BatchTask(journal, tx, readOnly, name, op)).get();
         
     }    
     
-    public Object submit(long tx, String name, int partitionId, IProcedure proc)
+    public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -714,8 +672,7 @@ abstract public class DataService implements IDataService,
             // submit the procedure and await its completion.
     
             return journal.submit(
-                    new ProcedureTask(journal, tx, readOnly, DataService
-                            .getIndexPartitionName(name, partitionId), proc)).get();
+                    new ProcedureTask(journal, tx, readOnly, name, proc)).get();
         
         } finally {
             
@@ -725,16 +682,14 @@ abstract public class DataService implements IDataService,
 
     }
 
-    public int rangeCount(long tx, String name, int partitionId,
-            byte[] fromKey, byte[] toKey) throws InterruptedException,
-            ExecutionException {
+    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+            throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
         
         try {
 
-            final RangeCountTask task = new RangeCountTask(journal, tx, DataService
-                .getIndexPartitionName(name, partitionId), fromKey, toKey);
+            final RangeCountTask task = new RangeCountTask(journal, tx, name, fromKey, toKey);
 
             // submit the task and wait for it to complete.
             
@@ -766,9 +721,9 @@ abstract public class DataService implements IDataService,
      *       {@link #readService} (consider reading against historical and
      *       modifying live).
      */
-    public ResultSet rangeQuery(long tx, String name, int partitionId,
-            byte[] fromKey, byte[] toKey, int capacity, int flags)
-            throws InterruptedException, ExecutionException {
+    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
+            byte[] toKey, int capacity, int flags) throws InterruptedException,
+            ExecutionException {
 
         setupLoggingContext();
         
@@ -776,9 +731,8 @@ abstract public class DataService implements IDataService,
 
             if( name == null ) throw new IllegalArgumentException();
             
-            final RangeQueryTask task = new RangeQueryTask(journal, tx, DataService
-                    .getIndexPartitionName(name, partitionId), fromKey, toKey,
-                    capacity, flags);
+            final RangeQueryTask task = new RangeQueryTask(journal, tx, name,
+                    fromKey, toKey, capacity, flags);
     
             // submit the task and wait for it to complete.
             return (ResultSet) journal.submit(task).get();
@@ -947,38 +901,6 @@ abstract public class DataService implements IDataService,
             
         }
         
-    }
-
-    /**
-     * Abstract class for tasks that execute {@link IProcedure} operations.
-     * There are various concrete subclasses, each of which MUST be submitted to
-     * the appropriate service for execution.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class ProcedureTask extends AbstractTask {
-        
-        protected final IProcedure proc;
-        
-        public ProcedureTask(ConcurrentJournal journal, long startTime,
-                boolean readOnly, String name, IProcedure proc) {
-
-            super(journal,startTime, readOnly, name);
-            
-            if (proc == null)
-                throw new IllegalArgumentException();
-            
-            this.proc = proc;
-            
-        }
-        
-        final public Object doTask() throws Exception {
-
-            return proc.apply(getIndex(getOnlyResource()));
-
-        }
-
     }
 
     /**

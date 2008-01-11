@@ -735,8 +735,7 @@ abstract public class MetadataService extends DataService implements
                                 DataService.getIndexPartitionName(name, pmd
                                         .getPartitionId()),
                                 managedIndexUUID,
-                                UnisolatedBTreePartition.class.getName(),
-                                new UnisolatedBTreePartition.Config(
+                                new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
                                         new PartitionMetadataWithSeparatorKeys(
                                                 separatorKeys[i],
                                                 pmd,
@@ -959,8 +958,7 @@ abstract public class MetadataService extends DataService implements
 
             dataServices[0].registerIndex(DataService.getIndexPartitionName(
                     name, pmd.getPartitionId()), managedIndexUUID,
-                    UnisolatedBTreePartition.class.getName(),
-                    new UnisolatedBTreePartition.Config(
+                    new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
                             new PartitionMetadataWithSeparatorKeys(
                                     new byte[] {}, pmd, null)));
             
@@ -1173,8 +1171,7 @@ abstract public class MetadataService extends DataService implements
              */
             dataServices[0].registerIndex(DataService.getIndexPartitionName(
                     name, pmd.getPartitionId()), mdi.getManagedIndexUUID(),
-                    UnisolatedBTreePartition.class.getName(),
-                    new UnisolatedBTreePartition.Config(
+                    new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
                             new PartitionMetadataWithSeparatorKeys(
                                     separatorKey, pmd, rightSeparatorKey)));
 

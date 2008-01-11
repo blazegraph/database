@@ -295,8 +295,8 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             /*
              * This should fail since the index was never registered.
              */
-            dataService0Proxy.rangeCount(IDataService.UNISOLATED, "xyz",
-                    0/* partitionId */, null, null);
+            dataService0Proxy.rangeCount(IDataService.UNISOLATED, DataService
+                    .getIndexPartitionName("xyz", 0/* partitionId */), null, null);
             
         } catch (ExecutionException ex) {
             

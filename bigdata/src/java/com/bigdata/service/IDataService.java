@@ -28,10 +28,8 @@ import java.io.Serializable;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IProcedure;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ITxCommitProtocol;
@@ -138,17 +136,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            for that scale-out index. Otherwise this MUST be a random
      *            UUID, e.g., using {@link UUID#randomUUID()}.
      * 
-     * @param className
-     *            The name of the implementation class for the index (must
-     *            extend {@link BTree}). This MUST be formed using
-     *            {@link Class#getName()}. Normally this is
-     *            {@link UnisolatedBTree} for an unpartitioned index and
-     *            {@link UnisolatedBTreePartition} for a partitioned index.
-     * 
-     * @param config
-     *            A serializable object containing configuration state that will
-     *            be used to initialize the index. For a partitioned index, this
-     *            will include the partition metadata for that index partition.
+     * @param ctor
+     *            An object that will be sent to the data service and used to
+     *            create the index to be registered on that data service.
      * 
      * @return <code>true</code> iff the index was created. <code>false</code>
      *         means that the index was pre-existing, but the metadata specifics
@@ -156,19 +146,9 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * 
      * @todo exception if index exists? or modify to validate consistent decl
      *       and exception iff not consistent.
-     * 
-     * @todo provide configuration options {whether the index supports isolation
-     *       or not ({@link BTree} vs {@link UnisolatedBTree}), the branching
-     *       factor for the index, and the value serializer. For a client server
-     *       divide I think that we can always go with an
-     *       {@link UnisolatedBTree}. We should pass in the UUID so that this
-     *       can be used by the {@link MetadataService} to create mutable btrees
-     *       to absorb writes when one or more partitions of a scale out index
-     *       are mapped onto the {@link DataService}.
      */
-    public void registerIndex(String name, UUID uuid, String className,
-            Object config) throws IOException, InterruptedException,
-            ExecutionException;
+    public void registerIndex(String name, UUID uuid, IIndexConstructor ctor)
+            throws IOException, InterruptedException, ExecutionException;
 
     /**
      * Return the unique index identifier for the named index.
@@ -266,9 +246,6 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
-     * @param partitionId
-     *            The partition identifier (must be -1 for an unpartitioned
-     *            index).
      * @param ntuples
      *            The #of items in the batch operation.
      * @param keys
@@ -287,28 +264,20 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                error.
      * 
      * @todo javadoc update.
-     * 
-     * @todo modify the API to NOT use partitionId. Clients should just form the
-     *       name of the index partition using
-     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
-     *       all of these methods equally useful for partitioned and
-     *       unpartitioned indices without having to worry about whether
-     *       partitionId == -1.
      */
-    public byte[][] batchInsert(long tx, String name, int partitionId,
-            int ntuples, byte[][] keys, byte[][] values, boolean returnOldValues)
+    public byte[][] batchInsert(long tx, String name, int ntuples,
+            byte[][] keys, byte[][] values, boolean returnOldValues)
             throws InterruptedException, ExecutionException, IOException;
 
-    public boolean[] batchContains(long tx, String name, int partitionId,
-            int ntuples, byte[][] keys) throws InterruptedException,
-            ExecutionException, IOException;
+    public boolean[] batchContains(long tx, String name, int ntuples,
+            byte[][] keys) throws InterruptedException, ExecutionException,
+            IOException;
 
-    public byte[][] batchLookup(long tx, String name, int partitionId,
-            int ntuples, byte[][] keys) throws InterruptedException,
-            ExecutionException, IOException;
+    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
+            throws InterruptedException, ExecutionException, IOException;
 
-    public byte[][] batchRemove(long tx, String name, int partitionId,
-            int ntuples, byte[][] keys, boolean returnOldValues)
+    public byte[][] batchRemove(long tx, String name, int ntuples,
+            byte[][] keys, boolean returnOldValues)
             throws InterruptedException, ExecutionException, IOException;
 
     /**
@@ -334,9 +303,6 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
-     * @param partitionId
-     *            The partition identifier (must be -1 for an unpartitioned
-     *            index).
      * @param fromKey
      *            The starting key for the scan.
      * @param toKey
@@ -359,17 +325,10 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *       selected for a single row of a sparse row store.
      * 
      * @todo provide for optional filter.
-     * 
-     * @todo modify the API to NOT use partitionId. Clients should just form the
-     *       name of the index partition using
-     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
-     *       all of these methods equally useful for partitioned and
-     *       unpartitioned indices without having to worry about whether
-     *       partitionId == -1.
      */
-    public ResultSet rangeQuery(long tx, String name, int partitionId,
-            byte[] fromKey, byte[] toKey, int capacity, int flags)
-            throws InterruptedException, ExecutionException, IOException;
+    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
+            byte[] toKey, int capacity, int flags) throws InterruptedException,
+            ExecutionException, IOException;
     
     /**
      * <p>
@@ -382,9 +341,6 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The index name (required).
-     * @param partitionId
-     *            The partition identifier (must be -1 for an unpartitioned
-     *            index).
      * @param fromKey
      *            The starting key for the scan.
      * @param toKey
@@ -402,9 +358,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      */
-    public int rangeCount(long tx, String name, int partitionId,
-            byte[] fromKey, byte[] toKey) throws InterruptedException,
-            ExecutionException, IOException;
+    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+            throws InterruptedException, ExecutionException, IOException;
         
     /**
      * <p>
@@ -434,9 +389,6 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      *            NOT isolated by a transaction.
      * @param name
      *            The name of the scale-out index.
-     * @param partitionId
-     *            The partition identifier (must be -1 for an unpartitioned
-     *            index).
      * @param proc
      *            The procedure to be executed. This MUST be downloadable code
      *            since it will be executed on the {@link DataService}.
@@ -449,15 +401,8 @@ public interface IDataService extends IRemoteTxCommitProtocol {
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException
-     * 
-     * @todo modify the API to NOT use partitionId. Clients should just form the
-     *       name of the index partition using
-     *       {@link DataService#getIndexPartitionName(String, int)}. That makes
-     *       all of these methods equally useful for partitioned and
-     *       unpartitioned indices without having to worry about whether
-     *       partitionId == -1.
      */
-    public Object submit(long tx, String name, int partitionId, IProcedure proc)
+    public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException, IOException;
  
 }

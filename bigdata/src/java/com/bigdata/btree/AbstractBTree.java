@@ -41,7 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.Split;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
@@ -992,6 +992,15 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+
+        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
+        
+        aggregator.aggregate(result, new Split(null,0,n));
+        
+    }
+    
     /**
      * Visits all entries in key order.
      * 

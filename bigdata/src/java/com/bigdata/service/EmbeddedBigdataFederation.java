@@ -656,35 +656,4 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         
     }
     
-    /**
-     * A local (in process) data service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class EmbeddedDataService extends DataService {
-        
-        final private UUID serviceUUID;
-        
-        public EmbeddedDataService(UUID serviceUUID, Properties properties) {
-            
-            super(properties);
-            
-            if (serviceUUID == null)
-                throw new IllegalArgumentException();
-            
-            this.serviceUUID = serviceUUID;
-            
-            log.info("uuid="+serviceUUID);
-            
-        }
-
-        public UUID getServiceUUID() throws IOException {
-
-            return serviceUUID;
-            
-        }
-        
-    }
-    
 }

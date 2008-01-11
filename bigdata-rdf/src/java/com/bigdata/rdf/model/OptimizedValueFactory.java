@@ -307,20 +307,19 @@ public class OptimizedValueFactory implements ValueFactory {
         public /*final*/ String term;
         
         /**
-         * The sort key under which this value will be placed into the
-         * {@link ITripleStore#getTermIdIndex() terms} index. The sort key is a
-         * representation of the total term, including any additional attributes
-         * such as the language code or the datatype URI.
+         * The sort key under which this value will be placed into the terms
+         * index. The sort key is a representation of the total term, including
+         * any additional attributes such as the language code or the datatype
+         * URI.
          * 
          * @see RdfKeyBuilder
          */
         public byte[] key = null;
 
         /**
-         * The term identifier assigned to this term by the
-         * {@link ITripleStore#getTermIdIndex() terms} index and the identifier
-         * under which the lexical item may be recovered from the
-         * {@link ITripleStore#getIdTermIndex() term identifiers} index.
+         * The term identifier assigned to this term by the terms index and the
+         * identifier under which the lexical item may be recovered from the
+         * term identifiers index.
          */
         public long termId = 0;
 
@@ -332,11 +331,9 @@ public class OptimizedValueFactory implements ValueFactory {
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
          * if it is determined that a term has already been assigned a term
-         * identifier and is therefore in both the
-         * {@link ITripleStore#getTermIdIndex() terms} index and the
-         * {@link ITripleStore#getIdTermIndex() term identifiers} index. This is
-         * used to avoid re-definition of terms in the term identifiers index
-         * during a bulk load operation.
+         * identifier and is therefore in both the terms index and the term
+         * identifiers index. This is used to avoid re-definition of terms in
+         * the term identifiers index during a bulk load operation.
          */
         public boolean known = false;
         

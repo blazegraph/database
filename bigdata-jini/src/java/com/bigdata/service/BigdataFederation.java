@@ -368,14 +368,13 @@ public class BigdataFederation implements IBigdataFederation {
          * 
          * @todo Does not support partitioned metadata index.
          */
-        final int partitionId = IDataService.UNPARTITIONED;
 
         while (true) {
 
             try {
 
                 rset = metadataService.rangeQuery(IDataService.UNISOLATED,
-                        metadataName, partitionId, nextKey, null, 1000,
+                        metadataName, nextKey, null, 1000,
                         IDataService.KEYS | IDataService.VALS);
 
                 BigdataClient.log.info("Fetched " + rset.getNumTuples()

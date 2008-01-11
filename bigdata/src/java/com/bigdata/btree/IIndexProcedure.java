@@ -31,7 +31,6 @@ package com.bigdata.btree;
 import java.io.Serializable;
 
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -58,11 +57,8 @@ import com.bigdata.service.IDataService;
  * @version $Id$
  * 
  * @see IReadOnlyOperation
- * 
- * @todo reconcile with the {@link AbstractTask} submission API on the
- *       {@link ConcurrentJournal}.
  */
-public interface IProcedure extends Serializable {
+public interface IIndexProcedure extends Serializable {
 
     /**
      * Run the procedure.
@@ -80,5 +76,39 @@ public interface IProcedure extends Serializable {
      *         across a network interface.
      */
     public Object apply(IIndex ndx);
+
+//    /**
+//     * Interface for custom aggregation of results when a procedure is applied
+//     * to a partitioned index.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * 
+//     * @param <T>
+//     *            The result type of the procedure.
+//     */
+//    public interface IAggregator<T> {
+//        
+//        /**
+//         * Method is invoked for each result. The implementation is responsible
+//         * for combining the results in whatever manner is meaningful for the
+//         * procedure. In general, implementations of this method MUST be
+//         * thread-safe since the procedure MAY be applied in parallel when it
+//         * spans more than one index partition.
+//         * 
+//         * @param result
+//         *            The result from applying the procedure to a single index
+//         *            partition.
+//         * @param split
+//         *            The {@link Split} that generated that result.
+//         */
+//        public void aggregate(T result, Split split);
+//
+//        /**
+//         * Return the aggregated results as an implementation dependent object.
+//         */
+//        public Object getResult();
+//        
+//    }
     
 }

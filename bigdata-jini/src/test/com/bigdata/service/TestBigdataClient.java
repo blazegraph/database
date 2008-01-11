@@ -39,7 +39,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.service.ClientIndexView.Split;
 
 /**
  * Test suite for the {@link BigdataClient}.
@@ -417,10 +416,14 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         // verify correct value in the index on the correct data service.
         assertEquals(new byte[] { 1 }, (byte[]) dataService0.batchLookup(
-                UNISOLATED, name, partition0, 1, new byte[][] { new byte[] { 1 } })[0]);
+                UNISOLATED,
+                DataService.getIndexPartitionName(name, partition0), 1,
+                new byte[][] { new byte[] { 1 } })[0]);
         //
         assertEquals(new byte[] { 5 }, (byte[]) dataService1.batchLookup(
-                UNISOLATED, name, partition1, 1, new byte[][] { new byte[] { 5 } })[0]);
+                UNISOLATED,
+                DataService.getIndexPartitionName(name, partition1), 1,
+                new byte[][] { new byte[] { 5 } })[0]);
 
         // verify some range counts.
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));

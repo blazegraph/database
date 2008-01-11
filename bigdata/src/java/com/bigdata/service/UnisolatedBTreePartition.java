@@ -30,7 +30,6 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.Serializable;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.ShortPacker;
@@ -76,13 +75,21 @@ public class UnisolatedBTreePartition extends UnisolatedBTree {
      * @param store
      * @param branchingFactor
      * @param indexUUID
-     * @param conflictResolver
+     * @param pmd
+     *            Describes the index key range partition.
      */
-    public UnisolatedBTreePartition(IRawStore store, UUID indexUUID, Config config) {
+    public UnisolatedBTreePartition(IRawStore store, int branchingFactor,
+            UUID indexUUID, PartitionMetadataWithSeparatorKeys pmd) {
         
-        super(store, config.branchingFactor, indexUUID, null/*conflictResolver*/);
+        super(store, branchingFactor, indexUUID, null/*conflictResolver*/);
         
-        pmd = config.pmd;
+        if (pmd == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+        
+        this.pmd = pmd;
         
     }
 
@@ -295,35 +302,73 @@ public class UnisolatedBTreePartition extends UnisolatedBTree {
     }
 
     /**
-     * Configuration options for the {@link UnisolatedBTreePartition}.
+     * Creates an {@link UnisolatedBTreePartition} instance.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo provide config objects for {@link BTree} and derived classes. the
-     *       class of the btree implementation can be inferred from the config
-     *       object so we can simplify the parameters on
-     *       {@link IDataService#registerIndex(String, UUID, String, Object)}.
      */
-    public static class Config implements Serializable {
+    public static class UnisolatedBTreePartitionConstructor implements IIndexConstructor {
 
         /**
          * 
          */
         private static final long serialVersionUID = 5758014871939321170L;
 
-        public int branchingFactor = DEFAULT_BRANCHING_FACTOR;
+        private int branchingFactor;
         
-//        public IConflictResolver conflictResolver;
-        
-        public PartitionMetadataWithSeparatorKeys pmd;
-        
-        public Config(PartitionMetadataWithSeparatorKeys pmd) {
+        private PartitionMetadataWithSeparatorKeys pmd;
+
+        /**
+         * De-serialization constructor.
+         */
+        public UnisolatedBTreePartitionConstructor() {
+            
+        }
+
+        /**
+         * 
+         * @param pmd
+         *            Describes the index key range partition.
+         */
+        public UnisolatedBTreePartitionConstructor(PartitionMetadataWithSeparatorKeys pmd) {
+            
+            this(DEFAULT_BRANCHING_FACTOR, pmd);
+            
+        }
+
+        /**
+         * 
+         * @param branchingFactor
+         *            The branching factor.
+         * @param pmd
+         *            Describes the index key range partition.
+         */
+        public UnisolatedBTreePartitionConstructor(int branchingFactor, PartitionMetadataWithSeparatorKeys pmd) {
+            
+            if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+
+            if (pmd == null) {
+                
+                throw new IllegalArgumentException();
+                
+            }
+
+            this.branchingFactor = branchingFactor;
             
             this.pmd = pmd;
             
         }
         
+        public BTree newInstance(IRawStore store, UUID indexUUID) {
+
+            return new UnisolatedBTreePartition(store, branchingFactor, indexUUID, pmd);
+            
+        }
+
     }
     
 }
