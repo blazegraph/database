@@ -457,6 +457,12 @@
       <version>1.0-b1-dev</version>
       <url>http://www.sourceforge.net/projects/cweb</url>
     </dependency>
+	<!-- FIXME Use autojar to select only the required classes for redistribution. -->
+    <dependency> 
+      <id>fastutil</id> 
+      <version>5.0.9</version> 
+      <url>http://fastutil.dsi.unimi.it/</url>
+    </dependency>
 
     <!-- Striterator support. -->
     <!-- Note: The jar name reflects the date when I downloaded it -->
