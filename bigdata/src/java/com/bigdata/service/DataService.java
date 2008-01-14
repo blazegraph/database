@@ -663,9 +663,6 @@ abstract public class DataService implements IDataService,
         setupLoggingContext();
 
         try {
-            
-            if (proc == null)
-                throw new IllegalArgumentException();
     
             final boolean readOnly = proc instanceof IReadOnlyOperation;
     
