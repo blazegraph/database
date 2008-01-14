@@ -28,8 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.File;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.service.DataService;
@@ -75,6 +78,14 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
      */
     final private long tx = IDataService.UNISOLATED;
     
+    final IIndex ndx_termId;
+    final IIndex ndx_idTerm;
+    final IIndex ndx_freeText;
+    final IIndex ndx_spo;
+    final IIndex ndx_pos;
+    final IIndex ndx_osp;
+    final IIndex ndx_just;
+    
     /**
      * 
      */
@@ -94,60 +105,107 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
         log.info("Using embedded data service: "+getFile());
         
+        /*
+         * register indices. 
+         */
         registerIndices();
         
-    }
+        /*
+         * create views.
+         * 
+         * Note: We can create views even for indices that will not be allowed
+         * since an error will result if an operation is submitted for that view
+         * to the data service.
+         * 
+         * Note: if full transactions are to be used then only the statement
+         * indices and the justification indices should be assigned the
+         * transaction identifier - the term:id and id:term indices ALWAYS use
+         * unisolated operation to ensure consistency without write-write
+         * conflicts.
+         */
 
-    private void registerIndices() {
+        ndx_termId   = new DataServiceIndex(name_termId, tx, dataService);
+        ndx_idTerm   = new DataServiceIndex(name_idTerm, tx, dataService);
+        ndx_freeText = new DataServiceIndex(name_freeText, tx, dataService);
+        ndx_spo      = new DataServiceIndex(name_spo, tx, dataService);
+        ndx_pos      = new DataServiceIndex(name_pos, tx, dataService);
+        ndx_osp      = new DataServiceIndex(name_osp, tx, dataService);
+        ndx_just     = new DataServiceIndex(name_just, tx, dataService);
         
-        try {
-
-            if (lexicon) {
-            
-                dataService.registerIndex(name_termId, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-                dataService.registerIndex(name_idTerm, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-                if (textIndex) {
-                    
-                    dataService.registerIndex(name_freeText, UUID.randomUUID(),
-                            new UnisolatedBTreeConstructor(branchingFactor));
-                    
-                }
-                
-            }
-            
-            if (oneAccessPath) {
-            
-                dataService.registerIndex(name_spo, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-            } else {
-                
-                dataService.registerIndex(name_spo, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-                dataService.registerIndex(name_osp, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-                dataService.registerIndex(name_pos, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-            }
-            if (justify) {
-                
-                dataService.registerIndex(name_just, UUID.randomUUID(),
-                        new UnisolatedBTreeConstructor(branchingFactor));
-                
-            }
-
-        } catch (Exception e) {
-            
-            throw new RuntimeException(e);
-            
+    }
+    
+    private class RegisterIndexTask implements Callable<Object> {
+     
+        final String name;
+        
+        public RegisterIndexTask(String name) {
+            this.name = name;
         }
         
+        public Object call() throws Exception {
+
+            dataService.registerIndex(name, UUID.randomUUID(),
+                    new UnisolatedBTreeConstructor(branchingFactor));
+            
+            return null;
+            
+        }
+
+    }
+    
+    /**
+     * Registers the various indices that will be made available to the client.
+     */
+    private void registerIndices() {
+        
+        final List<Callable<Object>> tasks = new LinkedList<Callable<Object>>();
+
+        if (lexicon) {
+
+            tasks.add(new RegisterIndexTask(name_termId));
+
+            tasks.add(new RegisterIndexTask(name_idTerm));
+
+            if (textIndex) {
+
+                tasks.add(new RegisterIndexTask(name_freeText));
+
+            }
+
+        }
+
+        if (oneAccessPath) {
+
+            tasks.add(new RegisterIndexTask(name_spo));
+
+        } else {
+
+            tasks.add(new RegisterIndexTask(name_spo));
+
+            tasks.add(new RegisterIndexTask(name_pos));
+
+            tasks.add(new RegisterIndexTask(name_osp));
+
+        }
+
+        if (justify) {
+
+            tasks.add(new RegisterIndexTask(name_just));
+
+        }
+
+        try {
+            
+            writeService.invokeAll(tasks);
+                        
+            log.info("Registered indices.");
+
+        } catch (InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
     }
     
     public void clear() {
@@ -198,43 +256,43 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
     public IIndex getTermIdIndex() {
 
-        return new DataServiceIndex(name_termId, tx, dataService);
+        return ndx_termId;
         
     }
 
     public IIndex getIdTermIndex() {
 
-        return new DataServiceIndex(name_idTerm, tx, dataService);
+        return ndx_idTerm;
 
     }
 
     public IIndex getFullTextIndex() {
 
-        return new DataServiceIndex(name_freeText, tx, dataService);
+        return ndx_freeText;
         
     }
 
     public IIndex getSPOIndex() {
 
-        return new DataServiceIndex(name_spo, tx, dataService);
+        return ndx_spo;
         
     }
 
     public IIndex getPOSIndex() {
 
-        return new DataServiceIndex(name_pos, tx, dataService);
+        return ndx_pos;
         
     }
 
     public IIndex getOSPIndex() {
 
-        return new DataServiceIndex(name_osp, tx, dataService);
+        return ndx_osp;
         
     }
 
     public IIndex getJustificationIndex() {
 
-        return new DataServiceIndex(name_just, tx, dataService);
+        return ndx_just;
         
     }
 

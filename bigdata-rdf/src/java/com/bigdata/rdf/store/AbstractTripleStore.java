@@ -146,14 +146,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo Add 3+1, 4, and 4+1 stores (+1 indicates statement identifiers and 4
  *       indicates a quad store).
  * 
- * @todo The concurrent data loader should combine small files within the same
- *       thread in order to get better performance on ordered writes. Basically,
- *       read the next file from the queue if the buffer has not reached some
- *       threshold capacity - looked at another way, just do not flush the
- *       buffers in the LoadTasks - wait until there are no more files to be
- *       loaded and then flush the buffers when the thread is shutdown by the
- *       pool.
- * 
  * @todo finish the full text indexing support.
  * 
  * @todo sesame 2.x TCL (technology compatibility kit).

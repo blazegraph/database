@@ -102,7 +102,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
      */
     public void test_U10() {
         
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 20000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
+        new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;
