@@ -115,7 +115,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
      * <dd>#of threads to use.</dd>
      * <dt>-DbufferCapacity</dt>
      * <dd>Capacity of the statement buffers.</dd>
-     * <dt>-Ddocuments</dr>
+     * <dt>-Ddocuments.directory</dr>
      * <dd>The file or directory to be loaded (recursive processing).</dd>
      * </dl>
      * 
@@ -133,6 +133,10 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
      * 
      * as well.
      * 
+     * @todo support load of the ontology as well?
+     * 
+     * @todo support distributed load (hash(filename) MOD #hosts)
+     * 
      * @param args
      * @throws Exception
      */
@@ -142,9 +146,9 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         
         final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","20")); 
         
-        final String file = System.getProperty("documents");
+        final String file = System.getProperty("documents.directory");
   
-        if(file==null) throw new RuntimeException("Required property 'file' was not specified");
+        if(file==null) throw new RuntimeException("Required property 'documents.directory' was not specified");
         
         TestTripleStoreLoadRateWithJiniFederation test = new TestTripleStoreLoadRateWithJiniFederation("test");
         
