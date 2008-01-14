@@ -87,9 +87,6 @@ public class RegisterIndexTask extends AbstractTask {
             // register the index.
             journal.registerIndex(name, btree);
 
-            log.info("Registered index: name=" + name + ", class="
-                    + btree.getClass() + ", indexUUID=" + btree.getIndexUUID());
-
         } catch (IndexExistsException ex) {
 
             IIndex ndx = journal.getIndex(name);
@@ -102,8 +99,11 @@ public class RegisterIndexTask extends AbstractTask {
 
         }
 
-        return btree.getIndexUUID();
+        log.info("Registered index: name=" + name + ", class="
+                + btree.getClass() + ", indexUUID=" + btree.getIndexUUID());
 
+        return btree.getIndexUUID();
+        
     }
 
 }
