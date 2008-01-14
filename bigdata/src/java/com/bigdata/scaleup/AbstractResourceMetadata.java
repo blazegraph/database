@@ -36,8 +36,6 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.sun.org.apache.bcel.internal.generic.GETSTATIC;
-
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

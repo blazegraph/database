@@ -29,8 +29,7 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
-
-import com.sun.org.apache.xerces.internal.util.URI;
+import org.openrdf.model.URI;
 
 /**
  * An interface that defines bit masks that are applied to the low bits of the
