@@ -133,7 +133,7 @@ public class TestTripleStoreLoadRateLocalConcurrent extends TestLocalTripleStore
 
         try {
 
-            new ConcurrentDataLoader(store, 20/*nthreads*/, 10000 /*bufferCapacity*/,  new File(
+            new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/,  new File(
                     "../rdf-data/lehigh/U10"), new FilenameFilter() {
 
                 public boolean accept(File dir, String name) {

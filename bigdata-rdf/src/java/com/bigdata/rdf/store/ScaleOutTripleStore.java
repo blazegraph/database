@@ -186,7 +186,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         // all known data service UUIDs.
         final UUID[] uuids = client.getDataServiceUUIDs(0);
     
-        if (false && uuids.length == 2 && lexicon && !oneAccessPath) {
+        if (true && uuids.length == 2 && lexicon && !oneAccessPath) {
 
             /*
              * Special case for (2) data services attempts to balance the write
