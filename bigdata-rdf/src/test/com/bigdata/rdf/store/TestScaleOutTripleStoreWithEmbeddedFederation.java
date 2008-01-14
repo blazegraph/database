@@ -33,8 +33,6 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.EmbeddedBigdataClient;
 import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.IBigdataClient;

@@ -29,7 +29,6 @@ import java.util.Set;
 
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.util.KeyOrder;
 
 /**

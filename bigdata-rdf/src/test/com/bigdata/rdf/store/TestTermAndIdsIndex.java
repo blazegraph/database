@@ -42,7 +42,6 @@ import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Test suite for use of the terms and ids indices.
