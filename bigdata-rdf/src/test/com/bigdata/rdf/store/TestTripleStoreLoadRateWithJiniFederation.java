@@ -144,7 +144,7 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
 
         final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
         
-        final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","20")); 
+        final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
         
         final String file = System.getProperty("documents.directory");
   
@@ -166,6 +166,10 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         });
         
         test.tearDown();
+        
+        System.out.println("Exiting normally.");
+        
+        System.exit(0);
         
     }
     
