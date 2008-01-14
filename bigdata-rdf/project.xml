@@ -298,12 +298,6 @@
       <version>0.1-b1-dev</version>
       <url>http://www.sourceforge.net/projects/bigdata</url>
     </dependency>
-    <dependency> 
-      <groupId>bigdata</groupId>
-      <artifactId>bigdata-jini</artifactId>
-      <version>0.1-b1-dev</version>
-      <url>http://www.sourceforge.net/projects/bigdata</url>
-    </dependency>
 
 	<!-- cweb utility classes. -->
     <dependency> 
@@ -341,7 +335,39 @@
       <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
     </dependency>
 
+	<!-- full text indexing support. -->
+	<dependency>
+	    <groupId>org.apache.lucene</groupId>
+	    <artifactId>lucene-core</artifactId>
+	    <version>2.2.0</version>
+	</dependency> 
+	<dependency>
+	    <groupId>org.apache.lucene</groupId>
+	    <artifactId>lucene-analyzers</artifactId>
+	    <version>2.2.0</version>
+	</dependency> 
+
+	<!-- The simple logging facade is required by sesame 2. -->
+	<dependency>
+	    <groupId>org.slf4j</groupId>
+	    <artifactId>slf4j-api</artifactId>
+	    <version>1.4.3</version>
+	</dependency> 
+	<!-- bigdata uses log4j so this SLF binding is required. -->
+	<dependency>
+	    <groupId>org.slf4j</groupId>
+	    <artifactId>slf4j-log4j12</artifactId>
+	    <version>1.4.3</version>
+	</dependency>
+
     <!-- The openrdf framework. -->
+    <!-- FIXME find the minimum set of dependencies for the bigdata-rdf module. -->
+	<dependency>
+	    <groupId>org.openrdf</groupId>
+	    <artifactId>sesame-onejar</artifactId>
+        <jar>openrdf-sesame-2.0-onejar.jar</jar>
+	</dependency> 
+	<!--
     <dependency>
       <groupId>sesame</groupId>
       <artifactId>openrdf-model</artifactId>
@@ -366,8 +392,16 @@
       <version>1.2.7</version>
       <url>http://sourceforge.net/projects/sesame/</url>
     </dependency>
+    -->
 
-    <!-- Jini is only required by the scale-out triple store. -->
+    <!-- bigdata-jini and jini are only required by the scale-out triple store
+         when run against a jini-based federation. -->
+    <dependency> 
+      <groupId>bigdata</groupId>
+      <artifactId>bigdata-jini</artifactId>
+      <version>0.1-b1-dev</version>
+      <url>http://www.sourceforge.net/projects/bigdata</url>
+    </dependency>
     <dependency> 
       <groupId>com.sun.jini</groupId>
 	  <artifactId>jini-core</artifactId>

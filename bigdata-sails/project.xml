@@ -29,23 +29,13 @@
   <p>
 
   This project provides an integration of the bigdata&#174; RDF database layer
-  for Sesame 1.x.
+  for Sesame 2.x.  <strong>This is a triple-store only at this time but a quad
+  store will be part of the release.</strong>
 
   </p><p>
 
-  SAIL is an acroynm for Storage And Inference Layer.  Sesame 1.x
-  defines two SAIL interfaces: <dl>
-
-  <dt>RdfRepository</dt><dd>The basic triple store API.</dd>
-
-  <dt>RdfSchemaRepository</dt><dd>An extended interface that requires
-  support for RDFS truth maintenance.</dd>
-
-  </dl>
-
-  Implementations of both SAILs are contained in this project.  In
-  addition, there is an option to turn on RDF(S)+ truth maintenance
-  for the RdfRepository and an option to turn on owl:sameAs,
+  SAIL is an acroynm for Storage And Inference Layer.  There is an option to turn
+  on RDF(S)+ truth maintenance and another option to turn on owl:sameAs,
   owl:equivalentClass, and owl:equivalentProperty entailments.
 
   </p><p>
@@ -55,11 +45,8 @@
   triples per second on any reasonable computer.  The algorithms for
   forward closure likewise exhibit high performance and loading with
   incremental truth maintenance demonstrates throughput in the range
-  of 15,000 triples per second.  However, the Sesame 1.x platform does
-  not make it possible to optimize high-level queries for the backend
-  database and high-level queries will suffer as a result.  Therefore
-  a Sesame 2.x integration is in the works.  This will be a native
-  quad store.
+  of 15,000 triples per second.  At this time, only simple JOIN optimizations
+  are in place and high-level query has not been tuned.
 
   </p>
 
