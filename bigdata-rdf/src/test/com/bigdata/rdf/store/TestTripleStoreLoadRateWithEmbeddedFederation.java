@@ -34,7 +34,6 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**

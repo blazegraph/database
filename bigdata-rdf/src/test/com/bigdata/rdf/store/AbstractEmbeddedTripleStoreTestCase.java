@@ -29,8 +29,6 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
-import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
 /**

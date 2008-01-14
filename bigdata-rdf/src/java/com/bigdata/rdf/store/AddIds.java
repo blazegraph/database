@@ -28,8 +28,8 @@ package com.bigdata.rdf.store;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.IndexProcedure;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**

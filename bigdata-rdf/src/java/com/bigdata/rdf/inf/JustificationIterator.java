@@ -39,7 +39,6 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.spo.ISPOFilter;
-import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

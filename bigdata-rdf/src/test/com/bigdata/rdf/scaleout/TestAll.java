@@ -23,12 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.scaleout;
 
-import com.bigdata.rdf.store.TestTripleStoreLoadRateWithJiniFederation;
-import com.bigdata.rdf.store.TestTripleStoreLoadRateWithEmbeddedFederation;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.store.TestTripleStoreLoadRateWithEmbeddedFederation;
+import com.bigdata.rdf.store.TestTripleStoreLoadRateWithJiniFederation;
 
 /**
  * Aggregates test suites into increasing dependency order.
