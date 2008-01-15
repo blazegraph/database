@@ -152,6 +152,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         // verify that the client has/can get the metadata service.
         assertNotNull("metadataService", client.getMetadataService());
 
+        assertEquals("#dataServices", 2, client.awaitServices(
+                2/* minDataServices */, 2000/* timeout(ms) */));
+        
 //        /*
 //         * Verify that we have discovered the _correct_ metadata service. This
 //         * is a potential problem when starting a stopping services for the test

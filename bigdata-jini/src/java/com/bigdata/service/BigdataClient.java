@@ -83,29 +83,9 @@ import com.bigdata.scaleup.IPartitionMetadata;
  * the transaction manager and it simply specifies <code>0L</code> as the
  * transaction identifier for its read and write operations.
  * 
- * @todo write tests where an index is static partitioned over multiple data
- *       services and verify that the {@link ClientIndexView} is consistent.
- *       <p>
- *       Work towards the same guarentee when dynamic partitioning is enabled.
- * 
- * @todo support transactions (there is no transaction manager service yet and
- *       the 2-/3-phase commit protocol has not been implemented on the
- *       journal).
- * 
- * @todo reuse cached information across transactional and non-transactional
- *       views of the same index.
- * 
- * @todo support failover metadata service discovery.
- * 
  * @todo document client configuration, the relationship between jini groups and
  *       a bigdata federation, and whether and how a single client could connect
  *       to more than one bigdata federation.
- * 
- * @todo Use a weak-ref cache with an LRU (or hard reference cache) to retain
- *       cached {@link IPartitionMetadata}. The client needs access by {
- *       indexName, key } to obtain a {@link ServiceID} for a
- *       {@link DataService} and then needs to translate the {@link ServiceID}
- *       to a data service using the {@link #dataServiceMap}.
  * 
  * @see ClientIndexView
  * 
@@ -136,6 +116,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
     private final ServiceTemplate dataServiceTemplate = new ServiceTemplate(
             null, new Class[] { IDataService.class }, null);
+    
     private ServiceItemFilter metadataServiceFilter = null;
 
     private ServiceItemFilter dataServiceFilter = new DataServiceFilter();
@@ -566,7 +547,10 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             if (metadataService == null
                     || dataServiceUUIDs.length < minDataServices) {
                 
-                log.info("Waiting...");
+                log.info("Waiting : metadataService="
+                        + (metadataService == null ? "not " : "")
+                        + " found; #dataServices=" + dataServiceUUIDs.length
+                        + " out of " + minDataServices + " required.");
                 
                 Thread.sleep(1000/*ms*/);
                 
