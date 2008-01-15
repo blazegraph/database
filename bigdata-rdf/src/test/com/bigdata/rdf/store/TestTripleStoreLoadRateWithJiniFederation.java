@@ -38,6 +38,9 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
+ * <p>
+ * Note: The configuration options for the (meta)data services are set in their
+ * respective <code>properties</code> files NOT by the System properties!
  * 
  * @see TestScaleOutTripleStoreWithJiniFederation, Notes on how to run this test
  *      suite.
