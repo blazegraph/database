@@ -369,21 +369,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     public AbstractJournal(Properties properties) {
 
-        long initialExtent = Options.DEFAULT_INITIAL_EXTENT;
-        long maximumExtent = Options.DEFAULT_MAXIMUM_EXTENT;
-        int offsetBits = Options.DEFAULT_OFFSET_BITS;
-        boolean validateChecksum = true;
-        boolean useDirectBuffers = Options.DEFAULT_USE_DIRECT_BUFFERS;
-        int writeCacheCapacity = Options.DEFAULT_WRITE_CACHE_CAPACITY;
         boolean create = Options.DEFAULT_CREATE;
-        boolean createTempFile = Options.DEFAULT_CREATE_TEMP_FILE;
         boolean isEmptyFile = false;
-        boolean deleteOnClose = Options.DEFAULT_DELETE_ON_CLOSE;
-        boolean deleteOnExit = Options.DEFAULT_DELETE_ON_EXIT;
-        boolean readOnly = Options.DEFAULT_READ_ONLY;
-        ForceEnum forceWrites = Options.DEFAULT_FORCE_WRITES;
-        ForceEnum forceOnCommit = Options.DEFAULT_FORCE_ON_COMMIT;
-        boolean doubleSync = Options.DEFAULT_DOUBLE_SYNC;
 
         String val;
 
@@ -394,165 +381,128 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 //        this.properties = properties;
 
         /*
-         * "bufferMode" mode. Note that very large journals MUST use the
-         * disk-based mode.
+         * "bufferMode" mode.
+         * 
+         * Note: very large journals MUST use the disk-based mode.
          */
 
-        val = properties.getProperty(Options.BUFFER_MODE);
+        final BufferMode bufferMode = BufferMode.parse(properties.getProperty(
+                Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
 
-        final BufferMode bufferMode;
-        
-        if (val != null) {
+        log.info(Options.BUFFER_MODE + "=" + bufferMode);
 
-            bufferMode = BufferMode.parse(val);
-            
-            log.info(Options.BUFFER_MODE+"="+bufferMode);
-            
-        } else bufferMode = Options.DEFAULT_BUFFER_MODE;
-
-        System.err.println(Options.BUFFER_MODE+"="+bufferMode);
+        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
         
         /*
          * "useDirectBuffers"
          */
 
-        val = properties.getProperty(Options.USE_DIRECT_BUFFERS);
-
-        if (val != null) {
-
-            useDirectBuffers = Boolean.parseBoolean(val);
+        final boolean useDirectBuffers = Boolean.parseBoolean(properties
+                .getProperty(Options.USE_DIRECT_BUFFERS, ""
+                        + Options.DEFAULT_USE_DIRECT_BUFFERS));
             
-            log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
-
-        }
+        log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
 
         /*
          * "writeCache"
          */
 
-        val = properties.getProperty(Options.WRITE_CACHE_CAPACITY);
+        final int writeCacheCapacity = Integer.parseInt(properties.getProperty(
+                Options.WRITE_CACHE_CAPACITY, ""
+                        + Options.DEFAULT_WRITE_CACHE_CAPACITY));
 
-        if (val != null) {
+        if (writeCacheCapacity > 0 && writeCacheCapacity < Bytes.megabyte) {
 
-            writeCacheCapacity = Integer.parseInt(val);
-
-            if (writeCacheCapacity > 0 && writeCacheCapacity < Bytes.megabyte) {
-
-                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
-                        + " must be ZERO (0) or at least 1M (" + Bytes.megabyte
-                        + ")");
-                
-            }
-            
-            log.info(Options.WRITE_CACHE_CAPACITY+"="+writeCacheCapacity);
+            throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
+                    + " must be ZERO (0) or at least 1M (" + Bytes.megabyte
+                    + ")");
 
         }
+
+        log.info(Options.WRITE_CACHE_CAPACITY + "=" + writeCacheCapacity);
 
         /*
          * "initialExtent"
          */
 
-        val = properties.getProperty(Options.INITIAL_EXTENT);
+        final long initialExtent = Long.parseLong(properties.getProperty(
+                Options.INITIAL_EXTENT, "" + Options.DEFAULT_INITIAL_EXTENT));
 
-        if (val != null) {
+        if (initialExtent < Bytes.megabyte) {
 
-            initialExtent = Long.parseLong(val);
-
-            if (initialExtent < Bytes.megabyte) {
-
-                throw new RuntimeException("The '" + Options.INITIAL_EXTENT
-                        + "' must be at least one megabyte(" + Bytes.megabyte
-                        + ")");
-
-            }
-
-            log.info(Options.INITIAL_EXTENT+"="+initialExtent);           
+            throw new RuntimeException("The '" + Options.INITIAL_EXTENT
+                    + "' must be at least one megabyte(" + Bytes.megabyte + ")");
 
         }
+
+        log.info(Options.INITIAL_EXTENT + "=" + initialExtent);           
 
         /*
          * "maximumExtent"
          */
 
-        val = properties.getProperty(Options.MAXIMUM_EXTENT);
+        maximumExtent = Long.parseLong(properties.getProperty(
+                Options.MAXIMUM_EXTENT, "" + Options.DEFAULT_MAXIMUM_EXTENT));
 
-        if (val != null) {
+        if (maximumExtent < initialExtent) {
 
-            maximumExtent = Long.parseLong(val);
+            throw new RuntimeException("The '" + Options.MAXIMUM_EXTENT + "' ("
+                    + maximumExtent + ") is less than the initial extent ("
+                    + initialExtent + ").");
 
-            if (maximumExtent < initialExtent) {
-
-                throw new RuntimeException("The '" + Options.MAXIMUM_EXTENT
-                        + "' (" + maximumExtent
-                        + ") is less than the initial extent ("+initialExtent+").");
-
-            }
-
-            log.info(Options.MAXIMUM_EXTENT+"="+maximumExtent); 
-            
         }
 
-        this.maximumExtent = maximumExtent;
+        log.info(Options.MAXIMUM_EXTENT + "=" + maximumExtent); 
 
         /*
          * "offsetBits"
          */
         
-        val = properties.getProperty(Options.OFFSET_BITS);
-        
-        if(val != null) {
-            
-            offsetBits = Integer.parseInt(val);
-            
-            WormAddressManager.assertOffsetBits(offsetBits);
-            
-            log.info(Options.OFFSET_BITS+"="+offsetBits);
+        final int offsetBits = Integer.parseInt(properties.getProperty(
+                Options.OFFSET_BITS, "" + Options.DEFAULT_OFFSET_BITS));
 
-            if(offsetBits!=WormAddressManager.DEFAULT_OFFSET_BITS) {
-                
-                /*
-                 * FIXME The problem is that the CommitRecordIndex and the
-                 * Name2Addr class both define IValueSerializer objects that
-                 * need to know how to pack and unpack addresses. Those objects
-                 * are serialized into the BTreeMetadata records using Java
-                 * default serialization. When when they are de-serialized they
-                 * no longer have a reference to the store and therefore do not
-                 * know the #of offset bits to use when encoding and decoding
-                 * addresses. This has been patched by requiring the use of the
-                 * default #of offset bits. A proper solution would take an
-                 * approach similar to the extSer package which provides a
-                 * marker interface used to identify objects who need to have
-                 * the store reference set during de-serialization.
-                 */
-                
-                throw new RuntimeException("Only "
-                        + WormAddressManager.DEFAULT_OFFSET_BITS
-                        + " is supported at this time");
-                
-            }
-            
+        WormAddressManager.assertOffsetBits(offsetBits);
+
+        log.info(Options.OFFSET_BITS + "=" + offsetBits);
+
+        if (offsetBits != WormAddressManager.DEFAULT_OFFSET_BITS) {
+
+            /*
+             * FIXME The problem is that the CommitRecordIndex and the Name2Addr
+             * class both define IValueSerializer objects that need to know how
+             * to pack and unpack addresses. Those objects are serialized into
+             * the BTreeMetadata records using Java default serialization. When
+             * when they are de-serialized they no longer have a reference to
+             * the store and therefore do not know the #of offset bits to use
+             * when encoding and decoding addresses. This has been patched by
+             * requiring the use of the default #of offset bits. A proper
+             * solution would take an approach similar to the extSer package
+             * which provides a marker interface used to identify objects who
+             * need to have the store reference set during de-serialization.
+             */
+
+            throw new RuntimeException("Only "
+                    + WormAddressManager.DEFAULT_OFFSET_BITS
+                    + " is supported at this time");
+
         }
         
         /*
          * "createTempFile"
          */
 
-        val = properties.getProperty(Options.CREATE_TEMP_FILE);
+        final boolean createTempFile = Boolean.parseBoolean(properties
+                .getProperty(Options.CREATE_TEMP_FILE, ""
+                        + Options.DEFAULT_CREATE_TEMP_FILE));
 
-        if (val != null) {
+        log.info(Options.CREATE_TEMP_FILE + "=" + createTempFile);
 
-            createTempFile = Boolean.parseBoolean(val);
+        if (createTempFile) {
 
-            log.info(Options.CREATE_TEMP_FILE+"="+createTempFile);
-            
-            if(createTempFile) {
-                
-                create = false;
-            
-                isEmptyFile = true;
-                
-            }
-         
+            create = false;
+
+            isEmptyFile = true;
+
         }
 
         // "tmp.dir"
@@ -593,115 +543,78 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * "validateChecksum"
          */
 
-        val = properties.getProperty(Options.VALIDATE_CHECKSUM);
+        final boolean validateChecksum = Boolean.parseBoolean(properties
+                .getProperty(Options.VALIDATE_CHECKSUM, ""
+                        + Options.DEFAULT_VALIDATE_CHECKSUM));
 
-        if (val != null) {
-
-            validateChecksum = Boolean.parseBoolean(val);
-
-            log.info(Options.VALIDATE_CHECKSUM+"="+validateChecksum);
-
-        }
+        log.info(Options.VALIDATE_CHECKSUM+"="+validateChecksum);
 
         /*
          * "readOnly"
          */
 
-        val = properties.getProperty(Options.READ_ONLY);
+        readOnly = Boolean.parseBoolean(properties.getProperty(
+                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
 
-        if (val != null) {
-
-            readOnly = Boolean.parseBoolean(val);
+        if (readOnly) {
 
             create = false;
-            
-            log.info(Options.READ_ONLY+"="+readOnly);
 
         }
         
-        this.readOnly = readOnly;
+        log.info(Options.READ_ONLY+"="+readOnly);
 
         /*
          * "forceWrites"
          */
 
-        val = properties.getProperty(Options.FORCE_WRITES);
+        final ForceEnum forceWrites = ForceEnum.parse(properties.getProperty(
+                Options.FORCE_WRITES, "" + Options.DEFAULT_FORCE_WRITES));
 
-        if (val != null) {
-
-            forceWrites = ForceEnum.parse(val);
-
-            log.info(Options.FORCE_WRITES+"="+forceWrites);
-
-        }
+        log.info(Options.FORCE_WRITES + "=" + forceWrites);
 
         /*
          * "forceOnCommit"
          */
 
-        val = properties.getProperty(Options.FORCE_ON_COMMIT);
+        forceOnCommit = ForceEnum.parse(properties.getProperty(
+                Options.FORCE_ON_COMMIT, "" + Options.DEFAULT_FORCE_ON_COMMIT));
 
-        if (val != null) {
-
-            forceOnCommit = ForceEnum.parse(val);
-
-            log.info(Options.FORCE_ON_COMMIT+"="+forceOnCommit);
-            
-        }
-        
-        this.forceOnCommit = forceOnCommit;
+        log.info(Options.FORCE_ON_COMMIT+"="+forceOnCommit);
 
         /*
          * "doubleSync"
          */
 
-        val = properties.getProperty(Options.DOUBLE_SYNC);
+        doubleSync = Boolean.parseBoolean(properties.getProperty(
+                Options.DOUBLE_SYNC, "" + Options.DEFAULT_DOUBLE_SYNC));
 
-        if (val != null) {
+        log.info(Options.DOUBLE_SYNC + "=" + doubleSync);
 
-            doubleSync = Boolean.parseBoolean(val);
-
-            log.info(Options.DOUBLE_SYNC+"="+doubleSync);
-            
-        }
-
-        this.doubleSync = doubleSync;
-        
         /*
          * "deleteOnClose"
          */
 
-        val = properties.getProperty(Options.DELETE_ON_CLOSE);
+        deleteOnClose = Boolean.parseBoolean(properties.getProperty(
+                Options.DELETE_ON_CLOSE, "" + Options.DEFAULT_DELETE_ON_CLOSE));
 
-        if (val != null) {
-
-            deleteOnClose = Boolean.parseBoolean(val);
-
-            log.info(Options.DELETE_ON_CLOSE+"="+deleteOnClose);
-
-        }
-
-        this.deleteOnClose = deleteOnClose;
+        log.info(Options.DELETE_ON_CLOSE + "=" + deleteOnClose);
 
         /*
          * "deleteOnExit"
          */
 
-        val = properties.getProperty(Options.DELETE_ON_EXIT);
+        final boolean deleteOnExit = Boolean.parseBoolean(properties
+                .getProperty(Options.DELETE_ON_EXIT, ""
+                        + Options.DEFAULT_DELETE_ON_EXIT));
 
-        if (val != null) {
-
-            deleteOnExit = Boolean.parseBoolean(val);
-
-            log.info(Options.DELETE_ON_EXIT+"="+deleteOnExit);
-
-        }
+        log.info(Options.DELETE_ON_EXIT + "=" + deleteOnExit);
         
         /*
          * branchingFactor.
          */
         
-        this.defaultBranchingFactor = Integer.parseInt(properties.getProperty(
+        defaultBranchingFactor = Integer.parseInt(properties.getProperty(
                 Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
 
         if (defaultBranchingFactor < BTree.MIN_BRANCHING_FACTOR) {
