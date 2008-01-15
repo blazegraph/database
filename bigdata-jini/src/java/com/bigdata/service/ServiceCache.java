@@ -38,6 +38,7 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
+import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
 
@@ -154,7 +155,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      * 
      * @return An array of {@link ServiceItem}s.
      */
-    public ServiceItem[] getServiceItems(int maxCount) {
+    public ServiceItem[] getServiceItems(int maxCount, ServiceItemFilter filter) {
 
         if (maxCount < 0)
             throw new IllegalArgumentException();
@@ -170,8 +171,12 @@ public class ServiceCache implements ServiceDiscoveryListener {
             Map.Entry<ServiceID, ServiceItem> entry = itr.next();
             
             ServiceItem item = entry.getValue();
+            
+            if (filter == null || filter.check(item)) {
 
-            v.add(item);
+                v.add(item);
+
+            }
             
         }
         

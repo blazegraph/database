@@ -29,6 +29,7 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -45,12 +46,10 @@ import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
-import net.jini.lookup.ServiceItemFilter;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
-import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -103,23 +102,42 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     private Configuration config;
     private DiscoveryManagement discoveryManager = null;
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
-    private LookupCache metadataServiceLookupCache = null;
+//    private LookupCache metadataServiceLookupCache = null;
+    
+    /**
+     * This is a cache for all services that implement the {@link IDataService}
+     * interface.
+     * <p>
+     * Note: No filter is used when this lookup cache is established so you MUST
+     * apply either the {@link MetadataServiceFilter} or the
+     * {@link DataServiceFilter} depending on what you want from the cache.
+     */
     private LookupCache dataServiceLookupCache = null;
     
     /**
-     * Used to provide {@link DataService} lookup by {@link ServiceID}.
+     * Used to provide {@link DataService} lookup by {@link ServiceID}. Items
+     * are added to the map as they are discovered by the
+     * {@link #dataServiceLookupCache}.
+     * <p>
+     * Note: Since the {@link #dataServiceLookupCache} contains both data and
+     * metadata services the map may be used to resolve either kind of service
+     * by its {@link ServiceID}.
      */
     private ServiceCache dataServiceMap = new ServiceCache();
 
-    private final ServiceTemplate metadataServiceTemplate = new ServiceTemplate(
-            null, new Class[] { IMetadataService.class }, null);
+//    private final ServiceTemplate metadataServiceTemplate = new ServiceTemplate(
+//            null, new Class[] { IMetadataService.class }, null);
 
+    /**
+     * Template matches anything that implements {@link IDataService}, which
+     * includes both data and metadata services.
+     */
     private final ServiceTemplate dataServiceTemplate = new ServiceTemplate(
             null, new Class[] { IDataService.class }, null);
     
-    private ServiceItemFilter metadataServiceFilter = null;
+//    private ServiceItemFilter metadataServiceFilter = MetadataServiceFilter.INSTANCE;
 
-    private ServiceItemFilter dataServiceFilter = new DataServiceFilter();
+//    private ServiceItemFilter dataServiceFilter = DataServiceFilter.INSTANCE;
 
     public DiscoveryManagement getDiscoveryManagement() {
         
@@ -147,7 +165,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public IMetadataService getMetadataService() {
         
-        ServiceItem item = metadataServiceLookupCache.lookup(null);
+        ServiceItem item = dataServiceLookupCache.lookup(MetadataServiceFilter.INSTANCE);
             
         if (item == null) {
 
@@ -162,8 +180,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
             try {
 
-                item = serviceDiscoveryManager.lookup(metadataServiceTemplate,
-                        metadataServiceFilter, timeout);
+                item = serviceDiscoveryManager.lookup(dataServiceTemplate,
+                        MetadataServiceFilter.INSTANCE, timeout);
 
             } catch (RemoteException ex) {
                 
@@ -202,7 +220,10 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
         
-        ServiceItem[] items = dataServiceMap.getServiceItems(maxCount);
+        ServiceItem[] items = dataServiceMap.getServiceItems(maxCount,DataServiceFilter.INSTANCE);
+        
+        log.info("There are at least " + items.length
+                + " data services : maxCount=" + maxCount);
         
         UUID[] uuids = new UUID[items.length];
         
@@ -246,7 +267,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             try {
 
                 item = serviceDiscoveryManager.lookup(dataServiceTemplate,
-                        dataServiceFilter, timeout);
+                        DataServiceFilter.INSTANCE, timeout);
 
             } catch (RemoteException ex) {
                 
@@ -393,28 +414,28 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         }
 
-        /*
-         * Setup a LookupCache that is used to keep track of all metadata
-         * services registered with any service registrar to which the client is
-         * listening.
-         * 
-         * @todo provide filtering by attributes to select the primary vs
-         * failover metadata servers? by attributes identiying the bigdata
-         * federation?
-         */
-        try {
-            
-            metadataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    metadataServiceTemplate,
-                    null /* filter */, null);
-            
-        } catch(RemoteException ex) {
-            
-            terminate();
-            
-            throw new RuntimeException("Could not setup MetadataService LookupCache", ex);
-            
-        }
+//        /*
+//         * Setup a LookupCache that is used to keep track of all metadata
+//         * services registered with any service registrar to which the client is
+//         * listening.
+//         * 
+//         * @todo provide filtering by attributes to select the primary vs
+//         * failover metadata servers? by attributes identiying the bigdata
+//         * federation?
+//         */
+//        try {
+//            
+//            metadataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
+//                    metadataServiceTemplate,
+//                    null /* filter */, null);
+//            
+//        } catch(RemoteException ex) {
+//            
+//            terminate();
+//            
+//            throw new RuntimeException("Could not setup MetadataService LookupCache", ex);
+//            
+//        }
 
         /*
          * Setup a LookupCache that is used to keep track of all data services
@@ -428,10 +449,12 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         try {
 
             dataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    dataServiceTemplate,
-                    dataServiceFilter /* filter */, dataServiceMap);
-            
-        } catch(RemoteException ex) {
+                    dataServiceTemplate, null /*
+                                                 * No filter so we get both data
+                                                 * and metadata service items
+                                                 */, dataServiceMap);
+
+        } catch (RemoteException ex) {
             
             terminate();
             
@@ -455,13 +478,13 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
          * Stop various discovery processes.
          */
          
-        if (metadataServiceLookupCache != null) {
-
-            metadataServiceLookupCache.terminate();
-            
-            metadataServiceLookupCache = null;
-
-        }
+//        if (metadataServiceLookupCache != null) {
+//
+//            metadataServiceLookupCache.terminate();
+//            
+//            metadataServiceLookupCache = null;
+//
+//        }
 
         if (dataServiceLookupCache != null) {
 
@@ -542,7 +565,10 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             // verify that the client has/can get the metadata service.
             IMetadataService metadataService = getMetadataService();
 
-            UUID[] dataServiceUUIDs = getDataServiceUUIDs(0);
+            // find all data services.
+            UUID[] dataServiceUUIDs = getDataServiceUUIDs(0/*all*/);
+//            // find at most that many data services.
+//            UUID[] dataServiceUUIDs = getDataServiceUUIDs(minDataServices);
         
             if (metadataService == null
                     || dataServiceUUIDs.length < minDataServices) {
@@ -550,7 +576,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
                 log.info("Waiting : metadataService="
                         + (metadataService == null ? "not " : "")
                         + " found; #dataServices=" + dataServiceUUIDs.length
-                        + " out of " + minDataServices + " required.");
+                        + " out of " + minDataServices + " required : "
+                        + Arrays.toString(dataServiceUUIDs));
                 
                 Thread.sleep(1000/*ms*/);
                 

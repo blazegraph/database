@@ -30,19 +30,18 @@ import net.jini.lookup.ServiceItemFilter;
 import org.apache.log4j.Logger;
 
 /**
- * Filter rejects items that implement {@link IMetadataService} so as to only
- * select those {@link IDataService}s that are being used as data services rather
- * than metadata services.
+ * Filter only matches a service item where the {@link IMetadataService} is
+ * implemented.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceFilter implements ServiceItemFilter {
+public class MetadataServiceFilter implements ServiceItemFilter {
 
     public static final transient Logger log = Logger
-            .getLogger(DataServiceFilter.class);
+            .getLogger(MetadataServiceFilter.class);
 
-    public static final transient ServiceItemFilter INSTANCE = new DataServiceFilter();
+    public static final transient ServiceItemFilter INSTANCE = new MetadataServiceFilter();
     
     public boolean check(ServiceItem item) {
 
@@ -54,7 +53,7 @@ public class DataServiceFilter implements ServiceItemFilter {
             
         }
         
-        if(!(item.service instanceof IMetadataService)) {
+        if((item.service instanceof IMetadataService)) {
            
             log.info("Matched: "+item);
             
