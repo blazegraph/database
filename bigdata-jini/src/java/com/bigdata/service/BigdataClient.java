@@ -30,6 +30,7 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -533,4 +534,54 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     }
     private IBigdataFederation fed = null;
     
+    /**
+     * Await the availability of an {@link IMetadataService} and the specified
+     * minimum #of {@link IDataService}s.
+     * 
+     * @param minDataServices
+     *            The minimum #of data services.
+     * @param timeout
+     *            The timeout (ms).
+     * 
+     * @return The #of data services that are available.
+     * 
+     * @throws InterruptedException
+     * @throws TimeoutException
+     *             If a timeout occurs.
+     */
+    public int awaitServices(int minDataServices, long timeout) throws InterruptedException, TimeoutException {
+        
+        assert minDataServices > 0;
+        assert timeout > 0;
+        
+        final long begin = System.currentTimeMillis();
+        
+        while ((System.currentTimeMillis() - begin) < timeout) {
+
+            // verify that the client has/can get the metadata service.
+            IMetadataService metadataService = getMetadataService();
+
+            UUID[] dataServiceUUIDs = getDataServiceUUIDs(0);
+        
+            if (metadataService == null
+                    || dataServiceUUIDs.length < minDataServices) {
+                
+                log.info("Waiting...");
+                
+                Thread.sleep(1000/*ms*/);
+                
+                continue;
+                
+            }
+            
+            log.info("Have metadata service and "+dataServiceUUIDs.length+" data services");
+            
+            return dataServiceUUIDs.length;
+            
+        }
+        
+        throw new TimeoutException();
+        
+    }
+
 }

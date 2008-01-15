@@ -342,6 +342,8 @@ public interface Options {
      * @see WormAddressManager#DEFAULT_OFFSET_BITS
      */
     public final static int DEFAULT_OFFSET_BITS = WormAddressManager.DEFAULT_OFFSET_BITS;
+
+    public final static boolean DEFAULT_VALIDATE_CHECKSUM = true;
     
     /**
      * The default for the {@link #CREATE} option.

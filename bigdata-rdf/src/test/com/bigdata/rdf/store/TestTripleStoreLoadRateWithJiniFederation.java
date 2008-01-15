@@ -122,13 +122,13 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
      * You must also specify
      * 
      * <pre>
-     *  -Djava.security.policy=policy.all
+     *   -Djava.security.policy=policy.all
      * </pre>
      * 
      * and probably want to specify
      * 
      * <pre>
-     * -Dcom.sun.jini.jeri.tcp.useNIO=true
+     *  -Dcom.sun.jini.jeri.tcp.useNIO=true
      * </pre>
      * 
      * as well.
@@ -136,6 +136,11 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
      * @todo support load of the ontology as well?
      * 
      * @todo support distributed load (hash(filename) MOD #hosts)
+     * 
+     * @todo make this part of the {@link ConcurrentDataLoader} and modify so
+     *       that you can run against any pre-existing database, including a
+     *       jini-based bigdata federation, or create a new one from the defined
+     *       properties.
      * 
      * @param args
      * @throws Exception
