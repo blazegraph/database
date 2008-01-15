@@ -25,6 +25,7 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -72,7 +73,7 @@ import com.bigdata.scaleup.JournalMetadata;
  *       that you can update or rollback the installed service versions with
  *       100% uptime.
  */
-public interface IDataService extends IRemoteTxCommitProtocol {
+public interface IDataService extends ITxCommitProtocol, Remote {
 
     /**
      * A constant that may be used as the transaction identifier when the
