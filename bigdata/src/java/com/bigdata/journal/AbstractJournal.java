@@ -438,7 +438,10 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         log.info(Options.INITIAL_EXTENT + "=" + initialExtent);           
 
         /*
-         * "maximumExtent"
+         * "maximumExtent" @todo refactor this a bit so that it is more
+         * explictly an overflow trigger leading to a new journal and eventually
+         * to a compacting merge. the parameter is not definable until the layer
+         * at which overflow is handled.
          */
 
         maximumExtent = Long.parseLong(properties.getProperty(
