@@ -212,7 +212,11 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    private void _open() {
+    /**
+     * Note: This is synchronized to ensure that at most one thread gets to
+     * re-open the index from its backing store.
+     */
+    synchronized private void _open() {
 
         // Read the root node.
         this.root = readNodeOrLeaf(fileStore.metadata.addrRoot);

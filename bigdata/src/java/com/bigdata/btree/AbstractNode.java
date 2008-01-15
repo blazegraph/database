@@ -271,8 +271,17 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            factor rather than using the branching factor declared on the
      *            btree we are able to support different branching factors at
      *            different levels of the tree.
+     * @param dirty
+     *            Used to set the {@link PO#dirty} state. All nodes and leaves
+     *            created by non-deserialization constructors begin their life
+     *            cycle as <code>dirty := true</code> All nodes or leaves
+     *            de-serialized from the backing store begin their life cycle as
+     *            clean (dirty := false). This we read nodes and leaves into
+     *            immutable objects, those objects will remain clean. Eventually
+     *            a copy-on-write will create a mutable node or leaf from the
+     *            immutable one and that node or leaf will be dirty.
      */
-    protected AbstractNode(AbstractBTree btree, int branchingFactor) {
+    protected AbstractNode(AbstractBTree btree, int branchingFactor, boolean dirty) {
 
         assert btree != null;
 
@@ -293,6 +302,17 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         // The maximum #of keys is easy to compute.
         this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
 
+        if (!dirty) {
+
+            /*
+             * Nodes default to being dirty, so we explicitly mark this as
+             * clean. This is ONLY done for the de-serialization constructors.
+             */
+
+            setDirty(false);
+
+        }
+        
         // Add to the hard reference queue.
         btree.touch(this);
         
@@ -330,7 +350,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          * persistence capable object, but it is not yet persistent and we
          * do not want to copy the persistent identity of the source object.
          */
-        this(src.btree,src.branchingFactor);
+        this(src.btree,src.branchingFactor,true/*dirty*/);
 
         // This node must be mutable (it is a new node).
         assert isDirty();

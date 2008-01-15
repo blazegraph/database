@@ -173,6 +173,10 @@ public class Node extends AbstractNode implements INodeData {
 
     /**
      * De-serialization constructor.
+     * <p>
+     * Note: The de-serialization constructor (and ONLY the de-serialization
+     * constructor) ALWAYS creates a clean node. Therefore the {@link PO#dirty}
+     * flag passed up from this constructor has the value <code>false</code>.
      * 
      * @param btree
      *            The tree to which the node belongs.
@@ -211,7 +215,7 @@ public class Node extends AbstractNode implements INodeData {
             int[] childEntryCounts
             ) {
 
-        super( btree, branchingFactor );
+        super( btree, branchingFactor, false /* The node is NOT dirty */ );
 
         assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
@@ -235,8 +239,8 @@ public class Node extends AbstractNode implements INodeData {
 
         childRefs = new Reference[branchingFactor+1];
 
-        // must clear the dirty flag since we just de-serialized this node.
-        setDirty(false);
+//        // must clear the dirty flag since we just de-serialized this node.
+//        setDirty(false);
 
     }
 
@@ -245,7 +249,7 @@ public class Node extends AbstractNode implements INodeData {
      */
     protected Node(BTree btree) {
 
-        super(btree, btree.branchingFactor );
+        super(btree, btree.branchingFactor, true /*dirty*/ );
 
         nentries = 0;
         
@@ -276,7 +280,7 @@ public class Node extends AbstractNode implements INodeData {
      */
     protected Node(BTree btree, AbstractNode oldRoot, int nentries) {
 
-        super(btree, btree.branchingFactor );
+        super(btree, btree.branchingFactor, true /*dirty*/ );
 
         // Verify that this is the root.
         assert oldRoot == btree.root;
@@ -2197,24 +2201,37 @@ public class Node extends AbstractNode implements INodeData {
         AbstractNode child = childRef == null ? null : childRef.get();
 
         if (child == null) {
+            
+            /*
+             * Note: This is synchronized in order to make sure that concurrent
+             * readers are single-threaded at the point where they read a node
+             * or leaf from the store into the btree. This ensures that only one
+             * thread will read the missing child in from the store and that
+             * inconsistencies in the data structure can not arise from
+             * concurrent readers.
+             */
 
-            long key = childAddr[index];
+            synchronized (this) {
 
-            if(key == NULL) {
-                dump(Level.DEBUG,System.err);
-                throw new AssertionError(
-                        "Child does not have persistent identity: this=" + this
-                                + ", index=" + index);
+                long key = childAddr[index];
+
+                if (key == NULL) {
+                    dump(Level.DEBUG, System.err);
+                    throw new AssertionError(
+                            "Child does not have persistent identity: this="
+                                    + this + ", index=" + index);
+                }
+
+                child = btree.readNodeOrLeaf(key);
+
+                // patch parent reference since loaded from store.
+                child.parent = btree.newRef(this);
+
+                // patch the child reference.
+                childRefs[index] = btree.newRef(child);
+
             }
-
-            child = btree.readNodeOrLeaf( key );
-
-            // patch parent reference since loaded from store.
-            child.parent = btree.newRef(this);
-
-            // patch the child reference.
-            childRefs[index] = btree.newRef(child);
-
+        
         }
 
         /*

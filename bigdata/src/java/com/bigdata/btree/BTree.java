@@ -600,9 +600,16 @@ public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexW
 
             /*
              * reload the root node.
+             * 
+             * Note: This is synchronized to avoid race conditions when
+             * re-opening the index from the backing store.
              */
 
-            root = readNodeOrLeaf(metadata.getRootAddr());
+            synchronized(this) {
+            
+                root = readNodeOrLeaf(metadata.getRootAddr());
+                
+            }
 
         }
 

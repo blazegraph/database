@@ -65,6 +65,10 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     /**
      * De-serialization constructor.
+     * <p>
+     * Note: The de-serialization constructor (and ONLY the de-serialization
+     * constructor) ALWAYS creates a clean leaf. Therefore the {@link PO#dirty}
+     * flag passed up from this constructor has the value <code>false</code>.
      * 
      * @param btree
      *            The tree to which the leaf belongs.
@@ -85,7 +89,7 @@ public class Leaf extends AbstractNode implements ILeafData {
     protected Leaf(AbstractBTree btree, long addr, int branchingFactor, 
             IKeyBuffer keys, Object[] values) {
         
-        super(btree, branchingFactor );
+        super(btree, branchingFactor, false /* The leaf is NOT dirty. */);
 
         assert nkeys >=0 && nkeys<= branchingFactor;
         
@@ -101,8 +105,8 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         this.values = values; // steal reference.
         
-        // must clear the dirty since we just de-serialized this leaf.
-        setDirty(false);
+//        // must clear the dirty since we just de-serialized this leaf.
+//        setDirty(false);
 
 //        // Add to the hard reference queue.
 //        btree.touch(this);
@@ -117,7 +121,7 @@ public class Leaf extends AbstractNode implements ILeafData {
      */
     protected Leaf(BTree btree) {
 
-        super(btree, btree.branchingFactor );
+        super(btree, btree.branchingFactor, true /*dirty*/ );
 
         keys = new MutableKeyBuffer( branchingFactor+1 );
 
