@@ -33,14 +33,13 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.ITxCommitProtocol;
 import com.bigdata.scaleup.JournalMetadata;
 
 /**
  * Data service interface.
  * <p>
  * The data service exposes the methods on this interface to the client and the
- * {@link ITxCommitProtocol} methods to the {@link ITransactionManager} service.
+ * {@link IRemoteTxCommitProtocol} methods to the {@link ITransactionManager} service.
  * <p>
  * The data service exposes both isolated (transactional) and unisolated batch
  * operations on scalable named btrees. Transactions are identified by their
@@ -73,7 +72,7 @@ import com.bigdata.scaleup.JournalMetadata;
  *       that you can update or rollback the installed service versions with
  *       100% uptime.
  */
-public interface IDataService extends ITxCommitProtocol, Remote {
+public interface IDataService extends IRemoteTxCommitProtocol, Remote {
 
     /**
      * A constant that may be used as the transaction identifier when the
