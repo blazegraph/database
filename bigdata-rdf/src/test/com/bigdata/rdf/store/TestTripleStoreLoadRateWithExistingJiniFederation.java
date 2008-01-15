@@ -37,12 +37,18 @@ import com.bigdata.service.BigdataClient;
 /**
  * Class designed to connect to an existing bigdata federation using jini and
  * bulk load a data set into that federation.
+ * <p>
+ * Note: Jini MUST be running.
+ * <p>
+ * The metadata service and the data services MUST be running
+ * <p>
+ * Note: The configuration options for the (meta)data services are set in their
+ * respective <code>properties</code> files NOT by the System properties!
  * 
  * @todo support distributed client using hash(filename) MOD N to select host
  * 
- * @todo verify N data services and one metadata service available before start.
- * 
- * @todo provide dropIndex so that we can guarentee a cleared federation.
+ * @todo provide dropIndex so that we can guarentee a cleared federation or at
+ *       least warn if the data services already have data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -54,8 +60,12 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
     /**
      * 
      * <dl>
+     * <dt>-DminDataServices</dt>
+     * <dd>The minium #of data services that must be available before the
+     * client will start (1 or more). In addition, there must be a metadata
+     * service available for the client to run.</dd>
      * <dt>-Dnthreads</dt>
-     * <dd>#of threads to use.</dd>
+     * <dd>#of threads to use <em>per client</em>.</dd>
      * <dt>-DbufferCapacity</dt>
      * <dd>Capacity of the statement buffers.</dd>
      * <dt>-Ddocuments.directory</dr>
@@ -65,16 +75,36 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * You must also specify
      * 
      * <pre>
-     *   -Djava.security.policy=policy.all
+     *      -Djava.security.policy=policy.all
      * </pre>
      * 
      * and probably want to specify
      * 
      * <pre>
-     *  -Dcom.sun.jini.jeri.tcp.useNIO=true
+     *     -Dcom.sun.jini.jeri.tcp.useNIO=true
      * </pre>
      * 
      * as well.
+     * 
+     * @todo support coordinate of the client loads, e.g., using map/reduce to
+     *       start the clients on each of the servers in the cluster.
+     * 
+     * <pre>
+     * <dt>
+     * -Dclient
+     * </dt>
+     * <dd>
+     *   The client host identifier in [0:nclients-1].
+     * </dd>
+     * <dt>
+     * -Dnclients
+     * </dt>
+     * <dd>
+     *   The #of client processes that will share the data load process.  Each
+     *    client process MUST be started independently in its own JVM.  All clients
+     *    MUST have access to the files to be loaded.
+     * </dd>
+     </pre>
      * 
      * @todo support load of the ontology as well?
      * 
@@ -82,6 +112,8 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * @throws Exception
      */
     public static void main(String[] args) throws Exception {
+        
+        final int minDataServices = Integer.parseInt(System.getProperty("minDataServices","2")); 
 
         final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
         
@@ -103,7 +135,9 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
          * Await at least N data services and one metadata service (otherwise
          * abort).
          */
-        final int N = client.awaitServices(2/* dataServices */, 6000/* timeout(ms) */);
+        final int N = client.awaitServices(minDataServices, 6000/* timeout(ms) */);
+        
+        System.err.println("Will run with "+N+" data services");
         
         AbstractTripleStore store = new ScaleOutTripleStore(client.connect(),System.getProperties());
         

@@ -37,6 +37,9 @@ import com.bigdata.service.MetadataServer;
  * An abstract test harness that sets up (and tears down) the metadata and data
  * services required for a bigdata federation using JINI to handle service
  * discovery.
+ * <p>
+ * Note: The configuration options for the (meta)data services are set in their
+ * respective <code>properties</code> files NOT by the System properties!
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

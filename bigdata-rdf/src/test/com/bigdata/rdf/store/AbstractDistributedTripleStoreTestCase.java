@@ -32,6 +32,9 @@ import java.util.Properties;
 /**
  * Abstract test case that sets up and connects to a bigdata federation and
  * establishes an RDF database on that federation.
+ * <p>
+ * Note: The configuration options for the (meta)data services are set in their
+ * respective <code>properties</code> files NOT by the System properties!
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
