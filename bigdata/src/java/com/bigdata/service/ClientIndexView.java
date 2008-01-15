@@ -129,6 +129,19 @@ import com.bigdata.scaleup.PartitionedIndexView;
  *       the execution of those operations by the worker threads (I don't think
  *       that a deadlock is possible).
  * 
+ * @todo write tests where an index is static partitioned over multiple data
+ *       services and verify that the {@link ClientIndexView} is consistent.
+ *       <p>
+ *       Work towards the same guarentee when dynamic partitioning is enabled.
+ * 
+ * @todo support failover metadata service discovery.
+ * 
+ * @todo Use a weak-ref cache with an LRU (or hard reference cache) to retain
+ *       cached {@link IPartitionMetadata}. The client needs access by {
+ *       indexName, key } to obtain a {@link ServiceID} for a
+ *       {@link DataService} and then needs to translate the {@link ServiceID}
+ *       to a data service using the {@link #dataServiceMap}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

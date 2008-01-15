@@ -1445,6 +1445,12 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     /**
      * Read a node or leaf from the store.
+     * <p>
+     * Note: Callers SHOULD be synchronized in order to ensures that only one
+     * thread will read the desired node or leaf in from the store and attach
+     * the reference to the newly read node or leaf as appropriate into the
+     * existing data structures (e.g., as the root reference or as a child of a
+     * node or leaf already live in memory).
      * 
      * @param addr
      *            The address in the store.
@@ -1469,7 +1475,9 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             
             assert tmp.position() == 0;
             
-            assert tmp.limit() == store.getByteCount(addr);
+            assert tmp.limit() == store.getByteCount(addr) : "limit="
+                    + tmp.limit() + ", byteCount(addr)="
+                    + store.getByteCount(addr);
 
             counters.readTimeNanos += System.nanoTime() - begin;
             
@@ -1493,7 +1501,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
             
         }
 
-        node.setDirty(false);
+        // Note: The de-serialization ctor already does this.
+//        node.setDirty(false);
 
         if (node instanceof Leaf) {
 
@@ -1505,7 +1514,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         }
 
-        touch(node);
+        // Note: The de-serialization ctor already does this.
+//        touch(node);
 
         return node;
 
