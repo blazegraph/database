@@ -64,6 +64,9 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * <dd>The minium #of data services that must be available before the
      * client will start (1 or more). In addition, there must be a metadata
      * service available for the client to run.</dd>
+     * <dt>-Dtimeout</dt>
+     * <dd>Timeout (ms) that the client will wait to discover the metadata
+     * service and required #of data services (default 20000).</dd>
      * <dt>-Dnthreads</dt>
      * <dd>#of threads to use <em>per client</em>.</dd>
      * <dt>-DbufferCapacity</dt>
@@ -75,13 +78,13 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * You must also specify
      * 
      * <pre>
-     *      -Djava.security.policy=policy.all
+     *       -Djava.security.policy=policy.all
      * </pre>
      * 
      * and probably want to specify
      * 
      * <pre>
-     *     -Dcom.sun.jini.jeri.tcp.useNIO=true
+     *      -Dcom.sun.jini.jeri.tcp.useNIO=true
      * </pre>
      * 
      * as well.
@@ -94,15 +97,15 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * -Dclient
      * </dt>
      * <dd>
-     *   The client host identifier in [0:nclients-1].
+     *    The client host identifier in [0:nclients-1].
      * </dd>
      * <dt>
      * -Dnclients
      * </dt>
      * <dd>
-     *   The #of client processes that will share the data load process.  Each
-     *    client process MUST be started independently in its own JVM.  All clients
-     *    MUST have access to the files to be loaded.
+     *    The #of client processes that will share the data load process.  Each
+     *     client process MUST be started independently in its own JVM.  All clients
+     *     MUST have access to the files to be loaded.
      * </dd>
      </pre>
      * 
@@ -114,6 +117,8 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
     public static void main(String[] args) throws Exception {
         
         final int minDataServices = Integer.parseInt(System.getProperty("minDataServices","2")); 
+
+        final long timeout = Long.parseLong(System.getProperty("timeout","20000")); 
 
         final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
         
@@ -135,7 +140,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
          * Await at least N data services and one metadata service (otherwise
          * abort).
          */
-        final int N = client.awaitServices(minDataServices, 20000/* timeout(ms) */);
+        final int N = client.awaitServices(minDataServices, timeout);
         
         System.err.println("Will run with "+N+" data services");
         
