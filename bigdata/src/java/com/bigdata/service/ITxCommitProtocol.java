@@ -32,7 +32,6 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ITxCommitProtocol;
 import com.bigdata.journal.ValidationError;
 
 /**
@@ -47,7 +46,7 @@ import com.bigdata.journal.ValidationError;
  *       {@link RemoteException} for an interface that will be exposed by a jini
  *       service (unless you use a smart proxy?).
  */
-public interface IRemoteTxCommitProtocol extends Remote {
+public interface ITxCommitProtocol extends Remote {
 
     /**
      * Request commit of the transaction write set.

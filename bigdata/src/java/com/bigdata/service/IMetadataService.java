@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -55,7 +56,7 @@ import com.bigdata.scaleup.MetadataIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMetadataService extends IDataService {
+public interface IMetadataService extends IDataService, Remote {
         
     /*
      * methods that require access to the metadata server for their
