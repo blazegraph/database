@@ -485,7 +485,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     public boolean unexport(boolean force) {
 
-        if(exporter.unexport(true)) {
+        if(exporter.unexport(true/*@todo should this be [force]?*/)) {
         
             proxy = null;
         

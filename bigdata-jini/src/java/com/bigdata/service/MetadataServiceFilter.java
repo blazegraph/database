@@ -53,7 +53,7 @@ public class MetadataServiceFilter implements ServiceItemFilter {
             
         }
         
-        if((item.service instanceof IMetadataService)) {
+        if (item.service instanceof IMetadataService) {
            
             log.info("Matched: "+item);
             

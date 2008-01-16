@@ -154,6 +154,11 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         assertEquals("#dataServices", 2, client.awaitServices(
                 2/* minDataServices */, 2000/* timeout(ms) */));
+
+        assertTrue(metadataServer0.getProxy() instanceof IMetadataService);
+        
+        assertTrue(client.getMetadataService() instanceof IMetadataService);
+        
         
 //        /*
 //         * Verify that we have discovered the _correct_ metadata service. This
