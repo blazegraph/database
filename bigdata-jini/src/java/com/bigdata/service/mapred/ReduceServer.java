@@ -72,7 +72,21 @@ public class ReduceServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new ReduceServer(args).run();
+        new ReduceServer(args) {
+            
+            /**
+             * Overriden to use {@link System#exit()} since this is the command
+             * line interface.
+             */
+            protected void fatal(String msg, Throwable t) {
+
+                log.fatal(msg, t);
+
+                System.exit(1);
+
+            }
+            
+        }.run();
         
     }
     

@@ -251,6 +251,22 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         }
 
     }
+
+    /**
+     * This method handles fatal exceptions for the server. The default
+     * implementation logs the throwable, wraps the throwable as a runtime
+     * exception and rethrows the wrapped exception. This implementation MAY be
+     * overriden to invoke {@link System#exit(int)} IFF it is known that the
+     * server is being invoked from a command line context. However in no case
+     * should execution be allowed to return to the caller.
+     */
+    protected void fatal(String msg, Throwable t) {
+       
+        log.fatal(msg, t);
+        
+        throw new RuntimeException( msg, t );
+        
+    }
     
     /**
      * Server startup reads {@link Configuration} data from the file(s) named by
@@ -348,11 +364,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                     serviceID = readServiceId(serviceIdFile);
                     
                 } catch(IOException ex) {
-                    
-                    log.fatal("Could not read serviceID from existing file: "
-                            + serviceIdFile);
 
-                    System.exit(1);
+                    fatal( "Could not read serviceID from existing file: "
+                            + serviceIdFile, ex );
                     
                 }
                 
@@ -380,9 +394,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
             } catch (IOException ex) {
 
-                log.fatal("Configuration error: "+ex, ex);
-                
-                System.exit(1);
+                fatal("Configuration error: "+ex, ex);
                 
             }
 
@@ -399,15 +411,11 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         } catch(ConfigurationException ex) {
             
-            log.fatal("Configuration error: "+ex, ex);
-            
-            System.exit(1);
+            fatal("Configuration error: "+ex, ex);
             
         } catch (ExportException ex) {
             
-            log.fatal("Export error: "+ex, ex);
-            
-            System.exit(1);
+            fatal("Export error: "+ex, ex);
             
         }
         
@@ -449,8 +457,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             
         } catch (IOException ex) {
             
-            log.fatal("Lookup service discovery error: "+ex, ex);
-
             try {
                 /* unexport the proxy */
                 unexport(true);
@@ -460,7 +466,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 /* ignore */
             }
             
-            System.exit(1);
+            fatal("Lookup service discovery error: "+ex, ex);
             
         }
 
@@ -549,7 +555,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
                 dout.close();
                 
-                log.info("ServiceID saved: " + serviceIdFile);
+                log.info("ServiceID saved: file=" + serviceIdFile+", serviceID="+serviceID);
 
             } catch (Exception ex) {
 

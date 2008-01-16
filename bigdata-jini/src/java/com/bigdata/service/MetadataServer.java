@@ -28,14 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.rmi.server.ServerNotActiveException;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.MDC;
+
+import net.jini.config.Configuration;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
+import net.jini.export.ServerContext;
+import net.jini.io.context.ClientHost;
+import net.jini.io.context.ClientSubject;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
@@ -128,16 +136,37 @@ public class MetadataServer extends DataServer {
              
     }
 
-//    /**
-//     * @param args
-//     * @param lifeCycle
-//     */
-//    public MetadataServer(String[] args, LifeCycle lifeCycle) {
-//        
-//        super(args, lifeCycle);
-//        
-//    }
+    /**
+     * Starts a new {@link MetadataServer}.  This can be done programmatically
+     * by executing
+     * <pre>
+     *    new MetadataServer(args).run();
+     * </pre>
+     * within a {@link Thread}.
+     * 
+     * @param args
+     *            The name of the {@link Configuration} file for the service.
+     */
+    public static void main(String[] args) {
+        
+        new MetadataServer(args) {
+            
+            /**
+             * Overriden to use {@link System#exit()} since this is the command
+             * line interface.
+             */
+            protected void fatal(String msg, Throwable t) {
 
+                log.fatal(msg, t);
+
+                System.exit(1);
+
+            }
+            
+        }.run();
+        
+    }
+    
     protected Remote newService(Properties properties) {
 
         return new AdministrableMetadataService(this,properties);
@@ -185,6 +214,60 @@ public class MetadataServer extends DataServer {
 
         }
 
+        /**
+         * Adds the following parameters to the {@link MDC}
+         * <dl>
+         * <dt>hostname
+         * <dt>
+         * <dd>The hostname or IP address of this server.</dd>
+         * <dt>clientname
+         * <dt>
+         * <dd>The hostname or IP address of the client making the request.</dd>
+         * </dl>
+         * 
+         * Note: {@link InetAddress#getHostName()} is used. This method makes a
+         * one-time best effort attempt to resolve the host name from the
+         * {@link InetAddress}.
+         * 
+         * @todo we could pass the class {@link ClientSubject} to obtain the
+         *       authenticated identity of the client (if any) for an incoming
+         *       remote call.
+         */
+        protected void setupLoggingContext() {
+            
+            super.setupLoggingContext();
+            
+            try {
+                
+                InetAddress clientAddr = ((ClientHost) ServerContext
+                        .getServerContextElement(ClientHost.class))
+                        .getClientHost();
+                
+                MDC.put("clientaddr",clientAddr.getHostName());
+                
+            } catch (ServerNotActiveException e) {
+                
+                /*
+                 * This exception gets thrown if the client has made a direct
+                 * (vs RMI) call so we just ignore it.
+                 */
+                
+            }
+            
+            MDC.put("hostname",server.getHostName());
+            
+        }
+
+        protected void clearLoggingContext() {
+            
+            MDC.remove("hostname");
+
+            MDC.remove("clientname");
+
+            super.clearLoggingContext();
+            
+        }
+        
         public UUID getServiceUUID() {
 
             if (serviceUUID == null) {

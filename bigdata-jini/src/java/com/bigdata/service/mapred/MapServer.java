@@ -72,7 +72,21 @@ public class MapServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new MapServer(args).run();
+        new MapServer(args) {
+            
+            /**
+             * Overriden to use {@link System#exit()} since this is the command
+             * line interface.
+             */
+            protected void fatal(String msg, Throwable t) {
+
+                log.fatal(msg, t);
+
+                System.exit(1);
+
+            }
+            
+        }.run();
         
     }
     
