@@ -144,7 +144,15 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         
         System.err.println("Will run with "+N+" data services");
         
-        AbstractTripleStore store = new ScaleOutTripleStore(client.connect(),System.getProperties());
+        ScaleOutTripleStore store = new ScaleOutTripleStore(client.connect(),System.getProperties());
+
+        if(store.getSPOIndex()==null) {
+    
+            log.info("Registering scale-out indices");
+            
+            store.registerIndices();
+            
+        }
         
         new ConcurrentDataLoader(store, nthreads, bufferCapacity,
                 new File(file), new FilenameFilter() {
