@@ -249,14 +249,18 @@ public class ConcurrentDataLoader {
         this.autoFlush = autoFlush;
         
         if (autoFlush) {
+
             buffers = null;
+            
         } else {
+
             /*
              * A collection of buffers that we need to flush once the main load
              * is over.
              */
             buffers = Collections.synchronizedSet(new HashSet<StatementBuffer>(
                     nthreads + nthreads << 2));
+            
         }
         
         loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
@@ -320,7 +324,8 @@ public class ConcurrentDataLoader {
      * 
      * @throws IOException
      */
-    private void process(File file, FilenameFilter filter) throws IOException, InterruptedException {
+    private void process(File file, FilenameFilter filter) throws IOException,
+            InterruptedException {
 
         final long begin = System.currentTimeMillis();
 
@@ -340,7 +345,8 @@ public class ConcurrentDataLoader {
 
             log.info("Awaiting termination: completed="
                     + loadService.getCompletedTaskCount() + ", active="
-                    + loadService.getActiveCount());
+                    + loadService.getActiveCount() + ", remaining="
+                    + loadService.getQueue().size());
 
             if (loadService.awaitTermination(60L/* 1 minute */,
                     TimeUnit.SECONDS)) {
@@ -394,7 +400,8 @@ public class ConcurrentDataLoader {
 
                 log.info("Awaiting termination: completed="
                         + tmpService.getCompletedTaskCount() + ", active="
-                        + tmpService.getActiveCount());
+                        + tmpService.getActiveCount()+ ", remaining="
+                        + tmpService.getQueue().size());
 
                 if (tmpService.awaitTermination(60L/* 1 minute */,
                         TimeUnit.SECONDS)) {

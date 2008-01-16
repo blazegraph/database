@@ -220,6 +220,7 @@ public class MetadataServer extends DataServer {
          * <dt>hostname
          * <dt>
          * <dd>The hostname or IP address of this server.</dd>
+         * 
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
@@ -243,7 +244,7 @@ public class MetadataServer extends DataServer {
                         .getServerContextElement(ClientHost.class))
                         .getClientHost();
                 
-                MDC.put("clientaddr",clientAddr.getHostName());
+                MDC.put("clientname",clientAddr.getHostName());
                 
             } catch (ServerNotActiveException e) {
                 

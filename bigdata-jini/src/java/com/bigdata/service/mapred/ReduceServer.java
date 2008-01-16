@@ -32,6 +32,8 @@ import java.rmi.RemoteException;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.MDC;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.service.AbstractServer;
@@ -101,6 +103,8 @@ public class ReduceServer extends AbstractServer {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo extend the {@link MDC} logging context.
      */
     public static class AdministrableReduceService
         extends ReduceService

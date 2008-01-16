@@ -199,12 +199,15 @@ public class DataServer extends AbstractServer {
         /**
          * Adds the following parameters to the {@link MDC}
          * <dl>
+         * 
          * <dt>hostname
          * <dt>
          * <dd>The hostname or IP address of this server.</dd>
+         * 
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
+         * 
          * </dl>
          * 
          * Note: {@link InetAddress#getHostName()} is used. This method makes a
@@ -225,7 +228,7 @@ public class DataServer extends AbstractServer {
                         .getServerContextElement(ClientHost.class))
                         .getClientHost();
                 
-                MDC.put("clientaddr",clientAddr.getHostName());
+                MDC.put("clientname",clientAddr.getHostName());
                 
             } catch (ServerNotActiveException e) {
                 
