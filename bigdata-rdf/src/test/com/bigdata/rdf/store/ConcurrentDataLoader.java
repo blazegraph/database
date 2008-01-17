@@ -135,6 +135,10 @@ public class ConcurrentDataLoader {
      * explictly flushed once no more files remain to be loaded.
      */
     final boolean autoFlush;
+
+    final int nclients;
+    
+    final int clientNum;
     
     /**
      * Validation of RDF by the RIO parser is disabled.
@@ -199,7 +203,7 @@ public class ConcurrentDataLoader {
             File file, FilenameFilter filter) {
         
         this(db, nthreads, bufferCapacity, file, filter, ""/* baseURL */,
-                null/* fallback */, false/* autoFlush */);
+                null/* fallback */, false/* autoFlush */, 1/* nclients */, 0/* clientNum */);
 
     }
     
@@ -231,10 +235,26 @@ public class ConcurrentDataLoader {
      *            buffers are reused by each file loaded by the same thread,
      *            flush when they overflow, and are explictly flushed once no
      *            more files remain to be loaded.
+     * @param nclients
+     *            The #of client processes that will share the data load
+     *            process. Each client process MUST be started independently in
+     *            its own JVM. All clients MUST have access to the files to be
+     *            loaded.
+     * 
+     * @param clientNum
+     *            The client host identifier in [0:nclients-1]. The clients will
+     *            load files where
+     *            <code>filename.hashCode() % nclients == clientNum</code>.
+     *            If there are N clients loading files using the same pathname
+     *            to the data then this will divide the files more or less
+     *            equally among the clients. (If the data to be loaded are
+     *            pre-partitioned then you do not need to specify either
+     *            <i>nclients</i> or <i>clientNum</i>.)
      */
     public ConcurrentDataLoader(AbstractTripleStore db, int nthreads,
             int bufferCapacity, File file, FilenameFilter filter,
-            String baseURL, RDFFormat fallback, boolean autoFlush) {
+            String baseURL, RDFFormat fallback, boolean autoFlush,
+            int nclients, int clientNum) {
 
         this.db = db;
 
@@ -247,6 +267,10 @@ public class ConcurrentDataLoader {
         this.fallback = fallback;
 
         this.autoFlush = autoFlush;
+
+        this.nclients = nclients;
+        
+        this.clientNum = clientNum;
         
         if (autoFlush) {
 
@@ -276,6 +300,7 @@ public class ConcurrentDataLoader {
              * the load tasks. The thread pool is shutdown once all tasks have
              * been run and some statistics are reported.
              */
+            
             process(file, filter);
 
         } catch (Throwable t) {
@@ -546,6 +571,25 @@ public class ConcurrentDataLoader {
 
             log.info("Scanning file: " + file);
 
+            if (nclients > 1) {
+
+                /*
+                 * This trick allocates files to clients based on the hash of
+                 * the pathname module the #of clients. If that expression does
+                 * not evaluate to the assigned clientNum then the file will NOT
+                 * be loaded by this host.
+                 */
+                
+                if(file.getPath().hashCode() % nclients != clientNum) {
+
+                    log.info("Client"+clientNum+" not tasked: "+file);
+                    
+                    return;
+                    
+                }
+                
+            }
+            
             nloaded.incrementAndGet();
 
             futures.add(loadService.submit(new LoadTask(file)));

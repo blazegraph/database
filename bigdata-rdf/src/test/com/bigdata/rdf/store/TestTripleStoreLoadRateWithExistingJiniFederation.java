@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 
 import org.apache.log4j.Logger;
+import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.service.BigdataClient;
 
@@ -60,17 +61,35 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
     /**
      * 
      * <dl>
+     * 
      * <dt>-DminDataServices</dt>
      * <dd>The minium #of data services that must be available before the
      * client will start (1 or more). In addition, there must be a metadata
      * service available for the client to run.</dd>
+     * 
      * <dt>-Dtimeout</dt>
      * <dd>Timeout (ms) that the client will wait to discover the metadata
      * service and required #of data services (default 20000).</dd>
+     * 
+     * <dt> -Dnclients </dt>
+     * <dd> The #of client processes that will share the data load process. Each
+     * client process MUST be started independently in its own JVM. All clients
+     * MUST have access to the files to be loaded. </dd>
+     * 
+     * <dt> -DclientNum </dt>
+     * <dd> The client host identifier in [0:nclients-1]. The clients will load
+     * files where <code>filename.hashCode() % nclients == clientNum</code>.
+     * If there are N clients loading files using the same pathname to the data
+     * then this will divide the files more or less equally among the clients.
+     * (If the data to be loaded are pre-partitioned then you do not need to
+     * specify either <i>nclients</i> or <i>clientNum</i>.) </dd>
+     * 
      * <dt>-Dnthreads</dt>
      * <dd>#of threads to use <em>per client</em>.</dd>
+     * 
      * <dt>-DbufferCapacity</dt>
      * <dd>Capacity of the statement buffers.</dd>
+     * 
      * <dt>-Ddocuments.directory</dr>
      * <dd>The file or directory to be loaded (recursive processing).</dd>
      * </dl>
@@ -78,36 +97,16 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
      * You must also specify
      * 
      * <pre>
-     *       -Djava.security.policy=policy.all
+     *            -Djava.security.policy=policy.all
      * </pre>
      * 
      * and probably want to specify
      * 
      * <pre>
-     *      -Dcom.sun.jini.jeri.tcp.useNIO=true
+     *           -Dcom.sun.jini.jeri.tcp.useNIO=true
      * </pre>
      * 
      * as well.
-     * 
-     * @todo support coordinate of the client loads, e.g., using map/reduce to
-     *       start the clients on each of the servers in the cluster.
-     * 
-     * <pre>
-     * <dt>
-     * -Dclient
-     * </dt>
-     * <dd>
-     *    The client host identifier in [0:nclients-1].
-     * </dd>
-     * <dt>
-     * -Dnclients
-     * </dt>
-     * <dd>
-     *    The #of client processes that will share the data load process.  Each
-     *     client process MUST be started independently in its own JVM.  All clients
-     *     MUST have access to the files to be loaded.
-     * </dd>
-     </pre>
      * 
      * @todo support load of the ontology as well?
      * 
@@ -123,6 +122,10 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         final int nthreads = Integer.parseInt(System.getProperty("nthreads","20")); 
         
         final int bufferCapacity = Integer.parseInt(System.getProperty("bufferCapacity","100000")); 
+        
+        final int nclients = Integer.parseInt(System.getProperty("nclients","1"));
+
+        final int clientNum = Integer.parseInt(System.getProperty("clientNum","0"));
         
         final String file = System.getProperty("documents.directory");
   
@@ -163,7 +166,8 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
 //                return false;
             }
             
-        });
+        }, ""/* baseURL */, RDFFormat.RDFXML/* fallback */,
+                false/* autoFlush */, nclients, clientNum);
         
         client.terminate();
         
