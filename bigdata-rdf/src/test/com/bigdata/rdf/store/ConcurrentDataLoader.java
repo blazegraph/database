@@ -140,6 +140,10 @@ public class ConcurrentDataLoader {
     
     final int clientNum;
     
+    AtomicInteger nscanned = new AtomicInteger(0);
+
+    AtomicInteger ntasked = new AtomicInteger(0);
+
     /**
      * Validation of RDF by the RIO parser is disabled.
      */
@@ -354,11 +358,9 @@ public class ConcurrentDataLoader {
 
         final long begin = System.currentTimeMillis();
 
-        AtomicInteger nloaded = new AtomicInteger(0);
+        process2(file, filter);
 
-        process2(file, filter, nloaded);
-
-        log.info("All files scanned: " + nloaded);
+        log.info("All files scanned: nscanned="+nscanned+", ntasked=" + ntasked);
 
         // normal termination - all queued tasks will complete.
         loadService.shutdown();
@@ -536,7 +538,7 @@ public class ConcurrentDataLoader {
             
             final double tps = (long) (((double) nstmts) / ((double) elapsed) * 1000d);
 
-            log.info("All done: #loaded=" + nloaded + " files in " + elapsed
+            log.info("All done: #loaded=" + ntasked + " files in " + elapsed
                     + " ms, #terms=" + nterms + ", #stmts=" + nstmts
                     + ", rate=" + tps + " (#threads=" + nthreads + ", class="
                     + db.getClass().getSimpleName() + ", largestPoolSize="
@@ -548,7 +550,7 @@ public class ConcurrentDataLoader {
         
     }
 
-    private void process2(File file, FilenameFilter filter, AtomicInteger nloaded) {
+    private void process2(File file, FilenameFilter filter) {
 
         if (file.isDirectory()) {
 
@@ -559,7 +561,7 @@ public class ConcurrentDataLoader {
 
             for (File f : files) {
 
-                process2(f, filter, nloaded);
+                process2(f, filter);
 
             }
 
@@ -571,29 +573,47 @@ public class ConcurrentDataLoader {
 
             log.info("Scanning file: " + file);
 
-            if (nclients > 1) {
+            nscanned.incrementAndGet();
+
+            if(nclients>1) {
 
                 /*
-                 * This trick allocates files to clients based on the hash of
-                 * the pathname module the #of clients. If that expression does
-                 * not evaluate to the assigned clientNum then the file will NOT
-                 * be loaded by this host.
+                 * More than one client will run so we need to allocate the
+                 * files fairly to each client.
+                 * 
+                 * This is done by the #of files scanned modulo the #of clients.
+                 * When that expression evaluates to the [clientNum] then the
+                 * file will be allocated to this client.
+                 */ 
+                 /* 
+//                 * This trick allocates files to clients based on the hash of the
+//                 * pathname module the #of clients. If that expression does not
+//                 * evaluate to the assigned clientNum then the file will NOT be
+//                 * loaded by this host.
+                 */
+                    
+                if ((nscanned.get() /* file.getPath().hashCode() */% nclients == clientNum)) {
+
+                    log.info("Client" + clientNum + " tasked: " + file);
+
+                    ntasked.incrementAndGet();
+
+                    futures.add(loadService.submit(new LoadTask(file)));
+
+                }   
+            
+            } else {
+                
+                /*
+                 * Only one client so it loads all of the files.
                  */
                 
-                if(file.getPath().hashCode() % nclients != clientNum) {
+                ntasked.incrementAndGet();
 
-                    log.info("Client"+clientNum+" not tasked: "+file);
-                    
-                    return;
-                    
-                }
-                
+                futures.add(loadService.submit(new LoadTask(file)));
+
             }
-            
-            nloaded.incrementAndGet();
-
-            futures.add(loadService.submit(new LoadTask(file)));
-
+                
         }
 
     }
