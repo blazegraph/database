@@ -3,6 +3,7 @@ package com.bigdata.service;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.io.ByteArrayBufferWithPosition;
@@ -70,6 +71,8 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
      * count operation and you might as well use rangeCount instead.
      */
     private final int flags;
+    
+    private final IEntryFilter filter;
     
     /**
      * Index of the first partition to be queried.
@@ -188,7 +191,8 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     }
     
     public PartitionedRangeQueryIterator(ClientIndexView ndx, long tx,
-            byte[] fromKey, byte[] toKey, int capacity, int flags) {
+            byte[] fromKey, byte[] toKey, int capacity, int flags,
+            IEntryFilter filter) {
 
         if (ndx == null) {
 
@@ -208,6 +212,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
         this.toKey = toKey;
         this.capacity = capacity;
         this.flags = flags;
+        this.filter = filter;
 
 //          IMetadataService metadataService = getMetadataService();
         MetadataIndex mdi = ndx.getMetadataIndex();
@@ -302,7 +307,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
             final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
             
             rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
-                    flags);
+                    flags, filter);
             
             // reset index into the ResultSet.
             lastVisited = -1;
@@ -375,7 +380,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
                     ndx.getName(), partitionId);
             
             rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
-                    flags);
+                    flags, filter);
             
             // reset index into the ResultSet.
             lastVisited = -1;

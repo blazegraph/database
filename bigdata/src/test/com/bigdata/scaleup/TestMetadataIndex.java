@@ -53,6 +53,8 @@ import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.service.UnisolatedBTreePartition;
+import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 
 /**
  * A test suite for managing a partitioned index.
@@ -103,6 +105,9 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
     }
     
+    protected final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor(
+            UnisolatedBTreePartition.DEFAULT_BRANCHING_FACTOR);
+    
     /**
      * Test the ability to create and update the metadata for a partition.
      */
@@ -117,7 +122,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -200,7 +205,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
 
         /*
          * initially there are no entries in the metadata index. if this is a
@@ -300,7 +305,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
 
         /*
          * the separator key for the first partition (index := 0). this will
@@ -420,7 +425,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
@@ -530,7 +535,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
@@ -714,7 +719,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
@@ -1027,7 +1032,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
         // create the metadata index.
         MetadataIndex md = new MetadataIndex(store, indexUUID,
-                managedIndexUUID, "abc");
+                managedIndexUUID, "abc", ctor);
         
         // define a single partition with no segments.
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));

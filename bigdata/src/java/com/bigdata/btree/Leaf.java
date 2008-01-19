@@ -326,7 +326,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         final int tupleIndex = op.tupleIndex;
         
-        assert tupleIndex < op.ntuples;
+        assert tupleIndex < op.n;
         
         if(btree.debug) assertInvariants();
         
@@ -718,7 +718,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         final int tupleIndex = op.tupleIndex;
         
-        assert tupleIndex < op.ntuples;
+        assert tupleIndex < op.n;
         
         btree.touch(this);
         
@@ -774,7 +774,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         final int tupleIndex = op.tupleIndex;
         
-        assert tupleIndex < op.ntuples;
+        assert tupleIndex < op.n;
         
         btree.touch(this);
         
@@ -1303,7 +1303,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         final int tupleIndex = op.tupleIndex;
         
-        assert tupleIndex < op.ntuples;
+        assert tupleIndex < op.n;
         
         if(btree.debug) assertInvariants();
         

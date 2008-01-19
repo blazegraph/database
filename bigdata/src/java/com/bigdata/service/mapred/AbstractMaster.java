@@ -484,13 +484,13 @@ public abstract class AbstractMaster {
                 try {
                     // the index name (local on the data service).
                     String name = reduceTasks[i].toString();
-                    String className = UnisolatedBTree.class.getName();
-                    Object config = null;
-                    client.getDataService(dataServices[i]).registerIndex(
-                            name,
-                            reduceTasks[i],
-                            new BTreeConstructor(
-                                    ByteArrayValueSerializer.INSTANCE));
+                    client.getDataService(dataServices[i])
+                            .registerIndex(
+                                    name,
+                                    reduceTasks[i],
+                                    new BTreeConstructor(
+                                            ByteArrayValueSerializer.INSTANCE),
+                                    null/*pmd*/);
                 } catch (Exception e) {
                     log.warn("Could not create intermediate store: " + e);
                 }

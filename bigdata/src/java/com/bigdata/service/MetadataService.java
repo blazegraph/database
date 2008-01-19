@@ -162,6 +162,7 @@ abstract public class MetadataService extends DataService implements
      * Register and statically partition a scale-out index.
      * 
      * @param name
+     * @param ctor
      * @param separatorKeys
      * @param dataServices
      * @return
@@ -175,12 +176,13 @@ abstract public class MetadataService extends DataService implements
      *       that it makes sense for clients to pre-fetch and cache the entire
      *       set of partition definitions for a scale-out index.
      */
-    public UUID registerManagedIndex(String name, byte[][] separatorKeys,
+    public UUID registerManagedIndex(String name,
+            UnisolatedBTreePartitionConstructor ctor, byte[][] separatorKeys,
             UUID[] dataServices) throws IOException, InterruptedException,
             ExecutionException {
         
         final UUID managedIndexUUID = (UUID) journal.submit(
-                new RegisterMetadataIndexWithPartitionsTask(journal,name,
+                new RegisterMetadataIndexWithPartitionsTask(journal,name,ctor,
                         separatorKeys, dataServices))
                 .get();
 
@@ -195,7 +197,8 @@ abstract public class MetadataService extends DataService implements
      *       etc.) i had been passing in the BTree instance, but that does not
      *       work as well in a distributed environment.
      */
-    public UUID registerManagedIndex(String name, UUID dataServiceUUID)
+    public UUID registerManagedIndex(String name,
+            UnisolatedBTreePartitionConstructor ctor, UUID dataServiceUUID)
             throws IOException, InterruptedException, ExecutionException {
         
         if(dataServiceUUID==null) {
@@ -212,7 +215,8 @@ abstract public class MetadataService extends DataService implements
         };
 
         final UUID managedIndexUUID = (UUID) journal.submit(
-                new RegisterMetadataIndexTask(journal,name, dataServiceUUIDs)).get();
+                new RegisterMetadataIndexTask(journal, name, ctor,
+                        dataServiceUUIDs)).get();
         
         return managedIndexUUID; 
                 
@@ -486,6 +490,7 @@ abstract public class MetadataService extends DataService implements
 
         // the name of the index as specified by the caller.
         final private String name; 
+        final private UnisolatedBTreePartitionConstructor ctor;
         final private int npartitions;
         final private byte[][] separatorKeys;
         final private UUID[] dataServiceUUIDs;
@@ -510,10 +515,13 @@ abstract public class MetadataService extends DataService implements
          *            services.
          */
         public RegisterMetadataIndexWithPartitionsTask(
-                ConcurrentJournal journal, String name, byte[][] separatorKeys,
-                UUID[] dataServiceUUIDs) {
+                ConcurrentJournal journal, String name, UnisolatedBTreePartitionConstructor ctor,
+                byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
 
             super(journal, ITx.UNISOLATED, false/* readOnly */, getMetadataName(name));
+
+            if(ctor==null)
+                throw new IllegalArgumentException();
             
             if(separatorKeys==null) 
                 throw new IllegalArgumentException();
@@ -554,6 +562,8 @@ abstract public class MetadataService extends DataService implements
             }
 
             this.name = name;
+
+            this.ctor = ctor;
             
             this.npartitions = separatorKeys.length;
             
@@ -666,7 +676,7 @@ abstract public class MetadataService extends DataService implements
              */
             
             MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
-                    managedIndexUUID, name);
+                    managedIndexUUID, name, ctor);
 
             /*
              * Register the metadata index with the metadata service. This
@@ -730,22 +740,18 @@ abstract public class MetadataService extends DataService implements
                  * partition in order and null iff this is the last partition.
                  */
 
-                dataServices[i]
-                        .registerIndex(
-                                DataService.getIndexPartitionName(name, pmd
-                                        .getPartitionId()),
-                                managedIndexUUID,
-                                new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
-                                        new PartitionMetadataWithSeparatorKeys(
-                                                separatorKeys[i],
-                                                pmd,
-                                                i + 1 < npartitions ? separatorKeys[i + 1]
-                                                        : null)));
+                dataServices[i].registerIndex(DataService
+                        .getIndexPartitionName(name, pmd.getPartitionId()),
+                        managedIndexUUID, ctor,
+                        new PartitionMetadataWithSeparatorKeys(
+                                separatorKeys[i], pmd,
+                                i + 1 < npartitions ? separatorKeys[i + 1]
+                                        : null));
 //                
-//                dataServices[i].mapPartition(name,
-//                        new PartitionMetadataWithSeparatorKeys(
-//                                separatorKeys[i], pmd,
-//                                i + 1 < npartitions ? separatorKeys[i + 1]
+// dataServices[i].mapPartition(name,
+// new PartitionMetadataWithSeparatorKeys(
+// separatorKeys[i], pmd,
+// i + 1 < npartitions ? separatorKeys[i + 1]
 //                                        : null));
 
                 partitions[i] = pmd;
@@ -779,20 +785,37 @@ abstract public class MetadataService extends DataService implements
     protected class RegisterMetadataIndexTask extends AbstractTask {
 
         final private String name;
+        final private UnisolatedBTreePartitionConstructor ctor;
         final private UUID[] dataServiceUUIDs;
         final private IDataService[] dataServices;
         
-        public RegisterMetadataIndexTask(ConcurrentJournal journal,String name,UUID[] dataServiceUUIDs) {
+        public RegisterMetadataIndexTask(ConcurrentJournal journal,
+                String name, UnisolatedBTreePartitionConstructor ctor,
+                UUID[] dataServiceUUIDs) {
 
             super(journal,ITx.UNISOLATED,false/* readOnly */, getMetadataName(name));
             
             this.name = name;
-            
-            if (dataServiceUUIDs == null)
+
+            if (ctor == null) {
+
                 throw new IllegalArgumentException();
             
-            if (dataServiceUUIDs.length == 0)
+            }
+            
+            if (dataServiceUUIDs == null) {
+
                 throw new IllegalArgumentException();
+                
+            }
+            
+            if (dataServiceUUIDs.length == 0) {
+
+                throw new IllegalArgumentException();
+                
+            }
+            
+            this.ctor = ctor;
             
             this.dataServiceUUIDs = dataServiceUUIDs;
 
@@ -910,7 +933,7 @@ abstract public class MetadataService extends DataService implements
              */
             
             MetadataIndex mdi = new MetadataIndex(journal, metadataIndexUUID,
-                    managedIndexUUID, name);
+                    managedIndexUUID, name, ctor);
             
             PartitionMetadata pmd = new PartitionMetadata(
                     mdi.nextPartitionId(), dataServiceUUIDs, resourceMetadata);
@@ -957,10 +980,10 @@ abstract public class MetadataService extends DataService implements
              */
 
             dataServices[0].registerIndex(DataService.getIndexPartitionName(
-                    name, pmd.getPartitionId()), managedIndexUUID,
-                    new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
-                            new PartitionMetadataWithSeparatorKeys(
-                                    new byte[] {}, pmd, null)));
+                    name, pmd.getPartitionId()), managedIndexUUID, mdi
+                    .getIndexConstructor(),
+                    new PartitionMetadataWithSeparatorKeys(new byte[] {}, pmd,
+                            null));
             
 // // map the initial partition onto that data service.
 //            dataServices[0].mapPartition(name,
@@ -1170,10 +1193,10 @@ abstract public class MetadataService extends DataService implements
              * conditional registration.
              */
             dataServices[0].registerIndex(DataService.getIndexPartitionName(
-                    name, pmd.getPartitionId()), mdi.getManagedIndexUUID(),
-                    new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
-                            new PartitionMetadataWithSeparatorKeys(
-                                    separatorKey, pmd, rightSeparatorKey)));
+                    name, pmd.getPartitionId()), mdi.getManagedIndexUUID(), mdi
+                    .getIndexConstructor(),
+                    new PartitionMetadataWithSeparatorKeys(separatorKey, pmd,
+                            rightSeparatorKey));
 
             /*
              * map the partition onto that data service.
@@ -1191,7 +1214,7 @@ abstract public class MetadataService extends DataService implements
              * 
              * FIXME define a simple API to create a static partitioning of an
              * index onto N data services as part of the scale-out index
-             * registration.  That will let me decouple the logic of working
+             * registration. That will let me decouple the logic of working
              * through index partition split/joins and index partition moves
              * while supporting full operations on a statically partitioned
              * index.

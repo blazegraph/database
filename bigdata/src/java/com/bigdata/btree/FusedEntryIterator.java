@@ -63,8 +63,8 @@ public class FusedEntryIterator implements IEntryIterator {
      */
     private static class Tuple implements ITuple {
 
-        private final boolean keysRequested = true;
-        private final boolean valsRequested = true;
+        private final boolean keysRequested;
+        private final boolean valsRequested;
         
         /**
          * Aggregated across the source iterators.
@@ -77,7 +77,11 @@ public class FusedEntryIterator implements IEntryIterator {
          */
         ITuple current;
         
-        public Tuple() {
+        public Tuple(int flags) {
+            
+            keysRequested = (flags & IRangeQuery.KEYS) != 0;
+            
+            valsRequested = (flags & IRangeQuery.VALS) != 0;
             
         }
         
@@ -115,7 +119,8 @@ public class FusedEntryIterator implements IEntryIterator {
     
     private final Tuple tuple;
     
-    public FusedEntryIterator(AbstractBTree[] srcs, byte[] fromKey, byte[] toKey) {
+    public FusedEntryIterator(AbstractBTree[] srcs, byte[] fromKey,
+            byte[] toKey, int capacity, int flags, IEntryFilter filter) {
 
         assert srcs != null;
 
@@ -125,7 +130,8 @@ public class FusedEntryIterator implements IEntryIterator {
 
         for (int i = 0; i < itrs.length; i++) {
 
-            itrs[i] = srcs[i].rangeIterator(fromKey, toKey);
+            itrs[i] = srcs[i].rangeIterator(fromKey, toKey, capacity, flags,
+                    filter);
 
         }
 
@@ -139,8 +145,7 @@ public class FusedEntryIterator implements IEntryIterator {
 
         Arrays.fill(exhausted, false);
         
-        // @todo pass in caller's request for keys/vals.
-        tuple = new Tuple();
+        tuple = new Tuple(flags);
 
     }
 
@@ -168,8 +173,7 @@ public class FusedEntryIterator implements IEntryIterator {
 
         Arrays.fill(exhausted, false);
         
-        // @todo pass in caller's request for keys/vals.
-        tuple = new Tuple();
+        tuple = new Tuple(0/*flags*/);
 
     }
 

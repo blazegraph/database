@@ -57,8 +57,9 @@ public class EmbeddedBigdataClient implements IBigdataClient {
      */
     public EmbeddedBigdataClient(Properties properties) {
         
-        if(properties==null) throw new IllegalArgumentException(); 
-        
+        if (properties == null)
+            throw new IllegalArgumentException();
+
         this.properties = properties;
         
     }

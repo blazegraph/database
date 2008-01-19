@@ -104,6 +104,10 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         return src.rangeIterator(fromKey, toKey);
     }
 
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+        return src.rangeIterator(fromKey, toKey, capacity, flags, filter);
+    }
+    
     public void contains(BatchContains op) {
         src.contains(op);
     }
@@ -121,7 +125,7 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
     }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
         

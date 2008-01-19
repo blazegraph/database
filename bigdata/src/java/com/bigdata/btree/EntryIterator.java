@@ -26,9 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.io.IOException;
 import java.util.NoSuchElementException;
-
 
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
@@ -42,8 +40,8 @@ public class EntryIterator implements IEntryIterator {
     private final Leaf leaf;
 
     private final Tuple tuple;
-
-    private final EntryFilter filter;
+    
+    private final IEntryFilter filter;
     
     private int index = 0;
 
@@ -58,7 +56,7 @@ public class EntryIterator implements IEntryIterator {
 
     // first index to NOT visit.
     private final int toIndex;
-    
+
     public EntryIterator(Leaf leaf) {
 
         this(leaf, new Tuple(), null, null, null);
@@ -90,6 +88,9 @@ public class EntryIterator implements IEntryIterator {
      *            The first key whose entry will NOT be visited or
      *            <code>null</code> if the upper bound on the key traversal is
      *            not constrained.
+     * @param flags
+     *            Flags specifying whether the keys and/or values will be
+     *            materialized.
      * @param filter
      *            An optional filter used to test and exclude elements from the
      *            iteration.
@@ -98,7 +99,7 @@ public class EntryIterator implements IEntryIterator {
      *                if fromKey is given and is greater than toKey.
      */
     public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
-            EntryFilter filter) {
+            IEntryFilter filter) {
 
         assert leaf != null;
 
@@ -111,7 +112,7 @@ public class EntryIterator implements IEntryIterator {
 //        this.fromKey = fromKey; // may be null (no lower bound).
 //        
 //        this.toKey = toKey; // may be null (no upper bound).
-
+        
         this.filter = filter; // MAY be null.
         
         { // figure out the first index to visit.
@@ -263,7 +264,7 @@ public class EntryIterator implements IEntryIterator {
 
         if (tuple.needVals) {
 
-            // the current value.
+            // the current value. @todo when copying values into the leaf this will need to copy the value out!
             final Object val = filter == null ? leaf.values[lastVisited] : filter
                     .resolve(leaf.values[lastVisited]); 
             

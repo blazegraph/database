@@ -45,6 +45,7 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.EntryFilter;
 import com.bigdata.btree.IBatchOperation;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.IndexSegment;
@@ -497,9 +498,18 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     /**
      * Visits only the non-deleted entries in the key range.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
 
-        return getRoot().rangeIterator(fromKey, toKey, DeletedEntryFilter.INSTANCE);
+        final IEntryFilter f = DeletedEntryFilter.INSTANCE;
+
+        if (filter != null) {
+
+            f.add(filter);
+
+        }
+
+        return super.rangeIterator(fromKey, toKey, capacity, flags, f);
         
     }
 
@@ -524,7 +534,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
 
         public boolean isValid(Object value) {
 
-            return ! ((Value)value).deleted;
+            return ! ((Value)value).deleted && super.isValid(value);
             
         }
         
@@ -533,7 +543,9 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
          */
         public Object resolve(Object value) {
             
-            return ((Value)value).datum;
+            value = ((Value)value).datum;
+            
+            return super.resolve(value);
             
         }
         

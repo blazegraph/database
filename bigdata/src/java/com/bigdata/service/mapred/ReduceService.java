@@ -147,8 +147,9 @@ abstract public class ReduceService
             final int flags = IDataService.KEYS | IDataService.VALS;
 
             // index scan.
-            IEntryIterator itr = new RangeQueryIterator(ds, name, ITx.UNISOLATED,
-                    null/* fromKey */, null/* toKey */, capacity, flags);
+            IEntryIterator itr = new RangeQueryIterator(ds, name,
+                    ITx.UNISOLATED, null/* fromKey */, null/* toKey */,
+                    capacity, flags, null/*filter*/);
 
             long ntuples = 0L;
             

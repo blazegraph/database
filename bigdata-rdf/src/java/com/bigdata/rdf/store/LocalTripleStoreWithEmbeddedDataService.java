@@ -144,8 +144,10 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
         public Object call() throws Exception {
 
-            dataService.registerIndex(name, UUID.randomUUID(),
-                    new UnisolatedBTreeConstructor(branchingFactor));
+            dataService
+                    .registerIndex(name, UUID.randomUUID(),
+                            new UnisolatedBTreeConstructor(branchingFactor),
+                            null/*pmd*/);
             
             return null;
             

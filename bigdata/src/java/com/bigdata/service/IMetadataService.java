@@ -32,6 +32,7 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
 
@@ -96,6 +97,9 @@ public interface IMetadataService extends IDataService, Remote {
      * 
      * @param name
      *            The name of the scale-out index.
+     * @param ctor
+     *            The object used to create the mutable {@link BTree} instances
+     *            on the {@link DataService}s.
      * @param separatorKeys
      *            The array of separator keys. Each separator key is interpreted
      *            as an <em>unsigned byte[]</em>. The first entry MUST be an
@@ -119,7 +123,8 @@ public interface IMetadataService extends IDataService, Remote {
      *       that it makes sense for clients to pre-fetch and cache the entire
      *       set of partition definitions for a scale-out index.
      */
-    public UUID registerManagedIndex(String name, byte[][] separatorKeys,
+    public UUID registerManagedIndex(String name,
+            UnisolatedBTreePartitionConstructor ctor, byte[][] separatorKeys,
             UUID[] dataServices) throws IOException, InterruptedException,
             ExecutionException;
     
@@ -139,7 +144,8 @@ public interface IMetadataService extends IDataService, Remote {
      * 
      * @return The UUID for that index.
      */
-    public UUID registerManagedIndex(String name, UUID dataService)
+    public UUID registerManagedIndex(String name,
+            UnisolatedBTreePartitionConstructor ctor, UUID dataService)
             throws IOException, InterruptedException, ExecutionException;
     
     /**

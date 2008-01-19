@@ -291,13 +291,21 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
      * in which the indices were declared to the constructor.
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+        return rangeIterator(fromKey, toKey, 0/* capacity */,
+                KEYS | VALS/* flags */, null/*filter*/);
         
-        return new FusedEntryIterator(srcs, fromKey, toKey);
-        
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        return new FusedEntryIterator(srcs, fromKey, toKey, capacity, flags, filter);
+
     }
     
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
         

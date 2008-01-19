@@ -35,8 +35,10 @@ import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 
 /**
  * An object used to stream key scan results back to the client.
@@ -132,12 +134,12 @@ public class ResultSet implements Externalizable {
      * @param fromKey
      * @param toKey
      * @param capacity
-     * @param sendKeys
-     * @param sendVals
+     * @param flags
+     * @param filter
      */
     public ResultSet(final IIndex ndx, final byte[] fromKey,
-            final byte[] toKey, final int capacity, final boolean sendKeys,
-            final boolean sendVals) {
+            final byte[] toKey, final int capacity, int flags,
+            final IEntryFilter filter) {
 
         // The upper bound on the #of key-value pairs in the range.
         rangeCount = ndx.rangeCount(fromKey, toKey);
@@ -146,12 +148,16 @@ public class ResultSet implements Externalizable {
 
         int ntuples = 0;
 
+        final boolean sendKeys = (flags & IRangeQuery.KEYS) != 0;
+        
+        final boolean sendVals = (flags & IRangeQuery.VALS) != 0;
+        
         keys = (sendKeys ? new byte[limit][] : null);
 
         vals = (sendVals ? new byte[limit][] : null);
 
         // iterator that will visit the key range.
-        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity, flags, filter );
 
         /*
          * true if any keys were visited regardless of whether or not they

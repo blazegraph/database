@@ -581,9 +581,16 @@ public class ConcurrentDataLoader {
                  * More than one client will run so we need to allocate the
                  * files fairly to each client.
                  * 
-                 * This is done by the #of files scanned modulo the #of clients.
-                 * When that expression evaluates to the [clientNum] then the
-                 * file will be allocated to this client.
+                 * FIXME This is done by the #of files scanned modulo the #of
+                 * clients. When that expression evaluates to the [clientNum]
+                 * then the file will be allocated to this client. (The problem
+                 * with this approach is that it is sensitive to the order in
+                 * which the files are visited in the file systems. The
+                 * hash(filename) approach is much more robust as long as the
+                 * same pathname is used, perhaps an absolute pathname. I need
+                 * to review this in practice since I have seen what appeared to
+                 * be a strong bias in favor of one client when scanning the
+                 * U1000 dataset on server1 and server2.)
                  */ 
                  /* 
 //                 * This trick allocates files to clients based on the hash of the

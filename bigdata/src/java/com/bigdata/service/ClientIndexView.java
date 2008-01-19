@@ -41,10 +41,14 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
@@ -604,22 +608,18 @@ public class ClientIndexView implements IIndex {
      * An {@link IEntryIterator} that kinds the use of a series of
      * {@link ResultSet}s to cover all index partitions spanned by the key
      * range.
-     * 
-     * @todo provide variant method so that the client can pass in a key and/or
-     *       value filter.
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
-        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
-                IDataService.KEYS | IDataService.VALS);
-
+        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
+                | IRangeQuery.VALS/* flags */, null/*filter*/);
     }
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags) {
+            int capacity, int flags, IEntryFilter filter ) {
 
         return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
-                flags);
+                flags, filter);
         
     }
 
@@ -628,7 +628,7 @@ public class ClientIndexView implements IIndex {
         if (op == null)
             throw new IllegalArgumentException();
         
-        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        final List<Split> splits = splitKeys(op.n, op.keys);
         
         final Iterator<Split> itr = splits.iterator();
         
@@ -670,7 +670,7 @@ public class ClientIndexView implements IIndex {
         if (op == null)
             throw new IllegalArgumentException();
         
-        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        final List<Split> splits = splitKeys(op.n, op.keys);
         
         final Iterator<Split> itr = splits.iterator();
         
@@ -713,7 +713,7 @@ public class ClientIndexView implements IIndex {
         
         final boolean returnOldValues = true;
         
-        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        final List<Split> splits = splitKeys(op.n, op.keys);
         
         final Iterator<Split> itr = splits.iterator();
         
@@ -764,7 +764,7 @@ public class ClientIndexView implements IIndex {
         
         final boolean returnOldValues = true;
         
-        final List<Split> splits = splitKeys(op.ntuples, op.keys);
+        final List<Split> splits = splitKeys(op.n, op.keys);
         
         final Iterator<Split> itr = splits.iterator();
         
@@ -814,7 +814,7 @@ public class ClientIndexView implements IIndex {
      *         index partitions.
      */
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         if (ctor == null) {
 

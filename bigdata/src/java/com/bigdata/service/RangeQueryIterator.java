@@ -32,6 +32,7 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.io.ByteArrayBufferWithPosition;
@@ -104,6 +105,8 @@ public class RangeQueryIterator implements IEntryIterator {
      */
     private final int flags;
 
+    private final IEntryFilter filter;
+    
     /**
      * The #of range query operations executed.
      */
@@ -188,7 +191,8 @@ public class RangeQueryIterator implements IEntryIterator {
     }
     
     public RangeQueryIterator(IDataService dataService, String name, long tx,
-            byte[] fromKey, byte[] toKey, int capacity, int flags) {
+            byte[] fromKey, byte[] toKey, int capacity, int flags,
+            IEntryFilter filter) {
 
         if (dataService == null) {
 
@@ -215,6 +219,7 @@ public class RangeQueryIterator implements IEntryIterator {
         this.toKey = toKey;
         this.capacity = capacity;
         this.flags = flags;
+        this.filter = filter;
 
         // Obtain the first result set.
         rangeQuery();
@@ -236,7 +241,7 @@ public class RangeQueryIterator implements IEntryIterator {
                     + BytesUtil.toString(toKey));
             
             rset = dataService.rangeQuery(tx, name /* unpartitioned */, fromKey,
-                    toKey, capacity, flags);
+                    toKey, capacity, flags, filter);
             
             // reset index into the ResultSet.
             lastVisited = -1;
@@ -278,7 +283,7 @@ public class RangeQueryIterator implements IEntryIterator {
                     + ", toKey=" + BytesUtil.toString(toKey));
             
             rset = dataService.rangeQuery(tx, name /* unpartitioned */,
-                    _fromKey, toKey, capacity, flags);
+                    _fromKey, toKey, capacity, flags, filter);
             
             // reset index into the ResultSet.
             lastVisited = -1;

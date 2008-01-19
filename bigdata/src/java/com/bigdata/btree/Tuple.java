@@ -128,9 +128,15 @@ public class Tuple implements ITuple {
     
     public Tuple() {
         
-        needKeys = true;
+        this(IRangeQuery.KEYS|IRangeQuery.VALS);
         
-        needVals = true;
+    }
+
+    public Tuple(int flags) {
+        
+        needKeys = (flags & IRangeQuery.KEYS) != 0;
+        
+        needVals = (flags & IRangeQuery.VALS) != 0;
         
         if(needKeys) {
             

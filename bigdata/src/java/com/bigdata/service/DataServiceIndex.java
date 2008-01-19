@@ -36,8 +36,11 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedureConstructor;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.journal.NoSuchIndexException;
 
 /**
@@ -286,8 +289,15 @@ public class DataServiceIndex implements IIndex {
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
+        return rangeIterator(fromKey, toKey, capacity, IDataService.KEYS
+                | IDataService.VALS, null/* filter */);
+
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+
         return new RangeQueryIterator(dataService, name, tx, fromKey, toKey,
-                capacity, IDataService.KEYS | IDataService.VALS);
+                capacity, flags, filter);
 
     }
 
@@ -295,10 +305,10 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            boolean[] vals = dataService.batchContains(tx, name, op.ntuples,
+            boolean[] vals = dataService.batchContains(tx, name, op.n,
                     op.keys);
 
-            System.arraycopy(vals, 0, op.contains, 0, op.ntuples);
+            System.arraycopy(vals, 0, op.contains, 0, op.n);
 
         } catch (Exception ex) {
 
@@ -316,7 +326,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            oldVals = dataService.batchInsert(tx, name, op.ntuples, op.keys,
+            oldVals = dataService.batchInsert(tx, name, op.n, op.keys,
                     (byte[][]) op.values, returnOldValues);
 
         } catch (Exception ex) {
@@ -327,7 +337,7 @@ public class DataServiceIndex implements IIndex {
 
         if (returnOldValues) {
 
-            System.arraycopy(oldVals, 0, op.values, 0, op.ntuples);
+            System.arraycopy(oldVals, 0, op.values, 0, op.n);
 
         }
 
@@ -341,10 +351,10 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            byte[][] vals = dataService.batchLookup(tx, name, op.ntuples,
+            byte[][] vals = dataService.batchLookup(tx, name, op.n,
                     op.keys);
 
-            System.arraycopy(vals, 0, op.values, 0, op.ntuples);
+            System.arraycopy(vals, 0, op.values, 0, op.n);
 
         } catch (Exception ex) {
 
@@ -362,7 +372,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            oldVals = dataService.batchRemove(tx, name, op.ntuples, op.keys,
+            oldVals = dataService.batchRemove(tx, name, op.n, op.keys,
                     returnOldValues);
 
         } catch (Exception ex) {
@@ -373,14 +383,14 @@ public class DataServiceIndex implements IIndex {
 
         if (returnOldValues) {
 
-            System.arraycopy(oldVals, 0, op.values, 0, op.ntuples);
+            System.arraycopy(oldVals, 0, op.values, 0, op.n);
 
         }
 
     }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         try {
 

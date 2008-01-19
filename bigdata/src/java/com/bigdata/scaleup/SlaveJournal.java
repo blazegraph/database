@@ -36,6 +36,7 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.service.UnisolatedBTreePartition;
 
 /**
  * Class delegates the {@link #overflow()} event to a {@link MasterJournal}.
@@ -226,7 +227,7 @@ public class SlaveJournal extends Journal {
         final UUID managedIndexUUID = btree.getIndexUUID();
         
         MetadataIndex mdi = new MetadataIndex(this, metadataIndexUUID,
-                managedIndexUUID, name);
+                managedIndexUUID, name, null /*@todo ctor*/);
         
         /*
          * Create the initial partition which can accept any key.
