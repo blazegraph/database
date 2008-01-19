@@ -31,55 +31,51 @@ package com.bigdata.repo;
 import java.io.IOException;
 import java.util.Random;
 
+import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.scaleup.MetadataIndex;
 
 /**
  * Test atomic append operations on the file data index for the
  * {@link BigdataRepository}.
  * 
- * @todo test append (i.e., write) with read back (read assembles a series of
- *       chunks into a byte stream).
- * 
- * @todo test read of byte ranges of the file (used by split).
- * 
  * @todo test split of a large file into blocks and the read of each block by
  *       its appropriate client. (@todo also test ability to figure out which
  *       client is "near" the blocks by consulting the {@link MetadataIndex} and
  *       an as yet undefined network topology model.)
  * 
- * @todo test estimate of the content length
- * 
  * @todo test exact computation of the content length (still an estimate since
- *       there is no guarentee that the file remains unmodified).
+ *       there is no guarentee that the file remains unmodified)? the only way
+ *       to do this is to run an iterator over the data and aggregate the block
+ *       lengths.
+ * 
+ * @todo test atomic append behavior after a file version has been deleted. Note
+ *       that a kind of {@link UnisolatedBTree} is being used so it stores
+ *       versioned data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAtomicAppend extends AbstractRepositoryTestCase {
+public class TestAtomicBlockAppend extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestAtomicAppend() {
+    public TestAtomicBlockAppend() {
     }
 
     /**
      * @param arg0
      */
-    public TestAtomicAppend(String arg0) {
+    public TestAtomicBlockAppend(String arg0) {
         super(arg0);
     }
 
-    static protected final int BLOCK_SIZE = BigdataRepository.BLOCK_SIZE; 
-    
     /**
      * Test the ability to write a byte[] onto the index and read it back.
      * 
      * @throws IOException
-     * 
-     * @todo test when the byte[] spans multiple blocks.
      */
-    public void test_atomicAppend123() throws IOException {
+    public void test_atomicAppendSmallBlock() throws IOException {
      
         final String id = "test";
         
@@ -87,14 +83,15 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
         
         final byte[] expected = new byte[]{1,2,3};
         
-        assertEquals("nblocks", 1, repo.atomicAppend(id, version, expected, 0, expected.length));
+        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
+                expected, 0, expected.length));
 
-        assertEquals("blockCount",1,repo.getBlockCount(id, version));
-        
-        final byte[] actual = read(repo.inputStream(id,version));
-        
-        assertEquals("data",expected,actual);
-        
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        final byte[] actual = read(repo.inputStream(id, version));
+
+        assertEquals("data", expected, actual);
+
     }
 
     /**
@@ -102,27 +99,86 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
      * 
      * @throws IOException
      */
-    public void test_atomicAppendZeroLength() throws IOException {
+    public void test_atomicAppendEmptyBlock() throws IOException {
+
+        final String id = "test";
+
+        final int version = 0;
+
+        final byte[] expected = new byte[] {};
+
+        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
+                expected, 0, expected.length));
+
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        final byte[] actual = read(repo.inputStream(id, version));
+
+        assertEquals("data", expected, actual);
+        
+    }
+
+    /**
+     * Atomic append of a full block.
+     * 
+     * @throws IOException
+     */
+    public void test_atomicAppendFullBlock() throws IOException {
         
         final String id = "test";
         
         final int version = 0;
         
-        final byte[] expected = new byte[]{};
+        Random r = new Random();
         
-        assertEquals("nblocks", 1, repo.atomicAppend(id, version, expected, 0, expected.length));
+        final byte[] expected = new byte[BLOCK_SIZE];
+
+        r.nextBytes(expected);
         
-        assertEquals("blockCount",1,repo.getBlockCount(id, version));
-        
-        final byte[] actual = read(repo.inputStream(id,version));
-        
-        assertEquals("data",expected,actual);
+        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
+                expected, 0, expected.length));
+
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        final byte[] actual = read(repo.inputStream(id, version));
+
+        assertEquals("data", expected, actual);
         
     }
 
     /**
-     * A stress test for writing a (partial) block on a file and reading back
-     * its data.
+     * Verify correct rejection: (a) writes that are larger than one block.
+     * 
+     * @todo do more correct rejection tests.
+     * 
+     * @throws IOException
+     */
+    public void test_atomicAppendCorrectRejection() throws IOException {
+     
+        final String id = "test";
+        
+        final int version = 0;
+        
+        // Note: too large by one byte.
+        final byte[] expected = new byte[BLOCK_SIZE + 1];
+        
+        try {
+            
+            repo.atomicAppend(id, version, expected, 0, expected.length);
+            
+            fail("Expecting: " + IllegalArgumentException.class);
+            
+        } catch (IllegalArgumentException ex) {
+            
+            log.info("Ignoring expected exception: "+ex);
+            
+        }
+
+    }
+    
+    /**
+     * A stress test for writing a partial and full blocks on a file and reading
+     * back its data.  Each pass writes on a different file.
      * <p>
      * Note: By virtue of how the file names are choosen this also tests atomic
      * append of a file when there is an existing file and the new file would be
@@ -130,11 +186,14 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
      * 
      * @throws IOException
      */
-    public void test_atomicAppendPartialBlockStressTest() throws IOException {
+    public void test_atomicAppendStressTest() throws IOException {
         
         final int LIMIT = 100;
         
         final Random r = new Random();
+
+        int nzero = 0;
+        int nfull = 0;
         
         for(int i=0; i<LIMIT; i++) {
         
@@ -145,15 +204,38 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
 
             final int version = i;
 
-            // does not exceed one block in length (zero bytes is allowed).
-            final int len = r.nextInt(BLOCK_SIZE);
+            /*
+             * Note: size in [0:block_size] bytes.
+             * 
+             * @todo adjust the distribution to make zero and near zero and
+             * block_size and near block_size operations at least 10% of all
+             * operations.
+             */
+            final int len;
+            {
+                final int x = r.nextInt(100);
+                if (x < 10) {
+                    // short block length.
+                    len = r.nextInt(5);
+                } else if (x >= 90) {
+                    // long block length (up to block_size).
+                    len = r.nextInt(5) + BLOCK_SIZE - 4;
+                } else {
+                    // uniform random distribution.
+                    len = r.nextInt(BLOCK_SIZE + 1);
+                }
+            }
+            
+            if(len==0) nzero++;
+            if(len==BLOCK_SIZE) nfull++;
             
             final byte[] expected = new byte[len];
             
             // random data.
             r.nextBytes(expected);
 
-            assertEquals("nblocks", 1, repo.atomicAppend(id, version, expected, 0, expected.length));
+            assertEquals("nbytes", expected.length, repo.atomicAppend(id,
+                    version, expected, 0, expected.length));
 
             assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
@@ -161,6 +243,9 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
 
             assertEquals("data", expected, actual);
 
+            log.warn("There were " + nzero + " zero length blocks and " + nfull
+                    + " full length blocks out of " + LIMIT + " trials");
+            
         }
         
     }
@@ -170,6 +255,10 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
      * OutputStream for a file version and write on it and it periodically
      * flushes blocks to the file version.
      */
+    
+    public void test_atomicAppend_smallStream() {
+        
+    }
     
     /**
      * @todo Test the ability to write a stream onto the index that is

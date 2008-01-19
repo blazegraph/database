@@ -501,7 +501,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter) {
 
-        final IEntryFilter f = DeletedEntryFilter.INSTANCE;
+        final IEntryFilter f = new DeletedEntryFilter();
 
         if (filter != null) {
 
@@ -528,8 +528,6 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      */
     public static class DeletedEntryFilter extends EntryFilter {
 
-        static public final transient EntryFilter INSTANCE = new DeletedEntryFilter();
-        
         private static final long serialVersionUID = 2783761261078831116L;
 
         public boolean isValid(Object value) {
