@@ -178,7 +178,7 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
 
-        final IEntryFilter f = DeletedEntryFilter.INSTANCE;
+        final IEntryFilter f = new DeletedEntryFilter();
 
         if (filter != null) {
 

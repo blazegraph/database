@@ -3,8 +3,6 @@
  */
 package com.bigdata.repo;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -474,11 +472,11 @@ public class BigdataRepository implements ContentRepository {
          * able to access the historical versions of the file).
          */
         final int version = 0;
-        
-        writeContent( id, version, document.getInputStream() );
+
+        copyStream(id, version, document.getInputStream());
         
     }
-
+    
     public Document read(String id) {
         // TODO Auto-generated method stub
         return null;
@@ -549,126 +547,126 @@ public class BigdataRepository implements ContentRepository {
      * file data operations (read, atomic append).
      */
     
-    /**
-     * Break up the content into blocks and write them onto the data index.
-     * 
-     * @todo encapsulate this as a class using a pipe model so that someone can
-     *       write continuously on an {@link OutputStream} and have the data
-     *       transparently partitioned into blocks and those blocks written with
-     *       atomic appends. Provide a record aware and block boundary aware
-     *       extensible layer for the class so that applications can pad out to
-     *       fill a block when the goal is transparently split during m/r
-     *       processing.
-     */
-    public void writeContent(String id, int version, InputStream is) {
-
-        /*
-         * This constant determines the amount of data that will go into each
-         * atomic append invoked by this method.
-         */
-        final int BUFFER_SIZE = 64 * Bytes.kilobyte32; // @todo config.
-        
-        if (!(is instanceof ByteArrayInputStream)
-//                && !(is instanceof BufferedInputStream)
-                ) {
-
-            /*
-             * @todo Try this with just the default buffer size. I think that
-             * the size of the input stream buffer will become less critical as
-             * the #of concurrent clients of this interface goes up. However we
-             * always want to use a large buffer to collect writes that will be
-             * sent across the data service interface in order to keep up the
-             * efficiency of the RPC.
-             */
-
-            is = new BufferedInputStream(is, BUFFER_SIZE);
-            
-        }
-
-        /*
-         * Fill the buffer repeatedly, doing an atomic append on the file
-         * each time the buffer becomes full.
-         */
-        
-        // @todo use a thread-local variable for this buffer?
-        final byte[] b = new byte[BUFFER_SIZE];
-
-        int off = 0; // offset of the 1st unwritten byte in the buffer.
-        int remaining = b.length; // #of unwritten bytes remaining in buf.
-        long nwritten = 0; // total #of bytes written.
-        int nblocks = 0; // total #of blocks (buffers) written.
-        
-        try {
-
-            while (true) {
-
-                int nread = is.read(b, off, remaining);
-
-                if (nread == -1)
-                    break;
-
-                off += nread;
-                remaining -= nread;
-                
-                if (remaining == 0) {
-
-                    /*
-                     * The buffer is full. Incremental write using atomic append
-                     * each time the buffer is filled to capacity.
-                     */
-                    
-                    atomicAppend( id, version, b, 0/*offset*/, off/*length*/ );
-
-                    // increment totals.
-                    nblocks++;
-                    nwritten += off;
-
-                    // reset within buffer counters.
-                    off = 0;
-                    remaining = b.length;
-                    
-                }
-                
-            }
-
-            if (off > 0) {
-
-                /*
-                 * Write anything remaining once the input stream is exhausted.
-                 */
-                
-                atomicAppend( id, version, b, 0/*offset*/, off/*length*/ );
-
-                // incremental totals.
-                nblocks++;
-                nwritten += off;
-
-            }
-
-            log.info("Wrote " + nwritten + " bytes on " + id + " in " + nblocks
-                    + " blocks");
-            
-        } catch (Throwable t) {
-
-            log.error("Problem writing on file: id=" + id, t);
-            
-            throw new RuntimeException( t );
-
-        } finally {
-
-            try {
-                
-                is.close();
-
-            } catch (IOException e) {
-                
-                log.warn("Problem closing input stream.", e);
-                
-            }
-
-        }
-        
-    }
+//    /**
+//     * Break up the content into blocks and write them onto the data index.
+//     * 
+//     * @todo encapsulate this as a class using a pipe model so that someone can
+//     *       write continuously on an {@link OutputStream} and have the data
+//     *       transparently partitioned into blocks and those blocks written with
+//     *       atomic appends. Provide a record aware and block boundary aware
+//     *       extensible layer for the class so that applications can pad out to
+//     *       fill a block when the goal is transparently split during m/r
+//     *       processing.
+//     */
+//    public void writeContent(String id, int version, InputStream is) {
+//
+//        /*
+//         * This constant determines the amount of data that will go into each
+//         * atomic append invoked by this method.
+//         */
+//        final int BUFFER_SIZE = 64 * Bytes.kilobyte32; // @todo config.
+//        
+//        if (!(is instanceof ByteArrayInputStream)
+////                && !(is instanceof BufferedInputStream)
+//                ) {
+//
+//            /*
+//             * @todo Try this with just the default buffer size. I think that
+//             * the size of the input stream buffer will become less critical as
+//             * the #of concurrent clients of this interface goes up. However we
+//             * always want to use a large buffer to collect writes that will be
+//             * sent across the data service interface in order to keep up the
+//             * efficiency of the RPC.
+//             */
+//
+//            is = new BufferedInputStream(is, BUFFER_SIZE);
+//            
+//        }
+//
+//        /*
+//         * Fill the buffer repeatedly, doing an atomic append on the file
+//         * each time the buffer becomes full.
+//         */
+//        
+//        // @todo use a thread-local variable for this buffer?
+//        final byte[] b = new byte[BUFFER_SIZE];
+//
+//        int off = 0; // offset of the 1st unwritten byte in the buffer.
+//        int remaining = b.length; // #of unwritten bytes remaining in buf.
+//        long nwritten = 0; // total #of bytes written.
+//        int nblocks = 0; // total #of blocks (buffers) written.
+//        
+//        try {
+//
+//            while (true) {
+//
+//                int nread = is.read(b, off, remaining);
+//
+//                if (nread == -1)
+//                    break;
+//
+//                off += nread;
+//                remaining -= nread;
+//                
+//                if (remaining == 0) {
+//
+//                    /*
+//                     * The buffer is full. Incremental write using atomic append
+//                     * each time the buffer is filled to capacity.
+//                     */
+//                    
+//                    atomicAppend( id, version, b, 0/*offset*/, off/*length*/ );
+//
+//                    // increment totals.
+//                    nblocks++;
+//                    nwritten += off;
+//
+//                    // reset within buffer counters.
+//                    off = 0;
+//                    remaining = b.length;
+//                    
+//                }
+//                
+//            }
+//
+//            if (off > 0) {
+//
+//                /*
+//                 * Write anything remaining once the input stream is exhausted.
+//                 */
+//                
+//                atomicAppend( id, version, b, 0/*offset*/, off/*length*/ );
+//
+//                // incremental totals.
+//                nblocks++;
+//                nwritten += off;
+//
+//            }
+//
+//            log.info("Wrote " + nwritten + " bytes on " + id + " in " + nblocks
+//                    + " blocks");
+//            
+//        } catch (Throwable t) {
+//
+//            log.error("Problem writing on file: id=" + id, t);
+//            
+//            throw new RuntimeException( t );
+//
+//        } finally {
+//
+//            try {
+//                
+//                is.close();
+//
+//            } catch (IOException e) {
+//                
+//                log.warn("Problem closing input stream.", e);
+//                
+//            }
+//
+//        }
+//        
+//    }
 
     /**
      * Atomic append of one or more 64k blocks to a file.
@@ -707,6 +705,7 @@ public class BigdataRepository implements ContentRepository {
             assert b != null;
             assert off >= 0 : "off="+off;
             assert len >= 0 && off + len <= b.length;
+            assert len <= BLOCK_SIZE : "len="+len+" exceeds blockSize="+BLOCK_SIZE;
 
             this.id = id;
             this.version = version;
@@ -768,13 +767,13 @@ public class BigdataRepository implements ContentRepository {
             /*
              * The next block identifier to be assigned.
              */
-            final long nextBlock;
+            final long block;
             {
 
                 /*
-                 * Find the key for the last block written for this file. When
-                 * no blocks have been written on this index partition then we
-                 * start with block#0.
+                 * Find the key for the last block written for this file
+                 * version. When no blocks for this file version have been
+                 * written on this index partition then we start with block#0.
                  * 
                  * @todo This implies that the leftSeparator for the index
                  * partition MUST NOT split the blocks for a file unless there
@@ -796,7 +795,7 @@ public class BigdataRepository implements ContentRepository {
                 final ILinearList tmp = (ILinearList)ndx;
                 
                 /*
-                 * Index of the first key after this file.
+                 * Index of the first key after this file version.
                  * 
                  * Note: This will always be an insertion point (a negative
                  * value) since the toKey only encodes the successor of the file
@@ -824,13 +823,28 @@ public class BigdataRepository implements ContentRepository {
                 
                 toIndex = -(toIndex+1); // convert to an index.
 
-                log.debug("toIndex="+toIndex+", entryCount="+ndx.rangeCount(null, null)); // @todo comment out.
+                // #of entries in the index.
+                final int entryCount = ((AbstractBTree)ndx).getEntryCount();
+                
+                log.debug("toIndex="+toIndex+", entryCount="+entryCount);
 
                 if (toIndex == 0) {
+
+                    // insertion point is before all other entries in the index.
                     
-                    log.info("Will write 1st block for file: id="+id);
+                    log.info("Will write 1st block: id=" + id + ", version="
+                            + version);
                     
-                    nextBlock = 0;
+                    block = 0;
+                    
+                } else if (toIndex == entryCount) {
+                    
+                    // insertion point is after all entries in the index.
+                    
+                    log.info("Will write 1st block: id=" + id + ", version="
+                            + version);
+                    
+                    block = 0;
                     
                 } else {
                     
@@ -858,49 +872,33 @@ public class BigdataRepository implements ContentRepository {
                             prefix.length, prefix, 0, prefix.length, key) != 0) {
                         
                         // last block identifier assigned for this file + 1.
-                        nextBlock = KeyBuilder.decodeLong(key, key.length
+                        block = KeyBuilder.decodeLong(key, key.length
                                 - Bytes.SIZEOF_LONG) + 1;
                         
                         log.info("Appending to existing file: id=" + id
-                                + ", version=" + version + ", nextBlock="
-                                + nextBlock);
+                                + ", version=" + version + ", block=" + block);
                         
                     } else {
                         
                         log.info("Will write 1st block for file: id=" + id
                                 + ", version=" + version);
                         
-                        nextBlock = 0;
+                        block = 0;
                         
                     }
                     
                 }
 
                 log.info("Will write " + len + " bytes on id=" + id
-                                + ", version=" + version + ", next block#="
-                                + nextBlock);
+                        + ", version=" + version + ", block#=" + block);
                 
             }
 
-            long block = nextBlock; // next block# to be written.
-            int off = this.off; // offset of the next byte to write.
-            int remaining = this.len; // #of bytes remaining to be written.
-            long nwritten = 0; // #of bytes written.
-            int nblocks = 0; // #of blocks written.
-
-            // the block will be written on the store.
-            final IRawStore store = ((BTree) ndx).getStore();
+            {
             
-            final DataOutputBuffer out = new DataOutputBuffer(Bytes.SIZEOF_LONG);
-            
-            while(remaining>0) {
-            
-                // write block size bytes up to the #of bytes remaining in the buffer.
-                final int n = Math.min(BLOCK_SIZE, remaining);
-                
-                // write the block on the journal.
-                final long addr = store.write(
-                        ByteBuffer.wrap(b, off, n));
+                // write the block on the journal - use 0L for an empty block.
+                final long addr = len == 0 ? 0L : journal.write(ByteBuffer
+                        .wrap(b, off, len));
 
                 // form the key for the index entry for this block.
                 final byte[] key = keyBuilder.reset()
@@ -911,33 +909,29 @@ public class BigdataRepository implements ContentRepository {
                 // record the address of the block in the index.
                 {
                 
+                    final DataOutputBuffer out = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+                    
                     // encode the value for the entry.
                     out.reset().putLong(addr);
                     
+                    final byte[] val = out.toByteArray();
+
                     // insert the entry into the index.
-                    ndx.insert(key, out.toByteArray() );
+                    ndx.insert(key, val);
                  
                     log.info("id=" + id + ", version=" + version
                             + ", wrote block=" + block + " @ addr"
-                            + store.toString(addr));
+                            + journal.toString(addr));
                     
                 }
-
-                // increment counters.
-                off += n;
-                remaining -= n;
-                nwritten += n;
-                nblocks++;
-                block++;
             
             }
             
-            log.info("Wrote " + nwritten + " bytes in " + nblocks
-                    + " blocks: id=" + id + ", version=" + version
-                    + ", next block#=" + block);
+            log.info("Wrote " + len + " bytes : id=" + id + ", version="
+                    + version + ", block#=" + block);
             
-            // #of blocks written.
-            return Integer.valueOf(nblocks);
+            // #of bytes written.
+            return Long.valueOf(len);
             
         }
 
@@ -975,6 +969,72 @@ public class BigdataRepository implements ContentRepository {
         }
         
     }
+
+    /**
+     * Atomic write of a block into an existing file and version.
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The file version.
+     * @param block
+     *            The block identifier.
+     * @param b
+     *            The buffer containing the bytes to be written. When the buffer
+     *            contains more than {@link #BLOCK_SIZE} bytes it will be broken
+     *            up into multiple blocks.
+     * @param off
+     *            The offset of the 1st byte to be written.
+     * @param len
+     *            The #of bytes to be written.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>id</id> is <code>null</code> or an empty string.
+     * @throws IllegalArgumentException
+     *             if <i>version</id> is negative.
+     * @throws IllegalArgumentException
+     *             if <i>block</id> is negative.
+     * @throws IllegalArgumentException
+     *             if <i>b</id> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>off</id> is negative or greater than the length of the
+     *             byte[].
+     * @throws IllegalArgumentException
+     *             if <i>len</id> is negative or <i>off+len</i> is greater
+     *             than the length of the byte[].
+     * @throws IllegalArgumentException
+     *             if <i>len</i> is greater than {@link #BLOCK_SIZE}.
+     * 
+     * @return The #of bytes written.
+     * 
+     * @todo should writes beyond the end of the file be allowed? They will
+     *       leave "holes", but that's ok, right? Can any block identifier be
+     *       written in this manner whether or not it exists or is beyond the
+     *       end of the file?
+     */
+    public int atomicWrite(String id, int version, long block, byte[] b, int off, int len) {
+
+        if (id == null || id.length() == 0)
+            throw new IllegalArgumentException();
+        if (version < 0)
+            throw new IllegalArgumentException();
+        if(block<0L) {
+            // Note: restriction implies 63-bit block identifier (no negative#s).
+            throw new IllegalArgumentException();
+        }
+        if (b == null)
+            throw new IllegalArgumentException();
+        if (off < 0 || off > b.length)
+            throw new IllegalArgumentException();
+        if (len < 0 || off + len > b.length)
+            throw new IllegalArgumentException();
+        if(len>BLOCK_SIZE) {
+            throw new IllegalArgumentException();
+        }
+
+        throw new UnsupportedOperationException();
+        
+    }
     
     /**
      * Atomic append of data onto the end of a file.
@@ -1010,10 +1070,12 @@ public class BigdataRepository implements ContentRepository {
      * @throws IllegalArgumentException
      *             if <i>len</id> is negative or <i>off+len</i> is greater
      *             than the length of the byte[].
-     * 
-     * @return #of blocks written.
+     * @throws IllegalArgumentException
+     *             if <i>len</i> is greater than {@link #BLOCK_SIZE}.
+     *             
+     * @return #of bytes written.
      */
-    public int atomicAppend(String id, int version, byte[] b, int off, int len) {
+    public long atomicAppend(String id, int version, byte[] b, int off, int len) {
         
         if (id == null || id.length() == 0)
             throw new IllegalArgumentException();
@@ -1025,13 +1087,8 @@ public class BigdataRepository implements ContentRepository {
             throw new IllegalArgumentException();
         if (len < 0 || off + len > b.length)
             throw new IllegalArgumentException();
-
-        if(len % BLOCK_SIZE != 0) {
-            
-            log.warn("Not an even multiple of the block size: id=" + id
-                    + ", version=" + version + ", len=" + len + ", blockSize="
-                    + BLOCK_SIZE);
-            
+        if(len>BLOCK_SIZE) {
+            throw new IllegalArgumentException();
         }
         
         /*
@@ -1116,11 +1173,13 @@ public class BigdataRepository implements ContentRepository {
             final IIndexProcedure proc = new AtomicAppendProc(id, version, b, off,
                     len);
 
-            log.info("Submitting append operation to data service: id="+id+", version="+version+", len="+len);
-            
-            Integer nblocks = (Integer) dataService.submit(IBigdataFederation.UNISOLATED, name, proc);
+            log.info("Submitting append operation to data service: id=" + id
+                    + ", version=" + version + ", len=" + len);
 
-            return nblocks;
+            Long nwritten = (Long) dataService.submit(
+                    IBigdataFederation.UNISOLATED, name, proc);
+
+            return nwritten;
             
         } catch (Exception ex) {
         
@@ -1232,7 +1291,8 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @return An input stream from which the caller may read the data in the
      *         file -or- <code>null</code> if there is no data for that file
-     *         version.
+     *         version. An empty input stream MAY be returned since empty blocks
+     *         are allowed.
      */
     public FileVersionInputStream inputStream(String id,int version) {
 
@@ -1242,11 +1302,11 @@ public class BigdataRepository implements ContentRepository {
          * this read operation. If the result is zero then there are no index
          * partitions which span that file and version and we return null.
          */
-        
+
         final long nblocks = getBlockCount(id, version);
-        
-        if(nblocks==0) {
-            
+
+        if (nblocks == 0) {
+
             log.info("No data: id=" + id + ", version=" + version);
             
             return null;
@@ -1295,6 +1355,249 @@ public class BigdataRepository implements ContentRepository {
         return new FileVersionInputStream(id, version, itr);
         
     }
+
+    /**
+     * Return an output stream that will write on the file version. Bytes
+     * written on the output stream will be buffered until they are full blocks
+     * and then written on the file version using an atomic append.
+     * <p>
+     * Note: Map/Reduce processing of files MAY be facilitated greatly by
+     * ensuring that "records" never cross a block boundary - this means that
+     * files can be split into blocks and blocks distributed to clients without
+     * any regard for the record structure within those blocks. The caller can
+     * prevent records from crossing block boundaries by the simple expediency
+     * of invoking {@link OutputStream#flush()} to force the atomic append of a
+     * (partial but non-empty) block to the file.
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The version identifier.
+     * 
+     * @return The output stream.
+     */
+    public OutputStream outputStream(String id, int version) {
+
+        return new FileVersionOutputStream(id, version);
+
+    }
+    
+    /**
+     * Copies data from the input stream to the file version. The data is
+     * buffered into blocks. Each block is written on the file version using an
+     * atomic append.
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The version identifier.
+     * @param is
+     *            The input stream (closed iff it is fully consumed).
+     * 
+     * @return The #of bytes copied.
+     */
+    public long copyStream(String id, int version, InputStream is) {
+        
+        final FileVersionOutputStream os = (FileVersionOutputStream) outputStream(
+                id, version);
+
+        final long ncopied;
+        
+        try {
+
+            ncopied = os.copyStream( is );
+            
+            os.close();
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+        return ncopied;
+
+    }
+
+    /**
+     * Class buffers up to a block of data at a time and flushes blocks using an
+     * atomic append operation on the identifier file version.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class FileVersionOutputStream extends OutputStream {
+
+        private final String id;
+        private final int version;
+
+        /**
+         * The file identifier.
+         */
+        public String getId() {
+            
+            return id;
+            
+        }
+
+        /**
+         * The file version identifer.
+         */
+        public int getVersion() {
+
+            return version;
+            
+        }
+
+        /**
+         * The buffer in which the current block is being accumulated.
+         */
+        private byte[] buffer = new byte[BigdataRepository.BLOCK_SIZE];
+
+        /**
+         * The index of the next byte in {@link #buffer} on which a byte would be
+         * written.
+         */
+        private int len = 0;
+
+        /**
+         * Create an output stream that will atomically append blocks of data to
+         * the specified file version.
+         * 
+         * @param id
+         *            The file identifier.
+         * @param version
+         *            The version identifier.
+         */
+        public FileVersionOutputStream(String id, int version) {
+            
+            this.id = id;
+            
+            this.version = version;
+            
+        }
+
+        /**
+         * Buffers the byte. If the buffer would overflow then it is flushed.
+         * 
+         * @throws IOException
+         */
+        public void write(int b) throws IOException {
+
+            if (len == buffer.length) {
+
+                // buffer would overflow.
+                
+                flush();
+                
+            }
+            
+            buffer[len++] = (byte) (b & 0xff);
+            
+        }
+
+        /**
+         * If there is data data accumulated in the buffer then it is written on
+         * the file version using an atomic append.
+         * 
+         * @throws IOException
+         */
+        public void flush() throws IOException {
+            
+            if (len > 0) {
+
+                log.info("Flushing buffer: id="+id+", version="+version+", len="+len);
+                
+                atomicAppend(id, version, buffer, 0, len);
+
+                len = 0;
+                
+            }
+            
+        }
+        
+        /**
+         * Flushes the buffer.
+         * 
+         * @throws IOException
+         */
+        public void close() throws IOException {
+           
+            flush();
+            
+        }
+
+        /**
+         * Consumes the input stream, writing blocks onto the file version. The
+         * output stream is NOT flushed.
+         * 
+         * @param is
+         *            The input stream (closed iff it is fully consumed).
+         * 
+         * @return The #of bytes copied from the input stream.
+         * 
+         * @throws IOException
+         * 
+         * @todo write tests at fence posts (copying zero, N, and BLOCK_SIZE
+         *       bytes) and make sure that flush occurs only when the buffer is
+         *       completely full.
+         */
+        public long copyStream(InputStream is) throws IOException {
+
+            long ncopied = 0L;
+
+            while (true) {
+
+                if (this.len == buffer.length) {
+
+                    // flush if the buffer would overflow.
+                    
+                    flush();
+                    
+                }
+                
+                // next byte to write in the buffer.
+                final int off = this.len;
+
+                // #of bytes remaining in the buffer.
+                final int remainder = this.buffer.length - off;
+
+                // read into the buffer.
+                final int nread = is.read(buffer, off, remainder);
+
+                if (nread == -1) {
+
+                    // the input stream is exhausted.
+                    
+                    log.info("Copied " + ncopied + " bytes: id=" + id
+                            + ", version=" + version);
+
+                    try {
+
+                        is.close();
+                        
+                    } catch (IOException ex) {
+                        
+                        log.warn("Problem closing input stream: id=" + id
+                                + ", version=" + version, ex);
+                        
+                    }
+
+                    return ncopied;
+
+                }
+
+                // update the index of the next byte to write in the buffer.
+                this.len = off + nread;
+
+                // update #of bytes copied.
+                ncopied += nread;
+
+            }
+
+        }
+        
+    }
     
     /**
      * Reads from blocks visited by a range scan for a file and version.
@@ -1302,7 +1605,7 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class FileVersionInputStream extends InputStream {
+    protected static class FileVersionInputStream extends InputStream {
 
         private final String id;
         private final int version;
@@ -1401,7 +1704,7 @@ public class BigdataRepository implements ContentRepository {
             len = b.length;
             
             assert b != null;
-            assert b.length > 0;
+//            assert b.length > 0; // zero length blocks are allowed.
             
             final byte[] key = src.getKey(); // @todo use the key buffer (no copy)
             
@@ -1436,7 +1739,7 @@ public class BigdataRepository implements ContentRepository {
             }
             
             // the next byte.
-            int v = b[off++];
+            int v = (0xff & b[off++]);
 
             return v;
             
@@ -1509,6 +1812,8 @@ public class BigdataRepository implements ContentRepository {
          */
         private final DataInputBuffer in = new DataInputBuffer(new byte[]{});
        
+        private static transient final byte[] EMPTY_BLOCK = new byte[]{};
+        
         /**
          * 
          * @param store
@@ -1523,7 +1828,14 @@ public class BigdataRepository implements ContentRepository {
         
         public Object resolve(Object val) {
             
-            byte[] b = (byte[])val;
+//            // @todo remove - shows each invocation context.
+//            log.info("Context",new RuntimeException("Context"));
+            
+            final byte[] b = (byte[])val;
+            
+            assert b != null;
+            assert b.length == 8 :
+                "Expecting 8 bytes not "+b.length;// +" : "+Arrays.toString(b);
             
             in.setBuffer(b);
             
@@ -1539,6 +1851,17 @@ public class BigdataRepository implements ContentRepository {
                 
             }
             
+            if (addr == 0L) {
+
+                /*
+                 * Note: empty blocks are allowed and are recorded with 0L as
+                 * their address.
+                 */
+                
+                return EMPTY_BLOCK;
+
+            }
+            
             /*
              * FIXME This is a great example of when passing in the buffer makes
              * sense. The code here jumps through some hoops to avoid double
@@ -1547,6 +1870,9 @@ public class BigdataRepository implements ContentRepository {
              * Note: hasArray() will not return true if the buffer is marked
              * [readOnly].
              */
+            
+            log.info("Reading block from addr="+store.toString(addr));
+            
             final ByteBuffer buffer = store.read(addr);
 
             if(buffer.hasArray() && buffer.arrayOffset()==0) {
@@ -1556,7 +1882,7 @@ public class BigdataRepository implements ContentRepository {
             }
             
             // log a notice since this is so annoying.
-            log.warn("Cloning data in block");
+            log.warn("Cloning data in block: len="+buffer.limit());
             
             // allocate array into which we will copy the data.
             byte[] dst = new byte[buffer.limit()];

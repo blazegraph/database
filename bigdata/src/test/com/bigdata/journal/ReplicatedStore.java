@@ -49,6 +49,64 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
+ * FIXME I've outlined a re-design below.
+ * 
+ * <pre>
+    - Media redundency
+
+      - derive a constrained interface similar to the Channel for
+        read/write.  The main additional constraint is that
+        implementations should be able to take advantage of the
+        append-only nature of the store for writes and perhaps have a
+        custom extension for updating the root blocks, since that is
+        the only non-append write.
+      
+        - provide a FileChannel implementation.  it just writes on the
+          file channel.
+
+        - provide a write cache implementation.  it should be based on
+          the disk only strategy's write cache and provide
+          asynchronous write behind to the delegate.  this is the only
+          layer that should buffer writes and it is the only layer
+          that should handle read through of its write cache.  in
+          order to have asynchronous writes there should be multiple
+          buffers.  only one buffer is actively recieving writes while
+          the other buffers are providing a read-behind cache (until
+          they are reused) and an asynchronous write-behind to the
+          delegate.
+
+    - provide a network socket implementation (client and
+          server). synchronous read/write on a network socket.  only
+          the write facet is required for media redundency.  the
+          read+write design would allow us to write on a remote
+          service.  the client should have a single thread handling
+          writes on the socket. the server should be single threaded
+          using NIO.
+
+    - provide a tee (writes on two delegates, reads from one).
+          this will be used to write on both a local FileChannel and a
+          remote store via a network socket.  it could also be used to
+          write on two FileChannels for live redundency of the
+          journal.
+
+    - provide a memory only implementation based on the Transient
+          buffer strategy.
+
+    - The stacked set would look like this when used for media
+          redundency.
+
+      IRawStore>WriteCache>Tee>(NetworkChannel+FileChannel)
+
+      Alternative stacks would handle a purely transient model
+      with media redundency.
+
+      IRawStore>WriteCache>Tee>(NetworkChannel+MemoryChannel)
+
+      or without
+
+      IRawStore>MemoryChannel
+ * </pre>
+ * 
  * A class that intercepts writes on an {@link IRawStore} and causes the written
  * record to be replicated on one or more remote store(s). Writes are replicated
  * asynchronously to minimize latency for the caller.

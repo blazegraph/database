@@ -54,6 +54,8 @@ public class AbstractRepositoryTestCase extends
         super(arg0);
     }
 
+    static protected final int BLOCK_SIZE = BigdataRepository.BLOCK_SIZE;     
+
     protected BigdataRepository repo;
     
     public void setUp() throws Exception {

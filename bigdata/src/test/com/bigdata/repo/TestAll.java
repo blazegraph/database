@@ -71,8 +71,11 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Bigdata Scale-Out Repository");
  
-        // test atomic append operations on the file data index.
-        suite.addTestSuite( TestAtomicAppend.class );
+        // test atomic append operations on the file and read back.
+        suite.addTestSuite( TestAtomicBlockAppend.class );
+
+        // test atomic random block read / write operations.
+        suite.addTestSuite( TestAtomicRandomBlockWrite.class );
 
         /*
          * test various operations on the file metadata index, including those

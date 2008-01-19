@@ -76,7 +76,7 @@ public interface ILinearList {
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
      * @exception IndexOutOfBoundsException
-     *                if index is greater than the #of entries.
+     *                if index is greater than or equal to the #of entries.
      * 
      * @see #indexOf(Object)
      * @see #getValue(int)
@@ -95,7 +95,7 @@ public interface ILinearList {
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
      * @exception IndexOutOfBoundsException
-     *                if index is greater than the #of entries.
+     *                if index is greater than or equal to the #of entries.
      * 
      * @see #indexOf(Object)
      * @see #keyAt(int)
