@@ -70,6 +70,7 @@ public class TestTripleStoreLoadRateLocalConcurrent extends TestLocalTripleStore
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
         
         properties.setProperty(Options.INITIAL_EXTENT, ""+Bytes.gigabyte*2);
+        properties.setProperty(Options.MAXIMUM_EXTENT, ""+Bytes.gigabyte*2);
         
         return properties;
         

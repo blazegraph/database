@@ -27,8 +27,8 @@ package com.bigdata.sparse;
 import com.bigdata.btree.KeyBuilder;
 
 /**
- * A schema for a sparse row store defines. Note that more than one schema may
- * be used with the same index. The name of the schema is always encoded as the
+ * A schema for a sparse row store. Note that more than one schema may be used
+ * with the same index. The name of the schema is always encoded as the
  * component of the key.
  * 
  * @todo support optional strong typing for column values?
@@ -45,7 +45,8 @@ public class Schema {
     
     /**
      * 
-     * @param name The schema name.
+     * @param name
+     *            The schema name.
      * @param primaryKey
      *            The name of the column whose value is the (application
      *            defined) primary key.

@@ -35,9 +35,12 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.service.Split;
 
@@ -192,7 +195,18 @@ public class ReadCommittedIndex implements IIndexWithCounter {
     }
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        return getIndex().rangeIterator(fromKey, toKey);
+
+        return getIndex().rangeIterator(fromKey, toKey, 0/* capacity */,
+                KEYS|VALS/* flags */, null/* filter */);
+        
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+        
+        return getIndex()
+                .rangeIterator(fromKey, toKey, capacity, flags, filter);
+        
     }
 
     public void contains(BatchContains op) {
@@ -218,7 +232,7 @@ public class ReadCommittedIndex implements IIndexWithCounter {
     }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(getIndex());
         

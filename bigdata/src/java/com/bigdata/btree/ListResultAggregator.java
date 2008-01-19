@@ -1,4 +1,4 @@
-/**
+/*
 
 Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
@@ -22,45 +22,46 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 27, 2006
+ * Created on Jan 16, 2008
  */
+package com.bigdata.btree;
 
-package com.bigdata.istore;
+import java.util.LinkedList;
+import java.util.List;
+
+import com.bigdata.service.Split;
 
 /**
- * A persistence store.
+ * Aggregates result into a list of results.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Reify the notion of a segment?  Provide named roots for segments?
+ * @param <R>
+ * @param <A>
  */
-public interface IStore {
+public class ListResultAggregator<R, A extends List<R>> implements
+        IResultHandler<R, A> {
 
-    /**
-     * Return an unisolated object manager.
-     * 
-     * @return
-     * 
-     * @todo Optional operation?  Drop completely?
-     */
-    public IOM getObjectManager();
-    
-    /**
-     * Return a new object manager with transactional isolation.
-     * 
-     * @return
-     */
-    public ITx startTx();
-    
-    /**
-     * Shutdown the store.
-     */
-    public void close();
+    public ListResultAggregator() {
+        
+    }
 
-    /**
-     * True iff the store is open.
-     */
-    public boolean isOpen();
-    
+    private final A results = (A) new LinkedList<R>();
+
+    public void aggregate(R result, Split split) {
+
+        synchronized(results) {
+        
+            results.add(result);
+            
+        }
+
+    }
+
+    public A getResult() {
+
+        return results;
+
+    }
+
 }

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.service.ResultSet;
 
 /**
  * Interface for range count and range query operations (non-batch api).
@@ -35,6 +36,20 @@ package com.bigdata.btree;
  * @version $Id$
  */
 public interface IRangeQuery {
+    
+    /**
+     * Flag specifies that keys in the key range will be returned. When not
+     * given, the keys will NOT be included in the {@link ResultSet} sent to the
+     * client.
+     */
+    public static final int KEYS = 1 << 0;
+
+    /**
+     * Flag specifies that values in the key range will be returned. When not
+     * given, the values will NOT be included in the {@link ResultSet} sent to
+     * the client.
+     */
+    public static final int VALS = 1 << 1;
     
     /**
      * Return an iterator that visits the entries in a half-open key range.
@@ -62,6 +77,43 @@ public interface IRangeQuery {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
 
     /**
+     * Designated variant (the one that gets overriden) for an iterator that
+     * visits the entries in a half-open key range.
+     * 
+     * @param fromKey
+     *            The first key that will be visited (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will NOT be visited (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * @param capacity
+     *            The #of entries to buffer at a time. This is a hint and MAY be
+     *            zero to use a default capacity. The capacity is intended to
+     *            limit the burden on the heap imposed by the iterator if it
+     *            needs to buffer data, e.g., before sending it across a network
+     *            interface.
+     * @param flags
+     *            A bitwise OR of {@link #KEYS} and/or {@link #VALS} determining
+     *            whether the keys or the values or both will be visited by the
+     *            iterator.
+     * @param filter
+     *            An optional filter and/or resolver.
+     * 
+     * @see #entryIterator(), which visits all entries in the btree.
+     * 
+     * @see SuccessorUtil, which may be used to compute the successor of a value
+     *      before encoding it as a component of a key.
+     * 
+     * @see BytesUtil#successor(byte[]), which may be used to compute the
+     *      successor of an encoded key.
+     * 
+     * @see EntryFilter, which may be used to filter the entries visited by the
+     *      iterator.
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter);
+
+    /**
      * Return the #of entries in a half-open key range. The fromKey and toKey
      * need not be defined in the btree. This method computes the #of entries in
      * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
@@ -78,7 +130,7 @@ public interface IRangeQuery {
      *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
      *         total ordering.
      * 
-     * @todo this could overflow an int32 for a scale out database.
+     * FIXME change the return type to [long]
      */
     public int rangeCount(byte[] fromKey, byte[] toKey);
 

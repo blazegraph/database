@@ -69,6 +69,11 @@ public class TestIterators extends AbstractBTreeTestCase {
     }
 
     /**
+     * @todo test the effect of these flags.
+     */
+    final int flags = IRangeQuery.KEYS|IRangeQuery.VALS;
+    
+    /**
      * Test ability to visit the entries on a leaf in key order.
      */
     public void test_leaf_entryIterator01() {
@@ -76,6 +81,8 @@ public class TestIterators extends AbstractBTreeTestCase {
         BTree btree = getBTree(3);
         
         final Leaf root = (Leaf) btree.root;
+        
+        final IEntryFilter filter = null;
         
         final byte[] k1 = i2k(1); // before any used key.
         final byte[] k3 = i2k(3);
@@ -99,11 +106,11 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
         assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
         // entry range iterator tests.
-        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(null,null));
-        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(k3, k8));
-        assertSameIterator(new Object[]{v3,v5},root.rangeIterator(k3, k7));
-        assertSameIterator(new Object[]{v5},root.rangeIterator(k5, k7));
-        assertSameIterator(new Object[]{v5,v7},root.rangeIterator(k5, k8));
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(null,null,flags,filter));
+        assertSameIterator(new Object[]{v3,v5,v7},root.rangeIterator(k3, k8,flags,filter));
+        assertSameIterator(new Object[]{v3,v5},root.rangeIterator(k3, k7,flags,filter));
+        assertSameIterator(new Object[]{v5},root.rangeIterator(k5, k7,flags,filter));
+        assertSameIterator(new Object[]{v5,v7},root.rangeIterator(k5, k8,flags,filter));
         
         try {
             /*
@@ -113,7 +120,7 @@ public class TestIterators extends AbstractBTreeTestCase {
              * EntryIterator that actually detects the search key ordering
              * problem.
              */
-            root.rangeIterator(k8, k3).next();
+            root.rangeIterator(k8, k3,flags,filter).next();
             fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: "+ex);
@@ -130,10 +137,10 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new Object[]{root},root.postOrderIterator(null,null));
         assertSameIterator(new Object[]{root},root.postOrderIterator(k1,k8));
         // entry range iterator tests.
-        assertSameIterator(new Object[]{},root.rangeIterator(k3, k8));
-        assertSameIterator(new Object[]{},root.rangeIterator(k3, k7));
-        assertSameIterator(new Object[]{},root.rangeIterator(k5, k7));
-        assertSameIterator(new Object[]{},root.rangeIterator(k5, k8));
+        assertSameIterator(new Object[]{},root.rangeIterator(k3, k8,flags,filter));
+        assertSameIterator(new Object[]{},root.rangeIterator(k3, k7,flags,filter));
+        assertSameIterator(new Object[]{},root.rangeIterator(k5, k7,flags,filter));
+        assertSameIterator(new Object[]{},root.rangeIterator(k5, k8,flags,filter));
 
     }
 
@@ -507,7 +514,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         }));
 
         // visit everything exception v7 using a rangeIterator.
-        assertSameIterator(new Object[]{v3,v5},a.rangeIterator(null,null,new EntryFilter() {
+        assertSameIterator(new Object[]{v3,v5},a.rangeIterator(null,null,flags,new EntryFilter() {
             private static final long serialVersionUID = 1L;
             public boolean isValid(Object value) {
                         if (value.equals(v7))

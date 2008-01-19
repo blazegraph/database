@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
@@ -41,6 +42,7 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 
 /**
  * A metadata index for the partitions of a distributed index. There is one
@@ -79,6 +81,19 @@ public class MetadataIndex extends UnisolatedBTree {
     final public String getManagedIndexName() {
         
         return managedIndexName;
+        
+    }
+    
+    private final UnisolatedBTreePartitionConstructor ctor;
+    
+    /**
+     * The object used to create mutable {@link BTree}s for to absorb writes on
+     * the index partitions of the scale-out index managed by this
+     * {@link MetadataIndex}.
+     */
+    final public UnisolatedBTreePartitionConstructor getIndexConstructor() {
+        
+        return ctor;
         
     }
     
@@ -142,16 +157,22 @@ public class MetadataIndex extends UnisolatedBTree {
      *            The unique identifier for the managed scale-out index.
      * @param managedIndexName
      *            The managedIndexName of the managed scale out index.
+     * @param ctor
+     *            The constructor used to create instances of the mutable btree
+     *            indices for the scale-out index.
      */
     public MetadataIndex(IRawStore store, UUID indexUUID,
-            UUID managedIndexUUID, String managedIndexName) {
+            UUID managedIndexUUID, String managedIndexName,
+            UnisolatedBTreePartitionConstructor ctor) {
 
         super(store, indexUUID );
         
-        this.managedIndexName = managedIndexName;
-
         //
         this.managedIndexUUID = managedIndexUUID;
+
+        this.managedIndexName = managedIndexName;
+
+        this.ctor = ctor;
         
         // The first partitionId is zero(0).
         this.nextPartitionId = 0;
@@ -162,10 +183,12 @@ public class MetadataIndex extends UnisolatedBTree {
         
         super(store, metadata);
         
-        managedIndexName = ((MetadataIndexMetadata)metadata).getName();
-
         managedIndexUUID = ((MetadataIndexMetadata)metadata).getManagedIndexUUID();
 
+        managedIndexName = ((MetadataIndexMetadata)metadata).getName();
+
+        ctor = ((MetadataIndexMetadata)metadata).getIndexConstructor();
+        
         nextPartitionId = ((MetadataIndexMetadata)metadata).getNextPartitionId();
         
     }
@@ -188,6 +211,7 @@ public class MetadataIndex extends UnisolatedBTree {
         private static final long serialVersionUID = -7309267778881420043L;
         
         private String name;
+        private UnisolatedBTreePartitionConstructor ctor;
         private UUID managedIndexUUID;
         private int nextPartitionId;
         
@@ -201,6 +225,17 @@ public class MetadataIndex extends UnisolatedBTree {
             
         }
         
+        /**
+         * The object used to create mutable {@link BTree}s for to absorb writes on
+         * the index partitions of the scale-out index managed by this
+         * {@link MetadataIndex}.
+         */
+        final public UnisolatedBTreePartitionConstructor getIndexConstructor() {
+            
+            return ctor;
+            
+        }
+
         /**
          * The unique identifier for the index whose data metadata is managed by
          * this {@link MetadataIndex}.
@@ -244,6 +279,8 @@ public class MetadataIndex extends UnisolatedBTree {
             
             this.name = mdi.getManagedIndexName();
             
+            this.ctor = mdi.getIndexConstructor();
+            
             this.managedIndexUUID = mdi.getManagedIndexUUID();
             
             this.nextPartitionId = mdi.nextPartitionId;
@@ -265,6 +302,8 @@ public class MetadataIndex extends UnisolatedBTree {
             }
             
             name = in.readUTF();
+
+            ctor = (UnisolatedBTreePartitionConstructor)in.readObject();
             
             managedIndexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
@@ -279,6 +318,8 @@ public class MetadataIndex extends UnisolatedBTree {
             LongPacker.packLong(out,VERSION0);
 
             out.writeUTF(name);
+            
+            out.writeObject(ctor);
             
             out.writeLong(managedIndexUUID.getMostSignificantBits());
             

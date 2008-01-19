@@ -222,9 +222,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         IBigdataFederation fed = client.connect();
         
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+        
         final String name = "testIndex";
         
-        UUID indexUUID = fed.registerIndex(name);
+        // @todo verify type of mutable btree registered!
+        UUID indexUUID = fed.registerIndex(name,ctor);
         
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
         
@@ -294,6 +297,8 @@ public class TestBigdataClient extends AbstractServerTestCase {
         IBigdataFederation fed = client.connect();
         
         final String name = "testIndex";
+
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
         
         final long tx = IBigdataFederation.UNISOLATED;
         
@@ -301,7 +306,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertNull(fed.getIndex(tx, name));
         
         // register.
-        UUID indexUUID = fed.registerIndex(name);
+        UUID indexUUID = fed.registerIndex(name, ctor);
         
         // obtain view.
         IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
@@ -339,8 +344,10 @@ public class TestBigdataClient extends AbstractServerTestCase {
         BigdataFederation fed = (BigdataFederation)client.connect();
         
         final String name = "testIndex";
+        
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
 
-        UUID indexUUID = fed.registerIndex(name, new byte[][]{//
+        UUID indexUUID = fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -570,10 +577,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
         /*
          * Register and statically partition an index.
          */
-        fed.registerIndex(name, new byte[][]{//
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{}, // keys less than 5...
                 new byte[]{5} // keys GTE 5....
         }, new UUID[]{//
@@ -654,7 +663,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        fed.registerIndex(name, new byte[][]{//
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -698,7 +709,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        fed.registerIndex(name, new byte[][]{//
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -749,7 +762,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        fed.registerIndex(name, new byte[][]{//
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -800,7 +815,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        fed.registerIndex(name, new byte[][]{//
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -865,7 +882,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
-        fed.registerIndex(name, new byte[][]{//
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{},
                 new byte[]{5}
         }, new UUID[]{//
@@ -895,7 +914,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             final int flags = IDataService.KEYS | IDataService.VALS;
             
             itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null,
-                    capacity, flags);
+                    capacity, flags,null/*filter*/);
 
             assertTrue("hasNext",
                     itr.hasNext()
@@ -939,10 +958,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
         /*
          * Register and statically partition an index.
          */
-        fed.registerIndex(name, new byte[][]{//
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{}, // keys less than 5...
                 new byte[]{5} // keys GTE 5....
         }, new UUID[]{//
@@ -1062,10 +1083,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
         final String name = "testIndex";
 
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
         /*
          * Register and statically partition an index.
          */
-        fed.registerIndex(name, new byte[][]{//
+        fed.registerIndex(name, ctor, new byte[][]{//
                 new byte[]{}, // keys less than 5...
                 new byte[]{5} // keys GTE 5....
         }, new UUID[]{//

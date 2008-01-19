@@ -80,12 +80,12 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.IndexProcedure;
+import com.bigdata.btree.IntegerCounterAggregator;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.IIndex.IIndexProcedureConstructor;
-import com.bigdata.btree.IIndex.IResultAggregator;
-import com.bigdata.btree.IIndex.IntegerCounterAggregator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -953,7 +953,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                     }
 
-                }, new IResultAggregator<AddTerms.Result, Void>() {
+                }, new IResultHandler<AddTerms.Result, Void>() {
 
                     /**
                      * Copy the assigned/discovered term identifiers onto the
@@ -1056,7 +1056,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 }
 
-            }, new IResultAggregator<Void, Void>() {
+            }, new IResultHandler<Void, Void>() {
 
                 /**
                  * Since the unisolated write succeeded the client knows that

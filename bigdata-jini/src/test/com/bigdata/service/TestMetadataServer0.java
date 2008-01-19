@@ -318,8 +318,10 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
          */
         final String indexName = "testIndex";
         
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
         UUID indexUUID = metadataServiceProxy.registerManagedIndex(indexName,
-                null);
+                ctor, null);
         
         log.info("Registered scale-out index: indexUUID="+indexUUID);
         

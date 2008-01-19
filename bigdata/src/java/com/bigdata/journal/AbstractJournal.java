@@ -46,7 +46,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
@@ -336,6 +338,34 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * The default branching factor for indices created using {@link #registerIndex(String)}.
      */
     private final int defaultBranchingFactor;
+    
+    /**
+     * A {@link ThreadLocal} variable providing access to thread-specific
+     * instances of a configured {@link IKeyBuilder}.
+     * <p>
+     * Note: this {@link ThreadLocal} is not static since we need configuration
+     * properties from the constructor - those properties can be different for
+     * different {@link Journal}s on the same machine.
+     */
+    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+
+        protected synchronized IKeyBuilder initialValue() {
+
+            return KeyBuilder.newUnicodeInstance(properties);
+
+        }
+
+    };
+
+    /**
+     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
+     * using the properties specified to the journal constructor.
+     */
+    public IKeyBuilder getKeyBuilder() {
+        
+        return threadLocalKeyBuilder.get();
+        
+    }
     
     /**
      * The default branching factor for indices created using

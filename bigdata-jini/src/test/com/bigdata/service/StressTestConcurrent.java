@@ -285,7 +285,10 @@ public class StressTestConcurrent extends AbstractServerTestCase implements ICom
         /*
          * Register the scale-out index.
          */
-        UUID indexUUID = federation.registerIndex(name, new byte[][] {//
+        
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+
+        UUID indexUUID = federation.registerIndex(name, ctor, new byte[][] {//
                 new byte[] {} }, //
                 new UUID[] {//
                 dataService.getServiceUUID(), });

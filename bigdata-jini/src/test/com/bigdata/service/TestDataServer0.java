@@ -192,16 +192,18 @@ public class TestDataServer0 extends AbstractServerTestCase {
                 .registerIndex(
                         DataService.getIndexPartitionName(name, partitionId),//
                         UUID.randomUUID(),
-                        new UnisolatedBTreePartition.UnisolatedBTreePartitionConstructor(
-                                new PartitionMetadataWithSeparatorKeys(
-                                        partitionId,
-                                        new UUID[] { JiniUtil
-                                                .serviceID2UUID(serviceID) },
-                                        new IResourceMetadata[] {/* @todo resource metadata */},
-                                        new byte[] {}, null/* no right sibling */)));
+                        new UnisolatedBTreePartitionConstructor(),
+                        new PartitionMetadataWithSeparatorKeys(
+                                partitionId,
+                                new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
+                                new IResourceMetadata[] {/*
+                                                             * @todo resource
+                                                             * metadata
+                                                             */},
+                                new byte[] {}, null/* no right sibling */));
         
-//        proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
-//                partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
+// proxy.mapPartition(name, new PartitionMetadataWithSeparatorKeys(
+// partitionId, new UUID[] { JiniUtil.serviceID2UUID(serviceID) },
 //                new IResourceMetadata[] {/* @todo resource metadata */},
 //                new byte[] {}, null/* no right sibling */));
         
@@ -244,7 +246,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
         final int flags = IDataService.KEYS | IDataService.VALS;
         
         ResultSet rset = proxy.rangeQuery(IDataService.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), null, null, 100, flags);
+                .getIndexPartitionName(name, partitionId), null, null, 100, flags, null/*filter*/);
         
         assertEquals("rangeCount",1,rset.getRangeCount());
         assertEquals("ntuples",1,rset.getNumTuples());

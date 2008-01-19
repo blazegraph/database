@@ -35,7 +35,6 @@ import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.util.KeyOrder;
-import com.bigdata.service.ClientIndexView;
 
 import cutthecrap.utils.striterators.Striterator;
 
@@ -112,12 +111,14 @@ public class AccessPathFusedView implements IAccessPath {
         
     }
 
-    /**
-     * @todo modify {@link FusedEntryIterator} to support
-     *       {@link ClientIndexView} for the {@link ScaleOutTripleStore}.
-     */ 
     public IEntryIterator rangeQuery() {
 
+        /*
+         * @todo The modification to drive the range iterator capacity, flags
+         * and filter through everywhere might have broken FusedEntryIterator
+         * for this call in the case where the source iterators are not
+         * requesting either the keys or the values.
+         */
         return new FusedEntryIterator( new IEntryIterator[] {
                 path1.rangeQuery(),//
                 path2.rangeQuery()//

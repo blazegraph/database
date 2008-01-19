@@ -44,6 +44,7 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IBatchOperation;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexWithCounter;
@@ -57,6 +58,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
+import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.JournalMetadata;
 import com.bigdata.scaleup.PartitionedIndexView;
 import com.bigdata.scaleup.ResourceState;
@@ -413,8 +415,8 @@ abstract public class DataService implements IDataService,
     }
 
     public void registerIndex(String name, UUID indexUUID,
-            IIndexConstructor ctor) throws IOException, InterruptedException,
-            ExecutionException {
+            IIndexConstructor ctor, IPartitionMetadata pmd) throws IOException,
+            InterruptedException, ExecutionException {
 
         setupLoggingContext();
 
@@ -426,7 +428,7 @@ abstract public class DataService implements IDataService,
             if (ctor == null)
                 throw new IllegalArgumentException();
 
-            BTree btree = ctor.newInstance(journal, indexUUID);
+            BTree btree = ctor.newInstance(journal, indexUUID, pmd);
 
             journal.submit(new RegisterIndexTask(journal, name, btree)).get();
         
@@ -719,8 +721,8 @@ abstract public class DataService implements IDataService,
      *       modifying live).
      */
     public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags) throws InterruptedException,
-            ExecutionException {
+            byte[] toKey, int capacity, int flags, IEntryFilter filter)
+            throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
         
@@ -729,7 +731,7 @@ abstract public class DataService implements IDataService,
             if( name == null ) throw new IllegalArgumentException();
             
             final RangeQueryTask task = new RangeQueryTask(journal, tx, name,
-                    fromKey, toKey, capacity, flags);
+                    fromKey, toKey, capacity, flags, filter );
     
             // submit the task and wait for it to complete.
             return (ResultSet) journal.submit(task).get();
@@ -873,10 +875,11 @@ abstract public class DataService implements IDataService,
         private final byte[] toKey;
         private final int capacity;
         private final int flags;
+        private final IEntryFilter filter;
         
         public RangeQueryTask(ConcurrentJournal journal, long startTime,
                 String name, byte[] fromKey, byte[] toKey, int capacity,
-                int flags) {
+                int flags, IEntryFilter filter) {
 
             super(journal,startTime,true/*readOnly*/,name);
             
@@ -884,17 +887,14 @@ abstract public class DataService implements IDataService,
             this.toKey = toKey;
             this.capacity = capacity;
             this.flags = flags;
+            this.filter = filter; // MAY be null.
             
         }
         
         public Object doTask() throws Exception {
             
-            final boolean sendKeys = (flags & KEYS) != 0;
-            
-            final boolean sendVals = (flags & VALS) != 0;
-            
             return new ResultSet(getIndex(getOnlyResource()), fromKey, toKey,
-                    capacity, sendKeys, sendVals);
+                    capacity, flags, filter);
             
         }
         

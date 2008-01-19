@@ -30,6 +30,7 @@ package com.bigdata.isolation;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentExtensionMetadata;
@@ -175,9 +176,17 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
     /**
      * Visits only the non-deleted entries in the key range.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
 
-        return getRoot().rangeIterator(fromKey, toKey, DeletedEntryFilter.INSTANCE);
+        final IEntryFilter f = DeletedEntryFilter.INSTANCE;
+
+        if (filter != null) {
+
+            f.add(filter);
+
+        }
+
+        return super.rangeIterator(fromKey, toKey, capacity, flags, f);
 
     }
 

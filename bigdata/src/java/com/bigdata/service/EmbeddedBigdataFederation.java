@@ -229,11 +229,17 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         final boolean isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
+        log.warn("federation is "+(isTransient?"not ":"")+"persistent");
+        
         /*
          * The directory in which the data files will reside.
          */
-        {
+        if (isTransient) {
 
+            dataDir = null;
+            
+        } else {
+            
             String val = properties.getProperty(Options.DATA_DIR,
                     Options.DEFAULT_DATA_DIR);
             
@@ -436,11 +442,11 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * 
      * @see #registerIndex(String, UUID)
      */
-    public UUID registerIndex(String name) {
+    public UUID registerIndex(String name,UnisolatedBTreePartitionConstructor ctor) {
 
         assertOpen();
 
-        return registerIndex(name, null);
+        return registerIndex(name, ctor, null);
 
     }
 
@@ -484,14 +490,14 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      *             replaced by
      *             {@link #registerIndex(String, byte[][], UUID[])}
      */
-    public UUID registerIndex(String name, UUID dataServiceUUID) {
+    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor, UUID dataServiceUUID) {
 
         assertOpen();
 
         try {
 
             UUID indexUUID = getMetadataService().registerManagedIndex(name,
-                    dataServiceUUID);
+                    ctor, dataServiceUUID);
 
             return indexUUID;
 
@@ -505,15 +511,15 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
 
-    public UUID registerIndex(String name, byte[][] separatorKeys,
-            UUID[] dataServiceUUIDs) {
+    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor,
+            byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
 
         assertOpen();
 
         try {
 
             UUID indexUUID = getMetadataService().registerManagedIndex(name,
-                    separatorKeys, dataServiceUUIDs);
+                    ctor, separatorKeys, dataServiceUUIDs);
 
             return indexUUID;
 

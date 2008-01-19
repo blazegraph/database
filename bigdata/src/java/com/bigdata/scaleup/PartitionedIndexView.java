@@ -40,9 +40,12 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.EmptyEntryIterator;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IFusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedureConstructor;
+import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyFusedView;
@@ -454,6 +457,18 @@ public class PartitionedIndexView implements IIndex, ICommitter {
      */
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
+        return rangeIterator(fromKey, toKey, 0/* capacity */,
+                KEYS | VALS/* flags */, null/* filter */);
+
+    }
+    
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        // FIXME capacity and flags are ignored.
+        
+        if(filter!=null) throw new UnsupportedOperationException();
+        
         // index of the first partition to check.
         final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
 
@@ -509,7 +524,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
     // FIXME submit(proc)
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         throw new UnsupportedOperationException();
 

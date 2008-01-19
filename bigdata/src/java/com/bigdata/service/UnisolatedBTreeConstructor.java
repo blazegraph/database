@@ -34,6 +34,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Creates an {@link UnisolatedBTree} instance.
@@ -87,7 +88,7 @@ public class UnisolatedBTreeConstructor implements IIndexConstructor {
         
     }
     
-    public BTree newInstance(IRawStore store, UUID indexUUID) {
+    public BTree newInstance(IRawStore store, UUID indexUUID, IPartitionMetadata ignored) {
 
         return new UnisolatedBTree(store, branchingFactor, indexUUID,
                 conflictResolver);

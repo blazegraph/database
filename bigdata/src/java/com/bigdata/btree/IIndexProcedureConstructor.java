@@ -1,4 +1,4 @@
-/**
+/*
 
 Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
@@ -22,41 +22,35 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 26, 2006
+ * Created on Jan 16, 2008
  */
-
-package com.bigdata.istore;
+package com.bigdata.btree;
 
 /**
- * A transactional object manager.
+ * A factory for {@link IIndexProcedure}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo The reason to expose prepare separately at the application level is so
- *       that distributed hybrid transactions may be implementation.  However, 
- *       that is a sticky wicket and we are better off with commit implictly
- *       preparing the transaction for now.
  */
-public interface ITx extends IOM {
-    
-//    public void prepare();
-  
-    /**
-     * Commit the transaction.
-     */
-    public void commit();
-    
-    /**
-     * Abort the transaction.
-     */
-    public void abort();
+public interface IIndexProcedureConstructor {
 
     /**
-     * The object manager from which the transaction was started.
      * 
-     * @return
+     * @param n
+     *            The #of tuples on which the procedure will operate.
+     * @param offset
+     *            The offset of the 1st tuple into <i>keys[]</i> and
+     *            <i>vals[]</i>.
+     * @param keys
+     *            The keys.
+     * @param vals
+     *            The values.
+     * 
+     * @return An instance of the procedure.
+     * 
+     * @todo we will need a different method signature to support
+     *       hash-partitioned (vs range partitioned) indices.
      */
-    public IOM getRootObjectManager();
+    public IIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals);
     
 }

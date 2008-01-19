@@ -188,11 +188,11 @@ public class BigdataFederation implements IBigdataFederation {
      * 
      * @see #registerIndex(String, UUID)
      */
-    public UUID registerIndex(String name) {
+    public UUID registerIndex(String name,UnisolatedBTreePartitionConstructor ctor) {
 
         assertOpen();
 
-        return registerIndex(name, null);
+        return registerIndex(name, ctor, null);
 
     }
 
@@ -214,14 +214,15 @@ public class BigdataFederation implements IBigdataFederation {
      *             replaced by
      *             {@link #registerIndex(String, byte[][], UUID[])}
      */
-    public UUID registerIndex(String name, UUID dataServiceUUID) {
+    public UUID registerIndex(String name,
+            UnisolatedBTreePartitionConstructor ctor, UUID dataServiceUUID) {
 
         assertOpen();
 
         try {
 
             UUID indexUUID = getMetadataService().registerManagedIndex(name,
-                    dataServiceUUID);
+                    ctor, dataServiceUUID);
 
             return indexUUID;
 
@@ -235,14 +236,14 @@ public class BigdataFederation implements IBigdataFederation {
 
     }
 
-    public UUID registerIndex(String name, byte[][] separatorKeys,
-            UUID[] dataServiceUUIDs) {
+    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor,
+            byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
 
         assertOpen();
 
         try {
 
-            UUID indexUUID = getMetadataService().registerManagedIndex(name,
+            UUID indexUUID = getMetadataService().registerManagedIndex(name, ctor,
                     separatorKeys, dataServiceUUIDs);
 
             return indexUUID;
@@ -352,7 +353,15 @@ public class BigdataFederation implements IBigdataFederation {
          * Allocate a cache for the defined index partitions.
          */
         MetadataIndex mdi = new MetadataIndex(clientTempStore,
-                metadataIndexUUID, managedIndexUUID, name);
+                metadataIndexUUID, managedIndexUUID, name,
+                /*
+                 * Note: We do not need to use the same ctor here that was
+                 * declared to the real metadata index since we are not going to
+                 * be creating data indices using the clients view of the
+                 * metadata index.
+                 */
+                new UnisolatedBTreePartitionConstructor()
+        );
 
         /*
          * Bulk copy the partition definitions for the scale-out index into the
@@ -374,8 +383,8 @@ public class BigdataFederation implements IBigdataFederation {
             try {
 
                 rset = metadataService.rangeQuery(IDataService.UNISOLATED,
-                        metadataName, nextKey, null, 1000,
-                        IDataService.KEYS | IDataService.VALS);
+                        metadataName, nextKey, null, 1000, IDataService.KEYS
+                                | IDataService.VALS, null/* filter */);
 
                 BigdataClient.log.info("Fetched " + rset.getNumTuples()
                         + " partition records for " + name);

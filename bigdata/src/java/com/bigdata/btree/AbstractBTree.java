@@ -657,7 +657,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     public void insert(BatchInsert op) {
 
-        final int ntuples = op.ntuples;
+        final int ntuples = op.n;
 
         while (op.tupleIndex < ntuples) {
 
@@ -705,7 +705,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     public void lookup(BatchLookup op) {
 
-        final int ntuples = op.ntuples;
+        final int ntuples = op.n;
 
         while (op.tupleIndex < ntuples) {
 
@@ -726,7 +726,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     public void contains(BatchContains op) {
 
-        final int ntuples = op.ntuples;
+        final int ntuples = op.n;
 
         while (op.tupleIndex < ntuples) {
 
@@ -756,7 +756,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     public void remove(BatchRemove op) {
 
-        final int ntuples = op.ntuples;
+        final int ntuples = op.n;
 
         while (op.tupleIndex < ntuples) {
 
@@ -952,18 +952,20 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-
-        /*
-         * Note: the code will check for fromKey > toKey no later than when
-         * next() is called for the first time. If eager rejection of bad
-         * parameters is desired then invoke compareBytes on the keys (if both
-         * are non-null) before calling rangeIterator on the root node.
-         */
-        return getRoot().rangeIterator(fromKey, toKey);
-
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        
+        return rangeIterator(fromKey, toKey, 0/* capacity */, IRangeQuery.KEYS
+                | IRangeQuery.VALS/* flags */, null/* filter */);
+        
     }
 
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        return getRoot().rangeIterator(fromKey, toKey, flags, filter);
+        
+    }
+    
     public int rangeCount(byte[] fromKey, byte[] toKey) {
 
         AbstractNode root = getRoot();
@@ -993,7 +995,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultAggregator aggregator) {
+            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
         

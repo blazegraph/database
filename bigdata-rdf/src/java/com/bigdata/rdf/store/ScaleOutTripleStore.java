@@ -37,6 +37,7 @@ import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of a
@@ -183,6 +184,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         final IBigdataClient client = fed.getClient();
         
+        /*
+         * @todo consider if any of the indices could do without isolation
+         * (probably not since we need it for compacting merges).
+         */
+        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+        
         // all known data service UUIDs.
         final UUID[] uuids = client.getDataServiceUUIDs(0);
     
@@ -212,10 +219,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
             log.warn("Special case allocation for two data services");
             
-            fed.registerIndex(name_termId, new byte[][] { new byte[] {} },
+            fed.registerIndex(name_termId, ctor, new byte[][] { new byte[] {} },
                     new UUID[] { uuids[0] });
             
-            fed.registerIndex(name_idTerm, new byte[][] { new byte[] {} },
+            fed.registerIndex(name_idTerm, ctor, new byte[][] { new byte[] {} },
                     new UUID[] { uuids[1] });
             
             if(justify) {
@@ -225,7 +232,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                  * inference since there appears to be a large number of queries
                  * resulting in small result sets (0 to 5 statements).
                  */
-                fed.registerIndex(name_just, new byte[][] { new byte[] {} },
+                fed.registerIndex(name_just, ctor, new byte[][] { new byte[] {} },
                         new UUID[] { uuids[1] });
             }
             
@@ -253,13 +260,13 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * separator keys would have to be changed.
              */
             
-            fed.registerIndex(name_spo,new byte[][] { new byte[] {} },
+            fed.registerIndex(name_spo, ctor, new byte[][] { new byte[] {} },
                     new UUID[] { uuids[0] });
             
-            fed.registerIndex(name_pos, new byte[][] { new byte[] {} },
+            fed.registerIndex(name_pos, ctor, new byte[][] { new byte[] {} },
                     new UUID[] { uuids[1] });
             
-            fed.registerIndex(name_osp, new byte[][] { new byte[] {} },
+            fed.registerIndex(name_osp, ctor, new byte[][] { new byte[] {} },
                     new UUID[] { uuids[1] });
             
             return;
@@ -273,29 +280,29 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         if(lexicon) {
 
-            fed.registerIndex(name_termId);
+            fed.registerIndex(name_termId, ctor);
         
-            fed.registerIndex(name_idTerm);
+            fed.registerIndex(name_idTerm, ctor);
 
         }
 
         if (oneAccessPath) {
 
-            fed.registerIndex(name_spo);
+            fed.registerIndex(name_spo, ctor);
             
         } else {
             
-            fed.registerIndex(name_spo);
+            fed.registerIndex(name_spo, ctor);
             
-            fed.registerIndex(name_pos);
+            fed.registerIndex(name_pos, ctor);
             
-            fed.registerIndex(name_osp);
+            fed.registerIndex(name_osp, ctor);
             
         }
 
         if(justify) {
 
-            fed.registerIndex(name_just);
+            fed.registerIndex(name_just, ctor);
             
         }
 

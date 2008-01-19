@@ -592,23 +592,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
     }
 
     /**
-     * Return an iterator that visits the entries in a half-open key range.
-     * 
-     * @param fromKey
-     *            The first key that will be visited (inclusive). When
-     *            <code>null</code> there is no lower bound.
-     * @param toKey
-     *            The first key that will NOT be visited (exclusive). When
-     *            <code>null</code> there is no upper bound.
-     */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-
-        return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
-                fromKey, toKey, null);
-
-    }
-
-    /**
      * Return an iterator that visits the entries in a half-open key range but
      * filters the values.
      * 
@@ -618,14 +601,18 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param toKey
      *            The first key that will NOT be visited (exclusive). When
      *            <code>null</code> there is no upper bound.
+     * @param flags
+     *            indicating whether the keys and/or values will be
+     *            materialized.
      * @param filter
      *            An optional filter that will be applied to the values before
      *            they are visited by the returned iterator.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, EntryFilter filter) {
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int flags, IEntryFilter filter) {
 
         return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
-                fromKey, toKey, filter);
+                fromKey, toKey, flags, filter);
 
     }
 
@@ -676,11 +663,13 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
          * 
          * @see EntryIterator#EntryIterator(Leaf, Tuple)
          */
-        final Tuple tuple = new Tuple();
+        final Tuple tuple;
         
         public PostOrderEntryIterator(Iterator postOrderIterator) {
             
             super(postOrderIterator);
+            
+            this.tuple = new Tuple();
             
             addFilter(new Expander() {
 
@@ -722,10 +711,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         }
 
         public PostOrderEntryIterator(Iterator postOrderIterator,
-                final byte[] fromKey, final byte[] toKey,
-                final EntryFilter filter) {
+                final byte[] fromKey, final byte[] toKey, int flags,
+                final IEntryFilter filter) {
             
             super(postOrderIterator);
+            
+            this.tuple = new Tuple(flags);
             
             addFilter(new Expander() {
 

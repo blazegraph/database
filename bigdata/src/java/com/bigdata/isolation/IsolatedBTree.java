@@ -31,6 +31,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IBatchBTree;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.ISimpleBTree;
@@ -334,7 +335,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * Returns an ordered fused view of the entries in the key range in this
      * write set merged with those in the key range in the isolated index.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,int capacity, int flags, IEntryFilter filter) {
 
         /*
          * This uses a version of ReadOnlyFusedView that is aware of delete markers and
@@ -342,7 +343,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
          * have a value reported from the isolated index.
          */
         
-        return new IsolatableFusedView(this,src).rangeIterator(fromKey, toKey);
+        return new IsolatableFusedView(this,src).rangeIterator(fromKey, toKey, capacity, flags, filter );
         
     }
 
@@ -470,7 +471,8 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = getRoot().rangeIterator(null, null, null);
+        final IEntryIterator itr = getRoot().rangeIterator(null, null,
+                KEYS | VALS/*flags*/, null);
 
         while (itr.hasNext()) {
 
@@ -591,7 +593,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = getRoot().rangeIterator(null, null, null);
+        final IEntryIterator itr = getRoot().rangeIterator(null, null, KEYS|VALS/*flags*/, null);
 
         while (itr.hasNext()) {
 

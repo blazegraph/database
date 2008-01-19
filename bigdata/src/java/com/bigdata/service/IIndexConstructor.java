@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * An interface that knows how to create an instance of an index when it
@@ -19,7 +20,15 @@ public interface IIndexConstructor extends Serializable {
     
     /**
      * Create an instance of a class that extends {@link BTree}.
+     * 
+     * @param store
+     *            The backing store on which the index will be created.
+     * @param indexUUID
+     *            The UUID to be assigned to the index.
+     * @param pmd
+     *            The partition metadata (optional, required only for
+     *            partitioned indices).
      */
-    public BTree newInstance(IRawStore store, UUID indexUUID);
+    public BTree newInstance(IRawStore store, UUID indexUUID, IPartitionMetadata pmd);
     
 }

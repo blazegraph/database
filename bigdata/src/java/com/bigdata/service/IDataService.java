@@ -29,10 +29,14 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.JournalMetadata;
 
 /**
@@ -92,14 +96,14 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * given, the keys will NOT be included in the {@link ResultSet} sent to the
      * client.
      */
-    public static final int KEYS = 1 << 0;
+    public static final int KEYS = IRangeQuery.KEYS;
 
     /**
      * Flag specifies that values in the key range will be returned. When not
      * given, the values will NOT be included in the {@link ResultSet} sent to
      * the client.
      */
-    public static final int VALS = 1 << 1;
+    public static final int VALS = IRangeQuery.VALS;
     
     /**
      * A description of the journal currently backing the data service.
@@ -140,6 +144,10 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *            An object that will be sent to the data service and used to
      *            create the index to be registered on that data service.
      * 
+     * @param pmd
+     *            The partition metadata for the index (optional, required only
+     *            when creating an instance of a partitioned index).
+     * 
      * @return <code>true</code> iff the index was created. <code>false</code>
      *         means that the index was pre-existing, but the metadata specifics
      *         for the index MAY differ from those specified.
@@ -147,7 +155,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @todo exception if index exists? or modify to validate consistent decl
      *       and exception iff not consistent.
      */
-    public void registerIndex(String name, UUID uuid, IIndexConstructor ctor)
+    public void registerIndex(String name, UUID uuid, IIndexConstructor ctor, IPartitionMetadata pmd)
             throws IOException, InterruptedException, ExecutionException;
 
     /**
@@ -327,8 +335,8 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @todo provide for optional filter.
      */
     public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags) throws InterruptedException,
-            ExecutionException, IOException;
+            byte[] toKey, int capacity, int flags, IEntryFilter filter)
+            throws InterruptedException, ExecutionException, IOException;
     
     /**
      * <p>

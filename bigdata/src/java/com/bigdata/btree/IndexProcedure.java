@@ -1,27 +1,27 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-*/
+ */
 /*
  * Created on Jan 7, 2008
  */
@@ -54,8 +54,8 @@ import com.bigdata.service.Split;
 
 /**
  * Abstract base class supports compact serialization and compression for remote
- * {@link IIndexProcedure} execution (procedures may be executed on a local index,
- * but they are only (de-)serialized when executed on a remote index).
+ * {@link IIndexProcedure} execution (procedures may be executed on a local
+ * index, but they are only (de-)serialized when executed on a remote index).
  * 
  * FIXME efficient (de-)serialization. There is a high impedence right now in
  * serialization and de-serialization since the procedure state is in terms of
@@ -92,14 +92,18 @@ import com.bigdata.service.Split;
  *       is not used by the {@link BTree} internally and has barely been
  *       developed).
  * 
- * @todo reconcile with {@link ResultSet}.
+ * @todo reconcile with {@link ResultSet} (sends keys and/or values with some
+ *       additional metadata).
  * 
  * @todo support prefix scan (distinct term scan).
  * 
  * @todo reconcile with the batch operations - {@link BatchInsert},
  *       {@link BatchRemove}, {@link BatchContains}, and {@link BatchLookup}.
  *       Those operations should all accept an [offset] so that they can be used
- *       with auto-split more efficiently on a partitioned index.
+ *       with auto-split more efficiently on a partitioned index. (Note that
+ *       these operations are not being used anywhere - in practice index
+ *       procedures are far more flexible, even though a {@link BatchInsert} can
+ *       be more optimized.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -117,12 +121,12 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * vals[] by specifying the offset identified for a {@link Split}.
      */
     private int offset;
-    
+
     /**
      * The keys.
      */
     private byte[][] keys;
-    
+
     /**
      * The values.
      */
@@ -134,20 +138,20 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * vals[] by specifying the offset identified for a {@link Split}.
      */
     public int offset() {
-        
+
         return offset;
-        
+
     }
-    
+
     /**
      * The #of keys/tuples
      */
     public int getKeyCount() {
-        
+
         return n;
-        
+
     }
-    
+
     /**
      * Return the key at the given index (after adjusting for the
      * {@link #offset}).
@@ -158,11 +162,11 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * @return The key at that index.
      */
     protected byte[] getKey(int i) {
-        
+
         return keys[offset + i];
-        
+
     }
-    
+
     /**
      * Return the value at the given index (after adjusting for the
      * {@link #offset}).
@@ -173,9 +177,9 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * @return The value at that index.
      */
     protected byte[] getValue(int i) {
-        
+
         return vals[offset + i];
-        
+
     }
 
     /**
@@ -184,54 +188,57 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * techniques.
      * 
      * @todo this is not a very nice way to handle extensibility - it is here
-     *       really as a placeholder while I experiment with {@link IndexProcedure}
-     *       specific compression techniques.  the choice of the compression
-     *       technique is static (per procedure implementation) but it really
-     *       needs to be (a) broken down into key vs value compression methods;
-     *       and (b) needs to allow extensible data to be sent along with the
-     *       procedure.
+     *       really as a placeholder while I experiment with
+     *       {@link IndexProcedure} specific compression techniques. the choice
+     *       of the compression technique is static (per procedure
+     *       implementation) but it really needs to be (a) broken down into key
+     *       vs value compression methods; and (b) needs to allow extensible
+     *       data to be sent along with the procedure.
      */
     protected AbstractCompression getCompression() {
 
         return NoCompression.INSTANCE;
-        
+
     }
-    
-//    /**
-//     * Counters for procedure (de-)serialization costs.
-//     * 
-//     * @todo in order to instrument we need something that corresponds to the
-//     *       RPC connection. Perhaps make it thread-local or even just static.
-//     *
-//     * @todo #keys, #vals, #keyBytes, #valBytes?
-//     *
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class Counters {
-//        
-//        long nread, nwritten;
-//        long nbytesRead, nbytesWritten;
-//        long readNanos, writeNanos;
-//        
-//        public String toString() {
-//            
-//            StringBuilder sb = new StringBuilder();
-//            
-//            sb.append("#read="+nread+", #bytesRead="+nbytesRead+", elapsed="+readNanos+"(nanos)\n");
-//            sb.append("#written="+nwritten+", #bytesWritten="+nbytesWritten+", elapsed="+writeNanos+"(nanos)\n");
-//
-//            return sb.toString();
-//            
-//        }
-//        
-//    };
-    
+
+    // /**
+    // * Counters for procedure (de-)serialization costs.
+    // *
+    // * @todo in order to instrument we need something that corresponds to the
+    // * RPC connection. Perhaps make it thread-local or even just static.
+    // *
+    // * @todo #keys, #vals, #keyBytes, #valBytes?
+    // *
+    // * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+    // Thompson</a>
+    // * @version $Id$
+    // */
+    // public static class Counters {
+    //        
+    // long nread, nwritten;
+    // long nbytesRead, nbytesWritten;
+    // long readNanos, writeNanos;
+    //        
+    // public String toString() {
+    //            
+    // StringBuilder sb = new StringBuilder();
+    //            
+    // sb.append("#read="+nread+", #bytesRead="+nbytesRead+",
+    // elapsed="+readNanos+"(nanos)\n");
+    // sb.append("#written="+nwritten+", #bytesWritten="+nbytesWritten+",
+    // elapsed="+writeNanos+"(nanos)\n");
+    //
+    // return sb.toString();
+    //            
+    // }
+    //        
+    // };
+
     /**
      * De-serialization constructor.
      */
     protected IndexProcedure() {
-        
+
     }
 
     /**
@@ -245,7 +252,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      * @version $Id$
      */
     private static enum CompressionEnum {
-        
+
         /**
          * Each key / value is serialized as a full length byte[]s.
          */
@@ -281,9 +288,9 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
          * indices). The data must be an even multiple of 64-bit integers.
          */
         HuTucker64
-        
+
     };
-    
+
     /**
      * 
      * @param n
@@ -326,88 +333,90 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
     /**
      * Interface for alternative serialization and compression schemes.
      * 
-     * @todo subclasses will need to be able to access {@link IndexProcedure#keys}.
-     *       The only way to really do this is to have the serialization classes
-     *       be inner classes on the Procedure implementation classes - just
-     *       like extSer.
+     * @todo subclasses will need to be able to access
+     *       {@link IndexProcedure#keys}. The only way to really do this is to
+     *       have the serialization classes be inner classes on the Procedure
+     *       implementation classes - just like extSer.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     static public abstract class AbstractCompression {
-        
+
         protected static final Logger log = Logger
                 .getLogger(AbstractCompression.class);
-        
-        abstract public void write(DataOutput out, IndexProcedure proc) throws IOException;
 
-        abstract public void read(DataInput in, IndexProcedure proc) throws IOException;
-        
+        abstract public void write(DataOutput out, IndexProcedure proc)
+                throws IOException;
+
+        abstract public void read(DataInput in, IndexProcedure proc)
+                throws IOException;
+
     }
-    
-//    /**
-//     * @todo different compression models for the keys and the values (when
-//     *       present).
-//     */
-////    private final CompressionEnum compression = CompressionEnum.None;
-//    private final CompressionEnum compression = CompressionEnum.BTree;
-    
+
+    // /**
+    // * @todo different compression models for the keys and the values (when
+    // * present).
+    // */
+    // // private final CompressionEnum compression = CompressionEnum.None;
+    // private final CompressionEnum compression = CompressionEnum.BTree;
+
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         getCompression().read(in, this);
-        
-//        switch(compression) {
-//            
-//        case None:
-//            NoCompression.INSTANCE.read(in, this);
-//            break;
-//            
-//        case BTree:
-//            BTreeCompression.INSTANCE.read(in, this);
-//            break;
-//            
-//        default:
-//
-//            throw new UnsupportedOperationException(compression.toString());
-//        
-//        }
-        
+
+        // switch(compression) {
+        //            
+        // case None:
+        // NoCompression.INSTANCE.read(in, this);
+        // break;
+        //            
+        // case BTree:
+        // BTreeCompression.INSTANCE.read(in, this);
+        // break;
+        //            
+        // default:
+        //
+        // throw new UnsupportedOperationException(compression.toString());
+        //        
+        // }
+
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
         getCompression().write(out, this);
-        
-//        /*
-//         * Setup a buffer for serialization.
-//         * 
-//         * @todo reuse this buffer for each request? make it a thread-local
-//         * variable?
-//         */
-////        DataOutputBuffer buf = new DataOutputBuffer();
-//        
-//        switch(compression) {
-//        
-//        case None:
-//            NoCompression.INSTANCE.write(out, this);
-//            break;
-//            
-//        case BTree:
-//            BTreeCompression.INSTANCE.write(out, this);
-//            break;
-//            
-//        default:
-//
-//            throw new UnsupportedOperationException(compression.toString());
-//        
-//        }
 
-//        /*
-//         * Copy the serialized form onto the caller's output stream.
-//         */
-//        out.write(buf.array(),0,buf.position());
-        
+        // /*
+        // * Setup a buffer for serialization.
+        // *
+        // * @todo reuse this buffer for each request? make it a thread-local
+        // * variable?
+        // */
+        // // DataOutputBuffer buf = new DataOutputBuffer();
+        //        
+        // switch(compression) {
+        //        
+        // case None:
+        // NoCompression.INSTANCE.write(out, this);
+        // break;
+        //            
+        // case BTree:
+        // BTreeCompression.INSTANCE.write(out, this);
+        // break;
+        //            
+        // default:
+        //
+        // throw new UnsupportedOperationException(compression.toString());
+        //        
+        // }
+
+        // /*
+        // * Copy the serialized form onto the caller's output stream.
+        // */
+        // out.write(buf.array(),0,buf.position());
+
     }
 
     /**
@@ -419,9 +428,9 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
     static class NoCompression extends AbstractCompression {
 
         public final static AbstractCompression INSTANCE = new NoCompression();
-        
+
         public void read(DataInput in, IndexProcedure proc) throws IOException {
-            
+
             final int n = (int) LongPacker.unpackLong(in);
             proc.n = n;
             final boolean haveKeys = in.readBoolean();
@@ -457,7 +466,8 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
         }
 
-        public void write(DataOutput out, IndexProcedure proc) throws IOException {
+        public void write(DataOutput out, IndexProcedure proc)
+                throws IOException {
 
             final int n = proc.n;
             final int offset = proc.offset;
@@ -469,7 +479,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
             if (keys != null) {
                 for (int i = 0; i < n; i++) {
                     // keys are never null.
-                    final byte[] key = keys[offset+i];
+                    final byte[] key = keys[offset + i];
                     LongPacker.packLong(out, key.length);
                     out.write(key);
                 }
@@ -487,7 +497,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
             }
 
         }
-        
+
     }
 
     /**
@@ -502,49 +512,53 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
         public final static AbstractCompression INSTANCE = new BTreeCompression();
 
         public void read(DataInput in, IndexProcedure proc) throws IOException {
-            
+
             /*
              * Read the entire input stream into a buffer.
              */
-            DataOutputBuffer buf = new DataOutputBuffer((InputStream)in);
-            
+            DataOutputBuffer buf = new DataOutputBuffer((InputStream) in);
+
             /*
              * Unpack the buffer.
              */
-            DataInputBuffer is = new DataInputBuffer(buf.array(),0,buf.position());
-            
+            DataInputBuffer is = new DataInputBuffer(buf.array(), 0, buf
+                    .position());
+
             /*
-             * The offset is always zero when the de-serialized since we only send
-             * along the relevant data for the split.
+             * The offset is always zero when the de-serialized since we only
+             * send along the relevant data for the split.
              */
 
             proc.offset = 0;
-            
-            final boolean hasValues = is.readBoolean();
-            
-            proc.keys = ((ImmutableKeyBuffer)KeyBufferSerializer.INSTANCE.getKeys(is)).toKeyArray();
-            
-            proc.n = proc.keys.length;
-            
-            if(hasValues) {
 
-                proc.vals = ((MutableValueBuffer)ValueBufferSerializer.INSTANCE.deserialize(is)).vals;
-                
+            final boolean hasValues = is.readBoolean();
+
+            proc.keys = ((ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
+                    .getKeys(is)).toKeyArray();
+
+            proc.n = proc.keys.length;
+
+            if (hasValues) {
+
+                proc.vals = ((MutableValueBuffer) ValueBufferSerializer.INSTANCE
+                        .deserialize(is)).vals;
+
             }
-            
-//            assert keys.getKeyCount() == vals.getValueCount();
-           
+
+            // assert keys.getKeyCount() == vals.getValueCount();
+
         }
 
-        public void write(DataOutput out, IndexProcedure proc) throws IOException {
-            
+        public void write(DataOutput out, IndexProcedure proc)
+                throws IOException {
+
             DataOutputBuffer buf = new DataOutputBuffer();
-            
+
             final int n = proc.n;
             final int offset = proc.offset;
             final byte[][] vals = proc.vals;
             final byte[][] keys = proc.keys;
-            
+
             /*
              * Write boolean flag - true iff values are also serialized.
              */
@@ -554,28 +568,29 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
              * Serialize the keys onto the buffer.
              */
             {
-                
-                IKeyBuffer tmp = new ImmutableKeyBuffer(offset,n,n/*maxKeys*/,keys);
-                
+
+                IKeyBuffer tmp = new ImmutableKeyBuffer(offset, n,
+                        n/* maxKeys */, keys);
+
                 KeyBufferSerializer.INSTANCE.putKeys(buf, tmp);
-                
+
             }
-            
+
             /*
              * Serialize the values onto the buffer.
              */
             if (vals != null) {
-            
-                IValueBuffer tmp = new MutableValueBuffer(n,offset,vals);
-                
+
+                IValueBuffer tmp = new MutableValueBuffer(n, offset, vals);
+
                 ValueBufferSerializer.INSTANCE.serialize(buf, tmp);
-                
+
             }
-            
-          out.write(buf.array(),0,buf.position());
-            
+
+            out.write(buf.array(), 0, buf.position());
+
         }
-        
+
     }
 
     /**
@@ -617,26 +632,27 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
         // @todo private ctors for the compression impls.
         public static final AbstractCompression INSTANCE = new FastRDFCompression();
-        
+
         /**
          * Either 3 or 4 depending on whether it is a triple or a quad store
          * index.
          */
         final static private int N = 3;
-        
+
         /**
          * The natural log of 2.
          */
         static final double LOG2 = Math.log(2);
-        
-        static void add(HashMap<Long,Integer> symbols, Long v) {
-            
-            if( symbols.containsKey(v)) return;
-            
+
+        static void add(HashMap<Long, Integer> symbols, Long v) {
+
+            if (symbols.containsKey(v))
+                return;
+
             symbols.put(v, symbols.size());
-            
+
         }
-        
+
         /**
          * Identifies the distinct symbols (64-bit long integers) in the keys
          * and assigns each symbol a unique integer code.
@@ -647,75 +663,85 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
          * @return A map from the long value to the size of the map at the time
          *         that the value was encountered (a one up integer in [0:n-1]).
          */
-        static HashMap<Long,Integer> getSymbols(int nkeys, int offset, byte[][] keys) {
-            
-            final HashMap<Long,Integer> symbols = new HashMap<Long,Integer>(nkeys*N);
-            
-            for(int i=0; i<nkeys; i++) {
-                
+        static HashMap<Long, Integer> getSymbols(int nkeys, int offset,
+                byte[][] keys) {
+
+            final HashMap<Long, Integer> symbols = new HashMap<Long, Integer>(
+                    nkeys * N);
+
+            for (int i = 0; i < nkeys; i++) {
+
                 final byte[] key = keys[offset + i];
-                
+
                 assert key.length == N * Bytes.SIZEOF_LONG : "Expecting key with "
                         + N * Bytes.SIZEOF_LONG + " bytes, not " + key.length;
-                
+
                 for (int j = 0, off = 0; j < N; j++, off += 8) {
 
                     add(symbols, KeyBuilder.decodeLong(key, off));
-                 
+
                 }
 
             }
-            
+
             return symbols;
-            
+
         }
-        
-        public void write(DataOutput out, IndexProcedure proc) throws IOException {
+
+        public void write(DataOutput out, IndexProcedure proc)
+                throws IOException {
 
             final int nkeys = proc.n;
             final int offset = proc.offset;
             final byte[][] keys = proc.keys;
             final byte[][] vals = proc.vals;
-            
-            final HashMap<Long,Integer> symbols = getSymbols(nkeys, offset, keys);
-            
+
+            final HashMap<Long, Integer> symbols = getSymbols(nkeys, offset,
+                    keys);
+
             final int nsymbols = symbols.size();
-            
+
             /*
              * The bit length of the code.
              * 
              * Note: The code for a long value is simply its index in the
              * symbols[].
              */
-            final int codeBitLength = (int) Math.ceil(Math.log(nsymbols) / LOG2); 
-            
+            final int codeBitLength = (int) Math
+                    .ceil(Math.log(nsymbols) / LOG2);
+
             {
-//                /*
-//                 * @todo conpute the byte length for the serialized dictionary, the
-//                 * bit length of the encoded keys (ceiling of that to the next
-//                 * higher byte length), and the byte length of the values (2 per
-//                 * byte) and then pre-size the output buffer (an output bit stream).
-//                 * 
-//                 * @todo write the dictionary
-//                 * 
-//                 * @todo this requires a second pass converting bytes to longs, so
-//                 * maybe allocate and store the long[]?
-//                 */
-//                final int recordByteLength;
-//                {
-//                    
-//                    final int dictBitLen = 0; 
-//
-//                    final int codesBitLength = nkeys * N * codeBitLength;
-//                    
-//                    final int valsBitLen = nkeys / 2; // one nibble per value.
-//                    
-//                    final int recordBitLength = dictBitLen+ codesBitLength + valsBitLen;
-//                    
-//                    recordByteLength = recordBitLength / 8 + recordBitLength % 8;
-//                    
-//                }
-//                final byte[] buf = new byte[recordByteLength];
+                // /*
+                // * @todo conpute the byte length for the serialized
+                // dictionary, the
+                // * bit length of the encoded keys (ceiling of that to the next
+                // * higher byte length), and the byte length of the values (2
+                // per
+                // * byte) and then pre-size the output buffer (an output bit
+                // stream).
+                // *
+                // * @todo write the dictionary
+                // *
+                // * @todo this requires a second pass converting bytes to
+                // longs, so
+                // * maybe allocate and store the long[]?
+                // */
+                // final int recordByteLength;
+                // {
+                //                    
+                // final int dictBitLen = 0;
+                //
+                // final int codesBitLength = nkeys * N * codeBitLength;
+                //                    
+                // final int valsBitLen = nkeys / 2; // one nibble per value.
+                //                    
+                // final int recordBitLength = dictBitLen+ codesBitLength +
+                // valsBitLen;
+                //                    
+                // recordByteLength = recordBitLength / 8 + recordBitLength % 8;
+                //                    
+                // }
+                // final byte[] buf = new byte[recordByteLength];
 
                 /*
                  * @todo The success of this relies on being able to cast to an
@@ -725,7 +751,8 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                  * backing byte[] but it currently lacks an auto-extend
                  * capability.
                  */
-                final OutputBitStream obs = new OutputBitStream((OutputStream)out);
+                final OutputBitStream obs = new OutputBitStream(
+                        (OutputStream) out);
 
                 /*
                  * write the header {#keys}.
@@ -745,19 +772,20 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                  * buffer size for the dictionary.
                  */
                 {
-                    
-                    Iterator<Map.Entry<Long,Integer>> itr = symbols.entrySet().iterator();
-                    
-                    while(itr.hasNext()) {
-                        
+
+                    Iterator<Map.Entry<Long, Integer>> itr = symbols.entrySet()
+                            .iterator();
+
+                    while (itr.hasNext()) {
+
                         Map.Entry<Long, Integer> entry = itr.next();
-                        
+
                         obs.writeLongNibble(entry.getKey());
 
-                        obs.writeInt(entry.getValue(),codeBitLength);
-                        
+                        obs.writeInt(entry.getValue(), codeBitLength);
+
                     }
-                    
+
                 }
 
                 /*
@@ -772,7 +800,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                         for (int j = 0, off = 0; j < N; j++, off += 8) {
 
                             final long v = KeyBuilder.decodeLong(key, off);
-                            
+
                             obs.writeInt(symbols.get(v).intValue(),
                                     codeBitLength);
 
@@ -796,17 +824,17 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                  * index.
                  */
                 {
-                    
-                    for(int i=0; i<nkeys; i++) {
-                        
+
+                    for (int i = 0; i < nkeys; i++) {
+
                         final byte[] val = vals[offset + i];
-                        
-                        obs.writeInt((int)val[0], 3);
-                        
+
+                        obs.writeInt((int) val[0], 3);
+
                     }
-                    
+
                 }
-                
+
                 obs.flush();
 
                 /*
@@ -822,47 +850,49 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                         + " symbols with a code length of " + codeBitLength
                         + " bits.");
 
-//                // copy onto the output buffer.
-//                out.write(buf);
+                // // copy onto the output buffer.
+                // out.write(buf);
             }
-            
+
         }
 
         public void read(DataInput in, IndexProcedure proc) throws IOException {
 
             /*
              * @todo this relies on being able to cast to an input stream. in
-             * order to work for the DataInputStream you would obtain the backing
-             * byte[] and pass that along (PROBLEM : we would need to specify a
-             * limit and InputBitStream does not support that).
+             * order to work for the DataInputStream you would obtain the
+             * backing byte[] and pass that along (PROBLEM : we would need to
+             * specify a limit and InputBitStream does not support that).
              */
-            InputBitStream ibs = new InputBitStream((InputStream)in);
-            
+            InputBitStream ibs = new InputBitStream((InputStream) in);
+
             /*
              * read the header.
              */
             final int nkeys = ibs.readNibble();
             final int nsymbols = ibs.readNibble();
             final int codeBitLength = ibs.readNibble();
-            
+
             /*
-             * read the dictionary, building a reverse lookup from code to value.
+             * read the dictionary, building a reverse lookup from code to
+             * value.
              */
-            final HashMap<Integer,Long> symbols = new HashMap<Integer,Long>(nkeys*N);
+            final HashMap<Integer, Long> symbols = new HashMap<Integer, Long>(
+                    nkeys * N);
             {
 
                 for (int i = 0; i < nsymbols; i++) {
-                    
+
                     final long v = ibs.readLongNibble();
-                    
+
                     final int code = ibs.readInt(codeBitLength);
-                    
-                    symbols.put(code,v);
-                    
+
+                    symbols.put(code, v);
+
                 }
-                
+
             }
-            
+
             /*
              * read the codes, expanding them into keys.
              */
@@ -870,25 +900,25 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
             {
 
                 KeyBuilder keyBuilder = new KeyBuilder(N * Bytes.SIZEOF_LONG);
-                
+
                 for (int i = 0; i < nkeys; i++) {
-                    
+
                     keyBuilder.reset();
-                    
-                    for(int j=0; j<N; j++) {
-                        
+
+                    for (int j = 0; j < N; j++) {
+
                         final int code = ibs.readInt(codeBitLength);
-                        
+
                         final long v = symbols.get(code).longValue();
-                        
+
                         keyBuilder.append(v);
-                        
+
                     }
-                    
+
                     keys[i] = keyBuilder.getKey();
-                    
+
                 }
-                
+
             }
 
             /*
@@ -896,28 +926,28 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
              */
             final byte[][] vals = new byte[nkeys][];
             {
-                
-                for(int i=0; i<nkeys; i++) {
-                    
+
+                for (int i = 0; i < nkeys; i++) {
+
                     vals[i] = new byte[] {
 
-                        (byte) ibs.readInt(3)
-                            
+                    (byte) ibs.readInt(3)
+
                     };
-                    
+
                 }
-                
+
             }
-            
+
             /*
-             * set the data on the proc. 
+             * set the data on the proc.
              */
             proc.n = nkeys;
             proc.keys = keys;
             proc.vals = vals;
-                
+
         }
 
     }
-    
+
 }

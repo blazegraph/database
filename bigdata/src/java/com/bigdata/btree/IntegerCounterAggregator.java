@@ -1,4 +1,4 @@
-/**
+/*
 
 Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
@@ -22,46 +22,39 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 9, 2006
+ * Created on Jan 16, 2008
  */
+package com.bigdata.btree;
 
-package com.bigdata.istore;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.bigdata.service.Split;
 
 /**
- * Abstract base class for store exceptions.
+ * Aggregates the value of an integer counter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+public class IntegerCounterAggregator implements
+        IResultHandler<Integer, Integer> {
 
-abstract public class StoreException extends RuntimeException {
+    private final AtomicInteger counter = new AtomicInteger(0);
 
-    /**
-     * 
-     */
-    public StoreException() {
+    public IntegerCounterAggregator() {
+        
+    }
+    
+    public void aggregate(Integer result, Split split) {
+
+        counter.addAndGet(result.intValue());
+
     }
 
-    /**
-     * @param message
-     */
-    public StoreException(String message) {
-        super(message);
-    }
+    public Integer getResult() {
 
-    /**
-     * @param cause
-     */
-    public StoreException(Throwable cause) {
-        super(cause);
-    }
+        return counter.get();
 
-    /**
-     * @param message
-     * @param cause
-     */
-    public StoreException(String message, Throwable cause) {
-        super(message, cause);
     }
 
 }

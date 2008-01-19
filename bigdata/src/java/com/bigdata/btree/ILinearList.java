@@ -52,6 +52,12 @@ public interface ILinearList {
      *         this guarantees that the return value will be >= 0 if and only if
      *         the key is found. When found the index will be in [0:nentries).
      *         Adding or removing entries in the tree may invalidate the index.
+     *         <P>
+     *         <code>pos = -(pos+1)</code> will convert an insertion point to
+     *         the index at which the <i>key</i> would be found if it were
+     *         inserted - this is also the index of the predecessor of <i>key</i>
+     *         in the index.
+     * 
      * 
      * @see #keyAt(int)
      * @see #valueAt(int)

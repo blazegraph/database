@@ -33,6 +33,7 @@ import java.util.UUID;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Create an instance of a {@link BTree}.
@@ -97,7 +98,7 @@ public class BTreeConstructor implements IIndexConstructor {
         
     }
     
-    public BTree newInstance(IRawStore store, UUID indexUUID) {
+    public BTree newInstance(IRawStore store, UUID indexUUID, IPartitionMetadata ignored) {
 
         return new BTree(store, branchingFactor, indexUUID, valueSerializer);
         

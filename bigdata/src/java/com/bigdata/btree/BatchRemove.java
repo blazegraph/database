@@ -39,7 +39,7 @@ public class BatchRemove implements IBatchOperation {
     /**
      * The #of tuples to be processed.
      */
-    public final int ntuples;
+    public final int n;
     
     /**
      * The keys for each tuple.
@@ -57,7 +57,7 @@ public class BatchRemove implements IBatchOperation {
     public int tupleIndex = 0;
 
     public int getTupleCount() {
-        return ntuples;
+        return n;
     }
     
     public byte[][] getKeys() {
@@ -101,7 +101,7 @@ public class BatchRemove implements IBatchOperation {
         if (values.length < ntuples)
             throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
 
-        this.ntuples = ntuples;
+        this.n = ntuples;
         this.keys = keys;
         this.values = values;
 
@@ -114,7 +114,7 @@ public class BatchRemove implements IBatchOperation {
      */
     public void apply(ISimpleBTree btree) {
 
-        while( tupleIndex < ntuples) {
+        while( tupleIndex < n) {
 
             values[tupleIndex] = btree.remove(keys[tupleIndex]);
 
