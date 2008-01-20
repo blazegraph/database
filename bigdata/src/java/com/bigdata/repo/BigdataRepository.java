@@ -10,12 +10,14 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
@@ -78,10 +80,12 @@ import com.bigdata.sparse.SparseRowStore;
  * The distributed file system uses two scale-out indices to support ACID
  * operations on file metadata and atomic file append. These ACID guarentees
  * arise from the use of unisolated operations on the respective indices and
- * therefore apply only to the individual file metadata or file data operations.
- * In particular, file metadata read and write are atomic and file append is
- * atomic. File read will never read inconsistent data. Files once created are
- * append only.
+ * therefore apply only to the individual file metadata or file block
+ * operations. In particular, file metadata read and write are atomic and all
+ * individual file block IO (read,write,and append) operations are atomic.
+ * Atomicity is NOT guarenteed when performing more than a single file block IO
+ * operation, e.g., multiple appends MIGHT NOT write sequential blocks since
+ * other block operations could have intervened.
  * <p>
  * The content length of the file is not stored as file metadata. Instead it MAY
  * be estimated by a range count of the index entries spanned by the file's
@@ -186,6 +190,10 @@ import com.bigdata.sparse.SparseRowStore;
  *       readily use a hierarchical one. Unicode characters are supported in the
  *       file identifiers.
  * 
+ * @todo create an abstract base class and derive two versions: one runs against
+ *       and embedded data service (supports restart but does not use jini) and
+ *       the other runs against a federation (scale-out deployment).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -193,6 +201,18 @@ public class BigdataRepository implements ContentRepository {
 
     protected static Logger log = Logger.getLogger(BigdataRepository.class);
     
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * Configuration options.
      * 
@@ -209,6 +229,16 @@ public class BigdataRepository implements ContentRepository {
      * bytes (16 Exabytes).
      */
     public static final int BLOCK_SIZE = 64 * Bytes.kilobyte32;
+
+    /**
+     * The maximum block identifier that can be assigned to a file version.
+     * <p>
+     * Note: This is limited to {@value Long#MAX_VALUE}-1 so that we can always
+     * form the key greater than any valid key for a file version. This is
+     * required by the atomic append logic when it seeks the next block
+     * identifier. See {@link AtomicAppendProc}.
+     */
+    protected static final long MAX_BLOCK = Long.MAX_VALUE - 1;
     
     /**
      * The connection to the bigdata federation.
@@ -770,7 +800,9 @@ public class BigdataRepository implements ContentRepository {
          * </ol>
          * </ol>
          * 
-         * @return The #of blocks written as an {@link Integer}.
+         * @return The #of bytes written as a {@link Long}.
+         *
+         * @todo consider returning the block identifier written.
          * 
          * FIXME This optimizes the performance of the mutable {@link BTree} by
          * writing the blocks onto raw records on the journal and recording the
@@ -798,8 +830,10 @@ public class BigdataRepository implements ContentRepository {
 
                 /*
                  * Find the key for the last block written for this file
-                 * version. When no blocks for this file version have been
-                 * written on this index partition then we start with block#0.
+                 * version. We do this by forming a probe key from the file,
+                 * version, and the maximum allowed block identifier. This is
+                 * guarenteed to be after any existing block for that file and
+                 * version.
                  * 
                  * @todo This implies that the leftSeparator for the index
                  * partition MUST NOT split the blocks for a file unless there
@@ -813,8 +847,8 @@ public class BigdataRepository implements ContentRepository {
                  */
                 
                 final byte[] toKey = keyBuilder.reset().appendText(id,
-                        true/* unicode */, true/* successor */).append(
-                        version).getKey();
+                        true/* unicode */, false/* successor */).append(
+                        version).append(Long.MAX_VALUE).getKey();
 
                 // @todo promote this interface onto IIndex?
                 // @todo verify iface implemented for index partition view.
@@ -856,27 +890,76 @@ public class BigdataRepository implements ContentRepository {
 
                 if (toIndex == 0) {
 
-                    // insertion point is before all other entries in the index.
+                    /*
+                     * Insertion point is before all other entries in the index.
+                     * 
+                     * FIXME In this case we need to examine the leftSeparator
+                     * key for the index partition. If that key is for the same
+                     * file version then we use the successor of the block
+                     * identifier found in that key. (Note: when it is not for
+                     * the same file version it MAY be that the leftSeparator
+                     * does not include the block identifier - the block
+                     * identifier is only required in the leftSeparator when the
+                     * a file version spans both the prior index partition and
+                     * this index partition.) (The code for this may be derived
+                     * from the code below that considers the key at the
+                     * (possibly adjusted) toIndex.
+                     */
                     
-                    log.info("Will write 1st block: id=" + id + ", version="
-                            + version);
-                    
-                    block = 0;
-                    
-                } else if (toIndex == entryCount) {
-                    
-                    // insertion point is after all entries in the index.
-                    
-                    log.info("Will write 1st block: id=" + id + ", version="
-                            + version);
+                    log.info("Insertion point is before all entries in the index partition: id="
+                                    + id + ", version=" + version);
                     
                     block = 0;
                     
                 } else {
                     
+                    if (toIndex == entryCount) {
+
+                        /*
+                         * Insertion point is after all entries in the index.
+                         * 
+                         * Note: In this case we consider the prior key in the
+                         * index partition. If that key is for the same file
+                         * version then we use the successor of the block
+                         * identifier found in that key.
+                         */
+
+                        log.info("Insertion point is after all entries in the index partition: id="
+                                        + id + ", version=" + version);
+
+                    } else {
+
+                        /*
+                         * Insertion point is at the toKey.
+                         * 
+                         * Note: Since the probe key is beyond the last block
+                         * for the file version we adjust the toIndex so that we
+                         * consider the prior key.
+                         */
+
+                        log.info("Insertion point is at the toKey: id=" + id
+                                + ", version=" + version);
+
+                    }
+
+                    /*
+                     * Adjust to consider the key before the insertion point.
+                     */
+
+                    toIndex--;
+                    
+                    /*
+                     * Look at the key at the computed index. If it is a key for
+                     * this file version then we use the successor of the given
+                     * block identifier. Otherwise we are writing a new file
+                     * version and the block identifier will be zero (0).
+                     */
+                    
+                    log.info("adjusted toIndex="+toIndex+", entryCount="+entryCount);
+                    
                     // the key at that index.
                     final byte[] key = tmp.keyAt(toIndex);
-                    
+
                     assert key != null : "Expecting entry: id=" + id
                             + ", version=" + version + ", toIndex=" + toIndex;
 
@@ -884,6 +967,8 @@ public class BigdataRepository implements ContentRepository {
                     final byte[] prefix = keyBuilder.reset().appendText(id,
                             true/* unicode */, false/* successor */).append(
                             version).getKey();
+
+                    log.info("Comparing\nkey   :"+Arrays.toString(key)+"\nprefix:"+Arrays.toString(prefix));
                     
                     /*
                      * Test the encoded file id and version against the encoded
@@ -894,25 +979,49 @@ public class BigdataRepository implements ContentRepository {
                      * (I.e., if true, then the key is from a block entry for
                      * this version of this file).
                      */
-                    if (BytesUtil.compareBytesWithLenAndOffset(0,
-                            prefix.length, prefix, 0, prefix.length, key) != 0) {
+
+                    final int cmp = BytesUtil.compareBytesWithLenAndOffset(0,
+                            prefix.length, prefix, 0, prefix.length, key);
+
+                    log.info("Prefix and key comparison: " + cmp);
+                    
+                    if (cmp == 0) {
+
+                        /*
+                         * The key at the computed toIndex is the same file
+                         * version, so extract the block identifier.
+                         */
                         
                         // last block identifier assigned for this file + 1.
                         block = KeyBuilder.decodeLong(key, key.length
                                 - Bytes.SIZEOF_LONG) + 1;
+
+                        if (block > MAX_BLOCK) {
+                            
+                            throw new RuntimeException(
+                                    "File version has maximum #of blocks: id="
+                                            + id + ", version=" + version);
+                            
+                        }
                         
-                        log.info("Appending to existing file: id=" + id
+                        log.info("Appending to existing file version: id=" + id
                                 + ", version=" + version + ", block=" + block);
-                        
+
                     } else {
-                        
-                        log.info("Will write 1st block for file: id=" + id
-                                + ", version=" + version);
+
+                        /*
+                         * The key at computed toIndex is a different file
+                         * version so we are starting a new file version at
+                         * block := 0.
+                         */
                         
                         block = 0;
-                        
+
+                        log.info("Appending to new file version: id=" + id
+                                + ", version=" + version + ", block=" + block);
+
                     }
-                    
+
                 }
 
                 log.info("Will write " + len + " bytes on id=" + id

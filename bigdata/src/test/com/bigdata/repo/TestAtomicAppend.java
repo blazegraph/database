@@ -89,6 +89,74 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
     }
 
     /**
+     * Test the ability to write two partial blocks in a row onto a file version
+     * and then read them back (test of append semantics).
+     * 
+     * @throws IOException
+     */
+    public void test_atomicAppend2SmallBlocks() throws IOException {
+     
+        final String id = "test";
+        
+        final int version = 0;
+        
+        final byte[] expected1 = new byte[]{1,2,3};
+        final byte[] expected2 = new byte[]{4,5,6};
+        
+        assertEquals("nbytes", expected1.length, repo.atomicAppend(id, version,
+                expected1, 0, expected1.length));
+
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        assertEquals("nbytes", expected2.length, repo.atomicAppend(id, version,
+                expected2, 0, expected2.length));
+
+        assertEquals("blockCount", 2, repo.getBlockCount(id, version));
+
+        final byte[] actual = read(repo.inputStream(id, version));
+
+        assertEquals("data", new byte[]{1,2,3,4,5,6}, actual);
+
+    }
+
+    /**
+     * Test the ability to write three partial blocks in a row onto a file
+     * version and then read them back (test of append semantics).
+     * 
+     * @throws IOException
+     */
+    public void test_atomicAppend3SmallBlocks() throws IOException {
+     
+        final String id = "test";
+        
+        final int version = 0;
+        
+        final byte[] expected1 = new byte[]{1,2,3};
+        final byte[] expected2 = new byte[]{4,5,6};
+        final byte[] expected3 = new byte[]{7,8,9};
+        
+        assertEquals("nbytes", expected1.length, repo.atomicAppend(id, version,
+                expected1, 0, expected1.length));
+
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        assertEquals("nbytes", expected2.length, repo.atomicAppend(id, version,
+                expected2, 0, expected2.length));
+
+        assertEquals("blockCount", 2, repo.getBlockCount(id, version));
+
+        assertEquals("nbytes", expected3.length, repo.atomicAppend(id, version,
+                expected3, 0, expected3.length));
+
+        assertEquals("blockCount", 3, repo.getBlockCount(id, version));
+
+        final byte[] actual = read(repo.inputStream(id, version));
+
+        assertEquals("data", new byte[]{1,2,3,4,5,6,7,8,9}, actual);
+
+    }
+
+    /**
      * Atomic append of a zero length block.
      * 
      * @throws IOException

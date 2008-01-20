@@ -37,6 +37,8 @@ import com.bigdata.repo.BigdataRepository.FileVersionOutputStream;
 /**
  * Unit tests for copying streams into the repository and reading them back.
  * 
+ * FIXME test flush semantics at BLOCK_SIZE-1, BLOCK_SIZE, and BLOCK_SIZE+1.
+ * 
  * @todo test: A flush or close on the output stream should cause the buffered
  *       data to be atomically appended as a (partial) block.
  * 
@@ -242,12 +244,77 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
     }
     
     /**
-     * @todo Stress test writing large streams of random length.
+     * Stress test writing large streams of random length.
+     * 
+     * @throws IOException 
      */
-    public void test_copyStream_largeRandomStreams() {
+    public void test_copyStream_largeRandomStreams() throws IOException {
 
-        fail("write test");
+        final int LIMIT = 100;
         
+        final Random r = new Random();
+
+//        int nzero = 0;
+//        int nfull = 0;
+        
+        for(int i=0; i<LIMIT; i++) {
+        
+            /*
+             * Note: {id + version} are always unique for this test.
+             */
+            final String id = "test#" + r.nextInt(1000);
+
+            final int version = i;
+
+            /*
+             * Note: size in [0:block_size] bytes.
+             * 
+             * Note: the distribution is adjusted to make near zero and near
+             * block_size operations at least 10% of all operations.
+             */
+            final int n = r.nextInt(10); // #of full blocks [0:N-1].
+            final int len;
+            {
+                final int x = r.nextInt(BLOCK_SIZE); // #of bytes in last block.
+                if (x < 10) {
+                    // short block length.
+                    len = n * BLOCK_SIZE + r.nextInt(5);
+                } else if (x >= 90) {
+                    // long block length (up to block_size - 1).
+                    len = n * BLOCK_SIZE + r.nextInt(5) + BLOCK_SIZE - 5;
+                } else {
+                    // uniform random distribution.
+                    len = n * BLOCK_SIZE + r.nextInt(BLOCK_SIZE + 1);
+                }
+            }
+            final int nblocks = (len + BLOCK_SIZE) / BLOCK_SIZE;
+            log.info("n=" + n + ", len=" + len + ", nblocks=" + nblocks);
+            
+//            if (len % BLOCK_SIZE == 0)
+//                nzero++;
+//
+//            if (len % BLOCK_SIZE == BLOCK_SIZE)
+//                nfull++;
+            
+            final byte[] expected = new byte[len];
+            
+            // random data.
+            r.nextBytes(expected);
+
+            assertEquals("nbytes", expected.length, repo.copyStream(id,
+                    version, new ByteArrayInputStream(expected)));
+
+            assertEquals("blockCount", nblocks, repo.getBlockCount(id, version));
+
+            final byte[] actual = read(repo.inputStream(id, version));
+
+            assertEquals("data", expected, actual);
+
+//            log.warn("There were " + nzero + " zero length blocks and " + nfull
+//                    + " full length blocks out of " + LIMIT + " trials");
+            
+        }
+                
     }
   
 }
