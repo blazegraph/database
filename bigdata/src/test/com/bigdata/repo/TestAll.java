@@ -29,6 +29,7 @@ package com.bigdata.repo;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.scaleup.MetadataIndex;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -65,6 +66,14 @@ public class TestAll extends TestCase {
      *       optimize the chunk storage for the {@link BTree} to use raw records
      *       on the journal (thereby requiring an extension of the overflow
      *       semantics to get the data inline on the {@link IndexSegment}).
+     * 
+     * @todo test split of a large file into blocks (the file is conditioned by
+     *       the application for this by flushing the stream before the next 64k
+     *       block) and the read of each block by its appropriate client.
+     * 
+     * @todo also test ability to figure out which client is "near" the blocks
+     *       by consulting the {@link MetadataIndex} and an as yet undefined
+     *       network topology model.
      */
     public static Test suite()
     {
@@ -72,8 +81,11 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite("Bigdata Scale-Out Repository");
  
         // test atomic append operations on the file and read back.
-        suite.addTestSuite( TestAtomicBlockAppend.class );
+        suite.addTestSuite( TestAtomicAppend.class );
 
+        // test copying streams to a file using atomic append.
+        suite.addTestSuite( TestCopyStream.class );
+        
         // test atomic random block read / write operations.
         suite.addTestSuite( TestAtomicRandomBlockWrite.class );
 

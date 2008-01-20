@@ -32,16 +32,10 @@ import java.io.IOException;
 import java.util.Random;
 
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.scaleup.MetadataIndex;
 
 /**
  * Test atomic append operations on the file data index for the
  * {@link BigdataRepository}.
- * 
- * @todo test split of a large file into blocks and the read of each block by
- *       its appropriate client. (@todo also test ability to figure out which
- *       client is "near" the blocks by consulting the {@link MetadataIndex} and
- *       an as yet undefined network topology model.)
  * 
  * @todo test exact computation of the content length (still an estimate since
  *       there is no guarentee that the file remains unmodified)? the only way
@@ -55,18 +49,18 @@ import com.bigdata.scaleup.MetadataIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAtomicBlockAppend extends AbstractRepositoryTestCase {
+public class TestAtomicAppend extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestAtomicBlockAppend() {
+    public TestAtomicAppend() {
     }
 
     /**
      * @param arg0
      */
-    public TestAtomicBlockAppend(String arg0) {
+    public TestAtomicAppend(String arg0) {
         super(arg0);
     }
 
@@ -207,9 +201,8 @@ public class TestAtomicBlockAppend extends AbstractRepositoryTestCase {
             /*
              * Note: size in [0:block_size] bytes.
              * 
-             * @todo adjust the distribution to make zero and near zero and
-             * block_size and near block_size operations at least 10% of all
-             * operations.
+             * Note: the distribution is adjusted to make near zero and near
+             * block_size operations at least 10% of all operations.
              */
             final int len;
             {
@@ -250,44 +243,4 @@ public class TestAtomicBlockAppend extends AbstractRepositoryTestCase {
         
     }
 
-    /*
-     * @todo the stream tests should focus on a pipe model where you obtain an
-     * OutputStream for a file version and write on it and it periodically
-     * flushes blocks to the file version.
-     */
-    
-    public void test_atomicAppend_smallStream() {
-        
-    }
-    
-    /**
-     * @todo Test the ability to write a stream onto the index that is
-     *       automatically partitioned into blocks. A flush or close on the
-     *       output stream should cause the buffered data to be atomically
-     *       appended as a (partial) block.
-     * 
-     * @todo The next append should add another block after that (partial)
-     *       block. The caller should be able to re-write the (partial) block,
-     *       changing its size to any size between [0:64k] bytes (including 0?
-     *       delete the block if length is zero?) - that is you can do random
-     *       access read/write by block.
-     */
-    public void test_atomicAppend_largeStream() {
-        
-    }
-    
-    /**
-     * @todo Stress test writing small streams of random length.
-     */
-    public void test_atomicAppend_smallRandomStreams() {
-        
-    }
-
-    /**
-     * @todo Stress test writing large streams of random length.
-     */
-    public void test_atomicAppend_largeRandomStreams() {
-        
-    }
-  
 }

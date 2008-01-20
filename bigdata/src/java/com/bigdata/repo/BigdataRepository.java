@@ -56,7 +56,24 @@ import com.bigdata.sparse.SparseRowStore;
 
 /**
  * A distributed file system with extensible metadata and atomic append
- * implemented using the bigdata scale-out architecture.
+ * implemented using the bigdata scale-out architecture. Files have a client
+ * assigned identifier, which is a Unicode string. The file identifier MAY be
+ * structured so as to look like a hierarchical file system using any desired
+ * convention. Files are versioned and historical versions MAY be accessed until
+ * the next compacting merge discards their data. File data is stored in large
+ * {@link #BLOCK_SIZE} blocks, but partial and even empty blocks are allowed.
+ * Storage is space - only the data written will be stored.
+ * <p>
+ * Efficient method are offered for streaming and block oriented IO. All block
+ * read and write operations are atomic, including block append. Files may be
+ * easily written such that records never cross a block boundary by the
+ * expediency of flushing the output stream if a record would overflow the
+ * current block. (A flush forces the atomic write of a partial block. Partial
+ * blocks are stored efficiently - only the bytes actually written are stored.)
+ * Such files are well-suited to map/reduce processing as they may be
+ * efficiently split at block boundaries and references to the blocks
+ * distributed to clients. Likewise, reduce clients can aggregate data into
+ * large files suitable for further map/reduce processing.
  * <p>
  * The distributed file system uses two scale-out indices to support ACID
  * operations on file metadata and atomic file append. These ACID guarentees
@@ -66,12 +83,12 @@ import com.bigdata.sparse.SparseRowStore;
  * atomic. File read will never read inconsistent data. Files once created are
  * append only.
  * <p>
- * The content length of the file is not stored as file metadata. Instead it is
- * estimated by a range count of the index entries spanned by the file's data.
- * The exact file size may be readily determined when reading small files by the
- * expediency of sucking the entire file into a buffer. Streaming processing is
- * advised in all cases when handling large files, including when the file is to
- * be delivered via HTTP.
+ * The content length of the file is not stored as file metadata. Instead it MAY
+ * be estimated by a range count of the index entries spanned by the file's
+ * data. The exact file size may be readily determined when reading small files
+ * by the expediency of sucking the entire file into a buffer - all reads are at
+ * least one block. Streaming processing is advised in all cases when handling
+ * large files, including when the file is to be delivered via HTTP.
  * <p>
  * The metadata index uses a {@link SparseRowStore} design, similar to Google's
  * bigtable or Hadoop's HBase. Certain properties MUST be defined for each entry -
@@ -79,23 +96,12 @@ import com.bigdata.sparse.SparseRowStore;
  * define additional properties. Reads and writes of file metadata are always
  * atomic.
  * <p>
- * <p>
  * Each time a file is created a new version number is assigned. The data index
  * uses the {@link MetadataSchema#ID} as the first field in a compound key. The
- * second field is the {@link MetadataSchema#VERSION}. The remainder of the key
- * is a 64-bit block identifier. The block identifiers are strictly monotonic
- * (e.g., up one) and their sequence orders the blocks into the logical byte
- * order of the file.
- * <p>
- * All writes on a file are atomic appends. In general, applications atomic
- * appends should write 64k of data - less if the last block of the file is
- * being written. As an aid to local clients, method exists to consume an
- * {@link InputStream}, buffering data and performing atomic appends as the
- * buffer overflows. Distributed clients can also use atomic appends, but they
- * must provide themselves for an internal consistency within the blocks, e.g.,
- * by always padding out records to the next 64k boundary. In particular, this
- * makes it easy for a master to split a file across map clients and makes it
- * equally easy for distributed processes to aggregate results.
+ * second field is the {@link MetadataSchema#VERSION} - a 32-bit integer. The
+ * remainder of the key is a 64-bit block identifier. The block identifiers are
+ * strictly monotonic (e.g., up one) and their sequence orders the blocks into
+ * the logical byte order of the file.
  * <p>
  * <h2>Use cases</h2>
  * <p>
@@ -120,15 +126,41 @@ import com.bigdata.sparse.SparseRowStore;
  * metadata record for the file and then does a series of atomic appears to the
  * file.
  * 
- * FIXME Modify to always logically pad out to {@link #BLOCK_SIZE}. However,
- * store the actual length of the block in the data record. Never read the
- * unwritten bytes so that short files and long files all appear to have exactly
- * those bytes that were written but you can read blocks using random access.
- * <P>
- * Also modify the {@link FileVersionInputStream} to maintain running byte count
- * so that it can report the #of blocks expected, visited so far, and the #of
- * bytes read so far. The {@link #inputStream(String, int)} method can be
- * defined to return an interface that reveals those little goodies.
+ * @todo describe the relationship to the media redundency system. unless the
+ *       replication factor is part of the key all files in a file system will
+ *       have the same replication factor (the journals are mirrored, leading to
+ *       mirrored index partitions). Is there any way to achieve per file
+ *       replication quotas? Perhaps just choose the partition of the file
+ *       system, e.g., <code>/highly-available</code> might be given on
+ *       guarentee while other prefixes have a different guarentee - that seems
+ *       simple enough. The availability can be managed by changing what data is
+ *       on an index partition. If availability prefixes are created then we
+ *       could juggle the separator keys to correspond to exact partition
+ *       boundaries so that we never over-replicate a file because it's lumped
+ *       with a highly available partition.
+ * 
+ * @todo multiple file systems can be easily created but that seems to just
+ *       create problems since the file identifers are no longer sufficient to
+ *       locate a file.
+ * 
+ * @todo provide scans for file versions, e.g., given a file, what versions
+ *       exist.
+ * 
+ * @todo compacting merge policies. consider how data is eradicated from the
+ *       metadata and data indices and that it might not be "atomically"
+ *       eradicated so it is quite possible that only some data will remain
+ *       available after a period of time. the policy can set the minimum
+ *       criteria, e.g., in terms of time and #of versions to be retained. After
+ *       those criteria have been met you may still find your data or not. You
+ *       can read blocks directly for a file version and blocks that have not
+ *       been eradicated will still have valid data.
+ * 
+ * @todo should compression be applied? applications are obviously free to apply
+ *       their own compression, but it could be convienent to stored compressed
+ *       blocks. the caller could specify the compression method on a per block
+ *       basis (we don't want to lookup the file metadata for this). the
+ *       compression method would be written into a block header. blocks can
+ *       always be decompressed by examining the header.
  * 
  * @todo Full text indexing support. Perhaps the best way to handle this is to
  *       queue document metadata up for a distributed full text indexing
@@ -147,12 +179,6 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @todo ensure that index partitions do not break across the metadata record
  *       for a file.
- * 
- * @todo ensure that atomic appends always go to a single data service so that
- *       the update is in fact atomic. after the write the data service can
- *       decide the partition the index, in which case the next append might go
- *       to another data service. In all cases the append is atomic on a single
- *       data service.
  * 
  * @todo there should be some constraints on the file identifier but it general
  *       it represents a client determined absolute file path name. It is
@@ -1378,14 +1404,15 @@ public class BigdataRepository implements ContentRepository {
      */
     public OutputStream outputStream(String id, int version) {
 
-        return new FileVersionOutputStream(id, version);
+        return new FileVersionOutputStream(this, id, version);
 
     }
     
     /**
      * Copies data from the input stream to the file version. The data is
      * buffered into blocks. Each block is written on the file version using an
-     * atomic append.
+     * atomic append. Writing an empty stream will cause an empty block to be
+     * appended (this ensures that read back will read an empty stream).
      * 
      * @param id
      *            The file identifier.
@@ -1406,6 +1433,13 @@ public class BigdataRepository implements ContentRepository {
         try {
 
             ncopied = os.copyStream( is );
+       
+            if (ncopied == 0) {
+                
+                // force an empty block to be written.
+                atomicAppend(id, version, new byte[]{}, 0, 0);
+                
+            }
             
             os.close();
             
@@ -1426,11 +1460,12 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class FileVersionOutputStream extends OutputStream {
+    protected static class FileVersionOutputStream extends OutputStream {
 
-        private final String id;
-        private final int version;
-
+        protected final BigdataRepository repo;
+        protected final String id;
+        protected final int version;
+        
         /**
          * The file identifier.
          */
@@ -1461,6 +1496,36 @@ public class BigdataRepository implements ContentRepository {
         private int len = 0;
 
         /**
+         * #of bytes written onto this output stream.
+         */
+        private long nwritten;
+        
+        /**
+         * #of bytes written onto this output stream.
+         * 
+         * @todo handle overflow of long - leave counter at {@link Long#MAX_VALUE}.
+         */
+        public long getByteCount() {
+            
+            return nwritten;
+            
+        }
+
+        /**
+         * #of blocks written onto the file version.
+         */
+        private long nblocks;
+        
+        /**
+         * #of blocks written onto the file version.
+         */
+        public long getBlockCount() {
+           
+            return nblocks;
+            
+        }
+        
+        /**
          * Create an output stream that will atomically append blocks of data to
          * the specified file version.
          * 
@@ -1469,7 +1534,14 @@ public class BigdataRepository implements ContentRepository {
          * @param version
          *            The version identifier.
          */
-        public FileVersionOutputStream(String id, int version) {
+        public FileVersionOutputStream(BigdataRepository repo, String id, int version) {
+            
+            if (repo == null)
+                throw new IllegalArgumentException();
+            if (id == null)
+                throw new IllegalArgumentException();
+            
+            this.repo = repo;
             
             this.id = id;
             
@@ -1494,6 +1566,8 @@ public class BigdataRepository implements ContentRepository {
             
             buffer[len++] = (byte) (b & 0xff);
             
+            nwritten++;
+            
         }
 
         /**
@@ -1508,9 +1582,11 @@ public class BigdataRepository implements ContentRepository {
 
                 log.info("Flushing buffer: id="+id+", version="+version+", len="+len);
                 
-                atomicAppend(id, version, buffer, 0, len);
+                repo.atomicAppend(id, version, buffer, 0, len);
 
                 len = 0;
+                
+                nblocks++;
                 
             }
             
@@ -1541,6 +1617,8 @@ public class BigdataRepository implements ContentRepository {
          * @todo write tests at fence posts (copying zero, N, and BLOCK_SIZE
          *       bytes) and make sure that flush occurs only when the buffer is
          *       completely full.
+         * 
+         * @todo test multi block writes.
          */
         public long copyStream(InputStream is) throws IOException {
 
@@ -1593,6 +1671,9 @@ public class BigdataRepository implements ContentRepository {
                 // update #of bytes copied.
                 ncopied += nread;
 
+                // update #of bytes written on this output stream.
+                nwritten += nread;
+
             }
 
         }
@@ -1607,14 +1688,15 @@ public class BigdataRepository implements ContentRepository {
      */
     protected static class FileVersionInputStream extends InputStream {
 
-        private final String id;
-        private final int version;
+        protected final String id;
+        protected final int version;
         private final IEntryIterator src;
 
         /**
          * The current block# whose data are being read.
          */
         private long block;
+        
         /**
          * A buffer holding the current block's data. This is initially filled
          * from the first block by the ctor. When no more data is available it
@@ -1622,10 +1704,12 @@ public class BigdataRepository implements ContentRepository {
          * been exhausted.
          */
         private byte[] b;
+        
         /**
          * The next byte to be returned from the current block's data.
          */
         private int off;
+        
         /**
          * The #of bytes remaining in the current block's data.
          */
