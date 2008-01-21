@@ -618,6 +618,12 @@ public class ClientIndexView implements IIndex {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter ) {
 
+        if(capacity==0) {
+            
+            capacity = this.capacity;
+            
+        }
+        
         return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
                 flags, filter);
         

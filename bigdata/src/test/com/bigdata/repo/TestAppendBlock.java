@@ -35,7 +35,18 @@ import com.bigdata.isolation.UnisolatedBTree;
 
 /**
  * Test atomic append operations on the file data index for the
- * {@link BigdataRepository}.
+ * {@link BigdataRepository}. This also tests the correct assignment of block
+ * identifiers, the ability to count the #of blocks in a file version, the
+ * ability to visit the block identifiers for a file version, the ability to
+ * read a specific block for a file version, and the ability to read all data
+ * for a file version from an input stream.
+ * 
+ * FIXME test where there is only a single index partition and where there are
+ * several. This will exercise both the logic that locates the index partition
+ * into which the atomic append will go and the logic that computes the next
+ * block identifer for the file version when entering a new partition. These
+ * tests can be run by establishing the appropriate partitions in the data index
+ * for the embedded federation.
  * 
  * @todo test exact computation of the content length (still an estimate since
  *       there is no guarentee that the file remains unmodified)? the only way
@@ -49,18 +60,18 @@ import com.bigdata.isolation.UnisolatedBTree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAtomicAppend extends AbstractRepositoryTestCase {
+public class TestAppendBlock extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestAtomicAppend() {
+    public TestAppendBlock() {
     }
 
     /**
      * @param arg0
      */
-    public TestAtomicAppend(String arg0) {
+    public TestAppendBlock(String arg0) {
         super(arg0);
     }
 
@@ -76,15 +87,20 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
         final int version = 0;
         
         final byte[] expected = new byte[]{1,2,3};
-        
-        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
-                expected, 0, expected.length));
 
+        final long block = repo.appendBlock(id, version,
+                expected, 0, expected.length);
+
+        assertEquals("block#", 0L, block);
+        
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
-
-        assertEquals("data", expected, actual);
+        assertSameIterator("block identifiers", new Long[] { block }, repo
+                .blocks(id, version));
+        
+        assertEquals("readBlock", expected, repo.readBlock(id, version, block));
+        
+        assertEquals("inputStream", expected, read(repo.inputStream(id, version)));
 
     }
 
@@ -100,22 +116,40 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
         
         final int version = 0;
         
-        final byte[] expected1 = new byte[]{1,2,3};
-        final byte[] expected2 = new byte[]{4,5,6};
+        final byte[] expected0 = new byte[]{1,2,3};
+        final byte[] expected1 = new byte[]{4,5,6};
         
-        assertEquals("nbytes", expected1.length, repo.atomicAppend(id, version,
-                expected1, 0, expected1.length));
+        // 1st block
+        final long block0 = repo.appendBlock(id, version,
+                expected0, 0, expected0.length);
 
+        assertEquals("block#", 0L, block0);
+        
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        assertEquals("nbytes", expected2.length, repo.atomicAppend(id, version,
-                expected2, 0, expected2.length));
+        assertSameIterator("block identifiers", new Long[] { block0 }, repo
+                .blocks(id, version));
+
+        assertEquals("data", expected0, repo.readBlock(id, version, block0));
+
+        assertEquals("data", expected0, read(repo.inputStream(id, version)));
+
+        // 2nd block
+        final long block1 = repo.appendBlock(id, version, expected1, 0,
+                expected1.length);
+
+        assertEquals("block#", 1L, block1);
 
         assertEquals("blockCount", 2, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertSameIterator("block identifiers", new Long[] { block0, block1 },
+                repo.blocks(id, version));
 
-        assertEquals("data", new byte[]{1,2,3,4,5,6}, actual);
+        assertEquals("data", expected0, repo.readBlock(id, version, block0));
+        assertEquals("data", expected1, repo.readBlock(id, version, block1));
+
+        assertEquals("data", new byte[] { 1, 2, 3, 4, 5, 6 }, read(repo
+                .inputStream(id, version)));
 
     }
 
@@ -131,28 +165,50 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
         
         final int version = 0;
         
-        final byte[] expected1 = new byte[]{1,2,3};
-        final byte[] expected2 = new byte[]{4,5,6};
-        final byte[] expected3 = new byte[]{7,8,9};
+        final byte[] expected0 = new byte[]{1,2,3};
+        final byte[] expected1 = new byte[]{4,5,6};
+        final byte[] expected2 = new byte[]{7,8,9};
         
-        assertEquals("nbytes", expected1.length, repo.atomicAppend(id, version,
-                expected1, 0, expected1.length));
+        // 1st block
+        final long block0 = repo.appendBlock(id, version, expected0, 0,
+                expected0.length);
+
+        assertEquals("block#", 0L, block0);
 
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        assertEquals("nbytes", expected2.length, repo.atomicAppend(id, version,
-                expected2, 0, expected2.length));
+        assertEquals("readBlock", expected0, repo
+                .readBlock(id, version, block0));
+
+        assertEquals("inputStream", expected0, read(repo.inputStream(id,
+                version)));
+
+        // 2nd block
+        final long block1 = repo.appendBlock(id, version, expected1, 0,
+                expected1.length);
+
+        assertEquals("block#", 1L, block1);
 
         assertEquals("blockCount", 2, repo.getBlockCount(id, version));
 
-        assertEquals("nbytes", expected3.length, repo.atomicAppend(id, version,
-                expected3, 0, expected3.length));
+        assertEquals("readBlock", expected1, repo
+                .readBlock(id, version, block1));
+
+        assertEquals("data", new byte[] { 1, 2, 3, 4, 5, 6 }, read(repo
+                .inputStream(id, version)));
+
+        // 3rd block
+        final long block2 = repo.appendBlock(id, version, expected2, 0,
+                expected2.length);
+
+        assertEquals("block#", 2L, block2);
 
         assertEquals("blockCount", 3, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertEquals("data", expected2, repo.readBlock(id, version, block2));
 
-        assertEquals("data", new byte[]{1,2,3,4,5,6,7,8,9}, actual);
+        assertEquals("data", new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+                read(repo.inputStream(id, version)));
 
     }
 
@@ -169,14 +225,16 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
 
         final byte[] expected = new byte[] {};
 
-        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
-                expected, 0, expected.length));
-
+        final long block0 = repo.appendBlock(id, version,
+                expected, 0, expected.length);
+        
+        assertEquals("block#",0L,block0);
+        
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertEquals("readBlock", expected, repo.readBlock(id, version, block0));
 
-        assertEquals("data", expected, actual);
+        assertEquals("inputStream", expected, read(repo.inputStream(id, version)));
         
     }
 
@@ -197,14 +255,16 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
 
         r.nextBytes(expected);
         
-        assertEquals("nbytes", expected.length, repo.atomicAppend(id, version,
-                expected, 0, expected.length));
-
+        final long block0 = repo.appendBlock(id, version,
+                expected, 0, expected.length);
+        
+        assertEquals("block#",0L,block0);
+        
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertEquals("readBlock", expected, repo.readBlock(id, version, block0));
 
-        assertEquals("data", expected, actual);
+        assertEquals("inputStream", expected, read(repo.inputStream(id, version)));
         
     }
 
@@ -226,7 +286,7 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
         
         try {
             
-            repo.atomicAppend(id, version, expected, 0, expected.length);
+            repo.appendBlock(id, version, expected, 0, expected.length);
             
             fail("Expecting: " + IllegalArgumentException.class);
             
@@ -295,19 +355,21 @@ public class TestAtomicAppend extends AbstractRepositoryTestCase {
             // random data.
             r.nextBytes(expected);
 
-            assertEquals("nbytes", expected.length, repo.atomicAppend(id,
-                    version, expected, 0, expected.length));
-
+            final long block0 = repo.appendBlock(id, version,
+                    expected, 0, expected.length);
+            
+            assertEquals("block#",0L,block0);
+            
             assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-            final byte[] actual = read(repo.inputStream(id, version));
+            assertEquals("readBlock", expected, repo.readBlock(id, version, block0));
 
-            assertEquals("data", expected, actual);
+            assertEquals("inputStream", expected, read(repo.inputStream(id, version)));
 
-            log.warn("There were " + nzero + " zero length blocks and " + nfull
-                    + " full length blocks out of " + LIMIT + " trials");
-            
         }
+        
+        log.warn("There were " + nzero + " zero length blocks and " + nfull
+                + " full length blocks out of " + LIMIT + " trials");
         
     }
 
