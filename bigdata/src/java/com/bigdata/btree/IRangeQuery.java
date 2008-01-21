@@ -88,10 +88,10 @@ public interface IRangeQuery {
      *            <code>null</code> there is no upper bound.
      * @param capacity
      *            The #of entries to buffer at a time. This is a hint and MAY be
-     *            zero to use a default capacity. The capacity is intended to
-     *            limit the burden on the heap imposed by the iterator if it
-     *            needs to buffer data, e.g., before sending it across a network
-     *            interface.
+     *            zero (0) to use an implementation specific <i>default</i>
+     *            capacity. The capacity is intended to limit the burden on the
+     *            heap imposed by the iterator if it needs to buffer data, e.g.,
+     *            before sending it across a network interface.
      * @param flags
      *            A bitwise OR of {@link #KEYS} and/or {@link #VALS} determining
      *            whether the keys or the values or both will be visited by the

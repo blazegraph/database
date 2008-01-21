@@ -36,14 +36,13 @@ import com.bigdata.repo.BigdataRepository.FileVersionOutputStream;
 
 /**
  * Unit tests for copying streams into the repository and reading them back.
- * 
- * FIXME test flush semantics at BLOCK_SIZE-1, BLOCK_SIZE, and BLOCK_SIZE+1.
- * 
- * @todo test: A flush or close on the output stream should cause the buffered
- *       data to be atomically appended as a (partial) block.
- * 
- * @todo test {@link FileVersionOutputStream} counters (#of bytes written on the
- *       stream, #of blocks written on the file version).
+ * <p>
+ * Note: Copying streams is basically a sequence of atomic append operations.
+ * {@link TestAppendBlock} is responsible for covering the behavior of the
+ * atomic append operation, including when spanning multiple index partitions,
+ * etc. The unit tests in {@link TestCopyStream} are only required to test the
+ * logic that breaks down the {@link FileVersionOutputStream} into a sequence of
+ * atomic append operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -62,12 +61,6 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
         
     }
 
-    /*
-     * @todo the stream tests should focus on a pipe model where you obtain an
-     * OutputStream for a file version and write on it and it periodically
-     * flushes blocks to the file version.
-     */
-    
     /**
      * Copies a short stream onto a file version and reads it back.
      */
@@ -109,12 +102,43 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
 
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertSameIterator("block identifiers", new Long[] { 0L }, repo.blocks(
+                id, version));
 
-        assertEquals("data", expected, actual);
+        assertEquals("data", expected, read(repo.inputStream(id, version)));
 
     }
 
+    /**
+     * Test copy of an stream containing exactly one byte less than a full block
+     * of data.
+     * 
+     * @throws IOException
+     */
+    public void test_copyStream_nearlyFullBlock() throws IOException {
+        
+        final String id = "test";
+        
+        final int version = 0;
+        
+        Random r = new Random();
+        
+        final byte[] expected = new byte[BLOCK_SIZE - 1];
+        
+        r.nextBytes(expected);
+        
+        assertEquals("nbytes", expected.length, repo.copyStream(id, version,
+                new ByteArrayInputStream(expected)));
+
+        assertEquals("blockCount", 1, repo.getBlockCount(id, version));
+
+        assertSameIterator("block identifiers", new Long[] { 0L }, repo.blocks(
+                id, version));
+
+        assertEquals("data", expected, read(repo.inputStream(id, version)));
+
+    }
+    
     /**
      * Test copy of an stream containing exactly one block's data.
      * 
@@ -137,9 +161,40 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
 
         assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        assertSameIterator("block identifiers", new Long[] { 0L }, repo.blocks(
+                id, version));
 
-        assertEquals("data", expected, actual);
+        assertEquals("data", expected, read(repo.inputStream(id, version)));
+
+    }
+
+    /**
+     * Test copy of an stream containing exactly one byte more than a full block
+     * of data.
+     * 
+     * @throws IOException
+     */
+    public void test_copyStream_fullBlockPlusOne() throws IOException {
+        
+        final String id = "test";
+        
+        final int version = 0;
+        
+        Random r = new Random();
+        
+        final byte[] expected = new byte[BLOCK_SIZE + 1];
+        
+        r.nextBytes(expected);
+        
+        assertEquals("nbytes", expected.length, repo.copyStream(id, version,
+                new ByteArrayInputStream(expected)));
+
+        assertEquals("blockCount", 2, repo.getBlockCount(id, version));
+
+        assertSameIterator("block identifiers", new Long[] { 0L, 1L }, repo
+                .blocks(id, version));
+
+        assertEquals("data", expected, read(repo.inputStream(id, version)));
 
     }
 
@@ -201,15 +256,16 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
 
             assertEquals("blockCount", 1, repo.getBlockCount(id, version));
 
-            final byte[] actual = read(repo.inputStream(id, version));
+            assertSameIterator("block identifiers", new Long[] { 0L }, repo
+                    .blocks(id, version));
 
-            assertEquals("data", expected, actual);
+            assertEquals("data", expected, read(repo.inputStream(id, version)));
 
-            log.warn("There were " + nzero + " zero length blocks and " + nfull
-                    + " full length blocks out of " + LIMIT + " trials");
-            
         }
         
+        log.warn("There were " + nzero + " zero length blocks and " + nfull
+                + " full length blocks out of " + LIMIT + " trials");
+                
     }
 
     /**
@@ -238,9 +294,22 @@ public class TestCopyStream extends AbstractRepositoryTestCase {
 
         assertEquals("blockCount", N+1, repo.getBlockCount(id, version));
 
-        final byte[] actual = read(repo.inputStream(id, version));
+        {
 
-        assertEquals("data", expected, actual);
+            final Long[] blockIds = new Long[N + 1];
+            
+            for (int i = 0; i < N + 1; i++) {
+            
+                blockIds[i] = (long) i;
+                
+            }
+            
+            assertSameIterator("block identifiers", blockIds, repo.blocks(id,
+                    version));
+
+        }
+
+        assertEquals("data", expected, read(repo.inputStream(id, version)));
     }
     
     /**
