@@ -162,7 +162,10 @@ public class SparseRowStore {
     static final String UTF8 = "UTF-8";
     
     private final IIndex ndx;
+    
+    // FIXME Thread safety.
     final IKeyBuilder keyBuilder;
+    
     private final Schema schema;
     
     /**
@@ -432,10 +435,15 @@ public class SparseRowStore {
 
             /*
              * FIXME this needs to be done server-side during the unisolated
-             * operation. It should not be a distinct timestamp if we allow
+             * operation.
+             * 
+             * @todo It should not be a distinct timestamp if we allow
              * concurrent unisolated operations in the same commit group to
-             * overwrite one another.
+             * overwrite one another (alternatively, the behavior here could be
+             * governed by the metadata for the sparse row store index so some
+             * applications could insist on distrint timestamps).
              */
+
             timestamp = System.currentTimeMillis();
 
         }
@@ -444,7 +452,7 @@ public class SparseRowStore {
          * Get the column value that corresponds to the primary key for this
          * row.
          */
-        Object primaryKey = row.get(schema.getPrimaryKey());
+        final Object primaryKey = row.get(schema.getPrimaryKey());
 
         if (primaryKey == null) {
 
@@ -453,6 +461,9 @@ public class SparseRowStore {
             
         }
 
+        log.info("Schema=" + schema + ", primaryKey=" + schema.getPrimaryKey()
+                + ", value=" + primaryKey);
+        
         // force the row into order by column name.
         if(! (row instanceof SortedMap)) {
 
@@ -587,26 +598,50 @@ public class SparseRowStore {
      * and a variable length primary key. Another approach is to fill the
      * variable length primary key to a set length...
      */
-    protected IKeyBuilder appendPrimaryKey(Object v) {
+    protected IKeyBuilder appendPrimaryKey(Object v, boolean successor) {
         
         KeyType keyType = schema.getPrimaryKeyType();
         
-        switch(keyType) {
+        if (successor) {
+            
+            switch (keyType) {
 
-        case Integer:
-            return keyBuilder.append(((Number)v).intValue());
-        case Long:
-            return keyBuilder.append(((Number)v).longValue());
-        case Float:
-            return keyBuilder.append(((Number)v).floatValue());
-        case Double:
-            return keyBuilder.append(((Number)v).doubleValue());
-        case Unicode:
-            return keyBuilder.append(v.toString());
-        case ASCII:
-            return keyBuilder.appendASCII(v.toString());
-        case Date:
-            return keyBuilder.append(((Date)v).getTime());
+            case Integer:
+                return keyBuilder.append(successor(((Number) v).intValue()));
+            case Long:
+                return keyBuilder.append(successor(((Number) v).longValue()));
+            case Float:
+                return keyBuilder.append(successor(((Number) v).floatValue()));
+            case Double:
+                return keyBuilder.append(successor(((Number) v).doubleValue()));
+            case Unicode:
+                return keyBuilder.appendText(v.toString(), true/*unicode*/, true/*successor*/);
+            case ASCII:
+                return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/);
+            case Date:
+                return keyBuilder.append(successor(((Date) v).getTime()));
+            }
+            
+        } else {
+            
+            switch (keyType) {
+
+            case Integer:
+                return keyBuilder.append(((Number) v).intValue());
+            case Long:
+                return keyBuilder.append(((Number) v).longValue());
+            case Float:
+                return keyBuilder.append(((Number) v).floatValue());
+            case Double:
+                return keyBuilder.append(((Number) v).doubleValue());
+            case Unicode:
+                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
+            case ASCII:
+                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
+            case Date:
+                return keyBuilder.append(((Date) v).getTime());
+            }
+            
         }
 
         return keyBuilder;
@@ -641,14 +676,14 @@ public class SparseRowStore {
         case Double:
             return SuccessorUtil.successor(((Number)v).doubleValue());
         case Unicode:
+        case ASCII:
             /*
              * Note: See toKey() for how to correctly form the sort key for the
              * successor of a Unicode value.
              */
             throw new UnsupportedOperationException();
 //            return SuccessorUtil.successor(v.toString());
-        case ASCII:
-            return SuccessorUtil.successor(v.toString());
+//            return SuccessorUtil.successor(v.toString());
         case Date:
             return SuccessorUtil.successor(((Date)v).getTime());
         }
@@ -676,7 +711,7 @@ public class SparseRowStore {
         keyBuilder.append(schema.getSchemaBytes());
         
         // append the (encoded) primary key.
-        appendPrimaryKey(primaryKey);
+        appendPrimaryKey(primaryKey,false/*successor*/);
         
         return keyBuilder;
 
@@ -699,36 +734,10 @@ public class SparseRowStore {
 
         // append the (encoded) schema name.
         keyBuilder.append(schema.getSchemaBytes());
-        
-        // append the (encoded) successor of the primary key.
-        if (schema.getPrimaryKeyType() == KeyType.Unicode) {
 
-            /*
-             * Form the successor of a Unicode key.
-             * 
-             * Note: The sort key generated by a Collator from a Unicode key
-             * with a trailing nul character will be identical to the sort key
-             * generated without the trailing nul, rendering the two keys
-             * indestiguisable in the index, unless the Collator strength is
-             * IDENTICAL (which is too costly).
-             * 
-             * Therefore, we append a trailing nul ourselves so that it is
-             * guarenteed to make it into the generated key. 
-             */
-            
-            appendPrimaryKey(primaryKey).appendNul();
-            
-        } else {
-            
-            /*
-             * For all other data types we form the successor first and then
-             * append it into the key.
-             */
-            
-            appendPrimaryKey(successor(primaryKey));
-            
-        }
-        
+        // append successor of the (encoded) primary key.
+        appendPrimaryKey(primaryKey, true/*successor*/);
+
         return keyBuilder;
 
     }

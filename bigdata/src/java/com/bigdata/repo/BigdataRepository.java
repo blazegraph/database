@@ -6,11 +6,17 @@ package com.bigdata.repo;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -32,7 +38,6 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
@@ -56,6 +61,9 @@ import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A distributed file system with extensible metadata and atomic append
@@ -139,15 +147,16 @@ import com.bigdata.sparse.SparseRowStore;
  * file. The file may grow arbitrarily large. Clients may begin to read from the
  * file as soon as the first block has been flushed.
  * <p>
- * Use case: Queue-like mechanisms MAY be created. A file version is written by
- * clients that ensure that records never cross block boundaries (e.g., by
- * flushing a partial block if the next record would cause the block to
- * overflow). A master reads from the head of the file version, obtaining a set
- * of records. Those records are distributed to clients for processing. Once all
- * records in the head of the block have been consumed the master performs an
- * atomic delete of the head block. Clients MAY continue to append to the file
- * version while the master is running. The result is a block oriented queue
- * sharing many features of the map/reduce architecture.
+ * Use case: Queues MAY be built from the operations to atomically read or
+ * delete the first block for the file version. The "design pattern" is to have
+ * clients append blocks to the file version, taking care that logical rows
+ * never cross a block boundary (e.g., by flushing partial blocks). A master
+ * then reads the head block from the file version, distributing the logical
+ * records therein to consumers and providing fail safe processing in case
+ * consumers die or take too long. Once all records for the head block have been
+ * processed the master simply deletes the head block. This "pattern" is quite
+ * similar to map/reduce and, like map/reduce, requires that the consumer
+ * operations may be safely re-run.
  * <p>
  * Use case: File replication, retention of deleted versions, and media indexing
  * are administered by creating "zones" comprising one or more index partitions
@@ -167,7 +176,7 @@ import com.bigdata.sparse.SparseRowStore;
  *       exist.
  * 
  * @todo implement "zones" and their various policies (replication, retention,
- *       and media indexing).
+ *       and media indexing).  access control could also be part of the zones.
  * 
  * @todo compacting merge policies. consider how data is eradicated from the
  *       metadata and data indices and that it might not be "atomically"
@@ -212,6 +221,11 @@ import com.bigdata.sparse.SparseRowStore;
  * @todo create an abstract base class and derive two versions: one runs against
  *       and embedded data service (supports restart but does not use jini) and
  *       the other runs against a federation (scale-out deployment).
+ * 
+ * @todo do we need a global lock mechanism to prevent concurrent
+ *       create/update/delete of the same file? a distributed lease-based lock
+ *       system derived from jini or built ourselves? Can this be supported with
+ *       the historical and not yet purged timestamped metadata for the file?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -305,9 +319,6 @@ public class BigdataRepository implements ContentRepository {
      *       defined.)
      * 
      * @todo other obvious metadata would include the user identifier.
-     * 
-     * @todo if permissions are developed for the file system (a nightmare) then
-     *       that metadata would go here as well.
      */
     public static class MetadataSchema extends Schema {
         
@@ -349,7 +360,7 @@ public class BigdataRepository implements ContentRepository {
         
         public MetadataSchema() {
             
-            super("metadata", "id", KeyType.Unicode);
+            super("metadata", ID, KeyType.Unicode);
             
         }
         
@@ -498,125 +509,371 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
-     * @todo do we need a global lock mechanism to prevent concurrent
-     *       create/update/delete of the same file? Perhaps a lease-based lock?
-     *       Can this be supported with the historical and not yet purged
-     *       timestamped metadata for the file?
+     * Creates a new file version from the specified metadata. The new file
+     * version will not have any blocks. You can use either stream-oriented or
+     * block oriented IO to write data on the newly created file version.
+     * 
+     * @param metadata
+     *            The file metadata.
+     * 
+     * @return The new version identifier.
      */
-    public void create(Document document) {
+    public int create(Map<String, Object> metadata) {
+
+        if (metadata == null)
+            throw new IllegalArgumentException();
+
+        // check required properties.
+        assertString(metadata, MetadataSchema.ID);
+        assertString(metadata, MetadataSchema.CONTENT_TYPE);
+
+        // FIXME specify auto-increment counter for VERSION.
+        metadata.put(MetadataSchema.VERSION,Integer.valueOf(0));
         
-        if (document == null)
+        // write the metadata (atomic operation).
+        metadataIndex.write(metadata, AUTO_TIMESTAMP);
+
+        /*
+         * FIXME Consider making this the auto-assigned timestamp generated by
+         * the {@link SparseRowStore}. Otherwise the {@link SparseRowStore} API
+         * will need more revising in order to support the side-effect return of
+         * the new version identifier.
+         */
+        final int version = 0;
+
+        return version;
+        
+    }
+    
+    public void create(Document doc) {
+        
+        if (doc == null)
             throw new IllegalArgumentException();
         
-        final String id = document.getId(); 
+        final String id = doc.getId(); 
         
         if (id == null)
             throw new RuntimeException("The " + MetadataSchema.ID
                     + " property must be defined.");
+
+        /*
+         * copy metadata from the document header.
+         */
+        final Map<String,Object> metadata = new HashMap<String,Object>();
         
-        if ( read( id ) != null ) {
-            
-            throw new ExistsException(id);
-            
-        }
-        
-        Map<String,Object> properties = new HashMap<String,Object>();
-        
-        Iterator<PropertyValue> itr = document.propertyValues();
+        final Iterator<PropertyValue> itr = doc.propertyValues();
         
         while(itr.hasNext()) {
             
             PropertyValue tmp = itr.next();
             
-            properties.put(tmp.getName(), tmp.getValue());
+            metadata.put(tmp.getName(), tmp.getValue());
+
+            log.info("copying metadata: [" + tmp.getName() + "]=["
+                    + tmp.getValue() + "]");
             
         }
 
-        // required properties.
-        assertString(properties, MetadataSchema.ID);
-        assertString(properties, MetadataSchema.CONTENT_TYPE);
-        assertString(properties, MetadataSchema.CONTENT_ENCODING);
-//        assertLong(properties, MetadataSchema.CONTENT_LENGTH);
-
-        // write the metadata (atomic operation).
-        metadataIndex.write(properties, AUTO_TIMESTAMP);
+        /*
+         * create new file version.
+         */
+        final int version = create(metadata);
 
         /*
-         * FIXME Lookup and increment. Until we have overflow of the journal
-         * this does not matter since we will never encounter the problems that
-         * file versions are designed to solve (but of course you will not be
-         * able to access the historical versions of the file).
+         * copy data from the document.
          */
-        final int version = 0;
-
-        copyStream(id, version, document.getInputStream());
+        copyStream(id, version, doc.getInputStream());
         
     }
     
-    public Document read(String id) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
     /**
-     * Return the current metadata for the file.
-     * <p>
-     * Note: This method will return metadata for a file whose most recent
-     * version is deleted.
+     * Reads the document metadata for the current version of the specified
+     * file.
      * 
      * @param id
      *            The file identifier.
      * 
-     * @return The most recent metadata for that file.
+     * @return A read-only view of the file version that is capable of reading
+     *         the content from the repository -or- <code>null</code> iff
+     *         there is no current version for that file identifier.
      */
-    public Map<String,Object> _read(String id) {
-        // TODO Auto-generated method stub
-        return null;
+    public Document read(String id) {
+
+        RepositoryDocumentImpl doc = new RepositoryDocumentImpl(this, id);
+
+        if (!doc.exists()) {
+
+            // no current version for that document.
+            
+            log.info("No current version: id="+id);
+            
+            return null;
+            
+        }
+        
+        return doc;
+        
+    }
+    
+    /**
+     * A read-only view of a {@link Document} that has been read from a
+     * {@link BigdataRepository}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class RepositoryDocumentImpl implements DocumentHeader, Document 
+    {
+        
+        final BigdataRepository repo;
+        
+        final String id;
+        
+        final private Map<String,Object> metadata;
+        
+        /**
+         * Create a new empty document.
+         */
+        public RepositoryDocumentImpl(BigdataRepository repo,String id)
+        {
+
+            this.repo = repo;
+            
+            this.id = id;
+            
+            log.info("Reading metadata : id="+id);
+            
+            this.metadata = repo.getMetadataIndex().read(id);
+
+            if(metadata==null) {
+
+                log.warn("id=" + id + " : no current version");
+
+                return;
+                
+            }
+            
+            log.info("id=" + id + ", version=" + getVersion());
+            
+            if(DEBUG) {
+                
+                Iterator<Map.Entry<String,Object>> itr = metadata.entrySet().iterator();
+                
+                while(itr.hasNext()) {
+                    
+                    Map.Entry<String, Object> entry = itr.next();
+                    
+                    log.debug("id=" + id + ", version=" + getVersion() + ", ["
+                            + entry.getKey() + "]=[" + entry.getValue() + "]");
+                    
+                }
+                
+            }
+            
+        }
+        
+        private void assertExists() {
+
+            if (metadata == null)
+                throw new IllegalStateException("No current version: id="+id);
+            
+        }
+        
+        public boolean exists() {
+            
+            return metadata != null;
+            
+        }
+        
+        public InputStream getInputStream() {
+
+            assertExists();
+            
+            return repo.inputStream(id,getVersion());
+            
+        }
+        
+        public Reader getReader() throws UnsupportedEncodingException {
+
+            assertExists();
+
+            return repo.reader(id, getVersion(), getContentEncoding());
+
+        }
+
+        public int getVersion() {
+
+            assertExists();
+
+            return (Integer)metadata.get(MetadataSchema.VERSION);
+
+        }
+        
+        public String getContentEncoding() {
+
+            assertExists();
+            
+            return (String)metadata.get(MetadataSchema.CONTENT_ENCODING);
+            
+        }
+
+        public String getContentType() {
+         
+            assertExists();
+
+            return (String)metadata.get(MetadataSchema.CONTENT_TYPE);
+            
+        }
+
+        public String getId() {
+
+            return id;
+            
+        }
+
+        /**
+         * Read-only view of the file version metadata.
+         */
+        public Map<String,Object> getMetadata() {
+
+            assertExists();
+
+            return Collections.unmodifiableMap( metadata );
+            
+        }
+        
+        public Iterator<PropertyValue> propertyValues() {
+
+            assertExists();
+
+            return new Striterator(metadata.entrySet().iterator())
+                    .addFilter(new Resolver() {
+
+                        private static final long serialVersionUID = 1L;
+
+                        protected Object resolve(Object arg0) {
+
+                            Map.Entry<String, Object> entry = (Map.Entry<String, Object>) arg0;
+
+                            return new PropertyValueImpl(entry.getKey(), entry
+                                    .getValue());
+
+                        }
+                    });
+
+        }
+
     }
 
     /**
-     * Note: This interface replaces a files content.  if you want to append to
-     * an existing file use {@link #atomicAppend(String, int, byte[])} or
-     * {@link #writeContent(String, InputStream)}.
-     * 
-     * FIXME Update that overwrites the content of the file MUST assign a new
-     * file version identifer!
+     * Create a new file version from the document.
+     * <p>
+     * Note: This is essentially a delete + create operation. Since the combined
+     * operation is NOT atomic it is possible that conflicts can arise when more
+     * than one client attempts to update a file concurrently.
      */
-    public void update(Document document) {
-        // TODO Auto-generated method stub
+    public void update(Document doc) {
+        
+        // delete the existing file version (if any).
+        delete(doc.getId());
+        
+        // create a new file version.
+        create(doc);
         
     }
 
     /**
-     * FIXME define a range-delete operation so we do not have to materialize
-     * the keys to delete the data. This can be just an {@link IIndexProcedure}
-     * but it should not extend {@link IndexProcedure} since that expects the
-     * serialization of keys and values with the request. In fact, a common base
-     * class could doubtless be identified for use with the range iterator as
-     * well.
      * 
-     * FIXME delete MUST indicate that the current file version identifier is no
-     * longer valid such that a subsequent create will use a new file version
-     * identifier.
+     * @todo make this more efficient at deleting the blocks comprising the file
+     *       version.
      */
-    public void delete(String id) {
-        // TODO Auto-generated method stub
+    public boolean delete(String id) {
+
+        final RepositoryDocumentImpl doc = (RepositoryDocumentImpl) read(id);
+        
+        if (id == null) {
+            
+            // no current version.
+            
+            return false;
+            
+        }
+        
+        final int version = doc.getVersion();
+        
+        /*
+         * Delete blocks from the file version.
+         * 
+         * FIXME define a range-delete operation so we do not have to
+         * materialize the keys to delete the data. This can be just an
+         * {@link IIndexProcedure} but it should not extend
+         * {@link IndexProcedure} since that expects the serialization of keys
+         * and values with the request. In fact, a common base class could
+         * doubtless be identified for use with the range iterator as well.
+         */
+        {
+
+            final Iterator<Long> itr = blocks(id, version);
+
+            long n = 0;
+
+            while (itr.hasNext()) {
+
+                long block = itr.next();
+
+                n++;
+
+                deleteBlock(id, version, block);
+
+            }
+
+            log.info("Deleted " + n + " blocks : id=" + id + ", version="
+                    + version);
+
+        }
+        
+        /*
+         * FIXME do we mark file version as deleted with a flag or delete all
+         * metadata for the file version? In the latter case, how do we do a
+         * high-level read of a deleted file? By scanning the metadata and
+         * choosing a file version based on a specific timestamp? Also, how do
+         * we do an atomic "delete" of the logical row - that needs to be a
+         * sparse row store API method.
+         * 
+         * FIXME delete MUST indicate that the current file version identifier
+         * is no longer valid such that a subsequent create will use a new file
+         * version identifier.
+         */
+        
+        Map<String,Object> metadata = new HashMap<String,Object>();
+        
+        metadata.put(MetadataSchema.ID,Long.valueOf(id));
+        metadata.put(MetadataSchema.VERSION,Integer.valueOf(version));
+//        metadata.put(MetadataSchema.DELETED,Boolean.TRUE);
+        
+        getMetadataIndex().write(metadata, AUTO_TIMESTAMP);
+
+        return true;
         
     }
 
     public void deleteAll(String fromId, String toId) {
-        // TODO Auto-generated method stub
-        
+        /*
+         * TODO Delete all documents in range and all blocks for those documents
+         * as well. I.e., a range delete on both the file metadata and the file
+         * data indices.
+         */
+        throw new UnsupportedOperationException();
     }
 
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId, String toId) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     public Iterator<String> search(String query) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     /*
@@ -1935,6 +2192,76 @@ public class BigdataRepository implements ContentRepository {
         return nblocks;
         
     }
+
+    /**
+     * Return a {@link Writer} that will <em>append</em> character data on the
+     * file version. Characters written on the {@link Writer} will be converted
+     * to bytes using the specified encoding. Bytes will be buffered until the
+     * block is full and then written on the file version using an atomic
+     * append. An {@link Writer#flush()} will force a non-empty partial block to
+     * be written immediately.
+     * <p>
+     * Note: Map/Reduce processing of a file version MAY be facilitated greatly
+     * by ensuring that "records" never cross a block boundary - this means that
+     * file versions can be split into blocks and blocks distributed to clients
+     * without any regard for the record structure within those blocks. The
+     * caller can prevent records from crossing block boundaries by the simple
+     * expediency of invoking {@link Writer#flush()} to force the atomic append
+     * of a (partial but non-empty) block to the file.
+     * <p>
+     * Since the characters are being converted to bytes, the caller MUST make
+     * {@link Writer#flush()} decisions with an awareness of the expansion rate
+     * of the specified encoding. For simplicity, it is easy to specify
+     * <code>UTF-16</code> in which case you can simply count two bytes
+     * written for each character written.
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The version identifier.
+     * @param encoding
+     *            The character set encoding.
+     * 
+     * @return The writer on which to write the character data.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    public Writer writer(String id, int version, String encoding)
+            throws UnsupportedEncodingException {
+        
+        log.info("id="+id+", version="+version+", encoding="+encoding);
+
+        return new OutputStreamWriter(outputStream(id, version), encoding);
+        
+    }
+    
+    /**
+     * Read character data from a file version.
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The version identifier.
+     * @param encoding
+     *            The character set encoding.
+     *            
+     * @return The reader from which you can read the character data.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    public Reader reader(String id, int version, String encoding) throws UnsupportedEncodingException {
+
+        log.info("id="+id+", version="+version+", encoding="+encoding);
+        
+        if (encoding == null) {
+
+            throw new IllegalStateException();
+            
+        }
+        
+        return new InputStreamReader(inputStream(id, version), encoding);
+
+    }
     
     /**
      * Read data from a file version.
@@ -1956,6 +2283,8 @@ public class BigdataRepository implements ContentRepository {
      *         are allowed.
      */
     public FileVersionInputStream inputStream(String id,int version) {
+
+        log.info("id="+id+", version="+version);
 
         /*
          * Range count the file and version on the federation - this is the
@@ -2020,10 +2349,12 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Return an output stream that will <em>append</em> on the file version.
      * Bytes written on the output stream will be buffered until they are full
-     * blocks and then written on the file version using an atomic append.
+     * blocks and then written on the file version using an atomic append. An
+     * {@link OutputStream#flush()} will force a non-empty partial block to be
+     * written immediately.
      * <p>
-     * Note: Map/Reduce processing of files MAY be facilitated greatly by
-     * ensuring that "records" never cross a block boundary - this means that
+     * Note: Map/Reduce processing of a file version MAY be facilitated greatly
+     * by ensuring that "records" never cross a block boundary - this means that
      * files can be split into blocks and blocks distributed to clients without
      * any regard for the record structure within those blocks. The caller can
      * prevent records from crossing block boundaries by the simple expediency
@@ -2038,6 +2369,8 @@ public class BigdataRepository implements ContentRepository {
      * @return The output stream.
      */
     public OutputStream outputStream(String id, int version) {
+
+        log.info("id="+id+", version="+version);
 
         return new FileVersionOutputStream(this, id, version);
 

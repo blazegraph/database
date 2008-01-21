@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
+
 
 /**
  * Utility methods for computing the successor of a value for various data
@@ -521,18 +523,20 @@ public class SuccessorUtil {
      *             If all bytes overflow.
      * @throws NoSuccessorException
      *             If the byte[] has zero length.
+     * 
+     * @todo unit tests when offset is non-zero.
      */
     static public byte[] successor(byte[] b, int off, int len) {
 
         if (len == 0) {
 
-            throw new NoSuccessorException();
+            throw new NoSuccessorException("Empty byte[]");
             
         }
         
         boolean overflow = false;
 
-        for (int i = len - 1; i >= off; i--) {
+        for (int i = off+len - 1; i >= off; i--) {
 
 //            overflow = b[i] == Byte.MAX_VALUE;
             overflow = b[i] == (byte)-1; // Note: largest 8-bit value == 1111 1111
@@ -554,7 +558,7 @@ public class SuccessorUtil {
         }
         
         // overflow for the entire bit string.
-        throw new NoSuccessorException();
+        throw new NoSuccessorException("Overflow");
         
     }
     

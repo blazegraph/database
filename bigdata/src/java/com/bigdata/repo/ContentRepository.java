@@ -36,14 +36,10 @@ public interface ContentRepository
     /**
      * Update an existing persistent document in this repository based on the
      * metadata and content in the supplied document object. The document to be
-     * updated will be identified by the {@link DocumentHeader#getURI()} method.
+     * updated will be identified by the {@link DocumentHeader#getId()} method.
      * 
      * @param document
      *            an object containing the content and metadata to update
-     * 
-     * @todo it would be nice if there were a way to indicate that only the
-     *       metadata was to be updated, e.g., by passing in a
-     *       {@link DocumentHeader}.
      */
     void update( Document document );
     
@@ -53,13 +49,9 @@ public interface ContentRepository
      * @param id
      *            the identifier of the document to delete
      * 
-     * @throws NotFoundException
-     *             if the identifier document does not exist.
-     *             
-     * @todo throw exception or return <code>true</code> iff the repository
-     *       was modified (ie., iff the document existed and was deleted).
+     * @return true iff the identified document was deleted.
      */
-    void delete(String id);
+    boolean delete(String id);
     
     /**
      * Delete all documents in the identified key range.
