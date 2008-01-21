@@ -79,12 +79,9 @@ public class TestAll extends TestCase {
         // test some specifics of the FileVersionOutputStream.
         suite.addTestSuite( TestFileVersionOutputStream.class );
         
-        // test atomic random block read / write operations.
-        suite.addTestSuite( TestBlockWrite.class );
+        // test random block read / write / update / delete operations.
+        suite.addTestSuite( TestRandomBlockOps.class );
         
-        // test atomic operations supporting queues.
-        suite.addTestSuite( TestBlockQueue.class );
-
         /*
          * These two tests should be part of the map/reduce master test suite.
          * 
@@ -118,7 +115,7 @@ public class TestAll extends TestCase {
          * media indexing policy could also be per-zone. A "zone" corresponds to
          * a set of index partitions.
          */
-        suite.addTestSuite( TestMetadataIndex.class );
+        suite.addTestSuite( TestFileMetadataIndex.class );
  
         // @todo test document metadata range scan and range delete.
         

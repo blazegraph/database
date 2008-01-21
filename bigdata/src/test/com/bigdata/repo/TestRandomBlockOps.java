@@ -42,30 +42,21 @@ import junit.framework.TestCase;
  * and delete.  There are also some unit tests for atomic append after random
  * write since random writes can leave "holes" in files.
  * 
- * @todo test correct rejection.
- * 
- * @todo a stress test in which we keep the data on hand - for one file version
- *       and for many. this could be based on a generated sequence of
- *       operations.
- * 
- * @todo tests where a partial block is replaced, including by an empty block,
- *       another partial block, or a full block.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBlockWrite extends AbstractRepositoryTestCase {
+public class TestRandomBlockOps extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestBlockWrite() {
+    public TestRandomBlockOps() {
     }
 
     /**
      * @param arg0
      */
-    public TestBlockWrite(String arg0) {
+    public TestRandomBlockOps(String arg0) {
         super(arg0);
     }
 

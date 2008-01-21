@@ -56,12 +56,51 @@ public class DocumentHeaderImpl implements DocumentHeader
 
     }
 
+    /**
+     * Package private method sets the file version.
+     * 
+     * @param version
+     *            The file version.
+     */
+    void getVersion(int version) {
+        
+        properties.put(MetadataSchema.VERSION,Integer.valueOf(version));
+        
+    }
+
     public void setContentType(String contentType) {
 
         properties.put(MetadataSchema.CONTENT_TYPE, contentType);
 
     }
 
+    /**
+     * Gte an arbitrary property value.
+     * 
+     * @param property
+     *            The property name.
+     * @return The value.
+     */
+    public Object get(String property) {
+
+        return properties.get(property);
+        
+    }
+    
+    /**
+     * Set an arbitrary property value.
+     * 
+     * @param property
+     *            The property name.
+     * @param value
+     *            The value.
+     */
+    public void set(String property, Object value) {
+
+        properties.put(property, value);
+        
+    }
+    
     public void setContentEncoding(String contentEncoding) {
 
         properties.put(MetadataSchema.CONTENT_ENCODING, contentEncoding);
@@ -74,6 +113,17 @@ public class DocumentHeaderImpl implements DocumentHeader
         
     }
 
+    public int getVersion() {
+        
+        Integer version = (Integer) properties.get(MetadataSchema.VERSION);
+
+        if (version == null)
+            throw new IllegalStateException("No version");
+        
+        return version.intValue();
+        
+    }
+    
     public String getContentType() {
 
         return (String) properties.get(MetadataSchema.CONTENT_TYPE);
@@ -86,13 +136,6 @@ public class DocumentHeaderImpl implements DocumentHeader
         return (String) properties.get(MetadataSchema.CONTENT_ENCODING);
         
     }
-
-//    public long getContentLength() {
-//
-//        return ((Long) properties.get(MetadataSchema.CONTENT_LENGTH))
-//                .longValue();
-//        
-//    }
 
     public Iterator<PropertyValue> propertyValues() {
 

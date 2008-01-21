@@ -31,6 +31,8 @@ package com.bigdata.repo;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringWriter;
 
 import com.bigdata.service.AbstractEmbeddedBigdataFederationTestCase;
 
@@ -88,7 +90,7 @@ public class AbstractRepositoryTestCase extends
      * 
      * @throws IOException
      */
-    public static byte[] read( InputStream is ) throws IOException
+    protected static byte[] read( InputStream is ) throws IOException
     {
 
         final boolean close = true;
@@ -129,4 +131,48 @@ public class AbstractRepositoryTestCase extends
         
     }
         
+    /**
+     * Suck the character data from the reader into a string.
+     * 
+     * @param reader
+     * 
+     * @return
+     * 
+     * @throws IOException
+     */
+    protected static String read( Reader reader ) throws IOException
+    {
+        
+        StringWriter writer = new StringWriter();
+        
+        try {
+            
+            int i;
+            
+            while ( ( i = reader.read() ) != -1 ) {
+                
+                writer.write( i );
+                
+            }
+            
+        } finally {
+            
+            try {
+                
+                reader.close();
+                
+                writer.close();
+                
+            } catch ( Exception ex ) {
+                
+                log.warn( "Could not close reader/writer: "+ex, ex );
+                
+            }
+            
+        }
+        
+        return writer.toString();
+        
+    }
+
 }

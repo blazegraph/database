@@ -28,36 +28,113 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.repo;
 
+import java.io.IOException;
+
+import com.bigdata.repo.BigdataRepository.RepositoryDocumentImpl;
+
 /**
  * Test operations on the file metadata index for the {@link BigdataRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMetadataIndex extends AbstractRepositoryTestCase {
+public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    public TestMetadataIndex() {
+    public TestFileMetadataIndex() {
     }
 
     /**
      * @param arg0
      */
-    public TestMetadataIndex(String arg0) {
+    public TestFileMetadataIndex(String arg0) {
         super(arg0);
     }
 
     /**
+     * 
+     * @throws IOException
+     */
+    public void test_create_binary01() throws IOException {
+        
+        final String id = "test";
+        
+        final String mimeType = "application/octet-stream";
+        
+        final byte[] content = new byte[]{1,2,3,4,5,6};
+        
+        DocumentImpl doc = new DocumentImpl();
+        
+        doc.setId(id);
+        
+        doc.setContentType(mimeType);
+        
+        doc.set("foo","bar");
+        
+        doc.copyStream(content);
+        
+        repo.create(doc);
+
+        Document actual = repo.read(id);
+        
+        assertEquals("version", 0, ((RepositoryDocumentImpl) actual)
+                .getVersion());
+
+        assertEquals("Content-Type", mimeType, actual.getContentType());
+
+        assertEquals("content", content, read(actual.getInputStream()));
+
+    }
+    
+    /**
+     * Test create a document with text content and verifies that we can read
+     * back its metadata and textual content.
+     * 
+     * @throws IOException
+     * 
      * @todo test create of a file without any content and read back of its
      *       metadata.
      * 
      * @todo test create of a file with content, read back its metadata and
      *       verify that the data was written into the data index as well.
      */
-    public void test_create01() {
+    public void test_create_text01() throws IOException {
         
+        final String id = "test";
+        
+        final String encoding = "UTF-8";
+        
+        final String mimeType = "text/plain; charset="+encoding;
+        
+        final String content = "Hello world!";
+        
+        DocumentImpl doc = new DocumentImpl();
+        
+        doc.setId(id);
+        
+        doc.setContentType(mimeType);
+        
+        doc.setContentEncoding(encoding);
+        
+        doc.set("foo","bar");
+        
+        doc.copyString(encoding, content);
+        
+        repo.create(doc);
+
+        Document actual = repo.read(id);
+        
+        assertEquals("version", 0, ((RepositoryDocumentImpl) actual)
+                .getVersion());
+
+        assertEquals("Content-Type", mimeType, actual.getContentType());
+
+        assertEquals("Content-Encoding", encoding, actual.getContentEncoding());
+
+        assertEquals("content", content, read(actual.getReader()));
+
     }
     
     /**
@@ -65,6 +142,8 @@ public class TestMetadataIndex extends AbstractRepositoryTestCase {
      *       should this operation take place?)
      */
     public void test_delete01() {
+     
+        fail("write test");
         
     }
     
@@ -79,6 +158,8 @@ public class TestMetadataIndex extends AbstractRepositoryTestCase {
      */
     public void test_update01() {
         
+        fail("write test");
+        
     }
 
     /**
@@ -88,7 +169,9 @@ public class TestMetadataIndex extends AbstractRepositoryTestCase {
      *       low-level reads with the rest of the data index operations.
      */
     public void test_read() {
-        
+     
+        fail("write test");
+
     }
     
 }
