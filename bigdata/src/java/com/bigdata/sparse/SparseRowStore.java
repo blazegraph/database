@@ -24,23 +24,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sparse;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.SuccessorUtil;
+import com.bigdata.journal.ITimestampService;
+import com.bigdata.journal.Journal;
+import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 
 /**
@@ -61,18 +68,15 @@ import com.bigdata.service.IDataService;
  * Therefore, by default column values are loosely typed. However, column values
  * MAY be constrained by a {@link Schema}.
  * <p>
- * Note: Instances of this class are NOT thread-safe since the
- * {@link #keyBuilder} used by an instance is not thread-safe.
- * <p>
  * This class builds keys using the sparse row store design pattern. Each
- * logical row is modeled as an ordered set of BTree entries whose keys are
+ * logical row is modeled as an ordered set of index entries whose keys are
  * formed as:
  * </p>
  * 
  * <pre>
- *       
- *       [schemaName][primaryKey][columnName][timestamp]
- *       
+ *                 
+ *                 [schemaName][primaryKey][columnName][timestamp]
+ *                 
  * </pre>
  * 
  * <p>
@@ -110,31 +114,46 @@ import com.bigdata.service.IDataService;
  * </p>
  * 
  * <pre>
- *       
- *       [employee][12][DateOfHire][t0] : [4/30/02]
- *       [employee][12][DateOfHire][t1] : [4/30/05]
- *       [employee][12][Employer][t0]   : [SAIC]
- *       [employee][12][Employer][t1]   : [SYSTAP]
- *       [employee][12][Id][t0]         : [12]
- *       [employee][12][Name][t0]       : [Bryan Thompson]
- *       
+ *                 
+ *                 [employee][12][DateOfHire][t0] : [4/30/02]
+ *                 [employee][12][DateOfHire][t1] : [4/30/05]
+ *                 [employee][12][Employer][t0]   : [SAIC]
+ *                 [employee][12][Employer][t1]   : [SYSTAP]
+ *                 [employee][12][Id][t0]         : [12]
+ *                 [employee][12][Name][t0]       : [Bryan Thompson]
+ *                 
  * </pre>
  * 
  * <p>
  * 
+ * In order to read the logical row whose last update was <code>t0</code>,
+ * the caller would specify <code>t0</code> as the timestamp of interest. The
+ * values read in this example would be {&lt;DateOfHire, t0, 4/30/02&gt;,
+ * &lt;Employer, t0, SAIC&gt;, &lt;Id, t0, 12&gt;, &lt;Name, t0, Bryan
+ * Thompson&gt;}.
+ * </p>
+ * <p>
+ * Likewise, in order to read the logical row whose last update was
+ * &lt;code&gt;t1&lt;/code&gt; the caller would specify
+ * &lt;code&gt;t1&lt;/code&gt; as the timestamp of interest. The values read in
+ * this example would be {&lt;DateOfHire, t1, 4/30/05&gt;, &lt;Employer, t0,
+ * SYSTAP&gt;, &lt;Id, t0, 12&gt;, &lt;Name, t0, Bryan Thompson&gt;}. Notice
+ * that values written at &lt;code&gt;t0&lt;/code&gt; and not overwritten or
+ * deleted by &lt;code&gt;t1&lt;/code&gt; are present in the resulting logical
+ * row.
+ * </p>
+ * <p>
+ * Note: The constant {@link #MAX_TIMESTAMP} is commonly used to read the most
+ * current row from the sparse row store since its value is greater or equal to
+ * any valid timestamp.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Do not require unicode support for column names or values?
- * 
- * @todo disallow nul bytes in the schema and column names.
- * 
  * @todo We do not have a means to decode a primary key that is Unicode (or
- *       variable length). The problem is that the #of bytes in the primary key
- *       needs to be part of the overall key itself but that will distort the
- *       total key ordering unless it is VERY cleverly done.
- * 
+ *       variable length) ??? Is this true ???
+ *       
  * @todo support byte[] as a primary key type.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -142,9 +161,6 @@ import com.bigdata.service.IDataService;
  */
 public class SparseRowStore {
 
-    /**
-     * Log for btree opeations.
-     */
     protected static final Logger log = Logger.getLogger(SparseRowStore.class);
 
     /**
@@ -163,25 +179,44 @@ public class SparseRowStore {
     
     private final IIndex ndx;
     
-    // FIXME Thread safety.
-    final IKeyBuilder keyBuilder;
-    
-    private final Schema schema;
+//    private Schema schema;
     
     /**
-     * The value which indicates that the timestamp will be assigned by the
-     * server.
+     * The maximum value for a timestamp. This may be used to read the most
+     * current logical row from the sparse row store since the value is the
+     * largest timestamp that can be written into the index.
+     */
+    public static final long MAX_TIMESTAMP = Long.MAX_VALUE;
+    
+    /**
+     * A value which indicates that the timestamp will be assigned by the server -
+     * unique timestamps are NOT guarenteed with this constant.
+     * 
+     * @see #AUTO_TIMESTAMP_UNIQUE
      */
     public static final long AUTO_TIMESTAMP = -1L;
-
+    
     /**
-     * Return the {@link Schema} used by the {@link SparseRowStore}.
+     * A value which indicates that a unique timestamp will be assigned by
+     * the server.
+     * 
+     * @see #AUTO_TIMESTAMP
      */
-    public Schema getSchema() {
-        
-        return schema;
-        
-    }
+    public static final long AUTO_TIMESTAMP_UNIQUE = 0L;
+
+//    /**
+//     * Return the {@link Schema} used by the {@link SparseRowStore}.
+//     * 
+//     * @todo refactor the schema into a parameter to the read and write methods
+//     *       so that we can support more than one {@link Schema} using the same
+//     *       {@link SparseRowStore} object (you can already use more than one
+//     *       schema per backing index).
+//     */
+//    public Schema getSchema() {
+//        
+//        return schema;
+//        
+//    }
     
     /**
      * Create a client-side abstraction that treats and {@link IIndex} as a
@@ -189,338 +224,614 @@ public class SparseRowStore {
      * 
      * @param ndx
      *            The index.
-     * @param keyBuilder
-     *            Used to construct keys for the index.
-     * @param schema
-     *            The schema that defines how keys will be encoded.
      */
-    public SparseRowStore(IIndex ndx, IKeyBuilder keyBuilder, Schema schema) {
+    public SparseRowStore(IIndex ndx) {
         
         if(ndx==null) throw new IllegalArgumentException();
-
-        if(keyBuilder==null) throw new IllegalArgumentException();
-        
-        if(schema==null) throw new IllegalArgumentException();
         
         this.ndx = ndx;
-        
-        this.keyBuilder = keyBuilder;
-       
-        this.schema = schema;
         
     }
 
     /**
      * Read the most recent logical row from the index.
      * 
+     * @param keyBuilder
+     *            An object used to construct keys for the index.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * 
      * @param primaryKey
      *            The primary key that identifies the logical row.
-     *            
+     * 
      * @return The data in that row -or- <code>null</code> if there was no row
      *         for that primary key.
      */
-    public Map<String,Object> read(Object primaryKey) {
+    public Map<String,Object> read(IKeyBuilder keyBuilder, Schema schema, Object primaryKey) {
 
-        return read( primaryKey, -1L );
+        final long timestamp = Long.MAX_VALUE;
+        
+        final INameFilter filter = null;
+        
+        TPS tps = (TPS) read(keyBuilder, schema, primaryKey, timestamp, filter );
+
+        if (tps == null) {
+
+            return null;
+
+        }
+
+        return tps.asMap(timestamp,filter);
 
     }
     
     /**
      * Read a logical row from the index.
      * 
+     * @param keyBuilder
+     *            An object used to construct keys for the index.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     *            
      * @param primaryKey
      *            The primary key that identifies the logical row.
      * 
      * @param timestamp
-     *            The logical row having a timestamp not greater than this value
-     *            will be retrieved. In particular, older revisions of a column
-     *            value will be overwritten by more recent revisions of that
-     *            column value before the row is returned (revisions may include
-     *            the deletion of a column value, which is marked as a null
-     *            column value in the index). When -1L, the most recent logical
-     *            row will be retrieved.
+     *            Property values whose timestamps are not greater than this
+     *            value will be retrieved. Use {@link Long#MAX_VALUE} to read
+     *            the most current property values.
+     * 
+     * @param filter
+     *            An optional filter that may be used to select values for
+     *            property names accepted by the filter.
      * 
      * @return The data in that row -or- <code>null</code> if there was no row
      *         for that primary key.
      * 
-     * FIXME Support an optional filter to see only certain columns or revisions --
-     * this needs to be downloadable code that can be used in
-     * {@link IDataService#rangeQuery(long, String, int, byte[], byte[], int, int)}
-     * and {@link IIndex} needs to support passing through that filter.
+     * @see ITimestampPropertySet#asMap(), return the most current bindings.
+     * @see ITimestampPropertySet#asMap(long)), return the most current bindings
+     *      as of the specified timestamp.
      * 
-     * @todo the timestamp is not returned to the caller. it could be set by
-     *       side effect or using a member field. (in the general case of course
-     *       each column value has its own timestamp and the map needs to store
-     *       a list of timestamped column values for each column or some such
-     *       absurdity).
+     * @todo consider semantics were {@link Long#MAX_VALUE} returns ONLY the
+     *       current bindings rather than all data available for that primary
+     *       key or define another value such as CURRENT_ROW to obtain only the
+     *       current row. The filtering should be applied on the server side to
+     *       reduce the network traffic.
      */
-    public Map<String,Object> read(Object primaryKey, long timestamp) {
+    public ITPS read(IKeyBuilder keyBuilder, Schema schema,
+            Object primaryKey, long timestamp, INameFilter filter) {
         
-        byte[] fromKey = fromKey(primaryKey).getKey(); 
+        final AtomicRead proc = new AtomicRead(schema, primaryKey, timestamp,
+                filter);
+        
+        if(ndx instanceof ClientIndexView) {
 
-        byte[] toKey = toKey(primaryKey).getKey();
-        
-        if (DEBUG) {
-            log.info("read: fromKey=" + Arrays.toString(fromKey));
-            log.info("read:   toKey=" + Arrays.toString(toKey));
-        }
-        
-        /*
-         * range query (scan).
-         */
-        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
-        
-        Map<String,Object> map = new HashMap<String,Object>(); 
-        
-        while(itr.hasNext()) {
+            /*
+             * Remote index.
+             * 
+             * Figure out which index partition will get the write.
+             */
+
+            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
             
-            byte[] val = (byte[]) itr.next();
-            
-            byte[] key = itr.getKey();
+            final PartitionMetadata pmd = ((ClientIndexView) ndx).getPartition(
+                    IBigdataFederation.UNISOLATED, key);
             
             /*
-             * Decode the key so that we can get the column name. We have the
-             * advantage of knowing the last byte in the primary key. Since the
-             * fromKey was formed as [schema][primaryKey], the length of the
-             * fromKey is the index of the 1st byte in the column name.
+             * Lookup the data service for that index partition.
              */
-            KeyDecoder keyDecoder = new KeyDecoder(schema,key,fromKey.length);
-
-            // The column name.
-            final String col = keyDecoder.col;
+            
+            final IDataService dataService = ((ClientIndexView)ndx).getDataService(pmd);
             
             /*
-             * If a timestamp target was given, then skip column values having a
-             * timestamp strictly greater than the given value.
-             * 
-             * @todo this should be done server side in the filter so that only
-             * relevant index entries are returned to the client.
-             */
-            if (timestamp != -1L) {
-
-                final long columnValueTimestamp = keyDecoder.getTimestamp();
-
-                if (columnValueTimestamp > timestamp) {
-
-                    if (DEBUG)
-                        log.info("Ignoring newer revision: col=" + col
-                                + ", timestamp=" + columnValueTimestamp);
-                    
-                    continue;
-
-                }
-
-            }
-            
-            /*
-             * decode the value.
+             * Submit the atomic write operation to that data service.
              */
             
-            Object v = ValueType.decode(val);
-            
-            /*
-             * Add to the map representing the row.
-             * 
-             * Note: This will overwrite revisions of the same column value with
-             * an earlier timestamp.
-             * 
-             * Note: A write of a [null] column value will be made persistent in
-             * the index. In order for that [null] to have the effect of
-             * removing the entry from the map we MUST explicitly test for that
-             * here.
-             * 
-             * @todo if filtering for certain column names or revisions then we
-             * need to impose that filtering here.
-             */
-            
-            if(v == null) {
-             
-                /*
-                 * We have found a null column value, so we need to remove an
-                 * older revision if one exists.
-                 */
+            try {
+                
+                final String name = DataService
+                        .getIndexPartitionName(((ClientIndexView) ndx)
+                                .getName(), pmd.getPartitionId());
 
-                Object oldValue = map.remove(col);
+                log.info("Submitting operation to dataService=" + dataService);
                 
-                if( oldValue != null) {
-                
-                    if (DEBUG)
-                        log.debug("Removing revision for " + col
-                                + " from the row (was " + oldValue + ").");
-                    
-                }
-                                
-            } else {
+                return (TPS) dataService.submit(IBigdataFederation.UNISOLATED,
+                        name, proc);
 
-                /*
-                 * Insert the column value, potentially overwriting an older
-                 * revision.
-                 */
-                
-                Object oldValue = map.put(col, v);
-                
-                if( oldValue != null ) {
-                    
-                    if (DEBUG)
-                        log.debug("Overwriting revision for " + col
-                                + " from the row (was " + oldValue + ", now "
-                                + v + ")");
-                    
-                }
+            } catch (Exception ex) {
+            
+                throw new RuntimeException("Read failed", ex);
                 
             }
-            
-        }
 
-        if(map.size()==0) {
-            
+        } else {
+
             /*
-             * Return null iff there are no column values for that primary key.
+             * Local index.
              */
             
-            if (DEBUG)
-                log.debug("No row for primaryKey: " + primaryKey);
-            
-            return null;
+            return (ITPS) proc.apply(ndx);
             
         }
-        
-        return map;
         
     }
     
     /**
-     * Inserts or updates a row in the store.
+     * Atomic write with atomic read of the post-update state of the logical
+     * row.
      * <p>
      * Note: In order to cause a column value for row to be deleted you MUST
      * specify a <code>null</code> column value for that column.
+     * <p>
+     * Note: If the caller specified a <i>timestamp</i>, then that timestamp is
+     * used by the atomic read. If the timestamp was assigned by the server,
+     * then the server assigned timestamp is used by the atomic read.
      * 
-     * @param row
+     * @param keyBuilder
+     *            An object used to construct keys for the index. *
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * 
+     * @param propertySet
      *            The column names and values for that row.
+     * 
      * @param timestamp
      *            The timestamp to use for the row -or-
      *            <code>#AUTO_TIMESTAMP</code> if the timestamp will be
      *            auto-generated by the data service.
      * 
-     * @return The timestamp assigned to the row. If the caller specified a
-     *         timestamp, then this will be that value. If the timestamp was
-     *         assigned by the server, then this will be that value.
+     * @param filter
+     *            An optional filter used to select the property values that
+     *            will be returned (this has no effect on the atomic write).
+     * 
+     * @return The result of an atomic read on the post-update state of the
+     *         logical row.
+     * 
+     * @see ITPS#getTimestamp()
+     * 
+     * @todo the atomic read back may be overkill. When you need the data is
+     *       means that you only do one RPC rather than two. When you do not
+     *       need the data is is just more network traffic and more complexity
+     *       in this method signature. You can get pretty much the same result
+     *       by doing an atomic read after the fact using the timestamp assigned
+     *       by the server to the row (pretty much in the sense that it is
+     *       possible for another write to explictly specify the same timestamp
+     *       and hence overwrite your data).
+     * 
+     * @todo the timestamp could be an {@link ITimestampService} with an
+     *       implementation that always returns a caller-given constant, another
+     *       that uses the local system clock, another that uses the system
+     *       clock but ensures that it never hands off the same timestamp twice
+     *       in a row, and another than resolves the global timestamp service.
+     *       <p>
+     *       it is also possible that the timestamp behavior should be defined
+     *       by the {@link Schema} and therefore factored out of this method
+     *       signature.
      */
-    public long write(Map<String,Object> row, long timestamp) {
+    public ITPS write(IKeyBuilder keyBuilder, Schema schema,
+            Map<String, Object> propertySet, long timestamp, INameFilter filter) {
+
+        final AtomicWriteRead proc = new AtomicWriteRead(schema, propertySet,
+                timestamp, filter);
         
-        BatchInsert op = encode(row,timestamp);
-        
-        ndx.insert(op);
-        
-        // @todo return timestamp assigned by the server.
-        return timestamp;
+        if(ndx instanceof ClientIndexView) {
+
+            /*
+             * Remote index.
+             * 
+             * Figure out which index partition will get the write.
+             */
+
+            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
+            
+            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+            
+            final PartitionMetadata pmd = ((ClientIndexView) ndx).getPartition(
+                    IBigdataFederation.UNISOLATED, key);
+            
+            /*
+             * Lookup the data service for that index partition.
+             */
+            
+            final IDataService dataService = ((ClientIndexView)ndx).getDataService(pmd);
+            
+            /*
+             * Submit the atomic write operation to that data service.
+             */
+            
+            try {
+                
+                final String name = DataService
+                        .getIndexPartitionName(((ClientIndexView) ndx)
+                                .getName(), pmd.getPartitionId());
+
+                log.info("Submitting operation to dataService=" + dataService);
+                
+                return (TPS) dataService.submit(IBigdataFederation.UNISOLATED,
+                        name, proc);
+
+            } catch (Exception ex) {
+            
+                throw new RuntimeException("Write failed", ex);
+                
+            }
+
+        } else {
+
+            /*
+             * Local index.
+             */
+            
+            return (ITPS) proc.apply(ndx);
+            
+        }
         
     }
 
     /**
-     * Encode a write operation.
+     * Atomic read of the logical row associated.
      * 
-     * @param row
-     *            The logical row.
-     * @param timestamp
-     *            The timestamp to be used for the column value revisions in
-     *            that row -or- {@link #AUTO_TIMESTAMP} iff the timestamps will
-     *            be assigned by the server.
-     * 
-     * @return The batch operation that will write the row on the index.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    public BatchInsert encode(Map<String,Object> row, long timestamp) {
+    protected static class AtomicRead implements IIndexProcedure, Externalizable {
 
-        if (timestamp == AUTO_TIMESTAMP) {
-
-            /*
-             * FIXME this needs to be done server-side during the unisolated
-             * operation.
-             * 
-             * @todo It should not be a distinct timestamp if we allow
-             * concurrent unisolated operations in the same commit group to
-             * overwrite one another (alternatively, the behavior here could be
-             * governed by the metadata for the sparse row store index so some
-             * applications could insist on distrint timestamps).
-             */
-
-            timestamp = System.currentTimeMillis();
-
-        }
-
-        /*
-         * Get the column value that corresponds to the primary key for this
-         * row.
+        /**
+         * 
          */
-        final Object primaryKey = row.get(schema.getPrimaryKey());
+        private static final long serialVersionUID = 7240920229720302721L;
 
-        if (primaryKey == null) {
+        protected static final Logger log = Logger.getLogger(SparseRowStore.class);
 
-            throw new IllegalArgumentException("Primary key required: "
-                    + schema.getPrimaryKey());
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        /**
+         * True iff the {@link #log} level is DEBUG or less.
+         */
+        final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+                .toInt();
+
+        protected Schema schema;
+        protected Object primaryKey;
+        protected long timestamp;
+        protected INameFilter filter;
+        
+        /**
+         * Constructor for an atomic write/read operation.
+         * 
+         * @param schema
+         *            The schema governing the property set.
+         * @param primaryKey
+         *            The value of the primary key (identifies the logical row
+         *            to be read).
+         * @param timestamp
+         *            The timestamp to be assigned to the property values by an
+         *            atomic write -or- either
+         *            {@link SparseRowStore#AUTO_TIMESTAMP} or
+         *            {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE} if the
+         *            timestamp will be assigned by the server.
+         * @param filter
+         *            An optional filter used to restrict the property values
+         *            that will be returned.
+         */
+        public AtomicRead(Schema schema, Object primaryKey, long timestamp,
+                INameFilter filter) {
+            
+            if (schema == null)
+                throw new IllegalArgumentException("No schema");
+
+            if (primaryKey == null)
+                throw new IllegalArgumentException("No primary key");
+
+            this.schema = schema;
+            
+            this.primaryKey = primaryKey;
+            
+            this.timestamp = timestamp;
+
+            this.filter = filter;
             
         }
 
-        log.info("Schema=" + schema + ", primaryKey=" + schema.getPrimaryKey()
-                + ", value=" + primaryKey);
-        
-        // force the row into order by column name.
-        if(! (row instanceof SortedMap)) {
+        /**
+         * Atomic read.
+         * 
+         * @return A {@link TPS} instance containing the selected data from the
+         *         logical row identified by the {@link #primaryKey} -or-
+         *         <code>null</code> iff the primary key was NOT FOUND in the
+         *         index. I.e., iff there are NO entries for that primary key
+         *         regardless of whether or not they were selected.
+         */
+        public Object apply(IIndex ndx) {
 
-            /*
-             * @todo always do this to force override of column name comparator?
-             * If we do not always override then it is possible that an
-             * alternative comparator could have been given and the batch
-             * operation will not be fully ordered, resulting in a (slight)
-             * inefficiency during the operations on the index.
-             */
-            row = new TreeMap<String,Object>(row);
+            return atomicRead(ndx, schema, primaryKey, timestamp, filter);
             
         }
-        
-        final Iterator<Map.Entry<String,Object>> itr = row.entrySet().iterator();
 
-        final int ntuples = row.size();
-        
-        final byte[][] keys = new byte[ntuples][];
-        final byte[][] vals = new byte[ntuples][];
-        
-        int i = 0;
-        
-        while(itr.hasNext()) {
-            
-            Map.Entry<String, Object> entry = itr.next();
-            
-            String col = entry.getKey();
+        /**
+         * Return the thread-local key builder configured for the data service
+         * on which this procedure is being run.
+         * 
+         * @param ndx The index.
+         * 
+         * @return The {@link IKeyBuilder}.
+         */
+        protected IKeyBuilder getKeyBuilder(IIndex ndx) {
 
-            // validate the column name production.
-            NameChecker.assertColumnName(col);
+            return ((Journal) ((AbstractBTree) ndx).getStore()).getKeyBuilder();
+
+        }
+                
+        /**
+         * Atomic read on the index.
+         * 
+         * @param ndx
+         *            The index on which the data are stored.
+         * @param schema
+         *            The schema governing the row.
+         * @param primaryKey
+         *            The primary key identifies the logical row of interest.
+         * @param timestamp
+         *            A timestamp to obtain the value for the named property
+         *            whose timestamp does not exceed <i>timestamp</i> -or-
+         *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
+         *            recent value for the property.
+         * @param filter
+         *            An optional filter used to select the values for property
+         *            names accepted by that filter.
+         * 
+         * @return The logical row for that primary key.
+         */
+        protected TPS atomicRead(IIndex ndx, Schema schema, Object primaryKey,
+                long timestamp, INameFilter filter) {
+
+            final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
             
-            Object val = entry.getValue();
+            final byte[] fromKey = schema.fromKey(keyBuilder,primaryKey).getKey(); 
+
+            final byte[] toKey = schema.toKey(keyBuilder,primaryKey).getKey();
             
-            // format the schema name and the primary key into the key builder.
-            fromKey(primaryKey);
+            if (DEBUG) {
+                log.info("read: fromKey=" + Arrays.toString(fromKey));
+                log.info("read:   toKey=" + Arrays.toString(toKey));
+            }
+
+            // Result set object.
             
+            final TPS tps = new TPS(schema, timestamp);
+
             /*
-             * The column name. Note that the column name is NOT stored with
-             * Unicode compression so that we can decode it without loss.
+             * Scan all entries within the fromKey/toKey range populating [tps]
+             * as we go.
              */
-            try {
+
+            final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+
+            // #of entries scanned for that primary key.
+            int nscanned = 0;
+            
+            while(itr.hasNext()) {
                 
-                keyBuilder.append(col.getBytes(UTF8)).appendNul();
+                final byte[] val = (byte[]) itr.next();
                 
-            } catch(UnsupportedEncodingException ex) {
+                final byte[] key = itr.getKey();
+
+                nscanned++;
                 
-                throw new RuntimeException(ex);
+                /*
+                 * Decode the key so that we can get the column name. We have the
+                 * advantage of knowing the last byte in the primary key. Since the
+                 * fromKey was formed as [schema][primaryKey], the length of the
+                 * fromKey is the index of the 1st byte in the column name.
+                 */
+
+                final KeyDecoder keyDecoder = new KeyDecoder(schema,key,fromKey.length);
+
+                // The column name.
+                final String col = keyDecoder.col;
+                
+                if (filter != null && !filter.accept(col)) {
+
+                    // Skip property names that have been filtered out.
+                    
+                    log.debug("Skipping property: name="+col);
+
+                    continue;
+                    
+                }
+                
+                /*
+                 * Skip column values having a timestamp strictly greater than
+                 * the given value.
+                 */
+                {
+
+                    final long columnValueTimestamp = keyDecoder.getTimestamp();
+
+                    if (columnValueTimestamp > timestamp) {
+
+                        if (DEBUG) {
+
+                            log.debug("Ignoring newer revision: col=" + col
+                                    + ", timestamp=" + columnValueTimestamp);
+                            
+                        }
+                        
+                        continue;
+
+                    }
+
+                }
+                
+                /*
+                 * Decode the value. A [null] indicates a deleted property
+                 * value.
+                 */
+                
+                final Object v = ValueType.decode(val);
+                
+                /*
+                 * Add to the representation of the row.
+                 */
+
+                tps.set(col, timestamp, v);
+                                
+            }
+
+            if (nscanned == 0) {
+                
+                /*
+                 * Return null iff there are no column values for that primary
+                 * key.
+                 */
+                
+                log.info("No data for primaryKey: " + primaryKey);
+            
+                // Note: [null] return since no data for the primary key.
+                
+                return null;
                 
             }
             
+            // Note: MAY be empty.
+            
+            return tps;
+            
+        }
+        
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            final short version = in.readShort();
+            
+            if(version!=VERSION0) {
+                
+                throw new IOException("Unknown version="+version);
+                
+            }
+
+            schema = (Schema) in.readObject();
+            
+            primaryKey = in.readObject();
+            
+            timestamp = in.readLong();
+            
+            filter = (INameFilter) in.readObject();
+            
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            out.writeShort(VERSION0);
+            
+            out.writeObject(schema);
+            
+            out.writeObject(primaryKey);
+            
+            out.writeLong(timestamp);
+            
+            out.writeObject(filter);
+            
+        }
+
+        private final static transient short VERSION0 = 0x0;
+        
+    }
+    
+    /**
+     * Atomic write on a logical row. All property values written will have the
+     * same timestamp. An atomic read is performed as part of the procedure so
+     * that the caller may obtain a consistent view of the post-update state of
+     * the logical row. The server-assigned timestamp written may be obtained
+     * from the returned {@link ITPS} object.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class AtomicWriteRead extends AtomicRead {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 7481235291210326044L;
+
+        private Map<String,Object> propertySet;
+        
+        /**
+         * Constructor for an atomic write/read operation.
+         * 
+         * @param schema
+         *            The schema governing the property set.
+         * @param propertySet
+         *            The property set. An entry bound to a <code>null</code>
+         *            value will cause the corresponding binding to be "deleted"
+         *            in the index.
+         * @param timestamp
+         *            The timestamp to be assigned to the property values by an
+         *            atomic write -or- either
+         *            {@link SparseRowStore#AUTO_TIMESTAMP} or
+         *            {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE} if the
+         *            timestamp will be assigned by the server.
+         * @param filter
+         *            An optional filter used to restrict the property values
+         *            that will be returned.
+         */
+        public AtomicWriteRead(Schema schema, Map<String, Object> propertySet,
+                long timestamp, INameFilter filter) {
+            
+            super(schema, propertySet.get(schema.getPrimaryKey()), timestamp,
+                    filter);
+
+            if (propertySet.get(schema.getPrimaryKey()) == null) {
+
+                throw new IllegalArgumentException(
+                        "No value for primary key: name="
+                                + schema.getPrimaryKey());
+
+            }
+
             /*
-             * @todo support auto timestamp vs application timestamp.
+             * Validate the column name productions.
+             */
+
+            final Iterator<String> itr = propertySet.keySet().iterator();
+
+            while (itr.hasNext()) {
+
+                final String col = itr.next();
+
+                // validate the column name production.
+                NameChecker.assertColumnName(col);
+
+            }
+
+            this.propertySet = propertySet;
+            
+        }
+        
+        /**
+         * If a property set was specified then do an atomic write of the
+         * property set. Regardless, an atomic read of the property set is then
+         * performed and the results of that atomic read are returned to the
+         * caller.
+         * 
+         * @return The set of tuples for the primary key as a {@link TPS}
+         *         instance.
+         */
+        public Object apply(IIndex ndx) {
+
+            /*
+             * Choose the timestamp.
              * 
-             * When auto-timestamping is used, a timestamp must be assigned by
-             * the data service, which needs to append the timestamp for the
-             * atomic row write.
+             * When auto-timestamping is used the timestamp is assigned by the
+             * data service.
              * 
              * Note: Timestamps can be locally generated on the server since
              * they must be consistent solely within a row, and all revisions of
@@ -528,218 +839,159 @@ public class SparseRowStore {
              * partition and hence on the same server. The only way in which
              * time could go backward is if there is a failover to another
              * server for the partition and the other server has a different
-             * clock time.
+             * clock time. If the server clocks are kept synchronized then this
+             * should not be a problem.
              * 
-             * Note: Timestamp resolution can be either next nano, nanos, total
-             * commit counters (a new datum for the root blocks that always
-             * increments, rather than resetting to zero when a new store is
-             * created - this would be safest since the total commit counter
-             * will be consistent even across failovers), or
-             * currentTimeMillis(). What is at stake is that revisions written
-             * within the resolution of the timestamp assignment will cause
-             * overwrites of existing revisions with the same timestamp rather
-             * that causing new revisions with their own distinct timestamp to
-             * be written.
+             * Note: Revisions written with the same timestamp as a pre-existing
+             * column value will overwrite the existing column value rather that
+             * causing new revisions with their own distinct timestamp to be
+             * written. There is therefore a choice for "auto" vs "auto-unique"
+             * for timestamps.
              */
-            keyBuilder.append(timestamp);
-
-            keys[i] = keyBuilder.getKey();
+            long timestamp = this.timestamp;
             
-            // encode the value.
-            vals[i] = ValueType.encode( val );
+            if (timestamp == AUTO_TIMESTAMP) {
 
-            if (DEBUG)
-                log.debug("write: key=" + Arrays.toString(keys[i]));
+                timestamp = System.currentTimeMillis();
+                
+            } else if (timestamp == AUTO_TIMESTAMP_UNIQUE) {
 
-            i++;
-            
-        }
-
-        BatchInsert op = new BatchInsert(keys.length,keys,vals);
-
-        return op;
-        
-    }
-
-    /**
-     * Return an iterator that will visit each logical row that can be
-     * reconstructed from a scan in the specified primary key range.
-     * 
-     * @param fromKey
-     * @param toKey
-     * @return
-     * 
-     * FIXME Implement scan (and tests).
-     */
-    public Iterator<Map<String,Object>> scan(Object fromKey, Object toKey) {
-       
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
-     * Helper method appends a typed value to the compound key (this is used to
-     * get the primary key into the compound key).
-     * 
-     * @param keyType
-     *            The target data type.
-     * @param v
-     *            The value.
-     * 
-     * @return The {@link #keyBuilder}.
-     * 
-     * @todo support variable length byte[]s as a primary key type.
-     * 
-     * FIXME Verify that variable length primary keys do not cause problems in
-     * the total ordering. Do we need a code (e.g., nul nul) that never occurs
-     * in a valid primary key when the primary key can vary in length? The
-     * problem occurs when the column name could become confused with the
-     * primary key in comparisons owing to the lack of an unambiguous delimiter
-     * and a variable length primary key. Another approach is to fill the
-     * variable length primary key to a set length...
-     */
-    protected IKeyBuilder appendPrimaryKey(Object v, boolean successor) {
-        
-        KeyType keyType = schema.getPrimaryKeyType();
-        
-        if (successor) {
-            
-            switch (keyType) {
-
-            case Integer:
-                return keyBuilder.append(successor(((Number) v).intValue()));
-            case Long:
-                return keyBuilder.append(successor(((Number) v).longValue()));
-            case Float:
-                return keyBuilder.append(successor(((Number) v).floatValue()));
-            case Double:
-                return keyBuilder.append(successor(((Number) v).doubleValue()));
-            case Unicode:
-                return keyBuilder.appendText(v.toString(), true/*unicode*/, true/*successor*/);
-            case ASCII:
-                return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/);
-            case Date:
-                return keyBuilder.append(successor(((Date) v).getTime()));
+                timestamp = ((Journal)((AbstractBTree)ndx).getStore()).nextTimestamp();
+                
             }
             
-        } else {
-            
-            switch (keyType) {
+            atomicWrite(ndx, schema, primaryKey, propertySet, timestamp);
 
-            case Integer:
-                return keyBuilder.append(((Number) v).intValue());
-            case Long:
-                return keyBuilder.append(((Number) v).longValue());
-            case Float:
-                return keyBuilder.append(((Number) v).floatValue());
-            case Double:
-                return keyBuilder.append(((Number) v).doubleValue());
-            case Unicode:
-                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
-            case ASCII:
-                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/);
-            case Date:
-                return keyBuilder.append(((Date) v).getTime());
-            }
-            
-        }
-
-        return keyBuilder;
-        
-    }
- 
-    /**
-     * Return the successor of a primary key object.
-     * 
-     * @param v
-     *            The object.
-     * 
-     * @return The successor.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the primary key type is {@link KeyType#Unicode}. See
-     *             {@link #toKey(Object)}, which correctly forms the successor
-     *             key in all cases.
-     */
-    private Object successor(Object v) {
-        
-        KeyType keyType = schema.getPrimaryKeyType();
-        
-        switch(keyType) {
-
-        case Integer:
-            return SuccessorUtil.successor(((Number)v).intValue());
-        case Long:
-            return SuccessorUtil.successor(((Number)v).longValue());
-        case Float:
-            return SuccessorUtil.successor(((Number)v).floatValue());
-        case Double:
-            return SuccessorUtil.successor(((Number)v).doubleValue());
-        case Unicode:
-        case ASCII:
             /*
-             * Note: See toKey() for how to correctly form the sort key for the
-             * successor of a Unicode value.
+             * Note: Read uses whatever timestamp was selected above!
              */
-            throw new UnsupportedOperationException();
-//            return SuccessorUtil.successor(v.toString());
-//            return SuccessorUtil.successor(v.toString());
-        case Date:
-            return SuccessorUtil.successor(((Date)v).getTime());
+
+            return atomicRead(ndx, schema, propertySet.get(schema
+                    .getPrimaryKey()), timestamp, filter);
+            
         }
 
-        return keyBuilder;
+        protected void atomicWrite(IIndex ndx, Schema schema,
+                Object primaryKey, Map<String, Object> propertySet,
+                long timestamp) {
+
+            // FIXME handle auto increment property values.
+            
+            log.info("Schema=" + schema + ", primaryKey="
+                    + schema.getPrimaryKey() + ", value=" + primaryKey
+                    + ", ntuples=" + propertySet.size());
+            
+            final IKeyBuilder keyBuilder = getKeyBuilder(ndx);
+
+            final Iterator<Map.Entry<String, Object>> itr = propertySet
+                    .entrySet().iterator();
+            
+            while(itr.hasNext()) {
+                
+                final Map.Entry<String, Object> entry = itr.next();
+                
+                final String col = entry.getKey();
+
+                final Object value = entry.getValue();
+                
+                // encode the schema name and the primary key.
+                schema.fromKey(keyBuilder, primaryKey);
+                
+                /*
+                 * The column name. Note that the column name is NOT stored with
+                 * Unicode compression so that we can decode it without loss.
+                 */
+                try {
+                    
+                    keyBuilder.append(col.getBytes(UTF8)).appendNul();
+                    
+                } catch(UnsupportedEncodingException ex) {
+                    
+                    throw new RuntimeException(ex);
+                    
+                }
+                
+                keyBuilder.append(timestamp);
+
+                byte[] key = keyBuilder.getKey();
+                
+                // encode the value.
+                byte[] val = ValueType.encode( value );
+
+                ndx.insert(key,val);
+                
+            }
+
+        }
         
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            super.readExternal(in);
+            
+            final short version = in.readShort();
+            
+            if (version != VERSION0)
+                throw new IOException("Unknown version=" + version);
+
+            /*
+             * De-serialize into a property set using a tree map so that the
+             * index write operations will be fully ordered.
+             */
+            
+            propertySet = new TreeMap<String, Object>();
+                
+            // #of property values.
+            final int n = in.readInt();
+
+            log.info("Reading "+n+" property values");
+
+            for(int i=0; i<n; i++) {
+
+                final String name = in.readUTF();
+                
+                final Object value = in.readObject();
+
+                propertySet.put(name,value);
+                
+                log.info("name=" + name + ", value=" + value);
+                
+            }
+            
+        }
+        
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            // serialization version.
+            out.writeShort(VERSION0);
+                        
+            // #of property values
+            out.writeInt(propertySet.size());
+            
+            /*
+             * write property values
+             */
+            
+            Iterator<Map.Entry<String,Object>> itr = propertySet.entrySet().iterator();
+            
+            while(itr.hasNext()) {
+                
+                Map.Entry<String,Object> entry = itr.next();
+                
+                out.writeUTF(entry.getKey());
+                
+                out.writeObject(entry.getValue());
+                                
+            }
+            
+        }
+
+        /**
+         * 
+         */
+        private static final short VERSION0 = 0x0;
+
     }
-    
-    /**
-     * Forms the key in {@link #keyBuilder} that should be used as the first key
-     * (inclusive) for a range query that will visit all index entries for the
-     * specified primary key.
-     * 
-     * @param primaryKey
-     *            The primary key.
-     * 
-     * @return The {@link #keyBuilder}, which will have the schema and the
-     *         primary key already formatted in its buffer.
-     */
-    protected IKeyBuilder fromKey(Object primaryKey) {
         
-        keyBuilder.reset();
-
-        // append the (encoded) schema name.
-        keyBuilder.append(schema.getSchemaBytes());
-        
-        // append the (encoded) primary key.
-        appendPrimaryKey(primaryKey,false/*successor*/);
-        
-        return keyBuilder;
-
-    }
-
-    /**
-     * Forms the key in {@link #keyBuilder} that should be used as the last key
-     * (exclusive) for a range query that will visit all index entries for the
-     * specified primary key.
-     * 
-     * @param primaryKey
-     *            The primary key.
-     * 
-     * @return The {@link #keyBuilder}, which will have the schema and the
-     *         successor of the primary key already formatted in its buffer.
-     */
-    protected IKeyBuilder toKey(Object primaryKey) {
-        
-        keyBuilder.reset();
-
-        // append the (encoded) schema name.
-        keyBuilder.append(schema.getSchemaBytes());
-
-        // append successor of the (encoded) primary key.
-        appendPrimaryKey(primaryKey, true/*successor*/);
-
-        return keyBuilder;
-
-    }
-    
 }

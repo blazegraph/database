@@ -38,6 +38,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
 
@@ -51,6 +52,17 @@ import com.bigdata.rawstore.IRawStore;
  * locally means that we do not need to do a network operation in order to
  * validate that a partition was mapped onto the {@link DataService} or to
  * validate that a key lies within the key range of the partition.
+ * 
+ * @todo Modify this class to be a fused view on read of the resources for the
+ *       index partition. We have all the data that we require in {@link #pmd}.
+ *       Make sure that the {@link IndexSegment}s are not re-opened all the
+ *       time and that we never have a given {@link IndexSegment} "double open".
+ *       This requires coordindation by the data service, which should introduce
+ *       additional tasks for overflow and compacting merges. Make sure that
+ *       metadata for index partition "zones" propagates with the partition
+ *       metadata so that appropriate policies are enforcable locally (access
+ *       control, latency requirements, replication, purging of historical
+ *       deleted versions, etc).
  * 
  * @todo Overflow handling: Since the partition metadata is stored locally in
  *       the btree metadata record, then we need to create a new btree each time

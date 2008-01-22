@@ -41,6 +41,9 @@ public class POSComparator implements Comparator<SPO> {
 
     public int compare(SPO stmt1, SPO stmt2) {
 
+        if (stmt1 == stmt2)
+            return 0;
+
         /*
          * Note: logic avoids possible overflow of [long] by not computing the
          * difference between two longs.
