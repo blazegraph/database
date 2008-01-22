@@ -49,6 +49,8 @@ import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.sparse.TPS.TPV;
+import com.bigdata.sparse.ValueType.AutoIncCounter;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -74,9 +76,9 @@ import com.bigdata.service.IDataService;
  * </p>
  * 
  * <pre>
- *                 
- *                 [schemaName][primaryKey][columnName][timestamp]
- *                 
+ *                  
+ *                  [schemaName][primaryKey][columnName][timestamp]
+ *                  
  * </pre>
  * 
  * <p>
@@ -114,14 +116,14 @@ import com.bigdata.service.IDataService;
  * </p>
  * 
  * <pre>
- *                 
- *                 [employee][12][DateOfHire][t0] : [4/30/02]
- *                 [employee][12][DateOfHire][t1] : [4/30/05]
- *                 [employee][12][Employer][t0]   : [SAIC]
- *                 [employee][12][Employer][t1]   : [SYSTAP]
- *                 [employee][12][Id][t0]         : [12]
- *                 [employee][12][Name][t0]       : [Bryan Thompson]
- *                 
+ *                  
+ *                  [employee][12][DateOfHire][t0] : [4/30/02]
+ *                  [employee][12][DateOfHire][t1] : [4/30/05]
+ *                  [employee][12][Employer][t0]   : [SAIC]
+ *                  [employee][12][Employer][t1]   : [SYSTAP]
+ *                  [employee][12][Id][t0]         : [12]
+ *                  [employee][12][Name][t0]       : [Bryan Thompson]
+ *                  
  * </pre>
  * 
  * <p>
@@ -151,9 +153,12 @@ import com.bigdata.service.IDataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo add an atomic delete for all current property values as of a called
+ *       given timestamp?
+ * 
  * @todo We do not have a means to decode a primary key that is Unicode (or
  *       variable length) ??? Is this true ???
- *       
+ * 
  * @todo support byte[] as a primary key type.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -651,9 +656,8 @@ public class SparseRowStore {
                  * Skip column values having a timestamp strictly greater than
                  * the given value.
                  */
+                final long columnValueTimestamp = keyDecoder.getTimestamp();
                 {
-
-                    final long columnValueTimestamp = keyDecoder.getTimestamp();
 
                     if (columnValueTimestamp > timestamp) {
 
@@ -681,8 +685,11 @@ public class SparseRowStore {
                  * Add to the representation of the row.
                  */
 
-                tps.set(col, timestamp, v);
-                                
+                tps.set(col, columnValueTimestamp, v);
+                
+                log.info("Read: name=" + col + ", timestamp="
+                        + columnValueTimestamp + ", v");
+
             }
 
             if (nscanned == 0) {
@@ -875,8 +882,6 @@ public class SparseRowStore {
                 Object primaryKey, Map<String, Object> propertySet,
                 long timestamp) {
 
-            // FIXME handle auto increment property values.
-            
             log.info("Schema=" + schema + ", primaryKey="
                     + schema.getPrimaryKey() + ", value=" + primaryKey
                     + ", ntuples=" + propertySet.size());
@@ -892,7 +897,14 @@ public class SparseRowStore {
                 
                 final String col = entry.getKey();
 
-                final Object value = entry.getValue();
+                Object value = entry.getValue();
+                
+                if (value instanceof AutoIncCounter) {
+
+                    value = Integer.valueOf(inc(ndx, schema, primaryKey,
+                            timestamp, col));
+                    
+                }
                 
                 // encode the schema name and the primary key.
                 schema.fromKey(keyBuilder, primaryKey);
@@ -921,6 +933,75 @@ public class SparseRowStore {
                 ndx.insert(key,val);
                 
             }
+
+        }
+        
+        /**
+         * This is a bit heavy weight, but what it does is read the current
+         * state of the logical row so that we can find the previous value(s)
+         * for the counter column.
+         */
+        protected int inc(IIndex ndx, Schema schema, Object primaryKey,
+                long timestamp, final String col) {
+            
+            final TPS tps = atomicRead(ndx, schema, primaryKey, timestamp,
+                    new INameFilter() {
+
+                public boolean accept(String name) {
+                    
+                    return name.equals(col);
+
+                }
+                
+            });
+            
+            /*
+             * Locate the previous non-null value for the counter column and
+             * then add one to that value. If there is no previous non-null
+             * value then we start the counter at zero(0).
+             */
+            
+            int counter = 0;
+            
+            {
+
+                final Iterator<TPV> vals = tps.iterator();
+
+                while (vals.hasNext()) {
+                    
+                    final TPV val = vals.next();
+                    
+                    if (val.getValue() != null) {
+                        
+                        try {
+
+                            counter = (Integer) val.getValue();
+                            
+                            log.info("Previous value: name=" + col
+                                    + ", counter=" + counter + ", timestamp="
+                                    + val.getTimestamp());
+                            
+                            counter++;
+                            
+                        } catch(ClassCastException ex) {
+                            
+                            log.warn("Non-Integer value: schema="+schema+", name="+col);
+
+                            continue;
+                            
+                        }
+                        
+                    }
+                    
+                }
+
+            }
+        
+            // outcome of the auto-inc counter.
+            
+            log.info("Auto-increment: name="+col+", counter="+counter);
+            
+            return counter;
 
         }
         
