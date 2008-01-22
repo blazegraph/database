@@ -34,6 +34,17 @@ public interface DocumentHeader
      */
     String getContentEncoding();
     
+
+    /**
+     * Get an arbitrary property value.
+     * 
+     * @param property
+     *            The property name.
+     *            
+     * @return The value.
+     */
+    Object getProperty(String name);
+    
     /**
      * Visits all defined property values.
      */

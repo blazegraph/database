@@ -742,6 +742,12 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
+        public Object getProperty(String name) {
+            
+            return metadata.get(name);
+            
+        }
+        
         public Iterator<PropertyValue> propertyValues() {
 
             assertExists();
@@ -2800,6 +2806,8 @@ public class BigdataRepository implements ContentRepository {
             // the next byte.
             int v = (0xff & b[off++]);
 
+//            log.info("returning byte: "+v);
+            
             return v;
             
         }
@@ -2840,7 +2848,7 @@ public class BigdataRepository implements ContentRepository {
 
             this.off += n;
 
-            this.len -= n;
+//            this.len -= n;
             
             return n;
             
