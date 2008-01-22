@@ -64,7 +64,11 @@ public enum ValueType {
     /**
      * An uninterpreted byte array.
      */
-    ByteArray(7)
+    ByteArray(7),
+    /**
+     * An auto-incremental counter.
+     */
+    AutoIncInteger(8)
     ;
     
     private final int code;
@@ -96,6 +100,7 @@ public enum ValueType {
         case 5: return Unicode;
         case 6: return Date;
         case 7: return ByteArray;
+        case 8: return AutoIncInteger;
         default:
             throw new IllegalArgumentException("Unknown code: "+code);
         }
@@ -219,8 +224,12 @@ public enum ValueType {
                 
                 buf.write( bytes );
                 
-            } else {
+            } else if( v instanceof AutoIncCounter ){
 
+                buf.writeByte(ValueType.AutoIncInteger.intValue());
+                
+            } else {
+                
                 throw new UnsupportedOperationException();
 
             }
@@ -278,6 +287,9 @@ public enum ValueType {
                 buf.readFully(bytes);
                 return bytes;
             }
+            case AutoIncInteger: {
+                return AutoIncCounter.INSTANCE;
+            }
             default:
                 throw new AssertionError();
 
@@ -287,6 +299,26 @@ public enum ValueType {
 
             throw new RuntimeException(ex);
 
+        }
+        
+    }
+
+    /**
+     * A singleton object that causes the associated property value to be
+     * assigned the next higher 32-bit integer value when it is written on the
+     * {@link SparseRowStore}.
+     * 
+     * @todo This mechanism should be replaced by something more elegant.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class AutoIncCounter {
+
+        public static final AutoIncCounter INSTANCE = new AutoIncCounter();
+        
+        private AutoIncCounter() {
+            
         }
         
     }

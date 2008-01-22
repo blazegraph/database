@@ -1,6 +1,6 @@
 package com.bigdata.repo;
 
-import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Document header interface for {@link Document}s stored in the
@@ -46,8 +46,8 @@ public interface DocumentHeader
     Object getProperty(String name);
     
     /**
-     * Visits all defined property values.
+     * Returns a read-only view of the document metadata.
      */
-    Iterator<PropertyValue> propertyValues();
+    Map<String,Object> asMap();
     
 }

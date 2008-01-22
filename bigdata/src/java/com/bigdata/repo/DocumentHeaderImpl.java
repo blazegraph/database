@@ -1,15 +1,12 @@
 package com.bigdata.repo;
 
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.repo.BigdataRepository.MetadataSchema;
-
-import cutthecrap.utils.striterators.Resolver;
-import cutthecrap.utils.striterators.Striterator;
 
 public class DocumentHeaderImpl implements DocumentHeader 
 {
@@ -36,17 +33,7 @@ public class DocumentHeaderImpl implements DocumentHeader
     public DocumentHeaderImpl( DocumentHeader header )
     {
      
-        properties = new HashMap<String,Object>();
-        
-        Iterator<PropertyValue> itr = header.propertyValues();
-        
-        while(itr.hasNext()) {
-            
-            PropertyValue tmp = itr.next();
-            
-            properties.put(tmp.getName(), tmp.getValue());
-            
-        }
+        properties = new HashMap<String,Object>(header.asMap());
         
     }
     
@@ -129,24 +116,11 @@ public class DocumentHeaderImpl implements DocumentHeader
         return properties.get(name); 
         
     }
-    
-    public Iterator<PropertyValue> propertyValues() {
 
-        return new Striterator(properties.entrySet().iterator())
-                .addFilter(new Resolver() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    protected Object resolve(Object arg0) {
-
-                        Map.Entry<String, Object> entry = (Map.Entry<String, Object>) arg0;
-
-                        return new PropertyValueImpl(entry.getKey(), entry
-                                .getValue());
-
-                    }
-                });
-
+    public Map<String,Object> asMap() {
+        
+        return Collections.unmodifiableMap(properties);
+        
     }
 
 }
