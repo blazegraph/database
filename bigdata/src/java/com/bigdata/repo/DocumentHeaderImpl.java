@@ -73,33 +73,6 @@ public class DocumentHeaderImpl implements DocumentHeader
         properties.put(MetadataSchema.CONTENT_TYPE, contentType);
 
     }
-
-    /**
-     * Gte an arbitrary property value.
-     * 
-     * @param property
-     *            The property name.
-     * @return The value.
-     */
-    public Object get(String property) {
-
-        return properties.get(property);
-        
-    }
-    
-    /**
-     * Set an arbitrary property value.
-     * 
-     * @param property
-     *            The property name.
-     * @param value
-     *            The value.
-     */
-    public void set(String property, Object value) {
-
-        properties.put(property, value);
-        
-    }
     
     public void setContentEncoding(String contentEncoding) {
 
@@ -137,6 +110,26 @@ public class DocumentHeaderImpl implements DocumentHeader
         
     }
 
+    /**
+     * Set an arbitrary property value.
+     * 
+     * @param property
+     *            The property name.
+     * @param value
+     *            The value.
+     */
+    public void setProperty(String name,Object newValue) {
+        
+        properties.put(name,newValue);
+        
+    }
+
+    public Object getProperty(String name) {
+        
+        return properties.get(name); 
+        
+    }
+    
     public Iterator<PropertyValue> propertyValues() {
 
         return new Striterator(properties.entrySet().iterator())

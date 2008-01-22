@@ -71,7 +71,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
         
         doc.setContentType(mimeType);
         
-        doc.set("foo","bar");
+        doc.setProperty("foo","bar");
         
         doc.copyStream(content);
         
@@ -81,6 +81,8 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
         
         assertEquals("version", 0, ((RepositoryDocumentImpl) actual)
                 .getVersion());
+
+        assertEquals("user property", "bar", actual.getProperty("foo"));
 
         assertEquals("Content-Type", mimeType, actual.getContentType());
 
@@ -118,7 +120,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
         
         doc.setContentEncoding(encoding);
         
-        doc.set("foo","bar");
+        doc.setProperty("foo","bar");
         
         doc.copyString(encoding, content);
         
@@ -132,6 +134,8 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
         assertEquals("Content-Type", mimeType, actual.getContentType());
 
         assertEquals("Content-Encoding", encoding, actual.getContentEncoding());
+
+        assertEquals("user property", "bar", actual.getProperty("foo"));
 
         assertEquals("content", content, read(actual.getReader()));
 
