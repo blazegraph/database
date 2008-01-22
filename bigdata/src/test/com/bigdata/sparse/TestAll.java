@@ -60,8 +60,13 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("Sparse Row Store");
 
+        // value encoding and decoding.
         suite.addTestSuite(TestValueType.class);
         
+        // sparse property set object.
+        suite.addTestSuite(TestTPS.class);
+        
+        // sparse row store operations.
         suite.addTestSuite(TestSparseRowStore.class);
         
         /*

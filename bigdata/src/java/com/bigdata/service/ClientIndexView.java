@@ -156,6 +156,12 @@ public class ClientIndexView implements IIndex {
     
     private final IBigdataFederation fed;
 
+    public IBigdataFederation getFederation() {
+        
+        return fed;
+        
+    }
+    
     /**
      * The maximum #of tuples per request for the
      * {@link #rangeIterator(byte[], byte[])}
@@ -368,7 +374,7 @@ public class ClientIndexView implements IIndex {
 
             final byte[] key = new byte[] {};
 
-            IPartitionMetadata pmd = getPartition(tx, name, key);
+            IPartitionMetadata pmd = getPartition(tx, key);
 
             IDataService dataService = getDataService(pmd);
 
@@ -392,7 +398,7 @@ public class ClientIndexView implements IIndex {
     
     public boolean contains(byte[] key) {
         
-        IPartitionMetadata pmd = getPartition(tx,name, key);
+        IPartitionMetadata pmd = getPartition(tx, key);
 
         IDataService dataService = getDataService(pmd);
 
@@ -418,7 +424,7 @@ public class ClientIndexView implements IIndex {
 
     public Object insert(Object key, Object value) {
 
-        IPartitionMetadata pmd = getPartition(tx,name, (byte[])key);
+        IPartitionMetadata pmd = getPartition(tx,(byte[])key);
         
         IDataService dataService = getDataService(pmd);
 
@@ -448,7 +454,7 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = getPartition(tx, name, (byte[]) key);
+        IPartitionMetadata pmd = getPartition(tx, (byte[]) key);
 
         IDataService dataService = getDataService(pmd);
         
@@ -475,7 +481,7 @@ public class ClientIndexView implements IIndex {
 
     public Object remove(Object key) {
 
-        IPartitionMetadata pmd = getPartition(tx,name, (byte[])key);
+        IPartitionMetadata pmd = getPartition(tx,(byte[])key);
 
         IDataService dataService = getDataService(pmd);
         
@@ -934,7 +940,7 @@ public class ClientIndexView implements IIndex {
         while(fromIndex<ntuples) {
         
             // partition spanning that key.
-            final PartitionMetadataWithSeparatorKeys pmd = getPartition(tx, name,
+            final PartitionMetadataWithSeparatorKeys pmd = getPartition(tx,
                     keys[fromIndex]);
 
             final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
@@ -989,7 +995,7 @@ public class ClientIndexView implements IIndex {
      * @return
      */
     public PartitionMetadataWithSeparatorKeys getPartition(long tx,
-            String name, byte[] key) {
+            /*String name, */ byte[] key) {
 
         MetadataIndex mdi = fed.getMetadataIndex(name);
 

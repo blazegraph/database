@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
 
@@ -42,7 +43,9 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
@@ -74,11 +77,23 @@ public class TestSparseRowStore extends TestCase2 {
     protected IRawStore store;
     protected UnisolatedBTree btree;
     
+    public Properties getProperties() {
+        
+        Properties properties = new Properties(super.getProperties());
+        
+        properties.setProperty(Options.BUFFER_MODE, "" + BufferMode.Transient);
+        
+        return properties;
+        
+    }
+    
     public void setUp() {
         
-        keyBuilder = KeyBuilder.newUnicodeInstance();
+        Properties properties = getProperties();
         
-        store = new TemporaryRawStore();
+        keyBuilder = KeyBuilder.newUnicodeInstance(properties);
+        
+        store = new Journal(properties);
         
         btree = new UnisolatedBTree(store,UUID.randomUUID());
         
@@ -140,7 +155,7 @@ public class TestSparseRowStore extends TestCase2 {
 
         CSVReader r = new CSVReader(is,charSet);
         
-        SparseRowStore srs = new SparseRowStore(btree,keyBuilder,schema);
+        SparseRowStore srs = new SparseRowStore(btree);
         
         /*
          * The ground truth data read from the test resource.
@@ -182,7 +197,7 @@ public class TestSparseRowStore extends TestCase2 {
                  */
                 
                 // write on the sparse row store.
-                srs.write(row, timestamp );
+                srs.write(keyBuilder, schema, row, timestamp, null/*filter*/ );
 
                 /*
                  * Verify read back of the row that we just wrote.
@@ -190,14 +205,15 @@ public class TestSparseRowStore extends TestCase2 {
                 {
 
                     // extract the primary key for this row.
-                    Object primaryKey = row.get(srs.getSchema().getPrimaryKey());
+                    Object primaryKey = row.get(schema.getPrimaryKey());
 
                     // read the row from the store.
-                    Map<String, Object> actual = srs.read(primaryKey, timestamp);
+                    ITPS tps = srs.read(keyBuilder, schema, primaryKey,
+                            timestamp, null/* filter */);
 
-                    assertNotNull("No such row: " + primaryKey, actual);
+                    assertNotNull("No such row: " + primaryKey, tps);
 
-                    assertSameValues(row, actual);
+                    assertSameValues(row, tps.asMap());
 
                 }
 
@@ -259,7 +275,7 @@ public class TestSparseRowStore extends TestCase2 {
                 Map<String,Object> expected = rows.get(i);
                 
                 // extract the primary key for this row.
-                Object primaryKey = expected.get(srs.getSchema().getPrimaryKey());
+                Object primaryKey = expected.get(schema.getPrimaryKey());
                 
                 /*
                  * Use the date of hire column as the timestamp on the record.
@@ -267,11 +283,12 @@ public class TestSparseRowStore extends TestCase2 {
                 long timestamp = ((Date)expected.get(timestampColumn)).getTime();
 
                 // read the row from the store.
-                Map<String,Object> actual = srs.read(primaryKey, timestamp);
+                ITPS tps = srs.read(keyBuilder, schema, primaryKey, timestamp,
+                        null/*filter*/);
                 
-                assertNotNull("No such row: "+primaryKey,actual);
+                assertNotNull("No such row: "+primaryKey,tps);
                 
-                assertSameValues(expected,actual);
+                assertSameValues(expected,tps.asMap());
                 
             }
             
@@ -292,9 +309,9 @@ public class TestSparseRowStore extends TestCase2 {
         
         final Schema schema = new Schema("Employee","Id",KeyType.Long);
         
-        SparseRowStore srs = new SparseRowStore(btree,keyBuilder,schema);
+        SparseRowStore srs = new SparseRowStore(btree);
         
-        assertNull(srs.read(Long.valueOf(0L)));
+        assertNull(srs.read(keyBuilder,schema,Long.valueOf(0L)));
         
     }
     

@@ -77,8 +77,10 @@ import com.bigdata.scaleup.ResourceState;
  * FIXME All methods declared by the {@link IDataService} need to operate at the
  * abstraction where an index may comprise both a mutable {@link BTree} and
  * immutable {@link IndexSegment}s - in fact it may make sense to introduce
- * that abstraction at a layer under the {@link ConcurrentJournal}.  See {@link PartitionedIndexView}
- * for an earlier attempt.
+ * that abstraction at a layer under the {@link ConcurrentJournal}. See
+ * {@link PartitionedIndexView} for an earlier attempt. In fact, the changes
+ * should be folded into the {@link UnisolatedBTreePartition} which needs to
+ * expose a fused view of the resources for the index partition on read.
  * <p>
  * Regardless, the data service needs to keep all resources locally for a given
  * index partition. In general, that includes the mutable {@link BTree} on the

@@ -711,37 +711,6 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                     .ceil(Math.log(nsymbols) / LOG2);
 
             {
-                // /*
-                // * @todo conpute the byte length for the serialized
-                // dictionary, the
-                // * bit length of the encoded keys (ceiling of that to the next
-                // * higher byte length), and the byte length of the values (2
-                // per
-                // * byte) and then pre-size the output buffer (an output bit
-                // stream).
-                // *
-                // * @todo write the dictionary
-                // *
-                // * @todo this requires a second pass converting bytes to
-                // longs, so
-                // * maybe allocate and store the long[]?
-                // */
-                // final int recordByteLength;
-                // {
-                //                    
-                // final int dictBitLen = 0;
-                //
-                // final int codesBitLength = nkeys * N * codeBitLength;
-                //                    
-                // final int valsBitLen = nkeys / 2; // one nibble per value.
-                //                    
-                // final int recordBitLength = dictBitLen+ codesBitLength +
-                // valsBitLen;
-                //                    
-                // recordByteLength = recordBitLength / 8 + recordBitLength % 8;
-                //                    
-                // }
-                // final byte[] buf = new byte[recordByteLength];
 
                 /*
                  * @todo The success of this relies on being able to cast to an
@@ -755,7 +724,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                         (OutputStream) out);
 
                 /*
-                 * write the header {#keys}.
+                 * write the header {#keys, nsymbols, codeBitLength}.
                  */
                 obs.writeNibble(nkeys);
                 obs.writeNibble(nsymbols);
@@ -767,9 +736,6 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
                  * {packed(symbol) -> bits(code)}*
                  * 
                  * The entries are written in an arbitrary order.
-                 * 
-                 * @todo if we pack the symbols then we can not pre-compute the
-                 * buffer size for the dictionary.
                  */
                 {
 
