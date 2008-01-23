@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.scaleup;
 
 import com.bigdata.btree.IBatchBTree;
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IsolatableFusedView;

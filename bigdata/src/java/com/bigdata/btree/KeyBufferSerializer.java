@@ -25,16 +25,11 @@ package com.bigdata.btree;
 
 import java.io.DataInput;
 import java.io.IOException;
-//import java.util.zip.Deflater;
-//import java.util.zip.Inflater;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-//import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-//import com.bigdata.util.TestHuffmanEncoder.HuffmanDecoder;
-//import com.bigdata.util.TestHuffmanEncoder.HuffmanEncoder;
 
 /**
  * Compact serialization for the key buffer.

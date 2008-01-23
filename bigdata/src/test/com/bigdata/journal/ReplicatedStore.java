@@ -43,9 +43,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.IResourceTransfer;
+import com.bigdata.service.IWritePipeline;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -105,6 +106,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
       or without
 
       IRawStore>MemoryChannel
+      
+      
+   There must also be support for replication of the secondary resources for
+   an index partition (the index segments).
  * </pre>
  * 
  * A class that intercepts writes on an {@link IRawStore} and causes the written

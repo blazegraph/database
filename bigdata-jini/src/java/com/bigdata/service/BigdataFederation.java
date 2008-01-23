@@ -30,6 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.IRawStore;
@@ -382,9 +384,9 @@ public class BigdataFederation implements IBigdataFederation {
 
             try {
 
-                rset = metadataService.rangeQuery(IDataService.UNISOLATED,
-                        metadataName, nextKey, null, 1000, IDataService.KEYS
-                                | IDataService.VALS, null/* filter */);
+                rset = metadataService.rangeIterator(ITx.UNISOLATED,
+                        metadataName, nextKey, null, 1000, IRangeQuery.KEYS
+                                | IRangeQuery.VALS, null/* filter */);
 
                 BigdataClient.log.info("Fetched " + rset.getNumTuples()
                         + " partition records for " + name);

@@ -35,7 +35,9 @@ import com.bigdata.isolation.IsolatedBTree;
 public interface ITx extends IIndexStore {
 
     /**
-     * The transaction identifier that is used for unisolated transactions (0L).
+     * A constant that may be used as the transaction identifier when the
+     * operation is <em>unisolated</em> (non-transactional).  The value of
+     * this constant is ZERO (0L).
      */
     public static final long UNISOLATED = 0L;
     

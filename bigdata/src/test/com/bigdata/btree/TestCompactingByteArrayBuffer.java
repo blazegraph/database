@@ -28,12 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import junit.framework.TestCase;
+
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.ibm.icu.impl.ByteBuffer;
-
-import junit.framework.TestCase;
 
 /**
  * Test harness used to develop a compacting buffer for maintaining branch nodes

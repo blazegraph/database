@@ -44,10 +44,10 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.Journal;
+import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.TPS.TPV;
 import com.bigdata.sparse.ValueType.AutoIncCounter;
@@ -183,8 +183,15 @@ public class SparseRowStore {
     static final String UTF8 = "UTF-8";
     
     private final IIndex ndx;
-    
-//    private Schema schema;
+
+    /**
+     * The backing index.
+     */
+    public IIndex getIndex() {
+        
+        return ndx;
+        
+    }
     
     /**
      * The maximum value for a timestamp. This may be used to read the most
@@ -209,20 +216,6 @@ public class SparseRowStore {
      */
     public static final long AUTO_TIMESTAMP_UNIQUE = 0L;
 
-//    /**
-//     * Return the {@link Schema} used by the {@link SparseRowStore}.
-//     * 
-//     * @todo refactor the schema into a parameter to the read and write methods
-//     *       so that we can support more than one {@link Schema} using the same
-//     *       {@link SparseRowStore} object (you can already use more than one
-//     *       schema per backing index).
-//     */
-//    public Schema getSchema() {
-//        
-//        return schema;
-//        
-//    }
-    
     /**
      * Create a client-side abstraction that treats and {@link IIndex} as a
      * {@link SparseRowStore}.
@@ -231,9 +224,10 @@ public class SparseRowStore {
      *            The index.
      */
     public SparseRowStore(IIndex ndx) {
-        
-        if(ndx==null) throw new IllegalArgumentException();
-        
+
+        if (ndx == null)
+            throw new IllegalArgumentException();
+
         this.ndx = ndx;
         
     }
@@ -315,35 +309,28 @@ public class SparseRowStore {
 
             /*
              * Remote index.
-             * 
-             * Figure out which index partition will get the write.
              */
 
-            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-            
-            final PartitionMetadata pmd = ((ClientIndexView) ndx).getPartition(
-                    IBigdataFederation.UNISOLATED, key);
-            
-            /*
-             * Lookup the data service for that index partition.
-             */
-            
-            final IDataService dataService = ((ClientIndexView)ndx).getDataService(pmd);
-            
-            /*
-             * Submit the atomic write operation to that data service.
-             */
-            
             try {
                 
-                final String name = DataService
-                        .getIndexPartitionName(((ClientIndexView) ndx)
-                                .getName(), pmd.getPartitionId());
+                ClientIndexView ndx = (ClientIndexView)this.ndx;
+                
+                final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+                
+                // Figure out which index partition will get the write
+                final PartitionMetadata pmd = ndx.getPartition(key);
+                
+                // Lookup the data service for that index partition.
+                final IDataService dataService = ndx.getDataService(pmd);
+
+                // Name of the index partition.
+                final String name = DataService.getIndexPartitionName(ndx
+                        .getName(), pmd.getPartitionId());
 
                 log.info("Submitting operation to dataService=" + dataService);
                 
-                return (TPS) dataService.submit(IBigdataFederation.UNISOLATED,
-                        name, proc);
+                // Submit the atomic write operation to that data service.
+                return (TPS) dataService.submit(ndx.getTx(), name, proc);
 
             } catch (Exception ex) {
             
@@ -432,36 +419,28 @@ public class SparseRowStore {
             /*
              * Remote index.
              * 
-             * Figure out which index partition will get the write.
-             */
-
-            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
-            
-            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-            
-            final PartitionMetadata pmd = ((ClientIndexView) ndx).getPartition(
-                    IBigdataFederation.UNISOLATED, key);
-            
-            /*
-             * Lookup the data service for that index partition.
-             */
-            
-            final IDataService dataService = ((ClientIndexView)ndx).getDataService(pmd);
-            
-            /*
-             * Submit the atomic write operation to that data service.
+             * Lookup the data service hosting the index partition for that key
+             * and submit the atomic write operation to that data service.
              */
             
             try {
+
+                final Object primaryKey = propertySet.get(schema.getPrimaryKey());
                 
-                final String name = DataService
-                        .getIndexPartitionName(((ClientIndexView) ndx)
-                                .getName(), pmd.getPartitionId());
+                final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+                
+                ClientIndexView ndx = (ClientIndexView)this.ndx;
+                
+                final IPartitionMetadata pmd = ndx.getPartition(key);
+                
+                final IDataService dataService = ndx.getDataService(pmd);
+
+                final String name = DataService.getIndexPartitionName(ndx
+                        .getName(), pmd.getPartitionId());
 
                 log.info("Submitting operation to dataService=" + dataService);
                 
-                return (TPS) dataService.submit(IBigdataFederation.UNISOLATED,
-                        name, proc);
+                return (TPS) dataService.submit(ndx.getTx(), name, proc);
 
             } catch (Exception ex) {
             
@@ -693,7 +672,7 @@ public class SparseRowStore {
                 tps.set(col, columnValueTimestamp, v);
                 
                 log.info("Read: name=" + col + ", timestamp="
-                        + columnValueTimestamp + ", v");
+                        + columnValueTimestamp + ", value=" + v);
 
             }
 

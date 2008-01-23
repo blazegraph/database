@@ -35,10 +35,10 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
-import com.bigdata.service.IDataService;
 import com.bigdata.service.UnisolatedBTreeConstructor;
 
 /**
@@ -76,7 +76,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
      *       temporary store for later closure, e.g., still a process which must
      *       be serialized - much like a commit!)
      */
-    final private long tx = IDataService.UNISOLATED;
+    final private long tx = ITx.UNISOLATED;
     
     final IIndex ndx_termId;
     final IIndex ndx_idTerm;

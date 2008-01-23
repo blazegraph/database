@@ -28,10 +28,9 @@ public interface ContentRepository
      * @param document
      *            an object containing the content and metadata to persist
      * 
-     * @throws ExistsException
-     *             if there is already a document with the same identifier.
+     * @return The new version.
      */
-    void create( Document document );
+    int create( Document document );
     
     /**
      * Update an existing persistent document in this repository based on the
@@ -40,8 +39,10 @@ public interface ContentRepository
      * 
      * @param document
      *            an object containing the content and metadata to update
+     * 
+     * @return The new version.
      */
-    void update( Document document );
+    int update( Document document );
     
     /**
      * Delete a single document.
@@ -49,9 +50,9 @@ public interface ContentRepository
      * @param id
      *            the identifier of the document to delete
      * 
-     * @return true iff the identified document was deleted.
+     * @return The #of blocks that were deleted for that file.
      */
-    boolean delete(String id);
+    long delete(String id);
     
     /**
      * Delete all documents in the identified key range.
@@ -65,8 +66,10 @@ public interface ContentRepository
      * @param toId
      *            The identifier of the first document that will NOT be deleted
      *            or <code>null</code> if there is no upper bound.
+     * 
+     * @return The #of files that were deleted.
      */
-    void deleteAll(String fromId, String toId);
+    long deleteAll(String fromId, String toId);
     
     /**
      * Return a listing of the documents and metadata about them in this

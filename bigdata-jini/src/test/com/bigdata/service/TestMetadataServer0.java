@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
 
@@ -295,7 +296,7 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             /*
              * This should fail since the index was never registered.
              */
-            dataService0Proxy.rangeCount(IDataService.UNISOLATED, DataService
+            dataService0Proxy.rangeCount(ITx.UNISOLATED, DataService
                     .getIndexPartitionName("xyz", 0/* partitionId */), null, null);
             
         } catch (ExecutionException ex) {

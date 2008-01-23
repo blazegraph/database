@@ -31,12 +31,10 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.Iterator;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BatchContains;
@@ -455,19 +453,27 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * the global state of the tree. If the transaction validates, then the
      * merge down onto the global state will cause the corresponding entries to
      * be removed from the global tree.
-     * 
-     * FIXME This method throws an exception since the iterator does not support
-     * {@link Iterator#remove()}.  This issue is noted in {@link AbstractNode}.
      */
     public void removeAll() {
         
-        IEntryIterator itr = entryIterator();
+        /*
+         * @todo The range delete operations at present requires storage only
+         * for the keys so it makes sense to put some limit on the capacity.
+         * Eventually it will be modified to not buffer the keys and the
+         * capacity limit SHOULD be reset to zero (0), which indicates a
+         * default.
+         */
+        final int capacity = 100000;
         
-        while(itr.hasNext()) {
-            
-            itr.remove();
-            
-        }
+        rangeIterator(null, null, capacity, DELETE/* flags */, null/* filter */);
+        
+//        IEntryIterator itr = entryIterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            itr.remove();
+//            
+//        }
         
     }
 

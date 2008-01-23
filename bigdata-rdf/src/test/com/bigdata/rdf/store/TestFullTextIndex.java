@@ -53,8 +53,6 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *       and {@link #reopenStore(AbstractTripleStore)} would go away in this
  *       eventuality.
  * 
- * @todo test restart safety of the full text index.
- * 
  * @todo test search against the full text index. abstract the search api so
  *       that it queries the terms index directly when a data typed literal or a
  *       URI is used (typed query).

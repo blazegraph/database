@@ -233,6 +233,108 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
     }
     
     /**
+     * Test for delete of the head block.
+     */
+    public void test_deleteH() throws IOException {
+            
+        final String id = "test";
+
+        final int version = 0;
+
+        final long block0 = 0;
+        final byte[] expected0 = new byte[] { 1, 2, 3 };
+
+        assertEquals("blockCount", 0L, repo.getBlockCount(id, version));
+
+        assertSameIterator("blockIds", new Long[] {}, repo.blocks(id, version));
+
+        assertNull("inputStream", repo.inputStream(id, version));
+
+        assertNull("readBlock", repo.readBlock(id, version, block0));
+
+        assertNull("readHead", repo.readHead(id, version));
+
+        // atomic append
+        assertEquals("block#", block0, repo.appendBlock(id, version, expected0, 0, 3));
+
+        assertEquals("blockCount", 1L, repo.getBlockCount(id, version));
+
+        assertSameIterator("blockIds", new Long[] { block0 }, repo.blocks(id,
+                version));
+
+        assertEquals("inputStream", expected0, read(repo.inputStream(id,
+                version)));
+
+        assertEquals("readBlock", expected0, repo.readBlock(id, version,
+                block0));
+
+        assertEquals("readHead", expected0, repo.readHead(id, version));
+
+        /*
+         * write the 2nd block.
+         */
+
+        final long block1 = 1;
+        final byte[] expected1 = new byte[] { 4,5,6 };
+
+        // atomic append
+        assertEquals("block#", block1, repo.appendBlock(id, version, expected1, 0, 3));
+
+        assertEquals("blockCount", 2L, repo.getBlockCount(id, version));
+
+        assertSameIterator("blockIds", new Long[] { block0, block1 }, repo.blocks(id,
+                version));
+
+        assertEquals("inputStream", new byte[] { 1, 2, 3, 4, 5, 6 }, read(repo
+                .inputStream(id, version)));
+
+        assertEquals("readBlock", expected0, repo
+                .readBlock(id, version, block0));
+
+        assertEquals("readBlock", expected1, repo
+                .readBlock(id, version, block1));
+
+        assertEquals("readHead", expected0, repo.readHead(id, version));
+
+        /*
+         * delete the head.
+         */
+
+        assertEquals("block#", block0, repo.deleteHead(id, version));
+
+        // note: does not decrease.
+        assertEquals("blockCount", 2L, repo.getBlockCount(id, version));
+
+        assertSameIterator("blockIds", new Long[] { block1 }, repo.blocks(id,
+                version));
+
+        assertEquals("inputStream", expected1, read(repo.inputStream(id,
+                version)));
+
+        assertEquals("readBlock", expected1, repo
+                .readBlock(id, version, block1));
+
+        assertEquals("readHead", expected1, repo.readHead(id, version));
+
+        /*
+         * delete the head again.
+         */
+
+        assertEquals("block#", block1, repo.deleteHead(id, version));
+
+        // note: does not decrease.
+        assertEquals("blockCount", 2L, repo.getBlockCount(id, version));
+
+        assertSameIterator("blockIds", new Long[] {}, repo.blocks(id, version));
+
+        assertEquals("inputStream", new byte[] {}, read(repo.inputStream(id,
+                version)));
+
+        assertEquals("readHead", null, repo.readHead(id, version));
+
+    }
+
+    /**
      * A small stress test for a single file version.
      */
     public void test_stress() {
@@ -664,11 +766,11 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
                 }
                 case Op.deleteH: {
                     final long block = getFirstBlock(id,version);
-                    final boolean deleted = repo.deleteHead(id,version);
+                    final long deleted = repo.deleteHead(id,version);
                     if(block==-1L) {
-                        assertFalse("Expecting nothing deleted",deleted);
+                        assertEquals("Expecting nothing deleted",-1L,deleted);
                     } else {
-                        assertTrue("Expecting block="+block+" to be deleted",deleted);
+                        assertEquals("Expecting block="+block+" to be deleted",block,deleted);
                         blocks.remove(new FileVersionBlock(id,version,block));
                     }
                     break;

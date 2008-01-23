@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.Map;
 
 public class DocumentImpl extends DocumentHeaderImpl implements Document 
 {
@@ -22,6 +23,17 @@ public class DocumentImpl extends DocumentHeaderImpl implements Document
         
     }
     
+    /**
+     * Copy constructor for header information.
+     * 
+     * @param metadata
+     *            to copy
+     */
+    public DocumentImpl(Map<String,Object> metadata) {
+
+        super(metadata);
+    }
+
     /**
      * Copy constructor for header information.
      * 

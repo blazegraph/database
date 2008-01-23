@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
@@ -144,7 +145,7 @@ abstract public class ReduceService
             final int capacity = 1000;
 
             // get both keys and values.
-            final int flags = IDataService.KEYS | IDataService.VALS;
+            final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
 
             // index scan.
             IEntryIterator itr = new RangeQueryIterator(ds, name,

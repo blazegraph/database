@@ -29,7 +29,6 @@ import java.io.IOException;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.io.SerializerUtil;
 
 /**

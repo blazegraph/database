@@ -37,6 +37,8 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.journal.ITx;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
 
@@ -229,7 +231,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         // @todo verify type of mutable btree registered!
         UUID indexUUID = fed.registerIndex(name,ctor);
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
         
         // fetches the index UUID from the metadata service.
         assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
@@ -300,7 +302,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
         
-        final long tx = IBigdataFederation.UNISOLATED;
+        final long tx = ITx.UNISOLATED;
         
         // verify index does not exist.
         assertNull(fed.getIndex(tx, name));
@@ -309,7 +311,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         UUID indexUUID = fed.registerIndex(name, ctor);
         
         // obtain view.
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         // verify view is non-null
         assertNotNull(ndx);
@@ -355,7 +357,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 JiniUtil.serviceID2UUID(dataServer1.getServiceID())
         });
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         final int partition0 = 0;
         final int partition1 = 1;
@@ -594,7 +596,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Request a view of that index.
          */
         ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                IBigdataFederation.UNISOLATED, name);
+                ITx.UNISOLATED, name);
 
         /*
          * Range count the index to verify that it is empty.
@@ -673,7 +675,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 JiniUtil.serviceID2UUID(dataServer1.getServiceID())
         });
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         PartitionedRangeQueryIterator itr = null;
         
@@ -719,7 +721,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 JiniUtil.serviceID2UUID(dataServer1.getServiceID())
         });
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -772,7 +774,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 JiniUtil.serviceID2UUID(dataServer1.getServiceID())
         });
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -825,7 +827,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 JiniUtil.serviceID2UUID(dataServer1.getServiceID())
         });
         
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -893,7 +895,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         });
         
         ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                IBigdataFederation.UNISOLATED, name);
+                ITx.UNISOLATED, name);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -911,7 +913,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             // Limit to one entry per data service query.
             final int capacity = 1;
             
-            final int flags = IDataService.KEYS | IDataService.VALS;
+            final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
             
             itr = (PartitionedRangeQueryIterator) ndx.rangeIterator(null, null,
                     capacity, flags,null/*filter*/);
@@ -975,7 +977,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
          * Request a view of that index.
          */
         ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                IBigdataFederation.UNISOLATED, name);
+                ITx.UNISOLATED, name);
 
         /*
          * Range count the index to verify that it is empty.
@@ -1099,7 +1101,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         /*
          * Request a view of that index.
          */
-        IIndex ndx = fed.getIndex(IBigdataFederation.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
         
         /*
          * Range count the index to verify that it is empty.

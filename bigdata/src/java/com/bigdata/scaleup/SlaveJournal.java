@@ -36,7 +36,6 @@ import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
-import com.bigdata.service.UnisolatedBTreePartition;
 
 /**
  * Class delegates the {@link #overflow()} event to a {@link MasterJournal}.

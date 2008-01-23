@@ -51,6 +51,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
@@ -294,7 +295,7 @@ public class StressTestConcurrent extends AbstractServerTestCase implements ICom
                 dataService.getServiceUUID(), });
 
         // request index view.
-        IIndex ndx = federation.getIndex(IBigdataFederation.UNISOLATED, name);
+        IIndex ndx = federation.getIndex(ITx.UNISOLATED, name);
         
         assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
         

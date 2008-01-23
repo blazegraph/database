@@ -31,7 +31,6 @@ import java.util.Properties;
 
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Test;
-import junit.framework.TestCase2;
 
 /**
  * <p>

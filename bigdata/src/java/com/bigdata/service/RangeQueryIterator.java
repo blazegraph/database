@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.io.ByteArrayBufferWithPosition;
 import com.bigdata.io.IByteArrayBuffer;
@@ -240,7 +241,7 @@ public class RangeQueryIterator implements IEntryIterator {
                     + BytesUtil.toString(fromKey) + ", toKey="
                     + BytesUtil.toString(toKey));
             
-            rset = dataService.rangeQuery(tx, name /* unpartitioned */, fromKey,
+            rset = dataService.rangeIterator(tx, name /* unpartitioned */, fromKey,
                     toKey, capacity, flags, filter);
             
             // reset index into the ResultSet.
@@ -282,7 +283,7 @@ public class RangeQueryIterator implements IEntryIterator {
                     + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(toKey));
             
-            rset = dataService.rangeQuery(tx, name /* unpartitioned */,
+            rset = dataService.rangeIterator(tx, name /* unpartitioned */,
                     _fromKey, toKey, capacity, flags, filter);
             
             // reset index into the ResultSet.
@@ -370,10 +371,10 @@ public class RangeQueryIterator implements IEntryIterator {
 
         lastVisited++;
         
-        lastKey = ((flags & IDataService.KEYS) == 0) ? null : rset
+        lastKey = ((flags & IRangeQuery.KEYS) == 0) ? null : rset
                 .getKeys()[lastVisited];
 
-        lastVal = ((flags & IDataService.VALS) == 0) ? null : rset
+        lastVal = ((flags & IRangeQuery.VALS) == 0) ? null : rset
                 .getValues()[lastVisited];
         
         return lastVal;
@@ -399,7 +400,7 @@ public class RangeQueryIterator implements IEntryIterator {
             
         }
         
-        if((flags & IDataService.KEYS)==0) {
+        if((flags & IRangeQuery.KEYS)==0) {
 
             // Keys not requested.
             throw new UnsupportedOperationException(ERR_NO_KEYS);
@@ -419,7 +420,7 @@ public class RangeQueryIterator implements IEntryIterator {
             
         }
         
-        if((flags & IDataService.VALS)==0) {
+        if((flags & IRangeQuery.VALS)==0) {
             
             // Values not requested.
             throw new UnsupportedOperationException(ERR_NO_VALS);
@@ -471,13 +472,13 @@ public class RangeQueryIterator implements IEntryIterator {
 
         public boolean getKeysRequested() {
 
-            return (flags & IDataService.KEYS) == 1;
+            return (flags & IRangeQuery.KEYS) == 1;
             
         }
 
         public boolean getValuesRequested() {
             
-            return (flags & IDataService.VALS) == 1;
+            return (flags & IRangeQuery.VALS) == 1;
             
         }
 

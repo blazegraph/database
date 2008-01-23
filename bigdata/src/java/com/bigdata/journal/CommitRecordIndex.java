@@ -177,8 +177,8 @@ public class CommitRecordIndex extends BTree {
      * less than or equal to the given timestamp. This is used primarily to
      * locate the commit record that will serve as the ground state for a
      * transaction having <i>timestamp</i> as its start time. In this context
-     * the LTE search identifies the most recent commit state that is never the
-     * less earlier than the start time of the transaction.
+     * the LTE search identifies the most recent commit state that not later
+     * than the start time of the transaction.
      * 
      * @param timestamp
      *            The given timestamp.
