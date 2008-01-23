@@ -167,7 +167,7 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
      * This method will include deleted entries in the key range in the
      * returned count.
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         return super.rangeCount(fromKey, toKey);
 

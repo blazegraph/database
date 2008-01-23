@@ -43,7 +43,7 @@ public class ClosureStats {
      * change in the #of statements in the database across the closure
      * operation.
      */
-    public int nentailments;
+    public long nentailments;
 
     /**
      * Time to compute the entailments and store them within the database

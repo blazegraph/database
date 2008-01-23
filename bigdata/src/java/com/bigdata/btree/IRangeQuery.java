@@ -141,9 +141,7 @@ public interface IRangeQuery {
      * @return The #of entries in the half-open key range. This will be zero if
      *         <i>toKey</i> is less than or equal to <i>fromKey</i> in the
      *         total ordering.
-     * 
-     * FIXME change the return type to [long]
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey);
+    public long rangeCount(byte[] fromKey, byte[] toKey);
 
 }

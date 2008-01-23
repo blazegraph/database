@@ -149,7 +149,7 @@ public class JustificationIterator implements IJustificationIterator {
          * exact value.
          */
 
-        final int rangeCount = ndx.rangeCount(null,null);
+        final long rangeCount = ndx.rangeCount(null,null);
 
         if (capacity == 0) {
 
@@ -157,9 +157,7 @@ public class JustificationIterator implements IJustificationIterator {
              * Attempt to fully buffer the justifications.
              */
 
-            capacity = rangeCount;
-
-            if (capacity > MAXIMUM_CAPACITY) {
+            if (capacity > MAXIMUM_CAPACITY || rangeCount > MAXIMUM_CAPACITY) {
 
                 /*
                  * If the capacity would exceed the maximum then we limit
@@ -168,6 +166,10 @@ public class JustificationIterator implements IJustificationIterator {
 
                 capacity = MAXIMUM_CAPACITY;
 
+            } else {
+                
+                capacity = (int) rangeCount;
+                
             }
 
         } else {
@@ -184,7 +186,7 @@ public class JustificationIterator implements IJustificationIterator {
                  * an exact value.
                  */
 
-                capacity = rangeCount;
+                capacity = (int) rangeCount;
 
                 /*
                  * Note: If the caller is making a best effort attempt to read

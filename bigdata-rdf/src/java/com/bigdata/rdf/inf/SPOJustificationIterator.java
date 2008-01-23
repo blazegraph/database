@@ -90,9 +90,18 @@ public class SPOJustificationIterator implements IJustificationIterator {
         byte[] toKey = keyBuilder.reset().append(head.s).append(head.p)
                 .append(head.o + 1).getKey();
         
-        final int rangeCount = ndx.rangeCount(fromKey,toKey);
+        final long rangeCount = ndx.rangeCount(fromKey,toKey);
 
-        this.justifications = new Justification[ rangeCount ];
+        if (rangeCount > 1000000) {
+
+            // Limit at 1M.
+            
+            throw new RuntimeException(
+                    "Too many justifications to materialize: " + rangeCount);
+
+        }
+
+        this.justifications = new Justification[(int) rangeCount ];
 
         /*
          * Materialize the matching justifications.

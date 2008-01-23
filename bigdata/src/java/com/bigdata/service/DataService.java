@@ -680,7 +680,7 @@ abstract public class DataService implements IDataService,
 
     }
 
-    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
             throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -691,7 +691,7 @@ abstract public class DataService implements IDataService,
 
             // submit the task and wait for it to complete.
             
-            return (Integer) journal.submit(task).get();
+            return (Long) journal.submit(task).get();
 
         } finally {
             
@@ -838,7 +838,7 @@ abstract public class DataService implements IDataService,
 
         public Object doTask() throws Exception {
             
-            return new Integer(getIndex(getOnlyResource()).rangeCount(fromKey, toKey));
+            return new Long(getIndex(getOnlyResource()).rangeCount(fromKey, toKey));
             
         }
         

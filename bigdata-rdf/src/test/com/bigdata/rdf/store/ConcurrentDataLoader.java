@@ -532,9 +532,9 @@ public class ConcurrentDataLoader {
             // total run time.
             final long elapsed = System.currentTimeMillis() - begin;
 
-            final int nterms = db.getTermCount();
+            final long nterms = db.getTermCount();
 
-            final int nstmts = db.getStatementCount();
+            final long nstmts = db.getStatementCount();
             
             final double tps = (long) (((double) nstmts) / ((double) elapsed) * 1000d);
 

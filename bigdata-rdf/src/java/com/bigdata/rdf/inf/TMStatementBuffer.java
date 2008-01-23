@@ -398,16 +398,18 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         try {
 
-            final int focusStoreSize = focusStore.getStatementCount();
+            final long focusStoreSize = focusStore.getStatementCount();
+            
+            final int capacity = (int) Math.min(focusStoreSize, 1000000);
             
             /*
              * This buffer will write on the database causing any statement that
              * is found in the focusStore and already known to the database to
              * be made into an explicit statement in the database.
              */
-            
+
             final SPOAssertionBuffer assertionBuffer = new SPOAssertionBuffer(
-                    database, database, filter, focusStoreSize/* capacity */, false/* justified */);
+                    database, database, filter, capacity, false/* justified */);
 
             /*
              * This buffer will retract statements from the tempStore that are
@@ -415,7 +417,7 @@ public class TMStatementBuffer implements IStatementBuffer {
              */
             
             final SPORetractionBuffer retractionBuffer = new SPORetractionBuffer(
-                    focusStore, focusStoreSize/* capacity */);
+                    focusStore, capacity);
 
 
             while (itr.hasNext()) {
@@ -514,7 +516,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
 
-        final int nbeforeClosure = tempStore.getStatementCount();
+        final long nbeforeClosure = tempStore.getStatementCount();
 
         log.info("Computing closure of the temporary store with "
                 + nbeforeClosure + " statements");
@@ -542,7 +544,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         stats = inferenceEngine.computeClosure(tempStore);
 
-        final int nafterClosure = tempStore.getStatementCount();
+        final long nafterClosure = tempStore.getStatementCount();
 
         log.info("There are " + nafterClosure
                 + " statements in the temporary store after closure");
@@ -609,7 +611,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         }
 
         // #of given statements to retract.
-        final int ngiven = tempStore.getStatementCount();
+        final long ngiven = tempStore.getStatementCount();
         
         log.info("Computing closure of the temporary store with "
                 + ngiven+ " statements");
@@ -704,7 +706,7 @@ public class TMStatementBuffer implements IStatementBuffer {
 
         MDC.put("depth", "depth="+depth);
         
-        final int tempStoreCount = tempStore.getStatementCount();
+        final long tempStoreCount = tempStore.getStatementCount();
 
         log.info("Doing truth maintenance with " + tempStoreCount
                 + " statements : depth="+depth);
@@ -720,7 +722,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         // consider each statement in the tempStore.
         ISPOIterator itr = tempStore.getAccessPath(KeyOrder.SPO).iterator();
 
-        final int nretracted;
+        final long nretracted;
         try {
 
             /*
@@ -962,7 +964,7 @@ public class TMStatementBuffer implements IStatementBuffer {
             
         }
         
-        int focusStoreCount = focusStore.getStatementCount();
+        long focusStoreCount = focusStore.getStatementCount();
 
         if (focusStoreCount == 0) {
 

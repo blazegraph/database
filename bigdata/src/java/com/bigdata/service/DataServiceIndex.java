@@ -276,7 +276,7 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         try {
 

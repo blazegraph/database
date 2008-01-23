@@ -207,7 +207,7 @@ public class SPOIterator implements ISPOIterator {
          * exact value.
          */
 
-        final int rangeCount = accessPath.rangeCount();
+        final long rangeCount = accessPath.rangeCount();
         
         if(capacity == 0) {
 
@@ -215,9 +215,7 @@ public class SPOIterator implements ISPOIterator {
              * Attempt to fully buffer the statements.
              */
             
-            capacity = rangeCount;
-            
-            if (capacity > MAXIMUM_CAPACITY) {
+            if (capacity>MAXIMUM_CAPACITY || rangeCount > MAXIMUM_CAPACITY) {
 
                 /*
                  * If the capacity would exceed the maximum then we limit
@@ -226,6 +224,10 @@ public class SPOIterator implements ISPOIterator {
                 
                 capacity = MAXIMUM_CAPACITY;
 
+            } else {
+                
+                capacity = (int) rangeCount;
+                
             }
 
         } else {
@@ -242,7 +244,7 @@ public class SPOIterator implements ISPOIterator {
                  * an exact value.
                  */
                 
-                capacity = rangeCount;
+                capacity = (int) rangeCount;
 
                 /*
                  * Note: If the caller is making a best effort attempt to read

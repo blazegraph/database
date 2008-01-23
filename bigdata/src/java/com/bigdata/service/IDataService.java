@@ -416,7 +416,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
      */
-    public int rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
             throws InterruptedException, ExecutionException, IOException;
         
     /**

@@ -91,35 +91,35 @@ public interface ITripleStore {
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public int getStatementCount();
+    public long getStatementCount();
 
     /**
      * The #of terms in the store.
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public int getTermCount();
+    public long getTermCount();
 
     /**
      * The #of URIs in the store.
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public int getURICount();
+    public long getURICount();
 
     /**
      * The #of Literals in the store.
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public int getLiteralCount();
+    public long getLiteralCount();
 
     /**
      * The #of BNodes in the store.
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public int getBNodeCount();
+    public long getBNodeCount();
 
     /**
      * Add a single {@link StatementEnum#Explicit} statement by lookup and/or

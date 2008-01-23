@@ -411,10 +411,10 @@ public class PartitionedIndexView implements IIndex, ICommitter {
      * {@link ReadOnlyFusedView}s for each partition, it will may overcount the #of
      * entries actually in the range on each partition).
      * <p>
-     * If the count would exceed {@link Integer#MAX_VALUE} then the result is
-     * {@link Integer#MAX_VALUE}.
+     * If the count would exceed {@link Long#MAX_VALUE} then the result is
+     * {@link Long#MAX_VALUE}.
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         // index of the first partition to check.
         final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
@@ -439,7 +439,7 @@ public class PartitionedIndexView implements IIndex, ICommitter {
             
             if(count<lastCount) {
                 
-                return Integer.MAX_VALUE;
+                return Long.MAX_VALUE;
                 
             }
             

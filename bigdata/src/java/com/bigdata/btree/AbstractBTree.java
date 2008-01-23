@@ -991,7 +991,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
          */
         
         // places a limit on the #of entries to be deleted.
-        final int rangeCount = capacity == 0 ? rangeCount(fromKey, toKey)
+        final int rangeCount = capacity == 0 ? (int) rangeCount(fromKey, toKey)
                 : capacity;
         
         IEntryIterator src = getRoot().rangeIterator(fromKey, toKey,
@@ -1178,7 +1178,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         
     }
     
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         AbstractNode root = getRoot();
 

@@ -195,9 +195,21 @@ public class SPOArrayIterator implements ISPOIterator {
 
 //        this.filter = filter;
         
-        final int rangeCount = accessPath.rangeCount();
+        final long rangeCount = accessPath.rangeCount();
 
-        final int n = limit > 0 ? Math.min(rangeCount, limit) : rangeCount;
+        if (rangeCount > 10000000) {
+            
+            /*
+             * Note: This is a relatively high limit (10M statements). You are
+             * much better off processing smaller chunks!
+             */
+            
+            throw new RuntimeException("Too many statements to read into memory: "+rangeCount);
+            
+        }
+        
+        final int n = (int) (limit > 0 ? Math.min(rangeCount, limit)
+                : rangeCount);
         
         this.stmts = new SPO[ n ];
 

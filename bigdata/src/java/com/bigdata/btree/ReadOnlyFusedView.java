@@ -270,12 +270,13 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
      * than one source index.
      * 
      * @todo this could be done using concurrent threads.
+     * @todo watch for overflow of {@link Long#MAX_VALUE}
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
         
-        int count = 0;
+        long count = 0;
         
-        for(int i=0; i<srcs.length; i++) {
+        for (int i = 0; i < srcs.length; i++) {
             
             count += srcs[i].rangeCount(fromKey, toKey);
             

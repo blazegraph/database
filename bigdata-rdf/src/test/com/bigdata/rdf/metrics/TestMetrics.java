@@ -952,73 +952,73 @@ public class TestMetrics extends AbstractMetricsTestCase {
          * The #of statements added to the repository during the trial (axioms,
          * told triples, and inferences) (iff GOM SAIL otherwise zero(0)).
          */
-        int statementsAdded;
+        long statementsAdded;
 
         /**
          * The #of inferences added to the repository during the trial (iff GOM
          * SAIL).
          */
-        int inferencesAdded;
+        long inferencesAdded;
 
         /**
          * The #of proof objects added to the repository during the trial (iff
          * GOM SAIL).
          */
-        int proofsAdded;
+        long proofsAdded;
 
         /**
          * The #of URIs added to the repository during the trail (iff GOM SAIL
          * otherewise zero(0)).
          */
-        int urisAdded;
+        long urisAdded;
 
         /**
          * The #of blank nodes added to the repository during the trail (iff GOM
          * SAIL).
          */
-        int bnodesAdded;
+        long bnodesAdded;
 
         /**
          * The #of literals added to the repository during the trail (iff GOM
          * SAIL).
          */
-        int literalsAdded;
+        long literalsAdded;
 
         /**
          * The #of statements in the repository after the trial (axioms, told
          * triples, and inferences) (iff GOM SAIL otherewise zero(0)).
          */
-        int statementCount1;
+        long statementCount1;
 
         /**
          * The #of inferences in the repository after the trial (iff GOM SAIL
          * otherewise zero(0)).
          */
-        int inferenceCount1;
+        long inferenceCount1;
 
         /**
          * The #of proofs objects in the repository after the trial (iff GOM
          * SAIL otherewise zero(0)).
          */
-        int proofCount1;
+        long proofCount1;
 
         /**
          * The #of URIs in the repository after the trial (iff GOM SAIL
          * otherewise zero(0)).
          */
-        int uriCount1;
+        long uriCount1;
 
         /**
          * The #of blank nodes in the repository after the trial (iff GOM SAIL
          * otherewise zero(0)).
          */
-        int bnodeCount1;
+        long bnodeCount1;
 
         /**
          * The #of literals in the repository after the trial (iff GOM SAIL
          * otherewise zero(0)).
          */
-        int literalCount1;
+        long literalCount1;
         
         /**
          * Load an RDF/XML file into the repository and write statistics on the
@@ -1034,17 +1034,17 @@ public class TestMetrics extends AbstractMetricsTestCase {
             this.file = file;
 
             // #of statements in the repository (before the trial).
-            final int statementCount0 = store.getStatementCount();
+            final long statementCount0 = store.getStatementCount();
 //            // @todo inference count.
 //            final int inferenceCount0 = 0;
             // proof count.
-            final int proofCount0 = store.getJustificationCount();
+            final long proofCount0 = store.getJustificationCount();
             // uri count.
-            final int uriCount0 = store.getURICount();
+            final long uriCount0 = store.getURICount();
             // bnode count.
-            final int bnodeCount0 = store.getBNodeCount();
+            final long bnodeCount0 = store.getBNodeCount();
             // literal count.
-            final int literalCount0 = store.getLiteralCount();
+            final long literalCount0 = store.getLiteralCount();
 
 //            final MetricsListener listener = new MetricsListener();
 
