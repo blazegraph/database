@@ -21,15 +21,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.scaleup;
+/*
+ * Created on Aug 10, 2007
+ */
+
+package com.bigdata.text;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites into increasing dependency order.
- *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -39,6 +41,7 @@ public class TestAll extends TestCase {
      * 
      */
     public TestAll() {
+        super();
     }
 
     /**
@@ -48,35 +51,13 @@ public class TestAll extends TestCase {
         super(arg0);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("scaleup");
+        TestSuite suite = new TestSuite("full text indexing");
 
-        /*
-         * journal overflow
-         * 
-         * @todo test overflow triggers near journal capacity
-         * 
-         * @todo test overflow will abort transactions if necessary, e.g., after
-         * a grace period and possible journal extension.
-         */
+        suite.addTestSuite(TestFullTextIndex.class);
         
-        /*
-         * management of partitioned indices.
-         * 
-         * @todo test overflow resulting in parition merge or split.
-         * 
-         * @todo test metadata management for index segments.
-         */
-        suite.addTestSuite(TestMetadataIndex.class);
-        suite.addTestSuite(TestPartitionedIndex.class);
-        suite.addTestSuite(TestPartitionedJournal.class);
-       
         return suite;
         
     }

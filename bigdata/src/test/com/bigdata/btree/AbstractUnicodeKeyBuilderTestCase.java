@@ -31,10 +31,10 @@ package com.bigdata.btree;
 import java.util.Locale;
 import java.util.Properties;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.btree.KeyBuilder.Options;
 import com.bigdata.btree.KeyBuilder.StrengthEnum;
-
-import junit.framework.TestCase2;
 
 /**
  * Base class for the test suites that examine support for Unicode sort keys in

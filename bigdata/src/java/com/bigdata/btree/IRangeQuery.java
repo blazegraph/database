@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.ResultSet;
 
 /**
@@ -50,6 +52,16 @@ public interface IRangeQuery {
      * the client.
      */
     public static final int VALS = 1 << 1;
+
+    /**
+     * Flag specifies that entries visited by the iterator in the key range will
+     * be deleted. This flag may be combined with {@link #KEYS} or {@link #VALS}
+     * in order to return the keys and/or values for the deleted entries.
+     * 
+     * @todo unit tests for delete at the {@link BTree},
+     *       {@link UnisolatedBTree}, and {@link IDataService} layers.
+     */
+    public static final int DELETE = 1 << 2;
     
     /**
      * Return an iterator that visits the entries in a half-open key range.

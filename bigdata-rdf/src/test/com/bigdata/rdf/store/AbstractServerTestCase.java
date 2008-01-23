@@ -42,6 +42,7 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.IResourceMetadata;
 import com.bigdata.service.AbstractServer;
@@ -102,9 +103,9 @@ import com.sun.jini.tool.ClassServer;
 public abstract class AbstractServerTestCase extends TestCase2 {
 
     /**
-     * Equal to {@link IDataService#UNISOLATED}.
+     * Equal to {@link ITx#UNISOLATED}.
      */
-    protected final long UNISOLATED = IDataService.UNISOLATED; 
+    protected final long UNISOLATED = ITx.UNISOLATED; 
     
     /**
      * 

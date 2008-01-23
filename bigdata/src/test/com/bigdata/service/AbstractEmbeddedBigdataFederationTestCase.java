@@ -30,10 +30,10 @@ package com.bigdata.service;
 import java.io.File;
 import java.util.Properties;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.journal.BufferMode;
 import com.bigdata.repo.BigdataRepository.Options;
-
-import junit.framework.TestCase2;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data

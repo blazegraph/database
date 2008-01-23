@@ -32,6 +32,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.journal.ITx;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
@@ -386,7 +387,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         if (terms == null) {
 
             terms = (ClientIndexView) fed.getIndex(
-                    IBigdataFederation.UNISOLATED, name_termId);
+                    ITx.UNISOLATED, name_termId);
 
         }
 
@@ -398,7 +399,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (ids == null) {
 
-            ids = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+            ids = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
                     name_idTerm);
 
         }
@@ -411,7 +412,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (spo == null) {
 
-            spo = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+            spo = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
                     name_spo);
 
         }
@@ -424,7 +425,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (pos == null) {
 
-            pos = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+            pos = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
                     name_pos);
 
         }
@@ -437,7 +438,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (osp == null) {
 
-            osp = (ClientIndexView) fed.getIndex(IBigdataFederation.UNISOLATED,
+            osp = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
                     name_osp);
 
         }
@@ -451,7 +452,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         if (just == null) {
 
             just = (ClientIndexView) fed.getIndex(
-                    IBigdataFederation.UNISOLATED, name_just);
+                    ITx.UNISOLATED, name_just);
 
         }
 

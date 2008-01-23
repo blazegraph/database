@@ -33,7 +33,14 @@ public class DocumentHeaderImpl implements DocumentHeader
     public DocumentHeaderImpl( DocumentHeader header )
     {
      
-        properties = new HashMap<String,Object>(header.asMap());
+        this(header.asMap());
+        
+    }
+    
+    public DocumentHeaderImpl( Map<String,Object> metadata )
+    {
+     
+        properties = new HashMap<String,Object>(metadata);
         
     }
     

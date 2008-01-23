@@ -2,9 +2,12 @@ package com.bigdata.service;
 
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.io.ByteArrayBufferWithPosition;
 import com.bigdata.io.IByteArrayBuffer;
@@ -27,6 +30,9 @@ import com.bigdata.scaleup.MetadataIndex;
  * @version $Id$
  */
 public class PartitionedRangeQueryIterator implements IEntryIterator {
+
+    public static final transient Logger log = Logger
+            .getLogger(PartitionedRangeQueryIterator.class);
 
     /**
      * Error message used by {@link #getKey()} when the iterator was not
@@ -299,14 +305,14 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
             final int partitionId = pmd.getPartitionId();
             
-            ClientIndexView.log.info("name=" + ndx.getName() + ", partition=" + partitionId
-                    + ", fromKey=" + BytesUtil.toString(_fromKey)
+            log.info("name=" + ndx.getName() + ", tx=" + tx + ", partition="
+                    + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
             
-            rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
+            rset = dataService.rangeIterator(tx, name, _fromKey, _toKey, capacity,
                     flags, filter);
             
             // reset index into the ResultSet.
@@ -371,15 +377,15 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
             final int partitionId = pmd.getPartitionId();
             
-            ClientIndexView.log.info("name=" + ndx.getName() + ", partition=" + partitionId
-                    + ", fromKey=" + BytesUtil.toString(_fromKey)
+            log.info("name=" + ndx.getName() + ", tx=" + tx + ", partition="
+                    + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
-            
+
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(
                     ndx.getName(), partitionId);
             
-            rset = dataService.rangeQuery(tx, name, _fromKey, _toKey, capacity,
+            rset = dataService.rangeIterator(tx, name, _fromKey, _toKey, capacity,
                     flags, filter);
             
             // reset index into the ResultSet.
@@ -494,10 +500,10 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
         lastVisited++;
         
-        lastKey = ((flags & IDataService.KEYS) == 0) ? null : rset
+        lastKey = ((flags & IRangeQuery.KEYS) == 0) ? null : rset
                 .getKeys()[lastVisited];
 
-        lastVal = ((flags & IDataService.VALS) == 0) ? null : rset
+        lastVal = ((flags & IRangeQuery.VALS) == 0) ? null : rset
                 .getValues()[lastVisited];
         
         return lastVal;
@@ -523,7 +529,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
             
         }
         
-        if((flags & IDataService.KEYS)==0) {
+        if((flags & IRangeQuery.KEYS)==0) {
 
             // Keys not requested.
             throw new UnsupportedOperationException(ERR_NO_KEYS);
@@ -543,7 +549,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
             
         }
         
-        if((flags & IDataService.VALS)==0) {
+        if((flags & IRangeQuery.VALS)==0) {
             
             // Values not requested.
             throw new UnsupportedOperationException(ERR_NO_VALS);
@@ -607,13 +613,13 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
         public boolean getKeysRequested() {
 
-            return (flags & IDataService.KEYS) == 1;
+            return (flags & IRangeQuery.KEYS) == 1;
             
         }
 
         public boolean getValuesRequested() {
             
-            return (flags & IDataService.VALS) == 1;
+            return (flags & IRangeQuery.VALS) == 1;
             
         }
 

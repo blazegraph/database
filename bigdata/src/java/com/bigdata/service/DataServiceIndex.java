@@ -39,8 +39,11 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexProcedureConstructor;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 
 /**
@@ -74,7 +77,7 @@ public class DataServiceIndex implements IIndex {
 
     /**
      * The transaction identifier for this index view -or-
-     * {@link IDataService#UNISOLATED} if the index view is not transactional.
+     * {@link ITx#UNISOLATED} if the index view is not transactional.
      * 
      * @return The transaction identifier for the index view.
      */
@@ -116,7 +119,7 @@ public class DataServiceIndex implements IIndex {
      * @param name
      *            The index name.
      * @param tx
-     *            The transaction -or- {@link IDataService#UNISOLATED} to use
+     *            The transaction -or- {@link ITx#UNISOLATED} to use
      *            unisolated atomic index operations.
      * @param dataService
      *            The data service.
@@ -289,8 +292,8 @@ public class DataServiceIndex implements IIndex {
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
-        return rangeIterator(fromKey, toKey, capacity, IDataService.KEYS
-                | IDataService.VALS, null/* filter */);
+        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
+                | IRangeQuery.VALS, null/* filter */);
 
     }
 

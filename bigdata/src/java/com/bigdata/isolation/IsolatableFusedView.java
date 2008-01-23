@@ -30,8 +30,8 @@ package com.bigdata.isolation;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IFusedView;
 import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.scaleup.PartitionedIndexView;
 
 /**
  * An read-only {@link IFusedView} that supports transactions and deletion

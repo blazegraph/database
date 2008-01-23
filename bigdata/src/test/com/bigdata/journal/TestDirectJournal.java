@@ -30,10 +30,10 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 
-import com.bigdata.rawstore.IRawStore;
-
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
+
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Test suite for {@link BufferMode#Direct} journals.

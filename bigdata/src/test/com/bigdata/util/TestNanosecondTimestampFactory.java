@@ -29,8 +29,6 @@ package com.bigdata.util;
 
 import junit.framework.TestCase;
 
-import com.bigdata.journal.RootBlockView;
-
 /**
  * Test suite for {@link NanosecondTimestampFactory}.
  * 

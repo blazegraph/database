@@ -46,8 +46,8 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.IAtomicStore;
+import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -175,9 +175,6 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * and since the file data must reside on the index partition(s) identified by
  * its file version.
  * 
- * @todo provide scans for file versions, e.g., given a file, what versions
- *       exist.
- * 
  * @todo implement "zones" and their various policies (replication, retention,
  *       and media indexing).  access control could also be part of the zones.
  * 
@@ -207,10 +204,6 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  *       {@link BigdataRepository} and applied locally as the blocks of the file
  *       are written into the repository. That's certainly easier right off the
  *       bat.)
- * 
- * @todo full transactions could be used to perform atomic updates on the file
- *       metadata. in a way this is easier than resorting to a distinct locking
- *       mechanism. file data writes MUST be outside of the transaction.
  * 
  * @todo ensure that index partitions do not break across the metadata record
  *       for a file.
@@ -330,20 +323,30 @@ public class BigdataRepository implements ContentRepository {
     }
         
     /**
-     * The schema for metadata about blobs stored in the repository. Some well
-     * known properties are always defined, but any property may be stored -
-     * ideally within their own namespace!
+     * The schema for metadata about file versions stored in the repository.
+     * Some well known properties are always defined, but any property may be
+     * stored - ideally within their own namespace!
+     * <p>
+     * Note: File version creation time and update times are available using the
+     * {@link SparseRowStore} API directly. This API reports the timestamp for
+     * each property value. The <em>file creation time</em> is the timestamp
+     * associated with the first occurrence of the {@link #ID} property for a
+     * file. The <em>file metadata last modified</em> time is the timestamp
+     * associated with most recent value of the {@link #ID} property for that
+     * file. The <em>file version creation time</em> is the timestamp
+     * associated with the first occurrence of the corresponding
+     * {@link #VERSION} property for a file. Timestamps for file block can NOT
+     * be obtained.
+     * <p>
+     * Note: A content length property was deliberately NOT defined. The design
+     * is geared towards very large file and asynchronous read/write of file
+     * blocks. The length of short files may be readily computed by the
+     * expediency of sucking their contents into a buffer. Large files should
+     * always be processed using a stream-oriented technique or distributed to
+     * concurrent clients in block sized pieces.
      * 
-     * @todo An Last-Modified property COULD be defined by the application, but
-     *       the application will have to explicitly update that property - it
-     *       will NOT be updated when a block is written on the file version
-     *       since block IO is decoupled by design from reading or writing the
-     *       file metadata. (This is the same reason why Content-Length is NOT
-     *       defined.)
-     *       <p>
-     *       On the other hand, a "Create-Time" property makes sense.
-     * 
-     * @todo other obvious metadata would include the user identifier.
+     * @todo other obvious metadata would include the user identifier associated
+     *       with each update request.
      */
     public static class MetadataSchema extends Schema {
         
@@ -355,16 +358,8 @@ public class BigdataRepository implements ContentRepository {
         /**
          * The content identifer is an arbitrary Unicode {@link String} whose
          * value may be defined by the client.
-         * 
-         * @todo support server-side generation of the id attribute.
          */
         public static transient final String ID = "Id";
-
-//        /**
-//         * The length of the encoded content #of bytes (the same semantics as
-//         * the HTTP <code>Content-Length</code> header).
-//         */
-//        public static final String CONTENT_LENGTH = "ContentLength";
         
         /**
          * The MIME type associated with the content (the same semantics as the
@@ -408,7 +403,7 @@ public class BigdataRepository implements ContentRepository {
     private IIndex dataIndex;
     
     // @todo unique or not?
-    final long AUTO_TIMESTAMP = SparseRowStore.AUTO_TIMESTAMP_UNIQUE;
+    final protected long AUTO_TIMESTAMP = SparseRowStore.AUTO_TIMESTAMP_UNIQUE;
         
     protected static void assertString(Map<String, Object> properties, String name) {
 
@@ -466,7 +461,7 @@ public class BigdataRepository implements ContentRepository {
         if (metadataIndex == null) {
 
             IIndex ndx = (ClientIndexView) fed.getIndex(
-                    IBigdataFederation.UNISOLATED, METADATA_NAME);
+                    ITx.UNISOLATED, METADATA_NAME);
 
             metadataIndex = new SparseRowStore(ndx);
             
@@ -484,7 +479,7 @@ public class BigdataRepository implements ContentRepository {
         if (dataIndex == null) {
 
             dataIndex = (ClientIndexView) fed.getIndex(
-                    IBigdataFederation.UNISOLATED, DATA_NAME);
+                    ITx.UNISOLATED, DATA_NAME);
 
         }
 
@@ -509,7 +504,7 @@ public class BigdataRepository implements ContentRepository {
                     new UnisolatedBTreePartitionConstructor(branchingFactor));
 
             IIndex ndx = (ClientIndexView) fed.getIndex(
-                    IBigdataFederation.UNISOLATED, METADATA_NAME);
+                    ITx.UNISOLATED, METADATA_NAME);
 
             metadataIndex = new SparseRowStore(ndx);
             
@@ -523,7 +518,7 @@ public class BigdataRepository implements ContentRepository {
                     new FileDataBTreePartitionConstructor(branchingFactor));
 
             dataIndex = (ClientIndexView) fed.getIndex(
-                        IBigdataFederation.UNISOLATED, DATA_NAME);
+                        ITx.UNISOLATED, DATA_NAME);
             
         }
 
@@ -574,7 +569,7 @@ public class BigdataRepository implements ContentRepository {
         
     }
     
-    public void create(Document doc) {
+    public int create(Document doc) {
         
         if (doc == null)
             throw new IllegalArgumentException();
@@ -587,11 +582,11 @@ public class BigdataRepository implements ContentRepository {
 
         final Map<String,Object> metadata = doc.asMap();
 
-        /*
-         * Verify content type was specified since we will write on the file
-         * version.
-         */
-        assertString(metadata, MetadataSchema.CONTENT_TYPE);
+//        /*
+//         * Verify content type was specified since we will write on the file
+//         * version.
+//         */
+//        assertString(metadata, MetadataSchema.CONTENT_TYPE);
 
         /*
          * Vreate new file version.
@@ -602,6 +597,8 @@ public class BigdataRepository implements ContentRepository {
          * Copy data from the document.
          */
         copyStream(id, version, doc.getInputStream());
+        
+        return version;
         
     }
     
@@ -749,8 +746,11 @@ public class BigdataRepository implements ContentRepository {
         
         private void assertExists() {
 
-            if (metadata == null)
+            if (metadata == null) {
+
                 throw new IllegalStateException("No current version: id="+id);
+                
+            }
             
         }
         
@@ -823,6 +823,36 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
+     * Update the metadata for the current file version.
+     * 
+     * @param id
+     *            The file identifier.
+     * 
+     * @param metadata
+     *            The properties to be written. A <code>null</code> value for
+     *            a property will cause the corresponding property to be
+     *            deleted. Properties not present in this map will NOT be
+     *            modified.
+     * 
+     * @return The complete metadata for the current file version.
+     */
+    public Map<String,Object> updateMetadata(String id, Map<String,Object> metadata) {
+
+        // copy since the map might be unmodifyable.
+        metadata = new HashMap<String,Object>(metadata);
+        
+        // set the id - this is required for the primary key.
+        metadata.put(MetadataSchema.ID, id);
+
+        // remove the version identifier if any - we do not want this modified!
+        metadata.remove(MetadataSchema.VERSION);
+        
+        return getMetadataIndex().write(getKeyBuilder(), metadataSchema,
+                metadata, AUTO_TIMESTAMP, null/* filter */).asMap();
+        
+    }
+    
+    /**
      * Create a new file version using the supplied file metadata.
      * <p>
      * Note: This is essentially a delete + create operation. Since the combined
@@ -832,32 +862,21 @@ public class BigdataRepository implements ContentRepository {
      * @param metadata
      *            The file metadata.
      */
-    public int update(Map<String,Object> metadata) {
-
+    public int update(Document doc) {
+        
+        Map<String,Object> metadata = doc.asMap();
+        
         final String id = (String) metadata.get(MetadataSchema.ID); 
         
         // delete the existing file version (if any).
         delete( id );
         
-        // create a new file version, returning the new version.
-        return create( metadata );
-
-    }
-    
-    public void update(Document doc) {
-        
-        update(doc.asMap());
+        // create a new file version using that metadata.
+        return create( doc );
         
     }
 
-    /**
-     * 
-     * @todo make this more efficient at deleting the blocks comprising the file
-     *       version.
-     * 
-     * @todo return the #of blocks deleted instead?
-     */
-    public boolean delete(String id) {
+    public long delete(String id) {
 
         final RepositoryDocumentImpl doc = (RepositoryDocumentImpl) read(id);
         
@@ -865,43 +884,52 @@ public class BigdataRepository implements ContentRepository {
             
             // no current version.
 
-            log.warn("No current version: id="+id);
-            
-            return false;
-            
+            log.warn("No current version: id=" + id);
+
+            return 0L;
+
         }
-        
+
         final int version = doc.getVersion();
-        
+
         /*
          * Delete blocks from the file version.
          * 
-         * FIXME define a range-delete operation so we do not have to
-         * materialize the keys to delete the data. This can be just an
-         * {@link IIndexProcedure} but it should not extend
-         * {@link IndexProcedure} since that expects the serialization of keys
-         * and values with the request. In fact, a common base class could
-         * doubtless be identified for use with the range iterator as well.
+         * Note: This is efficient in that it handles the delete on the data
+         * service for each index partition. However, if the data spans more
+         * than one index partition then the requests to delete the data on each
+         * index partition are issued in sequence. A range-delete procedure
+         * could be even more efficient since it can be parallelized when the
+         * operation spans more than one index partition.
          */
+
         long blockCount = 0;
-        {
 
-            final Iterator<Long> itr = blocks(id, version);
+        final IKeyBuilder keyBuilder = getKeyBuilder();
 
-            while (itr.hasNext()) {
+        // the key for {file,version}
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
+                true/* unicode */, false/* successor */).append(version)
+                .getKey();
 
-                long block = itr.next();
+        // the key for {file,successor(version)}
+        final byte[] toKey = keyBuilder.reset().appendText(id,
+                true/* unicode */, false/* successor */).append(version + 1)
+                .getKey();
 
-                blockCount++;
+        final IEntryIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
+                0/* capacity */, IRangeQuery.DELETE, null/* filter */);
 
-                deleteBlock(id, version, block);
+        while (itr.hasNext()) {
 
-            }
+            itr.next();
 
-            log.info("Deleted " + blockCount + " blocks : id=" + id + ", version="
-                    + version);
+            blockCount++;
 
         }
+
+        log.info("Deleted " + blockCount + " blocks : id=" + id + ", version="
+                + version);
         
         /*
          * Mark the file version as deleted.
@@ -926,12 +954,17 @@ public class BigdataRepository implements ContentRepository {
          * marker and also deleted any blocks for that file version.
          */
         
-        return true;
+        return blockCount;
         
     }
 
     /**
      * Return an array describing all non-eradicated versions of a file.
+     * <p>
+     * This method returns all known version identifiers together with their
+     * timestamps, thereby making it possible to read either the metadata or the
+     * data for historical file versions - as long as the metadata and/or data
+     * has not yet been eradicated.
      * <p>
      * The file metadata and data blocks for historical version(s) of a file
      * remain available until they are eradicated from their respective indices
@@ -945,11 +978,9 @@ public class BigdataRepository implements ContentRepository {
      * file version was deleted.
      * <p>
      * Likewise, in order to read the historical version data you need to know
-     * the version identifer which you wish to read. This method returns all
-     * known version identifiers together with their timestamps, thereby making
-     * it possible to read either the metadata or the data for historical file
-     * versions - as long as the metadata and/or data has not yet been
-     * eradicated.
+     * the version identifer which you wish to read as well as the timestamp.
+     * Again, this should be timestamp when that version was <em>deleted</em>
+     * MINUS ONE in order to read the last committed state for the file version.
      * <p>
      * Historical file version metadata is eradicated atomically since the
      * entire logical row will be hosted on the same index partition. Either the
@@ -976,8 +1007,8 @@ public class BigdataRepository implements ContentRepository {
      * @see #readMetadata(String, long), to read the file version metadata based
      *      on a timestamp.
      * 
-     * @see #inputStream(String, long), to read the file data as of a specific
-     *      timestamp.
+     * @see #inputStream(String, int, long), to read the file data as of a
+     *      specific timestamp.
      * 
      * @todo expose history policy for a file (from its zone metadata, which is
      *       replicated onto the index partition metadata). Make sure that the
@@ -1010,14 +1041,6 @@ public class BigdataRepository implements ContentRepository {
                 
             }
 
-//            if(tpv.getValue()==null) {
-//                
-//                // A deleted version.
-//                
-//                continue;
-//                
-//            }
-            
             vec.add(tpv);
 
         }
@@ -1026,18 +1049,106 @@ public class BigdataRepository implements ContentRepository {
 
     }
     
-    public void deleteAll(String fromId, String toId) {
-        /*
-         * TODO Delete all documents in range and all blocks for those documents
-         * as well. I.e., a range delete on both the file metadata and the file
-         * data indices.
-         */
+    /**
+     * FIXME Implement {@link #getDocumentHeaders(String, String)} . We need an
+     * "row scan" operation on the {@link SparseRowStore} to support this and
+     * {@link #deleteAll(String, String)}.
+     * 
+     * @todo write tests.
+     */
+    public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
+            String toId) {
+
+//        IKeyBuilder keyBuilder = getKeyBuilder();
+//
+//        // the key for {fromId}
+//        final byte[] fromKey = keyBuilder.reset().appendText(fromId,
+//                true/* unicode */, false/* successor */).getKey();
+//
+//        // the key for {successor(toId)}
+//        final byte[] toKey = keyBuilder.reset().appendText(toId,
+//                true/* unicode */, true/* successor */).getKey();
+//
+//        final IEntryIterator itr = getMetadataIndex().getIndex()
+//                .rangeIterator(fromKey, toKey, 0/* capacity */,
+//                        IRangeQuery.KEYS, null/* filter */);
+//
+//        long blockCount = 0;
+//
+//        while (itr.hasNext()) {
+//
+//            itr.next();
+//
+//            blockCount++;
+//            
+//        }
+     
         throw new UnsupportedOperationException();
+        
     }
 
-    public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId, String toId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+    /**
+     * Efficient delete of file metadata and file data for all files and file
+     * versions spanned by the specified file identifiers.
+     * 
+     * @todo write tests.
+     * 
+     * @todo run this in two threads?
+     * 
+     * @todo parallelize operations across data services?
+     */
+    public long deleteAll(String fromId, String toId) {
+
+        // delete file metadata
+        long ndeleted = 0;
+        {
+
+            /*
+             * FIXME Delete file metadata.
+             * 
+             * Consider that the sparse row store may need to use a delete
+             * rather than an insert (key,null) to delete a property value. The
+             * ITPV interface would then need an isDeleted() method, various
+             * javadoc and some code in both SRS and this class would need to be
+             * updated, and we could then do a rangeIterator with the DELETE
+             * flag set to wipe out a range of stuff.
+             */
+            
+            if(true) throw new UnsupportedOperationException();
+            
+        }
+        
+        // delete file blocks.
+        {
+            
+            IKeyBuilder keyBuilder = getKeyBuilder();
+
+            // the key for {fromId}
+            final byte[] fromKey = keyBuilder.reset().appendText(fromId,
+                    true/* unicode */, false/* successor */).getKey();
+
+            // the key for {successor(toId)}
+            final byte[] toKey = keyBuilder.reset().appendText(toId,
+                    true/* unicode */, true/* successor */).getKey();
+
+            final IEntryIterator itr = getDataIndex()
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.DELETE, null/* filter */);
+
+            long blockCount = 0;
+
+            while (itr.hasNext()) {
+
+                itr.next();
+
+                blockCount++;
+
+            }
+            
+        }
+
+        return ndeleted;
+        
     }
 
     public Iterator<String> search(String query) {
@@ -1593,7 +1704,7 @@ public class BigdataRepository implements ContentRepository {
 
             /*
              * Write the block on the journal, obtaining the address at which it
-             * was writte - use 0L as the addrress for an empty block.
+             * was written - use 0L as the address for an empty block.
              */
             final long addr = len == 0 ? 0L : journal.write(ByteBuffer.wrap(b,
                     off, len));
@@ -1784,10 +1895,11 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @return The #of blocks copied.
      * 
-     * @todo this could be made much more efficient by sending the copy
-     *       operation to each index partition in turn. that would avoid having
-     *       to copy the data first to the client and thence to the target index
-     *       partition.
+     * @todo This could be made more efficient by sending the copy operation to
+     *       each index partition in turn. that would avoid having to copy the
+     *       data first to the client and thence to the target index partition.
+     *       However, that would involve the data service in RPCs which might
+     *       have high latency.
      */
     public long copyBlocks(String fromId, int fromVersion, String toId,
             int toVersion) {
@@ -1913,8 +2025,7 @@ public class BigdataRepository implements ContentRepository {
 
             final ClientIndexView ndx = (ClientIndexView) getDataIndex();
 
-            final PartitionMetadata pmd = ndx.getPartition(
-                    IBigdataFederation.UNISOLATED, key);
+            final PartitionMetadata pmd = ndx.getPartition(key);
 
             /*
              * Lookup the data service for that index partition.
@@ -1940,7 +2051,7 @@ public class BigdataRepository implements ContentRepository {
                         + ", version=" + version + ", len=" + len);
 
                 boolean overwrite = (Boolean) dataService.submit(
-                        IBigdataFederation.UNISOLATED, name, proc);
+                        ITx.UNISOLATED, name, proc);
 
                 return overwrite;
 
@@ -1971,27 +2082,46 @@ public class BigdataRepository implements ContentRepository {
      * @param version
      *            The version identifier.
      * 
-     * @return <code>true</code> iff a block was deleted.
-     * 
-     * @todo this implementation is not truely atomic. It uses one operation to
-     *       locate the head block identifer and another to delete it. The
-     *       proposed design pattern for block-oriented queues presumes a single
-     *       master reading on the head of the queue so this should be
-     *       sufficient.
-     *       <p>
-     *       A truely atomic head delete could be created using logic similar to
-     *       the atomic append.
+     * @return The block identifier of the deleted block -or- <code>-1L</code>
+     *         if nothing was deleted.
      */
-    public boolean deleteHead(String id, int version) {
+    public long deleteHead(String id, int version) {
         
-        Iterator<Long> itr = blocks(id, version);
+        IKeyBuilder keyBuilder = getKeyBuilder();
 
-        if (!itr.hasNext())
-            return false;
+        // the key for {file,version}
+        final byte[] fromKey = keyBuilder.reset().appendText(id,
+                true/* unicode */, false/* successor */).append(version)
+                .getKey();
 
-        long block = itr.next();
+        // the key for {file,successor(version)}
+        final byte[] toKey = keyBuilder.reset().appendText(id,
+                true/* unicode */, false/* successor */).append(
+                version + 1).getKey();
 
-        return deleteBlock(id, version, block);
+        final IEntryIterator itr = getDataIndex()
+                .rangeIterator(fromKey, toKey,
+                1, // Note: limit is ONE block!
+                IRangeQuery.KEYS|IRangeQuery.DELETE, null/* filter */);
+        
+        if(!itr.hasNext()) {
+
+            log.warn("Nothing to delete: id="+id+", version="+version);
+            
+            return -1L;
+            
+        }
+        
+        /*
+         * consume the iterator but note that the block was already deleted if
+         * this was a remote request.
+         */
+        
+        final long block = new BlockIdentifierIterator(id, version, itr).next();
+            
+        log.info("id="+id+", version="+version+" : deleted block="+block);
+
+        return block;
         
     }
     
@@ -2007,8 +2137,6 @@ public class BigdataRepository implements ContentRepository {
      *            block in the file version regardless of its block identifier.
      * 
      * @return <code>true</code> iff the block was deleted.
-     * 
-     * @todo write tests.
      */
     public boolean deleteBlock(String id, int version, long block) {
         
@@ -2243,8 +2371,7 @@ public class BigdataRepository implements ContentRepository {
 
             final ClientIndexView ndx = (ClientIndexView) getDataIndex();
 
-            final PartitionMetadata pmd = ndx.getPartition(
-                    IBigdataFederation.UNISOLATED, nextKey);
+            final PartitionMetadata pmd = ndx.getPartition(nextKey);
 
             /*
              * Lookup the data service for that index partition.
@@ -2270,7 +2397,7 @@ public class BigdataRepository implements ContentRepository {
                         + id + ", version=" + version + ", len=" + len);
 
                 Long block = (Long) dataService.submit(
-                        IBigdataFederation.UNISOLATED, name, proc);
+                        ITx.UNISOLATED, name, proc);
 
                 return block;
 
@@ -2323,7 +2450,6 @@ public class BigdataRepository implements ContentRepository {
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
-        // @todo modify range count to return [long].
         long nblocks = dataIndex.rangeCount(fromKey, toKey);
 
         log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
@@ -2401,40 +2527,7 @@ public class BigdataRepository implements ContentRepository {
         return new InputStreamReader(inputStream(id, version), encoding);
 
     }
-    
-    /**
-     * Read the file data for a file version as of a specific timestamp.
-     * <p>
-     * Note: It is possible to re-create any state of a file version
-     * corresponding to a <em>commit point</em> for the
-     * {@link #getDataIndex() data index}. It is not possible to recover all
-     * states - merely all committed states - since unisolated writes may be
-     * grouped together by group commit and therefore have the same commit
-     * point.
-     * 
-     * @param id
-     * @param version
-     * @param timestamp
-     * 
-     * @return
-     * 
-     * @see IAtomicStore#getCommitRecord(long)
-     * 
-     * @todo implement historical read. This basically requires a modification
-     *       to the {@link AbstractTask} and the {@link IDataService} API such
-     *       that a historical read-only view may be requested. The simplest
-     *       thing is to use a negative timestamp to indicate a historical
-     *       read-only view. The {@link FileVersionInputStream} then merely
-     *       needs to pass (-timestamp) into its
-     *       {@link IDataService#rangeQuery(long, String, byte[], byte[], int, int, IEntryFilter)}
-     *       method call to read on the appropriate index view.
-     */
-    public InputStream read(String id,int version,long timestamp) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
+
     /**
      * Read data from a file version.
      * <p>
@@ -2459,23 +2552,79 @@ public class BigdataRepository implements ContentRepository {
      */
     public FileVersionInputStream inputStream(String id,int version) {
 
-        log.info("id="+id+", version="+version);
+        return inputStream(id, version, ITx.UNISOLATED);
+        
+    }
+
+    /**
+     * Read data from a file version.
+     * <p>
+     * Some points about consistency and transaction identifiers.
+     * <ol>
+     * 
+     * <li> When using an {@link ITx#UNISOLATED} read addition atomic writes and
+     * atomic appends issued after the input stream view was formed MAY be read,
+     * but that is NOT guarenteed - it depends on the buffering of the range
+     * iterator used to read blocks for the file version. Likewise, if the file
+     * is deleted and its data is expunged by a compacting merge during the read
+     * then the read MAY be truncated. </li>
+     * 
+     * <li> It is possible to re-create historical states of a file version
+     * corresponding to a <em>commit point</em> for the
+     * {@link #getDataIndex() data index} provided that the relevant data has
+     * not been eradicated by a compacting merge. It is not possible to recover
+     * all states - merely committed states - since unisolated writes may be
+     * grouped together by group commit and therefore have the same commit
+     * point. </li>
+     * 
+     * <li> It is possible to issue transactional read requests, but you must
+     * first open a transaction with an {@link ITransactionManager}. In general
+     * the use of full transactions is discouraged as the
+     * {@link BigdataRepository} is designed for high throughput and high
+     * concurrency with weaker isolation levels suitable for scale-out
+     * processing techniques including map/reduce.</li>
+     * 
+     * </ol>
+     * 
+     * @param id
+     *            The file identifier.
+     * @param version
+     *            The version identifier.
+     * @param tx
+     *            The transaction identifier. This is generally either
+     *            {@link ITx#UNISOLATED} to use an unisolated read -or-
+     *            <code>- timestamp</code> to use a historical read for the
+     *            most recent consistent state of the file data not later than
+     *            <i>timestamp</i>.
+     * 
+     * @return An input stream from which the caller may read the data in the
+     *         file -or- <code>null</code> if there is no data for that file
+     *         version, including no deleted blocks pending garbage collection.
+     *         An empty input stream MAY be returned since empty blocks are
+     *         allowed. An empty stream will also be returned after a file
+     *         version is deleted until the deleted blocks are eradicated from
+     *         the file data index.
+     */
+    public FileVersionInputStream inputStream(String id,int version, long tx) {
+
+        log.info("id=" + id + ", version=" + version + ", tx=" + tx);
 
         /*
          * Range count the file and version on the federation - this is the
          * number of blocks of data for that file and version as of the start of
          * this read operation. If the result is zero then there are no index
          * partitions which span that file and version and we return null.
+         * 
+         * Note: This step is skipped for historical and transactional reads
+         * since getBlockCount() does not accept the transaction identifier.
          */
 
-        final long nblocks = getBlockCount(id, version);
-
-        if (nblocks == 0) {
+        if (tx == ITx.UNISOLATED && getBlockCount(id, version) == 0L) {
 
             log.info("No data: id=" + id + ", version=" + version);
-            
+
             return null;
-            
+
         }
         
         /*
@@ -2507,8 +2656,29 @@ public class BigdataRepository implements ContentRepository {
         // both keys and values.
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
-        IEntryIterator itr = dataIndex.rangeIterator(fromKey, toKey, capacity,
-                flags, null/*filter*/);
+        final IEntryIterator itr;
+        
+        if (tx == ITx.UNISOLATED) {
+            
+            itr = dataIndex.rangeIterator(fromKey, toKey, capacity,
+                    flags, null/*filter*/);
+            
+        } else {
+            
+            if(dataIndex instanceof ClientIndexView) {
+                
+                ClientIndexView ndx = new ClientIndexView(fed, tx, DATA_NAME);
+
+                itr = ndx.rangeIterator(fromKey, toKey, capacity, flags, null/* filter */);
+
+            } else {
+                
+                // @todo lookup the index on the journal.
+                throw new UnsupportedOperationException();
+                
+            }
+            
+        }
         
         return new FileVersionInputStream(id, version, itr);
         

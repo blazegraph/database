@@ -151,13 +151,20 @@ public class ResultSet implements Externalizable {
         final boolean sendKeys = (flags & IRangeQuery.KEYS) != 0;
         
         final boolean sendVals = (flags & IRangeQuery.VALS) != 0;
-        
+
         keys = (sendKeys ? new byte[limit][] : null);
 
         vals = (sendVals ? new byte[limit][] : null);
 
-        // iterator that will visit the key range.
-        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity, flags, filter );
+        /*
+         * Iterator that will visit the key range.
+         * 
+         * Note: We always visit the keys regardless of whether we pass them on
+         * to the caller. This is necessary in order for us to set the [lastKey]
+         * field on the result set.
+         */
+        final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
+                flags | IRangeQuery.KEYS, filter);
 
         /*
          * true if any keys were visited regardless of whether or not they

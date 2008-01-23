@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.rawstore.Addr;
 
 /**
  * An interface providing a read-only view of a commit record. A commit record

@@ -39,6 +39,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.io.ByteArrayBufferWithPosition;
+import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
@@ -954,15 +956,225 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
-        return rangeIterator(fromKey, toKey, 0/* capacity */, IRangeQuery.KEYS
-                | IRangeQuery.VALS/* flags */, null/* filter */);
+        return rangeIterator(fromKey, toKey, 0/* capacity */,
+                KEYS | VALS/* flags */, null/* filter */);
         
     }
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter) {
 
-        return getRoot().rangeIterator(fromKey, toKey, flags, filter);
+        if((flags & DELETE) == 0) {
+
+            /*
+             * Simple case since we will not be writing on the btree.
+             */
+            
+            return getRoot().rangeIterator(fromKey, toKey, flags, filter);
+
+        }
+        
+        /*
+         * The iterator will write on the btree (it will in effect "delete
+         * behind"). Since the btree does not (yet) support concurrent
+         * modification from the iterator directly we wrap up the iterator with
+         * a buffer.
+         * 
+         * @todo modify the EntryIterator to accept [capacity], e.g., a limit on
+         * the #of entries that it will visit.  This is important with the DELETE
+         * flag since we may only want to delete the head of something.
+         * 
+         * @todo write unit tests for the DELETE flag.
+         * 
+         * @todo modify the EntryIterator to support remove so that we do not
+         * have to buffer the results here.
+         */
+        
+        // places a limit on the #of entries to be deleted.
+        final int rangeCount = capacity == 0 ? rangeCount(fromKey, toKey)
+                : capacity;
+        
+        IEntryIterator src = getRoot().rangeIterator(fromKey, toKey,
+                flags | KEYS// Note: we need the keys for the delete operation
+                , filter);
+        
+        BufferedEntryIterator buf = new BufferedEntryIterator(rangeCount,
+                flags, src);
+
+        for (int i = 0; i < buf.n; i++) {
+
+            // delete behind.
+            
+            remove(buf.keys[i]);
+
+        }
+        
+        // return iterator.
+        
+        return buf;
+        
+    }
+
+    /**
+     * Helper class provides a delete behind capability by fully buffering the
+     * iterator result.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @deprecated This will go away once {@link EntryIterator#remove()} is
+     *             supported.
+     */
+    private static class BufferedEntryIterator implements IEntryIterator {
+
+        /** #of tuples. */
+        final int n;
+        
+        /** from the ctor. */
+        final int flags;
+        
+        /** iff values were copied. */
+        final boolean needVals;
+
+        /** the keys (always copied). */
+        final byte[][] keys;
+
+        /** the values (iff copied). */
+        final Object[] vals;
+        
+        /**
+         * the current tuple index into {@link #keys}[] and {@link #vals}[].
+         */
+        private int i = 0;
+
+        private class Tuple implements ITuple {
+
+            IByteArrayBuffer kbuf;
+            
+            public byte[] getKey() {
+
+                return BufferedEntryIterator.this.getKey();
+                
+            }
+
+            public IByteArrayBuffer getKeyBuffer() {
+                
+                byte[] key = getKey();
+                
+                return new ByteArrayBufferWithPosition(key.length,key);
+                
+            }
+
+            public boolean getKeysRequested() {
+
+                return (flags & KEYS) != 0;
+
+            }
+
+            public boolean getValuesRequested() {
+
+                return (flags & VALS) != 0;
+                
+            }
+
+            public long getVisitCount() {
+                
+                return i;
+                
+            }
+            
+        }
+        
+        final Tuple tuple = new Tuple();
+        
+        public BufferedEntryIterator(int limit, int flags,
+                IEntryIterator src) {
+
+            this.flags = flags;
+            
+            int n = 0;
+            
+            needVals = (flags & VALS) == 0;
+
+            keys = new byte[limit][];
+
+            vals = needVals ? new Object[limit][] : null;
+
+            while (src.hasNext() && n < limit) {
+        
+                Object val = src.next();
+                
+                keys[n] = src.getKey(); 
+                
+                if(needVals) {
+                    
+                    vals[n] = val;
+                    
+                }
+                
+                n++;
+                
+            }
+            
+            this.n = n;
+            
+        }
+        
+        public boolean hasNext() {
+
+            return i < n;
+            
+        }
+
+        public Object next() {
+
+            if(needVals) {
+                
+                return vals[i++];
+                
+            }
+            
+            i++;
+            
+            return null;
+            
+        }
+
+        public ITuple getTuple() {
+
+            return tuple;
+            
+        }
+
+        public byte[] getKey() {
+
+            if (i == 0)
+                throw new IllegalStateException();
+            
+            return keys[i - 1];
+            
+        }
+
+        public Object getValue() {
+            
+            if (i == 0)
+                throw new IllegalStateException();
+
+            if(needVals) {
+                
+                return vals[i-1];
+                
+            }
+            
+            return null;
+            
+        }
+
+        public void remove() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
         
     }
     

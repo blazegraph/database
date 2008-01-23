@@ -50,6 +50,7 @@ import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.MetadataIndex;
@@ -151,7 +152,7 @@ import com.bigdata.scaleup.PartitionedIndexView;
  */
 public class ClientIndexView implements IIndex {
 
-    public static final transient Logger log = Logger
+    protected static final transient Logger log = Logger
             .getLogger(ClientIndexView.class);
     
     private final IBigdataFederation fed;
@@ -173,10 +174,7 @@ public class ClientIndexView implements IIndex {
     private final long tx;
     
     /**
-     * The transaction identifier for this index view -or-
-     * {@link IDataService#UNISOLATED} if the index view is not transactional.
-     * 
-     * @return The transaction identifier for the index view.
+     * The transaction identifier for this index view.
      */
     public long getTx() {
         
@@ -234,8 +232,10 @@ public class ClientIndexView implements IIndex {
      * @param fed
      *            The federation containing the index.
      * @param tx
-     *            The transaction identifier or zero(0L) iff the index view is
-     *            not isolated by a transaction.
+     *            The transaction identifier -or- {@link ITx#UNISOLATED} iff the
+     *            index view is unisolated -or- <code>- timestamp</code> for a
+     *            historical read of the most recent committed state not later
+     *            than <i>timestamp</i>.
      * @param name
      *            The index name.
      */
@@ -247,12 +247,12 @@ public class ClientIndexView implements IIndex {
         if (name == null)
             throw new IllegalArgumentException();
     
-        if(tx != IBigdataFederation.UNISOLATED) {
-            
-            throw new UnsupportedOperationException(
-                    "Only unisolated views are supported at this time");
-            
-        }
+//        if(tx != ITx.UNISOLATED) {
+//            
+//            throw new UnsupportedOperationException(
+//                    "Only unisolated views are supported at this time");
+//            
+//        }
         
         this.fed = fed;
 
@@ -374,7 +374,7 @@ public class ClientIndexView implements IIndex {
 
             final byte[] key = new byte[] {};
 
-            IPartitionMetadata pmd = getPartition(tx, key);
+            IPartitionMetadata pmd = getPartition(key);
 
             IDataService dataService = getDataService(pmd);
 
@@ -398,7 +398,7 @@ public class ClientIndexView implements IIndex {
     
     public boolean contains(byte[] key) {
         
-        IPartitionMetadata pmd = getPartition(tx, key);
+        IPartitionMetadata pmd = getPartition(key);
 
         IDataService dataService = getDataService(pmd);
 
@@ -424,7 +424,7 @@ public class ClientIndexView implements IIndex {
 
     public Object insert(Object key, Object value) {
 
-        IPartitionMetadata pmd = getPartition(tx,(byte[])key);
+        IPartitionMetadata pmd = getPartition((byte[])key);
         
         IDataService dataService = getDataService(pmd);
 
@@ -454,7 +454,7 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = getPartition(tx, (byte[]) key);
+        IPartitionMetadata pmd = getPartition((byte[]) key);
 
         IDataService dataService = getDataService(pmd);
         
@@ -481,7 +481,7 @@ public class ClientIndexView implements IIndex {
 
     public Object remove(Object key) {
 
-        IPartitionMetadata pmd = getPartition(tx,(byte[])key);
+        IPartitionMetadata pmd = getPartition((byte[])key);
 
         IDataService dataService = getDataService(pmd);
         
@@ -940,8 +940,7 @@ public class ClientIndexView implements IIndex {
         while(fromIndex<ntuples) {
         
             // partition spanning that key.
-            final PartitionMetadataWithSeparatorKeys pmd = getPartition(tx,
-                    keys[fromIndex]);
+            final PartitionMetadataWithSeparatorKeys pmd = getPartition(keys[fromIndex]);
 
             final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
 
@@ -988,14 +987,14 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
+     * Return the metadata for the index partition which spans the given key.
      * 
-     * @param tx
-     * @param name
      * @param key
-     * @return
+     *            The key.
+     *            
+     * @return The index partition metadata.
      */
-    public PartitionMetadataWithSeparatorKeys getPartition(long tx,
-            /*String name, */ byte[] key) {
+    public PartitionMetadataWithSeparatorKeys getPartition(byte[] key) {
 
         MetadataIndex mdi = fed.getMetadataIndex(name);
 
@@ -1163,14 +1162,25 @@ public class ClientIndexView implements IIndex {
     //          
     //      }
 
+//    /**
+//     * Resolve the data service on which the index partition is mapped that
+//     * spans the given key.
+//     * 
+//     * @param key
+//     *            The key.
+//     * 
+//     * @return The data service.
+//     */
+//    public IDataService getDataService(byte[] key) {
+//
+//        return getDataService(getPartition(key));
+//        
+//    }
+    
     /**
-     * Resolve the data service to which the index partition was mapped.
-     * <p>
-     * This uses the lookup cache provided by
-     * {@link IBigdataClient#getDataService(UUID))}
+     * Resolve the data service to which the index partition is mapped.
      */
     public IDataService getDataService(IPartitionMetadata pmd) {
-
 
         final UUID serviceID = pmd.getDataServices()[0];
         //ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);

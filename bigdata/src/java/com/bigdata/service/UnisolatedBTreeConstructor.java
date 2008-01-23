@@ -38,7 +38,13 @@ import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Creates an {@link UnisolatedBTree} instance.
- *  
+ * <p>
+ * The keys of the created index will be variable length unsigned byte[]s. The
+ * values will be variable length byte[]s. The index will support version
+ * counters and delete markers (it will be compatible with the both use of
+ * transactions for concurrency control and the use of history polices for
+ * purging data during compacting merges).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

@@ -30,10 +30,10 @@ package com.bigdata.io;
 
 import java.util.Random;
 
+import junit.framework.TestCase;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.rawstore.Bytes;
-
-import junit.framework.TestCase;
 
 /**
  * Test suite for {@link ByteArrayBuffer}.

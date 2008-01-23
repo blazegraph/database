@@ -18,8 +18,6 @@
  */
 package org.apache.system;
 
-import org.apache.system.SystemUtil;
-
 import junit.framework.TestCase;
 
 /**

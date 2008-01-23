@@ -28,9 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.util.Arrays;
-import java.util.Random;
-
-import com.bigdata.rawstore.Bytes;
 
 import junit.framework.TestCase2;
 

@@ -929,7 +929,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
         } else {
 
-            if (task.isolated) {
+            if (task.fullyIsolated) {
 
                 /*
                  * A task that reads from historical data and writes on isolated

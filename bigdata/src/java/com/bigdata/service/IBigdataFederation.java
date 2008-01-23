@@ -30,7 +30,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.MetadataIndex;
 import com.bigdata.scaleup.PartitionMetadata;
@@ -44,13 +43,6 @@ import com.bigdata.scaleup.PartitionMetadata;
  * @todo reconcile with {@link IIndexManager} and {@link IIndexStore}.
  */
 public interface IBigdataFederation {
-
-    /**
-     * A constant that may be used as the transaction identifier when the
-     * operation is <em>unisolated</em> (non-transactional).  The value of
-     * this constant is ZERO (0L).
-     */
-    public static final long UNISOLATED = ITx.UNISOLATED;
 
     /**
      * Return the metadata service (or a proxy for the metadata service).

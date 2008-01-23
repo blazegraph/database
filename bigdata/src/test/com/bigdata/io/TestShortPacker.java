@@ -34,9 +34,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
-import org.CognitiveWeb.extser.ShortPacker;
-
 import junit.framework.TestCase;
+
+import org.CognitiveWeb.extser.ShortPacker;
 
 /**
  * Test suite for packing and unpacking unsigned short integers.

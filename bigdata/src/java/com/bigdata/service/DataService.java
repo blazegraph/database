@@ -48,6 +48,7 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
@@ -89,6 +90,50 @@ import com.bigdata.scaleup.ResourceState;
  * Overflow can introduce a dependency on an old {@link Journal} until data on
  * the old journal can be exported into {@link IndexSegment}s.
  * 
+ * @todo Support overflow. Queued tasks should be migrated from the "old"
+ *       journal to the "new" journal while running tasks should complete on the
+ *       "old" journal. Consider encapsulating this behavior in a base class
+ *       using a delegation model. There is a sketch of that kind of a thing in
+ *       the "scaleout" package. The specifics should probably be discarded but
+ *       parts of the code may be of use. The handling of overflow events needs
+ *       to be coordinated with the {@link IMetadataService}.
+ *       <p>
+ *       MVCC requires a strategy to release old versions that are no longer
+ *       accessible to active transactions. bigdata uses a highly efficient
+ *       technique in which writes are multiplexed onto append-only
+ *       {@link Journal}s and then evicted on overflow into
+ *       {@link IndexSegment}s using a bulk index build mechanism. Old journal
+ *       and index segment resources are simply deleted from the file system
+ *       some time after they are no longer accessible to active transactions.
+ * 
+ * @todo The data service should redirect clients if an index partition has been
+ *       moved (shed) while a client has a lease.
+ * 
+ * @todo Support GOM pre-fetch using a rangeIterator - that will materialize N
+ *       records on the client and could minimize trips to the server. I am not
+ *       sure about unisolated operations for GOM.... Isolated operations are
+ *       straight forward. The other twist is supporting scalable link sets,
+ *       link set indices (not named, unless the identity of the object
+ *       collecting the link set is part of the key), and non-OID indices
+ *       (requires changes to generic-native). I think that link sets might have
+ *       to become indices in order to scale (to break the cycle of updating
+ *       both the object collecting the link set and the head/tail and
+ *       prior/next members in the link set). Or perhaps all those could be
+ *       materialized on the client and then an unisolated operation (perhaps
+ *       with conflict resolution?!?) would persist the results...
+ * 
+ * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
+ *       with an {@link ITransactionManager} service. The data service needs to
+ *       notify the {@link ITransactionManager} each time an isolated writer
+ *       touches a named index so that the transaction manager can build up the
+ *       set of resources that must be locked during the validate/commit phrase.
+ * 
+ * @todo Write benchmark test to measure interhost transfer rates. Should be
+ *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
+ *       duplex in the network and the protocol, that rate should be
+ *       bidirectional. Can that rate be sustained with a fully connected
+ *       bi-directional transfer?
+ * 
  * @todo RPC requests are currently made via RPC using JERI. While you can elect
  *       to use the TCP/NIO server via configuration options (see
  *       http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html),
@@ -128,58 +173,10 @@ import com.bigdata.scaleup.ResourceState;
  *       than {@link ConcurrentJournal.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
  *       threads.
  * 
- * @todo Support overflow. Queued tasks should be migrated from the "old"
- *       journal to the "new" journal while running tasks should complete on the
- *       "old" journal. Consider encapsulating this behavior in a base class
- *       using a delegation model. There is a sketch of that kind of a thing in
- *       the "scaleout" package. The specifics should probably be discarded but
- *       parts of the code may be of use. The handling of overflow events needs
- *       to be coordinated with the {@link IMetadataService}.
- *       <p>
- *       MVCC requires a strategy to release old versions that are no longer
- *       accessible to active transactions. bigdata uses a highly efficient
- *       technique in which writes are multiplexed onto append-only
- *       {@link Journal}s and then evicted on overflow into
- *       {@link IndexSegment}s using a bulk index build mechanism. Old journal
- *       and index segment resources are simply deleted from the file system
- *       some time after they are no longer accessible to active transactions.
- * 
- * @todo The data service should redirect clients if an index partition has been
- *       moved (shed) while a client has a lease.
- * 
- * @todo Support GOM pre-fetch using a rangeQuery iterator - that will
- *       materialize N records on the client and could minimize trips to the
- *       server. I am not sure about unisolated operations for GOM.... Isolated
- *       operations are straight forward. The other twist is supporting scalable
- *       link sets, link set indices (not named, unless the identity of the
- *       object collecting the link set is part of the key), and non-OID indices
- *       (requires changes to generic-native). I think that link sets might have
- *       to become indices in order to scale (to break the cycle of updating
- *       both the object collecting the link set and the head/tail and
- *       prior/next members in the link set). Or perhaps all those could be
- *       materialized on the client and then an unisolated operation (perhaps
- *       with conflict resolution?!?) would persist the results...
- * 
- * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
- *       with an {@link ITransactionManager} service. The data service needs to
- *       notify the {@link ITransactionManager} each time an isolated writer
- *       touches a named index so that the transaction manager can build up the
- *       set of resources that must be locked during the validate/commit phrase.
- * 
- * @todo Write benchmark test to measure interhost transfer rates. Should be
- *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
- *       duplex in the network and the protocol, that rate should be
- *       bidirectional. Can that rate be sustained with a fully connected
- *       bi-directional transfer?
- * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
  *       SSL or an SSH tunnel. For most purposes I expect bigdata to operate on
  *       a private network, but replicate across gateways is also a common use
  *       case. Do we have to handle it specially?
- * 
- * @todo Keep the "wire" format for the data and metadata services as clean as
- *       possible so that it will be possible for non-Java clients to talk to
- *       these services (assuming that they can talk to Jini...).
  */
 abstract public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer, IServiceShutdown {
@@ -704,25 +701,7 @@ abstract public class DataService implements IDataService,
 
     }
     
-    /**
-     * 
-     * @todo the iterator needs to be aware of the defintion of a "row" for the
-     *       sparse row store so that we can respect the atomic guarentee for
-     *       reads as well as writes.
-     * 
-     * @todo support filters. there are a variety of use cases from clients that
-     *       are aware of version counters and delete markers to clients that
-     *       encode a column name and datum or write time into the key to those
-     *       that will filter based on inspection of the value associated with
-     *       the key, e.g., only values having some attribute.
-     * 
-     * @todo if we allow the filter to cause mutations (e.g., deleting matching
-     *       entries) then we have to examine the operation to determine whether
-     *       or not we need to use the {@link #txWriteService} or the
-     *       {@link #readService} (consider reading against historical and
-     *       modifying live).
-     */
-    public ResultSet rangeQuery(long tx, String name, byte[] fromKey,
+    public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IEntryFilter filter)
             throws InterruptedException, ExecutionException {
 
@@ -732,8 +711,8 @@ abstract public class DataService implements IDataService,
 
             if( name == null ) throw new IllegalArgumentException();
             
-            final RangeQueryTask task = new RangeQueryTask(journal, tx, name,
-                    fromKey, toKey, capacity, flags, filter );
+            final RangeIteratorTask task = new RangeIteratorTask(journal, tx,
+                    name, fromKey, toKey, capacity, flags, filter);
     
             // submit the task and wait for it to complete.
             return (ResultSet) journal.submit(task).get();
@@ -866,12 +845,12 @@ abstract public class DataService implements IDataService,
     }
 
     /**
-     * Task for running a rangeQuery operation.
+     * Task for running a rangeIterator operation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static protected class RangeQueryTask extends AbstractTask {
+    static protected class RangeIteratorTask extends AbstractTask {
 
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -879,22 +858,23 @@ abstract public class DataService implements IDataService,
         private final int flags;
         private final IEntryFilter filter;
         
-        public RangeQueryTask(ConcurrentJournal journal, long startTime,
+        public RangeIteratorTask(ConcurrentJournal journal, long startTime,
                 String name, byte[] fromKey, byte[] toKey, int capacity,
                 int flags, IEntryFilter filter) {
 
-            super(journal,startTime,true/*readOnly*/,name);
-            
+            super(journal, startTime,
+                    (flags & IRangeQuery.DELETE) == 0/* readOnly */, name);
+
             this.fromKey = fromKey;
             this.toKey = toKey;
             this.capacity = capacity;
             this.flags = flags;
             this.filter = filter; // MAY be null.
-            
+
         }
-        
+
         public Object doTask() throws Exception {
-            
+
             return new ResultSet(getIndex(getOnlyResource()), fromKey, toKey,
                     capacity, flags, filter);
             

@@ -32,26 +32,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ReadOnlyIndex;
-import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for correct handling of {@link ClosedByInterruptException}s. When
