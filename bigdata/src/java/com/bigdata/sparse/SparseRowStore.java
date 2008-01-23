@@ -415,6 +415,11 @@ public class SparseRowStore {
      *       it is also possible that the timestamp behavior should be defined
      *       by the {@link Schema} and therefore factored out of this method
      *       signature.
+     * 
+     * @todo modify the atomic write to not overwrite the primary key each time?
+     *       There is really no reason to do that - it just adds data to the
+     *       index, but be careful to not delete the primary key when applying a
+     *       history policy during a compacting merge!
      */
     public ITPS write(IKeyBuilder keyBuilder, Schema schema,
             Map<String, Object> propertySet, long timestamp, INameFilter filter) {

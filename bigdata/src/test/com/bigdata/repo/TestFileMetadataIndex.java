@@ -272,19 +272,8 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
                     version1)));
 
             /*
-             * verify read back of version0 - it was deleted.
-             * 
-             * FIXME Verify that you can still read back the file version data
-             * using a historical view of the file data index whose commit time
-             * is less than version1's timestamp. This introduces some
-             * interesting twists - the sparse row store is willing to assign
-             * timestamps that proceed the probably commit timestamp that will
-             * be applied during the group commit - so want can people know when
-             * they try to read the deleted file version? Get the historical
-             * view having a commit time strictly less than the timestamp when
-             * the version was deleted? That logic will have to be encapsulated
-             * for mere mortals.
-             * 
+             * verify read back of version0 is now an empty byte[] since that
+             * version was deleted.
              */
             assertEquals("version0", new byte[]{}, read(repo.inputStream(id,
                     version0)));
@@ -316,15 +305,91 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
     }
 
     /**
-     * @todo test delete of the metadata and data for a file (in which order
-     *       should this operation take place?) make sure that the old version
-     *       is marked as deleted and that the data for that version are deleted
-     *       as well.
+     * Test of delete a file version verifies that the old version is marked as
+     * deleted and that the data for that version are deleted as well. The test
+     * also verifies that the deleted file version metadata and data remain
+     * readable.
+     * 
+     * @todo test that the metadata and data are no longer readable after a
+     *       suitable compacting merge.
+     * 
+     * @throws IOException
      */
-    public void test_delete01() {
+    public void test_delete01() throws IOException {
 
-        fail("write test");
+        final String id = "test";
 
+        final Map<String, Object> metadata = new HashMap<String, Object>();
+
+        metadata.put(MetadataSchema.ID, id);
+
+        metadata.put("foo", "bar");
+
+        final int version0;
+        final long createTime0;
+        final byte[] expected0 = new byte[] { 1, 2, 3 };
+        {
+
+            version0 = repo.create(metadata);
+
+            metadata.put(MetadataSchema.VERSION, Integer.valueOf(version0));
+
+            assertEquals("version", 0, version0);
+
+            RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
+
+            createTime0 = doc.createTime();
+
+            assertNotSame("createTime", 0L, createTime0);
+
+            Map<String, Object> actual = doc.asMap();
+
+            assertEquals("id", id, actual.get(MetadataSchema.ID));
+
+            assertEquals("version", version0, actual
+                    .get(MetadataSchema.VERSION));
+
+            assertEquals("user property", "bar", actual.get("foo"));
+
+            assertEquals("size", metadata.size(), actual.size());
+
+            // write on the file version.
+            repo.copyStream(id, version0, new ByteArrayInputStream(expected0));
+
+            // verify read back.
+            assertEquals("version0", expected0, read(repo.inputStream(id,
+                    version0)));
+
+        }
+
+        /*
+         * Delete the file version.
+         * 
+         * @todo test that double-delete has no effect (returns false, does (or
+         * does not?) write another delete marker).
+         */
+        assertTrue(repo.delete(id));
+        
+        /*
+         * FIXME Verify that you can still read back the file version data using
+         * a historical view of the file data index whose commit time is less
+         * than version1's timestamp. This introduces some interesting twists -
+         * the sparse row store is willing to assign timestamps that proceed the
+         * probably commit timestamp that will be applied during the group
+         * commit - so want can people know when they try to read the deleted
+         * file version? Get the historical view having a commit time strictly
+         * less than the timestamp when the version was deleted? That logic will
+         * have to be encapsulated for mere mortals.
+         */
+
+        ITPV[] a = repo.getAllVersionInfo(id);
+
+        assertEquals(2, a.length);
+        
+        assertEquals("v0",0,((Integer)a[0].getValue()).intValue());
+
+        assertNull("delete(v0)", a[1].getValue());
+        
     }
 
 }
