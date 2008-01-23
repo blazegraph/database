@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.Vector;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -45,6 +46,8 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -59,6 +62,7 @@ import com.bigdata.service.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.service.UnisolatedBTreePartition;
 import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
@@ -850,6 +854,8 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @todo make this more efficient at deleting the blocks comprising the file
      *       version.
+     * 
+     * @todo return the #of blocks deleted instead?
      */
     public boolean delete(String id) {
 
@@ -858,6 +864,8 @@ public class BigdataRepository implements ContentRepository {
         if (!doc.exists()) {
             
             // no current version.
+
+            log.warn("No current version: id="+id);
             
             return false;
             
@@ -875,44 +883,149 @@ public class BigdataRepository implements ContentRepository {
          * and values with the request. In fact, a common base class could
          * doubtless be identified for use with the range iterator as well.
          */
+        long blockCount = 0;
         {
 
             final Iterator<Long> itr = blocks(id, version);
-
-            long n = 0;
 
             while (itr.hasNext()) {
 
                 long block = itr.next();
 
-                n++;
+                blockCount++;
 
                 deleteBlock(id, version, block);
 
             }
 
-            log.info("Deleted " + n + " blocks : id=" + id + ", version="
+            log.info("Deleted " + blockCount + " blocks : id=" + id + ", version="
                     + version);
 
         }
         
         /*
          * Mark the file version as deleted.
+         * 
+         * Note: This only deletes the "version" property - the other properties
+         * are not changed.
          */
         
         Map<String,Object> metadata = new HashMap<String,Object>();
         
+        // primary key.
         metadata.put(MetadataSchema.ID, id);
 
+        // delete marker.
         metadata.put(MetadataSchema.VERSION, null);
         
         getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
                 AUTO_TIMESTAMP, null/* filter */);
 
+        /*
+         * There was a current version for the file. We have written a delete
+         * marker and also deleted any blocks for that file version.
+         */
+        
         return true;
         
     }
 
+    /**
+     * Return an array describing all non-eradicated versions of a file.
+     * <p>
+     * The file metadata and data blocks for historical version(s) of a file
+     * remain available until they are eradicated from their respective indices
+     * by a compacting merge in which the history policies no longer perserve
+     * those data.
+     * <p>
+     * In order to read the historical file metadata you need to know the
+     * timestamp associated with the version identifer which you wish to read.
+     * This should be timestamp when that version was <em>deleted</em> MINUS
+     * ONE in order to read the last valid metadata for the file version that
+     * file version was deleted.
+     * <p>
+     * Likewise, in order to read the historical version data you need to know
+     * the version identifer which you wish to read. This method returns all
+     * known version identifiers together with their timestamps, thereby making
+     * it possible to read either the metadata or the data for historical file
+     * versions - as long as the metadata and/or data has not yet been
+     * eradicated.
+     * <p>
+     * Historical file version metadata is eradicated atomically since the
+     * entire logical row will be hosted on the same index partition. Either the
+     * file version metadata is available or it is now.
+     * <p>
+     * Historical file version data is eradicated one index partition at a time.
+     * If the file version spans more than one index partition then it may be
+     * possible to read some blocks from the file but not others.
+     * <p>
+     * Historical file version metadata and data will remain available until
+     * their governing history policy is no longer satisified. Therefore, when
+     * in doubt, you can consult the history policy in force for the file to
+     * determine whether or not its data may have been eradicated.
+     * 
+     * @param id
+     *            The file identifier.
+     * 
+     * @return An array containing (timestamp,version) tuples. Tuples where the
+     *         {@link ITPV#getValue()} returns <code>null</code> give the
+     *         timestamp at which a file version was <em>deleted</em>. Tuples
+     *         where the {@link ITPV#getValue()} returns non-<code>null</code>
+     *         give the timestamp at which a file version was <em>created</em>.
+     * 
+     * @see #readMetadata(String, long), to read the file version metadata based
+     *      on a timestamp.
+     * 
+     * @see #inputStream(String, long), to read the file data as of a specific
+     *      timestamp.
+     * 
+     * @todo expose history policy for a file (from its zone metadata, which is
+     *       replicated onto the index partition metadata). Make sure that the
+     *       zone metadata is consistent for the file version metadata and file
+     *       version data.
+     */
+    public ITPV[] getAllVersionInfo(String id) {
+        
+        /*
+         * Query for all metadata for the file.
+         */
+        ITPS tps = readMetadata(id,Long.MAX_VALUE);
+
+        Vector<ITPV> vec = new Vector<ITPV>();
+
+        /*
+         * Filter for only the version propertys, skipping "delete" entries.
+         */
+        Iterator<? extends ITPV> itr = tps.iterator();
+        
+        while(itr.hasNext()) {
+            
+            ITPV tpv = itr.next();
+            
+            if(!tpv.getName().equals(MetadataSchema.VERSION)) {
+                
+                // Not a version field.
+                
+                continue;
+                
+            }
+
+//            if(tpv.getValue()==null) {
+//                
+//                // A deleted version.
+//                
+//                continue;
+//                
+//            }
+            
+            vec.add(tpv);
+
+        }
+
+        return vec.toArray(new ITPV[vec.size()]);
+
+    }
+    
     public void deleteAll(String fromId, String toId) {
         /*
          * TODO Delete all documents in range and all blocks for those documents
@@ -1755,8 +1868,6 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @todo return the data for the old block instead in the case of an
      *       overwrite?
-     * 
-     * @todo unit tests of [off,len].
      */
     public boolean writeBlock(String id, int version, long block, byte[] b, int off, int len) {
 
@@ -2084,8 +2195,6 @@ public class BigdataRepository implements ContentRepository {
      *             than the length of the byte[].
      * @throws IllegalArgumentException
      *             if <i>len</i> is greater than {@link #BLOCK_SIZE}.
-     *             
-     * @todo unit tests of [off,len].
      */
     public long appendBlock(String id, int version, byte[] b, int off, int len) {
         
@@ -2294,6 +2403,39 @@ public class BigdataRepository implements ContentRepository {
     }
     
     /**
+     * Read the file data for a file version as of a specific timestamp.
+     * <p>
+     * Note: It is possible to re-create any state of a file version
+     * corresponding to a <em>commit point</em> for the
+     * {@link #getDataIndex() data index}. It is not possible to recover all
+     * states - merely all committed states - since unisolated writes may be
+     * grouped together by group commit and therefore have the same commit
+     * point.
+     * 
+     * @param id
+     * @param version
+     * @param timestamp
+     * 
+     * @return
+     * 
+     * @see IAtomicStore#getCommitRecord(long)
+     * 
+     * @todo implement historical read. This basically requires a modification
+     *       to the {@link AbstractTask} and the {@link IDataService} API such
+     *       that a historical read-only view may be requested. The simplest
+     *       thing is to use a negative timestamp to indicate a historical
+     *       read-only view. The {@link FileVersionInputStream} then merely
+     *       needs to pass (-timestamp) into its
+     *       {@link IDataService#rangeQuery(long, String, byte[], byte[], int, int, IEntryFilter)}
+     *       method call to read on the appropriate index view.
+     */
+    public InputStream read(String id,int version,long timestamp) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
      * Read data from a file version.
      * <p>
      * Note: The input stream will remain coherent for the file version as of
@@ -2309,8 +2451,11 @@ public class BigdataRepository implements ContentRepository {
      * 
      * @return An input stream from which the caller may read the data in the
      *         file -or- <code>null</code> if there is no data for that file
-     *         version. An empty input stream MAY be returned since empty blocks
-     *         are allowed.
+     *         version, including no deleted blocks pending garbage collection.
+     *         An empty input stream MAY be returned since empty blocks are
+     *         allowed. An empty stream will also be returned after a file
+     *         version is deleted until the deleted blocks are eradicated from
+     *         the file data index.
      */
     public FileVersionInputStream inputStream(String id,int version) {
 
