@@ -219,10 +219,13 @@ abstract public class AbstractPartitionTask implements
             
             File outFile = master.getSegmentFile(name, partId);
 
+            // Note: truncates nentries to int.
+            final int nentries = (int) src.rangeCount(fromKey, toKey);
+            
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
-                    master.tmpDir, src.rangeCount(fromKey, toKey), src
-                            .rangeIterator(fromKey, toKey), branchingFactor,
-                    src.getNodeSerializer().getValueSerializer(), useChecksum,
+                    master.tmpDir, nentries, src.rangeIterator(fromKey, toKey),
+                    branchingFactor, src.getNodeSerializer()
+                            .getValueSerializer(), useChecksum,
                     recordCompressor, errorRate, indexUUID);
 
             IResourceMetadata[] resources = new SegmentMetadata[] { new SegmentMetadata(

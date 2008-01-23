@@ -93,7 +93,7 @@ public class IsolatableFusedView extends ReadOnlyFusedView implements IIsolatabl
 
     }
 
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         throw new UnsupportedOperationException();
         

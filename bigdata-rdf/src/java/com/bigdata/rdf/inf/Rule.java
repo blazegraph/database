@@ -920,7 +920,7 @@ abstract public class Rule {
                      * database].
                      */
 
-                    final int rangeCount1 = getAccessPath(order[0], false/* asBound */)
+                    final long rangeCount1 = getAccessPath(order[0], false/* asBound */)
                             .rangeCount();
 
                     /*
@@ -928,7 +928,7 @@ abstract public class Rule {
                      * will read against [focusStore].
                      */
 
-                    final int rangeCount2 = getAccessPath(order[focusIndex],
+                    final long rangeCount2 = getAccessPath(order[focusIndex],
                             false/*asBound*/).rangeCount();
 
                     if (rangeCount2 < rangeCount1) {
@@ -1176,7 +1176,7 @@ abstract public class Rule {
 
                 int index = -1;
                 int minVarCount = Integer.MAX_VALUE;
-                int minRangeCount = Integer.MAX_VALUE;
+                long minRangeCount = Long.MAX_VALUE;
                 
                 for( int j=0; j<body.length; j++) {
                     
@@ -1228,7 +1228,7 @@ abstract public class Rule {
                         }
                         
                         // range count of the current predicate under examination.
-                        int rangeCount = getAccessPath(j,false/*asBound*/).rangeCount();
+                        long rangeCount = getAccessPath(j,false/*asBound*/).rangeCount();
                         
                         if(rangeCount<minRangeCount) {
 
@@ -2062,7 +2062,7 @@ abstract public class Rule {
         
         final AbstractTripleStore fixPointStore = buffer.getFocusStore();
         
-        final int firstStatementCount = fixPointStore.getStatementCount();
+        final long firstStatementCount = fixPointStore.getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
@@ -2073,7 +2073,7 @@ abstract public class Rule {
 
         while (true) {
 
-            final int numEntailmentsBefore = fixPointStore.getStatementCount();
+            final long numEntailmentsBefore = fixPointStore.getStatementCount();
             
             for (int i = 0; i < nrules; i++) {
 
@@ -2108,7 +2108,7 @@ abstract public class Rule {
              */
             buffer.flush();
 
-            final int numEntailmentsAfter = fixPointStore.getStatementCount();
+            final long numEntailmentsAfter = fixPointStore.getStatementCount();
             
             if ( numEntailmentsBefore == numEntailmentsAfter ) {
                 
@@ -2129,13 +2129,13 @@ abstract public class Rule {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        final int lastStatementCount = fixPointStore.getStatementCount();
+        final long lastStatementCount = fixPointStore.getStatementCount();
 
         if (INFO) {
 
             log.info("\n"+closureStats.toString());
 
-            final int inferenceCount = lastStatementCount - firstStatementCount;
+            final long inferenceCount = lastStatementCount - firstStatementCount;
             
             // names of the rules that we ran.
             final String names; 

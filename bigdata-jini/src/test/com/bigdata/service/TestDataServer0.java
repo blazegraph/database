@@ -237,7 +237,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(null,values[1]);
         
         // rangeCount the partition of the index on the data service.
-        assertEquals(1, proxy.rangeCount(ITx.UNISOLATED, DataService
+        assertEquals(1L, proxy.rangeCount(ITx.UNISOLATED, DataService
                 .getIndexPartitionName(name, partitionId), null, null));
         
         /*
@@ -315,7 +315,7 @@ public class TestDataServer0 extends AbstractServerTestCase {
 
         public Object apply(IIndex ndx) {
 
-            return new Integer(ndx.rangeCount(null, null));
+            return new Long(ndx.rangeCount(null, null));
 
         }
 

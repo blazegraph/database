@@ -190,7 +190,7 @@ public class ReadCommittedIndex implements IIndexWithCounter {
         throw new UnsupportedOperationException();
     }
 
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
         return getIndex().rangeCount(fromKey, toKey);
     }
 

@@ -1720,7 +1720,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * to constants in the query.
                  */
 
-                final int rangeCount = accessPath.rangeCount();
+                final long rangeCount = accessPath.rangeCount();
 
                 cardinality = rangeCount;
 

@@ -82,7 +82,7 @@ public interface IAccessPath extends Iterable<SPO> {
      * the index in the range count. If the index does not support isolation
      * then this will be an exact count.
      */
-    public int rangeCount();
+    public long rangeCount();
 
     /**
      * The raw iterator for traversing the selected index within the key range

@@ -876,7 +876,7 @@ public class InferenceEngine extends RDFSHelper {
         final AbstractTripleStore closureStore = (focusStore != null ? focusStore
                 : database);
 
-        final int nbefore = closureStore.getStatementCount();
+        final long nbefore = closureStore.getStatementCount();
         
 //        /*
 //         * add RDF(S) axioms to the database.
@@ -903,7 +903,7 @@ public class InferenceEngine extends RDFSHelper {
             
         }
         
-        final int nafter = closureStore.getStatementCount();
+        final long nafter = closureStore.getStatementCount();
         
         final long elapsed = System.currentTimeMillis() - begin;
         
@@ -947,7 +947,7 @@ public class InferenceEngine extends RDFSHelper {
         final SPOAssertionBuffer buffer = new SPOAssertionBuffer(closureStore,
                 database, doNotAddFilter, bufferCapacity, justify);
         
-        final int firstStatementCount = closureStore.getStatementCount();
+        final long firstStatementCount = closureStore.getStatementCount();
 
         final long begin = System.currentTimeMillis();
 
@@ -1235,9 +1235,9 @@ public class InferenceEngine extends RDFSHelper {
         
         final long elapsed = System.currentTimeMillis() - begin;
 
-        final int lastStatementCount = closureStore.getStatementCount();
+        final long lastStatementCount = closureStore.getStatementCount();
 
-        final int inferenceCount = lastStatementCount - firstStatementCount;
+        final long inferenceCount = lastStatementCount - firstStatementCount;
         
         if(INFO) {
                         

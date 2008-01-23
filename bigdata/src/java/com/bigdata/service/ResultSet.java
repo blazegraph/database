@@ -141,8 +141,11 @@ public class ResultSet implements Externalizable {
             final byte[] toKey, final int capacity, int flags,
             final IEntryFilter filter) {
 
-        // The upper bound on the #of key-value pairs in the range.
-        rangeCount = ndx.rangeCount(fromKey, toKey);
+        /* The upper bound on the #of key-value pairs in the range.
+         * 
+         * Note: truncate to [int].
+         */
+        rangeCount = (int) ndx.rangeCount(fromKey, toKey);
 
         final int limit = (rangeCount > capacity ? capacity : rangeCount);
 

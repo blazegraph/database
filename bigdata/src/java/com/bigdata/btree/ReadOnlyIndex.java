@@ -96,7 +96,7 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         throw new UnsupportedOperationException();
     }
 
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
         return src.rangeCount(fromKey, toKey);
     }
 

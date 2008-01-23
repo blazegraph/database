@@ -324,8 +324,10 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * Returns the sum of the entries in the key range in this write set plus
      * those in the key range in the isolated index.
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
+        // @todo watch for overflow.
+        
         return super.rangeCount(fromKey, toKey)
                 + src.rangeCount(fromKey, toKey);
         

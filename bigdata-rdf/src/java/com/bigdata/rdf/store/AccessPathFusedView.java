@@ -103,9 +103,11 @@ public class AccessPathFusedView implements IAccessPath {
         
     }
 
-    public int rangeCount() {
+    public long rangeCount() {
 
         // Note: this is the upper bound.
+        
+        // @todo check for overflow on Long#Max_value
         
         return path1.rangeCount() + path2.rangeCount();
         

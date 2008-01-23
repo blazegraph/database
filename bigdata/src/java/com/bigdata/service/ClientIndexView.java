@@ -517,7 +517,7 @@ public class ClientIndexView implements IIndex {
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
      */
-    public int rangeCount(byte[] fromKey, byte[] toKey) {
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         MetadataIndex mdi = getMetadataIndex();
 
@@ -536,8 +536,8 @@ public class ClientIndexView implements IIndex {
             return 0;
 
         // use to counters so that we can look for overflow.
-        int count = 0;
-        int lastCount = 0;
+        long count = 0;
+        long lastCount = 0;
 
         for (int index = fromIndex; index <= toIndex; index++) {
 
@@ -597,8 +597,8 @@ public class ClientIndexView implements IIndex {
 
             if(count<lastCount) {
             
-                // more than would fit in an Integer.
-                return Integer.MAX_VALUE;
+                // more than would fit in a Long.
+                return Long.MAX_VALUE;
                 
             }
             

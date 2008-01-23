@@ -653,13 +653,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
     }
 
-    final public int getStatementCount() {
+    final public long getStatementCount() {
         
         return getSPOIndex().rangeCount(null,null);
         
     }
     
-    final public int getJustificationCount() {
+    final public long getJustificationCount() {
         
         if(justify) {
             
@@ -671,13 +671,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
-    final public int getTermCount() {
+    final public long getTermCount() {
         
         return getTermIdIndex().rangeCount(null,null);
         
     }
     
-    final public int getURICount() {
+    final public long getURICount() {
         
         byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_URI) };
 
@@ -687,7 +687,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
-    final public int getLiteralCount() {
+    final public long getLiteralCount() {
         
         // Note: the first of the kinds of literals (plain).
         byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_LIT) };
@@ -699,7 +699,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
-    final public int getBNodeCount() {
+    // @todo also statement identifer count.
+    final public long getBNodeCount() {
         
         byte[] fromKey = new byte[] { KeyBuilder.encodeByte(RdfKeyBuilder.TERM_CODE_BND) };
 
@@ -1393,7 +1394,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         /**
          * Always returns ZERO(0).
          */
-        public int rangeCount() {
+        public long rangeCount() {
             
             return 0;
             
@@ -1508,7 +1509,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
         
-        public int rangeCount() {
+        public long rangeCount() {
             
             return getStatementIndex().rangeCount(fromKey,toKey);
             
@@ -2434,7 +2435,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             long p = itr.next();
             
-            int n = getAccessPath(NULL, p, NULL).rangeCount();
+            long n = getAccessPath(NULL, p, NULL).rangeCount();
             
             System.err.println(n+"\t"+resolveTerms.toString(p));
             
@@ -2486,11 +2487,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             boolean explicit, boolean inferred, boolean axioms,
             boolean justifications) {
 
-        final int nstmts = getStatementCount();
+        final long nstmts = getStatementCount();
 
-        int nexplicit = 0;
-        int ninferred = 0;
-        int naxioms = 0;
+        long nexplicit = 0;
+        long ninferred = 0;
+        long naxioms = 0;
 
         {
 
