@@ -63,6 +63,7 @@ public class TestAll extends TestCase {
      * @todo write tests for {@link RangeQueryIterator}
      * @todo write tests for {@link PartitionedRangeQueryIterator}
      * @todo write tests for embedded services (w/o jini).
+     * @todo write tests for parallelized operations.
      */
     public static Test suite()
     {

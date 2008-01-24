@@ -67,6 +67,10 @@ import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.sparse.ValueType.AutoIncCounter;
+import com.bigdata.text.FullTextIndex;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A distributed file system with extensible metadata and atomic append
@@ -75,26 +79,33 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * structured so as to look like a hierarchical file system using any desired
  * convention. Files are versioned and historical versions MAY be accessed until
  * the next compacting merge discards their data. File data is stored in large
- * {@link #BLOCK_SIZE} blocks, but partial and even empty blocks are allowed.
- * Storage is space - only the data written will be stored.
+ * {@link #BLOCK_SIZE} blocks. Partial and even empty blocks are allowed and
+ * only the data written will be stored. <code>2^63-1</code> distinct blocks
+ * may be written per file version, making the maximum possible file size
+ * <code>536,870,912</code> exabytes. Files may be used as queues, in which
+ * case blocks containing new records are atomically appended while a map/reduce
+ * style master consumes the head block of the file.
  * <p>
  * Efficient method are offered for streaming and block oriented IO. All block
  * read and write operations are atomic, including block append. Files may be
  * easily written such that records never cross a block boundary by the
  * expediency of flushing the output stream if a record would overflow the
- * current block. (A flush forces the atomic write of a partial block. Partial
- * blocks are stored efficiently - only the bytes actually written are stored.)
- * Such files are well-suited to map/reduce processing as they may be
- * efficiently split at block boundaries and references to the blocks
- * distributed to clients. Likewise, reduce clients can aggregate data into
- * large files suitable for further map/reduce processing.
+ * current block. A flush forces the atomic write of a partial block. Partial
+ * blocks are stored efficiently - only the bytes actually written are stored.
+ * Blocks are large enough that most applications can safely store a large
+ * number of logical records in each block. Files comprised of application
+ * defined logical records organized into a sequence of blocks are well-suited
+ * to map/reduce processing. They may be efficiently split at block boundaries
+ * and references to the blocks distributed to clients. Likewise, reduce clients
+ * can aggregate data into large files suitable for further map/reduce
+ * processing.
  * <p>
  * The distributed file system uses two scale-out indices to support ACID
  * operations on file metadata and atomic file append. These ACID guarentees
  * arise from the use of unisolated operations on the respective indices and
  * therefore apply only to the individual file metadata or file block
  * operations. In particular, file metadata read and write are atomic and all
- * individual file block IO (read,write,and append) operations are atomic.
+ * individual file block IO (read, write, and append) operations are atomic.
  * Atomicity is NOT guarenteed when performing more than a single file block IO
  * operation, e.g., multiple appends MIGHT NOT write sequential blocks since
  * other block operations could have intervened.
@@ -106,18 +117,25 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * least one block. Streaming processing is advised in all cases when handling
  * large files, including when the file is to be delivered via HTTP.
  * <p>
- * The metadata index uses a {@link SparseRowStore} design, similar to Google's
- * bigtable or Hadoop's HBase. Certain properties MUST be defined for each entry -
- * they are documented on the {@link MetadataSchema}. Applications are free to
- * define additional properties. Reads and writes of file metadata are always
- * atomic.
+ * The {@link #getMetadataIndex() metadata index} uses a {@link SparseRowStore}
+ * design, similar to Google's bigtable or Hadoop's HBase. All updates to file
+ * version metadata are atomic. The primary key in the metadata index for every
+ * file is its {@link MetadataSchema#ID}. In addition, each version of a file
+ * has a distinct {@link MetadataSchema#VERSION} property. File creation time,
+ * version creation time, and file version metadata update timestamps may be
+ * recovered from the timestamps associated with the properties in the metadata
+ * index. The use of the {@link MetadataSchema#CONTENT_TYPE} and
+ * {@link MetadataSchema#CONTENT_ENCODING} properties is enforced by the
+ * high-level {@link Document} interface. Applications are free to define
+ * additional properties.
  * <p>
  * Each time a file is created a new version number is assigned. The data index
  * uses the {@link MetadataSchema#ID} as the first field in a compound key. The
  * second field is the {@link MetadataSchema#VERSION} - a 32-bit integer. The
- * remainder of the key is a 64-bit block identifier. The block identifiers are
- * strictly monotonic (e.g., up one) and their sequence orders the blocks into
- * the logical byte order of the file.
+ * remainder of the key is a 64-bit signed block identifier (2^63-1 distinct
+ * block identifiers). The block identifiers are strictly monotonic (e.g., up
+ * one) and their sequence orders the blocks into the logical byte order of the
+ * file.
  * <p>
  * Operations that create a new file actually create a new file version. The old
  * file version will eventually be garbage collected depending on the policy in
@@ -143,7 +161,7 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * count and multiplying through by the block size. Blocks may be handed off to
  * the clients in parallel (of course, clients need to deal with the hassle of
  * processing files where records will cross split boundaries unless they always
- * pad out with unused bytes to the next 64k boundary).
+ * pad out with unused bytes to the next {@link #BLOCK_SIZE} boundary).
  * <p>
  * Use case: A reduce client wants to write a very large files so it creates a
  * metadata record for the file and then does a series of atomic appears to the
@@ -176,7 +194,7 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * its file version.
  * 
  * @todo implement "zones" and their various policies (replication, retention,
- *       and media indexing).  access control could also be part of the zones.
+ *       and media indexing). access control could also be part of the zones.
  * 
  * @todo compacting merge policies. consider how data is eradicated from the
  *       metadata and data indices and that it might not be "atomically"
@@ -245,6 +263,8 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Configuration options.
      * 
+     * @todo block size.
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -253,19 +273,30 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
-     * The size of a file block (65,536 bytes aka 64k). Block identifiers are
-     * 64-bit integers. The maximum file length is <code>2^(16+64) - 1 </code>
-     * bytes (16 Exabytes).
+     * The size of a file block (64M). Block identifiers are 64-bit signed
+     * integers. The maximum file length is <code>2^63 - 1 </code> blocks (
+     * 536,870,912 Exabytes).
      */
-    public static final int BLOCK_SIZE = 64 * Bytes.kilobyte32;
+    protected final int BLOCK_SIZE = 64 * Bytes.megabyte32;
 
+    /**
+     * The size of a file block (64M). Block identifiers are 64-bit signed
+     * integers. The maximum file length is <code>2^63 - 1 </code> blocks (
+     * 536,870,912 Exabytes).
+     */
+    public final int getBlockSize() {
+        
+        return BLOCK_SIZE;
+        
+    }
+    
     /**
      * The maximum block identifier that can be assigned to a file version.
      * <p>
      * Note: This is limited to {@value Long#MAX_VALUE}-1 so that we can always
      * form the key greater than any valid key for a file version. This is
      * required by the atomic append logic when it seeks the next block
-     * identifier. See {@link AtomicAppendProc}.
+     * identifier. See {@link AtomicBlockAppendProc}.
      */
     protected static final long MAX_BLOCK = Long.MAX_VALUE - 1;
     
@@ -328,15 +359,10 @@ public class BigdataRepository implements ContentRepository {
      * stored - ideally within their own namespace!
      * <p>
      * Note: File version creation time and update times are available using the
-     * {@link SparseRowStore} API directly. This API reports the timestamp for
-     * each property value. The <em>file creation time</em> is the timestamp
-     * associated with the first occurrence of the {@link #ID} property for a
-     * file. The <em>file metadata last modified</em> time is the timestamp
-     * associated with most recent value of the {@link #ID} property for that
-     * file. The <em>file version creation time</em> is the timestamp
-     * associated with the first occurrence of the corresponding
-     * {@link #VERSION} property for a file. Timestamps for file block can NOT
-     * be obtained.
+     * {@link SparseRowStore}, which stores and reports the timestamp for each
+     * property value. Convenience methods are available on
+     * {@link RepositoryDocumentImpl} to report those timestamps. Timestamps for
+     * file blocks can NOT be obtained.
      * <p>
      * Note: A content length property was deliberately NOT defined. The design
      * is geared towards very large file and asynchronous read/write of file
@@ -456,7 +482,7 @@ public class BigdataRepository implements ContentRepository {
     /**
      * The index in which the file metadata is stored (the index must exist).
      */
-    protected SparseRowStore getMetadataIndex() {
+    public SparseRowStore getMetadataIndex() {
 
         if (metadataIndex == null) {
 
@@ -474,12 +500,12 @@ public class BigdataRepository implements ContentRepository {
     /**
      * The index in which the file data is stored (the index must exist).
      */
-    protected IIndex getDataIndex() {
+    public IIndex getDataIndex() {
 
         if (dataIndex == null) {
 
-            dataIndex = (ClientIndexView) fed.getIndex(
-                    ITx.UNISOLATED, DATA_NAME);
+            dataIndex = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
+                    DATA_NAME);
 
         }
 
@@ -557,8 +583,8 @@ public class BigdataRepository implements ContentRepository {
         metadata.put(MetadataSchema.VERSION, AutoIncCounter.INSTANCE);
         
         // write the metadata (atomic operation).
-        final ITPS tps = metadataIndex.write(getKeyBuilder(), metadataSchema,
-                metadata, AUTO_TIMESTAMP, null/* filter */);
+        final ITPS tps = getMetadataIndex().write(getKeyBuilder(),
+                metadataSchema, metadata, AUTO_TIMESTAMP, null/* filter */);
 
         final int version = (Integer) tps.get(MetadataSchema.VERSION).getValue();
 
@@ -668,54 +694,99 @@ public class BigdataRepository implements ContentRepository {
         final private String id;
         
         /**
-         * The create time for the file version -or- 0L.
+         * The result of the atomic read on the file's metadata. This
+         * representation is significantly richer than the current set of
+         * property values.
          */
-        final private long createTime;
-        
-        final private Map<String,Object> metadata;
+        final ITPS tps;
+
+        /**
+         * The current version identifer -or- <code>-1</code> iff there is no
+         * current version for the file (including when there is no record of
+         * any version for the file).
+         */
+        final int version;
         
         /**
-         * Create a new empty document.
+         * The property set for the current file version.
          */
-        public RepositoryDocumentImpl(BigdataRepository repo,String id)
-        {
+        final private Map<String,Object> metadata;
 
+        /**
+         * Read the metadata for the current version of the file from the
+         * repository.
+         * 
+         * @param id
+         *            The file identifier.
+         * @param tps
+         *            The logical row describing the metadata for some file in
+         *            the repository.
+         */
+        public RepositoryDocumentImpl(BigdataRepository repo, String id,
+                ITPS tps) {
+            
+            if (repo == null)
+                throw new IllegalArgumentException();
+
+            if (id == null)
+                throw new IllegalArgumentException();
+            
             this.repo = repo;
             
             this.id = id;
             
-            log.info("Reading metadata : id="+id);
+            this.tps = tps;
             
-            final ITPS tps = repo.getMetadataIndex().read(repo.getKeyBuilder(),
-                    metadataSchema, id, Long.MAX_VALUE, null/* filter */);
-            
-            this.metadata = tps.asMap();
-            
-            if (tps == null) {
+            if (tps != null) {
 
-                log.warn("id=" + id + " : no version");
+                ITPV tmp = tps.get(MetadataSchema.VERSION);
                 
-            }
+                if (tmp.getValue() != null) {
 
-            /*
-             * Get the create time from the timestamp for the VERSION property.
-             */
-            
-            if (metadata.get(MetadataSchema.VERSION) == null) {
+                    /*
+                     * Note the current version identifer.
+                     */
+                    
+                    this.version = (Integer) tmp.getValue();
 
-                log.warn("id=" + id + " : no current version");
+                    /*
+                     * Save a simplifed view of the propery set for the current
+                     * version.
+                     */
+                    
+                    this.metadata = tps.asMap();
 
-                this.createTime = 0L;
-                
+                    log.info("id="+id+", current version="+version);
+
+                } else {
+                    
+                    /*
+                     * No current version.
+                     */
+                    
+                    this.version = -1;
+
+                    this.metadata = null;
+                    
+                    log.warn("id="+id+" : no current version");
+
+                }
+    
             } else {
-
-                log.info("id=" + id + ", version=" + getVersion());
-
-                this.createTime = tps.get(MetadataSchema.VERSION).getTimestamp();
                 
+                /*
+                 * Nothing on record for that file identifier.
+                 */
+                
+                this.version = -1;
+                
+                this.metadata = null;
+                
+                log.warn("id="+id+" : no record of any version(s)");
+
             }
             
-            if(DEBUG) {
+            if (DEBUG && metadata != null) {
 
                 Iterator<Map.Entry<String,Object>> itr = metadata.entrySet().iterator();
                 
@@ -727,26 +798,37 @@ public class BigdataRepository implements ContentRepository {
                             + entry.getKey() + "]=[" + entry.getValue() + "]");
                     
                 }
-                
+
             }
+
+        }
+        
+        /**
+         * Read the metadata for the current version of the file from the
+         * repository.
+         * 
+         * @param id
+         *            The file identifier.
+         */
+        public RepositoryDocumentImpl(BigdataRepository repo,String id)
+        {
+            
+            this(repo, id, repo.getMetadataIndex().read(repo.getKeyBuilder(),
+                    metadataSchema, id, Long.MAX_VALUE, null/* filter */));
             
         }
 
         /**
-         * The create time for the file version -or- 0L if there is no current
-         * version for the file.
+         * Assert that a version of the file existed when this view was
+         * constructed.
          * 
-         * @todo move onto the {@link DocumentHeader} interface?
+         * @throws IllegalStateException
+         *             unless a version of the file existed at the time that
+         *             this view was constructed.
          */
-        public long createTime() {
-            
-            return createTime;
-            
-        }
-        
-        private void assertExists() {
+        final protected void assertExists() {
 
-            if (metadata == null) {
+            if (version == -1) {
 
                 throw new IllegalStateException("No current version: id="+id);
                 
@@ -754,13 +836,90 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
-        public boolean exists() {
+        final public boolean exists() {
             
-            return metadata != null;
+            return version != -1;
             
         }
         
-        public InputStream getInputStream() {
+        final public int getVersion() {
+
+            assertExists();
+
+            return (Integer)metadata.get(MetadataSchema.VERSION);
+
+        }
+
+        /**
+         * Note: This is obtained from the earliest available timestamp of the
+         * {@link MetadataSchema#ID} property.
+         */
+        final public long getEarliestVersionCreateTime() {
+            
+            assertExists();
+            
+            Iterator<ITPV> itr = tps.iterator();
+            
+            while(itr.hasNext()) {
+                
+                ITPV tpv = itr.next();
+                
+                if(tpv.getName().equals(MetadataSchema.ID)) {
+                    
+                    return tpv.getTimestamp();
+                    
+                }
+                
+            }
+            
+            throw new AssertionError();
+            
+        }
+
+        final public long getVersionCreateTime() {
+
+            assertExists();
+            
+            /*
+             * The timestamp for the most recent value of the VERSION property.
+             */
+            
+            final long createTime = tps.get(MetadataSchema.VERSION)
+                    .getTimestamp();
+            
+            return createTime;
+            
+        }
+
+        final public long getMetadataUpdateTime() {
+            
+            assertExists();
+            
+            /*
+             * The timestamp for the most recent value of the ID property.
+             */
+            
+            final long metadataUpdateTime = tps.get(MetadataSchema.ID)
+                    .getTimestamp();
+            
+            return metadataUpdateTime;
+
+        }
+
+        /**
+         * Return an array containing all non-eradicated values of the
+         * {@link MetadataSchema#VERSION} property for this file as of the time
+         * that this view was constructed.
+         * 
+         * @see BigdataRepository#getAllVersionInfo(String)
+         */
+        final public ITPV[] getAllVersionInfo() {
+            
+            return repo.getAllVersionInfo(id);
+            
+        }
+        
+        final public InputStream getInputStream() {
 
             assertExists();
             
@@ -768,7 +927,7 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
-        public Reader getReader() throws UnsupportedEncodingException {
+        final public Reader getReader() throws UnsupportedEncodingException {
 
             assertExists();
 
@@ -776,15 +935,7 @@ public class BigdataRepository implements ContentRepository {
 
         }
 
-        public int getVersion() {
-
-            assertExists();
-
-            return (Integer)metadata.get(MetadataSchema.VERSION);
-
-        }
-        
-        public String getContentEncoding() {
+        final public String getContentEncoding() {
 
             assertExists();
             
@@ -792,7 +943,7 @@ public class BigdataRepository implements ContentRepository {
             
         }
 
-        public String getContentType() {
+        final public String getContentType() {
          
             assertExists();
 
@@ -800,19 +951,19 @@ public class BigdataRepository implements ContentRepository {
             
         }
 
-        public String getId() {
+        final public String getId() {
 
             return id;
             
         }
         
-        public Object getProperty(String name) {
+        final public Object getProperty(String name) {
             
             return metadata.get(name);
             
         }
         
-        public Map<String,Object> asMap() {
+        final public Map<String,Object> asMap() {
             
             assertExists();
 
@@ -1050,40 +1201,32 @@ public class BigdataRepository implements ContentRepository {
     }
     
     /**
-     * FIXME Implement {@link #getDocumentHeaders(String, String)} . We need an
-     * "row scan" operation on the {@link SparseRowStore} to support this and
-     * {@link #deleteAll(String, String)}.
-     * 
      * @todo write tests.
      */
+    @SuppressWarnings("unchecked")
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
             String toId) {
 
-//        IKeyBuilder keyBuilder = getKeyBuilder();
-//
-//        // the key for {fromId}
-//        final byte[] fromKey = keyBuilder.reset().appendText(fromId,
-//                true/* unicode */, false/* successor */).getKey();
-//
-//        // the key for {successor(toId)}
-//        final byte[] toKey = keyBuilder.reset().appendText(toId,
-//                true/* unicode */, true/* successor */).getKey();
-//
-//        final IEntryIterator itr = getMetadataIndex().getIndex()
-//                .rangeIterator(fromKey, toKey, 0/* capacity */,
-//                        IRangeQuery.KEYS, null/* filter */);
-//
-//        long blockCount = 0;
-//
-//        while (itr.hasNext()) {
-//
-//            itr.next();
-//
-//            blockCount++;
-//            
-//        }
-     
-        throw new UnsupportedOperationException();
+        return new Striterator(getMetadataIndex().rangeQuery(getKeyBuilder(),
+                metadataSchema, fromId, toId, 0/* capacity */,
+                Long.MAX_VALUE/* timestamp */, null/* filter */))
+                .addFilter(new Resolver() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected Object resolve(Object arg0) {
+                        
+                        ITPS tps = (ITPS) arg0;
+                        
+                        String id = (String) tps.get(MetadataSchema.ID).getValue();
+                        
+                        return new RepositoryDocumentImpl(
+                                BigdataRepository.this, id, tps);
+                        
+                    }
+
+                });
         
     }
 
@@ -1113,6 +1256,8 @@ public class BigdataRepository implements ContentRepository {
              * updated, and we could then do a rangeIterator with the DELETE
              * flag set to wipe out a range of stuff.
              */
+            
+            
             
             if(true) throw new UnsupportedOperationException();
             
@@ -1151,9 +1296,87 @@ public class BigdataRepository implements ContentRepository {
         
     }
 
+    /**
+     * A procedure that performs a key range scan, marking all non-deleted
+     * versions within the key range as deleted (by storing a null property
+     * value for the {@link MetadataSchema#VERSION}).
+     * 
+     * @todo the caller will have to submit this procedure to each index
+     *       partition spanned by the key range. That logic should be
+     *       encapsulated within the {@link ClientIndexView}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class VersionDeleteProc implements IIndexProcedure {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -31946508577453575L;
+
+        private String fromId;
+        private String toId;
+        
+        public VersionDeleteProc(String fromId, String toId) {
+        
+            this.fromId = fromId;
+            
+            this.toId = toId;
+            
+        }
+        
+        public Object apply(IIndex ndx) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+        
+    }
+    
+    /**
+     * FIXME Integrate with {@link FullTextIndex} to providing indexing and
+     * search of file versions. Deleted file versions should be removed from the
+     * text index. There should be explicit metadata on the file version in
+     * order for it to be indexed. The text indexer will require content type
+     * and encoding information in order to handle indexing. Low-level output
+     * stream, writer, block write and block append operations will not trigger
+     * the indexer since it depends on the metadata index to know whether or not
+     * a file version should be indexed. However you could explicitly submit a
+     * file version for indexing.
+     * 
+     * @todo crawl or query job obtains a set of URLs, writing them onto a file.
+     *       <p>
+     *       m/r job downloads documents based on set of URLs, writing all
+     *       documents into a single file version. text-based downloads can be
+     *       record compressed and decompressed after the record is read. binary
+     *       downloads will be truncated at 64M and might be skipped all
+     *       together if the exceed the block size (get images, but not wildely
+     *       large files).
+     *       <p>
+     *       m/r job extracts a simplified html format from the source image,
+     *       writing the result onto another file. this job will optionally
+     *       split documents into "pages" by breaking where necessary at
+     *       paragraph boundaries.
+     *       <p>
+     *       m/r job builds text index from simplified html format.
+     *       <p>
+     *       m/r job runs extractors on simplified html format, producing
+     *       rdf/xml which is written onto another file. The rdf/xml for each
+     *       harvested document is written as its own logical record, perhaps
+     *       one record per block.
+     *       <p>
+     *       concurrent batch load of rdf/xml into scale-out knowledge base. the
+     *       input is a single file comprised of blocks, each of which is an
+     *       rdf/xml file.
+     * 
+     * @todo journal size and index segment sizes should be at least 500M when
+     *       file blocks are stored on the journal - perhaps raise that
+     *       threshold throughout?
+     */
     public Iterator<String> search(String query) {
-        // TODO Auto-generated method stub
+
         throw new UnsupportedOperationException();
+        
     }
 
     /*
@@ -1166,13 +1389,13 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AtomicAppendProc implements IIndexProcedure,
+    public static class AtomicBlockAppendProc implements IIndexProcedure,
             Externalizable {
 
         private static final long serialVersionUID = 1441331704737671258L;
 
         protected static transient Logger log = Logger
-                .getLogger(AtomicAppendProc.class);
+                .getLogger(AtomicBlockAppendProc.class);
 
         /**
          * True iff the {@link #log} level is INFO or less.
@@ -1205,14 +1428,14 @@ public class BigdataRepository implements ContentRepository {
          * @param len
          *            The #of bytes to be written.
          */
-        public AtomicAppendProc(String id, int version, byte[] b, int off, int len) {
+        public AtomicBlockAppendProc(BigdataRepository repo, String id, int version, byte[] b, int off, int len) {
 
             assert id != null && id.length() > 0;
             assert version >= 0;
             assert b != null;
             assert off >= 0 : "off="+off;
             assert len >= 0 && off + len <= b.length;
-            assert len <= BLOCK_SIZE : "len="+len+" exceeds blockSize="+BLOCK_SIZE;
+            assert len <= repo.BLOCK_SIZE : "len="+len+" exceeds blockSize="+repo.BLOCK_SIZE;
 
             this.id = id;
             this.version = version;
@@ -1624,13 +1847,13 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AtomicWriteProc implements IIndexProcedure,
+    public static class AtomicBlockWriteProc implements IIndexProcedure,
             Externalizable {
 
         private static final long serialVersionUID = 4982851251684333327L;
 
         protected static transient Logger log = Logger
-                .getLogger(AtomicWriteProc.class);
+                .getLogger(AtomicBlockWriteProc.class);
 
         /**
          * True iff the {@link #log} level is INFO or less.
@@ -1666,7 +1889,7 @@ public class BigdataRepository implements ContentRepository {
          * @param len
          *            The #of bytes to be written.
          */
-        public AtomicWriteProc(String id, int version, long block, byte[] b, int off, int len) {
+        public AtomicBlockWriteProc(BigdataRepository repo,String id, int version, long block, byte[] b, int off, int len) {
 
             assert id != null && id.length() > 0;
             assert version >= 0;
@@ -1674,7 +1897,7 @@ public class BigdataRepository implements ContentRepository {
             assert b != null;
             assert off >= 0 : "off="+off;
             assert len >= 0 && off + len <= b.length;
-            assert len <= BLOCK_SIZE : "len="+len+" exceeds blockSize="+BLOCK_SIZE;
+            assert len <= repo.BLOCK_SIZE : "len="+len+" exceeds blockSize="+repo.BLOCK_SIZE;
 
             this.id = id;
             this.version = version;
@@ -1806,7 +2029,7 @@ public class BigdataRepository implements ContentRepository {
         final int flags = IRangeQuery.KEYS;
         
         // visits the keys for the file version in block order.
-        IEntryIterator itr = dataIndex.rangeIterator(fromKey, toKey,
+        final IEntryIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
                 0/* capacity */, flags, null/* filter */);
 
         // resolve keys to block identifiers.
@@ -2008,8 +2231,8 @@ public class BigdataRepository implements ContentRepository {
         }
 
         // construct the atomic write operation.
-        final IIndexProcedure proc = new AtomicWriteProc(id, version, block, b,
-                off, len);
+        final IIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
+                block, b, off, len);
 
         if (getDataIndex() instanceof ClientIndexView) {
             
@@ -2341,8 +2564,8 @@ public class BigdataRepository implements ContentRepository {
         }
 
         // construct the atomic append operation.
-        final IIndexProcedure proc = new AtomicAppendProc(id, version, b, off,
-                len);
+        final IIndexProcedure proc = new AtomicBlockAppendProc(this, id, version, b,
+                off, len);
 
         if (getDataIndex() instanceof ClientIndexView) {
 
@@ -2450,7 +2673,7 @@ public class BigdataRepository implements ContentRepository {
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
-        long nblocks = dataIndex.rangeCount(fromKey, toKey);
+        final long nblocks = getDataIndex().rangeCount(fromKey, toKey);
 
         log.info("id=" + id + ", version=" + version + ", nblocks=" + nblocks);
 
@@ -2640,16 +2863,36 @@ public class BigdataRepository implements ContentRepository {
                 .getKey();
 
         /*
+         * The capacity is essentially the #of blocks to transfer at a time.
+         * 
          * Note: since the block size is so large this iterator limits its
          * capacity to avoid an undue burden on the heap. E.g., we do NOT want
-         * it to buffer and transmit 100,000 64k blocks at a time! In practice,
-         * the buffering is per data service, but that could still be hundreds
-         * of megabytes!
+         * it to buffer and transmit large numbers of 64M blocks at a time! In
+         * practice, the buffering is per data service, but that could still be
+         * hundreds of megabytes!
          * 
-         * Note: The capacity is essentially the #of blocks to transfer at a
-         * time. Each block is 64k, so a capacity of 10 is 640k per transfer. Of
-         * course, no more blocks will be transferred that exist on the data
-         * service for the identified file version.
+         * FIXME Work out a means to (a) inline block into the index segments;
+         * (b) store "blobs" consisting of the resource identifier (UUID) and
+         * the address within that resource; (c) return byte[]s the caller when
+         * the block is small and otherwise the blob; and (d) have the caller
+         * use a socket level API to stream blocks from the data service (make
+         * available on the result set) by specifying the UUID of the resource
+         * and the address of the block. At that point the capacity can be left
+         * to its default value and we will never have problems with buffering
+         * large amounts of data in the result set.
+         * 
+         * In order to do this we will also have to: (a) overflow the blocks
+         * from the journal onto the index segment; and (b) return an error
+         * (re-try) when the resource identified by the UUID has be deleted
+         * following a merge or compacting merge such that the block must now be
+         * read from another resource (if it still exists). This case should
+         * never arise when the caller processes the result set quickly and
+         * could be minimized by keeping the result set size down in the 100s.
+         * The case can in general be handled by re-issuing the query starting
+         * with the key for the block whose fetch failed.
+         * 
+         * Note: The socket-level api should share code with aspects of the media
+         * replication system.
          */
         final int capacity = 20;
         
@@ -2657,6 +2900,8 @@ public class BigdataRepository implements ContentRepository {
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
         final IEntryIterator itr;
+        
+        final IIndex dataIndex = getDataIndex();
         
         if (tx == ITx.UNISOLATED) {
             
@@ -2667,9 +2912,11 @@ public class BigdataRepository implements ContentRepository {
             
             if(dataIndex instanceof ClientIndexView) {
                 
-                ClientIndexView ndx = new ClientIndexView(fed, tx, DATA_NAME);
+                final ClientIndexView ndx = new ClientIndexView(fed, tx,
+                        DATA_NAME);
 
-                itr = ndx.rangeIterator(fromKey, toKey, capacity, flags, null/* filter */);
+                itr = ndx
+                        .rangeIterator(fromKey, toKey, capacity, flags, null/* filter */);
 
             } else {
                 
@@ -2799,7 +3046,7 @@ public class BigdataRepository implements ContentRepository {
         /**
          * The buffer in which the current block is being accumulated.
          */
-        private byte[] buffer = new byte[BigdataRepository.BLOCK_SIZE];
+        private final byte[] buffer;
 
         /**
          * The index of the next byte in {@link #buffer} on which a byte would be
@@ -2858,6 +3105,8 @@ public class BigdataRepository implements ContentRepository {
             this.id = id;
             
             this.version = version;
+
+            this.buffer = new byte[repo.BLOCK_SIZE];
             
         }
 
@@ -3087,7 +3336,18 @@ public class BigdataRepository implements ContentRepository {
                 
             }
             
-            // the next block's data FIXME offer a no-copy variant of next()!!! It's 64k per copy!
+            /*
+             * The next block's data
+             * 
+             * FIXME offer a no-copy variant of next()!!! It's 64M per copy!
+             * 
+             * The most obvious way to handle this is to NOT translate the addr
+             * to the block's data automatically in the iterator but to do it
+             * explicitly here. E.g., by returning storing a "blob" in the index
+             * (UUID of the resource and the addr of the block) and returning the
+             * "blob" from the iterator.  The client then fetches the blob using
+             * a socket-based streaming API.
+             */
             b = (byte[]) src.next();
             
             off = 0;
@@ -3309,8 +3569,8 @@ public class BigdataRepository implements ContentRepository {
      * performance of both the mutable {@link BTree} and the read-only
      * {@link IndexSegment}.
      * 
-     * @see AtomicAppendProc
-     * @see AtomicWriteProc
+     * @see AtomicBlockAppendProc
+     * @see AtomicBlockWriteProc
      */
     public static class FileDataBTreePartition extends UnisolatedBTreePartition {
 

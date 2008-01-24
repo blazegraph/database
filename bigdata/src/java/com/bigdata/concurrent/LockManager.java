@@ -35,6 +35,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.WeakValueCache;
@@ -80,6 +81,18 @@ import com.bigdata.cache.WeakValueCache;
 public class LockManager</*T,*/R extends Comparable<R>> {
 
     protected static final Logger log = Logger.getLogger(LockManager.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * Each resource that can be locked has an associated {@link ResourceQueue}.
@@ -494,7 +507,10 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        log.info("Acquiring lock(s): " + resource);
+        if(INFO) {
+
+            log.info("Acquiring lock(s): " + Arrays.toString(resource));
+        }
 
         for (int i = 0; i < resource.length; i++) {
 
@@ -502,7 +518,11 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
         }
 
-        log.info("Acquired lock(s): " + resource);
+        if(INFO) {
+
+            log.info("Acquired lock(s): " + Arrays.toString(resource));
+            
+        }
 
     }
 

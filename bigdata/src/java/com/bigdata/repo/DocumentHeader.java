@@ -18,11 +18,6 @@ public interface DocumentHeader
      */
     String getId();
     
-//    /**
-//     * The #of bytes in the encoded content.
-//     */
-//    long getContentLength();
-    
     /**
      * The MIME type for the document.
      */
@@ -33,7 +28,6 @@ public interface DocumentHeader
      * returned by {@link Document#getContent()}.
      */
     String getContentEncoding();
-    
 
     /**
      * Get an arbitrary property value.
@@ -50,4 +44,45 @@ public interface DocumentHeader
      */
     Map<String,Object> asMap();
     
+    /**
+     * Return <code>true</code> iff a version of the file existed at the
+     * time that this view was constructed.
+     */
+    boolean exists();
+    
+    /**
+     * Return the version identifier.
+     * 
+     * @throws IllegalStateException
+     *             unless a version of the file existed at the time that
+     *             this view was constructed.
+     */
+    int getVersion();
+
+    /**
+     * The time at which the earliest version of this file still on record
+     * was created (historical file metadata can be eradicated through
+     * compacting merges).
+     */
+    long getEarliestVersionCreateTime();
+    
+    /**
+     * The time at which the current version of this file was created.
+     * 
+     * @throws IllegalStateException
+     *             unless a version of the file existed at the time that
+     *             this view was constructed.
+     */
+    long getVersionCreateTime();
+    
+    /**
+     * The time at which the metadata for the current version of this file
+     * was last updated.
+     * 
+     * @throws IllegalStateException
+     *             unless a version of the file existed at the time that
+     *             this view was constructed.
+     */
+    long getMetadataUpdateTime();    
+
 }

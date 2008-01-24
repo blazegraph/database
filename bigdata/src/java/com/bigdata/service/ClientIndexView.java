@@ -28,11 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
@@ -46,9 +51,11 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexProcedureConstructor;
-import com.bigdata.btree.IKeyBuffer;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.LongAggregator;
+import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
@@ -88,7 +95,7 @@ import com.bigdata.scaleup.PartitionedIndexView;
  *       for both scenarios, but only because, at this time, the metadata index
  *       is fully cached in the remote case).
  * 
- * @todo note that it is possible (though unlikely) for an index partition split
+ * @todo note that it is possible (though uncommon) for an index partition split
  *       or join to occur during operations. Figure out how I want to handle
  *       that, and how I want to handle that with transactional isolation
  *       (presumably a read-only historical view of the metadata index would be
@@ -110,13 +117,6 @@ import com.bigdata.scaleup.PartitionedIndexView;
  *       definitions (aka the lower bounds for known partitions where the left
  *       sibling partition is not known to the client).
  * 
- * @todo support partitioned indices by resolving client operations against each
- *       index partition as necessary and maintaining leases with the metadata
- *       service - the necessary logic is in the {@link PartitionedIndexView}
- *       and can be refactored for this purpose. Some operations can be made
- *       parallel (rangeCount), and we could offer parallelization with
- *       post-sort for range query.
- * 
  * @todo offer alternatives for the batch insert and remove methods that do not
  *       return the old values to the client so that the client may opt to
  *       minimize network traffic for data that it does not need.
@@ -125,19 +125,9 @@ import com.bigdata.scaleup.PartitionedIndexView;
  *       unavailable at the time of the request (continued operation during
  *       partial failure).
  * 
- * @todo rangeCount and the batch CRUD API (contains, insert, lookup, remove)
- *       could all execute operations in parallel against the index partitions
- *       that are relevant to their data. Explore parallelism solutions in which
- *       the client uses a worker thread pool that throttles the #of concurrent
- *       operations that it is allowed to execute, but make sure that it is not
- *       possible for the client to deadlock owing to dependencies required by
- *       the execution of those operations by the worker threads (I don't think
- *       that a deadlock is possible).
- * 
- * @todo write tests where an index is static partitioned over multiple data
- *       services and verify that the {@link ClientIndexView} is consistent.
- *       <p>
- *       Work towards the same guarentee when dynamic partitioning is enabled.
+ * @todo The batch CRUD API (contains, insert, lookup, remove) operations could
+ *       all execute operations in parallel against the index partitions that
+ *       are relevant to their data (except, perhaps, for contains).
  * 
  * @todo support failover metadata service discovery.
  * 
@@ -164,15 +154,12 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
-     * The maximum #of tuples per request for the
-     * {@link #rangeIterator(byte[], byte[])}
-     * 
-     * @todo make this a configuration parameter for the client and/or index
+     * The default capacity for the {@link #rangeIterator(byte[], byte[])}
      */
     final int capacity = 50000;
 
     private final long tx;
-    
+
     /**
      * The transaction identifier for this index view.
      */
@@ -246,13 +233,6 @@ public class ClientIndexView implements IIndex {
 
         if (name == null)
             throw new IllegalArgumentException();
-    
-//        if(tx != ITx.UNISOLATED) {
-//            
-//            throw new UnsupportedOperationException(
-//                    "Only unisolated views are supported at this time");
-//            
-//        }
         
         this.fed = fed;
 
@@ -512,101 +492,108 @@ public class ClientIndexView implements IIndex {
      * All of these methods need to divide up the operation across index
      * partitions.
      */
-
+    
     /**
      * Returns the sum of the range count for each index partition spanned by
      * the key range.
      */
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        MetadataIndex mdi = getMetadataIndex();
+        LongAggregator handler = new LongAggregator();
+        
+        RangeCountProcedure proc = new RangeCountProcedure(fromKey,toKey);
 
-        final int fromIndex;
-        final int toIndex;
-
-        // index of the first partition to check.
-        fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
-
-        // index of the last partition to check.
-        toIndex = (toKey == null ? mdi.getEntryCount() - 1 : mdi
-                .findIndexOf(toKey));
-
-        // per javadoc, keys out of order returns zero(0).
-        if (toIndex < fromIndex)
-            return 0;
-
-        // use to counters so that we can look for overflow.
-        long count = 0;
-        long lastCount = 0;
-
-        for (int index = fromIndex; index <= toIndex; index++) {
-
-            PartitionMetadataWithSeparatorKeys pmd = getPartitionAtIndex(
-                    name, index);
-
-            // // The first key that would enter the nth partition.
-            // byte[] separatorKey = mdi.keyAt(index);
-
-            IDataService dataService = getDataService(pmd);
-
-            try {
-
-                /*
-                 * Add in the count from that partition.
-                 * 
-                 * Note: The range count request is formed such that it
-                 * addresses only those keys that actually lies within the
-                 * partition. This has two benefits:
-                 * 
-                 * (1) The data service can check the range and notify clients
-                 * that appear to be requesting data for index partitions that
-                 * have been relocated.
-                 * 
-                 * (2) In order to avoid double-counting when multiple
-                 * partitions for the same index are mapped onto the same data
-                 * service we MUST query at most the key range for a specific
-                 * partition (or we must provide the data service with the index
-                 * partition identifier and it must restrict the range on our
-                 * behalf).
-                 */
-
-                /*
-                 * For the first (last) partition use the caller's fromKey
-                 * (toKey) so that we do not count everything from the start
-                 * of (up to the close) of the partition unless the caller
-                 * specified fromKey := null (toKey := null).
-                 */
-                    
-                final byte[] _fromKey = (index == fromIndex ? fromKey : pmd
-                        .getLeftSeparatorKey());
-
-                final byte[] _toKey = (index == toIndex ? toKey : pmd
-                        .getRightSeparatorKey());
-                
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(this.name,
-                        pmd.getPartitionId());
-
-                count += dataService.rangeCount(tx, name, _fromKey, _toKey);
-                
-            } catch(Exception ex) {
-
-                throw new RuntimeException(ex);
-                
-            }
-
-            if(count<lastCount) {
-            
-                // more than would fit in a Long.
-                return Long.MAX_VALUE;
-                
-            }
-            
-            lastCount = count;
-            
-        }
-
-        return count;
+        submit(fromKey,toKey,proc,handler);
+        
+        return handler.getResult();
+        
+//        MetadataIndex mdi = getMetadataIndex();
+//
+//        final int fromIndex;
+//        final int toIndex;
+//
+//        // index of the first partition to check.
+//        fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
+//
+//        // index of the last partition to check.
+//        toIndex = (toKey == null ? mdi.getEntryCount() - 1 : mdi
+//                .findIndexOf(toKey));
+//
+//        // per javadoc, keys out of order returns zero(0).
+//        if (toIndex < fromIndex)
+//            return 0;
+//
+//        // use to counters so that we can look for overflow.
+//        long count = 0;
+//        long lastCount = 0;
+//
+//        for (int index = fromIndex; index <= toIndex; index++) {
+//
+//            PartitionMetadataWithSeparatorKeys pmd = getPartitionAtIndex(index);
+//
+//            // // The first key that would enter the nth partition.
+//            // byte[] separatorKey = mdi.keyAt(index);
+//
+//            IDataService dataService = getDataService(pmd);
+//
+//            try {
+//
+//                /*
+//                 * Add in the count from that partition.
+//                 * 
+//                 * Note: The range count request is formed such that it
+//                 * addresses only those keys that actually lies within the
+//                 * partition. This has two benefits:
+//                 * 
+//                 * (1) The data service can check the range and notify clients
+//                 * that appear to be requesting data for index partitions that
+//                 * have been relocated.
+//                 * 
+//                 * (2) In order to avoid double-counting when multiple
+//                 * partitions for the same index are mapped onto the same data
+//                 * service we MUST query at most the key range for a specific
+//                 * partition (or we must provide the data service with the index
+//                 * partition identifier and it must restrict the range on our
+//                 * behalf).
+//                 */
+//
+//                /*
+//                 * For the first (last) partition use the caller's fromKey
+//                 * (toKey) so that we do not count everything from the start
+//                 * of (up to the close) of the partition unless the caller
+//                 * specified fromKey := null (toKey := null).
+//                 */
+//                    
+//                final byte[] _fromKey = (index == fromIndex ? fromKey : pmd
+//                        .getLeftSeparatorKey());
+//
+//                final byte[] _toKey = (index == toIndex ? toKey : pmd
+//                        .getRightSeparatorKey());
+//                
+//                // the name of the index partition.
+//                final String name = DataService.getIndexPartitionName(this.name,
+//                        pmd.getPartitionId());
+//
+//                count += dataService.rangeCount(tx, name, _fromKey, _toKey);
+//                
+//            } catch(Exception ex) {
+//
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            if(count<lastCount) {
+//            
+//                // more than would fit in a Long.
+//                return Long.MAX_VALUE;
+//                
+//            }
+//            
+//            lastCount = count;
+//            
+//        }
+//
+//        return count;
         
     }
 
@@ -624,14 +611,14 @@ public class ClientIndexView implements IIndex {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter ) {
 
-        if(capacity==0) {
-            
+        if (capacity == 0) {
+
             capacity = this.capacity;
-            
+
         }
-        
-        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey, capacity,
-                flags, filter);
+
+        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey,
+                capacity, flags, filter);
         
     }
 
@@ -819,8 +806,297 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
+     * The procedure will be transparently applied against each index partition
+     * spanned by the given key range.
+     * <p>
+     * Note: Since this variant of <i>submit()</i> does not split keys the
+     * <i>fromIndex</i> and <i>toIndex</i> in the {@link Split}s reported to
+     * the {@link IResultHandler} will be zero (0).
+     * 
+     * @param fromKey
+     *            The lower bound (inclusive) -or- <code>null</code> if there
+     *            is no lower bound.
+     * @param toKey
+     *            The upper bound (exclusive) -or- <code>null</code> if there
+     *            is no upper bound.
+     * @param proc
+     *            The procedure. If the procedure implements the
+     *            {@link IParallelizableIndexProcedure} marker interface then it
+     *            MAY be executed in parallel against the relevant index
+     *            partition(s).
+     * @param resultHandler
+     *            When defined, results from each procedure application will be
+     *            reported to this object.
+     * 
+     * @see IParallelizableIndexProcedure
+     * @see IResultHandler
+     */
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler resultHandler) {
+
+        if (proc == null)
+            throw new IllegalArgumentException();
+        
+        final MetadataIndex mdi = getMetadataIndex();
+
+        // index of the first partition to check.
+        final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
+
+        // index of the last partition to check.
+        final int toIndex = (toKey == null ? mdi.getEntryCount() - 1 : mdi
+                .findIndexOf(toKey));
+
+        // keys are out of order.
+        if (fromIndex > toIndex) {
+
+            throw new IllegalArgumentException("fromKey > toKey");
+
+        }
+
+        // #of index partitions on which the procedure will be run.
+        final int nsplits = toIndex - fromIndex + 1;
+        
+        // true iff the procedure is known to be parallelizable.
+        final boolean parallel = proc instanceof IParallelizableIndexProcedure;
+        
+        log.info("Procedure " + proc.getClass().getName()
+                + " will run on " + nsplits + " index partitions in "
+                + (parallel ? "parallel" : "sequence"));
+        
+        /*
+         * Create an ordered list of the tasks to be executed.
+         */
+        
+        final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(nsplits);
+        
+        for (int index = toIndex; index <= fromIndex; index++) {
+
+            final IPartitionMetadata pmd = getPartitionAtIndex(index);
+
+            final IDataService dataService = getDataService(pmd);
+        
+            final Split split = new Split(pmd, 0/* fromIndex */, 0/* toIndex */);
+            
+            tasks.add(new DataServiceProcedureTask(split, dataService,
+                    proc, resultHandler));
+            
+        }
+
+        if (parallel) {
+
+            /*
+             * Map procedure across the index partitions in parallel.
+             */
+            
+            runParallel(tasks);
+            
+        } else {
+
+            /*
+             * Map procedure across the index partitions in sequence.
+             */
+
+            runSequence(tasks);
+            
+        }
+        
+    }
+
+    /**
+     * The thread pool exposed by {@link IBigdataClient#getThreadPool()}
+     */
+    protected ExecutorService getThreadPool() {
+
+        return fed.getClient().getThreadPool();
+
+    }
+    
+    /**
+     * Maps a set of {@link DataServiceProcedureTask} tasks across the index
+     * partitions in parallel.
+     * 
+     * @param tasks
+     *            The tasks.
+     * 
+     * @todo add counters for the #of procedures run and the execution time for
+     *       those procedures. add counters for the #of splits and the #of
+     *       tuples in each split, as well as the total #of tuples.
+     */
+    protected void runParallel(ArrayList<Callable<Void>> tasks) {
+        
+        final ExecutorService service = getThreadPool();
+        
+        int nfailed = 0;
+        
+        try {
+
+            final List<Future<Void>> futures = service.invokeAll(tasks);
+            
+            final Iterator<Future<Void>> itr = futures.iterator();
+           
+            int i = 0;
+            
+            while(itr.hasNext()) {
+                
+                final Future<Void> f = itr.next();
+                
+                try {
+                    
+                    f.get();
+                    
+                } catch (ExecutionException e) {
+                    
+                    DataServiceProcedureTask task = (DataServiceProcedureTask) tasks
+                            .get(i);
+                    
+                    log.error("Execution failed: partition=" + task.pmd, e);
+                    
+                    nfailed++;
+                    
+                }
+                
+            }
+            
+        } catch (InterruptedException e) {
+
+            throw new RuntimeException("Interrupted: "+e);
+
+        }
+        
+        if (nfailed > 0) {
+            
+            throw new RuntimeException("Execution failed: ntasks="
+                    + tasks.size() + ", nfailed=" + nfailed);
+            
+        }
+
+    }
+
+    /**
+     * Maps a set of {@link DataServiceProcedureTask} tasks across the index
+     * partitions in strict sequence. The tasks are run on the
+     * {@link #getThreadPool()} so that sequential tasks never increase the
+     * total burden placed by the client above the size of that thread pool.
+     * 
+     * @param tasks
+     *            The tasks.
+     * 
+     * @todo add counters for the #of procedures run and the execution time for
+     *       those procedures. add counters for the #of splits and the #of
+     *       tuples in each split, as well as the total #of tuples.
+     */
+    protected void runSequence(List<Callable<Void>> tasks) {
+
+        final ExecutorService service = getThreadPool();
+        
+        final Iterator<Callable<Void>> itr = tasks.iterator();
+
+        while (itr.hasNext()) {
+
+            final DataServiceProcedureTask task = (DataServiceProcedureTask) itr
+                    .next();
+
+            try {
+
+                final Future<Void> f = service.submit(task);
+                
+                // await completion of the task.
+                f.get();
+
+            } catch (Exception e) {
+        
+                log.error("Execution failed: partition=" + task.pmd, e);
+
+                throw new RuntimeException(e);
+
+            }
+
+        }
+
+    }
+    
+    protected abstract class AbstractDataServiceTask<T> implements Callable<T> {
+
+        protected final IPartitionMetadata pmd;
+        protected final IDataService dataService;
+        
+        protected AbstractDataServiceTask(IPartitionMetadata pmd, IDataService dataService) {
+
+            if (pmd == null)
+                throw new IllegalArgumentException();
+            
+            if (dataService == null)
+                throw new IllegalArgumentException();
+            
+            this.pmd = pmd;
+            
+            this.dataService = dataService;
+            
+        }
+
+    }
+
+    /**
+     * Wraps an {@link IIndexProcedure} for submission to an
+     * {@link ExecutorService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class DataServiceProcedureTask extends AbstractDataServiceTask<Void> {
+
+        protected final Split split;
+        protected final IIndexProcedure proc;
+        protected final IResultHandler resultHandler;
+        protected final String name;
+        
+        protected DataServiceProcedureTask(Split split,
+                IDataService dataService, IIndexProcedure proc,
+                IResultHandler resultHandler) {
+
+            super(split.pmd, dataService);
+
+            if (proc == null)
+                throw new IllegalArgumentException();
+
+//            if (resultHandler == null)
+//                throw new IllegalArgumentException();
+
+            this.split = split;
+            
+            this.proc = proc;
+
+            this.resultHandler = resultHandler;
+
+            final int partitionId = split.pmd.getPartitionId();
+            
+            // the name of the index partition.
+            name = DataService.getIndexPartitionName(ClientIndexView.this.name,
+                    partitionId);
+            
+        }
+
+        public Void call() throws Exception {
+
+            Object result = dataService.submit(tx, name, proc);
+
+            if (resultHandler != null) {
+
+                resultHandler.aggregate(result, split);
+
+            }
+
+            return null;
+
+        }
+
+    }
+    
+    /**
      * The procedure will be transparently broken down and executed against each
-     * index partitions spanned by its keys.
+     * index partitions spanned by its keys. If the <i>ctor</i> creates
+     * instances of {@link IParallelizableIndexProcedure} then the procedure
+     * will be mapped in parallel against the relevant index partitions.
      * 
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
@@ -841,41 +1117,68 @@ public class ClientIndexView implements IIndex {
         }
         
         /*
-         * Run the procedure remotely.
-         * 
-         * @todo add counters for the #of procedures run and the execution time
-         * for those procedures. add counters for the #of splits and the #of
-         * tuples in each split, as well as the total #of tuples.
+         * Break down the data into a series of "splits", each of which will be
+         * applied to a different index partition.
          */
 
         final List<Split> splits = splitKeys(n, keys);
 
-        final Iterator<Split> itr = splits.iterator();
+        final int nsplits = splits.size();
 
-        while (itr.hasNext()) {
+        /*
+         * Create the instances of the procedure for each split.
+         */
+        
+        final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                nsplits);
+        
+        // assume true until proven otherwise.
+        boolean parallel = true;
+        {
+         
+            final Iterator<Split> itr = splits.iterator();
 
-            final Split split = itr.next();
+            while (itr.hasNext()) {
 
-            final IDataService dataService = getDataService(split.pmd);
+                final Split split = itr.next();
 
-            final IIndexProcedure proc = ctor.newInstance(split.ntuples,
-                    split.fromIndex, keys, vals);
+                final IDataService dataService = getDataService(split.pmd);
 
-            try {
+                final IIndexProcedure proc = ctor.newInstance(split.ntuples,
+                        split.fromIndex, keys, vals);
 
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(
-                        this.name, split.pmd.getPartitionId());
+                if (!(proc instanceof IParallelizableIndexProcedure)) {
 
-                final Object result = dataService.submit(tx, name, proc);
+                    parallel = false;
 
-                aggregator.aggregate(result, split);
+                }
 
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-
+                tasks.add(new DataServiceProcedureTask(split, dataService,
+                        proc, aggregator));
+                
             }
+            
+        }
+
+        log.info("Procedures created by " + ctor.getClass().getName()
+                + " will run on " + nsplits + " index partitions in "
+                + (parallel ? "parallel" : "sequence"));
+        
+        if (parallel) {
+
+            /*
+             * Map procedure across the index partitions in parallel.
+             */
+
+            runParallel(tasks);
+
+        } else {
+            
+            /*
+             * sequential execution against of each split in turn.
+             */
+
+            runSequence(tasks);
 
         }
 
@@ -915,22 +1218,11 @@ public class ClientIndexView implements IIndex {
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 
      * @see BytesUtil#compareBytes(byte[], byte[])
-     * 
-     * @todo refactor to accept {@link IKeyBuffer}, which should be the basis
-     *       for the data interchange as well - along with an IValueBuffer. This
-     *       will promote reuse of key compression and value compression
-     *       techniques for the on the wire format.
-     *       <p>
-     *       I would need to modify the {@link IKeyBuffer#search(byte[])} method
-     *       to accept a fromIndex (and perhaps a toIndex) so that we can search
-     *       within only the remaining keys.
      */
     public List<Split> splitKeys(int ntuples, byte[][] keys) {
         
         if (ntuples <= 0)
             throw new IllegalArgumentException();
-        
-//        MetadataIndex mdi = getMetadataIndex();
         
         List<Split> splits = new LinkedList<Split>();
         
@@ -1072,8 +1364,7 @@ public class ClientIndexView implements IIndex {
      *       range count and range iterator requests and to some extent batch
      *       operations that span multiple index partitions).
      */
-    public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(String name,
-            int index) {
+    public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(int index) {
 
         MetadataIndex mdi = fed.getMetadataIndex(name);
 

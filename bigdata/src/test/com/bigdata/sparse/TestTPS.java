@@ -416,15 +416,15 @@ public class TestTPS extends TestCase2 {
         
         assertEquals("size", expected.size(), actual.size());
 
-        Iterator<TPV> eitr = expected.iterator(); 
+        Iterator<ITPV> eitr = expected.iterator(); 
 
-        Iterator<TPV> aitr = actual.iterator(); 
+        Iterator<ITPV> aitr = actual.iterator(); 
         
         while(eitr.hasNext()) {
 
             assertTrue(aitr.hasNext());
             
-            assertEquals(eitr.next(), aitr.next());
+            assertEquals((TPV)eitr.next(), (TPV)aitr.next());
             
         }
         

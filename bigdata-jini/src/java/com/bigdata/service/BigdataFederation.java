@@ -41,17 +41,18 @@ import com.bigdata.scaleup.PartitionMetadata;
 
 /**
  * This class encapsulates access to the metadata and data services for a
- * bigdata federation.
+ * bigdata federation - it is in effect a proxy object for the distributed set
+ * of services that comprise the federation.
  * 
- * @todo in order to for a {@link IPartitionMetadata} cache to remain valid
- *       we need to either not store the left and right separator keys or we
- *       need to update the right separator key of an existing partition
- *       when a new partition is created by either this client or any other
- *       client. If the data service validates that the key(s) lie within
- *       its mapped partitions, then it can issue an appropriate redirect
- *       when the client has stale information. Failure to handle this issue
- *       will result in reads or writes against the wrong data services,
- *       which will result in lost data from the perspective of the clients.
+ * @todo in order to for a {@link IPartitionMetadata} cache to remain valid we
+ *       need to either not store the left and right separator keys or we need
+ *       to update the right separator key of an existing partition when a new
+ *       partition is created by either this client or any other client. If the
+ *       data service validates that the key(s) lie within its mapped
+ *       partitions, then it can issue an appropriate redirect when the client
+ *       has stale information. Failure to handle this issue will result in
+ *       reads or writes against the wrong data services, which will result in
+ *       lost data from the perspective of the clients.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,7 +74,7 @@ public class BigdataFederation implements IBigdataFederation {
      * A per-index partition metadata cache.
      */
     private final Map<String, MetadataIndex> partitions = new ConcurrentHashMap<String, MetadataIndex>();
-
+    
     /**
      * @exception IllegalStateException
      *                if the client has disconnected from the federation.
@@ -98,7 +99,7 @@ public class BigdataFederation implements IBigdataFederation {
     }
 
     public void disconnect() {
-
+        
         if(client==null) {
             
             // Already disconnected.

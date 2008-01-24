@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,38 +20,39 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 16, 2008
+ * Created on Jan 24, 2008
  */
+
 package com.bigdata.btree;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.service.Split;
 
 /**
- * Aggregates the value of an integer counter.
+ * Aggregates the value of an {@link Long} result.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IntegerCounterAggregator implements
-        IResultHandler<Integer, Integer> {
+public class LongAggregator implements IResultHandler<Long, Long> {
 
-    private final AtomicInteger counter = new AtomicInteger(0);
+    private final AtomicLong counter = new AtomicLong(0);
 
-    public IntegerCounterAggregator() {
+    public LongAggregator() {
         
     }
     
-    public void aggregate(Integer result, Split split) {
+    public void aggregate(Long result, Split split) {
 
-        counter.addAndGet(result.intValue());
+        counter.addAndGet(result.longValue());
 
     }
 
-    public Integer getResult() {
+    public Long getResult() {
 
         return counter.get();
 

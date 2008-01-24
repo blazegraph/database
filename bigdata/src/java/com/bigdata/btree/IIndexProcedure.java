@@ -46,12 +46,12 @@ import com.bigdata.service.IDataService;
  * CLASSPATH used to start a {@link DataService} or you can use downloaded code
  * with the JINI codebase mechanism (<code>java.rmi.server.codebase</code>).
  * <p>
- * Note: While we could define a "procedure" operation on multiple named
- * indices, clients of the {@link IDataService} API would be unable to exploit
- * that operation without unreasonable knowledge of the location of index
- * partitions throughout the federation. People requiring those semantics who
- * are operating against an embedded {@link Journal} can trivially realize them
- * by extending {@link AbstractTask}.
+ * Note: While we could define a "procedure" operating on more than one named
+ * index at a time, clients of the {@link IDataService} API would be unable to
+ * exploit that operation without unreasonable knowledge of the location of
+ * index partitions throughout the federation. People requiring those semantics
+ * who are operating against an embedded {@link Journal} can trivially realize
+ * them by extending {@link AbstractTask}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -76,39 +76,5 @@ public interface IIndexProcedure extends Serializable {
      *         across a network interface.
      */
     public Object apply(IIndex ndx);
-
-//    /**
-//     * Interface for custom aggregation of results when a procedure is applied
-//     * to a partitioned index.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     * 
-//     * @param <T>
-//     *            The result type of the procedure.
-//     */
-//    public interface IAggregator<T> {
-//        
-//        /**
-//         * Method is invoked for each result. The implementation is responsible
-//         * for combining the results in whatever manner is meaningful for the
-//         * procedure. In general, implementations of this method MUST be
-//         * thread-safe since the procedure MAY be applied in parallel when it
-//         * spans more than one index partition.
-//         * 
-//         * @param result
-//         *            The result from applying the procedure to a single index
-//         *            partition.
-//         * @param split
-//         *            The {@link Split} that generated that result.
-//         */
-//        public void aggregate(T result, Split split);
-//
-//        /**
-//         * Return the aggregated results as an implementation dependent object.
-//         */
-//        public Object getResult();
-//        
-//    }
     
 }

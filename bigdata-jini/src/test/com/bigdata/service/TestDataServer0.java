@@ -32,10 +32,9 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IReadOnlyOperation;
+import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.scaleup.IResourceMetadata;
@@ -286,14 +285,15 @@ public class TestDataServer0 extends AbstractServerTestCase {
          */
         {
             
-            IIndexProcedure proc = new RangeCountProcedure();
+            IIndexProcedure proc = new RangeCountProcedure(null/* fromKey */,
+                    null/*toKey*/);
             
             /*
              * Note: The result is ONE (1) since there is one deleted entry in
              * the UnisolatedBTree and rangeCount does not correct for deletion
              * markers!
              */
-            assertEquals("result", 1, proxy.submit(ITx.UNISOLATED,
+            assertEquals("result", 1L, proxy.submit(ITx.UNISOLATED,
                     DataService.getIndexPartitionName(name, partitionId), proc));
             
         }
@@ -301,24 +301,5 @@ public class TestDataServer0 extends AbstractServerTestCase {
         proxy.dropIndex(DataService.getIndexPartitionName(name, partitionId));
 
     }
-    
-    /**
-     * This procedure just computes a range count on the index.
-     */
-    private static class RangeCountProcedure implements IIndexProcedure, IReadOnlyOperation {
 
-        private static final long serialVersionUID = 5856712176446915328L;
-
-        public RangeCountProcedure() {
-
-        }
-
-        public Object apply(IIndex ndx) {
-
-            return new Long(ndx.rangeCount(null, null));
-
-        }
-
-    }
-    
 }

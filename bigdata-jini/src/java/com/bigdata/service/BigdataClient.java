@@ -31,6 +31,9 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
@@ -50,6 +53,7 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -145,6 +149,23 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         
     }
     
+    private final ExecutorService threadPool;
+
+    public ExecutorService getThreadPool() {
+        
+        assertConnected();
+        
+        return threadPool;
+        
+    }
+
+    protected void assertConnected() {
+        
+        if (fed == null)
+            throw new IllegalStateException("Not connected");
+        
+    }
+    
     /**
      * Return the {@link IMetadataService} from the cache. If there is a cache
      * miss, then this will wait a bit for a {@link IMetadataService} to show up
@@ -164,6 +185,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      * @todo parameter for the bigdata federation? (filter)
      */
     public IMetadataService getMetadataService() {
+        
+        assertConnected();
         
         ServiceItem item = dataServiceLookupCache.lookup(MetadataServiceFilter.INSTANCE);
             
@@ -220,6 +243,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
         
+        assertConnected();
+
         ServiceItem[] items = dataServiceMap.getServiceItems(maxCount,DataServiceFilter.INSTANCE);
         
         log.info("There are at least " + items.length
@@ -249,6 +274,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public IDataService getDataService(UUID serviceUUID) {
         
+        assertConnected();
+
         ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
         
         ServiceItem item = dataServiceMap.getServiceItemByID(serviceID);
@@ -463,14 +490,39 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         }
 
+        // @todo configure nthreads.
+        final int nthreads = 10;
+        //properties.getProperty(Options.CLIENT_THREAD_POOL_SIZE,Options.DEFAULT_CLIENT_THREAD_POOL_SIZE);
+        
+        threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
+                .defaultThreadFactory());
+
     }
 
     public void terminate() {
 
         if( fed != null ) {
 
+            threadPool.shutdownNow();
+            
+            try {
+            
+                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    
+                    log.warn("Timeout awaiting thread pool termination.");
+                    
+                }
+   
+            } catch (InterruptedException e) {
+                
+                log.warn("Interrupted awaiting thread pool termination.", e);
+                
+            }
+
             // disconnect from the federation.
             fed.disconnect();
+         
+            fed = null;
             
         }
         
@@ -555,6 +607,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public int awaitServices(int minDataServices, long timeout) throws InterruptedException, TimeoutException {
         
+        assertConnected();
+
         assert minDataServices > 0;
         assert timeout > 0;
         

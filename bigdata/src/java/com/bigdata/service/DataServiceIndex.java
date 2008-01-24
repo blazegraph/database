@@ -108,9 +108,10 @@ public class DataServiceIndex implements IIndex {
      * for location code that needs to be re-written to use
      * {@link IIndexProcedure}s.
      * 
-     * @todo make this a config option.
+     * @todo make this a config option and also support this option on the
+     *       bigdata clients.
      */
-    private final boolean batchOnly = true;
+    private final boolean batchOnly = false;
     
     /**
      * Creates a view onto an unpartitioned index living on an embedded data

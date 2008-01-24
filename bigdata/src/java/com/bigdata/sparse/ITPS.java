@@ -90,9 +90,9 @@ public interface ITPS {
     public ITPV get(String name);
     
     /**
-     * Visits all tuples.
+     * Visits all tuples in order by <em>ascending timestamp</em>.
      */
-    public Iterator<? extends ITPV> iterator();
+    public Iterator<ITPV> iterator();
 
     /**
      * Return a copy of the tuples showing only the most recent value for each

@@ -30,6 +30,11 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A client for an embedded federation (the client and the data services all run
@@ -43,6 +48,16 @@ import java.util.UUID;
 public class EmbeddedBigdataClient implements IBigdataClient {
 
     protected final Properties properties;
+
+    private final ExecutorService threadPool;
+
+    public ExecutorService getThreadPool() {
+        
+        assertConnected();
+        
+        return threadPool;
+        
+    }
 
     protected void assertConnected() {
         
@@ -62,6 +77,13 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
         this.properties = properties;
         
+        // @todo configure nthreads.
+        final int nthreads = 10;
+        //properties.getProperty(Options.CLIENT_THREAD_POOL_SIZE,Options.DEFAULT_CLIENT_THREAD_POOL_SIZE);
+        
+        threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
+                .defaultThreadFactory());
+
     }
     
     public IBigdataFederation connect() {
@@ -81,8 +103,26 @@ public class EmbeddedBigdataClient implements IBigdataClient {
     public void terminate() {
 
         if(fed != null) {
+
+            threadPool.shutdownNow();
+            
+            try {
+            
+                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    
+                    log.warn("Timeout awaiting thread pool termination.");
+                    
+                }
+   
+            } catch (InterruptedException e) {
+                
+                log.warn("Interrupted awaiting thread pool termination.", e);
+                
+            }
             
             fed.disconnect();
+        
+            fed = null;
             
         }
         
@@ -93,6 +133,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
 
+        assertConnected();
+        
         if (maxCount < 0)
             throw new IllegalArgumentException();
         

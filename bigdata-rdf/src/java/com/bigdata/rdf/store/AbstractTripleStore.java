@@ -65,10 +65,11 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.IndexProcedure;
-import com.bigdata.btree.IntegerCounterAggregator;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.LongAggregator;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -2812,7 +2813,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             tasks.add(new StatementWriter(dst, itr, nwritten));
             
             // task will write justifications on the justifications index.
-            AtomicInteger nwrittenj = new AtomicInteger();
+            AtomicLong nwrittenj = new AtomicLong();
             
             if(justify) {
 
@@ -2944,7 +2945,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         /**
          * The #of justifications that were written on the justifications index.
          */
-        private final AtomicInteger nwritten;
+        private final AtomicLong nwritten;
         
         /**
          * 
@@ -2956,7 +2957,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          *            Incremented as a side-effect for each justification
          *            actually written on the justification index.
          */
-        public JustificationWriter(AbstractTripleStore dst, IChunkedIterator<Justification> src, AtomicInteger nwritten) {
+        public JustificationWriter(AbstractTripleStore dst, IChunkedIterator<Justification> src, AtomicLong nwritten) {
         
             this.dst = dst;
             
@@ -3201,7 +3202,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                          */
                         final long _begin = System.currentTimeMillis();
                         
-                        final IntegerCounterAggregator aggregator = new IntegerCounterAggregator();
+                        final LongAggregator aggregator = new LongAggregator();
                         
                         ndx.submit(numToAdd, keys, vals,
                                 new IIndexProcedureConstructor() {
@@ -3221,7 +3222,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                         );
                         
-                        final int writeCount = aggregator.getResult();
+                        final long writeCount = aggregator.getResult();
 
                         insertTime.addAndGet(System.currentTimeMillis()
                                 - _begin);
@@ -3328,7 +3329,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class IndexWriteProc extends IndexProcedure {
+    static class IndexWriteProc extends IndexProcedure implements
+            IParallelizableIndexProcedure {
 
         /**
          * 
@@ -3359,12 +3361,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         /**
          * 
          * @return The #of statements actually written on the index as an
-         *         {@link Integer}.
+         *         {@link Long}.
          */
         public Object apply(IIndex ndx) {
 
             // #of statements actually written on the index partition.
-            int writeCount = 0;
+            long writeCount = 0;
 
             final int n = getKeyCount();
             
@@ -3454,7 +3456,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             }
 
-            return Integer.valueOf(writeCount);
+            return Long.valueOf(writeCount);
 
         }
         
@@ -3479,7 +3481,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       source of latency, SLD/magic sets will translate into an immediate
      *       performance boost for data load.
      */
-    public int addJustifications(IChunkedIterator<Justification> itr) {
+    public long addJustifications(IChunkedIterator<Justification> itr) {
 
         try {
 
@@ -3497,7 +3499,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             KeyBuilder keyBuilder = new KeyBuilder(N * (1 + 3)
                     * Bytes.SIZEOF_LONG);
 
-            int nwritten = 0;
+            long nwritten = 0;
 
             while (itr.hasNext()) {
 
@@ -3528,7 +3530,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 final IIndex ndx = getJustificationIndex();
 
-                final IntegerCounterAggregator aggregator = new IntegerCounterAggregator();
+                final LongAggregator aggregator = new LongAggregator();
                 
                 ndx.submit(n, keys, null/*vals*/, new IIndexProcedureConstructor(){
 
@@ -3566,7 +3568,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class WriteJustificationsProc extends IndexProcedure {
+    static class WriteJustificationsProc extends IndexProcedure implements
+            IParallelizableIndexProcedure  {
 
         /**
          * 
@@ -3590,11 +3593,12 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
         
         /**
-         * @return The #of justifications actually written on the index.
+         * @return The #of justifications actually written on the index as a
+         *         {@link Long}.
          */
         public Object apply(IIndex ndx) {
 
-            int nwritten = 0;
+            long nwritten = 0;
             
             int n = getKeyCount();
             
@@ -3612,7 +3616,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             }
             
-            return Integer.valueOf(nwritten);
+            return Long.valueOf(nwritten);
             
         }
         
@@ -3757,8 +3761,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * terms in the RDF database (plain and language code {@link Literal}s and
      * possibly {@link URI}s) as "documents." You can understand the items in
      * the terms index as "documents" that are broken down into "token"s to
-     * obtain a "token frequency distribution" for that document.  The full
-     * text index contains the indexed token data.
+     * obtain a "token frequency distribution" for that document. The full text
+     * index contains the indexed token data.
+     * 
+     * @return The index or <code>null</code> iff the index is not being
+     *         maintained.
      */
     abstract public IIndex getFullTextIndex();
 
