@@ -67,4 +67,5 @@ public interface IResultHandler<R extends Object,A extends Object> {
      * Return the aggregated results as an implementation dependent object.
      */
     public A getResult();
+
 }

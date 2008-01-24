@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rdf.spo.ISPOAssertionBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
@@ -195,7 +196,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
                     stmts, numStmts), nwritten));
             
             // task will write justifications on the justifications index.
-            AtomicInteger nwrittenj = new AtomicInteger();
+            AtomicLong nwrittenj = new AtomicLong();
             tasks.add(new JustificationWriter(focusStore,
                     new JustificationArrayIterator(justifications,
                             numJustifications),nwrittenj));

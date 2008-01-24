@@ -28,6 +28,7 @@ package com.bigdata.rdf.store;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -40,7 +41,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddIds extends IndexProcedure {
+public class AddIds extends IndexProcedure implements
+        IParallelizableIndexProcedure {
 
     /**
      * 

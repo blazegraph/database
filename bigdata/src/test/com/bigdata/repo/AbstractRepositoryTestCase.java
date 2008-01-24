@@ -56,7 +56,7 @@ public class AbstractRepositoryTestCase extends
         super(arg0);
     }
 
-    static protected final int BLOCK_SIZE = BigdataRepository.BLOCK_SIZE;     
+    protected int BLOCK_SIZE;     
 
     protected BigdataRepository repo;
     
@@ -66,6 +66,8 @@ public class AbstractRepositoryTestCase extends
 
         // setup the repository
         repo = new BigdataRepository(fed, getProperties());
+        
+        BLOCK_SIZE = repo.getBlockSize();
         
         // register the indices.
         repo.registerIndices();

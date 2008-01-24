@@ -44,12 +44,12 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.Journal;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.scaleup.IPartitionMetadata;
 import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.sparse.TPS.TPV;
 import com.bigdata.sparse.ValueType.AutoIncCounter;
 
 /**
@@ -76,9 +76,9 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * </p>
  * 
  * <pre>
- *                  
- *                  [schemaName][primaryKey][columnName][timestamp]
- *                  
+ *                   
+ *  [schemaName][primaryKey][columnName][timestamp]
+ *                   
  * </pre>
  * 
  * <p>
@@ -116,14 +116,14 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * </p>
  * 
  * <pre>
- *                  
- *                  [employee][12][DateOfHire][t0] : [4/30/02]
- *                  [employee][12][DateOfHire][t1] : [4/30/05]
- *                  [employee][12][Employer][t0]   : [SAIC]
- *                  [employee][12][Employer][t1]   : [SYSTAP]
- *                  [employee][12][Id][t0]         : [12]
- *                  [employee][12][Name][t0]       : [Bryan Thompson]
- *                  
+ *                   
+ *  [employee][12][DateOfHire][t0] : [4/30/02]
+ *  [employee][12][DateOfHire][t1] : [4/30/05]
+ *  [employee][12][Employer][t0]   : [SAIC]
+ *  [employee][12][Employer][t1]   : [SYSTAP]
+ *  [employee][12][Id][t0]         : [12]
+ *  [employee][12][Name][t0]       : [Bryan Thompson]
+ *                   
  * </pre>
  * 
  * <p>
@@ -160,6 +160,15 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  *       variable length) ??? Is this true ???
  * 
  * @todo support byte[] as a primary key type.
+ * 
+ * @todo I am not sure that the timestamp filtering mechanism is of much use.
+ *       You can't really filter out the low end for a property value since a
+ *       property might have been bound once and never rebound nor deleted
+ *       thereafter. Likewise you can't really filter out the upper bound for a
+ *       property value since you generally are interested in the current value
+ *       for a property. Also, the returned
+ *       {@link ITPS timestamped property sets} make it relatively easy to find
+ *       the value of interest.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -293,7 +302,7 @@ public class SparseRowStore {
      * @see ITimestampPropertySet#asMap(long)), return the most current bindings
      *      as of the specified timestamp.
      * 
-     * @todo consider semantics were {@link Long#MAX_VALUE} returns ONLY the
+     * @todo consider semantics where {@link Long#MAX_VALUE} returns ONLY the
      *       current bindings rather than all data available for that primary
      *       key or define another value such as CURRENT_ROW to obtain only the
      *       current row. The filtering should be applied on the server side to
@@ -406,7 +415,10 @@ public class SparseRowStore {
      * @todo modify the atomic write to not overwrite the primary key each time?
      *       There is really no reason to do that - it just adds data to the
      *       index, but be careful to not delete the primary key when applying a
-     *       history policy during a compacting merge!
+     *       history policy during a compacting merge. (One reason to write the
+     *       primary key each time is that the timestamp on the primary key
+     *       tells you the timestamp of each row revision. The {@link BigdataRepository}
+     *       currently depends on this feature.)
      */
     public ITPS write(IKeyBuilder keyBuilder, Schema schema,
             Map<String, Object> propertySet, long timestamp, INameFilter filter) {
@@ -461,7 +473,54 @@ public class SparseRowStore {
     }
 
     /**
-     * Atomic read of the logical row associated.
+     * A logical row scan.
+     * 
+     * @param keyBuilder
+     *            An object used to build keys for the backing index.
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * @param fromKey
+     *            The value of the primary key for lower bound (inclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param toKey
+     *            The value of the primary key for upper bound (exclusive) of
+     *            the key range -or- <code>null</code> iff there is no lower
+     *            bound.
+     * @param capacity
+     *            When non-zero, this is the maximum #of logical rows that will
+     *            be buffered.
+     * @param timestamp
+     *            The property values whose timestamp is larger than this value
+     *            will be ignored (i.e., the maximum timestamp that will be
+     *            returned for a property value). Use {@link #MAX_TIMESTAMP} to
+     *            obtain all values for a property, including the most recent.
+     * @param filter
+     *            An optional filter used to select the property(s) of interest.
+     * 
+     * @return An iterator visiting each logical row in the specified key range.
+     * 
+     * FIXME implement logical row scan. This may require a modification to how
+     * we do key range scans since each logical row read needs to be atomic.
+     * While rows will not be split across index partitions, it is possible that
+     * the iterator would otherwise stop when it had N index entries rather than
+     * N logical rows, thereby requiring a restart of the iterator from the
+     * successor of the last fully read logical row. One way to handle that is
+     * to make the limit a function that can be interpreted on the data service
+     * in terms of index entries or some other abstraction -- in this case the
+     * #of logical rows. (A logical row ends when the primary key changes.)
+     */
+    public Iterator<ITPS> rangeQuery(IKeyBuilder keyBuilder, Schema schema,
+            Object fromKey, Object toKey, int capacity, long timestamp,
+            INameFilter filter) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * Atomic read of the logical row associated with some {@link Schema} and
+     * primary key.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -501,11 +560,10 @@ public class SparseRowStore {
          *            The value of the primary key (identifies the logical row
          *            to be read).
          * @param timestamp
-         *            The timestamp to be assigned to the property values by an
-         *            atomic write -or- either
-         *            {@link SparseRowStore#AUTO_TIMESTAMP} or
-         *            {@link SparseRowStore#AUTO_TIMESTAMP_UNIQUE} if the
-         *            timestamp will be assigned by the server.
+         *            A timestamp to obtain the value for the named property
+         *            whose timestamp does not exceed <i>timestamp</i> -or-
+         *            {@link SparseRowStore#MAX_TIMESTAMP} to obtain the most
+         *            recent value for the property.
          * @param filter
          *            An optional filter used to restrict the property values
          *            that will be returned.
@@ -949,11 +1007,11 @@ public class SparseRowStore {
             
             {
 
-                final Iterator<TPV> vals = tps.iterator();
+                final Iterator<ITPV> vals = tps.iterator();
 
                 while (vals.hasNext()) {
                     
-                    final TPV val = vals.next();
+                    final ITPV val = vals.next();
                     
                     if (val.getValue() != null) {
                         

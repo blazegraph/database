@@ -64,6 +64,134 @@ import com.bigdata.rawstore.Bytes;
 
 /**
  * Full text indexing and search support.
+ * <p>
+ * The basic data model is consists of documents, fields in documents, and
+ * tokens extracted by an analyzer from those fields.
+ * <p>
+ * The frequency distributions may be normalized to account for a varient of
+ * effects producing "term weights". For example, normalizing for document
+ * length or relative frequency of a term in the overall collection. Therefore
+ * the logical model is:
+ * 
+ * <pre>
+ *                                                    
+ *   token : {docId, freq?, weight?}+
+ *                                                    
+ * </pre>
+ * 
+ * where docId happens to be the term identifier as assigned by the terms index.
+ * The freq and weight are optional values that are representative of the kinds
+ * of statistical data that are kept on a per-token-document basis. The freq is
+ * the token frequency (the frequency of occurrence of the token in the
+ * document). The weight is generally a normalized token frequency weight for
+ * the token in that document in the context of the overall collection.
+ * <p>
+ * In fact, we actually represent the data as follows:
+ * 
+ * <pre>
+ *               
+ *                {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
+ *                        
+ * </pre>
+ * 
+ * That is, there is a distinct entry in the full text B+Tree for each field in
+ * each document in which a given token was recognized. The text of the token is
+ * not stored in the key, just the Unicode sort key generated from the token
+ * text. The value associated with the B+Tree entry is optional - it is simply
+ * not used unless we are storing statistics for the token-document pair. The
+ * advantages of this approach are: (a) it reuses the existing B+Tree data
+ * structures efficiently; (b) we are never faced with the possibility overflow
+ * when a token is used in a large number of documents. The entries for the
+ * token will simply be spread across several leaves in the B+Tree; (c) leading
+ * key compression makes the resulting B+Tree very efficient; and (d) in a
+ * scale-out range partitioned index we can load balance the resulting index
+ * partitions by choosing the partition based on an even token boundary.
+ * <p>
+ * A field is any pre-identified text container within a document. Field
+ * identifiers are integers, so there are <code>32^2</code> distinct possible
+ * field identifiers. It is possible to manage the field identifers through a
+ * secondary index, but that has no direct bearing on the structure of the full
+ * text index itself. Field identifies appear after the token in the key so that
+ * queries may be expressed that will be matched against any field in the
+ * document. Likewise, field identifiers occur before the document identifier in
+ * the key since we always search across documents (the document identifier is
+ * always 0L in the search keys). There are many applications for fields: for
+ * example, distinct fields may be used for the title, abstract, and full text
+ * of a document or for the CDATA section of each distinct element in documents
+ * corresponding to some DTD. The application is responsible for recognizing the
+ * fields in the document and producing the appropriate token stream, each of
+ * which must be tagged by the field.
+ * <p>
+ * A query is tokenized, producing a (possibly normalized) token-frequency
+ * vector identifical. The relevance of documents to the query is generally
+ * taken as the cosine between the query's and each document's (possibly
+ * normalized) token-frequency vectors. The main effort of search is assembling
+ * a token frequency vector for just those documents with which there is an
+ * overlap with the query. This is done using a key range scan for each token in
+ * the query against the full text index.
+ * 
+ * <pre>
+ *                    fromKey := token, 0L
+ *                    toKey   := successor(token), 0L
+ * </pre>
+ * 
+ * and extracting the appropriate token frequency, normalized token weight, or
+ * other statistic. When no value is associated with the entry we follow the
+ * convention of assuming a token frequency of ONE (1) for each document in
+ * which the token appears.
+ * <p>
+ * Tokenization is informed by the language code for a {@link Literal} (when
+ * declared) and by the configured {@link Locale} for the database otherwise. An
+ * appropriate {@link Analyzer} is choosen based on the language code or
+ * {@link Locale} and the "document" is broken into a token-frequency
+ * distribution (alternatively a set of tokens). The same process is used to
+ * tokenize queries, and the API allows the caller to specify the language code
+ * used to select the {@link Analyzer} to tokenize the query.
+ * <p>
+ * Once the tokens are formed the language code / {@link Locale} used to produce
+ * the token is discarded (it is not represented in the index). The reason for
+ * this is that we never utilize the total ordering of the full text index,
+ * merely the manner in which it groups tokens that map onto the same Unicode
+ * sort key together. Further, we use only a single Unicode collator
+ * configuration regardless of the language family in which the token was
+ * originally expressed. Unlike the collator used by the terms index (which
+ * often is set at IDENTICAL strength), the collector used by the full text
+ * index should be choosen such that it makes relatively few distinctions in
+ * order to increase recall (e.g., set at PRIMARY strength). Since a total order
+ * over the full text index is not critical from the perspective of its IR
+ * application, the {@link Locale} for the collator is likewise not critical and
+ * PRIMARY strength will produce significantly shorter Unicode sort keys.
+ * <p>
+ * A map from tokens extracted from {@link Literal}s to the term identifiers of
+ * the literals from which those tokens were extracted.
+ * 
+ * The term frequency within that literal is an optional property associated
+ * with each term identifier, as is the computed weight for the token in the
+ * term.
+ * <p>
+ * Note: Documents should be tokenized using an {@link Analyzer} appropriate for
+ * their declared language code (if any). However, once tokenized, the language
+ * code is discarded and we perform search purely on the Unicode sort keys
+ * resulting from the extracted tokens.
+ * 
+ * @todo verify that PRIMARY US English is an acceptable choice for the full
+ *       text index collator regardless of the language family in which the
+ *       terms were expressed and in which search is performed. I.e., that the
+ *       specific implementations retain some distinction among characters
+ *       regardless of their code points
+ *       (http://unicode.org/reports/tr10/#Legal_Code_Points indicates that they
+ *       SHOULD).
+ * 
+ * @todo we will get relatively little compression on the fldId or docId
+ *       component in the key using just leading key compression. A Hu-Tucker
+ *       encoding of those components would be much more compact. Note that the
+ *       encoding must be reversable since we need to be able to read the docId
+ *       out of the key in order to retrieve the document.
+ * 
+ * @todo refactor the full text index into a general purpose bigdata service
+ * 
+ * @todo support normalization passes over the index in which the weights are
+ *       updated based on aggregated statistics.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -92,140 +220,6 @@ public class FullTextIndex {
     /**
      * The index used to associate term identifiers with tokens parsed from
      * documents.
-     * <p>
-     * The frequency distributions may be normalized to account for a varient of
-     * effects producing "term weights". For example, normalizing for document
-     * length or relative frequency of a term in the overall collection.
-     * Therefore the logical model is:
-     * 
-     * <pre>
-     *                                                
-     *                token : {docId, freq?, weight?}+
-     *                                                
-     * </pre>
-     * 
-     * where docId happens to be the term identifier as assigned by the terms
-     * index. The freq and weight are optional values that are representative of
-     * the kinds of statistical data that are kept on a per-token-document
-     * basis. The freq is the token frequency (the frequency of occurrence of
-     * the token in the document). The weight is generally a normalized token
-     * frequency weight for the token in that document in the context of the
-     * overall collection.
-     * <p>
-     * In fact, we actually represent the data as follows:
-     * 
-     * <pre>
-     *           
-     *            {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
-     *                    
-     * </pre>
-     * 
-     * That is, there is a distinct entry in the full text B+Tree for each field
-     * in each document in which a given token was recognized. The text of the
-     * token is not stored in the key, just the Unicode sort key generated from
-     * the token text. The value associated with the B+Tree entry is optional -
-     * it is simply not used unless we are storing statistics for the
-     * token-document pair. The advantages of this approach are: (a) it reuses
-     * the existing B+Tree data structures efficiently; (b) we are never faced
-     * with the possibility overflow when a token is used in a large number of
-     * documents. The entries for the token will simply be spread across several
-     * leaves in the B+Tree; (c) leading key compression makes the resulting
-     * B+Tree very efficient; and (d) in a scale-out range partitioned index we
-     * can load balance the resulting index partitions by choosing the partition
-     * based on an even token boundary.
-     * <p>
-     * A field is any pre-identified text container within a document. Field
-     * identifiers are integers, so there are <code>32^2</code> distinct
-     * possible field identifiers. It is possible to manage the field identifers
-     * through a secondary index, but that has no direct bearing on the
-     * structure of the full text index itself. Field identifies appear after
-     * the token in the key so that queries may be expressed that will be
-     * matched against any field in the document. Likewise, field identifiers
-     * occur before the document identifier in the key since we always search
-     * across documents (the document identifier is always 0L in the search
-     * keys). There are many applications for fields: for example, distinct
-     * fields may be used for the title, abstract, and full text of a document
-     * or for the CDATA section of each distinct element in documents
-     * corresponding to some DTD. The application is responsible for recognizing
-     * the fields in the document and producing the appropriate token stream,
-     * each of which must be tagged by the field.
-     * <p>
-     * A query is tokenized, producing a (possibly normalized) token-frequency
-     * vector identifical. The relevance of documents to the query is generally
-     * taken as the cosine between the query's and each document's (possibly
-     * normalized) token-frequency vectors. The main effort of search is
-     * assembling a token frequency vector for just those documents with which
-     * there is an overlap with the query. This is done using a key range scan
-     * for each token in the query against the full text index.
-     * 
-     * <pre>
-     *                fromKey := token, 0L
-     *                toKey   := successor(token), 0L
-     * </pre>
-     * 
-     * and extracting the appropriate token frequency, normalized token weight,
-     * or other statistic. When no value is associated with the entry we follow
-     * the convention of assuming a token frequency of ONE (1) for each document
-     * in which the token appears.
-     * <p>
-     * Tokenization is informed by the language code for a {@link Literal} (when
-     * declared) and by the configured {@link Locale} for the database
-     * otherwise. An appropriate {@link Analyzer} is choosen based on the
-     * language code or {@link Locale} and the "document" is broken into a
-     * token-frequency distribution (alternatively a set of tokens). The same
-     * process is used to tokenize queries, and the API allows the caller to
-     * specify the language code used to select the {@link Analyzer} to tokenize
-     * the query.
-     * <p>
-     * Once the tokens are formed the language code / {@link Locale} used to
-     * produce the token is discarded (it is not represented in the index). The
-     * reason for this is that we never utilize the total ordering of the full
-     * text index, merely the manner in which it groups tokens that map onto the
-     * same Unicode sort key together. Further, we use only a single Unicode
-     * collator configuration regardless of the language family in which the
-     * token was originally expressed. Unlike the collator used by the terms
-     * index (which often is set at IDENTICAL strength), the collector used by
-     * the full text index should be choosen such that it makes relatively few
-     * distinctions in order to increase recall (e.g., set at PRIMARY strength).
-     * Since a total order over the full text index is not critical from the
-     * perspective of its IR application, the {@link Locale} for the collator is
-     * likewise not critical and PRIMARY strength will produce significantly
-     * shorter Unicode sort keys.
-     * <p>
-     * A map from tokens extracted from {@link Literal}s to the term
-     * identifiers of the literals from which those tokens were extracted.
-     * 
-     * The term frequency within that literal is an optional property associated
-     * with each term identifier, as is the computed weight for the token in the
-     * term.
-     * <p>
-     * Note: {@link Literal}s should be tokenized using an {@link Analyzer}
-     * appropriate for their declared language code (if any). However, once
-     * tokenizer, the language code is discarded and we perform search purely on
-     * the Unicode sort keys resulting from the extracted tokens. Those sort
-     * keys are generated in a batch once all tokens for are on hand.
-     * 
-     * @todo verify that PRIMARY US English is an acceptable choice for the full
-     *       text index collator regardless of the language family in which the
-     *       terms were expressed and in which search is performed. I.e., that
-     *       the specific implementations retain some distinction among
-     *       characters regardless of their code points
-     *       (http://unicode.org/reports/tr10/#Legal_Code_Points indicates that
-     *       they SHOULD).
-     * 
-     * @todo we will get relatively little compression on the fldId or docId
-     *       component in the key using just leading key compression. A
-     *       Hu-Tucker encoding of those components would be much more compact.
-     *       Note that the encoding must be reversable since we need to be able
-     *       to read the docId out of the key in order to retrieve the document.
-     * 
-     * @todo refactor the full text index into a general purpose bigdata service
-     * 
-     * @todo support normalization passes over the index in which the weights
-     *       are updated based on aggregated statistics.
-     * 
-     * @return The index or <code>null</code> iff the index is not being
-     *         maintained.
      */
     public IIndex getIndex() {
         

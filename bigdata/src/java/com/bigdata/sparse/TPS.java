@@ -68,7 +68,7 @@ public class TPS implements ITPS, Externalizable {
      * Note: The key is {property,timestamp}. The value is the value. The schema
      * is implicit since this class represents the data for a single schema.
      */
-    private TreeMap<TP,TPV> tuples;
+    private TreeMap<TP,ITPV> tuples;
 
     /**
      * De-serialization constructor.
@@ -104,7 +104,7 @@ public class TPS implements ITPS, Externalizable {
 
         this.schema = schema;
         
-        this.tuples = new TreeMap<TP,TPV>();
+        this.tuples = new TreeMap<TP,ITPV>();
         
         this.timestamp = timestamp;
         
@@ -150,7 +150,7 @@ public class TPS implements ITPS, Externalizable {
          */
         {
             
-            final TPV tpv = tuples.get(new TP(name, timestamp));
+            final TPV tpv = (TPV)tuples.get(new TP(name, timestamp));
 
             if (tpv != null) {
 
@@ -170,7 +170,7 @@ public class TPS implements ITPS, Externalizable {
          * the given timestamp.
          */
         
-        final Iterator<TPV> itr = tuples.values().iterator();
+        final Iterator<ITPV> itr = tuples.values().iterator();
         
         // last known value for that property.
         TPV last = null;
@@ -180,7 +180,7 @@ public class TPS implements ITPS, Externalizable {
         
         while(itr.hasNext()) {
             
-            TPV tmp = itr.next();
+            TPV tmp = (TPV)itr.next();
             
             if(tmp.name.equals(name)) {
                 
@@ -232,7 +232,7 @@ public class TPS implements ITPS, Externalizable {
         
     }
 
-    public Iterator<TPV> iterator() {
+    public Iterator<ITPV> iterator() {
 
         return Collections.unmodifiableCollection(tuples.values()).iterator();
 
@@ -254,11 +254,11 @@ public class TPS implements ITPS, Externalizable {
 
         Map<String, Object> m = new HashMap<String, Object>();
 
-        Iterator<TPV> itr = iterator();
+        Iterator<ITPV> itr = iterator();
         
         while (itr.hasNext()) {
 
-            TPV tpv = itr.next();
+            TPV tpv = (TPV)itr.next();
 
             if (tpv.timestamp > timestamp) {
 
@@ -303,11 +303,11 @@ public class TPS implements ITPS, Externalizable {
 
         HashMap<Long,Integer> fd = new HashMap<Long,Integer>();
         
-        Iterator<TPV> itr = tuples.values().iterator();
+        Iterator<ITPV> itr = tuples.values().iterator();
 
         while(itr.hasNext()) {
             
-            TPV tpv = itr.next();
+            TPV tpv = (TPV)itr.next();
             
             Long ts = tpv.timestamp;
             
@@ -336,11 +336,11 @@ public class TPS implements ITPS, Externalizable {
 
         HashMap<String,Integer> fd = new HashMap<String,Integer>();
         
-        Iterator<TPV> itr = tuples.values().iterator();
+        Iterator<ITPV> itr = tuples.values().iterator();
 
         while(itr.hasNext()) {
             
-            TPV tpv = itr.next();
+            TPV tpv = (TPV)itr.next();
             
             String name = tpv.name;
             
@@ -404,11 +404,11 @@ public class TPS implements ITPS, Externalizable {
          * write tuples.
          */
         
-        Iterator<TPV> itr = tuples.values().iterator();
+        Iterator<ITPV> itr = tuples.values().iterator();
         
         while(itr.hasNext()) {
             
-            TPV tpv = itr.next();
+            TPV tpv = (TPV)itr.next();
             
             out.writeUTF(tpv.name);
             
@@ -444,7 +444,7 @@ public class TPS implements ITPS, Externalizable {
 
         this.timestamp = in.readLong();
         
-        this.tuples = new TreeMap<TP,TPV>();
+        this.tuples = new TreeMap<TP,ITPV>();
 
         // #of tuples.
         final int n = in.readInt();
@@ -539,7 +539,7 @@ public class TPS implements ITPS, Externalizable {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class TPV implements ITPV {
+    public static class TPV implements ITPV {
 
         private static final long serialVersionUID = -3301002622055086380L;
 

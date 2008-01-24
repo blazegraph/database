@@ -130,5 +130,40 @@ public class DocumentHeaderImpl implements DocumentHeader
         
     }
 
-}
+    /**
+     * Always returns <code>false</code>.
+     */
+    public boolean exists() {
  
+        return false;
+        
+    }
+
+    /**
+     * @throws IllegalStateException always.
+     */
+    public long getEarliestVersionCreateTime() {
+        
+        throw new IllegalStateException();
+        
+    }
+
+    /**
+     * @throws IllegalStateException always.
+     */
+    public long getMetadataUpdateTime() {
+        
+        throw new IllegalStateException();
+        
+    }
+
+    /**
+     * @throws IllegalStateException always.
+     */
+    public long getVersionCreateTime() {
+        
+        throw new IllegalStateException();
+        
+    }
+
+}

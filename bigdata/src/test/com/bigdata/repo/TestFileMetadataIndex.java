@@ -162,7 +162,15 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
         RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
 
-        assertNotSame("createTime", 0L, doc.createTime());
+        assertTrue("exists", doc.exists());
+
+        assertEquals("version", version, doc.getVersion());
+
+        assertNotSame("versionCreateTime", 0L, doc.getVersionCreateTime());
+
+        assertEquals("earliestVersionCreateTime", doc.getVersionCreateTime(), doc.getEarliestVersionCreateTime());
+
+        assertEquals("metadataUpdateTime", doc.getVersionCreateTime(), doc.getMetadataUpdateTime());
 
         Map<String, Object> actual = doc.asMap();
 
@@ -206,9 +214,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
 
-            createTime0 = doc.createTime();
-
-            assertNotSame("createTime", 0L, createTime0);
+            createTime0 = doc.getVersionCreateTime();
 
             Map<String, Object> actual = doc.asMap();
 
@@ -251,7 +257,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
 
-            createTime1 = doc.createTime();
+            createTime1 = doc.getVersionCreateTime();
 
             assertNotSame("createTime", 0L, createTime1);
 
@@ -342,7 +348,7 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
 
             RepositoryDocumentImpl doc = (RepositoryDocumentImpl) repo.read(id);
 
-            createTime0 = doc.createTime();
+            createTime0 = doc.getVersionCreateTime();
 
             assertNotSame("createTime", 0L, createTime0);
 

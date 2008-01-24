@@ -37,6 +37,7 @@ import org.CognitiveWeb.extser.ShortPacker;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
@@ -103,7 +104,8 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddTerms extends IndexProcedure {
+public class AddTerms extends IndexProcedure implements
+        IParallelizableIndexProcedure {
 
     /**
      * 
