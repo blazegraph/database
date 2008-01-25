@@ -476,6 +476,18 @@
       <url>http://www.cutthecrap.biz/downloads/ctc_utils.zip</url>
     </dependency>
 
+	<!-- full text indexing support. -->
+	<dependency>
+	    <groupId>org.apache.lucene</groupId>
+	    <artifactId>lucene-core</artifactId>
+	    <version>2.2.0</version>
+	</dependency> 
+	<dependency>
+	    <groupId>org.apache.lucene</groupId>
+	    <artifactId>lucene-analyzers</artifactId>
+	    <version>2.2.0</version>
+	</dependency> 
+
 	<!-- ICU provides optional support for compressed Unicode sort keys. -->
     <dependency>
       <groupId>icu</groupId>
