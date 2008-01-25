@@ -1,11 +1,11 @@
-package com.bigdata.service;
+package com.bigdata.btree;
 
 import java.io.Serializable;
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
+import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
+import com.bigdata.service.IDataService;
 
 /**
  * An interface that knows how to create an instance of an index when it

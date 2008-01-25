@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 23, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.mdi;
 
 import java.util.UUID;
 

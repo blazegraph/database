@@ -1256,7 +1256,7 @@ public class IndexSegmentBuilder {
      * {@link IndexSegmentMetadata} record with a fixed format containing only
      * essential data and additional metadata records written at the end of the
      * file including the optional bloom filter and the required
-     * {@link IndexSegmentExtensionMetadata} record. the latter is where we
+     * {@link IndexSegmentExtensionMetadata} record. The latter is where we
      * write variable length metadata including the _name_ of the index, or
      * additional metadata defined by a specific class of index.
      * </p>
@@ -1449,6 +1449,19 @@ public class IndexSegmentBuilder {
                     offset);
             
         }
+        
+        /*
+         * FIXME Copy records references from blobs to this location in the
+         * output file. Those addresses (less the offset of the blob region) can
+         * be computed when we scan the btree since we know the size of each
+         * record to be copied. Another pass over the source iterator would be
+         * required to actually copy the data into place - or they can be
+         * buffered on another temporary file and the bulk copied into place.
+         * This is to support the BigdataRepository with 64M blocks without
+         * having to have those blocks be inline in the leaves of the index.
+         * Also the maximum record size for the journal (and the index segment)
+         * must be set to at least 64M (the block size).
+         */
         
         /*
          * Seek to the start of the file and write out the metadata record.

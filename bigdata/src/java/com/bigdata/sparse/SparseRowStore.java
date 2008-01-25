@@ -45,11 +45,7 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.Journal;
 import com.bigdata.repo.BigdataRepository;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.PartitionMetadata;
 import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.DataService;
-import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ValueType.AutoIncCounter;
 
 /**
@@ -320,32 +316,10 @@ public class SparseRowStore {
              * Remote index.
              */
 
-            try {
-                
-                ClientIndexView ndx = (ClientIndexView)this.ndx;
-                
-                final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-                
-                // Figure out which index partition will get the write
-                final PartitionMetadata pmd = ndx.getPartition(key);
-                
-                // Lookup the data service for that index partition.
-                final IDataService dataService = ndx.getDataService(pmd);
+            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
-                // Name of the index partition.
-                final String name = DataService.getIndexPartitionName(ndx
-                        .getName(), pmd.getPartitionId());
-
-                log.info("Submitting operation to dataService=" + dataService);
-                
-                // Submit the atomic write operation to that data service.
-                return (TPS) dataService.submit(ndx.getTx(), name, proc);
-
-            } catch (Exception ex) {
-            
-                throw new RuntimeException("Read failed", ex);
-                
-            }
+            // Submit the atomic read operation.
+            return (TPS) ((ClientIndexView)ndx).submit(key, proc);
 
         } else {
 
@@ -430,35 +404,13 @@ public class SparseRowStore {
 
             /*
              * Remote index.
-             * 
-             * Lookup the data service hosting the index partition for that key
-             * and submit the atomic write operation to that data service.
              */
-            
-            try {
 
-                final Object primaryKey = propertySet.get(schema.getPrimaryKey());
-                
-                final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
-                
-                ClientIndexView ndx = (ClientIndexView)this.ndx;
-                
-                final IPartitionMetadata pmd = ndx.getPartition(key);
-                
-                final IDataService dataService = ndx.getDataService(pmd);
+            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
 
-                final String name = DataService.getIndexPartitionName(ndx
-                        .getName(), pmd.getPartitionId());
+            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
-                log.info("Submitting operation to dataService=" + dataService);
-                
-                return (TPS) dataService.submit(ndx.getTx(), name, proc);
-
-            } catch (Exception ex) {
-            
-                throw new RuntimeException("Write failed", ex);
-                
-            }
+            return (TPS) ((ClientIndexView) ndx).submit(key, proc);
 
         } else {
 

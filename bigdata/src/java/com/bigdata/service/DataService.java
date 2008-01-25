@@ -46,6 +46,7 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IRangeQuery;
@@ -58,11 +59,13 @@ import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.ProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.UnisolatedBTreePartition;
 import com.bigdata.scaleup.PartitionedIndexView;
-import com.bigdata.scaleup.ResourceState;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is

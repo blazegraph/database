@@ -26,15 +26,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 11, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.mdi;
 
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Creates an {@link UnisolatedBTree} instance.

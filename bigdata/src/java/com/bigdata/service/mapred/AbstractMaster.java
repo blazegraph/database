@@ -33,9 +33,9 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTreeConstructor;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.service.BTreeConstructor;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;

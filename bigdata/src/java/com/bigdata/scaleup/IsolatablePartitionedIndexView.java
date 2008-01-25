@@ -32,6 +32,7 @@ import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IsolatableFusedView;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.mdi.MetadataIndex;
 
 /**
  * A {@link PartitionedIndexView} that supports transactions and deletion

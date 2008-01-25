@@ -1,10 +1,10 @@
-package com.bigdata.service;
+package com.bigdata.mdi;
 
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Creates an {@link UnisolatedBTreePartition} instance.

@@ -34,7 +34,8 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.io.ByteArrayBufferWithPosition;
 import com.bigdata.io.IByteArrayBuffer;
-import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 
 /**
  * Class supports range query across one or more index partitions.

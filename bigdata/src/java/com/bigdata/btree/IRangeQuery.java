@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.Serializable;
+
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ResultSet;
@@ -144,4 +146,57 @@ public interface IRangeQuery {
      */
     public long rangeCount(byte[] fromKey, byte[] toKey);
 
+    /**
+     * Interface
+     * 
+     * @todo alternative is to define an interface to recognize change in the
+     *       "logical row". This way the sense of the limit/capacity is
+     *       unchanged but we only would count logical rows rather than visited
+     *       index entries.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IRangeQueryLimit extends Serializable {
+        
+        public void report(IEntryIterator itr);
+        
+        public boolean isDone();
+        
+    }
+    
+    // @todo Externalizable impl.
+    public static class RangeQueryLimit implements IRangeQueryLimit {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6047061818958124788L;
+        
+        private int n = 0;
+
+        private int limit = 0;
+        
+        public RangeQueryLimit(int limit) {
+            
+            if(limit<=0) throw new IllegalArgumentException();
+            
+            this.limit = limit;
+            
+        }
+        
+        public void report(IEntryIterator itr) {
+
+            n++;
+            
+        }
+        
+        public boolean isDone() {
+
+            return n >= limit;
+            
+        }
+
+    }
+    
 }

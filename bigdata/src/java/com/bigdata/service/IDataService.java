@@ -31,14 +31,15 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.sparse.SparseRowStore;
 
 /**

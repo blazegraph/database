@@ -21,50 +21,48 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Jan 10, 2008
- */
-package com.bigdata.service;
+package com.bigdata.mdi;
 
-import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrentJournal;
+import java.util.UUID;
+
+import com.bigdata.btree.IndexSegment;
 
 /**
- * Class provides an adaptor allowing a {@link IIndexProcedure} to be executed on the
- * {@link ConcurrentJournal}.
+ * Metadata for a single {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ProcedureTask extends AbstractTask {
-
-    protected final IIndexProcedure proc;
-
+public class SegmentMetadata extends AbstractResourceMetadata {
+    
     /**
      * 
-     * @param journal
-     * @param startTime
-     * @param readOnly
-     * @param name
-     * @param proc
      */
-    public ProcedureTask(ConcurrentJournal journal, long startTime,
-            boolean readOnly, String name, IIndexProcedure proc) {
+    private static final long serialVersionUID = -7296761796029541465L;
 
-        super(journal, startTime, readOnly, name);
-
-        if (proc == null)
-            throw new IllegalArgumentException();
-
-        this.proc = proc;
-
+    public final boolean isIndexSegment() {
+        
+        return true;
+        
+    }
+    
+    public final boolean isJournal() {
+        
+        return false;
+        
+    }
+    
+    /**
+     * De-serialization constructor.
+     */
+    public SegmentMetadata() {
+        
     }
 
-    final public Object doTask() throws Exception {
+    public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
-        return proc.apply(getIndex(getOnlyResource()));
-
+        super(filename,nbytes,state,uuid);
+        
     }
 
 }

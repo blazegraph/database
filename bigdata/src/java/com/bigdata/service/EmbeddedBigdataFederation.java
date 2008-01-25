@@ -39,7 +39,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.io.NameAndExtensionFilter;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * An implementation that uses an embedded database rather than a distributed

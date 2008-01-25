@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on May 18, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.mdi;
 
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -41,6 +41,7 @@ import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.DataService;
 
 /**
  * An instance of this class is used to absorb writes on a {@link DataService}

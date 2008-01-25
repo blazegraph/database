@@ -33,8 +33,10 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.MetadataIndex;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * A metadata service for a named index.

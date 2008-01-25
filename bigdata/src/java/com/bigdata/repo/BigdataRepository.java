@@ -49,18 +49,16 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.UnisolatedBTreePartition;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.PartitionMetadataWithSeparatorKeys;
-import com.bigdata.service.UnisolatedBTreePartition;
-import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.KeyType;
@@ -263,7 +261,7 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Configuration options.
      * 
-     * @todo block size.
+     * @todo block size as config option?
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -273,11 +271,11 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
-     * The size of a file block (64M). Block identifiers are 64-bit signed
-     * integers. The maximum file length is <code>2^63 - 1 </code> blocks (
-     * 536,870,912 Exabytes).
+     * The size of a file block (default is 64M). Block identifiers are 64-bit
+     * signed integers. With 64M file blocks the maximum file length is
+     * <code>2^63 - 1 </code> blocks ( 536,870,912 Exabytes).
      */
-    protected final int BLOCK_SIZE = 64 * Bytes.megabyte32;
+    protected final int BLOCK_SIZE;
 
     /**
      * The size of a file block (64M). Block identifiers are 64-bit signed
@@ -460,6 +458,20 @@ public class BigdataRepository implements ContentRepository {
      *            The client.
      * @param properties
      *            See {@link Options}.
+     * 
+     * FIXME The {@link #BLOCK_SIZE} is set to 4M-1 bytes right now. In order to
+     * increase the block size to 64M a non-default split point would have to be
+     * specified for the {@link WormAddressManager#DEFAULT_OFFSET_BITS}. 4M at
+     * the default split point is [0:4,194,303] while 64M is 67,108,864 bytes.
+     * 
+     * @todo is it strictly requires that the block size is shared across across
+     *       a federation? I doubt it - it seems that the constraint is mainly
+     *       in the journal's record size - and in the addressing scheme choosen
+     *       for an {@link IndexSegment}. There should be little reason why a
+     *       client could not operate at whatever the maximum record size for a
+     *       journal was - except that you have to query the journal for that
+     *       which makes the value potentially different for each data service
+     *       (or each journal created by each data service).
      */
     public BigdataRepository(IBigdataFederation fed,Properties properties) {
         
@@ -467,6 +479,12 @@ public class BigdataRepository implements ContentRepository {
         
         // clone the properties to keep them immutable.
         this.properties = (Properties) properties.clone();
+     
+        /*
+         * This is the value for the default split point (4M-1 bytes).
+         */
+        BLOCK_SIZE = WormAddressManager
+                .getMaxByteCount(WormAddressManager.DEFAULT_OFFSET_BITS) - 1;
         
     }
 
@@ -1088,17 +1106,20 @@ public class BigdataRepository implements ContentRepository {
          * Note: This only deletes the "version" property - the other properties
          * are not changed.
          */
-        
-        Map<String,Object> metadata = new HashMap<String,Object>();
-        
-        // primary key.
-        metadata.put(MetadataSchema.ID, id);
+        {
+            
+            final Map<String, Object> metadata = new HashMap<String, Object>();
 
-        // delete marker.
-        metadata.put(MetadataSchema.VERSION, null);
-        
-        getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
-                AUTO_TIMESTAMP, null/* filter */);
+            // primary key.
+            metadata.put(MetadataSchema.ID, id);
+
+            // delete marker.
+            metadata.put(MetadataSchema.VERSION, null);
+
+            getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
+                    AUTO_TIMESTAMP, null/* filter */);
+            
+        }
 
         /*
          * There was a current version for the file. We have written a delete
@@ -2246,44 +2267,8 @@ public class BigdataRepository implements ContentRepository {
                     true/* unicode */, false/* successor */).append(version)
                     .append(block).getKey();
 
-            final ClientIndexView ndx = (ClientIndexView) getDataIndex();
-
-            final PartitionMetadata pmd = ndx.getPartition(key);
-
-            /*
-             * Lookup the data service for that index partition.
-             */
-
-            final IDataService dataService = ((ClientIndexView) ndx)
-                    .getDataService(pmd);
-
-            log.info("Write for id=" + id + ", version=" + version + ", block="
-                    + block + " will go into partition: " + pmd
-                    + ", dataService=" + dataService);
-
-            /*
-             * Submit the atomic write operation to that data service.
-             */
-
-            try {
-
-                final String name = DataService.getIndexPartitionName(ndx
-                        .getName(), pmd.getPartitionId());
-
-                log.info("Submitting write operation to data service: id=" + id
-                        + ", version=" + version + ", len=" + len);
-
-                boolean overwrite = (Boolean) dataService.submit(
-                        ITx.UNISOLATED, name, proc);
-
-                return overwrite;
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException("Atomic write failed: id=" + id
-                        + ", version=" + version, ex);
-
-            }
+            return (Boolean) ((ClientIndexView) getDataIndex()).submit(key,
+                    proc);
 
         } else {
 
@@ -2588,48 +2573,11 @@ public class BigdataRepository implements ContentRepository {
              */
 
             // the last possible key for this file
-            final byte[] nextKey = getKeyBuilder().reset().appendText(id,
+            final byte[] key = getKeyBuilder().reset().appendText(id,
                     true/* unicode */, true/* successor */).append(version)
                     .append(-1L).getKey();
 
-            final ClientIndexView ndx = (ClientIndexView) getDataIndex();
-
-            final PartitionMetadata pmd = ndx.getPartition(nextKey);
-
-            /*
-             * Lookup the data service for that index partition.
-             */
-
-            final IDataService dataService = ((ClientIndexView) ndx)
-                    .getDataService(pmd);
-
-            log.info("Appends for id=" + id + ", version=" + version
-                    + " will go into partition: " + pmd + ", dataService="
-                    + dataService);
-
-            /*
-             * Submit the atomic append operation to that data service.
-             */
-
-            try {
-
-                final String name = DataService.getIndexPartitionName(
-                        DATA_NAME, pmd.getPartitionId());
-
-                log.info("Submitting append operation to data service: id="
-                        + id + ", version=" + version + ", len=" + len);
-
-                Long block = (Long) dataService.submit(
-                        ITx.UNISOLATED, name, proc);
-
-                return block;
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException("Atomic append failed: id=" + id
-                        + ", version=" + version, ex);
-
-            }
+            return (Long) ((ClientIndexView) getDataIndex()).submit(key, proc);
             
         } else {
 
