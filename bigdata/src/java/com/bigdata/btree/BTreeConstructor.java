@@ -26,14 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 11, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IValueSerializer;
+import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
 
 /**
  * Create an instance of a {@link BTree}.

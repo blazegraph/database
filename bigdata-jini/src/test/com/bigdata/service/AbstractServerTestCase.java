@@ -43,8 +43,9 @@ import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.sun.jini.tool.ClassServer;
 
 /**

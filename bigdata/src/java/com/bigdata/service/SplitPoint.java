@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,31 +20,39 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
+/*
+ * Created on Jan 24, 2008
+ */
+
 package com.bigdata.service;
 
-import com.bigdata.mdi.IPartitionMetadata;
 
 /**
- * Describes a "split" of keys for a batch operation that are spanned by the
- * same index partition.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Split extends SplitPoint {
+public class SplitPoint {
 
     /**
-     * The index partition that spans the keys in this split.
+     * Index of the first key in this split.
      */
-    public final IPartitionMetadata pmd;
+    public final int fromIndex;
+
+    /**
+     * Index of the first key NOT included in this split.
+     */
+    public final int toIndex;
+
+    /**
+     * The #of keys in this split (toIndex - fromIndex).
+     */
+    public final int ntuples;
 
     /**
      * Create a representation of a split point.
      * 
-     * @param pmd
-     *            The metadata for the index partition within which the keys
-     *            in this split lie.
      * @param fromIndex
      *            The index of the first key that will enter that index
      *            partition (inclusive lower bound).
@@ -52,31 +60,28 @@ public class Split extends SplitPoint {
      *            The index of the first key that will NOT enter that index
      *            partition (exclusive upper bound).
      */
-    public Split(IPartitionMetadata pmd, int fromIndex, int toIndex) {
+    public SplitPoint(int fromIndex, int toIndex) {
 
-        super(fromIndex,toIndex);
-        
-//        assert pmd != null;
+        assert fromIndex >= 0;
+        assert toIndex >= fromIndex;
 
-        this.pmd = pmd;
+        this.fromIndex = fromIndex;
 
-    }
+        this.toIndex = toIndex;
 
-    /**
-     * Hash code is based on the {@link IPartitionMetadata} hash code.
-     */
-    public int hashCode() {
-
-        return pmd.hashCode();
+        this.ntuples = toIndex - fromIndex;
 
     }
 
     public boolean equals(Split o) {
 
-        if (!super.equals(o))
+        if (fromIndex != o.fromIndex)
             return false;
 
-        if (!pmd.equals(o.pmd))
+        if (toIndex != o.toIndex)
+            return false;
+
+        if (ntuples != o.ntuples)
             return false;
 
         return true;

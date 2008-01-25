@@ -143,7 +143,7 @@ public class ResultSet implements Externalizable {
 
         /* The upper bound on the #of key-value pairs in the range.
          * 
-         * Note: truncate to [int].
+         * Note: truncated to [int].
          */
         rangeCount = (int) ndx.rangeCount(fromKey, toKey);
 

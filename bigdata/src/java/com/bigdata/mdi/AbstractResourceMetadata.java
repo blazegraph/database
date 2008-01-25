@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 27, 2007
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.mdi;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -35,6 +35,7 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

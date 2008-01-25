@@ -36,10 +36,10 @@ import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.UnisolatedBTreeConstructor;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
-import com.bigdata.service.UnisolatedBTreeConstructor;
 
 /**
  * A thread-safe variant that supports concurrent data load and query (the

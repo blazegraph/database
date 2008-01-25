@@ -34,10 +34,11 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
 
 /**
  * This class encapsulates access to the metadata and data services for a

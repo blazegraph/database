@@ -54,6 +54,11 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 
 /**

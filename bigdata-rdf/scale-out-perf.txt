@@ -1,0 +1,575 @@
+nciOncology.owl, embedded federation.
+
+INFO : 31844   Main Thread com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:194): parse complete: elapsed=28187ms, toldTriples=464841, tps=16491
+
+INFO : 882875   Main Thread com.bigdata.rdf.store.DataLoader.loadData(DataLoader.java:517): Loaded 1 resources: 464841 stmts added in 28.265 secs, rate= 528, commitLatency=0ms
+rule    	ms	#entms	entms/ms
+RuleFastClosure13	15	0	0
+RuleOwlEquivalentProperty	16	0	0
+RuleRdfs02	5890	395806	67
+RuleRdfs03	3297	395806	120
+RuleRdfs08	31	41618	1342
+RuleRdfs09	12109	41724	3
+RuleRdfs10	110	41618	378
+RuleRdfs11	720126	5324314	7
+totals: elapsed=741594, nadded=376849, numComputed=6241034, added/sec=508, computed/sec=8415
+
+Note: this appears to be incremental TM rather than database at once closure.
+
+========================================
+
+Modified to use database at once closure.
+
+nciOncology.owl, embedded federation.
+
+INFO : 36188   Main Thread com.bigdata.rdf.store.DataLoader.loadData2(DataLoader.java:628): 464841 stmts added in 32.109 secs, rate= 14476, commitLatency=0ms
+
+rule    	ms	#entms	entms/ms
+RuleOwlEquivalentProperty	157	0	0
+RuleRdf01	110	43	0
+RuleRdfs02	8859	395958	44
+RuleRdfs03	7125	395958	55
+RuleRdfs08	250	41631	166
+RuleRdfs09	11406	41759	3
+RuleRdfs10	219	41631	190
+RuleRdfs11	240719	3951672	16
+totals: elapsed=268845, nadded=3951672, numComputed=4868778, added/sec=14698, computed/sec=18109
+
+Computed closure in 301500ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1249
+
+
+============================================================
+
+
+nciOncology.owl, no closure.
+
+ids: #entries(est)=289871
+SPO: #entries(est)=464993
+POS: #entries(est)=464993
+OSP: #entries(est)=464993
+just: #entries(est)=0
+
+!!!Note: be careful to choose the line that reports after the commit on the store!!!
+
+local, unisolated:
+
+run 1: Loaded 1 resources: 464841 stmts added in 23.656 secs, rate= 19650, commitLatency=172ms
+run 2: Loaded 1 resources: 464841 stmts added in 24.094 secs, rate= 19292, commitLatency=156ms
+run 3: Loaded 1 resources: 464841 stmts added in 24.328 secs, rate= 19107, commitLatency=235ms (after refactor for procedures)
+(Computed closure in 141047ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2671)
+
+local, isolated:
+
+run 1: Loaded 1 resources: 464841 stmts added in 26.735 secs, rate= 17386, commitLatency=438ms
+run 2: Loaded 1 resources: 464841 stmts added in 25.719 secs, rate= 18073, commitLatency=297ms
+
+embedded data service:
+run 1: Loaded 1 resources: 464841 stmts added in 27.532 secs, rate= 16883, commitLatency=0ms (SPOArrayIterator)
+(Computed closure in 375953ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1002)
+run 2: Loaded 1 resources: 464841 stmts added in 27.016 secs, rate= 17206, commitLatency=0ms (SPOIterator - no mem cap)
+(Computed closure in 482453ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=781)
+ren 3: Loaded 1 resources: 464841 stmts added in 27.485 secs, rate= 16912, commitLatency=0ms (SPOIterator - no mem cap)
+(Computed closure in 436266ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=863)
+
+embedded federation:
+
+run 1: Loaded 1 resources: 464841 stmts added in 32.313 secs, rate= 14385, commitLatency=31ms
+
+jini federation:
+
+run 1: Loaded 1 resources: 464841 stmts added in 57.204 secs, rate= 8126, commitLatency=16ms
+run 2: Loaded 1 resources: 464841 stmts added in 49.172 secs, rate= 9453, commitLatency=16ms
+
+(done) Report more data about the scale-out indices, including the #of
+partitions, where each partition is located, and the size on disk on
+the partition (the btrees on the journal are conflated so the journal
+space needs to be factored out but we can report the #of entries on
+the journal and maybe even the bytes written on the journal by the
+btree).  Call out the time spent on each index - we need better
+counters to report that correctly, or even counters on the data
+service.
+
+The embedded federation has a substantial drop in performance when
+compared to the local store using isolated indices (the data services
+always use isolated indices so that is the point for comparison), but
+the big drop is the jini federation - presumably that cost is entirely
+attributable to the serialization overhead for RPCs.
+
+Examine in more depth why the embedded federation is slower.  Try a
+run on a larger data set and see if this is related to start up costs.
+
+Thesaurus.owl: #terms=586945, #stmts=1,047,647
+
+local, unisolated  : Loaded 1 resources: 1086012 stmts added in  59.609 secs, rate= 18218, commitLatency=312ms
+                   : Loaded 1 resources: 1086012 stmts added in  57.765 secs, rate= 18800, commitLatency=328ms
+                   : Loaded 1 resources: 1086012 stmts added in  58.313 secs, rate= 18623, commitLatency=312ms
+		   : Loaded 1 resources: 1086012 stmts added in  58.687 secs, rate= 18505, commitLatency=312ms (keybuilder refactor)
+local,   isolated  : Loaded 1 resources: 1086012 stmts added in  64.562 secs, rate= 16821, commitLatency=156ms
+embedded federation: Loaded 1 resources: 1086012 stmts added in  76.969 secs, rate= 14109, commitLatency=31ms
+                   : Loaded 1 resources: 1086012 stmts added in  76.938 secs, rate= 14115, commitLatency=16ms
+jini federation    : Loaded 1 resources: 1086012 stmts added in 103.734 secs, rate= 10469, commitLatency=0ms
+                   : Loaded 1 resources: 1086012 stmts added in 103.859 secs, rate= 10456, commitLatency=31ms
+
+Results for a variety of serialization/compression approaches for the
+various Procedures (IndexWriteProc, JustificationWriteProc, etc), but
+NOT for serialization changes to the ResultSet (which is really only
+used during inference).  In all cases these results are obtained for
+the jini federation since that is the only case where we are forced to
+serialize the data in a Procedure or a ResultSet for RPC.
+
+NoCompression.  This serializes each key and value as a full length
+byte[].
+
+   Loaded 1 resources: 1086012 stmts added in 107.922 secs, rate= 10062, commitLatency=0ms
+   Loaded 1 resources: 1086012 stmts added in 105.531 secs, rate= 10290, commitLatency=16ms
+
+NoCompression, but writing on a DataOutputBuffer and then copying the
+results to the output stream (see if this case improves if we reuse
+the buffer for each request or using a thread-local variable):
+
+   Loaded 1 resources: 1086012 stmts added in 149.484 secs, rate= 7265, commitLatency=16ms
+
+BTreeCompression.  This uses prefix compression on the keys and simple
+serialization of the values.
+
+   Loaded 1 resources: 1086012 stmts added in 103.203 secs, rate= 10523, commitLatency=16ms
+
+FastRDFCompression
+
+   Loaded 1 resources: 1086012 stmts added in 102.109 secs, rate= 10635, commitLatency=16ms
+   Loaded 1 resources: 1086012 stmts added in  99.75  secs, rate= 10887, commitLatency=16ms (NIO)
+   Loaded 1 resources: 1086012 stmts added in  99.313 secs, rate= 10935, commitLatency=15ms (NIO)
+
+The "FastRDF" approach is probably as good as I can make it for the
+statement indices.  It performs only marginally better than the no
+compression approach.
+
+Perhaps the additional overhead is a mixture of:
+
+ - de-serialization to support RPC;
+ - the mechanisms of RPC (client, server, protocol, network)
+ - the added burden on the heap
+
+NIO for the RPC protocol appears to help a bit, but it runs out of
+memory in the test suite (this shows up as an NPE in ByteBuffer).
+
+
+Concurrent load rates:
+
+Explore interaction of the group commit policy.  If we check point vs
+commit vs do not wait around then how does that effect the
+throughput!!!
+
+Note: smaller buffer sizes (1000 statements) makes the total run much
+slower.  Try this with more threads, but we will probably have to wait
+on the group commit so that won't help with the current policy.
+
+Note: larger buffer sizes will cap out since there is only so much
+data in the LUBM files.
+
+U10
+
+embedded data service:
+
+Finished: #loaded=189 files in 96015 ms, #stmts=1272577, rate=13253.0
+(#threads=3, largestPoolSize=3, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 73797 ms, #stmts=1272577, rate=17244.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 85625 ms, #stmts=1272577, rate=14862.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 78750 ms, #stmts=1272577, rate=16159.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 73203 ms, #stmts=1272577, rate=17384.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+All done: #loaded=189 files in 63172 ms, #stmts=1272577, rate=20144.0
+(#threads=20, largestPoolSize=20, bufferCapacity=100000,
+autoFlush=false, #done=189, #ok=189, #err=0)
+
+All done: #loaded=189 files in 59734 ms, #stmts=1272577, rate=21304.0
+(#threads=20, class=LocalTripleStoreWithEmbeddedDataService,
+largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=189,
+#ok=189, #err=0)
+
+embedded federation:
+
+Finished: #loaded=189 files in 191828 ms, #stmts=1272577, rate=6633.0
+(#threads=1, largestPoolSize=1, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 122343 ms, #stmts=1272577, rate=10401.0
+(#threads=3, largestPoolSize=3, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 282140 ms, #stmts=1272577, rate=4510.0
+(#threads=3, largestPoolSize=3, bufferCapacity=1000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 90860 ms, #stmts=1272577, rate=14005.0
+(#threads=10, largestPoolSize=10, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 85735 ms, #stmts=1272577, rate=14843.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 88453 ms, #stmts=1272577, rate=14387.0
+(#threads=20, largestPoolSize=20, bufferCapacity=20000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 87359 ms, #stmts=1272577, rate=14567.0
+(#threads=30, largestPoolSize=30, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+All done: #loaded=189 files in 105203 ms, #stmts=1272577, rate=12096.0
+(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
+bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
+
+All done: #loaded=189 files in 106109 ms, #stmts=1272577, rate=11993.0
+(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
+bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
+
+   disk: 1,230,029,630 {osp,spo,terms} + 51,870,457 {ids,pos}
+
+Alternative index allocation: 
+
+   Note: This case appears to be much more efficient in term and
+   space, at least for the embedded federation:
+
+   disk: 80,506,107 {terms,spo} + 90,515,091 {ids,pos,osp}
+
+   All done: #loaded=189 files in 88016 ms, #stmts=1272577,
+   rate=14458.0 (#threads=20, class=ScaleOutTripleStore,
+   largestPoolSize=20, bufferCapacity=100000, autoFlush=false,
+   #done=189, #ok=189, #err=0)
+
+jini federation:
+
+Finished: #loaded=189 files in 392078 ms, #stmts=1272578, rate=3245.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+Finished: #loaded=189 files in 371297 ms, #stmts=1272582, rate=3427.0
+(#threads=20, largestPoolSize=20, bufferCapacity=10000, #done=189,
+#ok=189, #err=0)
+
+All done: #loaded=189 files in 82328 ms, #stmts=1272577, rate=15457.0
+(#threads=20, class=ScaleOutTripleStore, largestPoolSize=20,
+bufferCapacity=100000, autoFlush=false, #done=189, #ok=189, #err=0)
+
+    Note: This is an extremely odd result.  It was obtained by running
+    immediately after the previous jini federation run.  Overall, jini
+    seems very sensitive to initial conditions.  Perhaps this is
+    related to memory limits on the laptop platform?  Often the jini
+    run appears to be very nearly single threaded.
+
+All done: #loaded=189 files in 241672 ms, #terms=314871,
+#stmts=1272577, rate=5265.0 (#threads=20, class=ScaleOutTripleStore,
+largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=189,
+#ok=189, #err=0)
+
+server1: All done: #loaded=190 files in 74049 ms, #terms=314871,
+#stmts=1272577, rate=17185.0 (#threads=20, class=ScaleOutTripleStore,
+largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=190,
+#ok=189, #err=1)
+
+server1: All done: #loaded=190 files in 76956 ms, #terms=314871,
+#stmts=1272577, rate=16536.0 (#threads=20, class=ScaleOutTripleStore,
+largestPoolSize=20, bufferCapacity=100000, autoFlush=false, #done=190,
+#ok=189, #err=1)
+
+   disk: 90,926,328 {terms,spo} + 90,926,328 {ids,pos,osp}
+
+server1: All done: #loaded=2008 files in 739904 ms, #terms=3301736,
+#stmts=13405383, rate=18117.0 (#threads=20, class=ScaleOutTripleStore,
+largestPoolSize=20, bufferCapacity=100000, autoFlush=false,
+#done=2008, #ok=2007, #err=1) (U100 is 13M triples)
+
+   disk: 1,110,058,584 {terms,spo} + 1,071,640,537 {ids,pos,osp}
+
+[INFO ][memory ] Memory usage report
+[INFO ][memory ] young collections
+[INFO ][memory ]     total GC time =         140.096 s
+[INFO ][memory ] old collections
+[INFO ][memory ]     total GC time =         112.644 s (pause 15.700 s)
+
+server1: #loaded=20022 files in 11419382 ms, #terms=32885169,
+#stmts=133573856, rate=11697.0 (#threads=20,
+class=ScaleOutTripleStore, largestPoolSize=20, bufferCapacity=100000,
+autoFlush=false, #done=20022, #ok=20020, #err=2)
+
+   disk: 14,110,887,061 {terms,spo} + 12,039,810,264 {ids,pos,osp}
+
+[INFO ][memory ] Memory usage report
+[INFO ][memory ] young collections
+[INFO ][memory ]     total GC time =         1319.038 s
+[INFO ][memory ] old collections
+[INFO ][memory ]     total GC time =         693.036 s (pause 103.692 s)
+
+server1: All done: #loaded=20022 files in 11633794 ms, #terms=32885169,
+#stmts=133573856, rate=11481.0 (#threads=20,
+class=ScaleOutTripleStore, largestPoolSize=20, bufferCapacity=100000,
+autoFlush=false, #done=20022, #ok=20020, #err=2)
+
+   disk: 14,093,839,353 {terms,spo} + 12,038,914,891 {ids,pos,osp}
+
+[INFO ][memory ] Memory usage report
+[INFO ][memory ] young collections
+[INFO ][memory ]     total GC time =         1279.318 s
+[INFO ][memory ] old collections
+[INFO ][memory ]     total GC time =         666.388 s (pause 100.395 s)
+
+*** Jini tuning:
+
+    - Server runs:
+
+      - Since jini is so fast on the server, try to get asynchronous
+        writes to disk working in DiskOnlyStrategy - it might have a
+        big impact since we loose all concurrency when a write to disk
+        occurs.
+
+      - Try U10000 reading the data from NAS with 2 clients, 10
+        threads each and 2 servers.  See if scale-out holds as we
+        increase the data size.  The point of comparison is the 1B run
+        that we did on server2 (single host, non-scale-out
+        architecture, non-concurrent load).
+
+	- I am not seeing the 2nd data service on the current U10000
+          run.  That is super weird. 
+
+        - Make sure that yum-updatesd does not run on the servers.  It
+          absorbs an entire CPU for quite a while.
+
+        - Try running a thread that reads the file names and building
+          up a (blocking) queue of tasks to be started.  Reading all
+          the filenames and creating LoadTasks for each requires too
+          much startup time and too much heap!
+
+	- Make sure that each process writes on its own nohup_xxx.out
+          file.  Hum - there is no way to do that.  Try creating a
+          command group using (...) and running that group with nohup
+          - probably won't work either.  How about run each in its own
+          subdirectory?  Could work, but need to fiddle with the jini
+          config and CLASSPATH.
+
+      - Try with multiple index partitions, ideally dynamically
+        determined!
+
+      - Run single client with the metadata service (its lightly
+        loaded) and one data service on one server and the other data
+        service on another server.
+
+	- Move the client and  metadata server to server3, running the
+          data services on server1 and server2.
+
+        - Have a client on each machine connect to the same federation
+          (using hash(filename) MOD 2) to select the files to be
+          loaded (distributed clients doing a concurrent batch load).
+          The source data files will have to reside on NAS or a NSF
+          mount or be pre-allocated to the different servers.
+
+      - try TestTripleStoreLoadRateLocalConcurrent on the server to
+        get a sense of the performance comparison between jini and an
+        embedded data service when both use concurrent data load.
+
+      - we do not appear to be memory capped on the server on U10.  On
+        U100 we are using 60% of the RAM on the server (2.2G).
+
+      - examine performance logs to see IO, CPU, etc. rates over time.
+
+      - try larger loads (U100, U1000)
+
+    - Tune indices
+
+      - The ids index should benefit from value compression since the
+        values are the serialized terms.  This will require custom
+        code to break the values into symbols and then use huffman
+        encoding.  Alternatively, simply treat each value as a symbol
+        and code from that (assuming that value reuse is common - if
+        not then at least URIs can be broken down into common
+        symbols).
+
+      - The terms (term:id) index is on the order of 5x larger than
+        the ids (id:term) index.  Presumably this is because updates
+        are distributed more or less randomly across the terms index
+        as new terms become defined but are strictly append only for
+        the ids index since new ids are always larger than old ids.
+	
+         - A larger branching factor may benefit the ids index.
+
+	 - A compacting merge of the terms index should greatly reduce
+           its size.
+
+	 - Nearly ALL _read_ time between the SPO and TERMS index is
+           reading the TERMS index (99%).
+
+	 - Nearly ALL _write_ time between the SPO and the TERMS index
+           is writing the SPO index (99%).  Statements are more likely
+           to be distinct than terms, so it makes sense that we write
+           on the statement index more often.  However, note that this
+           is true even though the TERMS index is 3x larger than the
+           SPO index.
+      
+    - Tune network IO
+
+      - AddTerms and AddIds
+
+      - Have the keys and values converted to a compressed byte[]
+        before serialization (or deserialize the a compressed byte[]).
+
+      - Modify the procedure logic to abstract a 'next key/val'
+        iterator using a shared buffer for de-compression in order to
+        minimize heap churn on the data server.
+
+      - huffman encoding is appropriate for network IO, but hu-tucker
+        is not required since we have to decompress keys to get them
+        inserted into the btree.
+
+      - tokenization needs to be specified for RDF Value types for the
+        purposes of compression.  In fact, we are guarenteed that
+        values a NOT duplicated in a given batch so tokenization needs
+        to uncover common symbols.  This is easy for URIs but less so
+        for literals and impossible for BNodes (which do not really
+        need to be in the lexicon anyway).
+
+      - Make sure that ResultSet, batch operations, and remote
+        procedures all benefit from these tuning steps.  These should
+        all be implemented as procedures (at least the batch btree api
+        and submit) for simplicity of the API and the serialization
+        support mechanisms.
+
+    - Try jini federation using only the terms index to assign
+      consistent term identifiers, bulk loading into local SPO-only
+      indices, and then range partitioning the indices into global
+      SPO, POS, and OSP orders and bulk loading the global statement
+      indices.  The data loader should be concurrent and a filter
+      should be applied such that each "host" loads only the files
+      that hash MOD N to that host.  (note that only AddTerms and
+      AddIds go across the network API in this case.)
+
+    - Make it easy to summarize data service or index partition
+      properties (report named properties by data service and/or index
+      partition and aggregate).  Probably an XML syntax or a
+      generalized property set model will benefit in the long term for
+      telemetry.
+
+    - The temp triple store supports concurrent read only, so it is
+      not appropriate for a concurrent bulk loader.
+
+    Other tuning and feature completeness
+
+    - Inference has to be snell across the data service api.  So does
+      high-level query.  At least inference is slow due to a large #of
+      small join results.  Parallel sub-query is probably the way to
+      beat that.  After tuning, compare to the purely local
+      unconcurrent line.
+
+      - Consider batching a set of rangeQueries together in a single
+        operation vs parallel submits.  
+
+    - quad store
+
+    - 3+1 or 4+1 data models.  It IS possible to do statement
+      identifiers using bnodes on a quad store, but we lose the
+      opportunity to use the context position for virtual graph
+      partition (often used to group one or more data sources
+      together), which is also a key feature for federation
+
+    - Sesame 2 TCL (integration tests)
+
+**  Maven 2.x build and subversion for bigdata.
+
+----------------------------------------
+data service and index summary from U1000 run on server1;
+
+dataService: uuid=247d3d39-da6a-4efa-bdce-6a71e8184e9c
+file=DataServer1.jnl, mode=rw, nextOffset=14,093,839,353, extent=14,103,058,240
+store(read): #read=27,343,227, bytesRead=10,106,155,083, secs=6,246.804, bytesPerSec=1,617,812, maxRecordSize=1,240
+store(write): #write=48,176,437, bytesWritten=14,093,839,353, secs=3,753.166, bytesPerSec=3,755,187, maxRecordSize=1,360
+cache(read): 3.49% (#cache=954172, #disk=26389055, total=27343227, secs=36.737)
+cache(write): 100.00% (#cache=48176437, #disk=1507, total=48177944, secs=162.082)
+disk(read): #read=26389055, bytesRead=9,734,685,002, bytesPerRead=382, secs=6,009.483s, bytesPerSec=1,619,887, secs/read=0.000
+disk(write): #write=1507, bytesWritten=14,093,839,353, bytesPerWrite=9,352,249, secs=83.214s, bytesPerSec=169,368,756, secs/write=0.055
+disk(other): #force=702, #extend=420, #reopen=0, #rootBlocks=282
+
+index: name=SPO#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=2083276, #leaves=16688384, #(nodes+leaves)=18771660, #distinctOnQueue=347, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=8, #roots joined=0, #nodes split=2083268, #nodes joined=0, #leaves split=16688383, #leaves joined=0, #nodes copyOnWrite=29823, #leaves copyOnWrite=40949
+read (57208 nodes, 185336 leaves, 60,115,396 bytes, readSeconds=111.840, bytes/sec=537,511, deserializeSeconds=35.335, deserialized/sec=6,864)
+wrote (2113099 nodes, 16729333 leaves, 3,658,662,336 bytes, writeSeconds=3,575.106, bytes/sec=1,023,372, serializeSeconds=250.521, serialized/sec=75,213)
+
+index: name=terms#0 : #entries=32885169, branchingFactor=16, height=7, #nodes=422886, #leaves=3694872, #(nodes+leaves)=4117758, #distinctOnQueue=406, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=68619359, #bloomRejects=0, #insert=32885169, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=7, #roots joined=0, #nodes split=422879, #nodes joined=0, #leaves split=3694871, #leaves joined=0, #nodes copyOnWrite=14296674, #leaves copyOnWrite=10917466
+read (15074708 nodes, 12025975 leaves, 10,046,039,687 bytes, readSeconds=6,340.230, bytes/sec=1,584,491, deserializeSeconds=940.333, deserialized/sec=28,820)
+wrote (14719560 nodes, 14612338 leaves, 10,434,620,707 bytes, writeSeconds=270.662, bytes/sec=38,552,222, serializeSeconds=368.982, serialized/sec=79,494)
+
+dataService: uuid=cfabe608-7d0c-4c4f-9369-9889897eedbf
+file=DataServer0.jnl, mode=rw, nextOffset=12,038,914,891, extent=12,056,279,856
+store(read): #read=22,121,027, bytesRead=4,849,375,933, secs=899.838, bytesPerSec=5,389,163, maxRecordSize=1,122
+store(write): #write=62,317,229, bytesWritten=12,038,914,891, secs=830.813, bytesPerSec=14,490,520, maxRecordSize=1,331
+cache(read): 22.79% (#cache=5040340, #disk=17080687, total=22121027, secs=24.666)
+cache(write): 100.00% (#cache=62317229, #disk=1430, total=62318659, secs=178.284)
+disk(read): #read=17080687, bytesRead=3,726,012,880, bytesPerRead=283, secs=671.521s, bytesPerSec=5,548,621, secs/read=0.000
+disk(write): #write=1430, bytesWritten=12,038,914,891, bytesPerWrite=8,418,821, secs=76.801s, bytesPerSec=156,754,405, secs/write=0.054
+disk(other): #force=870, #extend=359, #reopen=0, #rootBlocks=511
+
+index: name=ids#0 : #entries=32885169, branchingFactor=16, height=7, #nodes=513066, #leaves=4110154, #(nodes+leaves)=4623220, #distinctOnQueue=368, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=68619359, #bloomRejects=0, #insert=32885169, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=7, #roots joined=0, #nodes split=513059, #nodes joined=0, #leaves split=4110153, #leaves joined=0, #nodes copyOnWrite=8262, #leaves copyOnWrite=1640
+read (121221 nodes, 559385 leaves, 285,491,447 bytes, readSeconds=147.523, bytes/sec=1,935,238, deserializeSeconds=43.001, deserialized/sec=15,828)
+wrote (521328 nodes, 4111794 leaves, 2,457,704,285 bytes, writeSeconds=70.132, bytes/sec=35,044,032, serializeSeconds=62.168, serialized/sec=74,526)
+
+index: name=just#0 : #entries=0, branchingFactor=16, height=0, #nodes=0, #leaves=1, #(nodes+leaves)=1, #distinctOnQueue=1, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=0, #bloomRejects=0, #insert=0, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=0, #roots joined=0, #nodes split=0, #nodes joined=0, #leaves split=0, #leaves joined=0, #nodes copyOnWrite=0, #leaves copyOnWrite=0
+read (0 nodes, 0 leaves, 0 bytes, readSeconds=0.000, bytes/sec=N/A, deserializeSeconds=0.000, deserialized/sec=N/A)
+wrote (0 nodes, 1 leaves, 19 bytes, writeSeconds=0.000, bytes/sec=2,843,035, serializeSeconds=0.000, serialized/sec=108,202)
+
+index: name=OSP#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=1986381, #leaves=16233732, #(nodes+leaves)=18220113, #distinctOnQueue=341, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=8, #roots joined=0, #nodes split=1986373, #nodes joined=0, #leaves split=16233731, #leaves joined=0, #nodes copyOnWrite=6432620, #leaves copyOnWrite=2837848
+read (6426941 nodes, 3001831 leaves, 2,106,210,577 bytes, readSeconds=321.601, bytes/sec=6,549,135, deserializeSeconds=285.973, deserialized/sec=32,971)
+wrote (8419001 nodes, 19071580 leaves, 5,056,956,115 bytes, writeSeconds=484.195, bytes/sec=10,444,042, serializeSeconds=267.202, serialized/sec=102,883)
+
+index: name=POS#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=1987343, #leaves=16281722, #(nodes+leaves)=18269065, #distinctOnQueue=340, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
+#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
+#roots split=8, #roots joined=0, #nodes split=1987335, #nodes joined=0, #leaves split=16281721, #leaves joined=0, #nodes copyOnWrite=8051852, #leaves copyOnWrite=3868642
+read (8023614 nodes, 3988035 leaves, 2,457,673,909 bytes, readSeconds=488.999, bytes/sec=5,025,928, deserializeSeconds=343.401, deserialized/sec=34,979)
+wrote (10039195 nodes, 20150364 leaves, 4,523,095,721 bytes, writeSeconds=382.653, bytes/sec=11,820,344, serializeSeconds=280.918, serialized/sec=107,468)
+----------------------------------------
+
+Problem: The proxy generated when running a local test case does not
+report the IMetadataService interface BUT it does implement that
+interface.  This does NOT appear to be true when the proxy is
+generated within another JVM (on the same machine, server1).  This is
+resulting in a failure to locate the metadata service.  The data
+services are discoverable since their interface is the one that the
+proxy always discloses (jini's "guess" as to the most interesting
+interface).
+
+laptop (TestBigdataClient):
+
+net.jini.core.lookup.ServiceItem[serviceID=a36732bf-e6f6-4fae-b853-d7e0ae141e1d,
+service=Proxy[IDataService,BasicInvocationHandler[BasicObjectEndpoint[8ed84860-ace3-44b3-90da-cc94dade6fa7,TcpEndpoint[192.168.1.102:3084]]]],
+attributeSets=[net.jini.lookup.entry.Name(name=MetadataService0)
+net.jini.lookup.entry.ServiceInfo(name=bigdata,manufacturer=SYSTAP,LLC,vendor=SYSTAP,LLC,version=0.1-beta,model=MetadataService,serialNumber=serial#)
+
+server1: fails to recognize the metadata service as implementing IMetadataService!?!
+
+DEBUG: 21490 task
+com.bigdata.service.MetadataServiceFilter.check(MetadataServiceFilter.java:64):
+Ignoring:
+net.jini.core.lookup.ServiceItem[serviceID=2e302d56-cbc4-491c-b458-d6d37b1f22cf,
+service=Proxy[IDataService,BasicInvocationHandler[BasicObjectEndpoint[dde6f758-7aca-4212-a683-5c1782611741,TcpEndpoint[192.168.20.26:54438]]]],
+attributeSets=[net.jini.lookup.entry.Name(name=MetadataService0)
+net.jini.lookup.entry.ServiceInfo(name=bigdata,manufacturer=SYSTAP,LLC,vendor=SYSTAP,LLC,version=0.1-beta,model=MetadataService,serialNumber=serial#)]]

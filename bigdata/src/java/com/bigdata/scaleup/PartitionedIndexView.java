@@ -51,6 +51,11 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.ResourceState;
 
 /**
  * A mutable B+-Tree that is dynamically partitioned into one or more key

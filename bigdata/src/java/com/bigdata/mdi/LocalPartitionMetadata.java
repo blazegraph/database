@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-package com.bigdata.service;
+package com.bigdata.mdi;
 
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -32,7 +32,6 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
-import com.bigdata.scaleup.IResourceMetadata;
 
 /**
  * Per-partition metadata records describing each partition of this index

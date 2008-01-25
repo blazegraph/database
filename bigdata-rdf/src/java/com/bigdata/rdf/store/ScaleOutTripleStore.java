@@ -33,12 +33,12 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of a

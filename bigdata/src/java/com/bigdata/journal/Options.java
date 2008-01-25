@@ -396,8 +396,13 @@ public interface Options {
     public final static String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
     
     /**
-     * The recommened extension for journal files.
+     * The recommended extension for journal files.
      */
     public static final String JNL = ".jnl";
+    
+    /**
+     * The recommended extension for {@link IndexSegment} files.
+     */
+    public static final String SEG = ".seg";
     
 }

@@ -31,8 +31,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * The client-facing interface to a bigdata federation.

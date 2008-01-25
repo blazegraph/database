@@ -37,7 +37,9 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.scaleup.IResourceMetadata;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}

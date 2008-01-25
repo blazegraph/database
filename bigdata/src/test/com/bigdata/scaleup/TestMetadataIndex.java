@@ -50,11 +50,15 @@ import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.SegmentMetadata;
+import com.bigdata.mdi.UnisolatedBTreePartition;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.service.UnisolatedBTreePartition;
-import com.bigdata.service.UnisolatedBTreePartitionConstructor;
 
 /**
  * A test suite for managing a partitioned index.

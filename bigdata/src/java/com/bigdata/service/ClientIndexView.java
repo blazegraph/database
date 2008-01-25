@@ -59,10 +59,10 @@ import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
-import com.bigdata.scaleup.PartitionedIndexView;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 
 /**
  * A client-side view of an index.
@@ -806,6 +806,48 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
+     * Submits an index procedure that operations on a single key to the
+     * appropriate index partition returning the result of that procedure.
+     * 
+     * @param key
+     *            The key.
+     * @param proc
+     *            The procedure.
+     * 
+     * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
+     */
+    public Object submit(byte[] key,IIndexProcedure proc) {
+
+        // The index partition for that key.
+        final PartitionMetadata pmd = getPartition( key );
+
+        // The data service for that index partition.
+        final IDataService dataService = getDataService(pmd);
+
+        /*
+         * Submit procedure to that data service.
+         */
+        try {
+
+            log.info("Submitting " + proc.getClass() + " to partition" + pmd
+                    + " on dataService=" + dataService);
+
+            final String name = DataService.getIndexPartitionName(this.name,
+                    pmd.getPartitionId());
+
+            Object result = dataService.submit(tx, name, proc);
+
+            return result;
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+    
+    /**
      * The procedure will be transparently applied against each index partition
      * spanned by the given key range.
      * <p>
@@ -1076,6 +1118,7 @@ public class ClientIndexView implements IIndex {
             
         }
 
+        @SuppressWarnings("unchecked")
         public Void call() throws Exception {
 
             Object result = dataService.submit(tx, name, proc);
@@ -1192,7 +1235,8 @@ public class ClientIndexView implements IIndex {
      * same partition then then this is the simplest case and we can just send
      * the data along, perhaps breaking it down into smaller batches (note that
      * batch break points MUST respect the "row" identity for a sparse row
-     * store).
+     * store, but we get that constraint by maintaining the index partition
+     * boundaries in agreement with the split point constraints for the index).
      * <p>
      * Otherwise, perform a binary search on the remaining keys looking for the
      * index of the first key GTE the right separator key for that partition.
@@ -1204,9 +1248,6 @@ public class ClientIndexView implements IIndex {
      * <p>
      * Examine the next key and repeat the process until all keys have been
      * allocated to index partitions.
-     * <p>
-     * Form requests based on the identified first/last key and partition
-     * identified by this process.
      * 
      * @param ntuples
      *            The #of keys.
@@ -1214,6 +1255,10 @@ public class ClientIndexView implements IIndex {
      *            An array of keys. Each key is an interpreted as an unsigned
      *            byte[]. All keys must be non-null. The keys must be in sorted
      *            order.
+     *            
+     * @return The {@link Split}s that you can use to form requests based on
+     *         the identified first/last key and partition identified by this
+     *         process.
      * 
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 

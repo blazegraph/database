@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.scaleup;
+package com.bigdata.mdi;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -90,7 +90,7 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     /**
      * @deprecated this is used by the test suite only.
      */
-    /*public*/ PartitionMetadata(int partId, UUID[] dataServices ) {
+    public PartitionMetadata(int partId, UUID[] dataServices ) {
 
         this(partId, dataServices, new IResourceMetadata[] {});
 

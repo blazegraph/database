@@ -38,12 +38,14 @@ import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.scaleup.IPartitionMetadata;
-import com.bigdata.scaleup.IResourceMetadata;
-import com.bigdata.scaleup.JournalMetadata;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.scaleup.MasterJournal;
-import com.bigdata.scaleup.MetadataIndex;
-import com.bigdata.scaleup.PartitionMetadata;
 
 /**
  * Implementation of a metadata service for a named scale-out index.

@@ -53,6 +53,7 @@ import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ValidationError;
+import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
 import com.bigdata.test.ExperimentDriver;

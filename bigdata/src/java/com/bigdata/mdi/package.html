@@ -1,0 +1,39 @@
+<html>
+<head>
+<title>Metadata Index (MDI) and Range Partitioned Indices</title>
+</head>
+<body>
+
+<p>
+
+This package provides a metadata index and range partitioned indices
+managed by that metadata index.  Each index partition is a fused view
+of one or more resources.  Those resources include a mutable BTree
+hosted on a Journal and read-only index segments.  Reads are against
+the fused view.  Writes are against the mutable BTree.
+
+</p>
+
+<p>
+
+Periodically the mutable BTree, or the journal on which it resides,
+will fill up and a merge task will generate a read-only index segment.
+When a full merge (aka compacting merge) is applied, the result is a
+single index segment containing all data for the index
+partition. Depending on the history policy, some historical data
+versions and delete markers may be purged from the view meaning that
+some historical commit states will no longer be readable.
+
+</p>
+
+<p>
+
+Index partitions are created by a <em>split</em> operation and merged
+by a <em>join</em> operation.  These operations create new index
+partitions having different separator keys.  Split and join operations
+are not effective until the metadata index has been updated. 
+
+</p>
+
+</body>
+</html>

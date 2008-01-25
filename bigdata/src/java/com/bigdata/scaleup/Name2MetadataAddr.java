@@ -29,6 +29,7 @@ package com.bigdata.scaleup;
 
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.journal.Name2Addr;
+import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.IRawStore;
 
 /**
