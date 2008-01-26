@@ -56,6 +56,8 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.RangeCountProcedure;
+import com.bigdata.btree.IndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.IndexProcedure.ResultBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
@@ -153,6 +155,21 @@ public class ClientIndexView implements IIndex {
         
     }
     
+    /**
+     * 
+     */
+    private static final String NON_BATCH_API = "Non-batch API";
+
+    /**
+     * This may be used to disable the non-batch API, which is quite convenient
+     * for location code that needs to be re-written to use
+     * {@link IIndexProcedure}s.
+     * 
+     * @todo make this a config option and also support this option on the
+     *       bigdata clients.
+     */
+    private final boolean batchOnly = false;
+
     /**
      * The default capacity for the {@link #rangeIterator(byte[], byte[])}
      */
@@ -378,55 +395,40 @@ public class ClientIndexView implements IIndex {
     
     public boolean contains(byte[] key) {
         
-        IPartitionMetadata pmd = getPartition(key);
+        if (batchOnly)
+            throw new RuntimeException(NON_BATCH_API);
+        else
+            log.warn(NON_BATCH_API);
 
-        IDataService dataService = getDataService(pmd);
+        final BatchContains proc = new BatchContains(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key } // keys
+        );
 
-        final boolean[] ret;
-        
-        try {
+        final boolean[] ret = ((ResultBitBuffer) submit((byte[]) key, proc))
+                .getResult();
 
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(this.name,
-                    pmd.getPartitionId());
-
-            ret = dataService.batchContains(tx, name, 1, new byte[][] { key });
-            
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
         return ret[0];
         
     }
 
     public Object insert(Object key, Object value) {
 
-        IPartitionMetadata pmd = getPartition((byte[])key);
-        
-        IDataService dataService = getDataService(pmd);
+        if (batchOnly)
+            throw new RuntimeException(NON_BATCH_API);
+        else
+            log.warn(NON_BATCH_API);
 
-        final boolean returnOldValues = true;
-        
-        final byte[][] ret;
-        
-        try {
-            
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(this.name,
-                    pmd.getPartitionId());
+        final BatchInsert proc = new BatchInsert(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key }, // keys
+                new byte[][] { (byte[]) value }, // vals
+                true // returnOldValues
+        );
 
-            ret = dataService.batchInsert(tx, name, 1,
-                    new byte[][] { (byte[]) key },
-                    new byte[][] { (byte[]) value }, returnOldValues);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
@@ -434,26 +436,18 @@ public class ClientIndexView implements IIndex {
 
     public Object lookup(Object key) {
 
-        IPartitionMetadata pmd = getPartition((byte[]) key);
+        if (batchOnly)
+            throw new RuntimeException(NON_BATCH_API);
+        else
+            log.warn(NON_BATCH_API);
 
-        IDataService dataService = getDataService(pmd);
-        
-        final byte[][] ret;
-        
-        try {
-            
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(this.name,
-                    pmd.getPartitionId());
+        final BatchLookup proc = new BatchLookup(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key } // keys
+        );
 
-            ret = dataService.batchLookup(tx, name, 1,
-                    new byte[][] { (byte[]) key });
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
@@ -461,28 +455,19 @@ public class ClientIndexView implements IIndex {
 
     public Object remove(Object key) {
 
-        IPartitionMetadata pmd = getPartition((byte[])key);
+        if (batchOnly)
+            throw new RuntimeException(NON_BATCH_API);
+        else
+            log.warn(NON_BATCH_API);
 
-        IDataService dataService = getDataService(pmd);
-        
-        final byte[][] ret;
-        
-        final boolean returnOldValues = true;
-        
-        try {
-            
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(this.name,
-                    pmd.getPartitionId());
+        final BatchRemove proc = new BatchRemove(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key }, // keys
+                true // returnOldValues
+        );
 
-            ret = dataService.batchRemove(tx, name, 1,
-                    new byte[][] { (byte[]) key }, returnOldValues );
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
@@ -499,9 +484,9 @@ public class ClientIndexView implements IIndex {
      */
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        LongAggregator handler = new LongAggregator();
+        final LongAggregator handler = new LongAggregator();
         
-        RangeCountProcedure proc = new RangeCountProcedure(fromKey,toKey);
+        final RangeCountProcedure proc = new RangeCountProcedure(fromKey,toKey);
 
         submit(fromKey,toKey,proc,handler);
         
@@ -622,188 +607,188 @@ public class ClientIndexView implements IIndex {
         
     }
 
-    public void contains(BatchContains op) {
-
-        if (op == null)
-            throw new IllegalArgumentException();
-        
-        final List<Split> splits = splitKeys(op.n, op.keys);
-        
-        final Iterator<Split> itr = splits.iterator();
-        
-        while(itr.hasNext()) {
-            
-            Split split = itr.next();
-            
-            IDataService dataService = getDataService(split.pmd);
-            
-            byte[][] _keys = new byte[split.ntuples][];
-            boolean[] _vals;
-            
-            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
-            
-            try {
-
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(this.name,
-                        split.pmd.getPartitionId());
-
-                _vals = dataService.batchContains(tx, name, split.ntuples, _keys);
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
-            System.arraycopy(_vals, 0, op.contains, split.fromIndex,
-                    split.ntuples);
-            
-        }
-        
-    }
-
-
-    public void lookup(BatchLookup op) {
-
-        if (op == null)
-            throw new IllegalArgumentException();
-        
-        final List<Split> splits = splitKeys(op.n, op.keys);
-        
-        final Iterator<Split> itr = splits.iterator();
-        
-        while(itr.hasNext()) {
-            
-            Split split = itr.next();
-            
-            IDataService dataService = getDataService(split.pmd);
-            
-            byte[][] _keys = new byte[split.ntuples][];
-            byte[][] _vals;
-            
-            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
-            
-            try {
-
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(this.name,
-                        split.pmd.getPartitionId());
-
-                _vals = dataService.batchLookup(tx, name, split.ntuples, _keys);
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
-            System.arraycopy(_vals, 0, op.values, split.fromIndex,
-                    split.ntuples);
-            
-        }
-        
-    }
-
-    public void insert(BatchInsert op) {
-
-        if (op == null)
-            throw new IllegalArgumentException();
-        
-        final boolean returnOldValues = true;
-        
-        final List<Split> splits = splitKeys(op.n, op.keys);
-        
-        final Iterator<Split> itr = splits.iterator();
-        
-        while(itr.hasNext()) {
-            
-            Split split = itr.next();
-            
-            IDataService dataService = getDataService(split.pmd);
-            
-            byte[][] _keys = new byte[split.ntuples][];
-            byte[][] _vals = new byte[split.ntuples][];
-            
-            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
-            System.arraycopy(op.values, split.fromIndex, _vals, 0, split.ntuples);
-            
-            byte[][] oldVals;
-            
-            try {
-
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(this.name,
-                        split.pmd.getPartitionId());
-
-                oldVals = dataService.batchInsert(tx, name, split.ntuples,
-                        _keys, _vals, returnOldValues);
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
-            if(returnOldValues) {
-                
-                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
-                        split.ntuples);
-                
-            }
-            
-        }
-        
-    }
-
-    public void remove(BatchRemove op) {
-
-        if (op == null)
-            throw new IllegalArgumentException();
-        
-        final boolean returnOldValues = true;
-        
-        final List<Split> splits = splitKeys(op.n, op.keys);
-        
-        final Iterator<Split> itr = splits.iterator();
-        
-        while(itr.hasNext()) {
-            
-            Split split = itr.next();
-            
-            IDataService dataService = getDataService(split.pmd);
-            
-            byte[][] _keys = new byte[split.ntuples][];
-            
-            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
-            
-            byte[][] oldVals;
-            
-            try {
-
-                // the name of the index partition.
-                final String name = DataService.getIndexPartitionName(this.name,
-                        split.pmd.getPartitionId());
-
-                oldVals = dataService.batchRemove(tx, name, split.ntuples,
-                        _keys, returnOldValues);
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
-            if(returnOldValues) {
-                
-                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
-                        split.ntuples);
-                
-            }
-            
-        }
-
-    }
+//    public void contains(BatchContains op) {
+//
+//        if (op == null)
+//            throw new IllegalArgumentException();
+//        
+//        final List<Split> splits = splitKeys(op.n, op.keys);
+//        
+//        final Iterator<Split> itr = splits.iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            Split split = itr.next();
+//            
+//            IDataService dataService = getDataService(split.pmd);
+//            
+//            byte[][] _keys = new byte[split.ntuples][];
+//            boolean[] _vals;
+//            
+//            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+//            
+//            try {
+//
+//                // the name of the index partition.
+//                final String name = DataService.getIndexPartitionName(this.name,
+//                        split.pmd.getPartitionId());
+//
+//                _vals = dataService.batchContains(tx, name, split.ntuples, _keys);
+//                
+//            } catch (Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            System.arraycopy(_vals, 0, op.contains, split.fromIndex,
+//                    split.ntuples);
+//            
+//        }
+//        
+//    }
+//
+//
+//    public void lookup(BatchLookup op) {
+//
+//        if (op == null)
+//            throw new IllegalArgumentException();
+//        
+//        final List<Split> splits = splitKeys(op.n, op.keys);
+//        
+//        final Iterator<Split> itr = splits.iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            Split split = itr.next();
+//            
+//            IDataService dataService = getDataService(split.pmd);
+//            
+//            byte[][] _keys = new byte[split.ntuples][];
+//            byte[][] _vals;
+//            
+//            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+//            
+//            try {
+//
+//                // the name of the index partition.
+//                final String name = DataService.getIndexPartitionName(this.name,
+//                        split.pmd.getPartitionId());
+//
+//                _vals = dataService.batchLookup(tx, name, split.ntuples, _keys);
+//                
+//            } catch (Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            System.arraycopy(_vals, 0, op.values, split.fromIndex,
+//                    split.ntuples);
+//            
+//        }
+//        
+//    }
+//
+//    public void insert(BatchInsert op) {
+//
+//        if (op == null)
+//            throw new IllegalArgumentException();
+//        
+//        final boolean returnOldValues = true;
+//        
+//        final List<Split> splits = splitKeys(op.n, op.keys);
+//        
+//        final Iterator<Split> itr = splits.iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            Split split = itr.next();
+//            
+//            IDataService dataService = getDataService(split.pmd);
+//            
+//            byte[][] _keys = new byte[split.ntuples][];
+//            byte[][] _vals = new byte[split.ntuples][];
+//            
+//            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+//            System.arraycopy(op.values, split.fromIndex, _vals, 0, split.ntuples);
+//            
+//            byte[][] oldVals;
+//            
+//            try {
+//
+//                // the name of the index partition.
+//                final String name = DataService.getIndexPartitionName(this.name,
+//                        split.pmd.getPartitionId());
+//
+//                oldVals = dataService.batchInsert(tx, name, split.ntuples,
+//                        _keys, _vals, returnOldValues);
+//                
+//            } catch (Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            if(returnOldValues) {
+//                
+//                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
+//                        split.ntuples);
+//                
+//            }
+//            
+//        }
+//        
+//    }
+//
+//    public void remove(BatchRemove op) {
+//
+//        if (op == null)
+//            throw new IllegalArgumentException();
+//        
+//        final boolean returnOldValues = true;
+//        
+//        final List<Split> splits = splitKeys(op.n, op.keys);
+//        
+//        final Iterator<Split> itr = splits.iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            Split split = itr.next();
+//            
+//            IDataService dataService = getDataService(split.pmd);
+//            
+//            byte[][] _keys = new byte[split.ntuples][];
+//            
+//            System.arraycopy(op.keys, split.fromIndex, _keys, 0, split.ntuples);
+//            
+//            byte[][] oldVals;
+//            
+//            try {
+//
+//                // the name of the index partition.
+//                final String name = DataService.getIndexPartitionName(this.name,
+//                        split.pmd.getPartitionId());
+//
+//                oldVals = dataService.batchRemove(tx, name, split.ntuples,
+//                        _keys, returnOldValues);
+//                
+//            } catch (Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            }
+//
+//            if(returnOldValues) {
+//                
+//                System.arraycopy(oldVals, 0, op.values, split.fromIndex,
+//                        split.ntuples);
+//                
+//            }
+//            
+//        }
+//
+//    }
 
     /**
      * Submits an index procedure that operations on a single key to the
@@ -815,11 +800,14 @@ public class ClientIndexView implements IIndex {
      *            The procedure.
      * 
      * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
+     * 
+     * @todo run on the {@link #getThreadPool()} in order to limit client
+     *       parallelism to the size of the thread pool.
      */
-    public Object submit(byte[] key,IIndexProcedure proc) {
+    public Object submit(byte[] key, IIndexProcedure proc) {
 
         // The index partition for that key.
-        final PartitionMetadata pmd = getPartition( key );
+        final PartitionMetadata pmd = getPartition(key);
 
         // The data service for that index partition.
         final IDataService dataService = getDataService(pmd);
@@ -911,7 +899,7 @@ public class ClientIndexView implements IIndex {
         
         final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(nsplits);
         
-        for (int index = toIndex; index <= fromIndex; index++) {
+        for (int index = fromIndex; index <= toIndex; index++) {
 
             final IPartitionMetadata pmd = getPartitionAtIndex(index);
 
@@ -1153,11 +1141,11 @@ public class ClientIndexView implements IIndex {
         
         }
         
-        if (aggregator == null) {
-
-            throw new IllegalArgumentException();
-            
-        }
+//        if (aggregator == null) {
+//
+//            throw new IllegalArgumentException();
+//            
+//        }
         
         /*
          * Break down the data into a series of "splits", each of which will be

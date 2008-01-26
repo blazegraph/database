@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.scaleup;
+package com.bigdata.mdi;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -74,8 +74,8 @@ public class TestAll extends TestCase {
          * @todo test metadata management for index segments.
          */
         suite.addTestSuite(TestMetadataIndex.class);
-        suite.addTestSuite(TestPartitionedIndex.class);
-        suite.addTestSuite(TestPartitionedJournal.class);
+//        suite.addTestSuite(TestPartitionedIndex.class);
+//        suite.addTestSuite(TestPartitionedJournal.class);
        
         return suite;
         

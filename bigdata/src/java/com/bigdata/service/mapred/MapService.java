@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BatchInsert;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -313,8 +314,13 @@ abstract public class MapService
 
             }
 
-            ds.batchInsert(ITx.UNISOLATED, name/*unpartitioned*/, ntuples, keys, vals,
-                            false /* returnOldValues */);
+            BatchInsert proc = new BatchInsert(ntuples, 0/* offset */, keys,
+                    vals, false/*returnOldValues*/);
+
+            ds.submit(ITx.UNISOLATED, name/*unpartitioned*/, proc);
+            
+//            ds.batchInsert(ITx.UNISOLATED, name/*unpartitioned*/, ntuples, keys, vals,
+//                            false /* returnOldValues */);
 
             log.info("Wrote " + ntuples + " tuples on dataService="
                     + dataService + " for reduceTask="

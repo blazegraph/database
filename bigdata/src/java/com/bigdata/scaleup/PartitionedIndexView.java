@@ -35,10 +35,6 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.EmptyEntryIterator;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
@@ -488,52 +484,52 @@ public class PartitionedIndexView implements IIndex, ICommitter {
 
     }
     
-    /*
-     * Batch API.
-     * 
-     * The write operations are trivial since we always direct them to the named
-     * btree on the journal.
-     * 
-     * The read operations are more complex. We need to partition the set of
-     * keys based on the partitions to which those keys would be directed. This
-     * is basically a join against the {@link MetadataIndex}. This operation is
-     * also required on the rangeCount and rangeIterator methods on the
-     * non-batch api.
-     */
-
-    public void insert(BatchInsert op) {
-
-        btree.insert(op);
-
-    }
-
-    public void remove(BatchRemove op) {
-
-        btree.remove(op);
-
-    }
-
-    // FIXME contains(batch)
-    public void contains(BatchContains op) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    // FIXME lookup(batch)
-    public void lookup(BatchLookup op) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    // FIXME submit(proc)
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
-
-        throw new UnsupportedOperationException();
-
-    }
+//    /*
+//     * Batch API.
+//     * 
+//     * The write operations are trivial since we always direct them to the named
+//     * btree on the journal.
+//     * 
+//     * The read operations are more complex. We need to partition the set of
+//     * keys based on the partitions to which those keys would be directed. This
+//     * is basically a join against the {@link MetadataIndex}. This operation is
+//     * also required on the rangeCount and rangeIterator methods on the
+//     * non-batch api.
+//     */
+//
+//    public void insert(BatchInsert op) {
+//
+//        btree.insert(op);
+//
+//    }
+//
+//    public void remove(BatchRemove op) {
+//
+//        btree.remove(op);
+//
+//    }
+//
+//    // FIXME contains(batch)
+//    public void contains(BatchContains op) {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
+//
+//    // FIXME lookup(batch)
+//    public void lookup(BatchLookup op) {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
+//
+//    // FIXME submit(proc)
+//    public void submit(int n, byte[][] keys, byte[][] vals,
+//            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
     
     /**
      * An iterator that visits all key/value entries in a specified key range
@@ -733,6 +729,12 @@ public class PartitionedIndexView implements IIndex, ICommitter {
     public boolean isIsolatable() {
         
         return btree.isIsolatable();
+        
+    }
+
+    public void submit(int n, byte[][] keys, byte[][] vals, IIndexProcedureConstructor ctor, IResultHandler handler) {
+
+        throw new UnsupportedOperationException();
         
     }
     

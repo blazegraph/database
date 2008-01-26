@@ -169,23 +169,23 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
         
     }
 
-    /**
-     * Write operations are not supported on the view.
-     */
-    public void insert(BatchInsert op) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * Write operations are not supported on the view.
-     */
-    public void remove(BatchRemove op) {
-
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * Write operations are not supported on the view.
+//     */
+//    public void insert(BatchInsert op) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
+//
+//    /**
+//     * Write operations are not supported on the view.
+//     */
+//    public void remove(BatchRemove op) {
+//
+//        throw new UnsupportedOperationException();
+//        
+//    }
     
     public Object insert(Object key, Object value) {
 
@@ -234,34 +234,34 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
         
     }
     
-    /**
-     * @todo implement and write test of chained lookup operations. the
-     *       challenge here is that we only want the first value for a
-     *       given key.  this seems to require that we mark tuples to
-     *       be ignored on subsequent indices, which in turn needs to
-     *       get into the batch api.  the contains() method already has
-     *       been modified to finesse this.
-     */
-    public void lookup(BatchLookup op) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
-    public void contains( BatchContains op ) {
-
-        for( int i=0; i<srcs.length; i++) {
-
-            AbstractBTree src = srcs[i];
-            
-            // reset the first tuple index for each pass.
-            op.tupleIndex = 0;
-            
-            src.contains(op);
-            
-        }
-
-    }
+//    /**
+//     * @todo implement and write test of chained lookup operations. the
+//     *       challenge here is that we only want the first value for a
+//     *       given key.  this seems to require that we mark tuples to
+//     *       be ignored on subsequent indices, which in turn needs to
+//     *       get into the batch api.  the contains() method already has
+//     *       been modified to finesse this.
+//     */
+//    public void lookup(BatchLookup op) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
+//
+//    public void contains( BatchContains op ) {
+//
+//        for( int i=0; i<srcs.length; i++) {
+//
+//            AbstractBTree src = srcs[i];
+//            
+//            // reset the first tuple index for each pass.
+//            op.tupleIndex = 0;
+//            
+//            src.contains(op);
+//            
+//        }
+//
+//    }
 
     /**
      * Returns the sum of the range count on each index in the view. This is the

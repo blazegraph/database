@@ -34,7 +34,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.SimpleEntry;
@@ -171,7 +170,13 @@ public class TestRestartSafe extends ProxyTestCase {
                     new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
                     new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
             
-            btree.insert(new BatchInsert(values.length, keys, values));
+//            btree.insert(new BatchInsert(values.length, keys, values));
+
+            for (int i = 0; i < values.length; i++) {
+            
+                btree.insert(keys[i], values[i]);
+                
+            }
             
             assertTrue(btree.dump(Level.DEBUG,System.err));
     
@@ -323,7 +328,13 @@ public class TestRestartSafe extends ProxyTestCase {
                     new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
                     new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
 
-            btree.insert(new BatchInsert(values.length, keys, values));
+//            btree.insert(new BatchInsert(values.length, keys, values));
+            
+            for (int i = 0; i < values.length; i++) {
+                
+                btree.insert(keys[i], values[i]);
+                
+            }
 
             assertTrue(btree.dump(Level.DEBUG, System.err));
 

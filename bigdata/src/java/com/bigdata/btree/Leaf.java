@@ -311,212 +311,212 @@ public class Leaf extends AbstractNode implements ILeafData {
 //
 //    }
 
-    /**
-     * Inserts or updates one or more tuples into the leaf. The caller MUST
-     * ensure by appropriate navigation of parent nodes that the key for the
-     * next tuple either exists in or belongs in this leaf. If the leaf
-     * overflows then it is split after the insert.
-     * 
-     * @return The #of tuples processed.
-     * 
-     * @todo optimize batch insertion by testing whether subsequent tuples fit
-     *       into the same leaf
-     */
-    public int batchInsert(BatchInsert op) {
-
-        final int tupleIndex = op.tupleIndex;
-        
-        assert tupleIndex < op.n;
-        
-        if(btree.debug) assertInvariants();
-        
-        btree.touch(this);
-
-        /*
-         * Note: This is one of the few gateways for mutation of a leaf via the
-         * main btree API (insert, lookup, delete). By ensuring that we have a
-         * mutable leaf here, we can assert that the leaf must be mutable in
-         * other methods.
-         */
-        Leaf copy = (Leaf) copyOnWrite();
-
-        if (copy != this) {
-
-            return copy.batchInsert(op);
-            
-        }
-
-        /*
-         * Search for the key.
-         * 
-         * Note: We do NOT search before triggering copy-on-write for an object
-         * index since an insert/update always triggers a mutation.
-         * 
-         * @todo This logic should optimized when the newval is a UDF such that
-         * we defer copy-on-write until we know that we will change the leaf in
-         * order to get a performance benefit from conditional inserts (it is
-         * apparent from some testing that there is a performance benefit to be
-         * had here). However the code will still benefit by performing 1/2 of
-         * the #of searches when compared to {if(!contains(key))
-         * insert(key,val);}
-         * 
-         * @todo Consider the interaction between UDFs and transaction
-         * isolation.
-         */
-
-        // the search key.
-        final byte[] searchKey = op.keys[tupleIndex];
-
-        // the value to be inserted into the leaf.
-        Object newval = op.values[tupleIndex];
-
-        // look for the search key in the leaf.
-        int entryIndex = this.keys.search(searchKey);
-
-        if (entryIndex >= 0) {
-
-            /*
-             * The key is already present in the leaf, so we are updating an
-             * existing entry.
-             */
-            
-            // the old value for the search key.
-            Object oldval = this.values[entryIndex];            
-            
-            if(newval instanceof UserDefinedFunction) {
-
-                UserDefinedFunction udf = ((UserDefinedFunction) newval);
-                
-                // apply the UDF.
-                newval = udf.found(searchKey, oldval);
-
-                // allow UDF to override the return value.
-                oldval = udf.returnValue(searchKey, oldval);
-                
-            }
-
-            // return old value by side-effect.
-            op.values[tupleIndex] = oldval;
-
-            // update the entry on the leaf.
-            this.values[entryIndex] = newval;
-            
-            return 1;
-
-        }
-
-        /*
-         * The insert goes into this leaf.
-         */
-        
-        Object oldval = null;
-        
-        if(newval instanceof UserDefinedFunction) {
-
-            UserDefinedFunction udf = ((UserDefinedFunction) newval);
-            
-            // apply UDF
-            newval = udf.notFound(searchKey);
-
-            oldval = udf.returnValue(searchKey, oldval);
-            
-            if(newval == null) {
-                
-                // The state of the entry was NOT modified.
-
-                // return old value by side-effect.
-                op.values[tupleIndex] = oldval;
-
-                return 1;
-                
-            }
-            
-            if(newval == UserDefinedFunction.INSERT_NULL) {
-                
-                // Force insert of a null value.
-                newval = null;
-                
-            }
-            
-            // fall through and do insert.
-            
-        }
-
-        // return old value by side-effect.
-        op.values[tupleIndex] = oldval;
-
-        // Convert the position to obtain the insertion point.
-        entryIndex = -entryIndex - 1;
-
-        // insert an entry under that key.
-        {
-
-            if (entryIndex < nkeys) {
-
-                /* index = 2;
-                 * nkeys = 6;
-                 * 
-                 * [ 0 1 2 3 4 5 ]
-                 *       ^ index
-                 * 
-                 * count = keys - index = 4;
-                 */
-                final int count = nkeys - entryIndex;
-                
-                assert count >= 1;
-
-                copyDown(entryIndex, count);
-
-            }
-
-            // Insert at index.
-            MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
-//            copyKey(entryIndex, searchKeys, tupleIndex);
-            keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
-            this.values[entryIndex] = newval;
-
-            nkeys++; keys.nkeys++;
-
-        }
-
-        // one more entry in the btree.
-        ((BTree)btree).nentries++;
-
-        if( parent != null ) {
-            
-            parent.get().updateEntryCount(this,1);
-            
-        }
-
-//        if (INFO) {
-//            log.info("this="+this+", key="+key+", value="+entry);
-//            if(DEBUG) {
-//                System.err.println("this"); dump(Level.DEBUG,System.err);
-//            }
+//    /**
+//     * Inserts or updates one or more tuples into the leaf. The caller MUST
+//     * ensure by appropriate navigation of parent nodes that the key for the
+//     * next tuple either exists in or belongs in this leaf. If the leaf
+//     * overflows then it is split after the insert.
+//     * 
+//     * @return The #of tuples processed.
+//     * 
+//     * @todo optimize batch insertion by testing whether subsequent tuples fit
+//     *       into the same leaf
+//     */
+//    public int batchInsert(BatchInsert op) {
+//
+//        final int tupleIndex = op.tupleIndex;
+//        
+//        assert tupleIndex < op.n;
+//        
+//        if(btree.debug) assertInvariants();
+//        
+//        btree.touch(this);
+//
+//        /*
+//         * Note: This is one of the few gateways for mutation of a leaf via the
+//         * main btree API (insert, lookup, delete). By ensuring that we have a
+//         * mutable leaf here, we can assert that the leaf must be mutable in
+//         * other methods.
+//         */
+//        Leaf copy = (Leaf) copyOnWrite();
+//
+//        if (copy != this) {
+//
+//            return copy.batchInsert(op);
+//            
 //        }
-
-        if (nkeys == maxKeys+1) {
-
-            /*
-             * The insert caused the leaf to overflow, so now we split the leaf.
-             */
-
-            Leaf rightSibling = (Leaf) split();
-
-            // assert additional invarients post-split.
-            if (btree.debug) {
-                rightSibling.assertInvariants();
-                getParent().assertInvariants();
-            }
-
-        }
-
-        // assert invarients post-split.
-        if(btree.debug) assertInvariants();
-
-        return 1;
-        
-    }
+//
+//        /*
+//         * Search for the key.
+//         * 
+//         * Note: We do NOT search before triggering copy-on-write for an object
+//         * index since an insert/update always triggers a mutation.
+//         * 
+//         * @todo This logic should optimized when the newval is a UDF such that
+//         * we defer copy-on-write until we know that we will change the leaf in
+//         * order to get a performance benefit from conditional inserts (it is
+//         * apparent from some testing that there is a performance benefit to be
+//         * had here). However the code will still benefit by performing 1/2 of
+//         * the #of searches when compared to {if(!contains(key))
+//         * insert(key,val);}
+//         * 
+//         * @todo Consider the interaction between UDFs and transaction
+//         * isolation.
+//         */
+//
+//        // the search key.
+//        final byte[] searchKey = op.keys[tupleIndex];
+//
+//        // the value to be inserted into the leaf.
+//        Object newval = op.values[tupleIndex];
+//
+//        // look for the search key in the leaf.
+//        int entryIndex = this.keys.search(searchKey);
+//
+//        if (entryIndex >= 0) {
+//
+//            /*
+//             * The key is already present in the leaf, so we are updating an
+//             * existing entry.
+//             */
+//            
+//            // the old value for the search key.
+//            Object oldval = this.values[entryIndex];            
+//            
+//            if(newval instanceof UserDefinedFunction) {
+//
+//                UserDefinedFunction udf = ((UserDefinedFunction) newval);
+//                
+//                // apply the UDF.
+//                newval = udf.found(searchKey, oldval);
+//
+//                // allow UDF to override the return value.
+//                oldval = udf.returnValue(searchKey, oldval);
+//                
+//            }
+//
+//            // return old value by side-effect.
+//            op.values[tupleIndex] = oldval;
+//
+//            // update the entry on the leaf.
+//            this.values[entryIndex] = newval;
+//            
+//            return 1;
+//
+//        }
+//
+//        /*
+//         * The insert goes into this leaf.
+//         */
+//        
+//        Object oldval = null;
+//        
+//        if(newval instanceof UserDefinedFunction) {
+//
+//            UserDefinedFunction udf = ((UserDefinedFunction) newval);
+//            
+//            // apply UDF
+//            newval = udf.notFound(searchKey);
+//
+//            oldval = udf.returnValue(searchKey, oldval);
+//            
+//            if(newval == null) {
+//                
+//                // The state of the entry was NOT modified.
+//
+//                // return old value by side-effect.
+//                op.values[tupleIndex] = oldval;
+//
+//                return 1;
+//                
+//            }
+//            
+//            if(newval == UserDefinedFunction.INSERT_NULL) {
+//                
+//                // Force insert of a null value.
+//                newval = null;
+//                
+//            }
+//            
+//            // fall through and do insert.
+//            
+//        }
+//
+//        // return old value by side-effect.
+//        op.values[tupleIndex] = oldval;
+//
+//        // Convert the position to obtain the insertion point.
+//        entryIndex = -entryIndex - 1;
+//
+//        // insert an entry under that key.
+//        {
+//
+//            if (entryIndex < nkeys) {
+//
+//                /* index = 2;
+//                 * nkeys = 6;
+//                 * 
+//                 * [ 0 1 2 3 4 5 ]
+//                 *       ^ index
+//                 * 
+//                 * count = keys - index = 4;
+//                 */
+//                final int count = nkeys - entryIndex;
+//                
+//                assert count >= 1;
+//
+//                copyDown(entryIndex, count);
+//
+//            }
+//
+//            // Insert at index.
+//            MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
+////            copyKey(entryIndex, searchKeys, tupleIndex);
+//            keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
+//            this.values[entryIndex] = newval;
+//
+//            nkeys++; keys.nkeys++;
+//
+//        }
+//
+//        // one more entry in the btree.
+//        ((BTree)btree).nentries++;
+//
+//        if( parent != null ) {
+//            
+//            parent.get().updateEntryCount(this,1);
+//            
+//        }
+//
+////        if (INFO) {
+////            log.info("this="+this+", key="+key+", value="+entry);
+////            if(DEBUG) {
+////                System.err.println("this"); dump(Level.DEBUG,System.err);
+////            }
+////        }
+//
+//        if (nkeys == maxKeys+1) {
+//
+//            /*
+//             * The insert caused the leaf to overflow, so now we split the leaf.
+//             */
+//
+//            Leaf rightSibling = (Leaf) split();
+//
+//            // assert additional invarients post-split.
+//            if (btree.debug) {
+//                rightSibling.assertInvariants();
+//                getParent().assertInvariants();
+//            }
+//
+//        }
+//
+//        // assert invarients post-split.
+//        if(btree.debug) assertInvariants();
+//
+//        return 1;
+//        
+//    }
     
     /**
      * Insert or update an entry in the leaf. The caller MUST ensure by
@@ -705,42 +705,42 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
     
-    /**
-     * Looks up one or more tuples. The values are set to the existing values
-     * when a key is found and <code>null</code> otherwise.
-     * 
-     * @return The #of tuples processed.
-     * 
-     * @todo optimize batch lookup here (also when bloom filter is available on
-     *       an IndexSegment).
-     */
-    public int batchLookup(BatchLookup op) {
-
-        final int tupleIndex = op.tupleIndex;
-        
-        assert tupleIndex < op.n;
-        
-        btree.touch(this);
-        
-        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
-
-        if (entryIndex < 0) {
-
-            // Not found.
-
-            op.values[tupleIndex] = null;
-            
-            return 1;
-
-        }
-
-        // Found.
-        
-        op.values[tupleIndex] = this.values[entryIndex];
-        
-        return 1;
-
-    }
+//    /**
+//     * Looks up one or more tuples. The values are set to the existing values
+//     * when a key is found and <code>null</code> otherwise.
+//     * 
+//     * @return The #of tuples processed.
+//     * 
+//     * @todo optimize batch lookup here (also when bloom filter is available on
+//     *       an IndexSegment).
+//     */
+//    public int batchLookup(BatchLookup op) {
+//
+//        final int tupleIndex = op.tupleIndex;
+//        
+//        assert tupleIndex < op.n;
+//        
+//        btree.touch(this);
+//        
+//        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
+//
+//        if (entryIndex < 0) {
+//
+//            // Not found.
+//
+//            op.values[tupleIndex] = null;
+//            
+//            return 1;
+//
+//        }
+//
+//        // Found.
+//        
+//        op.values[tupleIndex] = this.values[entryIndex];
+//        
+//        return 1;
+//
+//    }
 
     public Object lookup(byte[] searchKey) {
 
@@ -762,41 +762,41 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
 
-    /**
-     * Looks up one or more tuples and reports whether or not they exist.
-     * 
-     * @return The #of tuples processed.
-     * 
-     * @todo optimize batch lookup here (also when bloom filter is available on
-     *       an IndexSegment).
-     */
-    public int batchContains(BatchContains op) {
-
-        final int tupleIndex = op.tupleIndex;
-        
-        assert tupleIndex < op.n;
-        
-        btree.touch(this);
-        
-        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
-
-        if (entryIndex < 0) {
-
-            // Not found.
-
-            op.contains[tupleIndex] = false;
-            
-            return 1;
-
-        }
-
-        // Found.
-        
-        op.contains[tupleIndex] = true;
-        
-        return 1;
-
-    }
+//    /**
+//     * Looks up one or more tuples and reports whether or not they exist.
+//     * 
+//     * @return The #of tuples processed.
+//     * 
+//     * @todo optimize batch lookup here (also when bloom filter is available on
+//     *       an IndexSegment).
+//     */
+//    public int batchContains(BatchContains op) {
+//
+//        final int tupleIndex = op.tupleIndex;
+//        
+//        assert tupleIndex < op.n;
+//        
+//        btree.touch(this);
+//        
+//        final int entryIndex = this.keys.search(op.keys[tupleIndex]);
+//
+//        if (entryIndex < 0) {
+//
+//            // Not found.
+//
+//            op.contains[tupleIndex] = false;
+//            
+//            return 1;
+//
+//        }
+//
+//        // Found.
+//        
+//        op.contains[tupleIndex] = true;
+//        
+//        return 1;
+//
+//    }
 
     public boolean contains(byte[] searchKey) {
 
@@ -1290,171 +1290,171 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
 
-    /**
-     * Removes zero or more tuples from this leaf. The values are set to the
-     * existing values when a tuple is removed and <code>null</code>
-     * otherwise.
-     * 
-     * @return The #of tuples processed.
-     * 
-     * @todo optimize batch remove.
-     */
-    public int batchRemove(BatchRemove op) {
-        
-        final int tupleIndex = op.tupleIndex;
-        
-        assert tupleIndex < op.n;
-        
-        if(btree.debug) assertInvariants();
-        
-        btree.touch(this);
-
-        final int entryIndex = keys.search(op.keys[tupleIndex]);
-
-        if (entryIndex < 0) {
-
-            // Not found.
-
-            op.values[tupleIndex] = null;
-            
-            return 1;
-
-        }
-
-        /*
-         * Note: This is one of the few gateways for mutation of a leaf via
-         * the main btree API (insert, lookup, delete). By ensuring that we
-         * have a mutable leaf here, we can assert that the leaf must be
-         * mutable in other methods.
-         */
-
-        Leaf copy = (Leaf) copyOnWrite();
-
-        if (copy != this) {
-
-            return copy.batchRemove(op);
-
-        }
-
-        // The value that is being removed.
-        op.values[tupleIndex] = this.values[entryIndex];
-
-//        if (INFO) {
-//            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
-//            if(DEBUG) {
-//                System.err.println("this"); dump(Level.DEBUG,System.err);
-//            }
+//    /**
+//     * Removes zero or more tuples from this leaf. The values are set to the
+//     * existing values when a tuple is removed and <code>null</code>
+//     * otherwise.
+//     * 
+//     * @return The #of tuples processed.
+//     * 
+//     * @todo optimize batch remove.
+//     */
+//    public int batchRemove(BatchRemove op) {
+//        
+//        final int tupleIndex = op.tupleIndex;
+//        
+//        assert tupleIndex < op.n;
+//        
+//        if(btree.debug) assertInvariants();
+//        
+//        btree.touch(this);
+//
+//        final int entryIndex = keys.search(op.keys[tupleIndex]);
+//
+//        if (entryIndex < 0) {
+//
+//            // Not found.
+//
+//            op.values[tupleIndex] = null;
+//            
+//            return 1;
+//
 //        }
-
-        /*
-         * Copy over the hole created when the key and value were removed
-         * from the leaf.
-         * 
-         * Given: 
-         * keys : [ 1 2 3 4 ]
-         * vals : [ a b c d ]
-         * 
-         * Remove(1):
-         * index := 0
-         * length = nkeys(4) - index(0) - 1 = 3;
-         * 
-         * Remove(3):
-         * index := 2;
-         * length = nkeys(4) - index(2) - 1 = 1;
-         * 
-         * Remove(4):
-         * index := 3
-         * length = nkeys(4) - index(3) - 1 = 0;
-         * 
-         * Given: 
-         * keys : [ 1      ]
-         * vals : [ a      ]
-         * 
-         * Remove(1):
-         * index := 0
-         * length = nkeys(1) - index(0) - 1 = 0;
-         */
-
-        /*
-         * Copy down to cover up the hole.
-         */
-        final int length = nkeys - entryIndex - 1;
-
-        // Tunnel through to the mutable keys object.
-        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
-
-        if (length > 0) {
-
-            System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
-                    length);
-
-            System.arraycopy(this.values, entryIndex + 1, this.values,
-                    entryIndex, length);
-
-        }
-
-        /* 
-         * Erase the key/value that was exposed by this operation.
-         */
-        keys.zeroKey(nkeys - 1);
-        this.values[nkeys - 1] = null;
-
-        // One less entry in the tree.
-        ((BTree)btree).nentries--;
-        assert ((BTree)btree).nentries >= 0;
-
-        // One less key in the leaf.
-        nkeys--; keys.nkeys--;
-                
-        if( btree.root != this ) {
-
-            /*
-             * this is not the root leaf.
-             */
-        
-            // update entry count on ancestors.
-            
-            parent.get().updateEntryCount(this,-1);
-            
-            if( nkeys < minKeys ) {
-                
-                /*
-                 * The leaf is deficient. Join it with a sibling, causing their
-                 * keys to be redistributed such that neither leaf is deficient.
-                 * If there is only one other sibling and it has only the
-                 * minimum #of values then the two siblings will be merged into
-                 * a single leaf and their parent will have only a single child.
-                 * Since the minimum #of children is two (2), having a single
-                 * child makes the parent of this node deficient and it will be
-                 * joined with one of its siblings. If necessary, this process
-                 * will continue recursively up the tree. The root leaf never
-                 * has any siblings and never experiences underflow so it may be
-                 * legally reduced to zero values.
-                 * 
-                 * Note that the minmum branching factor (3) and the invariants
-                 * together guarentee that there is at least one sibling. Also
-                 * note that the minimum #of children for a node with the
-                 * minimum branching factor is two (2) so a valid tree never has
-                 * a node with a single sibling.
-                 * 
-                 * Note that we must invoked copy-on-write before modifying a
-                 * sibling.  However, the parent of the leave MUST already be
-                 * mutable (aka dirty) since that is a precondition for removing
-                 * a key from the leaf.  This means that copy-on-write will not
-                 * force the parent to be cloned.
-                 */
-                
-                join();
-                
-            }
-            
-        }
-            
-        if(btree.debug) assertInvariants();
-        
-        return 1;
-        
-    }
+//
+//        /*
+//         * Note: This is one of the few gateways for mutation of a leaf via
+//         * the main btree API (insert, lookup, delete). By ensuring that we
+//         * have a mutable leaf here, we can assert that the leaf must be
+//         * mutable in other methods.
+//         */
+//
+//        Leaf copy = (Leaf) copyOnWrite();
+//
+//        if (copy != this) {
+//
+//            return copy.batchRemove(op);
+//
+//        }
+//
+//        // The value that is being removed.
+//        op.values[tupleIndex] = this.values[entryIndex];
+//
+////        if (INFO) {
+////            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
+////            if(DEBUG) {
+////                System.err.println("this"); dump(Level.DEBUG,System.err);
+////            }
+////        }
+//
+//        /*
+//         * Copy over the hole created when the key and value were removed
+//         * from the leaf.
+//         * 
+//         * Given: 
+//         * keys : [ 1 2 3 4 ]
+//         * vals : [ a b c d ]
+//         * 
+//         * Remove(1):
+//         * index := 0
+//         * length = nkeys(4) - index(0) - 1 = 3;
+//         * 
+//         * Remove(3):
+//         * index := 2;
+//         * length = nkeys(4) - index(2) - 1 = 1;
+//         * 
+//         * Remove(4):
+//         * index := 3
+//         * length = nkeys(4) - index(3) - 1 = 0;
+//         * 
+//         * Given: 
+//         * keys : [ 1      ]
+//         * vals : [ a      ]
+//         * 
+//         * Remove(1):
+//         * index := 0
+//         * length = nkeys(1) - index(0) - 1 = 0;
+//         */
+//
+//        /*
+//         * Copy down to cover up the hole.
+//         */
+//        final int length = nkeys - entryIndex - 1;
+//
+//        // Tunnel through to the mutable keys object.
+//        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
+//
+//        if (length > 0) {
+//
+//            System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
+//                    length);
+//
+//            System.arraycopy(this.values, entryIndex + 1, this.values,
+//                    entryIndex, length);
+//
+//        }
+//
+//        /* 
+//         * Erase the key/value that was exposed by this operation.
+//         */
+//        keys.zeroKey(nkeys - 1);
+//        this.values[nkeys - 1] = null;
+//
+//        // One less entry in the tree.
+//        ((BTree)btree).nentries--;
+//        assert ((BTree)btree).nentries >= 0;
+//
+//        // One less key in the leaf.
+//        nkeys--; keys.nkeys--;
+//                
+//        if( btree.root != this ) {
+//
+//            /*
+//             * this is not the root leaf.
+//             */
+//        
+//            // update entry count on ancestors.
+//            
+//            parent.get().updateEntryCount(this,-1);
+//            
+//            if( nkeys < minKeys ) {
+//                
+//                /*
+//                 * The leaf is deficient. Join it with a sibling, causing their
+//                 * keys to be redistributed such that neither leaf is deficient.
+//                 * If there is only one other sibling and it has only the
+//                 * minimum #of values then the two siblings will be merged into
+//                 * a single leaf and their parent will have only a single child.
+//                 * Since the minimum #of children is two (2), having a single
+//                 * child makes the parent of this node deficient and it will be
+//                 * joined with one of its siblings. If necessary, this process
+//                 * will continue recursively up the tree. The root leaf never
+//                 * has any siblings and never experiences underflow so it may be
+//                 * legally reduced to zero values.
+//                 * 
+//                 * Note that the minmum branching factor (3) and the invariants
+//                 * together guarentee that there is at least one sibling. Also
+//                 * note that the minimum #of children for a node with the
+//                 * minimum branching factor is two (2) so a valid tree never has
+//                 * a node with a single sibling.
+//                 * 
+//                 * Note that we must invoked copy-on-write before modifying a
+//                 * sibling.  However, the parent of the leave MUST already be
+//                 * mutable (aka dirty) since that is a precondition for removing
+//                 * a key from the leaf.  This means that copy-on-write will not
+//                 * force the parent to be cloned.
+//                 */
+//                
+//                join();
+//                
+//            }
+//            
+//        }
+//            
+//        if(btree.debug) assertInvariants();
+//        
+//        return 1;
+//        
+//    }
 
     /**
      * Removes the entry from the leaf if found.

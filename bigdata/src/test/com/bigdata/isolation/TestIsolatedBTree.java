@@ -52,12 +52,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  *       suite, including the specific values of the version counters and the
  *       presence / absence of deletion markers, since those data are protected.
  * 
- * @todo test the batch apis. all methods must work with {@link Value}s (the
- *       test for this could be a test of the
- *       {@link IBatchOperation#apply(com.bigdata.btree.ISimpleBTree)} implementations
- *       in the btree package since we apply that method in a trivial manner to
- *       support the batch api.
- * 
  * @todo test the rangeCount and rangeIterator api. the former will over
  *       estimate if there are deleted entries while the latter must not visit
  *       deleted entries (or may it -- we will need to see them for mergeDown()

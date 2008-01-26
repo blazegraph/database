@@ -32,12 +32,27 @@ import com.bigdata.mdi.IPartitionMetadata;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Split extends SplitPoint {
+public class Split {
 
     /**
      * The index partition that spans the keys in this split.
      */
     public final IPartitionMetadata pmd;
+
+    /**
+     * Index of the first key in this split.
+     */
+    public final int fromIndex;
+
+    /**
+     * Index of the first key NOT included in this split.
+     */
+    public final int toIndex;
+
+    /**
+     * The #of keys in this split (toIndex - fromIndex).
+     */
+    public final int ntuples;
 
     /**
      * Create a representation of a split point.
@@ -54,11 +69,18 @@ public class Split extends SplitPoint {
      */
     public Split(IPartitionMetadata pmd, int fromIndex, int toIndex) {
 
-        super(fromIndex,toIndex);
-        
 //        assert pmd != null;
 
         this.pmd = pmd;
+
+        assert fromIndex >= 0;
+        assert toIndex >= fromIndex;
+
+        this.fromIndex = fromIndex;
+
+        this.toIndex = toIndex;
+
+        this.ntuples = toIndex - fromIndex;
 
     }
 
@@ -73,7 +95,13 @@ public class Split extends SplitPoint {
 
     public boolean equals(Split o) {
 
-        if (!super.equals(o))
+        if (fromIndex != o.fromIndex)
+            return false;
+
+        if (toIndex != o.toIndex)
+            return false;
+
+        if (ntuples != o.ntuples)
             return false;
 
         if (!pmd.equals(o.pmd))

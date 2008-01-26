@@ -66,7 +66,8 @@ public interface ILinearList {
 
     /**
      * Return the key for the identified entry. This performs an efficient
-     * search whose cost is essentially the same as {@link #lookup(Object)}.
+     * search whose cost is essentially the same as
+     * {@link ISimpleBTree#lookup(Object)}.
      * 
      * @param index
      *            The index position of the entry (origin zero).
@@ -82,10 +83,11 @@ public interface ILinearList {
      * @see #getValue(int)
      */
     public byte[] keyAt(int index);
-    
+
     /**
      * Return the value for the identified entry. This performs an efficient
-     * search whose cost is essentially the same as {@link #lookup(Object)}.
+     * search whose cost is essentially the same as
+     * {@link ISimpleBTree#lookup(Object)}.
      * 
      * @param index
      *            The index position of the entry (origin zero).

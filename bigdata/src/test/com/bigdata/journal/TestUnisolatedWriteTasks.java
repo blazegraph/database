@@ -33,8 +33,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
@@ -123,8 +121,14 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
                         assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
                         
-                        // Note: clone values since replaced with old values by the batch op.
-                        ndx.insert(new BatchInsert(ninserts, keys, vals.clone()));
+//                        // Note: clone values since replaced with old values by the batch op.
+//                        ndx.insert(new BatchInsert(ninserts, keys, vals.clone()));
+                        
+                        for (int i = 0; i < keys.length; i++) {
+                            
+                            ndx.insert(keys[i], vals[i]);
+                            
+                        }
                         
                         return null;
                         
@@ -163,18 +167,21 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                          * verify the written data from the prior task.
                          */
                         
-                        byte[][] actualValues = new byte[ninserts][];
+//                        byte[][] actualValues = new byte[ninserts][];
                         
-                        BatchLookup op = new BatchLookup(ninserts,keys,actualValues);
+//                        BatchLookup op = new BatchLookup(ninserts,keys,actualValues);
+//                        
+//                        ndx.lookup(op);
                         
-                        ndx.lookup(op);
-                        
-                        for(int i=0; i<ninserts; i++) {
+                        for (int i = 0; i < ninserts; i++) {
                             
                             assertNotNull(keys[i]);
+
                             assertNotNull(vals[i]);
 
-                            assertEquals("i="+i, vals[i], actualValues[i]);
+                            byte[] actualValue = (byte[])ndx.lookup(keys[i]);
+                            
+                            assertEquals("i="+i, vals[i], actualValue);
                             
                         }
                         
@@ -259,10 +266,16 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             assertEquals("indexUUID", indexUUID1, ndx
                                     .getIndexUUID());
 
-                            // Note: clone values since replaced with
-                            // old values by the batch op.
-                            ndx.insert(new BatchInsert(ninserts, keys1,
-                                    vals1.clone()));
+//                            // Note: clone values since replaced with
+//                            // old values by the batch op.
+//                            ndx.insert(new BatchInsert(ninserts, keys1,
+//                                    vals1.clone()));
+
+                            for (int i = 0; i < keys1.length; i++) {
+                                
+                                ndx.insert(keys1[i], vals1[i]);
+                                
+                            }
 
                         }
                         
@@ -273,10 +286,16 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             assertEquals("indexUUID", indexUUID2, ndx
                                     .getIndexUUID());
 
-                            // Note: clone values since replaced with
-                            // old values by the batch op.
-                            ndx.insert(new BatchInsert(ninserts, keys2,
-                                    vals2.clone()));
+//                            // Note: clone values since replaced with
+//                            // old values by the batch op.
+//                            ndx.insert(new BatchInsert(ninserts, keys2,
+//                                    vals2.clone()));
+                            
+                            for (int i = 0; i < keys2.length; i++) {
+                                
+                                ndx.insert(keys2[i], vals2[i]);
+                                
+                            }
 
                         }
                         
@@ -323,19 +342,22 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                              * verify the written data from the prior task.
                              */
 
-                            byte[][] actualValues = new byte[ninserts][];
-
-                            BatchLookup op = new BatchLookup(ninserts, keys1,
-                                    actualValues);
-
-                            ndx.lookup(op);
+//                            byte[][] actualValues = new byte[ninserts][];
+//
+//                            BatchLookup op = new BatchLookup(ninserts, keys1,
+//                                    actualValues);
+//
+//                            ndx.lookup(op);
 
                             for (int i = 0; i < ninserts; i++) {
 
                                 assertNotNull(keys1[i]);
+                                
                                 assertNotNull(vals1[i]);
 
-                                assertEquals("i=" + i, vals1[i], actualValues[i]);
+                                byte[] actualValue = (byte[]) ndx.lookup(keys1[i]);
+                                
+                                assertEquals("i=" + i, vals1[i], actualValue);
 
                             }
                             
@@ -362,20 +384,23 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             /*
                              * verify the written data from the prior task.
                              */
-
-                            byte[][] actualValues = new byte[ninserts][];
-
-                            BatchLookup op = new BatchLookup(ninserts, keys2,
-                                    actualValues);
-
-                            ndx.lookup(op);
+//
+//                            byte[][] actualValues = new byte[ninserts][];
+//
+//                            BatchLookup op = new BatchLookup(ninserts, keys2,
+//                                    actualValues);
+//
+//                            ndx.lookup(op);
 
                             for (int i = 0; i < ninserts; i++) {
 
                                 assertNotNull(keys2[i]);
+                                
                                 assertNotNull(vals2[i]);
 
-                                assertEquals("i=" + i, vals2[i], actualValues[i]);
+                                byte[] actualValue = (byte[]) ndx.lookup(keys2[i]);
+                                
+                                assertEquals("i=" + i, vals2[i], actualValue);
 
                             }
                             
@@ -504,13 +529,19 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
                             assertEquals("indexUUID",indices[i].indexUUID,ndx.getIndexUUID());
                             
-                            // Note: clone values since replaced with old values
-                            // by the batch op.
-                            ndx.insert(new BatchInsert(
-                                    indices[i].ninserts,
-                                    indices[i].keys, indices[i].vals
-                                    .clone()));
+//                            // Note: clone values since replaced with old values
+//                            // by the batch op.
+//                            ndx.insert(new BatchInsert(
+//                                    indices[i].ninserts,
+//                                    indices[i].keys, indices[i].vals
+//                                    .clone()));
                             
+                            for (int j = 0; j < indices[i].keys.length; j++) {
+                                
+                                ndx.insert(indices[i].keys[j], indices[i].vals[j]);
+                                
+                            }
+
                         }
                         
                         return null;
@@ -548,16 +579,18 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                              * verify the written data from the prior task.
                              */
 
-                            byte[][] actualValues = new byte[stuff.ninserts][];
-
-                            BatchLookup op = new BatchLookup(stuff.ninserts, stuff.keys,
-                                    actualValues);
-
-                            ndx.lookup(op);
+//                            byte[][] actualValues = new byte[stuff.ninserts][];
+//
+//                            BatchLookup op = new BatchLookup(stuff.ninserts, stuff.keys,
+//                                    actualValues);
+//
+//                            ndx.lookup(op);
 
                             for (int j = 0; j < stuff.ninserts; j++) {
 
-                                assertEquals("j=" + j, stuff.vals[j], actualValues[j]);
+                                byte[] actualValue = (byte[])ndx.lookup(stuff.keys[j]);
+                                
+                                assertEquals("j=" + j, stuff.vals[j], actualValue);
 
                             }
 

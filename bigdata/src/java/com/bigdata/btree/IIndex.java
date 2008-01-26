@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.Serializable;
 import java.util.UUID;
 
 import com.bigdata.isolation.IIsolatableIndex;
@@ -36,7 +37,7 @@ import com.bigdata.isolation.IIsolatableIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndex extends ISimpleBTree, IBatchBTree {
+public interface IIndex extends ISimpleBTree { //, IBatchBTree {
     
     /**
      * The unique identifier for the index whose data is stored in this B+Tree
@@ -65,5 +66,32 @@ public interface IIndex extends ISimpleBTree, IBatchBTree {
      * @see IIsolatableIndex
      */
     public boolean isIsolatable();
+
+    /**
+     * Runs a procedure against an index.
+     * <p>
+     * Note: This may be used to send custom logic together with the data to a
+     * remote index or index partition. When the index is remote both the
+     * procedure and the return value MUST be {@link Serializable}.
+     * <p>
+     * Note: The scale-out indices add support for auto-split of the procedure
+     * such that it runs locally against each relevant index partition.
+     * 
+     * @param n
+     *            The #of tuples (positive integer).
+     * @param keys
+     *            The keys (required).
+     * @param vals
+     *            The values (optional depending on the procedure).
+     * @param ctor
+     *            An object that can create instances of the procedure.
+     * @param handler
+     *            An object that is responsible for handling the results
+     *            obtained from the procedure, including both when it is applied
+     *            to a unitary index and when it is applied to multiple index
+     *            partitions of a scale-out index.
+     */
+    public void submit(int n, byte[][] keys, byte[][] vals,
+            IIndexProcedureConstructor ctor, IResultHandler handler);
 
 }

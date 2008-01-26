@@ -37,15 +37,9 @@ import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.EntryFilter;
-import com.bigdata.btree.IBatchOperation;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.IRawStore;
 
@@ -99,9 +93,6 @@ import com.bigdata.rawstore.IRawStore;
  *  rangeIterator - must filter out deleted entries.
  *  
  *  entryIterator() - only non-deleted entries.
- *  
- *  IBatchBTree - all methods are overriden to use {@link IBatchOperation#apply(ISimpleBTree)}
- *  so that they will correctly apply the semantics of the {@link UnisolatedBTree}.
  *  
  * </pre>
  * 
@@ -519,6 +510,19 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
     }
 
+    /**
+     * Visits only the all entries (deleted and non-deleted) in the key range.
+     * The visited values are {@link Value} objects. In order to determine
+     * whether or not the entry has been deleted you need to examine
+     * {@link Value#isDeleted()}.
+     */
+    public IEntryIterator rangeIterator2(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        return super.rangeIterator(fromKey, toKey, capacity, flags, filter);
+        
+    }
+    
     public IEntryIterator entryIterator() {
 
         return rangeIterator(null, null);
@@ -555,28 +559,28 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
         
     }
 
-    public void contains(BatchContains op) {
-
-        op.apply(this);
-        
-    }
-
-    public void insert(BatchInsert op) {
-        
-        op.apply(this);
-        
-    }
-
-    public void lookup(BatchLookup op) {
-        
-        op.apply(this);
-        
-    }
-
-    public void remove(BatchRemove op) {
-        
-        op.apply(this);
-        
-    }
+//    public void contains(BatchContains op) {
+//
+//        op.apply(this);
+//        
+//    }
+//
+//    public void insert(BatchInsert op) {
+//        
+//        op.apply(this);
+//        
+//    }
+//
+//    public void lookup(BatchLookup op) {
+//        
+//        op.apply(this);
+//        
+//    }
+//
+//    public void remove(BatchRemove op) {
+//        
+//        op.apply(this);
+//        
+//    }
 
 }

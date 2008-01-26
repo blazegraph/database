@@ -30,10 +30,6 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
@@ -209,27 +205,27 @@ public class ReadCommittedIndex implements IIndexWithCounter {
         
     }
 
-    public void contains(BatchContains op) {
-        getIndex().contains(op);
-    }
-
-    /**
-     * @exception UnsupportedOperationException always.
-     */
-    public void insert(BatchInsert op) {
-        throw new UnsupportedOperationException();
-    }
-
-    public void lookup(BatchLookup op) {
-        getIndex().lookup(op);
-    }
-
-    /**
-     * @exception UnsupportedOperationException always.
-     */
-    public void remove(BatchRemove op) {
-        throw new UnsupportedOperationException();
-    }
+//    public void contains(BatchContains op) {
+//        getIndex().contains(op);
+//    }
+//
+//    /**
+//     * @exception UnsupportedOperationException always.
+//     */
+//    public void insert(BatchInsert op) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public void lookup(BatchLookup op) {
+//        getIndex().lookup(op);
+//    }
+//
+//    /**
+//     * @exception UnsupportedOperationException always.
+//     */
+//    public void remove(BatchRemove op) {
+//        throw new UnsupportedOperationException();
+//    }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {

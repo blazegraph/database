@@ -108,21 +108,21 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         return src.rangeIterator(fromKey, toKey, capacity, flags, filter);
     }
     
-    public void contains(BatchContains op) {
-        src.contains(op);
-    }
-
-    public void insert(BatchInsert op) {
-        throw new UnsupportedOperationException();
-    }
-
-    public void lookup(BatchLookup op) {
-        src.lookup(op);
-    }
-
-    public void remove(BatchRemove op) {
-        throw new UnsupportedOperationException();
-    }
+//    public void contains(BatchContains op) {
+//        src.contains(op);
+//    }
+//
+//    public void insert(BatchInsert op) {
+//        throw new UnsupportedOperationException();
+//    }
+//
+//    public void lookup(BatchLookup op) {
+//        src.lookup(op);
+//    }
+//
+//    public void remove(BatchRemove op) {
+//        throw new UnsupportedOperationException();
+//    }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {

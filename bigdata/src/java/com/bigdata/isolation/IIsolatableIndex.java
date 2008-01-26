@@ -29,7 +29,6 @@ package com.bigdata.isolation;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentMerger;
@@ -97,16 +96,9 @@ import com.bigdata.scaleup.IsolatablePartitionedIndexView;
  * for some fixed point operation or query).
  * </p>
  * <p>
- * Note: Since each batch operation is atomic within an index partition, the
- * {@link IBatchBTree batch api} provides an alternative to transactional
- * isolatation that is suitable for some applications.
- * </p>
- * <p>
- * Note: Another alternative to transactional isolation is to append a timestamp
- * or version identifier to the application keys and then use a version
- * expiration policy based on either age or the maximum #of versions to be
- * retained. This approach can be combined with the use of the batch api
- * mentioned above.
+ * Note: An alternative to transactional isolation is to append a timestamp or
+ * version identifier to the application keys and then use a version expiration
+ * policy based on either age or the maximum #of versions to be retained.
  * </p>
  * 
  * @todo each value paired with a key must have a versionCounter and deletion
@@ -118,8 +110,8 @@ import com.bigdata.scaleup.IsolatablePartitionedIndexView;
  * @todo The read-only view must be against the partitioned index, not just the
  *       btree on the journal. the UnisolatedBTree is different in that it reads
  *       against a view and writes on the UnisolatedBTree. In fact, this is
- *       precisely how the PartitionedIndexView works already. All that we have to
- *       do is to construct the view from the historical committed state from
+ *       precisely how the PartitionedIndexView works already. All that we have
+ *       to do is to construct the view from the historical committed state from
  *       which the transaction emerges. In order to do this, we need to be able
  *       to recover prior historical states of btrees which we could do by
  *       chaining their metadata records or by maintaining the timestamp in the
@@ -170,14 +162,14 @@ import com.bigdata.scaleup.IsolatablePartitionedIndexView;
  *       correctly process delete markers (this applies to the batch api as
  *       well). The place to do this is probably where the btrees are created
  *       using an IsolatedBtree class (extends BTree or perhaps just implements
- *       {@link IIndex} so that we can use it in combination with the ReadOnlyFusedView
- *       to support partitioned indices). ReadOnlyFusedView will also need to be
- *       modified to support delete markers and could thrown an exception if the
- *       version counters were out of the expected order (so could the leaf
- *       merge iterator). The UnisolatedBTree would always use the
- *       {@link ValueSerializer} and applications would become responsible for
- *       serializing values before insert (we could serialize them on the index
- *       side but then we have much more network IO).
+ *       {@link IIndex} so that we can use it in combination with the
+ *       ReadOnlyFusedView to support partitioned indices). ReadOnlyFusedView
+ *       will also need to be modified to support delete markers and could
+ *       thrown an exception if the version counters were out of the expected
+ *       order (so could the leaf merge iterator). The UnisolatedBTree would
+ *       always use the {@link ValueSerializer} and applications would become
+ *       responsible for serializing values before insert (we could serialize
+ *       them on the index side but then we have much more network IO).
  *       <p>
  *       The only time to de-serialize the application values is when there is a
  *       write-write conflict and a conflict resolver registered on the btree to
