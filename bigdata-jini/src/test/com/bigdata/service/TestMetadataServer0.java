@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
+import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
@@ -297,9 +298,13 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             /*
              * This should fail since the index was never registered.
              */
-            dataService0Proxy.rangeCount(ITx.UNISOLATED, DataService
-                    .getIndexPartitionName("xyz", 0/* partitionId */), null, null);
-            
+            dataService0Proxy
+                    .submit(
+                            ITx.UNISOLATED,
+                            DataService
+                                    .getIndexPartitionName("xyz", 0/* partitionId */),
+                            new RangeCountProcedure(null/* fromKey */, null/* toKey */));
+
         } catch (ExecutionException ex) {
             
             assertNotNull("cause",ex.getCause());

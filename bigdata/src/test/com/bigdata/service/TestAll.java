@@ -60,9 +60,16 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      * 
+     * FIXME refactor service tests from the jini module use here against
+     * embedded services (w/o jini). Ideally the jini module could then add its
+     * own unit tests to verify the basic jini integration and then re-run the
+     * same test suite to verify the integratation at the bigdata services level -
+     * the main point to test there is the (de-)serialization of objects being
+     * passed by RMI to and from the services.
+     * 
      * @todo write tests for {@link RangeQueryIterator}
      * @todo write tests for {@link PartitionedRangeQueryIterator}
-     * @todo write tests for embedded services (w/o jini).
+     * 
      * @todo write tests for parallelized operations.
      */
     public static Test suite()
@@ -70,8 +77,11 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("embedded services");
 
-//        suite.addTestSuite(TestAbstractJobAndTaskService.class);
-        
+        /*
+         * Stress test of concurrent clients writing on a single data service.
+         */
+        suite.addTestSuite( StressTestConcurrent.class );
+
         return suite;
         
     }

@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.isolation;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IndexSegment;
@@ -196,16 +194,16 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
 
     }
 
-    public void contains(BatchContains op) {
-
-        op.apply(this);
-
-    }
-
-    public void lookup(BatchLookup op) {
-
-        op.apply(this);
-
-    }
+//    public void contains(BatchContains op) {
+//
+//        op.apply(this);
+//
+//    }
+//
+//    public void lookup(BatchLookup op) {
+//
+//        op.apply(this);
+//
+//    }
 
 }

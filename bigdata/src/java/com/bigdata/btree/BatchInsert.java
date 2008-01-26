@@ -27,42 +27,80 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 /**
- * Data for a batch insert operation.
+ * Batch insert operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchInsert implements IBatchOperation {
+public class BatchInsert extends IndexProcedure implements IBatchOperation, IParallelizableIndexProcedure {
 
     /**
-     * The #of tuples to be processed.
+     * 
      */
-    public final int n;
+    private static final long serialVersionUID = 6594362044816120035L;
+
+    private boolean returnOldValues;
     
     /**
-     * The keys for each tuple.
+     * True iff the old values stored under the keys will be returned by
+     * {@link #apply(IIndex)}.
      */
-    public final byte[][] keys;
-    
-    /**
-     * The value corresponding to each key.
-     */
-    public final Object[] values;
-    
-    /**
-     * The index of the tuple that is currently being processed.
-     */
-    public int tupleIndex = 0;
-    
-    public int getTupleCount() {
-        return n;
-    }
-    
-    public byte[][] getKeys() {
-        return keys;
+    public boolean getReturnOldValues() {
+
+        return returnOldValues;
+        
     }
 
+    /**
+     * Factory for {@link BatchInsert} procedures.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class BatchInsertConstructor implements IIndexProcedureConstructor {
+
+        /**
+         * Singleton requests the return of the old values that were overwritten
+         * in the index by the operation.
+         */
+        public static final BatchInsertConstructor RETURN_OLD_VALUES = new BatchInsertConstructor(true);
+        
+        /**
+         * Singleton does NOT request the return of the old values that were
+         * overwritten in the index by the operation.
+         */
+        public static final BatchInsertConstructor RETURN_NO_VALUES = new BatchInsertConstructor(false); 
+
+        private boolean returnOldValues;
+        
+        public BatchInsertConstructor(boolean returnOldValues) {
+            
+            this.returnOldValues = returnOldValues;
+            
+        }
+        
+        public IIndexProcedure newInstance(int n, int offset, byte[][] keys,
+                byte[][] vals) {
+
+            return new BatchInsert(n, offset, keys, vals, returnOldValues);
+            
+        }
+        
+    }
+    
+    /**
+     * De-serialization ctor.
+     *
+     */
+    public BatchInsert() {
+        
+    }
+    
     /**
      * Create a batch insert operation.
      * <p>
@@ -70,65 +108,94 @@ public class BatchInsert implements IBatchOperation {
      * operation can be very efficient if the tuples are presented sorted by key
      * order.
      * 
-     * @param ntuples
-     *            The #of tuples that are being inserted(in).
+     * @param n
+     *            The #of tuples that are being inserted.
+     * @param offset
+     *            The offset into <i>keys</i> and <i>vals</i> of the 1st
+     *            tuple.
      * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.<br>
-     *            The individual byte[] keys provided to this method MUST be
-     *            immutable - if the content of a given byte[] in <i>keys</i>
-     *            is changed after the method is invoked then the change MAY
-     *            have a side-effect on the keys stored in leaves of the tree.
-     *            While this constraint applies to the individual byte[] keys,
-     *            the <i>keys</i> byte[][] itself may be reused from invocation
-     *            to invocation without side-effect.
-     * @param values
-     *            Values (one element per key) (in/out). Null elements are
-     *            allowed. On output, each element is either null (if there was
-     *            no entry for that key) or the old value stored under that key
-     *            (which may be null).
+     *            A series of keys paired to values. Each key is an variable
+     *            length unsigned byte[]. The keys MUST be presented in sorted
+     *            order.
+     * @param vals
+     *            An array of values corresponding to those keys. Null elements
+     *            are allowed.
+     * @param returnOldValues
+     *            When <code>true</code> the old values for those keys will be
+     *            returned by {@link #apply(IIndex)}.
      */
-    public BatchInsert(int ntuples, byte[][] keys, Object[] values) {
+    public BatchInsert(int n, int offset, byte[][] keys, byte[][] vals,
+            boolean returnOldValues) {
 
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-            
-        if (keys == null)
-            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
+        super(n, offset, keys, vals);
 
-        if( keys.length < ntuples )
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-
-        if (values == null)
+        if (vals == null)
             throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
 
-        if( values.length < ntuples )
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
+        this.returnOldValues = returnOldValues;
 
-        this.n = ntuples;
-        this.keys = keys;
-        this.values = values;
-        
     }
     
     /**
      * Applies the operator using {@link ISimpleBTree#insert(Object, Object)}
      * 
-     * @param btree
+     * @param ndx
+     * 
+     * @return Either <code>null</code> if the old values were not requested
+     *         or a {@link ResultBuffer} containing the old values.
      */
-    public void apply(ISimpleBTree btree) {
-        
-        while (tupleIndex < n) {
+    public Object apply(IIndex ndx) {
 
-            values[tupleIndex] = btree.insert(keys[tupleIndex],
-                    values[tupleIndex]);
+        int i = 0;
+        
+        final int n = getKeyCount();
+
+        final byte[][] ret = (returnOldValues ? new byte[n][] : null);
+        
+        while (i < n) {
+
+            final byte[] key = getKey(i);
             
-            tupleIndex ++;
+            final byte[] val = getValue(i);
+            
+            final byte[] old = (byte[]) ndx.insert(key,val);
+            
+            if(returnOldValues) {
+                
+                ret[i] = old;
+                
+            }
+            
+            i++;
+            
+        }
+        
+        if (returnOldValues) {
+            
+            return new ResultBuffer(n, ret, getResultSerializer());
 
         }
+        
+        return null;
 
     }
     
+    @Override
+    protected void readMetadata(ObjectInput in) throws IOException {
+
+        super.readMetadata(in);
+
+        returnOldValues = in.readBoolean();
+
+    }
+
+    @Override
+    protected void writeMetadata(ObjectOutput out) throws IOException {
+
+        super.writeMetadata(out);
+
+        out.writeBoolean(returnOldValues);
+
+    }
+
 }

@@ -619,29 +619,29 @@ public class Node extends AbstractNode implements INodeData {
 
     }
 
-    /**
-     * Insert or update one or more tuples. For each tuple processed, this finds
-     * the index of the first key in the node whose value is greater than or
-     * equal to the key associated with that tuple. The insert operation is then
-     * delegated to the child node or leaf at position <code>index - 1</code>.
-     * 
-     * @return The #of tuples processed.
-     */
-    public int batchInsert(BatchInsert op) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-
-        btree.touch(this);
-
-        int childIndex = findChild(op.keys[op.tupleIndex]);
-
-        AbstractNode child = (AbstractNode) getChild(childIndex);
-
-        return child.batchInsert(op);
-
-    }
+//    /**
+//     * Insert or update one or more tuples. For each tuple processed, this finds
+//     * the index of the first key in the node whose value is greater than or
+//     * equal to the key associated with that tuple. The insert operation is then
+//     * delegated to the child node or leaf at position <code>index - 1</code>.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    public int batchInsert(BatchInsert op) {
+//
+//        assert !deleted;
+//        
+//        if(btree.debug) assertInvariants();
+//
+//        btree.touch(this);
+//
+//        int childIndex = findChild(op.keys[op.tupleIndex]);
+//
+//        AbstractNode child = (AbstractNode) getChild(childIndex);
+//
+//        return child.batchInsert(op);
+//
+//    }
 
     public Object insert(byte[] key,Object value) {
 
@@ -659,29 +659,29 @@ public class Node extends AbstractNode implements INodeData {
 
     }
 
-    /**
-     * Looks up one or more tuples. For each tuple processed, this finds the
-     * index of the first key in the node whose value is greater than or equal
-     * to the key associated with that tuple. The lookup operation is then
-     * delegated to the child node or leaf at position <code>index - 1</code>.
-     * 
-     * @return The #of tuples processed.
-     */
-    public int batchLookup(BatchLookup op) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-
-        btree.touch(this);
-
-        final int childIndex = findChild(op.keys[op.tupleIndex]);
-
-        AbstractNode child = (AbstractNode)getChild(childIndex);
-
-        return child.batchLookup(op);
-        
-    }
+//    /**
+//     * Looks up one or more tuples. For each tuple processed, this finds the
+//     * index of the first key in the node whose value is greater than or equal
+//     * to the key associated with that tuple. The lookup operation is then
+//     * delegated to the child node or leaf at position <code>index - 1</code>.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    public int batchLookup(BatchLookup op) {
+//
+//        assert !deleted;
+//        
+//        if(btree.debug) assertInvariants();
+//
+//        btree.touch(this);
+//
+//        final int childIndex = findChild(op.keys[op.tupleIndex]);
+//
+//        AbstractNode child = (AbstractNode)getChild(childIndex);
+//
+//        return child.batchLookup(op);
+//        
+//    }
     
     public Object lookup(byte[] key) {
 
@@ -699,30 +699,30 @@ public class Node extends AbstractNode implements INodeData {
         
     }
     
-    /**
-     * Existence test for up one or more tuples. For each tuple processed, this
-     * finds the index of the first key in the node whose value is greater than
-     * or equal to the key associated with that tuple. The lookup operation is
-     * then delegated to the child node or leaf at position
-     * <code>index - 1</code>.
-     * 
-     * @return The #of tuples processed.
-     */
-    public int batchContains(BatchContains op) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-
-        btree.touch(this);
-
-        final int childIndex = findChild(op.keys[op.tupleIndex]);
-
-        AbstractNode child = (AbstractNode)getChild(childIndex);
-
-        return child.batchContains(op);
-        
-    }
+//    /**
+//     * Existence test for up one or more tuples. For each tuple processed, this
+//     * finds the index of the first key in the node whose value is greater than
+//     * or equal to the key associated with that tuple. The lookup operation is
+//     * then delegated to the child node or leaf at position
+//     * <code>index - 1</code>.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    public int batchContains(BatchContains op) {
+//
+//        assert !deleted;
+//        
+//        if(btree.debug) assertInvariants();
+//
+//        btree.touch(this);
+//
+//        final int childIndex = findChild(op.keys[op.tupleIndex]);
+//
+//        AbstractNode child = (AbstractNode)getChild(childIndex);
+//
+//        return child.batchContains(op);
+//        
+//    }
     
     public boolean contains(byte[] searchKey) {
 
@@ -740,30 +740,30 @@ public class Node extends AbstractNode implements INodeData {
         
     }
     
-    /**
-     * Remove zero or more tuples. For each tuple processed, this finds the
-     * index of the first key in the node whose value is greater than or equal
-     * to the key associated with that tuple. The remove operation is then
-     * delegated to the child node or leaf at position <code>index - 1</code>.
-     * 
-     * @return The #of tuples processed (not necessarily the #of tuples
-     *         removed).
-     */
-    public int batchRemove(BatchRemove op) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-        
-        btree.touch(this);
-
-        int childIndex = findChild(op.keys[op.tupleIndex]);
-
-        AbstractNode child = (AbstractNode)getChild(childIndex);
-
-        return child.batchRemove(op);
-        
-    }
+//    /**
+//     * Remove zero or more tuples. For each tuple processed, this finds the
+//     * index of the first key in the node whose value is greater than or equal
+//     * to the key associated with that tuple. The remove operation is then
+//     * delegated to the child node or leaf at position <code>index - 1</code>.
+//     * 
+//     * @return The #of tuples processed (not necessarily the #of tuples
+//     *         removed).
+//     */
+//    public int batchRemove(BatchRemove op) {
+//
+//        assert !deleted;
+//        
+//        if(btree.debug) assertInvariants();
+//        
+//        btree.touch(this);
+//
+//        int childIndex = findChild(op.keys[op.tupleIndex]);
+//
+//        AbstractNode child = (AbstractNode)getChild(childIndex);
+//
+//        return child.batchRemove(op);
+//        
+//    }
     
     public Object remove(byte[] key) {
 

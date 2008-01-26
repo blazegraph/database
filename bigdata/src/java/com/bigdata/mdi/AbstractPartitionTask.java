@@ -26,21 +26,24 @@ package com.bigdata.mdi;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.concurrent.Executors;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.RecordCompressor;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.isolation.Value;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.scaleup.MasterJournal.Options;
-import com.bigdata.service.ClientIndexView;
-import com.bigdata.service.SplitPoint;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Abstract base class for tasks that build {@link IndexSegment}(s).
@@ -212,34 +215,58 @@ abstract public class AbstractPartitionTask extends AbstractTask {
         super(journal, ITx.UNISOLATED, false/* readOnly */, name);
         
     }
-
+    
     /**
+     * Factory for iterators allowing an application choose both the #of splits
+     * and the split points. The implementation should examine the
+     * {@link IIndex}, returning a sequence of keys that are acceptable index
+     * partition separators for the {@link IIndex}.
+     * <p>
+     * Various kinds of indices have constraints on the keys that may be used as
+     * index partition separators. For example, a {@link SparseRowStore}
+     * constrains its index partition separators such that
      * 
-     * @todo update the metadata index (synchronized) and invalidate
-     *       existing partitioned index views that depend on the source
-     *       index.
-     *       
-     * @param resources
-     */
-    protected void updatePartition(IResourceMetadata[] resources) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * Interface allowing an application choose both the #of splits and the
-     * split points.
+     * @see IIndex
+     * @see UnisolatedBTreePartition
+     * @see PartitionMetadataWithSeparatorKeys
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface ISplitRule extends Serializable {
-      
-        public SplitPoint[] split(IIndex ndx);
+    public static interface ISplitFactory extends Serializable {
+        
+        /**
+         * Create and return an {@link Iterator} that will return a sequence of
+         * zero or more keys that identify the leftSeparator of index partitions
+         * to be created from the given index.
+         * <p>
+         * Note: The factory is given a reference to an {@link IIndex}, which
+         * is typically a fused view of an index partition extending
+         * {@link UnisolatedBTreePartition}. Fused views do NOT implement the
+         * {@link AbstractBTree#keyAt(int)} method which relies on a total
+         * ordering rather than a merge of total orderings. As a result the
+         * {@link Iterator}s returned by the factory typically need to perform
+         * a key range scan to identify suitable index partition separators.
+         * <p>
+         * An index partition separator is a key that forms the
+         * <em>leftSeparator</em> key for that index partition. The
+         * leftSeparator describes the first key that will enter that index
+         * partition. Note that the leftSeparator keys do NOT have to be
+         * literally present in the index - they may be (and should be) the
+         * shortest prefix that creates the necessary separation between the
+         * index partitions.
+         * 
+         * @param ndx
+         *            The index to be split.
+         * 
+         * @return The iterator that will visit the keys at which the index will
+         *         be split into partitions (that is, it will visit the keys to
+         *         be used as leftSeparator keys for those index partitions).
+         */
+        public Iterator<byte[]/*key*/> newInstance(IIndex ndx);
         
     };
-    
+
     /**
      * Simple rule divides the index into N splits of roughly M index entries.
      * <p>
@@ -249,63 +276,164 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class DefaultSplitRule implements ISplitRule {
+    public static class DefaultSplitFactory implements ISplitFactory {
         
         private int m;
+        
+        public int getM() {
+            
+            return m;
+            
+        }
+        
+        public DefaultSplitFactory(int m) {
+
+            if (m <= 0)
+                throw new IllegalArgumentException();
+
+            this.m = m;
+            
+        }
+        
+        public Iterator<byte[]/*key*/> newInstance(IIndex ndx) {
+            
+            return new DefaultSpliterator(ndx, m);
+            
+        }
+        
+    }
+
+    /**
+     * Given M, the goal is to divide the index into N partitions of
+     * approximately M entries each.
+     * 
+     * <pre>
+     *        
+     *        n = round( rangeCount / m ) - the integer #of index partitions to be created.
+     *        
+     *        m' = round( rangeCount / n ) - the integer #of entries per partition.
+     * </pre>
+     * 
+     * To a first approximation, the splits are every m' index entries.
+     * 
+     * However, the split rule then needs to examine the actual keys at and
+     * around those split points and adjust them as necessary.
+     * 
+     * The running over/under run in cum(m') is maintained and the suggested
+     * split points are adjusted by that over/under run.
+     * 
+     * Repeat until all split points have been identifed and validated by the
+     * split run.
+     * 
+     * @todo could do special case version when the index is an
+     *       {@link AbstractBTree} and {@link AbstractBTree#keyAt(int)} can be
+     *       used.
+     * 
+     * @todo make sure that {@link UnisolatedBTreePartition} does not expose
+     *       keyAt() - this may break a lot of code assumptions - or at least
+     *       throws an exception for it.
+     * 
+     * FIXME when the index partition is a fused view we do not have a keyAt()
+     * implementation. (It's possible that this could be achieved using keyAt()
+     * to do a binary search probing on each of the components of that view and
+     * computing the rangeCount(null,k) for each key pulled out of the
+     * underlying indices, but this seems pretty complex.)
+     * 
+     * Another approach is a prefix scan. This is nice because it will only
+     * touch on the possible index separator keys, but it only works when the
+     * split points are constrained. If we allow any key as an index separator
+     * key then there is no prefix that we can use. Also, this might not work
+     * with the sparse row store since the [schema,primaryKey] are not fixed
+     * length fields.
+     * 
+     * An incremental approach is to consume M index entries halting at the key
+     * that forms an acceptable index partition separator closest to M (either
+     * before or after). This suggests that we can not pre-compute the split
+     * points when the index is a fused view but rather that we have to
+     * sequentially process the index deciding as we go where the split points
+     * are.
+     * 
+     * The inputs are then: (a) the #of index entries per partition, m'; (b) the
+     * desired size in bytes of each index partition; (c) the split rule which
+     * will decide what is an acceptable index partition separator; and (d) an
+     * iterator scanning the index partition view.
+     * 
+     * @todo rule variants that attempt to divide the index partition into equal
+     *       size (#of bytes) splits.
+     *       
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class DefaultSpliterator implements Iterator<byte[]> {
+
+        private final IIndex ndx;
+
+        private final long rangeCount;
+
+        private final IEntryIterator src;
+        
+        private final int m;
+        
+        private final int n;
         
         /**
          * 
          * @param m
          *            The maximum #of index entries in a split.
          */
-        public DefaultSplitRule(int m) {
+        public DefaultSpliterator(IIndex ndx, int m) {
 
+            if (ndx == null)
+                throw new IllegalArgumentException();
+            
             if (m <= 0)
                 throw new IllegalArgumentException();
 
-            this.m = m;
+            // the source index.
+            this.ndx = ndx;
+
+            // upper bound on #of non-deleted index entries.
+            this.rangeCount = ndx.rangeCount(null, null);
+            
+            // iterator visiting keys for the non-deleted index entries.
+            this.src = ndx.rangeIterator(null, null, 0/* capacity */,
+                    IRangeQuery.KEYS, null/*filter*/);
+            
+            // target #of index partitions.
+            this.n = Math.round(rangeCount / m);
+
+            // adjusted value for [m]
+            this.m = Math.round(rangeCount / n);
 
         }
 
         /**
-         * @todo implement - look at
-         *       {@link ClientIndexView#splitKeys(int, byte[][])} for some fence
-         *       posts. Basically, rangeCount/n == m so n := rangeCount / m
+         * Computes the key for the next split point and returns true iff one
+         * was found.
          */
-        public SplitPoint[] split(IIndex ndx) {
+        public boolean hasNext() {
+            // TODO Auto-generated method stub
+            return false;
+        }
 
-            final long rangeCount = ndx.rangeCount(null, null);
+        /**
+         * Returns the key for the next split point, which is computed by
+         * {@link #hasNext()}.
+         */
+        public byte[] next() {
+            // TODO Auto-generated method stub
+            return null;
+        }
 
-            final int numPerSplit = (int) Math.min(rangeCount / m + 1,
-                    Integer.MAX_VALUE);
-            
-            int nentries = 0;
-            
-            int fromIndex = 0;
-            
-            while(nentries<rangeCount) {
-                
-//                int toIndex = Math.min(rangeCount, b)
-                
-                
-            }
-            
-            // @todo review fence posts
-            
-            // @todo populate split[].
-            
-            /*
-             * @todo allow adjustment of the split points by a derived rule
-             * based on the desirable key boundaries (prefix break points).
-             * 
-             * @todo rule variants that attempt to divide the index partition
-             * into equal size (#of bytes) splits.
-             */
-            
+        /**
+         * @throws UnsupportedOperationException always.
+         */
+        public void remove() {
+
             throw new UnsupportedOperationException();
             
         }
-        
+
     }
     
     /**
@@ -325,7 +453,8 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * when a key would split an indivisable unit, such as a logical row in a
      * sparse row store. The rule could be more sophisticated and "prefer"
      * certain split points, but there are some split points that are hard
-     * constraints.
+     * constraints. The same "rule" could potentially be used to count logical
+     * "rows" for the {@link SparseRowStore} row iterator.
      * 
      * FIXME A merge rule that knows about deletion markers and is only usable
      * when the input is an {@link UnisolatedBTree}. The output
@@ -369,12 +498,15 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      *       sibling or split into two partitions). In this case any already
      *       scheduled operations MUST abort and new operations with the correct
      *       separator keys must be scheduled.
+     * 
+     * @todo do I need a full timestamp for the {@link Value}s in order to
+     *       support history policies based on age? If the timestamp is the time
+     *       at which the commit group begins then the timestamps can be
+     *       compressed readily using a dictionary since there will tend to be
+     *       very few distinct timestamps per leaf.
      */
     public static class MergeTask extends AbstractPartitionTask {
 
-        /**
-         * Branching factor used for generated {@link IndexSegment}(s). 
-         */
         protected final int branchingFactor;
         protected final double errorRate;
         protected final String name;
@@ -383,18 +515,19 @@ abstract public class AbstractPartitionTask extends AbstractTask {
         protected final byte[] toKey;
 
         /**
-         * Varient when a full merge is desired.
+         * Varient performs a full merge when the index partition is NOT being
+         * split. The result is a single index segment containing all data in
+         * the source index partition view.
          * 
          * @param partId
          *            The unique partition identifier to be assigned to the new
          *            partition.
          * @param branchingFactor
-         *            The branching factor to be used on the new
-         *            {@link IndexSegment}(s).
+         *            The branching factor for the new {@link IndexSegment}.
          * @param errorRate
          *            The error rate for the bloom filter for the new
-         *            {@link IndexSegment}(s) -or- zero(0d) if no bloom filter
-         *            is desired.
+         *            {@link IndexSegment} -or- zero(0d) if no bloom filter is
+         *            desired.
          */
         public MergeTask(Journal journal, String name, int partId,
                 int branchingFactor, double errorRate) {
@@ -405,17 +538,20 @@ abstract public class AbstractPartitionTask extends AbstractTask {
         }
 
         /**
+         * Varient performs a full merge when the index partition is being split
+         * and is invoked for each (fromKey,toKey) pair that define the output
+         * index partitions. The result is a single index segment containing all
+         * the data for the output index partition having the given key range.
          * 
          * @param partId
          *            The unique partition identifier to be assigned to the new
          *            partition.
          * @param branchingFactor
-         *            The branching factor to be used on the new
-         *            {@link IndexSegment}(s).
+         *            The branching factor for the new {@link IndexSegment}.
          * @param errorRate
          *            The error rate for the bloom filter for the new
-         *            {@link IndexSegment}(s) -or- zero(0d) if no bloom filter
-         *            is desired.
+         *            {@link IndexSegment} -or- zero(0d) if no bloom filter is
+         *            desired.
          * @param fromKey
          *            The first key that would be accepted into that partition
          *            (aka the separator key for that partition).<br>
@@ -469,17 +605,15 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             final int nentries = (int) src.rangeCount(fromKey, toKey);
             
             /*
-             * 
-             * @todo this needs to use the rangeIterator on the root of the
-             * btree so that the {@link Value}s will be visible, including both
-             * version counters and deletion markers. that is difficult since we
-             * are looking at a fused view. Either we have to build up the fused
-             * view ourselves or we have to somehow override the IEntryFilter so
-             * that we get to see the data versions. Perhaps the fused view can
-             * expose a variant iterator method that does not filter deleted
-             * data versions?
+             * Note: in order to see both version counters and deletion markers
+             * this needs to use an IEntryIterator that does NOT filter out
+             * deleted entries and which does NOT resolve {@link Value}s to
+             * their datums. That iterator MUST be defined for the fused view
+             * for the index partition.
              */
-            final IEntryIterator itr = src.rangeIterator(fromKey, toKey);
+            final IEntryIterator itr = src
+                    .rangeIterator2(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
             // Build index segment.
             final IndexSegmentBuilder builder = new IndexSegmentBuilder(

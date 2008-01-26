@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+
 /**
  * Batch existence test operation. Existence tests SHOULD be used in place of
  * lookup tests to determine key existence if null values are allowed in an
@@ -36,108 +37,85 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchContains implements IBatchOperation, IReadOnlyOperation {
+public class BatchContains extends IndexProcedure implements IBatchOperation,
+        IReadOnlyOperation, IParallelizableIndexProcedure {
 
     /**
-     * The #of tuples to be processed.
+     * 
      */
-    public final int n;
-    
+    private static final long serialVersionUID = -5195874136364040815L;
+
     /**
-     * The keys for each tuple.
+     * Factory for {@link BatchContains} procedures.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    public final byte[][] keys;
-    
+    public static class BatchContainsConstructor implements IIndexProcedureConstructor {
+
+        public static final BatchContainsConstructor INSTANCE = new BatchContainsConstructor(); 
+        
+        public BatchContainsConstructor() {
+            
+        }
+        
+        public IIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
+
+            return new BatchContains(n, offset, keys);
+            
+        }
+        
+    }
+
     /**
-     * The value corresponding to each key.
+     * De-serialization ctor.
+     *
      */
-    public final boolean[] contains;
-    
-    /**
-     * The index of the tuple that is currently being processed.
-     */
-    public int tupleIndex = 0;
-    
-    public int getTupleCount() {
-        return n;
+    public BatchContains() {
+        
     }
     
-    public byte[][] getKeys() {
-        return keys;
-    }
-    
     /**
-     * Create a batch existance test operation.
+     * Create a batch existence test operation.
      * 
      * @param ntuples
      *            The #of tuples in the operation (in).
-     * 
+     * @param offset
      * @param keys
-     *            A series of keys paired to values (in). Each key is an
-     *            variable length unsigned byte[]. The keys must be presented in
-     *            sorted order in order to obtain maximum efficiency for the
-     *            batch operation.
-     * 
-     * @param contains
-     *            An array of boolean flags, one per tuple (in,out). On input,
-     *            the tuple will be tested iff the corresponding element is
-     *            <code>false</code> (this supports chaining of this operation
-     *            on a view over multiple btrees). On output, the array element
-     *            corresponding to a tuple will be true iff the key exists.
-     * 
-     * @exception IllegalArgumentException
-     *                if the dimensions of the arrays are not sufficient for the
-     *                #of tuples declared.
-     *                
-     * @todo consider returning the #of keys that were found in the btree.
+     *            A series of keys. Each key is an variable length unsigned
+     *            byte[]. The keys MUST be presented in sorted order.
      */
-    public BatchContains(int ntuples, byte[][] keys, boolean[] contains) {
+    public BatchContains(int ntuples, int offset, byte[][] keys) {
         
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
-        if (keys == null)
-            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
-
-        if (keys.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-
-        if (contains == null)
-            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
-
-        if (contains.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
-
-        this.n = ntuples;
-        this.keys = keys;
-        this.contains = contains;
+        super( ntuples, offset, keys, null/*vals*/);
 
     }
 
     /**
      * Applies the operation using {@link ISimpleBTree#contains(byte[])}.
      * 
-     * @param btree
+     * @param ndx
+     * 
+     * @return A {@link ResultBitBuffer}.
      */
-    public void apply(ISimpleBTree btree) {
+    public Object apply(IIndex ndx) {
+
+        final int n = getKeyCount();
         
-        while( tupleIndex < n ) {
+        final boolean[] ret = new boolean[n];
+        
+        int i = 0;
+        
+        while( i < n ) {
 
-            // skip tuples already marked as true.
-            if (contains[tupleIndex]) {
+            ret[i] = ndx.contains(getKey(i));
 
-                tupleIndex++;
-
-                continue;
-
-            }
-
-            contains[tupleIndex] = btree.contains(keys[tupleIndex]);
-
-            tupleIndex ++;
+            i++;
 
         }
 
+        return new ResultBitBuffer(n, ret);
+        
     }
     
 }

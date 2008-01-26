@@ -84,8 +84,14 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
                     new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
                     new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
             
-            btree.insert(new BatchInsert(values.length, keys, values));
+//            btree.insert(new BatchInsert(values.length, keys, values));
             
+            for (int i = 0; i < values.length; i++) {
+                
+                btree.insert(keys[i], values[i]);
+                
+            }
+
             assertTrue(btree.dump(Level.DEBUG,System.err));
     
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },

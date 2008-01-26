@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.isolation.UnisolatedBTree;
+
 /**
  * This procedure computes a range count on an index.
  */
@@ -67,7 +69,21 @@ public class RangeCountProcedure implements IIndexProcedure,
     }
 
     /**
-     * @return The range count as a {@link Long}.
+     * <p>
+     * Range count of entries in a key range for the index.
+     * </p>
+     * <p>
+     * Note: This method reports the upper bound estimate of the #of key-value
+     * pairs in the key range of the index. The cost of computing this estimate
+     * is comparable to two index lookup probes. The estimate is an upper bound
+     * because deleted entries in an {@link UnisolatedBTree} or a view thereof
+     * that have not been eradicated through a suitable compacting merge will be
+     * reported. An exact count may be obtained using a range iterator by NOT
+     * requesting either the keys or the values.
+     * </p>
+     * 
+     * @return The upper bound estimate of the #of key-value pairs in the key
+     *         range of the named index.
      */
     public Object apply(IIndex ndx) {
 

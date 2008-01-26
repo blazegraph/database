@@ -186,7 +186,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public IMetadataService getMetadataService() {
         
-        assertConnected();
+        // Note: allowed before 'connected'.
+//        assertConnected();
         
         ServiceItem item = dataServiceLookupCache.lookup(MetadataServiceFilter.INSTANCE);
             
@@ -243,7 +244,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public UUID[] getDataServiceUUIDs(int maxCount) {
         
-        assertConnected();
+        // Note: allow before connected.
+//        assertConnected();
 
         ServiceItem[] items = dataServiceMap.getServiceItems(maxCount,DataServiceFilter.INSTANCE);
         
@@ -274,7 +276,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public IDataService getDataService(UUID serviceUUID) {
         
-        assertConnected();
+        // Note: allow before connected.
+//        assertConnected();
 
         ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
         
@@ -607,7 +610,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      */
     public int awaitServices(int minDataServices, long timeout) throws InterruptedException, TimeoutException {
         
-        assertConnected();
+        // Note: allow before connected.
+//        assertConnected();
 
         assert minDataServices > 0;
         assert timeout > 0;

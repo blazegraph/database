@@ -351,19 +351,6 @@ public class TestUnisolatedBTree extends AbstractBTreeTestCase {
     }
 
     /**
-     * @todo test the batch apis. all methods must work with {@link Value}s
-     *       (the test for this could be a test of the
-     *       {@link IBatchOperation#apply(com.bigdata.btree.ISimpleBTree)}
-     *       implementations in the btree package since we apply that method in
-     *       a trivial manner to support the batch api.
-     */
-    public void test_crud_batchApi() {
-        
-        fail("write test");
-        
-    }
-
-    /**
      * Test verifies that {@link UnisolatedBTree#removeAll()} causes deletion
      * markers to be written for each undeleted entry in the B+Tree.
      * <p>

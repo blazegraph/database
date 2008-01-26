@@ -43,6 +43,9 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.RangeCountProcedure;
+import com.bigdata.btree.IndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.IndexProcedure.ResultBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 
@@ -178,26 +181,23 @@ public class DataServiceIndex implements IIndex {
     }
 
     public boolean contains(byte[] key) {
-
+        
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
         else
             log.warn(NON_BATCH_API);
-        
-        final boolean[] ret;
 
-        try {
+        final BatchContains proc = new BatchContains(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key } // keys
+        );
 
-            ret = dataService.batchContains(tx, name, 1, new byte[][] { key });
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final boolean[] ret = ((ResultBitBuffer) submit((byte[]) key, proc))
+                .getResult();
 
         return ret[0];
-
+        
     }
 
     public Object insert(Object key, Object value) {
@@ -207,21 +207,15 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final boolean returnOldValues = true;
+        final BatchInsert proc = new BatchInsert(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key }, // keys
+                new byte[][] { (byte[]) value }, // vals
+                true // returnOldValues
+        );
 
-        final byte[][] ret;
-
-        try {
-
-            ret = dataService.batchInsert(tx, name, 1,
-                    new byte[][] { (byte[]) key },
-                    new byte[][] { (byte[]) value }, returnOldValues);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
@@ -234,18 +228,13 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final byte[][] ret;
+        final BatchLookup proc = new BatchLookup(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key } // keys
+        );
 
-        try {
-
-            ret = dataService.batchLookup(tx, name, 1,
-                    new byte[][] { (byte[]) key });
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
@@ -258,30 +247,39 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final byte[][] ret;
+        final BatchRemove proc = new BatchRemove(//
+                1, // n,
+                0, // offset
+                new byte[][] { (byte[]) key }, // keys
+                true // returnOldValues
+        );
 
-        final boolean returnOldValues = true;
-
-        try {
-
-            ret = dataService.batchRemove(tx, name, 1,
-                    new byte[][] { (byte[]) key }, returnOldValues);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final byte[][] ret = ((ResultBuffer)submit((byte[]) key, proc)).getResult();
 
         return ret[0];
 
     }
 
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    /**
+     * Submits an index procedure to the embedded data service returning the
+     * result of that procedure.
+     * <p>
+     * Note: This is parallel to
+     * {@link ClientIndexView#submit(byte[], IIndexProcedure)} so that some code
+     * can be shared by both classes.
+     * 
+     * @param key
+     *            The key (unused).
+     * @param proc
+     *            The procedure.
+     * 
+     * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
+     */
+    public Object submit(byte[] key,IIndexProcedure proc) {
 
         try {
 
-            return dataService.rangeCount(tx, name, fromKey, toKey);
+            return dataService.submit(tx, name, proc);
 
         } catch (Exception ex) {
 
@@ -291,6 +289,142 @@ public class DataServiceIndex implements IIndex {
 
     }
 
+//    public boolean contains(byte[] key) {
+//
+//        if (batchOnly)
+//            throw new RuntimeException(NON_BATCH_API);
+//        else
+//            log.warn(NON_BATCH_API);
+//        
+//        final boolean[] ret;
+//
+//        try {
+//
+//            ret = dataService.batchContains(tx, name, 1, new byte[][] { key });
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        return ret[0];
+//
+//    }
+//
+//    public Object insert(Object key, Object value) {
+//
+//        if (batchOnly)
+//            throw new RuntimeException(NON_BATCH_API);
+//        else
+//            log.warn(NON_BATCH_API);
+//
+//        final boolean returnOldValues = true;
+//
+//        final byte[][] ret;
+//
+//        try {
+//
+//            ret = dataService.batchInsert(tx, name, 1,
+//                    new byte[][] { (byte[]) key },
+//                    new byte[][] { (byte[]) value }, returnOldValues);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        return ret[0];
+//
+//    }
+//
+//    public Object lookup(Object key) {
+//
+//        if (batchOnly)
+//            throw new RuntimeException(NON_BATCH_API);
+//        else
+//            log.warn(NON_BATCH_API);
+//
+//        final byte[][] ret;
+//
+//        try {
+//
+//            ret = dataService.batchLookup(tx, name, 1,
+//                    new byte[][] { (byte[]) key });
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        return ret[0];
+//
+//    }
+//
+//    public Object remove(Object key) {
+//
+//        if (batchOnly)
+//            throw new RuntimeException(NON_BATCH_API);
+//        else
+//            log.warn(NON_BATCH_API);
+//
+//        final byte[][] ret;
+//
+//        final boolean returnOldValues = true;
+//
+//        try {
+//
+//            ret = dataService.batchRemove(tx, name, 1,
+//                    new byte[][] { (byte[]) key }, returnOldValues);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        return ret[0];
+//
+//    }
+
+//    public long rangeCount(byte[] fromKey, byte[] toKey) {
+//
+//        try {
+//
+//            return dataService.rangeCount(tx, name, fromKey, toKey);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
+
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
+
+//        final LongAggregator handler = new LongAggregator();
+        
+        final RangeCountProcedure proc = new RangeCountProcedure(fromKey,toKey);
+
+        final long rangeCount;
+
+        try {
+
+            rangeCount = (Long) dataService.submit(tx,name,proc);
+        
+        } catch (Exception ex) {
+        
+            throw new RuntimeException(ex);
+        
+        }
+
+        return rangeCount;
+
+    }
+    
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
@@ -305,93 +439,93 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public void contains(BatchContains op) {
-
-        try {
-
-            boolean[] vals = dataService.batchContains(tx, name, op.n,
-                    op.keys);
-
-            System.arraycopy(vals, 0, op.contains, 0, op.n);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    public void insert(BatchInsert op) {
-
-        final boolean returnOldValues = true;
-
-        byte[][] oldVals;
-
-        try {
-
-            oldVals = dataService.batchInsert(tx, name, op.n, op.keys,
-                    (byte[][]) op.values, returnOldValues);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        if (returnOldValues) {
-
-            System.arraycopy(oldVals, 0, op.values, 0, op.n);
-
-        }
-
-    }
-
-    /**
-     * @todo assert op.offset == 0 if offset defined for ops (for all batch
-     * operators and procedures).
-     */
-    public void lookup(BatchLookup op) {
-
-        try {
-
-            byte[][] vals = dataService.batchLookup(tx, name, op.n,
-                    op.keys);
-
-            System.arraycopy(vals, 0, op.values, 0, op.n);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    public void remove(BatchRemove op) {
-
-        final boolean returnOldValues = true;
-
-        byte[][] oldVals;
-
-        try {
-
-            oldVals = dataService.batchRemove(tx, name, op.n, op.keys,
-                    returnOldValues);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        if (returnOldValues) {
-
-            System.arraycopy(oldVals, 0, op.values, 0, op.n);
-
-        }
-
-    }
+//    public void contains(BatchContains op) {
+//
+//        try {
+//
+//            boolean[] vals = dataService.batchContains(tx, name, op.n,
+//                    op.keys);
+//
+//            System.arraycopy(vals, 0, op.contains, 0, op.n);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
+//
+//    public void insert(BatchInsert op) {
+//
+//        final boolean returnOldValues = true;
+//
+//        byte[][] oldVals;
+//
+//        try {
+//
+//            oldVals = dataService.batchInsert(tx, name, op.n, op.keys,
+//                    (byte[][]) op.values, returnOldValues);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        if (returnOldValues) {
+//
+//            System.arraycopy(oldVals, 0, op.values, 0, op.n);
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * @todo assert op.offset == 0 if offset defined for ops (for all batch
+//     * operators and procedures).
+//     */
+//    public void lookup(BatchLookup op) {
+//
+//        try {
+//
+//            byte[][] vals = dataService.batchLookup(tx, name, op.n,
+//                    op.keys);
+//
+//            System.arraycopy(vals, 0, op.values, 0, op.n);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
+//
+//    public void remove(BatchRemove op) {
+//
+//        final boolean returnOldValues = true;
+//
+//        byte[][] oldVals;
+//
+//        try {
+//
+//            oldVals = dataService.batchRemove(tx, name, op.n, op.keys,
+//                    returnOldValues);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//        if (returnOldValues) {
+//
+//            System.arraycopy(oldVals, 0, op.values, 0, op.n);
+//
+//        }
+//
+//    }
 
     public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {

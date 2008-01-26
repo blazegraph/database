@@ -100,8 +100,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestFindChild.class );
         // test insert, lookup, and remove for root leaf w/o splitting it.
         suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
-        // test insert, lookup, and remove for root leaf w/o splitting it using the batch api.
-        suite.addTestSuite( TestInsertLookupRemoveOnRootLeafWithBatchApi.class );
         // test splitting the root leaf.
         suite.addTestSuite( TestSplitRootLeaf.class );
         // test splitting and joining the root leaf (no more than two levels).

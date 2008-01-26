@@ -1151,28 +1151,28 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract protected void merge(AbstractNode sibling, boolean isRightSibling);
 
-    /**
-     * Batch insert of one or more tuples.
-     * 
-     * The behavior for each tuple is equivilent to a recursive search that
-     * locates the approprate leaf and inserts or updates a tuple under the key.
-     * The leaf is split iff necessary. Splitting the leaf can cause splits to
-     * cascade up towards the root. If the root is split then the total depth of
-     * the tree is inceased by one.
-     * 
-     * This operation can be very efficient if the tuples are presented in key
-     * order.
-     * 
-     * @return The #of tuples processed.
-     */
-    abstract public int batchInsert(BatchInsert op);
-
-    /**
-     * Batch lookup of one or more tuples.
-     * 
-     * @return The #of tuples processed.
-     */
-    abstract public int batchLookup(BatchLookup op);
+//    /**
+//     * Batch insert of one or more tuples.
+//     * 
+//     * The behavior for each tuple is equivilent to a recursive search that
+//     * locates the approprate leaf and inserts or updates a tuple under the key.
+//     * The leaf is split iff necessary. Splitting the leaf can cause splits to
+//     * cascade up towards the root. If the root is split then the total depth of
+//     * the tree is inceased by one.
+//     * 
+//     * This operation can be very efficient if the tuples are presented in key
+//     * order.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    abstract public int batchInsert(BatchInsert op);
+//
+//    /**
+//     * Batch lookup of one or more tuples.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    abstract public int batchLookup(BatchLookup op);
 
     /**
      * Insert or update a value.
@@ -1198,12 +1198,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract public Object lookup(byte[] key);
     
-    /**
-     * Batch existence testing for one or more keys.
-     * 
-     * @return The #of tuples processed.
-     */
-    abstract public int batchContains(BatchContains op);
+//    /**
+//     * Batch existence testing for one or more keys.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    abstract public int batchContains(BatchContains op);
 
     /**
      * Return true iff there is an entry for the search key (this method should
@@ -1216,13 +1216,13 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract public boolean contains(byte[] searchKey);
     
-    /**
-     * Batch removal of one or more tuples, returning their existing values by
-     * side-effect.
-     * 
-     * @return The #of tuples processed.
-     */
-    abstract public int batchRemove(BatchRemove op);
+//    /**
+//     * Batch removal of one or more tuples, returning their existing values by
+//     * side-effect.
+//     * 
+//     * @return The #of tuples processed.
+//     */
+//    abstract public int batchRemove(BatchRemove op);
 
     /**
      * Recursive search locates the appropriate leaf and removes the entry for

@@ -45,10 +45,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -110,7 +111,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StressTestConcurrent extends AbstractServerTestCase implements IComparisonTest {
+public class StressTestConcurrent extends
+        AbstractEmbeddedBigdataFederationTestCase implements IComparisonTest {
 
     /**
      * 
@@ -496,7 +498,10 @@ public class StressTestConcurrent extends AbstractServerTestCase implements ICom
 
                 }
                 
-                ndx.insert(new BatchInsert(nops,keys,vals));
+                ndx.submit(nops, keys, vals, //
+                        BatchInsertConstructor.RETURN_NO_VALUES, //
+                        null// handler
+                        );
                 
             } else {
 
@@ -506,7 +511,10 @@ public class StressTestConcurrent extends AbstractServerTestCase implements ICom
 
                 }
                 
-                ndx.remove(new BatchRemove(nops,keys,vals/* out */));
+                ndx.submit(nops, keys, vals,//
+                        BatchRemoveConstructor.RETURN_NO_VALUES,//
+                        null// handler
+                        );
                 
             }
             

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.scaleup;
 
-import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.isolation.IsolatableFusedView;
@@ -51,9 +50,8 @@ import com.bigdata.mdi.MetadataIndex;
  * full compacting merge of all index segments having life data for the
  * partition.
  * <p>
- * Implementation note: both the write operations and the {@link IBatchBTree}
- * operations are inherited from the base class. Only non-batch read operations
- * are overriden by this class.
+ * Implementation note: the write operations are inherited from the base class.
+ * Only read operations are overriden by this class.
  * 
  * FIXME implement; support processing of delete markers - basically they have
  * to be processed on read so that a delete on the mutable btree overrides an

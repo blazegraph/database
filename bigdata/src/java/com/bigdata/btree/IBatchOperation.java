@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 /**
- * A common interface for batch operations. Batch operations can be very
- * efficient if the keys are presented in sorted order and should be used
- * to minimize network traffic.
+ * A marker interface for some batch operations. Batch operations can be very
+ * efficient if the keys are presented in sorted order and should be used to
+ * minimize network traffic.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -39,26 +39,4 @@ package com.bigdata.btree;
  */
 public interface IBatchOperation {
     
-    /**
-     * Return the #of tuples in the operation.
-     */
-    public int getTupleCount();
-    
-    /**
-     * Return the keys.
-     * 
-     * @todo change to use IKeyBuffer?
-     */
-    public byte[][] getKeys();
-    
-    /**
-     * Apply the operation - this method may be used both to define extensible
-     * batch operations and to provide default (un-optimized) implementations of
-     * the batch api that are useful for derived btree implementations with
-     * modified semantics.
-     * 
-     * @param btree
-     */
-    public void apply(ISimpleBTree btree);
-
 }

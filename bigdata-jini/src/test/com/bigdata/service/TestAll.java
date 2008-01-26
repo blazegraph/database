@@ -66,11 +66,6 @@ public class TestAll extends TestCase {
          * Test of a single client talking to a bigdata federation.
          */
         suite.addTestSuite( TestBigdataClient.class );
-
-        /*
-         * Stress test of concurrent clients writing on a single data service.
-         */
-        suite.addTestSuite( StressTestConcurrent.class );
         
         /*
          * @todo test correctness when services fail at various points in

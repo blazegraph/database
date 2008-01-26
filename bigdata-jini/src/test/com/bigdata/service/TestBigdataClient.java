@@ -31,13 +31,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IndexProcedure.ResultBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadata;
@@ -433,15 +431,23 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertEquals(new byte[]{5},(byte[])ndx.lookup(new byte[]{5}));
 
         // verify correct value in the index on the correct data service.
-        assertEquals(new byte[] { 1 }, (byte[]) dataService0.batchLookup(
-                UNISOLATED,
-                DataService.getIndexPartitionName(name, partition0), 1,
-                new byte[][] { new byte[] { 1 } })[0]);
+        assertEquals(new byte[] { 1 }, ((ResultBuffer) dataService0.submit(
+                ITx.UNISOLATED,//
+                DataService.getIndexPartitionName(name, partition0),//
+                new BatchLookup(//
+                        1,// n
+                        0,// offset
+                        new byte[][] { new byte[] { 1 } }// keys
+                ))).getResult()[0]);
         //
-        assertEquals(new byte[] { 5 }, (byte[]) dataService1.batchLookup(
-                UNISOLATED,
-                DataService.getIndexPartitionName(name, partition1), 1,
-                new byte[][] { new byte[] { 5 } })[0]);
+        assertEquals(new byte[] { 5 }, ((ResultBuffer) dataService1.submit(
+                ITx.UNISOLATED,//
+                DataService.getIndexPartitionName(name, partition1),//
+                new BatchLookup(//
+                        1,// n
+                        0,// offset
+                        new byte[][] { new byte[] { 5 } }// keys
+                ))).getResult()[0]);
 
         // verify some range counts.
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));
@@ -594,13 +600,13 @@ public class TestBigdataClient extends AbstractServerTestCase {
         });
         
         /*
-         * Request a view of that index.
+         * Request a view of that partitioned index.
          */
         ClientIndexView ndx = (ClientIndexView) fed.getIndex(
                 ITx.UNISOLATED, name);
 
         /*
-         * Range count the index to verify that it is empty.
+         * Range count the view to verify that it is empty.
          */
         assertEquals("rangeCount",0,ndx.rangeCount(null, null));
 
@@ -1072,281 +1078,281 @@ public class TestBigdataClient extends AbstractServerTestCase {
         
     }
     
-    /**
-     * Test of batch operations (contains, lookup, insert, remove) that span
-     * more than one partition. The client is responsible for examining the keys
-     * provided by the application in a batch operation and issuing multiple
-     * requests (one per partition) if necessary. Those requests can be issued
-     * in parallel, but that is not required.
-     */
-    public void test_batchOps_staticPartitions() {
-       
-        // Connect to the federation.
-        BigdataFederation fed = (BigdataFederation)client.connect();
-        
-        final String name = "testIndex";
-
-        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
-
-        /*
-         * Register and statically partition an index.
-         */
-        fed.registerIndex(name, ctor, new byte[][]{//
-                new byte[]{}, // keys less than 5...
-                new byte[]{5} // keys GTE 5....
-        }, new UUID[]{//
-                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
-                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
-        });
-        
-        /*
-         * Request a view of that index.
-         */
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
-        
-        /*
-         * Range count the index to verify that it is empty.
-         */
-        assertEquals("rangeCount",0,ndx.rangeCount(null, null));
-       
-        /*
-         * Batch contains operation that spans two partitions (verifies no keys).
-         */
-        {
-            BatchContains op2 = new BatchContains(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new boolean[5]
-            );
-            
-            ndx.contains(op2);
-            
-            assertEquals("vals",new boolean[]{
-                    false,
-                    false,
-                    false,
-                    false,
-                    false
-            },op2.contains);
-        }
-
-        /*
-         * Batch lookup operation that spans two partitions (verifies no keys).
-         */
-        {
-            BatchLookup op2 = new BatchLookup(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new byte[5][]
-            );
-            
-            ndx.lookup(op2);
-            
-            assertEquals("vals",new byte[][]{
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-            },(byte[][])op2.values);
-        }
-
-        /*
-         * Batch insert operation that spans two partitions (2 keys in
-         * the 1st partition and 3 keys in the 2nd).
-         */
-        {
-            BatchInsert op1 = new BatchInsert(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            });
-            
-            ndx.insert(op1);
-            
-            // verify that the old values were reported as nulls.
-            assertEquals("vals",new byte[][]{
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-            },(byte[][])op1.values);
-        }
-        
-        {
-            // verify with range count.
-            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
-            
-            // verify with range query.
-            assertSameIterator(new byte[][]{//
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}},
-                    ndx.rangeIterator(null,null)
-                    );
-        
-        }
-        
-        /*
-         * Batch contains operation that spans two partitions (verifies keys
-         * found).
-         */
-        {
-            BatchContains op2 = new BatchContains(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new boolean[5]
-            );
-            
-            ndx.contains(op2);
-            
-            assertEquals("vals",new boolean[]{
-                    true,
-                    true,
-                    true,
-                    true,
-                    true
-            },op2.contains);
-        }
-
-        /*
-         * Re-run the batch insert operation using a fresh copy of the same
-         * data. This is used to verify that the overwrite reports the newly
-         * written values.
-         */
-        {
-            BatchInsert op1 = new BatchInsert(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            });
-            
-            ndx.insert(op1);
-            
-            /* verify that the old values are reported as non-nulls.
-             */
-            assertEquals("vals",new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },(byte[][])op1.values);
-
-        }
-        
-        {
-            // verify with range count.
-            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
-            
-            // verify with range query.
-            assertSameIterator(new byte[][]{//
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}},
-                    ndx.rangeIterator(null,null)
-                    );
-        }
-        
-        /*
-         * Batch lookup operation that spans two partitions (verify the insert
-         * operation).
-         */
-        {
-            BatchLookup op2 = new BatchLookup(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new byte[5][]
-            );
-            
-            ndx.lookup(op2);
-            
-            assertEquals("vals",new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },(byte[][])op2.values);
-        }
-        
-        /*
-         * Batch remove operation that spans two partitions and removes all of
-         * the keys that we inserted above.
-         */
-        {
-            BatchRemove op1 = new BatchRemove(5,new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },new byte[5][]
-            );
-            
-            ndx.remove(op1);
-            
-            // verify that the old values were reported.
-            assertEquals("vals",new byte[][]{
-                    new byte[]{1},
-                    new byte[]{2},
-                    new byte[]{5},
-                    new byte[]{6},
-                    new byte[]{9}
-            },(byte[][])op1.values);
-        }
-        
-        {
-            /*
-             * verify range count is _unchanged_ since the entries are marked as
-             * "deleted" until the index is compacted.
-             */
-            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
-            
-            /*
-             * verify that the entries are _gone_ with range query since it will
-             * automatically filter out the deleted entries.
-             */
-            assertSameIterator(new byte[][]{},
-                    ndx.rangeIterator(null,null)
-                    );
-        
-        }
-        
-    }
+//    /**
+//     * Test of batch operations (contains, lookup, insert, remove) that span
+//     * more than one partition. The client is responsible for examining the keys
+//     * provided by the application in a batch operation and issuing multiple
+//     * requests (one per partition) if necessary. Those requests can be issued
+//     * in parallel, but that is not required.
+//     */
+//    public void test_batchOps_staticPartitions() {
+//       
+//        // Connect to the federation.
+//        BigdataFederation fed = (BigdataFederation)client.connect();
+//        
+//        final String name = "testIndex";
+//
+//        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
+//
+//        /*
+//         * Register and statically partition an index.
+//         */
+//        fed.registerIndex(name, ctor, new byte[][]{//
+//                new byte[]{}, // keys less than 5...
+//                new byte[]{5} // keys GTE 5....
+//        }, new UUID[]{//
+//                JiniUtil.serviceID2UUID(dataServer0.getServiceID()),
+//                JiniUtil.serviceID2UUID(dataServer1.getServiceID())
+//        });
+//        
+//        /*
+//         * Request a view of that index.
+//         */
+//        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+//        
+//        /*
+//         * Range count the index to verify that it is empty.
+//         */
+//        assertEquals("rangeCount",0,ndx.rangeCount(null, null));
+//       
+//        /*
+//         * Batch contains operation that spans two partitions (verifies no keys).
+//         */
+//        {
+//            BatchContains op2 = new BatchContains(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new boolean[5]
+//            );
+//            
+//            ndx.contains(op2);
+//            
+//            assertEquals("vals",new boolean[]{
+//                    false,
+//                    false,
+//                    false,
+//                    false,
+//                    false
+//            },op2.contains);
+//        }
+//
+//        /*
+//         * Batch lookup operation that spans two partitions (verifies no keys).
+//         */
+//        {
+//            BatchLookup op2 = new BatchLookup(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new byte[5][]
+//            );
+//            
+//            ndx.lookup(op2);
+//            
+//            assertEquals("vals",new byte[][]{
+//                    null,
+//                    null,
+//                    null,
+//                    null,
+//                    null
+//            },(byte[][])op2.values);
+//        }
+//
+//        /*
+//         * Batch insert operation that spans two partitions (2 keys in
+//         * the 1st partition and 3 keys in the 2nd).
+//         */
+//        {
+//            BatchInsert op1 = new BatchInsert(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            });
+//            
+//            ndx.insert(op1);
+//            
+//            // verify that the old values were reported as nulls.
+//            assertEquals("vals",new byte[][]{
+//                    null,
+//                    null,
+//                    null,
+//                    null,
+//                    null
+//            },(byte[][])op1.values);
+//        }
+//        
+//        {
+//            // verify with range count.
+//            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+//            
+//            // verify with range query.
+//            assertSameIterator(new byte[][]{//
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}},
+//                    ndx.rangeIterator(null,null)
+//                    );
+//        
+//        }
+//        
+//        /*
+//         * Batch contains operation that spans two partitions (verifies keys
+//         * found).
+//         */
+//        {
+//            BatchContains op2 = new BatchContains(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new boolean[5]
+//            );
+//            
+//            ndx.contains(op2);
+//            
+//            assertEquals("vals",new boolean[]{
+//                    true,
+//                    true,
+//                    true,
+//                    true,
+//                    true
+//            },op2.contains);
+//        }
+//
+//        /*
+//         * Re-run the batch insert operation using a fresh copy of the same
+//         * data. This is used to verify that the overwrite reports the newly
+//         * written values.
+//         */
+//        {
+//            BatchInsert op1 = new BatchInsert(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            });
+//            
+//            ndx.insert(op1);
+//            
+//            /* verify that the old values are reported as non-nulls.
+//             */
+//            assertEquals("vals",new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },(byte[][])op1.values);
+//
+//        }
+//        
+//        {
+//            // verify with range count.
+//            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+//            
+//            // verify with range query.
+//            assertSameIterator(new byte[][]{//
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}},
+//                    ndx.rangeIterator(null,null)
+//                    );
+//        }
+//        
+//        /*
+//         * Batch lookup operation that spans two partitions (verify the insert
+//         * operation).
+//         */
+//        {
+//            BatchLookup op2 = new BatchLookup(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new byte[5][]
+//            );
+//            
+//            ndx.lookup(op2);
+//            
+//            assertEquals("vals",new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },(byte[][])op2.values);
+//        }
+//        
+//        /*
+//         * Batch remove operation that spans two partitions and removes all of
+//         * the keys that we inserted above.
+//         */
+//        {
+//            BatchRemove op1 = new BatchRemove(5,new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },new byte[5][]
+//            );
+//            
+//            ndx.remove(op1);
+//            
+//            // verify that the old values were reported.
+//            assertEquals("vals",new byte[][]{
+//                    new byte[]{1},
+//                    new byte[]{2},
+//                    new byte[]{5},
+//                    new byte[]{6},
+//                    new byte[]{9}
+//            },(byte[][])op1.values);
+//        }
+//        
+//        {
+//            /*
+//             * verify range count is _unchanged_ since the entries are marked as
+//             * "deleted" until the index is compacted.
+//             */
+//            assertEquals("rangeCount",5,ndx.rangeCount(null,null));
+//            
+//            /*
+//             * verify that the entries are _gone_ with range query since it will
+//             * automatically filter out the deleted entries.
+//             */
+//            assertSameIterator(new byte[][]{},
+//                    ndx.rangeIterator(null,null)
+//                    );
+//        
+//        }
+//        
+//    }
     
     /**
      * Verify that a named index is registered on a specific {@link DataService}

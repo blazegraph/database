@@ -34,7 +34,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
@@ -273,50 +272,50 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-    /**
-     * <p>
-     * Submit a batch operation to a named index.
-     * </p>
-     * 
-     * @param tx
-     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-     *            operation is NOT isolated by a transaction -or-
-     *            <code> - tx </code> to read from the most recent commit point
-     *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time).
-     * @param name
-     *            The index name (required).
-     * @param ntuples
-     *            The #of items in the batch operation.
-     * @param keys
-     *            The keys for the batch operation (must be in ascending order
-     *            when the keys are interpreted as unsigned byte[]s, e.g., using
-     *            an {@link UnsignedByteArrayComparator}).
-     * 
-     * @exception IOException
-     *                if there was a problem with the RPC.
-     * @exception InterruptedException
-     *                if the operation was interrupted (typically by
-     *                {@link #shutdownNow()}.
-     * @exception ExecutionException
-     *                If the operation caused an error. See
-     *                {@link ExecutionException#getCause()} for the underlying
-     *                error.
-     */
-    public byte[][] batchInsert(long tx, String name, int ntuples,
-            byte[][] keys, byte[][] values, boolean returnOldValues)
-            throws InterruptedException, ExecutionException, IOException;
-
-    public boolean[] batchContains(long tx, String name, int ntuples,
-            byte[][] keys) throws InterruptedException, ExecutionException,
-            IOException;
-
-    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
-            throws InterruptedException, ExecutionException, IOException;
-
-    public byte[][] batchRemove(long tx, String name, int ntuples,
-            byte[][] keys, boolean returnOldValues)
-            throws InterruptedException, ExecutionException, IOException;
+//    /**
+//     * <p>
+//     * Submit a batch operation to a named index.
+//     * </p>
+//     * 
+//     * @param tx
+//     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
+//     *            operation is NOT isolated by a transaction -or-
+//     *            <code> - tx </code> to read from the most recent commit point
+//     *            not later than the absolute value of <i>tx</i> (a fully
+//     *            isolated read-only transaction using a historical start time).
+//     * @param name
+//     *            The index name (required).
+//     * @param ntuples
+//     *            The #of items in the batch operation.
+//     * @param keys
+//     *            The keys for the batch operation (must be in ascending order
+//     *            when the keys are interpreted as unsigned byte[]s, e.g., using
+//     *            an {@link UnsignedByteArrayComparator}).
+//     * 
+//     * @exception IOException
+//     *                if there was a problem with the RPC.
+//     * @exception InterruptedException
+//     *                if the operation was interrupted (typically by
+//     *                {@link #shutdownNow()}.
+//     * @exception ExecutionException
+//     *                If the operation caused an error. See
+//     *                {@link ExecutionException#getCause()} for the underlying
+//     *                error.
+//     */
+//    public byte[][] batchInsert(long tx, String name, int ntuples,
+//            byte[][] keys, byte[][] values, boolean returnOldValues)
+//            throws InterruptedException, ExecutionException, IOException;
+//
+//    public boolean[] batchContains(long tx, String name, int ntuples,
+//            byte[][] keys) throws InterruptedException, ExecutionException,
+//            IOException;
+//
+//    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
+//            throws InterruptedException, ExecutionException, IOException;
+//
+//    public byte[][] batchRemove(long tx, String name, int ntuples,
+//            byte[][] keys, boolean returnOldValues)
+//            throws InterruptedException, ExecutionException, IOException;
 
     /**
      * <p>
@@ -375,50 +374,50 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
             byte[] toKey, int capacity, int flags, IEntryFilter filter)
             throws InterruptedException, ExecutionException, IOException;
     
-    /**
-     * <p>
-     * Range count of entries in a key range for the named index on this
-     * {@link DataService}.
-     * </p>
-     * <p>
-     * Note: This method reports the upper bound estimate of the #of key-value
-     * pairs in the key range of the the named index. The cost of computing this
-     * estimate is comparable to two index lookup probes. The estimate is an
-     * upper bound because deleted entries in the index that have not been
-     * eradicated through a suitable compacting merge will be reported. An exact
-     * count may be obtained using the
-     * {@link #rangeIterator(long, String, byte[], byte[], int, int, IEntryFilter)}
-     * by NOT requesting either the keys or the values.
-     * </p>
-     * 
-     * @param tx
-     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-     *            operation is NOT isolated by a transaction -or-
-     *            <code> - tx </code> to read from the most recent commit point
-     *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time).
-     * @param name
-     *            The index name (required).
-     * @param fromKey
-     *            The starting key for the scan (or <code>null</code> iff
-     *            there is no lower bound).
-     * @param toKey
-     *            The first key that will not be visited (or <code>null</code>
-     *            iff there is no upper bound).
-     * 
-     * @return The upper bound estimate of the #of key-value pairs in the key
-     *         range of the named index.
-     * 
-     * @exception InterruptedException
-     *                if the operation was interrupted (typically by
-     *                {@link #shutdownNow()}.
-     * @exception ExecutionException
-     *                If the operation caused an error. See
-     *                {@link ExecutionException#getCause()} for the underlying
-     *                error.
-     */
-    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-            throws InterruptedException, ExecutionException, IOException;
+//    /**
+//     * <p>
+//     * Range count of entries in a key range for the named index on this
+//     * {@link DataService}.
+//     * </p>
+//     * <p>
+//     * Note: This method reports the upper bound estimate of the #of key-value
+//     * pairs in the key range of the the named index. The cost of computing this
+//     * estimate is comparable to two index lookup probes. The estimate is an
+//     * upper bound because deleted entries in the index that have not been
+//     * eradicated through a suitable compacting merge will be reported. An exact
+//     * count may be obtained using the
+//     * {@link #rangeIterator(long, String, byte[], byte[], int, int, IEntryFilter)}
+//     * by NOT requesting either the keys or the values.
+//     * </p>
+//     * 
+//     * @param tx
+//     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
+//     *            operation is NOT isolated by a transaction -or-
+//     *            <code> - tx </code> to read from the most recent commit point
+//     *            not later than the absolute value of <i>tx</i> (a fully
+//     *            isolated read-only transaction using a historical start time).
+//     * @param name
+//     *            The index name (required).
+//     * @param fromKey
+//     *            The starting key for the scan (or <code>null</code> iff
+//     *            there is no lower bound).
+//     * @param toKey
+//     *            The first key that will not be visited (or <code>null</code>
+//     *            iff there is no upper bound).
+//     * 
+//     * @return The upper bound estimate of the #of key-value pairs in the key
+//     *         range of the named index.
+//     * 
+//     * @exception InterruptedException
+//     *                if the operation was interrupted (typically by
+//     *                {@link #shutdownNow()}.
+//     * @exception ExecutionException
+//     *                If the operation caused an error. See
+//     *                {@link ExecutionException#getCause()} for the underlying
+//     *                error.
+//     */
+//    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
+//            throws InterruptedException, ExecutionException, IOException;
         
     /**
      * <p>

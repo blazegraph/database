@@ -65,12 +65,15 @@ import cutthecrap.utils.striterators.Striterator;
  *       whether it should be maintained on the {@link IndexSegmentMetadata} as
  *       well.
  * 
- * @see {@link ReadOnlyFusedView}, which provides a dynamic view of two or more btrees.
- *      However, this class is more efficient when we are going to do a bulk
- *      merge operation since it performs the merge and computes the #of output
- *      entries in one pass.
+ * @see {@link ReadOnlyFusedView}, which provides a dynamic view of two or more
+ *      btrees. However, this class is more efficient when we are going to do a
+ *      bulk merge operation since it performs the merge and computes the #of
+ *      output entries in one pass.
  * 
  * @todo parameterize recordCompressor.
+ * 
+ * @deprecated This class is not currently in use. Instead a fused view of the
+ *             source {@link IIndex}s is dynamically composed and processed.
  */
 public class IndexSegmentMerger {
 
@@ -176,7 +179,7 @@ public class IndexSegmentMerger {
     final TemporaryRawStore tmpStore;
     
     /**
-     * The address at which each leaf in written in the {@link #tmpStore}. The
+     * The address at which each leaf was written in the {@link #tmpStore}. The
      * entries in this list are ordered. The first entry is the first leaf
      * written, the second entry is the second leaf written, etc.
      */

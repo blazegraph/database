@@ -657,125 +657,125 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    public void insert(BatchInsert op) {
-
-        final int ntuples = op.n;
-
-        while (op.tupleIndex < ntuples) {
-
-            /*
-             * Each call MAY process more than one tuple.
-             */
-            int nused = getRoot().batchInsert(op);
-
-            assert nused > 0;
-
-            /*
-             * Note: it is legal to reuse a key iff the data in the key is
-             * unchanged. Unfortunately it is tricky to do a fast test for this
-             * condition.
-             */
-            // {
-            // /*
-            // * detect if the caller reuses the same byte[] key from one
-            // * insert to the next. This is an error since the key needs to
-            // * be donated to the btree. This problem only exists for
-            // * insert().
-            // */
-            //                    
-            // byte[] key = keys[tupleIndex];
-            //
-            // if (key == lastKey) {
-            //
-            // throw new IllegalArgumentException(
-            // "keys must not be reused.");
-            //
-            // } else {
-            //
-            // lastKey = key;
-            //
-            // }
-            //
-            // }
-            counters.ninserts += nused;
-
-            op.tupleIndex += nused;
-
-        }
-
-    }
-
-    public void lookup(BatchLookup op) {
-
-        final int ntuples = op.n;
-
-        while (op.tupleIndex < ntuples) {
-
-            /*
-             * Each call MAY process more than one tuple.
-             */
-            int nused = getRoot().batchLookup(op);
-
-            assert nused > 0;
-
-            counters.nfinds += nused;
-
-            op.tupleIndex += nused;
-
-        }
-
-    }
-
-    public void contains(BatchContains op) {
-
-        final int ntuples = op.n;
-
-        while (op.tupleIndex < ntuples) {
-
-            // skip tuples already marked as true.
-            if (op.contains[op.tupleIndex]) {
-
-                op.tupleIndex++;
-
-                continue;
-
-            }
-
-            /*
-             * Each call MAY process more than one tuple.
-             */
-            int nused = getRoot().batchContains(op);
-
-            assert nused > 0;
-
-            counters.nfinds += nused;
-
-            op.tupleIndex += nused;
-
-        }
-
-    }
-
-    public void remove(BatchRemove op) {
-
-        final int ntuples = op.n;
-
-        while (op.tupleIndex < ntuples) {
-
-            /*
-             * Each call MAY process more than one tuple.
-             */
-            int nused = getRoot().batchRemove(op);
-
-            assert nused > 0;
-
-            counters.nremoves += nused;
-
-            op.tupleIndex += nused;
-
-        }
-
-    }
+//    public void insert(BatchInsert op) {
+//
+//        final int ntuples = op.n;
+//
+//        while (op.tupleIndex < ntuples) {
+//
+//            /*
+//             * Each call MAY process more than one tuple.
+//             */
+//            int nused = getRoot().batchInsert(op);
+//
+//            assert nused > 0;
+//
+//            /*
+//             * Note: it is legal to reuse a key iff the data in the key is
+//             * unchanged. Unfortunately it is tricky to do a fast test for this
+//             * condition.
+//             */
+//            // {
+//            // /*
+//            // * detect if the caller reuses the same byte[] key from one
+//            // * insert to the next. This is an error since the key needs to
+//            // * be donated to the btree. This problem only exists for
+//            // * insert().
+//            // */
+//            //                    
+//            // byte[] key = keys[tupleIndex];
+//            //
+//            // if (key == lastKey) {
+//            //
+//            // throw new IllegalArgumentException(
+//            // "keys must not be reused.");
+//            //
+//            // } else {
+//            //
+//            // lastKey = key;
+//            //
+//            // }
+//            //
+//            // }
+//            counters.ninserts += nused;
+//
+//            op.tupleIndex += nused;
+//
+//        }
+//
+//    }
+//
+//    public void lookup(BatchLookup op) {
+//
+//        final int ntuples = op.n;
+//
+//        while (op.tupleIndex < ntuples) {
+//
+//            /*
+//             * Each call MAY process more than one tuple.
+//             */
+//            int nused = getRoot().batchLookup(op);
+//
+//            assert nused > 0;
+//
+//            counters.nfinds += nused;
+//
+//            op.tupleIndex += nused;
+//
+//        }
+//
+//    }
+//
+//    public void contains(BatchContains op) {
+//
+//        final int ntuples = op.n;
+//
+//        while (op.tupleIndex < ntuples) {
+//
+//            // skip tuples already marked as true.
+//            if (op.contains[op.tupleIndex]) {
+//
+//                op.tupleIndex++;
+//
+//                continue;
+//
+//            }
+//
+//            /*
+//             * Each call MAY process more than one tuple.
+//             */
+//            int nused = getRoot().batchContains(op);
+//
+//            assert nused > 0;
+//
+//            counters.nfinds += nused;
+//
+//            op.tupleIndex += nused;
+//
+//        }
+//
+//    }
+//
+//    public void remove(BatchRemove op) {
+//
+//        final int ntuples = op.n;
+//
+//        while (op.tupleIndex < ntuples) {
+//
+//            /*
+//             * Each call MAY process more than one tuple.
+//             */
+//            int nused = getRoot().batchRemove(op);
+//
+//            assert nused > 0;
+//
+//            counters.nremoves += nused;
+//
+//            op.tupleIndex += nused;
+//
+//        }
+//
+//    }
 
     /**
      * Returns the node or leaf to be used for search. This implementation is

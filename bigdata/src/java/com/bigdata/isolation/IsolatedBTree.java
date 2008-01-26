@@ -30,7 +30,6 @@ package com.bigdata.isolation;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.ByteArrayValueSerializer;
-import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ILinearList;
@@ -54,11 +53,6 @@ import com.bigdata.rawstore.IRawStore;
  * immutable {@link UnisolatedBTree} specified in the constructor iff no entry
  * is found under the key. {@link ISimpleBTree#remove(Object) Deletes} leave
  * "delete markers" in the write set.
- * </p>
- * <p>
- * The {@link IBatchBTree} interface provides a convenience for iterative
- * operations using the corresponding {@link ISimpleBTree} method and shares the
- * semantics for that interface.
  * </p>
  * <p>
  * The {@link #rangeCount(byte[], byte[])} method MAY report more entries in a

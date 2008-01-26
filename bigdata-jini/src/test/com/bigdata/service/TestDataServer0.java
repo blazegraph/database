@@ -32,9 +32,15 @@ import java.util.concurrent.ExecutionException;
 
 import net.jini.core.lookup.ServiceID;
 
+import com.bigdata.btree.BatchContains;
+import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.RangeCountProcedure;
+import com.bigdata.btree.IndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.IndexProcedure.ResultBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IResourceMetadata;
@@ -132,55 +138,13 @@ public class TestDataServer0 extends AbstractServerTestCase {
         {
 
             try {
-                proxy.batchContains(ITx.UNISOLATED, DataService
-                        .getIndexPartitionName(name, partitionId), 1,
-                        new byte[][] { new byte[] { 1 } });
+                proxy.submit(ITx.UNISOLATED, DataService.getIndexPartitionName(
+                        name, partitionId), new RangeCountProcedure(
+                        null/* fromKey */, null/* toKey */));
                 fail("Expecting exception.");
             } catch (ExecutionException ex) {
                 if(!(ex.getCause() instanceof NoSuchIndexException)) {
                     fail("Unexpected exception: "+ex, ex);
-                } else {
-                    log.info("Ignoring expected exception: "+ex);
-                }
-            }
-
-            try {
-                proxy.batchLookup(ITx.UNISOLATED, DataService
-                        .getIndexPartitionName(name, partitionId),
-                        1, new byte[][] { new byte[] { 1 } });
-                fail("Expecting exception.");
-            } catch (ExecutionException ex) {
-                if(!(ex.getCause() instanceof NoSuchIndexException)) {
-                    fail("Unexpected exception: "+ex,ex);
-                } else {
-                    log.info("Ignoring expected exception: "+ex);
-                }
-            }
-
-            try {
-                proxy.batchInsert(ITx.UNISOLATED, DataService
-                        .getIndexPartitionName(name, partitionId),
-                        1, new byte[][] { new byte[] { 1 } },
-                        new byte[][] { new byte[] { 1 } }, false /* returnOldValues */
-                );
-                fail("Expecting exception.");
-            } catch (ExecutionException ex) {
-                if(!(ex.getCause() instanceof NoSuchIndexException)) {
-                    fail("Unexpected exception: "+ex,ex);
-                } else {
-                    log.info("Ignoring expected exception: "+ex);
-                }
-            }
-
-            try {
-                proxy.batchRemove(ITx.UNISOLATED, DataService
-                        .getIndexPartitionName(name, partitionId),
-                        1, new byte[][] { new byte[] { 1 } }, false /* returnOldValues */
-                );
-                fail("Expecting exception.");
-            } catch (ExecutionException ex) {
-                if(!(ex.getCause() instanceof NoSuchIndexException)) {
-                    fail("Unexpected exception: "+ex,ex);
                 } else {
                     log.info("Ignoring expected exception: "+ex);
                 }
@@ -211,16 +175,25 @@ public class TestDataServer0 extends AbstractServerTestCase {
 //                new byte[] {}, null/* no right sibling */));
         
         // batch insert into that index partition.
-        proxy.batchInsert(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), 1,
-                new byte[][] { new byte[] { 1 } },
-                new byte[][] { new byte[] { 1 } },
-                true /*returnOldValues*/ );
+        proxy.submit(ITx.UNISOLATED, //
+                DataService.getIndexPartitionName(name, partitionId),// 
+                new BatchInsert(//
+                        1, // n
+                        0, // offset
+                        new byte[][] { new byte[] { 1 } },// keys
+                        new byte[][] { new byte[] { 1 } },// vals
+                        false // returnOldValues
+                ));
 
         // verify keys that exist/do not exist.
-        boolean contains[] = proxy.batchContains(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), 2,
-                new byte[][] { new byte[] { 1 }, new byte[] { 2 } });
+        boolean contains[] = ((ResultBitBuffer) proxy.submit(
+                ITx.UNISOLATED, //
+                DataService.getIndexPartitionName(name, partitionId),
+                new BatchContains(//
+                        2,// n
+                        0,// offset
+                        new byte[][] { new byte[] { 1 }, new byte[] { 2 } } // keys
+                ))).getResult();
 
         assertNotNull(contains);
         assertEquals(2,contains.length);
@@ -228,9 +201,13 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertFalse(contains[1]);
 
         // lookup keys that do and do not exist. 
-        byte[][] values = proxy.batchLookup(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), 2,
-                new byte[][] { new byte[] { 1 }, new byte[] { 2 } });
+        byte[][] values = ((ResultBuffer) proxy.submit(ITx.UNISOLATED, //
+                DataService.getIndexPartitionName(name, partitionId),//
+                new BatchLookup(//
+                        2, // n
+                        0, // offset
+                        new byte[][] { new byte[] { 1 }, new byte[] { 2 } }// keys
+                ))).getResult();
 
         assertNotNull(values);
         assertEquals(2,values.length);
@@ -238,8 +215,10 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(null,values[1]);
         
         // rangeCount the partition of the index on the data service.
-        assertEquals(1L, proxy.rangeCount(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), null, null));
+        assertEquals(1L, 
+                proxy.submit(ITx.UNISOLATED, DataService.getIndexPartitionName(
+                        name, partitionId), new RangeCountProcedure(
+                        null/* fromKey */, null/* toKey */)));
         
         /*
          * visit all keys and values for the partition of the index on the data
@@ -263,9 +242,14 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(new byte[]{1},rset.getValues()[0]);
         
         // remove key that exists, verifying the returned values.
-        values = proxy.batchRemove(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), 2,
-                new byte[][] { new byte[] { 1 }, new byte[] { 2 } }, true);
+        values = ((ResultBuffer) proxy.submit(ITx.UNISOLATED, //
+                DataService.getIndexPartitionName(name, partitionId), //
+                new BatchRemove(//
+                        2,// n
+                        0,// offset
+                        new byte[][] { new byte[] { 1 }, new byte[] { 2 } },// keys
+                        true// returnOldValues
+                ))).getResult();
 
         assertNotNull(values);
         assertEquals(2,values.length);
@@ -273,9 +257,14 @@ public class TestDataServer0 extends AbstractServerTestCase {
         assertEquals(null,values[1]);
 
         // remove again, verifying that the returned values are now null.
-        values = proxy.batchRemove(ITx.UNISOLATED, DataService
-                .getIndexPartitionName(name, partitionId), 2,
-                new byte[][] { new byte[] { 1 }, new byte[] { 2 } }, true);
+        values = ((ResultBuffer) proxy.submit(ITx.UNISOLATED, //
+                DataService.getIndexPartitionName(name, partitionId), //
+                new BatchRemove(//
+                        2,// n
+                        0,// offset
+                        new byte[][] { new byte[] { 1 }, new byte[] { 2 } },// keys
+                        true// returnOldValues
+                ))).getResult();
 
         assertNotNull(values);
         assertEquals(2,values.length);

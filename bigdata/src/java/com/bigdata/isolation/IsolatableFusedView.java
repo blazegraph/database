@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.isolation;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.IBatchBTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IFusedView;
 import com.bigdata.btree.ReadOnlyFusedView;
@@ -47,9 +46,6 @@ import com.bigdata.btree.ReadOnlyFusedView;
  * segments having data for the view. Deletion markers are expunged from index
  * segments only by a full compacting merge of all index segments having life
  * data for the partition.
- * <p>
- * Implementation note: the {@link IBatchBTree} operations are inherited from
- * the base class. Only non-batch read operations are overriden by this class.
  * 
  * FIXME implement; support processing of delete markers (including handling of
  * the merge rule) - basically they have to be processed on read so that a

@@ -36,11 +36,11 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.io.NameAndExtensionFilter;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Journal;
@@ -59,6 +59,8 @@ import com.bigdata.scaleup.MasterJournal.Options;
  * 
  * @todo rather than writing this test suite directly, we mostly want to apply
  * the existing proxy test suites for {@link Journal}.
+ * 
+ * @deprecated either to be refactored for the mdi package or to be discarded.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -544,8 +546,10 @@ public class TestPartitionedJournal extends TestCase2 {
 
         public void insertInto(IIndex ndx) {
             
-            // note: clones values to avoid side effect.
-            ndx.insert(new BatchInsert(nrecords,keys,vals.clone()));
+            ndx.submit(nrecords, keys, vals,//
+                    BatchInsertConstructor.RETURN_NO_VALUES, //
+                    null// handler
+                    );
             
         }
         

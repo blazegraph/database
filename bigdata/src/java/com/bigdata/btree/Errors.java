@@ -39,6 +39,8 @@ public class Errors {
 
     public static final transient String ERR_NTUPLES_NON_POSITIVE = "ntuples is non-positive";
 
+    public static final transient String ERR_OFFSET_NEGATIVE = "offset is negative";
+
     public static final transient String ERR_KEYS_NULL = "keys is null";
 
     public static final transient String ERR_VALS_NULL = "values is null";

@@ -367,64 +367,64 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    /*
-     * IBatchBTree (disallows mutation operations, applies optional bloom filter
-     * for batch operations).
-     */
-
-    /**
-     * Disallowed.
-     */
-    public void insert(BatchInsert op) {
-
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
-
-    }
-
-    /**
-     * Disallowed.
-     */
-    public void remove(BatchRemove op) {
-
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
-
-    }
-
-    /**
-     * Apply a batch lookup operation. The bloom filter is used iff it is
-     * defined.
-     */
-    public void lookup(BatchLookup op) {
-
-        if( bloomFilter != null ) {
-            
-            op.apply(this);
-            
-        } else {
-            
-            super.lookup(op);
-            
-        }
-        
-    }
-
-    /**
-     * Apply a batch existence test operation. The bloom filter is used iff it
-     * is defined.
-     */
-    public void contains(BatchContains op) {
-
-        if( bloomFilter != null ) {
-            
-            op.apply(this);
-            
-        } else {
-            
-            super.contains(op);
-            
-        }
-
-    }
+//    /*
+//     * IBatchBTree (disallows mutation operations, applies optional bloom filter
+//     * for batch operations).
+//     */
+//
+//    /**
+//     * Disallowed.
+//     */
+//    public void insert(BatchInsert op) {
+//
+//        throw new UnsupportedOperationException(MSG_READ_ONLY);
+//
+//    }
+//
+//    /**
+//     * Disallowed.
+//     */
+//    public void remove(BatchRemove op) {
+//
+//        throw new UnsupportedOperationException(MSG_READ_ONLY);
+//
+//    }
+//
+//    /**
+//     * Apply a batch lookup operation. The bloom filter is used iff it is
+//     * defined.
+//     */
+//    public void lookup(BatchLookup op) {
+//
+//        if( bloomFilter != null ) {
+//            
+//            op.apply(this);
+//            
+//        } else {
+//            
+//            super.lookup(op);
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * Apply a batch existence test operation. The bloom filter is used iff it
+//     * is defined.
+//     */
+//    public void contains(BatchContains op) {
+//
+//        if( bloomFilter != null ) {
+//            
+//            op.apply(this);
+//            
+//        } else {
+//            
+//            super.contains(op);
+//            
+//        }
+//
+//    }
 
     /*
      * INodeFactory

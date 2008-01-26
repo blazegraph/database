@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
@@ -369,57 +369,27 @@ public class BigdataFederation implements IBigdataFederation {
 
         /*
          * Bulk copy the partition definitions for the scale-out index into the
-         * client. This uses range queries to bulk copy the keys and values from
-         * the metadata index on the metadata service into the client's cache.
-         */
-        ResultSet rset;
-
-        byte[] nextKey = null;
-
-        /*
-         * Note: metadata index is NOT partitioned.
+         * client.
          * 
-         * @todo Does not support partitioned metadata index.
+         * Note: This assumes that the metadata index is NOT partitioned.
          */
-
-        while (true) {
-
-            try {
-
-                rset = metadataService.rangeIterator(ITx.UNISOLATED,
-                        metadataName, nextKey, null, 1000, IRangeQuery.KEYS
-                                | IRangeQuery.VALS, null/* filter */);
-
-                BigdataClient.log.info("Fetched " + rset.getNumTuples()
-                        + " partition records for " + name);
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException(
-                        "Could not cache index partition metadata", ex);
-
+        {
+        
+            final IEntryIterator itr = new RangeQueryIterator(metadataService,
+                    metadataName, ITx.UNISOLATED, null/* fromKey */,
+                    null/* toKey */, 0/* capacity */, IRangeQuery.KEYS
+                            | IRangeQuery.VALS, null/*filter*/);
+        
+            while(itr.hasNext()) {
+             
+                byte[] val = (byte[])itr.next();
+                
+                byte[] key = itr.getKey();
+                
+                mdi.insert(key, val);
+                
             }
-
-            int npartitions = rset.getNumTuples();
-
-            byte[][] separatorKeys = rset.getKeys();
-
-            byte[][] values = rset.getValues();
-
-            mdi.insert(new BatchInsert(npartitions, separatorKeys, values));
-
-            if (rset.isExhausted()) {
-
-                // No more results are available.
-
-                break;
-
-            }
-
-            // @todo write test to validate fence post for successor/lastKey.
-            nextKey = rset.successor();
-            //                nextKey = rset.getLastKey();
-
+            
         }
 
         return mdi;

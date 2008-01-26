@@ -27,96 +27,88 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+
 /**
  * Batch lookup operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchLookup implements IBatchOperation, IReadOnlyOperation {
+public class BatchLookup extends IndexProcedure implements IBatchOperation, IReadOnlyOperation, IParallelizableIndexProcedure {
 
     /**
-     * The #of tuples to be processed.
+     * 
      */
-    public final int n;
-    
-    /**
-     * The keys for each tuple.
-     */
-    public final byte[][] keys;
-    
-    /**
-     * The value corresponding to each key.
-     */
-    public final Object[] values;
-    
-    /**
-     * The index of the tuple that is currently being processed.
-     */
-    public int tupleIndex = 0;
-    
-    public int getTupleCount() {
-        return n;
-    }
-    
-    public byte[][] getKeys() {
-        return keys;
-    }
+    private static final long serialVersionUID = 8102720738892338403L;
 
+    /**
+     * Factory for {@link BatchLookup} procedures.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class BatchLookupConstructor implements IIndexProcedureConstructor {
+
+        public static final BatchLookupConstructor INSTANCE = new BatchLookupConstructor(); 
+        
+        public BatchLookupConstructor() {
+            
+        }
+        
+        public IIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
+
+            return new BatchLookup(n, offset, keys);
+            
+        }
+        
+    }
+    
+    /**
+     * De-serialization ctor.
+     *
+     */
+    public BatchLookup() {
+        
+    }
+    
     /**
      * Create a batch lookup operation.
      * 
      * @param ntuples
      *            The #of tuples in the operation (in).
+     * @param offset
+     *            The offset into <i>keys</i> and <i>vals</i> of the 1st
+     *            tuple.
      * @param keys
-     *            The array of keys (one key per tuple) (in).
-     * @param values
-     *            Values (one element per key) (out). On output, each element is
-     *            either null (if there was no entry for that key) or the old
-     *            value stored under that key (which may be null).
-     * 
-     * @todo consider returning the #of keys that were found in the btree. this
-     *       either requires passing an additional counter through the
-     *       implementation of defining the value as always being non-null
-     *       (which is too restrictive).
-     * 
-     * @exception IllegalArgumentException
-     *                if the dimensions of the arrays are not sufficient for the
-     *                #of tuples declared.
+     *            The array of keys (one key per tuple).
      */
-    public BatchLookup(int ntuples, byte[][] keys, Object[] values) {
+    public BatchLookup(int ntuples, int offset, byte[][] keys) {
+
+        super(ntuples, offset, keys, null/* values */);
         
-        if (ntuples <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
-        if (keys == null)
-            throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
-
-        if (keys.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-
-        if (values == null)
-            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
-
-        if (values.length < ntuples)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
-
-        this.n = ntuples;
-        this.keys = keys;
-        this.values = values;
-
     }
 
-    public void apply(ISimpleBTree btree) {
+    /**
+     * @return {@link ResultBuffer}
+     */
+    public Object apply(IIndex ndx) {
 
-        while (tupleIndex < n) {
+        final int n = getKeyCount();
+        
+        final byte[][] ret = new byte[n][];
+        
+        int i = 0;
+        
+        while (i < n) {
 
-            values[tupleIndex] = btree.lookup(keys[tupleIndex]);
+            ret[i] = (byte[]) ndx.lookup(getKey(i));
 
-            tupleIndex ++;
+            i ++;
 
         }
 
+        return new ResultBuffer(n, ret, getResultSerializer());
+        
     }
     
 }

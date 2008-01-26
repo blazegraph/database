@@ -207,9 +207,9 @@ public class RangeQueryIterator implements IEntryIterator {
             
         }
         
-        if (capacity <= 0) {
+        if (capacity < 0) {
 
-            throw new IllegalArgumentException("capacity must be positive.");
+            throw new IllegalArgumentException();
             
         }
 
@@ -218,7 +218,7 @@ public class RangeQueryIterator implements IEntryIterator {
         this.tx = tx;
         this.fromKey = fromKey;
         this.toKey = toKey;
-        this.capacity = capacity;
+        this.capacity = capacity == 0 ? 100000 : capacity;
         this.flags = flags;
         this.filter = filter;
 

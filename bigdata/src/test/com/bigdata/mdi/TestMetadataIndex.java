@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Dec 7, 2006
  */
 
-package com.bigdata.scaleup;
+package com.bigdata.mdi;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,7 +38,6 @@ import org.apache.log4j.Level;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
@@ -50,12 +49,6 @@ import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
-import com.bigdata.mdi.ResourceState;
-import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.mdi.UnisolatedBTreePartition;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -455,7 +448,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         SimpleEntry v8 = new SimpleEntry(8);
         Object[] values = new Object[]{v5,v6,v7,v8,v3,v4,v2,v1};
 
-        btree.insert(new BatchInsert(values.length, keys, values));
+//        btree.insert(new BatchInsert(values.length, keys, values));
+        
+        for (int i = 0; i < values.length; i++) {
+            
+            btree.insert(keys[i], values[i]);
+            
+        }
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -568,7 +567,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Object[] values1 = new Object[] { v1, v3, v5, v7 }; // Note: modified by insert!
         Object[] values2 = new Object[] { v2, v4, v6, v8 }; // Note: modified by insert!
         
-        btree.insert(new BatchInsert(values1.length, keys1, values1));
+//        btree.insert(new BatchInsert(values1.length, keys1, values1));
+
+        for (int i = 0; i < values1.length; i++) {
+            
+            btree.insert(keys1[i], values1[i]);
+            
+        }
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -614,7 +619,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         btree = new BTree(store, 3, managedIndexUUID,
                 SimpleEntry.Serializer.INSTANCE);
         
-        btree.insert(new BatchInsert(values2.length, keys2, values2));
+//        btree.insert(new BatchInsert(values2.length, keys2, values2));
+        
+        for (int i = 0; i < values2.length; i++) {
+            
+            btree.insert(keys2[i], values2[i]);
+            
+        }
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -1064,7 +1075,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         Object[] values1 = new Object[] { v1, v3, v5, v7 }; // Note: modified by insert!
         Object[] values2 = new Object[] { v2, v4, v6, v8 }; // Note: modified by insert!
         
-        btree.insert(new BatchInsert(values1.length, keys1, values1));
+//        btree.insert(new BatchInsert(values1.length, keys1, values1));
+        
+        for (int i = 0; i < values1.length; i++) {
+            
+            btree.insert(keys1[i], values1[i]);
+            
+        }
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 
@@ -1108,7 +1125,13 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          */
         btree = new BTree(store,3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
         
-        btree.insert(new BatchInsert(values2.length, keys2, values2));
+//        btree.insert(new BatchInsert(values2.length, keys2, values2));
+
+        for (int i = 0; i < values2.length; i++) {
+            
+            btree.insert(keys2[i], values2[i]);
+            
+        }
         
         assertTrue(btree.dump(Level.DEBUG,System.err));
 

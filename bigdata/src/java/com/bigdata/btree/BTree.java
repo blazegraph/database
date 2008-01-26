@@ -237,7 +237,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IIndex, IBatchBTree, IIndexWithCounter, ICommitter {
+public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, ICommitter {
     
     /**
      * The default branching factor.
