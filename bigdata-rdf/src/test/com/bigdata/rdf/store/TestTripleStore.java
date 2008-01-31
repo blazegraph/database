@@ -56,6 +56,15 @@ import com.bigdata.rdf.util.KeyOrder;
 /**
  * Test basic features of the {@link ITripleStore} API.
  * 
+ * @todo Add tests of race condition where two threads attempt to: (1) add the
+ *       same term(s); (2) resolve the same term(s). While the {@link AddTerms}
+ *       and {@link AddIds} operations are designed to avoid the race condition
+ *       in the indices using consistent unisolated operations, however the
+ *       termCache can also have race conditions where one thread "wins" and
+ *       inserts its definition for a term and the other thread "loses" and an
+ *       IllegalStateException is thrown by the cache when it tries to insert
+ *       its own definition (distinct object) for the same term.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

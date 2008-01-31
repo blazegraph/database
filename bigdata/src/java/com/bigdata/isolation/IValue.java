@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.isolation;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Interface for values in an {@link AbstractBTree} supporting deletion markers
@@ -61,6 +62,12 @@ import com.bigdata.btree.AbstractBTree;
  * The reuse of version counters will not cause a problem since transactions are
  * always isolated with respect to a specific historical committed state (the
  * most recent committed state before the transaction starts).
+ * <p>
+ * Note: Version counters support transactional isolation and the eventual
+ * purging of "deleted" entries NOT history policies that remove all entries
+ * over a specified age. The latter is supported in the special case of the
+ * {@link SparseRowStore} since it has timestamps in the keys corresponding to
+ * the time at which the logical row was last updated.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

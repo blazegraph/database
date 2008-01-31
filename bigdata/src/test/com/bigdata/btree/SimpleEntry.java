@@ -28,6 +28,7 @@ package com.bigdata.btree;
 
 import java.io.DataInput;
 import java.io.IOException;
+import java.io.Serializable;
 
 import com.bigdata.io.DataOutputBuffer;
 
@@ -38,9 +39,9 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleEntry {
+public class SimpleEntry implements Serializable {
 
-    private static int nextId = 1;
+    private transient static int nextId = 1;
 
     private final int id;
     

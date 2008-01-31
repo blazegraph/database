@@ -39,41 +39,24 @@ import com.bigdata.rawstore.IStoreSerializer;
 
 /**
  * Helper utilities for (de-)serialization of {@link Serializable} objects using
- * the Java serialization mechanisms.
+ * the Java serialization mechanisms. This class MUST NOT be used when the
+ * objects require access to the {@link IRawStore} reference during
+ * de-serialization, e.g., when it is necessary to de-serialize an address into
+ * the store and the coding of the address depends on the bit split for the
+ * store.
+ * 
+ * @see IStoreSerializer 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write test suite.
- * 
- * @deprecated by {@link IStoreSerializer} which allows the serialized object to
- *             access the {@link IRawStore} reference (actually, this is still
- *             useful for serialization of application data that does not
- *             include addresses into a store).
  */
 public class SerializerUtil {
-
-// This is not useful since we have to adjust the length of the byte[] anyway.
-//    private static class BAOS extends  ByteArrayOutputStream {
-//        
-//        public BAOS(int size) {
-//
-//            super(size);
-//            
-//        }
-//        
-//        final public byte[] getBuffer() {
-//            
-//            return buf;
-//            
-//        }
-//        
-//    }
 
     /**
      * Serialize an object using the Java serialization mechansims.
      * 
-     * @param obj A {@link Serializable} object.
+     * @param obj
+     *            A {@link Serializable} object.
      * 
      * @return The serialized object state.
      */
@@ -102,11 +85,15 @@ public class SerializerUtil {
      * 
      * @param b
      *            A byte[] containing a serialized object.
-     *            
-     * @return The de-serialized object.
+     * 
+     * @return The de-serialized object -or- <code>null</code> iff the byte[]
+     *         reference is <code>null</code>.
      */
     static final public Object deserialize(byte[] b) {
 
+        if (b == null)
+            return null;
+        
         return deserialize(b, 0, b.length);
 
     }

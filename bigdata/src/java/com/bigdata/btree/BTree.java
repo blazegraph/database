@@ -121,26 +121,7 @@ import com.bigdata.rawstore.IRawStore;
  *       whether to split or join index segments during a journal overflow
  *       event.
  * 
- * @todo Modify the values in the tree to be variable length byte[]s. This will
- *       get rid of the {@link IValueSerializer}. It will also speed up leaf
- *       de-serialization since we can defer object creation until a specific
- *       value is fetched. Consider introducing an {@link IValueBuffer} to store
- *       the values and compression techniques useful for data that may not be
- *       sorted (in contrast to the keys for those values, which will be
- *       sorted). <br>
- *       Note: This will have the side-effect of increasing the cost of
- *       materializing frequently used values when the btree is used as a local
- *       (in process) data structure. The reason is that the value will need to
- *       be de-serialized each time. That cost can be offset using a weak-value
- *       cache to minimize cost for recently used objects, which is how a btree
- *       would be applied to create a cannonicalizing mapping, e.g., for an
- *       object store. It may also be worth examining the "fast-btree" branch,
- *       which supports primitive data type keys and seeing if that branch is a
- *       good candidiate for an in-process btree. the api for that branch allows
- *       Object keys and Object values, and that might be worth keeping as its
- *       own implementation. (I am not sure if there is an opportunity to merge
- *       those implementations since that gets into indirection about the data
- *       type of the key again.)
+ * @todo Modify the values in the tree to be variable length byte[]s.
  * 
  * @todo indexOf, keyAt, valueAt need batch api compatibility (they use the old
  *       findChild, search, and autobox logic).
@@ -386,11 +367,42 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
      *            {@link Leaf}.
      */
     public BTree(IRawStore store, int branchingFactor, UUID indexUUID, IValueSerializer valSer) {
+        
+        this(store,branchingFactor,indexUUID,KeyBufferSerializer.INSTANCE,valSer);
+        
+    }
+    
+    /**
+     * Constructor for a new B+Tree with a default hard reference queue policy
+     * and no record compression and a specified key and value (de-)serializer.
+     * 
+     * @param store
+     *            The persistence store.
+     * @param branchingFactor
+     *            The branching factor.
+     * @param indexUUID
+     *            The unique identifier for the index. All B+Tree objects having
+     *            data for the same scale-out index MUST have the same
+     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
+     *            used.
+     * @param valueSer
+     *            Object that knows how to (de-)serialize the keys in a
+     *            {@link Node} or {@link Leaf}.
+     * @param valueSer
+     *            Object that knows how to (de-)serialize the values in a
+     *            {@link Leaf}.
+     */
+    public BTree(IRawStore store, int branchingFactor, UUID indexUUID,
+            IKeySerializer keySer, IValueSerializer valSer) {
     
         this(store, branchingFactor, indexUUID, new HardReferenceQueue<PO>(
                 new DefaultEvictionListener(),
                 BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN), valSer, null/* recordCompressor */);
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN),
+                keySer,
+                valSer,
+                null// recordCompressor
+                );
         
     }
     
@@ -432,6 +444,7 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
             int branchingFactor,
             UUID indexUUID,
             HardReferenceQueue<PO> hardReferenceQueue,
+            IKeySerializer keySer,
             IValueSerializer valueSer,
             RecordCompressor recordCompressor )
     {
@@ -442,6 +455,7 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
                 hardReferenceQueue,
 //                FIXME new PackedAddressSerializer(store),
                 AddressSerializer.INSTANCE,
+                keySer,
                 valueSer,
                 NodeFactory.INSTANCE, //
                 recordCompressor, //
@@ -524,7 +538,9 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
                 hardReferenceQueue, 
 //                FIXME new PackedAddressSerializer(store),
                 AddressSerializer.INSTANCE,
-                metadata.getValueSerializer(), NodeFactory.INSTANCE,
+                metadata.getKeySerializer(),
+                metadata.getValueSerializer(),
+                NodeFactory.INSTANCE,
                 metadata.getRecordCompressor(),//
                 metadata.getUseChecksum(), // use checksum iff used on create.
                 metadata.getIndexUUID()

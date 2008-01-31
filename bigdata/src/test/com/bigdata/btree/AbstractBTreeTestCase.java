@@ -476,7 +476,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan),
-                SimpleEntry.Serializer.INSTANCE, null // no record compressor
+                KeyBufferSerializer.INSTANCE,
+                SimpleEntry.Serializer.INSTANCE,
+                null // no record compressor
         );
 
         return btree;
@@ -700,17 +702,19 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         for (int i = 0; i < keys.length; i++) {
 
-            int key = keys[i];
+            final int ikey = keys[i];
             
             SimpleEntry entry = entries[i];
             
             if( i>0 && i % 10000 == 0 ) {
                 
-                System.err.println("i="+i+", key="+key);
+                System.err.println("i="+i+", key="+ikey);
                 
             }
 
             assertEquals("#entries",i,btree.nentries);
+            
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -746,9 +750,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             for( int i=0; i<keys.length; i++ ) {
                 
-                assertEquals(entries[i],btree.lookup(keys[i]));
-                assertEquals(entries[i],btree.remove(keys[i]));
-                assertEquals(null,btree.lookup(keys[i]));
+                byte[] key = KeyBuilder.asSortKey(keys[i]);
+                
+                assertEquals(entries[i],btree.lookup(key));
+                assertEquals(entries[i],btree.remove(key));
+                assertEquals(null,btree.lookup(key));
                 
             }
             
@@ -812,17 +818,19 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         for (int i = 0; i < keys.length; i++) {
 
-            int key = keys[i];
+            final int ikey = keys[i];
             
             SimpleEntry entry = entries[i];
             
             if( i>0 && i%10000 == 0 ) {
             
-                System.err.println("i="+i+", key="+key);
+                System.err.println("i="+i+", key="+ikey);
                 
             }
 
             assertEquals("#entries",i,btree.nentries);
+            
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -858,9 +866,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
             for( int i=0; i<keys.length; i++ ) {
                 
-                assertEquals(entries[i],btree.lookup(keys[i]));
-                assertEquals(entries[i],btree.remove(keys[i]));
-                assertEquals(null,btree.lookup(keys[i]));
+                final byte[] key = KeyBuilder.asSortKey(keys[i]);
+                
+                assertEquals(entries[i],btree.lookup(key));
+                assertEquals(entries[i],btree.remove(key));
+                assertEquals(null,btree.lookup(key));
 
             }
             
@@ -1083,19 +1093,21 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             for (int i = 0; i < keys.length; i++) {
 
-                int key = keys[order[i]];
+                final int ikey = keys[order[i]];
 
                 SimpleEntry entry = entries[order[i]];
 
                 if( i>0 && i%10000 == 0 ) {
                     
-                    System.err.println("index=" + i + ", key=" + key + ", entry="
-                        + entry);
+                    log.info("index=" + i + ", key=" + ikey + ", entry="
+                            + entry);
                     
                 }
 
                 assertEquals("#entries", i, btree.nentries);
 
+                final byte[] key = KeyBuilder.asSortKey(ikey);
+                
                 assertNull(btree.lookup(key));
 
                 if (trace >= 2) {
@@ -1266,17 +1278,19 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         for (int i = 0; i < keys.length; i++) {
 
-            int key = keys[order[i]];
+            final int ikey = keys[order[i]];
             
             SimpleEntry entry = entries[order[i]];
             
             if( i >0 && i%10000 == 0 ) {
             
-                System.err.println("i="+i+", key="+key);
+                log.info("i="+i+", key="+ikey);
                 
             }
 
             assertEquals("#entries",i,btree.nentries);
+
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -1357,16 +1371,18 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             int index = r.nextInt(nkeys);
             
-            Integer key = keys[index];
+            final Integer ikey = keys[index];
+            
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             
             SimpleEntry val = vals[index];
             
             if( insert ) {
                 
 //                System.err.println("insert("+key+", "+val+")");
-                SimpleEntry old = expected.put(key, val);
+                SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.insert(key.intValue(), val);
+                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
                 
                 assertTrue(btree.dump(Level.ERROR,System.err));
                 
@@ -1375,9 +1391,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             } else {
                 
 //                System.err.println("remove("+key+")");
-                SimpleEntry old = expected.remove(key);
+                SimpleEntry old = expected.remove(ikey);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.remove(key.intValue());
+                SimpleEntry old2 = (SimpleEntry) btree.remove(key);
                 
                 assertTrue(btree.dump(Level.ERROR,System.err));
                 
@@ -1399,9 +1415,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     
                     Map.Entry<Integer,SimpleEntry> entry = itr.next();
                     
+                    final byte[] tmp = KeyBuilder.asSortKey(entry.getKey()); 
+                    
                     assertEquals("lookup(" + entry.getKey() + ")", entry
-                            .getValue(), btree
-                            .lookup(entry.getKey().intValue()));
+                            .getValue(), btree.lookup(tmp));
                     
                 }
                 
@@ -1429,13 +1446,13 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         BTree btree = getBTree(m);
         
-        Integer[] keys = new Integer[nkeys];
+        byte[][] keys = new byte[nkeys][];
         
         SimpleEntry[] vals = new SimpleEntry[nkeys];
 
         for( int i=0; i<nkeys; i++ ) {
             
-            keys[i] = i+1; // Note: this produces dense keys with origin ONE(1).
+            keys[i] = KeyBuilder.asSortKey(i+1); // Note: this produces dense keys with origin ONE(1).
             
             vals[i] = new SimpleEntry();
             
@@ -1474,7 +1491,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         for( int i=0; i<nkeys; i++ ) {
 
-            int key = keys[order[i]];
+            final byte[] key = keys[order[i]];
             
             SimpleEntry val = vals[order[i]];
             

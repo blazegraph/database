@@ -37,7 +37,7 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchContains extends IndexProcedure implements IBatchOperation,
+public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBatchOperation,
         IReadOnlyOperation, IParallelizableIndexProcedure {
 
     /**
@@ -59,7 +59,8 @@ public class BatchContains extends IndexProcedure implements IBatchOperation,
             
         }
         
-        public IIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
+        public IKeyArrayIndexProcedure newInstance(int n, int offset,
+                byte[][] keys, byte[][] vals) {
 
             return new BatchContains(n, offset, keys);
             
@@ -114,7 +115,17 @@ public class BatchContains extends IndexProcedure implements IBatchOperation,
 
         }
 
-        return new ResultBitBuffer(n, ret);
+        ResultBitBuffer result = newResult();
+        
+        result.setResult( n, ret );
+        
+        return result;
+        
+    }
+    
+    protected ResultBitBuffer newResult() {
+        
+        return new ResultBitBuffer();
         
     }
     

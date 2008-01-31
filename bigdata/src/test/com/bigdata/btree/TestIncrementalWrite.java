@@ -67,6 +67,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
                 UUID.randomUUID(),
                 new MyHardReferenceQueue<PO>(new DefaultEvictionListener(),
                         queueCapacity, queueScan),
+                        KeyBufferSerializer.INSTANCE,
                         SimpleEntry.Serializer.INSTANCE,
                         null // no record compressor
                         );
@@ -99,9 +100,9 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * insert some keys into the root leaf.
          */
         final Leaf a = (Leaf)btree.root;
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
         
         /*
          * do an incremental write of the root leaf.
@@ -134,10 +135,10 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         final SimpleEntry v7 = new SimpleEntry(7);
         final SimpleEntry v9 = new SimpleEntry(9);
         final Leaf a = (Leaf) btree.root;
-        btree.insert(3,v3);
-        btree.insert(5,v5);
-        btree.insert(7,v7);
-        btree.insert(9,v9);
+        btree.insert(KeyBuilder.asSortKey(3),v3);
+        btree.insert(KeyBuilder.asSortKey(5),v5);
+        btree.insert(KeyBuilder.asSortKey(7),v7);
+        btree.insert(KeyBuilder.asSortKey(9),v9);
         assertNotSame(a,btree.root);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
@@ -220,10 +221,10 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         final SimpleEntry v7 = new SimpleEntry(7);
         final SimpleEntry v9 = new SimpleEntry(9);
         final Leaf a = (Leaf) btree.root;
-        btree.insert(3,v3);
-        btree.insert(5,v5);
-        btree.insert(7,v7);
-        btree.insert(9,v9);
+        btree.insert(KeyBuilder.asSortKey(3),v3);
+        btree.insert(KeyBuilder.asSortKey(5),v5);
+        btree.insert(KeyBuilder.asSortKey(7),v7);
+        btree.insert(KeyBuilder.asSortKey(9),v9);
         assertNotSame(a,btree.root);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);

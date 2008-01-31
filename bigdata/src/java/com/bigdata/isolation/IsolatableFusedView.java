@@ -44,7 +44,7 @@ import com.bigdata.btree.ReadOnlyFusedView;
  * <p>
  * Note that deletion markers can exist in both historical journals and index
  * segments having data for the view. Deletion markers are expunged from index
- * segments only by a full compacting merge of all index segments having life
+ * segments only by a full compacting merge of all index segments having live
  * data for the partition.
  * 
  * FIXME implement; support processing of delete markers (including handling of

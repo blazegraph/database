@@ -69,6 +69,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
     private int nleaves;
     
     private int nentries;
+
+    private IKeySerializer keySer;
     
     private IValueSerializer valueSer;
     
@@ -109,6 +111,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
     public final int getLeafCount() {return nleaves;}
 
     public final int getEntryCount() {return nentries;}
+    
+    public final IKeySerializer getKeySerializer() {return keySer;}
     
     public final IValueSerializer getValueSerializer() {return valueSer;}
     
@@ -202,6 +206,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
 
         this.nentries = btree.nentries;
 
+        this.keySer = btree.nodeSer.keySerializer;
+        
         this.valueSer = btree.nodeSer.valueSerializer;
         
         this.className = btree.getClass().getName();
@@ -279,6 +285,7 @@ public class BTreeMetadata implements Serializable, Externalizable {
         sb.append(", nleaves=" + nleaves);
         sb.append(", nentries=" + nentries);
         sb.append(", addrMetadata=" + store.toString(addrMetadata));
+        sb.append(", keySerializer=" + keySer.getClass().getName());
         sb.append(", valueSerializer=" + valueSer.getClass().getName());
         sb.append(", recordCompressor="
                 + (recordCompressor == null ? null : recordCompressor
@@ -318,6 +325,8 @@ public class BTreeMetadata implements Serializable, Externalizable {
 
         nentries = (int)LongPacker.unpackLong(in);
         
+        keySer = (IKeySerializer)in.readObject();
+
         valueSer = (IValueSerializer)in.readObject();
         
         className = in.readUTF();
@@ -347,7 +356,9 @@ public class BTreeMetadata implements Serializable, Externalizable {
         LongPacker.packLong(out, nleaves);
         
         LongPacker.packLong(out, nentries);
-        
+
+        out.writeObject(keySer);
+
         out.writeObject(valueSer);
         
         out.writeUTF(className);

@@ -36,6 +36,7 @@ import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.ISimpleBTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
+import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -127,6 +128,8 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
     public IsolatedBTree(IRawStore store, UnisolatedBTree src) {
 
         super(store, src.getBranchingFactor(), src.getIndexUUID(), src
+                .getNodeSerializer().getKeySerializer(), src
+                .getNodeSerializer().getValueSerializer(), src
                 .getConflictResolver());
         
         this.src = src;
@@ -154,7 +157,9 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * @todo This constructor is somewhat different since it requires access to
      *       a persistence capable parameter in order to reconstruct the view.
      *       Consider whether or not this can be refactored per
-     *       {@link BTree#load(IRawStore, long)}.
+     *       {@link BTree#load(IRawStore, long)}. The [src] should probably be
+     *       expressed as {@link AbstractResourceMetadata}, or even an array of
+     *       such resources describing the current view.
      */
     public IsolatedBTree(IRawStore store, BTreeMetadata metadata, UnisolatedBTree src) {
 
@@ -211,12 +216,12 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * <code>null</code>. Otherwise return the
      * {@link IValue#getValue() application value} for that key.
      */
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
         
         if (key == null)
             throw new IllegalArgumentException();
 
-        Value value = super.getValue((byte[])key);
+        Value value = super.getValue(key);
 
         if (value == null) {
 
@@ -240,13 +245,13 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * unisolated index. If the key is found there, then we add a delete marker
      * to the isolated index.
      */
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
         // check the isolated index.
-        Value value = super.getValue((byte[])key);
+        Value value = super.getValue(key);
 
         if (value == null) {
 
@@ -255,7 +260,7 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
              * see if the key exists in the unisolated index. if it does then we
              * need to write a delete marker in the isolated index.
              */
-            value = src.getValue((byte[]) key);
+            value = src.getValue( key);
             
             if(value==null||value.deleted) return null;
 
@@ -283,8 +288,10 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * Adds an entry for the key under the value to the write set (does not
      * write through to the isolated index).
      */
-    public Object insert(Object key, Object val) {
+    public Object insert(byte[] key, Object val) {
+        
         return super.insert(key,val);
+        
     }
 
     /**
@@ -293,7 +300,9 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * isolated index).
      */
     public int indexOf(byte[] key) {
+        
         return super.indexOf(key);
+        
     }
 
     /**
@@ -302,7 +311,9 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * index).
      */
     public byte[] keyAt(int index) {
+        
         return super.keyAt(index);
+        
     }
 
     /**
@@ -311,7 +322,9 @@ public class IsolatedBTree extends UnisolatedBTree implements IIsolatedIndex {
      * index).
      */
     public Object valueAt(int index) {
+        
         return super.valueAt(index);
+        
     }
 
     /**

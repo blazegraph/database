@@ -56,7 +56,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
             } catch (Throwable t) {
 
-                TestLocalTripleStore.log.error(t);
+                log.error(t);
 
                 // discard the write set.
                 store.abort();
@@ -112,7 +112,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
         } catch (Throwable t) {
 
-            TestLocalTripleStore.log.error(t);
+            log.error(t);
 
             // discard the write set.
             store.abort();

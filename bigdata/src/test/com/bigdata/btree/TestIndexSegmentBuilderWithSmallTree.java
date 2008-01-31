@@ -120,7 +120,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         for (int i = 1; i <= 10; i++) {
 
-            btree.insert(i, new SimpleEntry(i));
+            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -331,7 +331,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         for (int i = 1; i <= 9; i++) {
 
-            btree.insert(i, new SimpleEntry(i));
+            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -423,7 +423,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
 
         for (int i = 1; i <= 20; i++) {
 
-            btree.insert(i, new SimpleEntry(i));
+            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         

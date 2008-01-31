@@ -31,7 +31,6 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.IBatchOperation;
 import com.bigdata.journal.TestTx;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -56,8 +55,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  *       estimate if there are deleted entries while the latter must not visit
  *       deleted entries (or may it -- we will need to see them for mergeDown()
  *       and validate())?
- * 
- * @todo test entryIterator() - it visits only those that are not deleted.
  * 
  * @todo write tests of validate() and mergeDown(). note that these are also
  *       tested by {@link TestTx} and friends. However, we can verify the
@@ -334,6 +331,17 @@ public class TestIsolatedBTree extends AbstractBTreeTestCase {
 //        
 //        fail("write test");
 //    }
+
+    /**
+     * Unit test for the rangeIterator verifies that we have access to the
+     * version counter and delete markers which are required in order to produce
+     * a fused view from the resources comprising an index partition.
+     */
+    public void test_rangeIterator01() {
+       
+        fail("write tests - Values must be visible to iterator");
+        
+    }
     
     /**
      * Does not resolve any conflicts.

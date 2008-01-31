@@ -42,13 +42,17 @@ import java.text.NumberFormat;
  */
 public class Counters {
 
-    private final AbstractBTree btree;
+//    private final AbstractBTree btree;
     
-    public Counters(AbstractBTree btree) {
-        
-        assert btree != null;
-        
-        this.btree = btree;
+//    public Counters(AbstractBTree btree) {
+//        
+//        assert btree != null;
+//        
+//        this.btree = btree;
+//        
+//    }
+
+    public Counters() {
         
     }
     

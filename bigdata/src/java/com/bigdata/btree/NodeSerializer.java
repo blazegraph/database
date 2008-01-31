@@ -29,7 +29,6 @@ package com.bigdata.btree;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
-import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.BufferOverflowException;
@@ -153,11 +152,33 @@ public class NodeSerializer {
     
     /**
      * Used to serialize and de-serialize the nodes and leaves of the tree. This
-     * is pre-allocated based on the estimated maximum size of a node or leaf.
-     * If the buffer overflows it is re-allocated and the operation will be
-     * retried.
+     * is pre-allocated based on the estimated maximum size of a node or leaf
+     * and grows as necessary when it overflows. The same buffer instance is
+     * used to serialize all nodes and leaves of the tree.
+     * <p>
+     * Note: this buffer is discarded by {@link #close()} when the btree is
+     * {@link AbstractBTree#close() closed} and then reallocated on demand.
+     * 
+     * @see #alloc(int)
+     * @see #close()
      */
     protected DataOutputBuffer _buf;
+    
+//    /**
+//     * Used to serialize and de-serialize the nodes and leaves of the tree. This
+//     * wraps {@link #_buf} and exposes an interface for writing bit streams and
+//     * a wide variety of useful codings for int and long values. The stream is
+//     * reset before each node or leaf is written, which causes the underlying
+//     * {@link DataOutputBuffer} to be reset as well.
+//     * <p>
+//     * Note: this buffer is discarded by {@link #close()} when the btree is
+//     * {@link AbstractBTree#close() closed} and then reallocated on demand.
+//     * 
+//     * @see #_buf
+//     * @see #alloc(int)
+//     * @see #close()
+//     */
+//    protected MyOutputBitStream _os;
     
     /**
      * Used to (de-)compress serialized records (optional).
@@ -302,6 +323,12 @@ public class NodeSerializer {
 
     private final int initialBufferCapacity;
     
+    public IKeySerializer getKeySerializer() {
+        
+        return keySerializer;
+        
+    }
+    
     public IValueSerializer getValueSerializer() {
         
         return valueSerializer;
@@ -404,7 +431,8 @@ public class NodeSerializer {
         
         this.initialBufferCapacity = initialBufferCapacity;
         
-        this._buf = alloc(initialBufferCapacity);
+        // set _buf and _os.
+        alloc(initialBufferCapacity);
 
         /*
          * Allocate compression buffer iff a compression algorithm is used.
@@ -441,19 +469,20 @@ public class NodeSerializer {
         
         _buf = null;
         
+//        _os = null;
+        
         cbuf = null;
         
     }
     
     /**
-     * Allocate a buffer of the stated capacity.
+     * Allocates {@link #_buf} with the specified initial capacity and sets up
+     * {@link #_os} to wrap {@link #_buf}.
      * 
-     * @param capacity
-     *            The buffer capacity.
-     * 
-     * @return The buffer.
+     * @param initialCapacity
+     *            The initial buffer capacity.
      */
-    static protected DataOutputBuffer alloc(int capacity) {
+    private void alloc(int initialCapacity) {
         
 //        return (true || capacity < Bytes.kilobyte32 * 8 )? ByteBuffer
 //                .allocate(capacity) : ByteBuffer
@@ -473,10 +502,90 @@ public class NodeSerializer {
 
 //        return ByteBuffer.allocate(capacity);
         
-        return new DataOutputBuffer(capacity);
+        assert _buf == null;
+        
+//        assert _os == null;
+        
+        _buf = new DataOutputBuffer(initialCapacity);
+
+//        _os = new MyOutputBitStream(_buf);
         
     }
 
+//    /**
+//     * An {@link OutputBitStream} wrapping a {@link DataOutputBuffer}. An
+//     * instance of this class is maintained by the {@link NodeSerializer} to
+//     * write the nodes and leaves of a given {@link BTree}. That instance is
+//     * rewound before each node or leaf is serialized. This allows us to reuse
+//     * the same internal buffer and the same backing {@link DataOutputStream}
+//     * for each node or leaf written.
+//     * <p>
+//     * Note: The caller can readily access the underlying
+//     * {@link DataOutputBuffer} in order to perform random or sequential data
+//     * type or byte oriented writes but you MUST first {@link #flush()} the
+//     * {@link OutputBitStream} in order to byte align the bit stream and force
+//     * the data in the internal buffer to the backing {@link DataOutputBuffer}.
+//     * <p>
+//     * Note: The {@link OutputBitStream} maintains an internal buffer for
+//     * efficiency. The contents of that buffer are copied en-mass onto the
+//     * backing {@link DataOutputBuffer} by {@link #flush()}, when the stream is
+//     * repositioned, and when it is closed. There should be very little overhead
+//     * incurred by these byte[] copies.
+//     * <p>
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class MyOutputBitStream extends OutputBitStream {
+//
+//        /**
+//         * Return the underlying {@link OutputStream} - {@link #flush()} before
+//         * writing on the returned stream!
+//         */
+//        public OutputStream getOutputStream() {
+//            
+//            return os;
+//            
+//        }
+//        
+//        /**
+//         * Return the underlying {@link DataOutputBuffer} - {@link #flush()}
+//         * before writing on the returned stream!
+//         * 
+//         * @throws ClassCastException
+//         *             if the backing {@link OutputStream} is not a
+//         *             {@link DataOutputBuffer}.
+//         */
+//        public DataOutputBuffer getDataOutputBuffer() {
+//            
+//            return (DataOutputBuffer)os;
+//            
+//        }
+//        
+////        /**
+////         * @param arg0
+////         */
+////        public MyOutputBitStream(byte[] arg0) {
+////            super(arg0);
+////        }
+//
+//        /**
+//         * @param os
+//         * @param bufSize
+//         */
+//        public MyOutputBitStream(OutputStream os, int bufSize) {
+//            super(os, bufSize);
+//        }
+//
+//        /**
+//         * @param os
+//         */
+//        public MyOutputBitStream(OutputStream os) {
+//            super(os);
+//        }
+//
+//    }
+    
     /**
      * De-serialize a node or leaf. This method is used when the caller does not
      * know a-priori whether the reference is to a node or leaf. The decision is
@@ -610,34 +719,33 @@ public class NodeSerializer {
         if( _buf == null ) {
             
             // the buffer was released so we reallocate it.
-            _buf = alloc(initialBufferCapacity);
+            alloc(initialBufferCapacity);
             
         }
         
-//        while (true) {
-//
-            try {
+        try {
 
-                return putNode(_buf, node);
-//
-            } catch (IOException ex) {
-                
-                throw new RuntimeException(ex); // exception is not expected.
-                
-            } catch (BufferOverflowException ex) {
+            // prepare buffer for reuse.
+             _buf.reset();
+//            _os.position(0L); 
 
-                throw ex; // exception is not expected.
-//                extendBuffer();
+            return putNode2(node);
 
-            }
-//
-//        }
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex); // exception is not expected.
+            
+        } catch (BufferOverflowException ex) {
+
+            throw ex; // exception is not expected.
+
+        }
 
     }
     
-    private ByteBuffer putNode(DataOutputBuffer buf, INodeData node) throws IOException {
+    private ByteBuffer putNode2(INodeData node) throws IOException {
 
-        assert buf != null;
+        assert _buf != null;
         assert node != null;
 
         final int branchingFactor = node.getBranchingFactor();
@@ -650,22 +758,20 @@ public class NodeSerializer {
         /*
          * fixed length node header.
          */
-
-        buf.reset();
         
-        final int pos0 = buf.position();
+        final int pos0 = _buf.pos();
 
         // checksum
-        buf.writeInt(0); // will overwrite below with the checksum.
+        _buf.writeInt(0); // will overwrite below with the checksum.
 
         // #bytes
-        buf.writeInt(0); // will overwrite below with the actual value.
+        _buf.writeInt(0); // will overwrite below with the actual value.
         
         // nodeType
-        buf.writeByte(TYPE_NODE); // this is a non-leaf node.
+        _buf.writeByte(TYPE_NODE); // this is a non-leaf node.
 
         // version
-        buf.writeShort(VERSION0);
+        _buf.writeShort(VERSION0);
         
 //        /*
 //         * Setup output stream over the buffer.
@@ -681,22 +787,34 @@ public class NodeSerializer {
         try {
 
             // branching factor.
-            buf.packLong( branchingFactor);
+            _buf.packLong( branchingFactor);
 
             // #of spanned entries.
-            buf.packLong( nentries);
+            _buf.packLong( nentries);
             
 //            // #of keys
 //            LongPacker.packLong(os, nkeys);
 
-            // keys.
-            keySerializer.putKeys(buf, keys);
+            /*
+             * keys
+             * 
+             * @todo This is always using a default (de-)serializer for the keys
+             * since the keys in the nodes of the btree are the shortest length
+             * separators identified among the leaves. This makes it rather
+             * difficult to exploit application specific knowledge when
+             * (de-)serializing the keys.
+             * 
+             * @todo The default serializer should use prefix coding and
+             * probably should use byte level hamming coding as well.
+             */
+//            keySerializer.putKeys(_buf, keys);
+            KeyBufferSerializer.INSTANCE.putKeys(_buf, keys);
 
             // addresses.
-            addrSerializer.putChildAddresses(buf, childAddr, nkeys+1);
+            addrSerializer.putChildAddresses(_buf, childAddr, nkeys+1);
 
             // #of entries spanned per child.
-            putChildEntryCounts(buf,childEntryCounts,nkeys+1);
+            putChildEntryCounts(_buf,childEntryCounts,nkeys+1);
             
 //            // Done using the DataOutputStream so flush to the ByteBuffer.
 //            os.flush();
@@ -731,10 +849,10 @@ public class NodeSerializer {
         }
 
         // #of bytes actually written.
-        final int nbytes = buf.position() - pos0;
+        final int nbytes = _buf.pos() - pos0;
         assert nbytes > SIZEOF_NODE_HEADER;
         
-        ByteBuffer buf2 = ByteBuffer.wrap(buf.array(),0,nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(_buf.array(),0,nbytes);
 
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
@@ -886,8 +1004,20 @@ public class NodeSerializer {
             // Keys.
 
 //            final Object keys = ArrayType.alloc(keyType, branchingFactor, stride);
-
-            final IKeyBuffer keys = keySerializer.getKeys(is);
+            /*
+             * keys
+             * 
+             * @todo This is always using a default (de-)serializer for the keys
+             * since the keys in the nodes of the btree are the shortest length
+             * separators identified among the leaves. This makes it rather
+             * difficult to exploit application specific knowledge when
+             * (de-)serializing the keys.
+             * 
+             * @todo The default serializer should use prefix coding and
+             * probably should use byte level hamming coding as well.
+             */
+            final IKeyBuffer keys = KeyBufferSerializer.INSTANCE.getKeys(is);
+//            final IKeyBuffer keys = keySerializer.getKeys(is);
 
             final int nkeys = keys.getKeyCount();
             
@@ -953,60 +1083,62 @@ public class NodeSerializer {
         if( _buf == null ) {
             
             // the buffer was released so we reallocate it.
-            _buf = alloc(initialBufferCapacity);
+            alloc(initialBufferCapacity);
             
         }
-        
-//        while (true) {
 
-            try {
+        try {
 
-                return putLeaf(_buf,leaf);
+            // prepare buffer for reuse.
+            _buf.reset();
+//            _os.position(0L);
 
-            } catch (IOException ex) {
+            return putLeaf2(leaf);
 
-                throw new RuntimeException(ex); // exception is not expected.
-                
-            } catch (BufferOverflowException ex) {
+        } catch (IOException ex) {
 
-                throw ex; // exception is not expected.
-                
-//                extendBuffer();
+            throw new RuntimeException(ex); // exception is not expected.
 
-            }
+        } catch (BufferOverflowException ex) {
 
-//        }
+            throw ex; // exception is not expected.
+
+        }
         
     }
      
-    private ByteBuffer putLeaf(DataOutputBuffer buf, ILeafData leaf) throws IOException {
+    private ByteBuffer putLeaf2(ILeafData leaf) throws IOException {
 
-        assert buf != null;
+        assert _buf != null;
         assert leaf != null;
         
         final int nkeys = leaf.getKeyCount();
         final int branchingFactor = leaf.getBranchingFactor();
         final IKeyBuffer keys = leaf.getKeys();
+        /*
+         * @todo if the btree is constrained to have only byte[] values then
+         * modify this array to be typed as byte[][] and check all of the value
+         * serializers for inefficiencies or copying into a byte[][] in order
+         * to align with the IDataSerializer API.
+         */
         final Object[] vals = leaf.getValues();
-        
-        buf.reset();
         
         /*
          * common data.
          */
-        final int pos0 = buf.position();
+        final int pos0 = _buf.pos();
 
         // checksum
-        buf.writeInt(0); // will overwrite below with the checksum.
+        _buf.writeInt(0); // will overwrite below with the checksum.
         
         // nbytes
-        buf.writeInt(0); // will overwrite below with the actual value.
+        _buf.writeInt(0); // will overwrite below with the actual value.
         
         // nodeType
-        buf.writeByte(TYPE_LEAF); // this is a leaf node.
+        _buf.writeByte(TYPE_LEAF); // this is a leaf node.
 
         // version
-        buf.writeShort(VERSION0);
+        _buf.writeShort(VERSION0);
         
         /*
          * Setup output stream over the buffer.
@@ -1021,16 +1153,16 @@ public class NodeSerializer {
         try {
             
             // branching factor.
-            buf.packLong( branchingFactor);
+            _buf.packLong( branchingFactor);
 
 //            // #of keys
 //            LongPacker.packLong(os, nkeys);
 
             // keys.
-            keySerializer.putKeys(buf, keys);
+            keySerializer.putKeys(_buf, keys);
 
             // values.
-            valueSerializer.putValues(buf, vals, nkeys);
+            valueSerializer.putValues(_buf, vals, nkeys);
 
 //            // Done using the DataOutputStream so flush to the ByteBuffer.
 //            os.flush();
@@ -1064,10 +1196,10 @@ public class NodeSerializer {
         }
 
         // #of bytes actually written.
-        final int nbytes = buf.position() - pos0;
+        final int nbytes = _buf.pos() - pos0;
         assert nbytes > SIZEOF_LEAF_HEADER;
 
-        ByteBuffer buf2 = ByteBuffer.wrap(buf.array(),0,nbytes);
+        ByteBuffer buf2 = ByteBuffer.wrap(_buf.array(),0,nbytes);
         
         // patch #of bytes written on the record format.
         buf2.putInt(pos0 + OFFSET_NBYTES, nbytes);
@@ -1312,31 +1444,31 @@ public class NodeSerializer {
 
     }
 
-    protected void putTimestamps(DataOutputStream os, long[] timestamps,
-            int nentries) throws IOException {
-
-        for (int i = 0; i < nentries; i++) {
-
-            final long timestamp = timestamps[i];
-
-            LongPacker.packLong(os, timestamp);
-
-        }
-
-    }
-
-    protected void getTimestamps(DataInputStream is, long[] timestamps,
-            int nentries) throws IOException {
-
-        for (int i = 0; i < nentries; i++) {
-
-            final long timestamp = LongPacker.unpackLong(is);
-
-            timestamps[i] = timestamp;
-
-        }
-
-    }
+//    protected void putTimestamps(DataOutputStream os, long[] timestamps,
+//            int nentries) throws IOException {
+//
+//        for (int i = 0; i < nentries; i++) {
+//
+//            final long timestamp = timestamps[i];
+//
+//            LongPacker.packLong(os, timestamp);
+//
+//        }
+//
+//    }
+//
+//    protected void getTimestamps(DataInputStream is, long[] timestamps,
+//            int nentries) throws IOException {
+//
+//        for (int i = 0; i < nentries; i++) {
+//
+//            final long timestamp = LongPacker.unpackLong(is);
+//
+//            timestamps[i] = timestamp;
+//
+//        }
+//
+//    }
 
     /**
      * Compress a record in the buffer.
@@ -1346,8 +1478,11 @@ public class NodeSerializer {
      *            compressed.
      * 
      * @return The record unless compression is enabled in which case the
-     *         compressed record is returned.  the position will be zero and
-     *         the limit will be the #of bytes in the compressed record.
+     *         compressed record is returned. the position will be zero and the
+     *         limit will be the #of bytes in the compressed record.
+     * 
+     * @todo compression should be on the byte[] not the slower
+     *       {@link ByteBuffer}.
      */
     protected ByteBuffer compress(ByteBuffer buf) {
 

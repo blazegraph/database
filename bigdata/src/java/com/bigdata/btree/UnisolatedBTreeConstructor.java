@@ -26,14 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 11, 2008
  */
 
-package com.bigdata.mdi;
+package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -57,6 +56,10 @@ public class UnisolatedBTreeConstructor implements IIndexConstructor {
 
     private int branchingFactor;
     
+    IKeySerializer keySerializer;
+
+    IValueSerializer valueSerializer;
+    
     private IConflictResolver conflictResolver;
     
     /**
@@ -66,29 +69,54 @@ public class UnisolatedBTreeConstructor implements IIndexConstructor {
         
     }
 
-    public UnisolatedBTreeConstructor(int branchingFactor) {
-        
-        this(branchingFactor,null);
-        
-    }
+//    public UnisolatedBTreeConstructor(int branchingFactor) {
+//
+//        this(branchingFactor, null/*conflictResolver*/);
+//
+//    }
 
     /**
      * 
      * @param branchingFactor
      *            The branching factor.
-     * 
+     * @param keySerializer
+     *            The object used to (de-)serialize the keys in the
+     *            {@link BTree}.
+     * @param valueSerializer
+     *            The object used to (de-)serialize values in the {@link BTree}.
      * @param conflictResolver
      *            The conflict resolver (optional).
      */
-    public UnisolatedBTreeConstructor(int branchingFactor, IConflictResolver conflictResolver) {
-        
+    public UnisolatedBTreeConstructor(
+            int branchingFactor,
+            IKeySerializer keySerializer,
+            IValueSerializer valueSerializer,
+            IConflictResolver conflictResolver
+            ) {
+
         if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        if (keySerializer == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        if (valueSerializer == null) {
             
             throw new IllegalArgumentException();
             
         }
         
         this.branchingFactor = branchingFactor;
+
+        this.keySerializer = keySerializer;
+        
+        this.valueSerializer = valueSerializer;
         
         this.conflictResolver = conflictResolver;
         
@@ -97,7 +125,7 @@ public class UnisolatedBTreeConstructor implements IIndexConstructor {
     public BTree newInstance(IRawStore store, UUID indexUUID, IPartitionMetadata ignored) {
 
         return new UnisolatedBTree(store, branchingFactor, indexUUID,
-                conflictResolver);
+                keySerializer, valueSerializer, conflictResolver);
         
     }
 

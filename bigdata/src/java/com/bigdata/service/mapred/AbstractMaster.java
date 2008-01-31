@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTreeConstructor;
 import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -488,6 +489,7 @@ public abstract class AbstractMaster {
                                     name,
                                     reduceTasks[i],
                                     new BTreeConstructor(
+                                            KeyBufferSerializer.INSTANCE,
                                             ByteArrayValueSerializer.INSTANCE),
                                     null/*pmd*/);
                 } catch (Exception e) {

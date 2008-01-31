@@ -23,14 +23,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.isolation;
 
+import it.unimi.dsi.mg4j.io.InputBitStream;
+import it.unimi.dsi.mg4j.io.OutputBitStream;
+
 import java.io.DataInput;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.IDataSerializer.WrappedValueSerializer;
 import com.bigdata.io.DataOutputBuffer;
 
 /**
@@ -127,6 +133,8 @@ public class Value implements IValue {
      * 
      * @todo explore compression techniques, most likely dictionary encodings or
      *       hamming encodings.
+     * 
+     * @deprecated by {@link WrappedValueSerializer}
      */
     public static class Serializer implements IValueSerializer {
 
@@ -260,6 +268,135 @@ public class Value implements IValue {
                 
             }
             
+        }
+
+    }
+
+    /**
+     * A serializer for {@link Value}s (version counters with deletion markers)
+     * wrapping byte[]s datums. The byte[] datums are serialized by the delegate
+     * {@link IDataSerializer}. The use of this class allows specification of
+     * custom serialization and compression for the values of a btree that
+     * supports transactional isolation. This class is automatically used by the
+     * {@link UnisolatedBTree} and derived classes.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class ValueSerializer extends WrappedValueSerializer {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -6183699738836371403L;
+
+        public static final transient short VERSION1 = 0x1;
+
+        /**
+         * @param delegate
+         */
+        public ValueSerializer(IDataSerializer delegate) {
+            super(delegate);
+        }
+        
+        @Override
+        public void getValues(DataInput is, Object[] values, int nvals) throws IOException {
+
+            final short version = is.readShort();
+
+            if (version != VERSION1) {
+
+                throw new IOException("Unknown version=" + version);
+
+            }
+            
+            final Value[] vals = (Value[])values;
+
+            /*
+             * Ask the super class to de-serialize the byte[] datums using its
+             * delegate IDataSerializer.
+             */
+            final byte[][] a = new byte[nvals][];
+            {
+                
+                super.getValues(is, a, nvals);
+                
+            }
+
+            /*
+             * Read each Value's metadata (versionCounter and deleted flag) and
+             * fuse it with the Value's datum read above to create the Value
+             * object.
+             */
+            {
+                
+                InputBitStream ibs = new InputBitStream((InputStream) is, 0/* unbuffered! */);
+                
+                for(int i=0; i<nvals; i++) {
+                    
+                    final int versionCounter = ibs.readNibble();
+
+                    assert versionCounter <= Short.MAX_VALUE;
+                    
+                    assert versionCounter >= 0;
+                    
+                    final boolean deleted = ibs.readBit() == 1 ? true : false;
+                    
+                    vals[i] = new Value((short) versionCounter, deleted, a[i]);
+                    
+                }
+                
+            }
+            
+        }
+
+        @Override
+        public void putValues(DataOutputBuffer os, Object[] values, int nvals) throws IOException {
+
+            os.writeShort(VERSION1);
+            
+//            final Value[] vals = (Value[])values;
+            
+            /*
+             * Ask the super class to write the byte[] datums using the delegate
+             * IDataSerializer.
+             */
+            {
+
+                byte[][] a = new byte[nvals][];
+
+                for (int i = 0; i < nvals; i++) {
+
+                    a[i] = ((Value)values[i]).datum;
+
+                }
+
+                super.putValues(os, a, nvals);
+
+            }
+
+            /*
+             * Write out the version counter and deleted marker for each Value.
+             */
+            {
+                
+                OutputBitStream obs = new OutputBitStream(os, 0/* unbuffered! */);
+
+                for (int i = 0; i < nvals; i++) {
+
+                    Value value = ((Value)values[i]);
+
+                    obs.writeNibble(value.versionCounter);
+
+                    obs.writeBit(value.deleted);
+
+                }
+
+                // flush required!
+                obs.flush();
+                
+            }
+
         }
 
     }

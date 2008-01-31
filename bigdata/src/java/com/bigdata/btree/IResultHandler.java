@@ -46,7 +46,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IResultHandler<R extends Object,A extends Object> {
+public interface IResultHandler<R extends Object, A extends Object> {
     
     /**
      * Method is invoked for each result and is responsible for combining

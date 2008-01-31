@@ -42,6 +42,9 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.isolation.Value;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.Journal;
 import com.bigdata.repo.BigdataRepository;
@@ -72,9 +75,9 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * </p>
  * 
  * <pre>
- *                   
- *  [schemaName][primaryKey][columnName][timestamp]
- *                   
+ *                           
+ *          [schemaName][primaryKey][columnName][timestamp]
+ *                           
  * </pre>
  * 
  * <p>
@@ -112,14 +115,14 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * </p>
  * 
  * <pre>
- *                   
- *  [employee][12][DateOfHire][t0] : [4/30/02]
- *  [employee][12][DateOfHire][t1] : [4/30/05]
- *  [employee][12][Employer][t0]   : [SAIC]
- *  [employee][12][Employer][t1]   : [SYSTAP]
- *  [employee][12][Id][t0]         : [12]
- *  [employee][12][Name][t0]       : [Bryan Thompson]
- *                   
+ *                           
+ *          [employee][12][DateOfHire][t0] : [4/30/02]
+ *          [employee][12][DateOfHire][t1] : [4/30/05]
+ *          [employee][12][Employer][t0]   : [SAIC]
+ *          [employee][12][Employer][t1]   : [SYSTAP]
+ *          [employee][12][Id][t0]         : [12]
+ *          [employee][12][Name][t0]       : [Bryan Thompson]
+ *                           
  * </pre>
  * 
  * <p>
@@ -144,6 +147,49 @@ import com.bigdata.sparse.ValueType.AutoIncCounter;
  * Note: The constant {@link #MAX_TIMESTAMP} is commonly used to read the most
  * current row from the sparse row store since its value is greater or equal to
  * any valid timestamp.
+ * </p>
+ * <h2>Isolation and version counters vs history policies and datum timestamps</h2>
+ * <p>
+ * Transactional isolation uses {@link Value version counters} to detect
+ * write-write conflicts, including for the special case of writing a "delete"
+ * marker. Version counters are applied when the write set for an
+ * {@link IsolatedBTree isolated index} is merged down onto the
+ * {@link UnisolatedBTree unisolated index}. Version counters are also applied
+ * when reading from a fused view since they allow us to distinguish between a
+ * "not found" and a deleted record marker which is necessary to prevent deleted
+ * records from "re-appearing".
+ * <p>
+ * </p>
+ * A history policy specifies how long "redundent" versions of some datum will
+ * be retained, e.g., N days or M versions. History policies are based on datum
+ * timestamps. Those timestamps reflect the (more or less coordinated) server
+ * time at which the datum was written. Deleted datums are associated with a
+ * null value. The {@link SparseRowStore} is the only data model that maintains
+ * datum timestamps, which it does by including the local server timestamp in
+ * all datums written for a logical row in an atomic write operation. The
+ * history policy processes the logical row, accepting only those datums that
+ * satisfy the age requirement.
+ * <p>
+ * </p>
+ * Merged views of {@link SparseRowStore} indices could in fact rely on the
+ * timestamp in the key to present a coherent view of a logical row, which means
+ * that we do NOT require version counters for the sparse row store - it could
+ * use normal btrees. However, the only "index partition" implementation is
+ * based on btrees that support version counters, so in practice all scale-out
+ * indices use version counters.
+ * <p>
+ * </p>
+ * Note: version counters alone are NOT sufficient for history policies for
+ * several reasons: (a) they do not have enough bits to represent a timestamp;
+ * (b) timestamps have to correspond more or less to commit groups for a history
+ * policy and that information is not available in the context in which we
+ * assign version counters; and (c) version counter information is not visible
+ * in the merged view. Perhaps all of these issues could be addressed, but I am
+ * not clear that history policies are meaningful outside of the context of the
+ * {@link SparseRowStore} since that is the only data model where history is
+ * inherently part of the representation. In contrast, version counters are
+ * designed to support transactional isolation and do NOT expose history to
+ * index readers.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

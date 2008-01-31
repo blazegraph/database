@@ -38,7 +38,7 @@ import java.io.ObjectOutput;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchRemove extends IndexProcedure implements IBatchOperation, IParallelizableIndexProcedure {
+public class BatchRemove extends AbstractKeyArrayIndexProcedure implements IBatchOperation, IParallelizableIndexProcedure {
 
     /**
      * 
@@ -85,7 +85,7 @@ public class BatchRemove extends IndexProcedure implements IBatchOperation, IPar
 
         }
 
-        public IIndexProcedure newInstance(int n, int offset, byte[][] keys,
+        public IKeyArrayIndexProcedure newInstance(int n, int offset, byte[][] keys,
                 byte[][] vals) {
 
             return new BatchRemove(n, offset, keys, returnOldValues);
@@ -134,7 +134,7 @@ public class BatchRemove extends IndexProcedure implements IBatchOperation, IPar
 
         final int n = getKeyCount();
         
-        final byte[][] old = returnOldValues ? new byte[n][] : null;
+        final byte[][] ret = returnOldValues ? new byte[n][] : null;
         
         int i = 0;
         
@@ -144,7 +144,7 @@ public class BatchRemove extends IndexProcedure implements IBatchOperation, IPar
 
             if(returnOldValues) {
                 
-                old[i] = val;
+                ret[i] = val;
                 
             }
             
@@ -152,9 +152,14 @@ public class BatchRemove extends IndexProcedure implements IBatchOperation, IPar
 
         }
 
-        if(returnOldValues) {
 
-            return new ResultBuffer(n, old, getResultSerializer());
+        if (returnOldValues) {
+            
+            ResultBuffer result = (ResultBuffer) newResult();
+
+            result.setResult(n, ret);
+
+            return result;
             
         }
         
@@ -162,6 +167,15 @@ public class BatchRemove extends IndexProcedure implements IBatchOperation, IPar
         
     }
     
+    /**
+     * Note: Override to customize serialization for the {@link ResultBuffer}.
+     */
+    public ResultBuffer newResult() {
+        
+        return new ResultBuffer();
+        
+    }
+
     @Override
     protected void readMetadata(ObjectInput in) throws IOException {
         

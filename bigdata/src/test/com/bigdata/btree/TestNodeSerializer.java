@@ -92,6 +92,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
                 new HardReferenceQueue<PO>(new NoEvictionListener(),
                         leafQueueCapacity, nscan),
+                        KeyBufferSerializer.INSTANCE,
                 SimpleEntry.Serializer.INSTANCE,
                 useCompression ? new RecordCompressor() : null);
 

@@ -36,13 +36,19 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.NOPSerializer;
+import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
+import com.bigdata.btree.IDataSerializer.WrappedKeySerializer;
+import com.bigdata.btree.IDataSerializer.WrappedValueSerializer;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ReadCommittedIndex;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 
 /**
@@ -197,11 +203,22 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
             } else {
 
+                /*
+                 * Note: index does not support isolation.
+                 */
+                
                 ndx = store.registerIndex(name, new BTree(store,
-                        store.getDefaultBranchingFactor(), UUID.randomUUID(),
-//                        StatementSerializer.INSTANCE
+                        store.getDefaultBranchingFactor(), //
+                        UUID.randomUUID(),//
+                        // key serializer
+                        KeyBufferSerializer.INSTANCE,
+////                        new WrappedKeySerializer(DefaultDataSerializer.INSTANCE),
+//                        new WrappedKeySerializer(new FastRDFKeyCompression(N)),
+                        // value serializer
+//                        new WrappedValueSerializer(new FastRDFValueCompression())
                         ByteArrayValueSerializer.INSTANCE
                         ));
+//              StatementSerializer.INSTANCE
 
             }
 

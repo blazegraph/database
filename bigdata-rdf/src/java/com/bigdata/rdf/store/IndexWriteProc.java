@@ -29,21 +29,22 @@ package com.bigdata.rdf.store;
 import it.unimi.dsi.mg4j.io.InputBitStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IParallelizableIndexProcedure;
-import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -67,10 +68,22 @@ import com.bigdata.rdf.spo.SPO;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class IndexWriteProc extends IndexProcedure implements
+public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
 
     protected static final Logger log = Logger.getLogger(IndexWriteProc.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * 
@@ -208,6 +221,15 @@ class IndexWriteProc extends IndexProcedure implements
     }
 
     /**
+     * Note: This method is not used.
+     */
+    final protected Long newResult() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
      * A fast bit-coding of the keys and values for an RDF statement index. The
      * approach uses a fixed length code for the statement keys and a fixed bit
      * length (3 bits) for the statement values.
@@ -304,29 +326,32 @@ class IndexWriteProc extends IndexProcedure implements
 
         }
 
-        public byte[][] read(ObjectInput in) throws IOException {
+        public byte[][] read(DataInput in) throws IOException {
 
-            /*
-             * @todo this relies on being able to cast to an input stream. in
-             * order to work for the DataInputStream you would obtain the
-             * backing byte[] and pass that along (PROBLEM : we would need to
-             * specify a limit and InputBitStream does not support that).
-             */
-            InputBitStream ibs = new InputBitStream((InputStream) in);
+            // #of keys.
+            final int n = in.readInt();
+            
+            if (n == 0)
+                return new byte[0][];
+            
+            InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
 
             /*
              * read the header.
              */
-            final int n = ibs.readNibble();
+//            final int n = ibs.readNibble();
             final int nsymbols = ibs.readNibble();
             final int codeBitLength = ibs.readNibble();
 
             /*
              * read the dictionary, building a reverse lookup from code to
              * value.
+             * 
+             * Note: An array of length [nsymbols] is used since the codes are
+             * one up integers in [0:nsymbols-1]. We just index into the by the
+             * code to store the symbol or translate a code to a symbol.
              */
-            final HashMap<Integer, Long> symbols = new HashMap<Integer, Long>(n
-                    * N);
+            final long[] symbols = new long[nsymbols];
             {
 
                 for (int i = 0; i < nsymbols; i++) {
@@ -335,7 +360,7 @@ class IndexWriteProc extends IndexProcedure implements
 
                     final int code = ibs.readInt(codeBitLength);
 
-                    symbols.put(code, v);
+                    symbols[code] = v;
 
                 }
 
@@ -357,7 +382,7 @@ class IndexWriteProc extends IndexProcedure implements
 
                         final int code = ibs.readInt(codeBitLength);
 
-                        final long v = symbols.get(code).longValue();
+                        final long v = symbols[code];
 
                         keyBuilder.append(v);
 
@@ -373,9 +398,16 @@ class IndexWriteProc extends IndexProcedure implements
             
         }
 
-        public void write(int n, int offset, byte[][] keys, ObjectOutput out)
+        public void write(int n, int offset, byte[][] keys, DataOutput out)
                 throws IOException {
 
+            // #of keys.
+            out.writeInt(n);
+            
+            if (n == 0) {
+                return;
+            }
+            
             final HashMap<Long, Integer> symbols = getSymbols(n, offset, keys);
 
             final int nsymbols = symbols.size();
@@ -391,21 +423,12 @@ class IndexWriteProc extends IndexProcedure implements
 
             {
 
-                /*
-                 * @todo The success of this relies on being able to cast to an
-                 * OutputStream. That rules out the DataOutputStream since it
-                 * has a different base class. Modify the OutputBitStream so
-                 * that it is more flexible for us. Also, may be faster with a
-                 * backing byte[] but it currently lacks an auto-extend
-                 * capability.
-                 */
-                final OutputBitStream obs = new OutputBitStream(
-                        (OutputStream) out);
-
+                final OutputBitStream obs = new OutputBitStream((OutputStream) out,0/*unbuffered*/);
+                
                 /*
                  * write the header {nsymbols, codeBitLength}.
                  */
-                obs.writeNibble(n);
+//                obs.writeNibble(n);
                 obs.writeNibble(nsymbols);
                 obs.writeNibble(codeBitLength);
 
@@ -465,7 +488,8 @@ class IndexWriteProc extends IndexProcedure implements
                  * auto-extend aggressively or they are writing onto a fixed
                  * buffer that writes on a socket.
                  */
-                log.warn(n + " statements were serialized in "
+                if(INFO)
+                log.info(n + " statements were serialized in "
                         + obs.writtenBits() + " bytes using " + nsymbols
                         + " symbols with a code length of " + codeBitLength
                         + " bits.");
@@ -505,15 +529,9 @@ class IndexWriteProc extends IndexProcedure implements
 
         }
 
-        public byte[][] read(ObjectInput in) throws IOException {
+        public byte[][] read(DataInput in) throws IOException {
 
-            /*
-             * @todo this relies on being able to cast to an input stream. in
-             * order to work for the DataInputStream you would obtain the
-             * backing byte[] and pass that along (PROBLEM : we would need to
-             * specify a limit and InputBitStream does not support that).
-             */
-            InputBitStream ibs = new InputBitStream((InputStream) in);
+            InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
 
             /*
              * read the values.
@@ -537,16 +555,9 @@ class IndexWriteProc extends IndexProcedure implements
             
         }
 
-        public void write(int n,int offset, byte[][] vals, ObjectOutput out) throws IOException {
+        public void write(int n,int offset, byte[][] vals, DataOutput out) throws IOException {
 
-            /*
-             * @todo The success of this relies on being able to cast to an
-             * OutputStream. That rules out the DataOutputStream since it has a
-             * different base class. Modify the OutputBitStream so that it is
-             * more flexible for us. Also, may be faster with a backing byte[]
-             * but it currently lacks an auto-extend capability.
-             */
-            final OutputBitStream obs = new OutputBitStream((OutputStream) out);
+            final OutputBitStream obs = new OutputBitStream((OutputStream) out, 0 /* unbuffered! */);
 
             /*
              * write the values.

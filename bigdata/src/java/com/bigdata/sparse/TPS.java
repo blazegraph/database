@@ -41,7 +41,7 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexProcedure;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 
 /**
  * Default implementation.
@@ -365,7 +365,7 @@ public class TPS implements ITPS, Externalizable {
     /**
      * 
      * FIXME use compression for the names and timestamps, refactoring the logic
-     * already in {@link IndexProcedure}.
+     * already in {@link AbstractKeyArrayIndexProcedure}.
      * 
      * @todo use huffman compression for the name and timestamp dictionaries
      *       (fewer bits for the more frequent symbols, but at what added cost)?

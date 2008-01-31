@@ -37,7 +37,8 @@ import java.io.ObjectOutput;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchInsert extends IndexProcedure implements IBatchOperation, IParallelizableIndexProcedure {
+public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
+        IBatchOperation, IParallelizableIndexProcedure {
 
     /**
      * 
@@ -84,7 +85,7 @@ public class BatchInsert extends IndexProcedure implements IBatchOperation, IPar
             
         }
         
-        public IIndexProcedure newInstance(int n, int offset, byte[][] keys,
+        public IKeyArrayIndexProcedure newInstance(int n, int offset, byte[][] keys,
                 byte[][] vals) {
 
             return new BatchInsert(n, offset, keys, vals, returnOldValues);
@@ -144,7 +145,7 @@ public class BatchInsert extends IndexProcedure implements IBatchOperation, IPar
      * @return Either <code>null</code> if the old values were not requested
      *         or a {@link ResultBuffer} containing the old values.
      */
-    public Object apply(IIndex ndx) {
+    public ResultBuffer apply(IIndex ndx) {
 
         int i = 0;
         
@@ -172,12 +173,25 @@ public class BatchInsert extends IndexProcedure implements IBatchOperation, IPar
         
         if (returnOldValues) {
             
-            return new ResultBuffer(n, ret, getResultSerializer());
+            ResultBuffer result = (ResultBuffer) newResult();
 
+            result.setResult(n, ret);
+
+            return result;
+            
         }
         
         return null;
 
+    }
+    
+    /**
+     * Note: Override to customize serialization for the {@link ResultBuffer}.
+     */
+    public ResultBuffer newResult() {
+        
+        return new ResultBuffer();
+        
     }
     
     @Override

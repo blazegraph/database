@@ -180,101 +180,101 @@ public class TestCompactingByteArrayBuffer extends TestCase {
         super(arg0);
     }
 
-    /**
-     * Trial balloon for node/leaf data structure using a mutable buffer and a
-     * compacting GC.
-     * 
-     * @todo also implement {@link INodeData} or have two concrete classes of
-     *       the same {@link CompactingByteBuffer} base class that exposes the
-     *       node vs leaf data interfaces.
-     * 
-     * @todo reconcile with the {@link NodeSerializer}. remove the use of the
-     *       {@link IValueSerializer} and only support serialization of byte[]
-     *       values (and version counters when the index is unisolated).
-     *       <p>
-     *       Should the btree api automatically (de-)serialize values using a
-     *       local extSer data structure or should strong typing of values be
-     *       required or should people use a utility object to wrap a btree and
-     *       provide key/val encoding and decoding?
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class CompactingByteBuffer extends ByteArrayBuffer implements ILeafData {
-
-        /**
-         * The serialization version.
-         */
-        private static transient int SIZEOF_VERSION = Bytes.SIZEOF_BYTE;
-        /**
-         * A set of bit flags.
-         * 
-         * @todo if more than 8 bits are required then look into generalized bit
-         *       stream support or just read the data as a short, int or long and
-         *       then do the bit stuff on that value.
-         */
-        private static transient int SIZEOF_FLAGS = Bytes.SIZEOF_BYTE;
-        /**
-         * The branching factor (m).
-         */
-        private static transient int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_SHORT;
-        /**
-         * The #of keys.
-         */
-        private static transient int SIZEOF_NKEYS = Bytes.SIZEOF_SHORT;
-
-        private static transient int OFFSET_VERSION = 0x0;
-        private static transient int OFFSET_FLAGS = OFFSET_VERSION + SIZEOF_VERSION; 
-        private static transient int OFFSET_BRANCHING_FACTOR = OFFSET_FLAGS + SIZEOF_BRANCHING_FACTOR;
-        private static transient int OFFSET_NKEYS = OFFSET_BRANCHING_FACTOR + SIZEOF_NKEYS;
-
-        /**
-         * Mask for flags revealing the bit whose value is ONE (1) iff the record
-         * represents a leaf (otherwise it represents a node).
-         */
-        private static transient int MASK_IS_LEAF = 0x01;
-        
-        /*
-         * @todo fields m (branchingFactor), isLeaf, nkeys(aka nvals), keys, vals.
-         */
-        
-        public boolean isLeaf() {
-            
-            return (buf[OFFSET_FLAGS] & MASK_IS_LEAF) == 1;
-            
-        }
-        
-        public int getBranchingFactor() {
-
-            return 0;
-            
-        }
-
-        public int getEntryCount() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public int getKeyCount() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public IKeyBuffer getKeys() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public int getValueCount() {
-            // TODO Auto-generated method stub
-            return 0;
-        }
-
-        public Object[] getValues() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-    }
+//    /**
+//     * Trial balloon for node/leaf data structure using a mutable buffer and a
+//     * compacting GC.
+//     * 
+//     * @todo also implement {@link INodeData} or have two concrete classes of
+//     *       the same {@link CompactingByteBuffer} base class that exposes the
+//     *       node vs leaf data interfaces.
+//     * 
+//     * @todo reconcile with the {@link NodeSerializer}. remove the use of the
+//     *       {@link IValueSerializer} and only support serialization of byte[]
+//     *       values (and version counters when the index is unisolated).
+//     *       <p>
+//     *       Should the btree api automatically (de-)serialize values using a
+//     *       local extSer data structure or should strong typing of values be
+//     *       required or should people use a utility object to wrap a btree and
+//     *       provide key/val encoding and decoding?
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class CompactingByteBuffer extends ByteArrayBuffer implements ILeafData {
+//
+//        /**
+//         * The serialization version.
+//         */
+//        private static transient int SIZEOF_VERSION = Bytes.SIZEOF_BYTE;
+//        /**
+//         * A set of bit flags.
+//         * 
+//         * @todo if more than 8 bits are required then look into generalized bit
+//         *       stream support or just read the data as a short, int or long and
+//         *       then do the bit stuff on that value.
+//         */
+//        private static transient int SIZEOF_FLAGS = Bytes.SIZEOF_BYTE;
+//        /**
+//         * The branching factor (m).
+//         */
+//        private static transient int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_SHORT;
+//        /**
+//         * The #of keys.
+//         */
+//        private static transient int SIZEOF_NKEYS = Bytes.SIZEOF_SHORT;
+//
+//        private static transient int OFFSET_VERSION = 0x0;
+//        private static transient int OFFSET_FLAGS = OFFSET_VERSION + SIZEOF_VERSION; 
+//        private static transient int OFFSET_BRANCHING_FACTOR = OFFSET_FLAGS + SIZEOF_BRANCHING_FACTOR;
+//        private static transient int OFFSET_NKEYS = OFFSET_BRANCHING_FACTOR + SIZEOF_NKEYS;
+//
+//        /**
+//         * Mask for flags revealing the bit whose value is ONE (1) iff the record
+//         * represents a leaf (otherwise it represents a node).
+//         */
+//        private static transient int MASK_IS_LEAF = 0x01;
+//        
+//        /*
+//         * @todo fields m (branchingFactor), isLeaf, nkeys(aka nvals), keys, vals.
+//         */
+//        
+//        public boolean isLeaf() {
+//            
+//            return (buf[OFFSET_FLAGS] & MASK_IS_LEAF) == 1;
+//            
+//        }
+//        
+//        public int getBranchingFactor() {
+//
+//            return 0;
+//            
+//        }
+//
+//        public int getEntryCount() {
+//            // TODO Auto-generated method stub
+//            return 0;
+//        }
+//
+//        public int getKeyCount() {
+//            // TODO Auto-generated method stub
+//            return 0;
+//        }
+//
+//        public IKeyBuffer getKeys() {
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//        public int getValueCount() {
+//            // TODO Auto-generated method stub
+//            return 0;
+//        }
+//
+//        public Object[] getValues() {
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+//
+//    }
     
 }

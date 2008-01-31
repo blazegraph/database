@@ -101,13 +101,13 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 
         for (int i = 1; i <= 10; i++) {
 
-            btree1.insert(i, new SimpleEntry(i));
+            btree1.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
 
         for (int i = 11; i <= 20; i++) {
 
-            btree2.insert(i, new SimpleEntry(i));
+            btree2.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -170,18 +170,18 @@ public class TestIndexSegmentMerger extends AbstractBTreeTestCase {
 
             if((i&1)==1) {
                 
-                btree1.insert(i, new SimpleEntry(i));
+                btree1.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
                 
             } else {
                 
-                btree2.insert(i, new SimpleEntry(i));
+                btree2.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
                 
             }
 
         }
 
-        assertNotNull(btree1.lookup(1)); // odd keys
-        assertNotNull(btree2.lookup(2)); // even keys.
+        assertNotNull(btree1.lookup(KeyBuilder.asSortKey(1))); // odd keys
+        assertNotNull(btree2.lookup(KeyBuilder.asSortKey(2))); // even keys.
 
         assertEquals("btree1.nentries", 10, btree1.getEntryCount());
         assertEquals("btree2.nentries", 10, btree2.getEntryCount());

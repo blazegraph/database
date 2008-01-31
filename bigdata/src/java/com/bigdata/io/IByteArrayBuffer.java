@@ -28,6 +28,8 @@
 
 package com.bigdata.io;
 
+import it.unimi.dsi.fastutil.io.RepositionableStream;
+
 /**
  * An interface for reading from and accessing a managed byte[].
  * 
@@ -49,8 +51,11 @@ public interface IByteArrayBuffer {
 
     /**
      * The current position in the buffer.
+     * <p>
+     * Note: The method name was choosen to avoid a collision with
+     * {@link RepositionableStream#position()}.
      */
-    public int position();
+    public int pos();
 
     /**
      * The #of bytes remaining in the buffer before it would overflow.

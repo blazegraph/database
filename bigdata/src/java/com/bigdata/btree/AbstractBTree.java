@@ -38,8 +38,9 @@ import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.io.ByteArrayBufferWithPosition;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
@@ -116,7 +117,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * Counters tracking various aspects of the btree.
      */
-    /* protected */public final Counters counters = new Counters(this);
+    /* protected */public final Counters counters = new Counters();
 
     /**
      * The persistence store.
@@ -366,6 +367,9 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * @param addrSer
      *            Object that knows how to (de-)serialize the child addresses in
      *            an {@link INodeData}.
+     * @param keySer
+     *            Object that knows how to (de-)serialize the keys in a node or
+     *            leaf.
      * @param valueSer
      *            Object that knows how to (de-)serialize the values in an
      *            {@link ILeafData}.
@@ -392,9 +396,14 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     protected AbstractBTree(IRawStore store, int branchingFactor,
             int initialBufferCapacity,
             HardReferenceQueue<PO> hardReferenceQueue,
-            IAddressSerializer addrSer, IValueSerializer valueSer,
-            INodeFactory nodeFactory, RecordCompressor recordCompressor,
-            boolean useChecksum, UUID indexUUID) {
+            IAddressSerializer addrSer,
+            IKeySerializer keySer,
+            IValueSerializer valueSer,
+            INodeFactory nodeFactory,
+            RecordCompressor recordCompressor,
+            boolean useChecksum,
+            UUID indexUUID
+            ) {
 
         assert store != null;
 
@@ -404,6 +413,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         assert addrSer != null;
 
+        assert keySer != null;
+        
         assert valueSer != null;
 
         assert nodeFactory != null;
@@ -431,8 +442,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         }
         
         this.nodeSer = new NodeSerializer(nodeFactory, branchingFactor,
-                initialBufferCapacity, addrSer, KeyBufferSerializer.INSTANCE,
-                valueSer, recordCompressor, useChecksum);
+                initialBufferCapacity, addrSer, keySer, valueSer,
+                recordCompressor, useChecksum);
 
         this.indexUUID = indexUUID;
 
@@ -851,37 +862,37 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    public Object insert(Object key, Object value) {
+    public Object insert(byte[] key, Object value) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
         counters.ninserts++;
+//
+//        if (!(key instanceof byte[])) {
+//
+//            key = KeyBuilder.asSortKey(key);
+//
+//        }
 
-        if (!(key instanceof byte[])) {
-
-            key = KeyBuilder.asSortKey(key);
-
-        }
-
-        return getRootOrFinger((byte[]) key).insert((byte[]) key, value);
+        return getRootOrFinger( key).insert( key, value);
 
     }
 
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
         counters.nfinds++;
 
-        if (!(key instanceof byte[])) {
+//        if (!(key instanceof byte[])) {
+//
+//            key = KeyBuilder.asSortKey(key);
+//
+//        }
 
-            key = KeyBuilder.asSortKey(key);
-
-        }
-
-        return getRootOrFinger((byte[]) key).lookup((byte[]) key);
+        return getRootOrFinger(key).lookup(key);
 
     }
 
@@ -892,24 +903,24 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nfinds++;
 
-        return getRootOrFinger((byte[]) key).contains((byte[]) key);
+        return getRootOrFinger(key).contains(key);
 
     }
 
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
         counters.nremoves++;
 
-        if (!(key instanceof byte[])) {
+//        if (!(key instanceof byte[])) {
+//
+//            key = KeyBuilder.asSortKey(key);
+//
+//        }
 
-            key = KeyBuilder.asSortKey(key);
-
-        }
-
-        return getRootOrFinger((byte[]) key).remove((byte[]) key);
+        return getRootOrFinger(key).remove(key);
 
     }
 
@@ -920,7 +931,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         counters.nindexOf++;
 
-        int index = getRootOrFinger((byte[]) key).indexOf(key);
+        int index = getRootOrFinger( key).indexOf(key);
 
         return index;
 
@@ -1061,7 +1072,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
                 
                 byte[] key = getKey();
                 
-                return new ByteArrayBufferWithPosition(key.length,key);
+                return new ByteArrayBuffer(key.length,key);
                 
             }
 

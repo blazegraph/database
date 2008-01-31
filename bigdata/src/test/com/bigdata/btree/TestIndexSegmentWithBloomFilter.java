@@ -210,9 +210,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
        
         final File outFile2 = new File(getName()+"_m"+m+ "_bloom.seg");
 

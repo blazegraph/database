@@ -350,8 +350,7 @@ public class BigdataFederation implements IBigdataFederation {
         }
 
         // The UUID for the managed scale-out index.
-        final UUID managedIndexUUID = metadataService
-                .getManagedIndexUUID(metadataName);
+        final UUID managedIndexUUID = metadataService.getManagedIndexUUID(name);
 
         /*
          * Allocate a cache for the defined index partitions.

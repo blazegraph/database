@@ -48,6 +48,8 @@ public class BTreeConstructor implements IIndexConstructor {
 
     private int branchingFactor;
     
+    IKeySerializer keySerializer;
+
     IValueSerializer valueSerializer;
     
     /**
@@ -58,32 +60,44 @@ public class BTreeConstructor implements IIndexConstructor {
     }
 
     /**
-     * 
+     * @param keySerializer
+     *            The object used to (de-)serialize the keys in the
+     *            {@link BTree}.
      * @param valueSerializer
      *            The object used to (de-)serialize values in the {@link BTree}.
      */
-    public BTreeConstructor(IValueSerializer valueSerializer) {
+    public BTreeConstructor(IKeySerializer keySerializer,
+            IValueSerializer valueSerializer) {
 
-        this(BTree.DEFAULT_BRANCHING_FACTOR,valueSerializer);
-        
+        this(BTree.DEFAULT_BRANCHING_FACTOR, keySerializer, valueSerializer);
+
     }
-    
+
     /**
      * 
      * @param branchingFactor
      *            The branching factor.
-     * 
+     * @param keySerializer
+     *            The object used to (de-)serialize the keys in the
+     *            {@link BTree}.
      * @param valueSerializer
      *            The object used to (de-)serialize values in the {@link BTree}.
      */
-    public BTreeConstructor(int branchingFactor, IValueSerializer valueSerializer) {
-        
+    public BTreeConstructor(int branchingFactor, IKeySerializer keySerializer,
+            IValueSerializer valueSerializer) {
+
         if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
-            
+
             throw new IllegalArgumentException();
             
         }
 
+        if (keySerializer == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
         if (valueSerializer == null) {
             
             throw new IllegalArgumentException();
@@ -92,13 +106,16 @@ public class BTreeConstructor implements IIndexConstructor {
         
         this.branchingFactor = branchingFactor;
         
+        this.keySerializer = keySerializer;
+        
         this.valueSerializer = valueSerializer;
         
     }
     
     public BTree newInstance(IRawStore store, UUID indexUUID, IPartitionMetadata ignored) {
 
-        return new BTree(store, branchingFactor, indexUUID, valueSerializer);
+        return new BTree(store, branchingFactor, indexUUID, keySerializer,
+                valueSerializer);
         
     }
 

@@ -46,6 +46,7 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.DropIndexTask;
@@ -874,7 +875,7 @@ abstract public class DataService implements IDataService,
 
             return new ResultSet(getIndex(getOnlyResource()), fromKey, toKey,
                     capacity, flags, filter);
-            
+
         }
         
     }

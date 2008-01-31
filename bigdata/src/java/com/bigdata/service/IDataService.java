@@ -34,11 +34,13 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -144,6 +146,14 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo add support for reading low-level records from a journal or index
+ *       segment in support of the {@link BigdataRepository}. The API should
+ *       provide a means to obtain a socket from which record data may be
+ *       streamed. The client sends the resource identifier (UUID of the journal
+ *       or index segment) and the address of the record and the data service
+ *       sends the record data.  This is designed for streaming reads of up to
+ *       64M or more.
  * 
  * @todo add support for triggers. unisolated triggers must be asynchronous if
  *       they will take actions with high latency (such as writing on a
@@ -272,51 +282,6 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public void dropIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
 
-//    /**
-//     * <p>
-//     * Submit a batch operation to a named index.
-//     * </p>
-//     * 
-//     * @param tx
-//     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-//     *            operation is NOT isolated by a transaction -or-
-//     *            <code> - tx </code> to read from the most recent commit point
-//     *            not later than the absolute value of <i>tx</i> (a fully
-//     *            isolated read-only transaction using a historical start time).
-//     * @param name
-//     *            The index name (required).
-//     * @param ntuples
-//     *            The #of items in the batch operation.
-//     * @param keys
-//     *            The keys for the batch operation (must be in ascending order
-//     *            when the keys are interpreted as unsigned byte[]s, e.g., using
-//     *            an {@link UnsignedByteArrayComparator}).
-//     * 
-//     * @exception IOException
-//     *                if there was a problem with the RPC.
-//     * @exception InterruptedException
-//     *                if the operation was interrupted (typically by
-//     *                {@link #shutdownNow()}.
-//     * @exception ExecutionException
-//     *                If the operation caused an error. See
-//     *                {@link ExecutionException#getCause()} for the underlying
-//     *                error.
-//     */
-//    public byte[][] batchInsert(long tx, String name, int ntuples,
-//            byte[][] keys, byte[][] values, boolean returnOldValues)
-//            throws InterruptedException, ExecutionException, IOException;
-//
-//    public boolean[] batchContains(long tx, String name, int ntuples,
-//            byte[][] keys) throws InterruptedException, ExecutionException,
-//            IOException;
-//
-//    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
-//            throws InterruptedException, ExecutionException, IOException;
-//
-//    public byte[][] batchRemove(long tx, String name, int ntuples,
-//            byte[][] keys, boolean returnOldValues)
-//            throws InterruptedException, ExecutionException, IOException;
-
     /**
      * <p>
      * Streaming traversal of keys and/or values in a key range.
@@ -362,13 +327,6 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying
      *                error.
-     * 
-     * @todo the implementation could use a server-side buffer holding the data
-     *       and read on that buffer using a socket. this would reduce the
-     *       latency owing to (de-)serialization of the result set. the server
-     *       side buffer could be swept based on an expired lease model, in
-     *       which case the client would have to re-issue the query from the
-     *       last key read.
      */
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IEntryFilter filter)

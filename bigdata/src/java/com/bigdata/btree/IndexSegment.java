@@ -155,6 +155,7 @@ public class IndexSegment extends AbstractBTree {
         super(fileStore, fileStore.metadata.branchingFactor,
                 fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
                 new CustomAddressSerializer(fileStore.metadata),
+                fileStore.extensionMetadata.getKeySerializer(),
                 fileStore.extensionMetadata.getValueSerializer(),
                 ImmutableNodeFactory.INSTANCE,
                 fileStore.extensionMetadata.getRecordCompressor(),
@@ -285,7 +286,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Operation is disallowed.
      */
-    public Object insert(Object key, Object entry) {
+    public Object insert(byte[] key, Object entry) {
 
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -294,7 +295,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Operation is disallowed.
      */
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
 
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -331,7 +332,7 @@ public class IndexSegment extends AbstractBTree {
      * (note that the key might not exist in the index since a bloom filter
      * allows false positives).
      */
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
 
         if (bloomFilter != null) {
 

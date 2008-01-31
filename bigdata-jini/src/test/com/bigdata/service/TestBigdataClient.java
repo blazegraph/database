@@ -35,7 +35,7 @@ import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IndexProcedure.ResultBuffer;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadata;
@@ -159,7 +159,6 @@ public class TestBigdataClient extends AbstractServerTestCase {
         assertTrue(metadataServer0.getProxy() instanceof IMetadataService);
         
         assertTrue(client.getMetadataService() instanceof IMetadataService);
-        
         
 //        /*
 //         * Verify that we have discovered the _correct_ metadata service. This

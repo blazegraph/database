@@ -29,7 +29,7 @@ package com.bigdata.rdf.store;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IParallelizableIndexProcedure;
-import com.bigdata.btree.IndexProcedure;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
@@ -41,7 +41,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AddIds extends IndexProcedure implements
+public class AddIds extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure {
 
     /**
@@ -163,4 +163,13 @@ public class AddIds extends IndexProcedure implements
         
     }
 
+    /**
+     * Note: This method is not used as the procedure returns <code>null</code>.
+     */
+    protected Void newResult() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

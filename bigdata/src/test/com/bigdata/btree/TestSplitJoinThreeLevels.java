@@ -123,9 +123,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         int n = 0;
         
         { // insert(5,5)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 5 && val.id() == key;
+            assert ikey == 5 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -137,9 +138,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         }
 
         { // insert(6,6)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 6 && val.id() == key;
+            assert ikey == 6 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -158,9 +160,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * keys: [ 5 6 7 ]
          */
         { // insert(7,7)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 7 && val.id() == key;
+            assert ikey == 7 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -187,9 +190,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node c;
         final Leaf b;
         { // insert(8,8)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 8 && val.id() == key;
+            assert ikey == 8 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -228,9 +232,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * b.keys[ 7 8 - ]
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 3 && val.id() == key;
+            assert ikey == 3 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -257,9 +262,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          */
         final Leaf d;
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 4 && val.id() == key;
+            assert ikey == 4 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -292,9 +298,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * insert(2,2), bringing (a) to capacity again.
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 2 && val.id() == key;
+            assert ikey == 2 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -333,9 +340,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node f, g;
         {
             
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 1 && val.id() == key;
+            assert ikey == 1 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -425,7 +433,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * 
          * e, f, g are deleted.
          */
-        assertEquals(v1,btree.remove(1));
+        assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
         assertTrue("after remove(1)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{2,3,4},a);
@@ -449,7 +457,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         /*
          * step#2 : remove(2) - simple operation just removes(2) from (a).
          */
-        assertEquals(v2,btree.remove(2));
+        assertEquals(v2,btree.remove(KeyBuilder.asSortKey(2)));
         assertTrue("after remove(2)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{3,4},a);
         assertValues(new Object[]{v3,v4},a);
@@ -459,7 +467,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * step#3 : remove(4) triggers a.join(d), which in turn calls a.merge(d)
          * and causes c.removeChild(5,d).
          */
-        assertEquals(v4,btree.remove(4));
+        assertEquals(v4,btree.remove(KeyBuilder.asSortKey(4)));
         assertTrue("after remove(4)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{3,5,6},a);
@@ -481,7 +489,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * b.redistributeKeys(a) which sends (6,v6) to (b) and updates the
          * separatorKey in (c) to (6).
          */
-        assertEquals(v8,btree.remove(8));
+        assertEquals(v8,btree.remove(KeyBuilder.asSortKey(8)));
         assertTrue("after remove(8)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{3,5},a);
@@ -501,7 +509,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * c.removeChild(-,a). Since (c) now has a single child we replace the
          * root of the tree with (b).
          */
-        assertEquals(v6,btree.remove(6));
+        assertEquals(v6,btree.remove(KeyBuilder.asSortKey(6)));
         assertTrue("after remove(6)", btree.dump(Level.DEBUG,System.err));
         // verify the new root leaf.
         assertKeys(new int[]{3,5,7},b);
@@ -510,17 +518,17 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertTrue(a.isDeleted());
         assertTrue(c.isDeleted());
         
-        assertEquals(v7,btree.remove(7));
+        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
         assertTrue("after remove(7)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{3,5},b);
         assertValues(new Object[]{v3,v5},b);
         
-        assertEquals(v3,btree.remove(3));
+        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
         assertTrue("after remove(3)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{5},b);
         assertValues(new Object[]{v5},b);
         
-        assertEquals(v5,btree.remove(5));
+        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5)));
         assertTrue("after remove(5)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{},b);
         assertValues(new Object[]{},b);
@@ -585,9 +593,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         int n = 0;
         
         { // insert(5,5)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 5 && val.id() == key;
+            assert ikey == 5 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -599,9 +608,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         }
 
         { // insert(6,6)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 6 && val.id() == key;
+            assert ikey == 6 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -620,9 +630,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * keys: [ 5 6 7 ]
          */
         { // insert(7,7)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 7 && val.id() == key;
+            assert ikey == 7 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -649,9 +660,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node c;
         final Leaf b;
         { // insert(8,8)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 8 && val.id() == key;
+            assert ikey == 8 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -690,9 +702,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * b.keys[ 7 8 - ]
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 3 && val.id() == key;
+            assert ikey == 3 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -720,9 +733,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          */
         final Leaf d;
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 4 && val.id() == key;
+            assert ikey == 4 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -755,9 +769,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * insert(2,2), bringing (a) to capacity again.
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 2 && val.id() == key;
+            assert ikey == 2 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -798,9 +813,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node f, g;
         {
             
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 1 && val.id() == key;
+            assert ikey == 1 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -890,7 +906,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * 
          * c, d, g are deleted.
          */
-        assertEquals(v7,btree.remove(7));
+        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
         assertTrue("after remove(7)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{1,2},a);
@@ -925,7 +941,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * e.keys[ 4 5 - ]
          * b.keys[ 6 8 - ]
          */
-        assertEquals(v3,btree.remove(3));
+        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
         assertTrue("after remove(3)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{1,2},a);
@@ -957,7 +973,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * 
          * e is deleted.
          */
-        assertEquals(v8,btree.remove(8));
+        assertEquals(v8,btree.remove(KeyBuilder.asSortKey(8)));
         assertTrue("after remove(8)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{1,2},a);
@@ -986,7 +1002,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * a.keys[ 1 4 - ]
          * b.keys[ 5 6 - ]
          */
-        assertEquals(v2,btree.remove(2));
+        assertEquals(v2,btree.remove(KeyBuilder.asSortKey(2)));
         assertTrue("after remove(2)", btree.dump(Level.DEBUG,System.err));
         // verify leaves.
         assertKeys(new int[]{1,4},a);
@@ -1012,7 +1028,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * 
          * b, f is deleted.
          */
-        assertEquals(v1,btree.remove(1));
+        assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
         assertTrue("after remove(1)", btree.dump(Level.DEBUG,System.err));
         // verify the remaining leaf, which is now the root of the tree.
         assertKeys(new int[]{4,5,6},a);
@@ -1025,19 +1041,19 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * At this point we have only the root leaf and we just delete the final
          * keys.
          */
-        assertEquals(v4,btree.remove(4));
+        assertEquals(v4,btree.remove(KeyBuilder.asSortKey(4)));
         assertTrue("after remove(4)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{5,6},a);
         assertValues(new Object[]{v5,v6},a);
         assertEquals(a,btree.root);
 
-        assertEquals(v6,btree.remove(6));
+        assertEquals(v6,btree.remove(KeyBuilder.asSortKey(6)));
         assertTrue("after remove(6)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{5},a);
         assertValues(new Object[]{v5},a);
         assertEquals(a,btree.root);
 
-        assertEquals(v5,btree.remove(5));
+        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5)));
         assertTrue("after remove(5)", btree.dump(Level.DEBUG,System.err));
         assertKeys(new int[]{},a);
         assertValues(new Object[]{},a);
@@ -1100,9 +1116,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         int n = 0;
         
         { // insert(5,5)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 5 && val.id() == key;
+            assert ikey == 5 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1114,9 +1131,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         }
 
         { // insert(6,6)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 6 && val.id() == key;
+            assert ikey == 6 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1135,9 +1153,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * keys: [ 5 6 7 ]
          */
         { // insert(7,7)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 7 && val.id() == key;
+            assert ikey == 7 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1164,9 +1183,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node c;
         final Leaf b;
         { // insert(8,8)
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 8 && val.id() == key;
+            assert ikey == 8 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1205,9 +1225,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * b.keys[ 7 8 - ]
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 3 && val.id() == key;
+            assert ikey == 3 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1235,9 +1256,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          */
         final Leaf d;
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 4 && val.id() == key;
+            assert ikey == 4 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1270,9 +1292,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          * insert(2,2), bringing (a) to capacity again.
          */
         {
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 2 && val.id() == key;
+            assert ikey == 2 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1313,9 +1336,10 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Node f, g;
         {
             
-            int key = keys[n];
+            final int ikey = keys[n];
             SimpleEntry val = vals[n++];
-            assert key == 1 && val.id() == key;
+            assert ikey == 1 && val.id() == ikey;
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
             assertNull(btree.lookup(key)); // not found.
             assertNull(btree.insert(key,val)); // insert.
@@ -1421,7 +1445,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         {
             
             { // insert(9,v9)
-                int key = 9;
+                final byte[] key = KeyBuilder.asSortKey(9);
                 SimpleEntry val = v9;
                 assertNull(btree.remove(key)); // not found / no change.
                 assertNull(btree.lookup(key)); // not found.
@@ -1435,7 +1459,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
                * insert(10,v10) - splits (b) into (b,h) and adds (h) as a
                * child of (f).
                */
-                int key = 10;
+                final byte[] key = KeyBuilder.asSortKey(10);
                 SimpleEntry val = v10;
                 assertNull(btree.remove(key)); // not found / no change.
                 assertNull(btree.lookup(key)); // not found.
@@ -1525,7 +1549,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
          */
         {
 
-            assertEquals(v1,btree.remove(1));
+            assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
             assertTrue("after remove(1)", btree.dump(Level.DEBUG,System.err));
             
             // validate the root(g).
@@ -1595,7 +1619,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         final Leaf i;
         {
 
-            assertNull(btree.insert(1,v1));
+            assertNull(btree.insert(KeyBuilder.asSortKey(1),v1));
             assertTrue("after insert(1)", btree.dump(Level.DEBUG,System.err));
             
             // validate the root(g).
@@ -1672,7 +1696,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
 
         {
             
-            assertEquals(v10,btree.remove(10));
+            assertEquals(v10,btree.remove(KeyBuilder.asSortKey(10)));
             assertTrue("after remove(10)", btree.dump(Level.DEBUG,System.err));
             
             // validate the root(g).

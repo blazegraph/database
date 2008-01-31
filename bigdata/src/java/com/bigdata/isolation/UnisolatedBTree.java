@@ -40,7 +40,10 @@ import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.EntryFilter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IKeySerializer;
+import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -116,10 +119,10 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     /**
      * True iff this is an instanceof {@link IIsolatedIndex}. This effects
      * which value we use for the version counter in
-     * {@link #insert(Object, Object)} when there is no pre-existing entry for a
+     * {@link #insert(byte[], Object)} when there is no pre-existing entry for a
      * key.
      */
-    final boolean isIsolated = this instanceof IsolatedBTree;
+    final boolean isIsolated = this instanceof IIsolatedIndex;
 
     /**
      * The delegate that handles write-write conflict resolution during backward
@@ -197,8 +200,28 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
     public UnisolatedBTree(IRawStore store, int branchingFactor,
             UUID indexUUID, IConflictResolver conflictResolver) {
        
-        super(store, branchingFactor, indexUUID, Value.Serializer.INSTANCE );
+        super(store, branchingFactor, indexUUID, KeyBufferSerializer.INSTANCE,
+                Value.Serializer.INSTANCE);
         
+        this.conflictResolver = conflictResolver;
+        
+    }
+
+    /**
+     * 
+     * @param store
+     * @param branchingFactor
+     * @param indexUUID
+     * @param keySer
+     * @param valSer
+     * @param conflictResolver
+     */
+    public UnisolatedBTree(IRawStore store, int branchingFactor,
+            UUID indexUUID, IKeySerializer keySer, IValueSerializer valSer,
+            IConflictResolver conflictResolver) {
+
+        super(store, branchingFactor, indexUUID, keySer, valSer);
+
         this.conflictResolver = conflictResolver;
         
     }
@@ -348,7 +371,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      *         or null if the key was not found or if they entry was marked as
      *         deleted.
      */
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -373,7 +396,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * @return The old value (may be null) and null if the key did not exist or
      *         if the entry was marked as deleted.
      */
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -403,7 +426,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      * @return The old value under that key (may be null) and null if the key
      *         was marked as deleted or if the key was not found.
      */
-    public Object insert(Object key, Object val) {
+    public Object insert(byte[] key, Object val) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -447,24 +470,7 @@ public class UnisolatedBTree extends BTree implements IIsolatableIndex {
      */
     public void removeAll() {
         
-        /*
-         * @todo The range delete operations at present requires storage only
-         * for the keys so it makes sense to put some limit on the capacity.
-         * Eventually it will be modified to not buffer the keys and the
-         * capacity limit SHOULD be reset to zero (0), which indicates a
-         * default.
-         */
-        final int capacity = 100000;
-        
-        rangeIterator(null, null, capacity, DELETE/* flags */, null/* filter */);
-        
-//        IEntryIterator itr = entryIterator();
-//        
-//        while(itr.hasNext()) {
-//            
-//            itr.remove();
-//            
-//        }
+        rangeIterator(null, null, 0/* capacity */, DELETE/* flags */, null/* filter */);
         
     }
 

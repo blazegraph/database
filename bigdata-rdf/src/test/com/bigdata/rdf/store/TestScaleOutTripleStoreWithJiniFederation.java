@@ -102,7 +102,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
          */
 
         ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "Scale-Out Triple Store Test Suite");
+                "Scale-Out Triple Store Test Suite (jini federation)");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).

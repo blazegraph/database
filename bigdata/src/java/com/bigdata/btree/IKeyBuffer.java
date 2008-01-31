@@ -35,25 +35,10 @@ package com.bigdata.btree;
  * references to keys rather than allocating new byte[]s and copying the data.
  * There are mutable and immutable implementations of this interface.
  * 
- * @todo This code is optimized for very long variable length unsigned byte[]s.
- *       It will be much less efficient that direct comparison when the key is a
- *       simple int or long integer value (including a float or double which can
- *       be expressed in the int and long spaces respectively). Provide an
- *       alternative realization of the btree that is efficient for these
- *       special cases for use in, e.g., an embedded object database
- *       application.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IKeyBuffer {
-
-//    /**
-//     * The minimum #of allowed keys. When the instance is immutable, this value
-//     * still provides the minimum #of keys that are allowed in a mutable
-//     * instance.
-//     */
-//    public int getMinKeyCount();
     
     /**
      * The #of defined keys.
