@@ -69,9 +69,9 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -79,7 +79,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(2,v2);
+        btree.insert(KeyBuilder.asSortKey(2),v2);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -112,9 +112,9 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -122,7 +122,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(4,v4);
+        btree.insert(KeyBuilder.asSortKey(4),v4);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -155,9 +155,9 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v6 = new SimpleEntry(6);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -165,7 +165,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(6,v6);
+        btree.insert(KeyBuilder.asSortKey(6),v6);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -198,9 +198,9 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v7 = new SimpleEntry(7);
         SimpleEntry v8 = new SimpleEntry(8);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -208,7 +208,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * insert key that will go into the high leaf.
          */
-        btree.insert(8,v8);
+        btree.insert(KeyBuilder.asSortKey(8),v8);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -242,10 +242,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v7 = new SimpleEntry(7);
         SimpleEntry v9 = new SimpleEntry(9);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
-        btree.insert(9, v9);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(KeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
@@ -253,7 +253,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(2,v2);
+        btree.insert(KeyBuilder.asSortKey(2),v2);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -287,10 +287,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v7 = new SimpleEntry(7);
         SimpleEntry v9 = new SimpleEntry(9);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
-        btree.insert(9, v9);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(KeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
@@ -298,7 +298,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(4,v4);
+        btree.insert(KeyBuilder.asSortKey(4),v4);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -332,10 +332,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v7 = new SimpleEntry(7);
         SimpleEntry v9 = new SimpleEntry(9);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
-        btree.insert(9, v9);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(KeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
@@ -343,7 +343,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(6,v6);
+        btree.insert(KeyBuilder.asSortKey(6),v6);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -377,10 +377,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v8 = new SimpleEntry(8);
         SimpleEntry v9 = new SimpleEntry(9);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
-        btree.insert(9, v9);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(KeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
@@ -388,7 +388,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(8,v8);
+        btree.insert(KeyBuilder.asSortKey(8),v8);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -422,10 +422,10 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         SimpleEntry v9 = new SimpleEntry(9);
         SimpleEntry v10 = new SimpleEntry(10);
 
-        btree.insert(3, v3);
-        btree.insert(5, v5);
-        btree.insert(7, v7);
-        btree.insert(9, v9);
+        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(KeyBuilder.asSortKey(5), v5);
+        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(KeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
@@ -433,7 +433,7 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(10,v10);
+        btree.insert(KeyBuilder.asSortKey(10),v10);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();

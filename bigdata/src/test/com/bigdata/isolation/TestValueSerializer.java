@@ -35,6 +35,8 @@ import java.util.Random;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.io.DataOutputBuffer;
 
 /**
@@ -157,7 +159,8 @@ public class TestValueSerializer extends TestCase2 {
     
     public void doRoundTripTest(Value[] values) {
         
-        Value.Serializer ser = Value.Serializer.INSTANCE;
+//        final IValueSerializer ser = Value.Serializer.INSTANCE;
+        final IValueSerializer ser = new Value.ValueSerializer(DefaultDataSerializer.INSTANCE);
 
         try {
             

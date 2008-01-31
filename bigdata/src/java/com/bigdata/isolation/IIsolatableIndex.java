@@ -36,7 +36,6 @@ import com.bigdata.btree.Leaf;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.ValueSerializer;
-import com.bigdata.scaleup.IsolatablePartitionedIndexView;
 
 /**
  * <p>
@@ -177,8 +176,6 @@ import com.bigdata.scaleup.IsolatablePartitionedIndexView;
  * 
  * @see UnisolatedBTree
  * @see IsolatableFusedView
- * @see IsolatablePartitionedIndexView
- * @see IndexSegmentMerger
  * @see Journal
  * @see Tx
  */

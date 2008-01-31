@@ -4,6 +4,11 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndexConstructor;
+import com.bigdata.btree.IKeySerializer;
+import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.KeyBufferSerializer;
+import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.isolation.Value;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -25,6 +30,9 @@ public class UnisolatedBTreePartitionConstructor implements IIndexConstructor {
     private static final long serialVersionUID = 5758014871939321170L;
 
     protected int branchingFactor;
+    protected IKeySerializer keySer;
+    protected IValueSerializer valSer;
+    protected IConflictResolver conflictResolver;
     
     /**
      * De-serialization constructor.
@@ -36,6 +44,12 @@ public class UnisolatedBTreePartitionConstructor implements IIndexConstructor {
             // @todo verify that this default is overriden by de-serialization.
             branchingFactor = UnisolatedBTreePartition.DEFAULT_BRANCHING_FACTOR;
             
+            keySer = KeyBufferSerializer.INSTANCE;
+            
+            valSer = Value.Serializer.INSTANCE;
+            
+            conflictResolver = null;
+            
         }
         
     }
@@ -46,22 +60,53 @@ public class UnisolatedBTreePartitionConstructor implements IIndexConstructor {
      *            The branching factor.
      */
     public UnisolatedBTreePartitionConstructor(int branchingFactor) {
+    
+        this(branchingFactor, KeyBufferSerializer.INSTANCE,
+                Value.Serializer.INSTANCE, null/* conflictResolver */);
         
+    }
+
+    public UnisolatedBTreePartitionConstructor(int branchingFactor,
+            IKeySerializer keySerializer, IValueSerializer valueSerializer,
+            IConflictResolver conflictResolver) {
+
         if (branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        this.branchingFactor = branchingFactor;
+
+        if (keySerializer == null) {
             
             throw new IllegalArgumentException();
             
         }
-
-        this.branchingFactor = branchingFactor;
         
+        if (valueSerializer == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        this.branchingFactor = branchingFactor;
+
+        this.keySer = keySerializer;
+        
+        this.valSer = valueSerializer;
+        
+        this.conflictResolver = conflictResolver;
+       
     }
-    
-    public BTree newInstance(IRawStore store, UUID indexUUID,IPartitionMetadata pmd) {
+
+    public BTree newInstance(IRawStore store, UUID indexUUID,
+            IPartitionMetadata pmd) {
 
         return new UnisolatedBTreePartition(store, branchingFactor, indexUUID,
+                keySer, valSer, conflictResolver,
                 (PartitionMetadataWithSeparatorKeys) pmd);
-        
+
     }
 
 }

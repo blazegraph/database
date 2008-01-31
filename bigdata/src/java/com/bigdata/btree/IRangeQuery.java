@@ -31,7 +31,6 @@ import java.io.Serializable;
 
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ResultSet;
 
 /**
  * Interface for range count and range query operations (non-batch api).
@@ -42,16 +41,16 @@ import com.bigdata.service.ResultSet;
 public interface IRangeQuery {
     
     /**
-     * Flag specifies that keys in the key range will be returned. When not
-     * given, the keys will NOT be included in the {@link ResultSet} sent to the
-     * client.
+     * Flag specifies that keys in the key range will be returned. The keys are
+     * guarenteed to be made available via {@link IEntryIterator#getKey()} only
+     * when this flag is given.
      */
     public static final int KEYS = 1 << 0;
 
     /**
-     * Flag specifies that values in the key range will be returned. When not
-     * given, the values will NOT be included in the {@link ResultSet} sent to
-     * the client.
+     * Flag specifies that values in the key range will be returned. The values
+     * are guarenteed to be made available via {@link IEntryIterator#next()} and
+     * {@link IEntryIterator#getValue()} only when this flag is given.
      */
     public static final int VALS = 1 << 1;
 
@@ -146,57 +145,57 @@ public interface IRangeQuery {
      */
     public long rangeCount(byte[] fromKey, byte[] toKey);
 
-    /**
-     * Interface
-     * 
-     * @todo alternative is to define an interface to recognize change in the
-     *       "logical row". This way the sense of the limit/capacity is
-     *       unchanged but we only would count logical rows rather than visited
-     *       index entries.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static interface IRangeQueryLimit extends Serializable {
-        
-        public void report(IEntryIterator itr);
-        
-        public boolean isDone();
-        
-    }
-    
-    // @todo Externalizable impl.
-    public static class RangeQueryLimit implements IRangeQueryLimit {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 6047061818958124788L;
-        
-        private int n = 0;
-
-        private int limit = 0;
-        
-        public RangeQueryLimit(int limit) {
-            
-            if(limit<=0) throw new IllegalArgumentException();
-            
-            this.limit = limit;
-            
-        }
-        
-        public void report(IEntryIterator itr) {
-
-            n++;
-            
-        }
-        
-        public boolean isDone() {
-
-            return n >= limit;
-            
-        }
-
-    }
+//    /**
+//     * Interface
+//     * 
+//     * @todo alternative is to define an interface to recognize change in the
+//     *       "logical row". This way the sense of the limit/capacity is
+//     *       unchanged but we only would count logical rows rather than visited
+//     *       index entries.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static interface IRangeQueryLimit extends Serializable {
+//        
+//        public void report(IEntryIterator itr);
+//        
+//        public boolean isDone();
+//        
+//    }
+//    
+//    // @todo Externalizable impl.
+//    public static class RangeQueryLimit implements IRangeQueryLimit {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 6047061818958124788L;
+//        
+//        private int n = 0;
+//
+//        private int limit = 0;
+//        
+//        public RangeQueryLimit(int limit) {
+//            
+//            if(limit<=0) throw new IllegalArgumentException();
+//            
+//            this.limit = limit;
+//            
+//        }
+//        
+//        public void report(IEntryIterator itr) {
+//
+//            n++;
+//            
+//        }
+//        
+//        public boolean isDone() {
+//
+//            return n >= limit;
+//            
+//        }
+//
+//    }
     
 }

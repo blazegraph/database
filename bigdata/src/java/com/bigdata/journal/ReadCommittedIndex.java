@@ -34,10 +34,10 @@ import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ReadOnlyCounter;
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.service.Split;
 
 /**
@@ -171,18 +171,22 @@ public class ReadCommittedIndex implements IIndexWithCounter {
     /**
      * @exception UnsupportedOperationException always.
      */
-    public Object insert(Object key, Object value) {
+    public Object insert(byte[] key, Object value) {
+        
         throw new UnsupportedOperationException();
+        
     }
 
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
+        
         return getIndex().lookup(key);
+        
     }
 
     /**
      * @exception UnsupportedOperationException always.
      */
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
         throw new UnsupportedOperationException();
     }
 

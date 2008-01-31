@@ -70,22 +70,8 @@ import com.bigdata.service.IDataService;
  * executed as part of a map-reduce job.
  * <p>
  * 
- * FIXME refactor to run against either the concurrent journal API or the data
- * service API and verify that load, inference, and query work correctly and
- * that the memory cap on inference has been removed. Examine implementation for
- * hidden performance costs (there should be no new performance hits when
- * compared to the current scale-out version) and examine ways to reduce costs
- * and increase parallelism -- if this works out nicely then we can converge the
- * scale-out and local implementations! Test 1st on an embedded federation. Note
- * that we will want to turn off auto-commit and index check points for index
- * operations in order to be competitive with the bulk scale-out of the local
- * implementation.
- * 
- * @todo test with indices split into more than one partition and with parallel
- *       processing of batch operation and procedure splits using a thread pool.
- * 
- * @todo test with concurrent threads running load of many small files, such as
- *       LUBM.
+ * @todo test with indices split into more than one partition, preferrably using
+ *       dynamic splits.
  * 
  * @todo provide a mechanism to make document loading robust to client failure.
  *       When loads are unisolated, a client failure can result in the
@@ -94,41 +80,11 @@ import com.bigdata.service.IDataService;
  *       loaded based on map/reduce would naturally provide a robust mechanism
  *       using a redo model.
  * 
- * @todo run various tests against all implementations and tune up the network
- *       protocol. Examine dictinary and hamming codes and parallelization of
- *       operations. Write a distributed join.
+ * @todo Tune up inference for remote data services.
  * 
- * @todo write a stress test with concurrent threads inserting terms and having
- *       occasional failures between the insertion into terms and the insertion
- *       into ids and verify that the resulting mapping is always fully
- *       consistent because the client verifies that the term is in the ids
- *       mapping on each call to addTerm().
+ * @todo Write a distributed join for inference and high-level query.
  * 
- * @todo write a performance test with (a) a single client thread; and (b)
- *       concurrent clients/threads loaded terms into the KB and use it to tune
- *       the batch load operations (there is little point to tuning the single
- *       term load operations).
- * 
- * @todo Each unisolated write results in a commit. This means that a single
- *       client will run more slowly since it must perform more commits when
- *       loading the data. However, if we support group commit on the data
- *       service then that will have a big impact on concurrent load rates since
- *       multiple clients can write on the same data service before the next
- *       commit. (This does not work for a single client since the write must
- *       commit before control returns to the client.)
- * 
- * @todo test consistent concurrent load.
- * 
- * @todo test query (LUBM).
- * 
- * @todo provide read against historical state and periodically notify clients
- *       when there is a new historical state that is complete (data are loaded
- *       and closure exists). this will prevent partial reads of data during
- *       data load.
- * 
- * @todo Very large bulk data load.
- * 
- * @todo write utility class to create and pre-partition a federated store.
+ * @todo tune up SPARQL query (modified LUBM).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

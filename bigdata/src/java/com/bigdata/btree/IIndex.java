@@ -26,6 +26,7 @@ package com.bigdata.btree;
 import java.io.Serializable;
 import java.util.UUID;
 
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.isolation.IIsolatableIndex;
 
 /**

@@ -64,6 +64,7 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
     private static final long serialVersionUID = 4846316492768402991L;
 
     private String className;
+    private IKeySerializer keySer;
     private IValueSerializer valSer;
     private RecordCompressor recordCompressor;
     
@@ -75,6 +76,15 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
     public final String getClassName() {
         
         return className;
+        
+    }
+    
+    /**
+     * The serializer used for the keys in the nodes and leaves of the index.
+     */
+    public final IKeySerializer getKeySerializer() {
+        
+        return keySer;
         
     }
     
@@ -121,8 +131,8 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
      *            When non-null, a {@link RecordCompressor} that was used to
      *            write the nodes and leaves of the {@link IndexSegment}.
      */
-    public IndexSegmentExtensionMetadata(Class cl, IValueSerializer valSer,
-            RecordCompressor recordCompressor) {
+    public IndexSegmentExtensionMetadata(Class cl, IKeySerializer keySer,
+            IValueSerializer valSer, RecordCompressor recordCompressor) {
 
         if( cl == null ) throw new IllegalArgumentException();
         
@@ -136,6 +146,8 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
         if( valSer == null ) throw new IllegalArgumentException();
 
         this.className = cl.getName();
+        
+        this.keySer = keySer;
         
         this.valSer = valSer;
         
@@ -176,6 +188,8 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
         
         className = in.readUTF();
         
+        keySer = (IKeySerializer) in.readObject();
+        
         valSer = (IValueSerializer) in.readObject();
         
         recordCompressor = (RecordCompressor) in.readObject();
@@ -188,6 +202,8 @@ public class IndexSegmentExtensionMetadata implements Serializable, Externalizab
 
         out.writeUTF(className);
 
+        out.writeObject(keySer);
+        
         out.writeObject(valSer);
         
         out.writeObject(recordCompressor);

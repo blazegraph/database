@@ -38,7 +38,10 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IKeySerializer;
+import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
@@ -92,9 +95,12 @@ public class UnisolatedBTreePartition extends UnisolatedBTree {
      *            Describes the index key range partition.
      */
     public UnisolatedBTreePartition(IRawStore store, int branchingFactor,
-            UUID indexUUID, PartitionMetadataWithSeparatorKeys pmd) {
-        
-        super(store, branchingFactor, indexUUID, null/*conflictResolver*/);
+            UUID indexUUID, IKeySerializer keySer, IValueSerializer valSer,
+            IConflictResolver conflictResolver,
+            PartitionMetadataWithSeparatorKeys pmd) {
+
+        super(store, branchingFactor, indexUUID, keySer, valSer,
+                conflictResolver);
         
         if (pmd == null) {
 

@@ -132,7 +132,7 @@ public class UnisolatedIndexSegment extends IndexSegment implements IIsolatableI
      *         null) or null if the key was not found or if they entry was
      *         marked as deleted.
      */
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();

@@ -40,11 +40,11 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IFusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyFusedView;
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
@@ -382,13 +382,13 @@ public class PartitionedIndexView implements IIndex, ICommitter {
      * together.
      */
 
-    public Object insert(Object key, Object value) {
+    public Object insert(byte[] key, Object value) {
 
         return btree.insert(key, value);
         
     }
 
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
 
         return btree.remove(key);
         
@@ -400,9 +400,9 @@ public class PartitionedIndexView implements IIndex, ICommitter {
         
     }
 
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
 
-        return getView((byte[])key).lookup(key);
+        return getView(key).lookup(key);
         
     }
 

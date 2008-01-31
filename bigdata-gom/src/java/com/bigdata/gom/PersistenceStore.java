@@ -72,7 +72,6 @@ import org.CognitiveWeb.generic.core.ndx.FloatSuccessor;
 import org.CognitiveWeb.generic.core.ndx.IntegerSuccessor;
 import org.CognitiveWeb.generic.core.ndx.LongSuccessor;
 import org.CognitiveWeb.generic.core.ndx.ShortSuccessor;
-import org.CognitiveWeb.generic.core.ndx.StringSuccessor;
 import org.CognitiveWeb.generic.core.ndx.Successor;
 import org.CognitiveWeb.generic.core.om.BaseObject;
 import org.CognitiveWeb.generic.core.om.IPersistentStore;
@@ -305,6 +304,12 @@ public class PersistenceStore implements IPersistentStore
 
     }
 
+    final protected IKeyBuilder getKeyBuilder() {
+        
+        return m_journal.getKeyBuilder();
+        
+    }
+    
     /**
      * Required constructor either opens the named store or creates a new store
      * if none exists with that name.
@@ -577,7 +582,7 @@ public class PersistenceStore implements IPersistentStore
 
     }
 
-    public void setNamedObject(String name, long oid) {
+    public void setNamedObject(final String name, long oid) {
 
         if (name == null) {
 
@@ -585,13 +590,17 @@ public class PersistenceStore implements IPersistentStore
 
         }
 
+        final byte[] key = getKeyBuilder().reset().append(name).getKey();
+        
         if(oid==0L) {
 
-            name_ndx.remove(name);
+            name_ndx.remove(key);
             
         } else {
             
-            name_ndx.insert(name, KeyBuilder.asSortKey(oid));
+            final byte[] val = getKeyBuilder().reset().append(oid).getKey();
+
+            name_ndx.insert(key, val);
             
         }
 
@@ -605,7 +614,9 @@ public class PersistenceStore implements IPersistentStore
 
         }
 
-        final byte[] val = (byte[]) name_ndx.lookup(name);
+        final byte[] key = getKeyBuilder().reset().append(name).getKey();
+        
+        final byte[] val = (byte[]) name_ndx.lookup(key);
 
         if (val == null) return 0L;
 
@@ -757,7 +768,9 @@ public class PersistenceStore implements IPersistentStore
 
     public void delete(long oid) {
 
-        oid_ndx.remove(oid);
+        final byte[] key = getKeyBuilder().reset().append(oid).getKey();
+
+        oid_ndx.remove(key);
         
         cache.remove(oid);
 
@@ -788,7 +801,9 @@ public class PersistenceStore implements IPersistentStore
 
             // read from the object index.
             
-            final byte[] data = (byte[]) oid_ndx.lookup(oid);
+            final byte[] key = getKeyBuilder().reset().append(oid).getKey();
+
+            final byte[] data = (byte[]) oid_ndx.lookup(key);
 
             if(data == null) {
 
@@ -934,7 +949,9 @@ public class PersistenceStore implements IPersistentStore
 
                 BaseObject obj = (BaseObject) entry.getObject();
                 
-                oid_ndx.insert(obj.getOID(), serialize(obj));
+                final byte[] key = getKeyBuilder().reset().append(obj.getOID()).getKey();
+                
+                oid_ndx.insert(key, serialize(obj));
 
                 _counters.dirtyObjectsEvictedFromCache++;
 
@@ -970,7 +987,9 @@ public class PersistenceStore implements IPersistentStore
 
                 // write on the object index.
                 
-                oid_ndx.insert(obj.getOID(), serialize(obj));
+                final byte[] key = getKeyBuilder().reset().append(obj.getOID()).getKey();
+
+                oid_ndx.insert(key, serialize(obj));
                 
                 /*
                  * Clear the dirty flag. Unlike a cache eviction notice, the
@@ -1037,7 +1056,7 @@ public class PersistenceStore implements IPersistentStore
      * 
      * @see #disintern( int stringId )
      */
-    public int intern( String s, boolean insert )
+    public int intern( final String s, boolean insert )
     {
 
         if( s == null ) {
@@ -1046,7 +1065,9 @@ public class PersistenceStore implements IPersistentStore
             
         }
 
-        final byte[] val = (byte[]) str_id_ndx.lookup(s);
+        final byte[] key1 = getKeyBuilder().reset().append(s).getKey();
+        
+        final byte[] val = (byte[]) str_id_ndx.lookup( key1 );
         
         if( val != null) {
            
@@ -1087,9 +1108,15 @@ public class PersistenceStore implements IPersistentStore
 
         }
 
-        str_id_ndx.insert(s, KeyBuilder.asSortKey(tmp));
+        {
 
-        id_str_ndx.insert((long) tmp, SerializerUtil.serialize(s));
+            final byte[] key2 = getKeyBuilder().reset().append((long)tmp).getKey();
+
+            str_id_ndx.insert(key1, key2);
+
+            id_str_ndx.insert(key2, SerializerUtil.serialize(s));
+
+        }
 
         return (int) tmp;
         
@@ -1098,7 +1125,9 @@ public class PersistenceStore implements IPersistentStore
     public String disintern( int stringId )
     {
 
-        final byte[] val = (byte[]) id_str_ndx.lookup((long) stringId);
+        final byte[] key = getKeyBuilder().reset().append((long)stringId).getKey();
+
+        final byte[] val = (byte[]) id_str_ndx.lookup(key);
         
         if (val == null) {
 
@@ -1132,7 +1161,7 @@ public class PersistenceStore implements IPersistentStore
     // PropertyClass support.
     //
 
-    public IPropertyClass getPropertyClass(String property, boolean insert) {
+    public IPropertyClass getPropertyClass(final String property, boolean insert) {
 
         if(property==null) throw new IllegalArgumentException();
         
@@ -1140,7 +1169,9 @@ public class PersistenceStore implements IPersistentStore
 
         // Lookup the recid of the named property class.
 
-        byte[] val = (byte[]) pcls_ndx.lookup(property);
+        final byte[] key = getKeyBuilder().reset().append(property).getKey();
+        
+        byte[] val = (byte[]) pcls_ndx.lookup(key);
 
         if (val == null) {
 
@@ -1174,7 +1205,7 @@ public class PersistenceStore implements IPersistentStore
 
             final Long oid = new Long(propertyClass.getOID());
             
-            final Object oldValue = pcls_ndx.insert(property, KeyBuilder.asSortKey(oid));
+            final Object oldValue = pcls_ndx.insert(key, KeyBuilder.asSortKey(oid));
 
             if (oldValue != null) {
 

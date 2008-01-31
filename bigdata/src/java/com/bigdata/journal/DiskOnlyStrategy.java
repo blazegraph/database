@@ -249,9 +249,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         /**
          * An index into the write cache used for read through on the cache. The
          * keys are the addresses that would be used to read the corresponding
-         * record. The values are the position in {@link #buffer} where that record
-         * is buffered. A cache miss means that you need to read the record from the
-         * disk.
+         * record. The values are the position in {@link #buf} where that record
+         * is buffered. A cache miss means that you need to read the record from
+         * the disk.
          */
         final private Map<Long,Integer> writeCacheIndex;
         

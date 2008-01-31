@@ -1431,7 +1431,8 @@ public class IndexSegmentBuilder {
              * Setup and serialize the extension metadata.
              */
             IndexSegmentExtensionMetadata extensionMetadata = new IndexSegmentExtensionMetadata(
-                    cl, nodeSer.valueSerializer, nodeSer.recordCompressor);
+                    cl, nodeSer.keySerializer, nodeSer.valueSerializer,
+                    nodeSer.recordCompressor);
 
             final byte[] extensionMetadataBytes = SerializerUtil
                     .serialize(extensionMetadata);

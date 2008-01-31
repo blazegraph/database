@@ -32,7 +32,8 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.io.ByteArrayBufferWithPosition;
+import com.bigdata.btree.ResultSet;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
@@ -336,8 +337,8 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
             
-            rset = dataService.rangeIterator(tx, name, _fromKey, _toKey, capacity,
-                    flags, filter);
+            rset = dataService.rangeIterator(tx, name, _fromKey, _toKey,
+                    capacity, flags, filter);
             
             // reset index into the ResultSet.
             lastVisited = -1;
@@ -612,7 +613,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     private class Tuple implements ITuple {
 
         // begin with an empty buffer.
-        private ByteArrayBufferWithPosition buf = new ByteArrayBufferWithPosition(0);
+        private ByteArrayBuffer buf = new ByteArrayBuffer(0);
         
         public byte[] getKey() {
 

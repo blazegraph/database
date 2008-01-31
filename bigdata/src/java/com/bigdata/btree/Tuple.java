@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.io.ByteArrayBufferWithPosition;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 
@@ -79,12 +79,12 @@ public class Tuple implements ITuple {
      * {@link #kbuf} and the application can either examine the data in the
      * {@link #kbuf} or copy it into its own buffers. The key will always begin
      * at ZERO(0) within the #kbuf and extend up to (but exclusive of) the
-     * current {@link DataOutputBuffer#position()} in the buffer. The
+     * current {@link DataOutputBuffer#pos()} in the buffer. The
      * application MUST NOT modify the {@link DataOutputBuffer#mark()} as that
      * is used to efficiently copy keys that have been broken into a shared
      * prefix and a per-key remainder.
      */
-    final /*public*/ ByteArrayBufferWithPosition kbuf;
+    final /*public*/ ByteArrayBuffer kbuf;
     
     final public IByteArrayBuffer getKeyBuffer() {
         

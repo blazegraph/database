@@ -44,6 +44,7 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.CommitEnum;
+import com.bigdata.repo.AbstractRepositoryTestCase;
 
 /**
  * FIXME refactor to use the ExperimentDriver.  This let me collect better

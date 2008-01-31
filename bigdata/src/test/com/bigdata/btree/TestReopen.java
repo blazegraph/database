@@ -104,10 +104,10 @@ public class TestReopen extends AbstractBTreeTestCase {
          */
         final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
 
-        btree.insert(1, new SimpleEntry(1));
-        btree.insert(2, new SimpleEntry(2));
-        btree.insert(3, new SimpleEntry(3));
-        btree.insert(4, new SimpleEntry(4));
+        btree.insert(KeyBuilder.asSortKey(1), new SimpleEntry(1));
+        btree.insert(KeyBuilder.asSortKey(2), new SimpleEntry(2));
+        btree.insert(KeyBuilder.asSortKey(3), new SimpleEntry(3));
+        btree.insert(KeyBuilder.asSortKey(4), new SimpleEntry(4));
         
         // verify that the root was split.
         assertEquals("height",1,btree.getHeight());
@@ -127,10 +127,10 @@ public class TestReopen extends AbstractBTreeTestCase {
         assertTrue(btree.isOpen());
         
         // force materialization of the leaves.
-        btree.lookup(1);
-        btree.lookup(2);
-        btree.lookup(3);
-        btree.lookup(4);
+        btree.lookup(KeyBuilder.asSortKey(1));
+        btree.lookup(KeyBuilder.asSortKey(2));
+        btree.lookup(KeyBuilder.asSortKey(3));
+        btree.lookup(KeyBuilder.asSortKey(4));
 
         // dump after re-open.
         System.out.println("Dump after reopen:");

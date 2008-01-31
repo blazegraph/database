@@ -65,7 +65,7 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
          */
 
         ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "Scale-Out Triple Store Test Suite");
+                "Scale-Out Triple Store Test Suite (embedded federation)");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).

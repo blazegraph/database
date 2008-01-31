@@ -307,7 +307,7 @@ abstract public class MetadataService extends DataService implements
         // the name of the metadata index itself.
         final String metadataName = getMetadataName(name);
         
-        // make sure there is no metadata index for that btree.
+        // make sure there is a metadata index by that name.
         MetadataIndex mdi = (MetadataIndex) journal.getIndex(metadataName);
         
         if(mdi == null) {

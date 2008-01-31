@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,65 +22,72 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-package com.bigdata.service;
+package com.bigdata.btree;
 
 import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.Serializable;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
+import com.bigdata.service.DataService;
 
 /**
  * An object used to stream key scan results back to the client.
- * 
- * FIXME Modify to use a compressed key buffer for the keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class ResultSet implements Externalizable {
-    
+
     protected static final Logger log = Logger.getLogger(ResultSet.class);
-    
+
     /**
      * 
      */
     private static final long serialVersionUID = 8823205844134046434L;
 
     private int rangeCount;
+
     private int ntuples;
+
     private boolean exhausted;
+
     private byte[] lastKey;
+
     private byte[][] keys;
+
     private byte[][] vals;
-    
+
     /**
      * Total #of key-value pairs within the key range (approximate).
      */
-    public int getRangeCount() {return rangeCount;}
-    
+    public int getRangeCount() {
+        return rangeCount;
+    }
+
     /**
      * Actual #of key-value pairs in the {@link ResultSet}
      */
-    public int getNumTuples() {return ntuples;}
+    public int getNumTuples() {
+        return ntuples;
+    }
 
     /**
      * True iff the iterator exhausted the available keys such that no more
      * results would be available if you formed the successor of the
      * {@link #lastKey}.
      */
-    public boolean isExhausted() {return exhausted;}
-        
+    public boolean isExhausted() {
+        return exhausted;
+    }
+
     /**
      * The last key visited by the iterator <em>regardless</em> of the
      * filter imposed -or- <code>null</code> iff no keys were visited by
@@ -88,7 +95,9 @@ public class ResultSet implements Externalizable {
      * 
      * @see #successor()
      */
-    public byte[] getLastKey() {return lastKey;}
+    public byte[] getLastKey() {
+        return lastKey;
+    }
 
     /**
      * The next key that should be used to retrieve keys and/or values starting
@@ -103,29 +112,99 @@ public class ResultSet implements Externalizable {
      *                if the {@link #lastKey} is <code>null</code>.
      */
     public byte[] successor() {
-        
+
         if (lastKey == null)
             throw new UnsupportedOperationException();
-        
+
         return BytesUtil.successor(lastKey);
-        
+
     }
-    
+
     /**
      * The visited keys iff the keys were requested.
      */
-    public byte[][] getKeys() {return keys;}
+    public byte[][] getKeys() {
+        return keys;
+    }
 
     /**
      * The visited values iff the values were requested.
      */
-    public byte[][] getValues() {return vals;}
-    
+    public byte[][] getValues() {
+        return vals;
+    }
+
     /**
      * Deserialization constructor.
      */
-    public ResultSet() {}
+    public ResultSet() {
+    }
 
+    /**
+     * Return the object used to (de-)serialize the keys.
+     * <p>
+     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
+     * be overriden to use custom serialization or compression of the keys.
+     */
+    protected IDataSerializer getKeySerializer() {
+
+        return new DefaultDataSerializer();
+
+    }
+
+    /**
+     * Return the object used to (de-)serialize the values.
+     * <p>
+     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
+     * be overriden to use custom serialization or compression of the values.
+     */
+    protected IDataSerializer getValSerializer() {
+
+        return new DefaultDataSerializer();
+
+    }
+
+//    /**
+//     * Interface used to construct instances of {@link ResultSet}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static interface IResultSetConstructor extends Serializable {
+//
+//        public ResultSet newResultSet(IIndex ndx, byte[] fromKey, byte[] toKey,
+//                int capacity, int flags, IEntryFilter filter);
+//
+//    }
+//
+//    /**
+//     * Default implementation.
+//     * <p>
+//     * Note: Derived implementations can return a subclass of {@link ResultSet}
+//     * that uses custom serialization for the keys and/or values.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class DefaultResultSetConstructor implements
+//            IResultSetConstructor {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = -237842375057508872L;
+//
+//        public static transient IResultSetConstructor INSTANCE = new DefaultResultSetConstructor();
+//        
+//        public ResultSet newResultSet(IIndex ndx, byte[] fromKey, byte[] toKey,
+//                int capacity, int flags, IEntryFilter filter) {
+//            
+//            return new ResultSet(ndx, fromKey, toKey, capacity, flags, filter);
+//            
+//        }
+//        
+//    }
+    
     /**
      * Constructor used by the {@link DataService} to populate the
      * {@link ResultSet}.
@@ -137,11 +216,11 @@ public class ResultSet implements Externalizable {
      * @param flags
      * @param filter
      */
-    public ResultSet(final IIndex ndx, final byte[] fromKey,
-            final byte[] toKey, final int capacity, int flags,
-            final IEntryFilter filter) {
+    public ResultSet(IIndex ndx, byte[] fromKey, byte[] toKey, int capacity,
+            int flags, IEntryFilter filter) {
 
-        /* The upper bound on the #of key-value pairs in the range.
+        /*
+         * The upper bound on the #of key-value pairs in the range.
          * 
          * Note: truncated to [int].
          */
@@ -152,7 +231,7 @@ public class ResultSet implements Externalizable {
         int ntuples = 0;
 
         final boolean sendKeys = (flags & IRangeQuery.KEYS) != 0;
-        
+
         final boolean sendVals = (flags & IRangeQuery.VALS) != 0;
 
         keys = (sendKeys ? new byte[limit][] : null);
@@ -180,9 +259,9 @@ public class ResultSet implements Externalizable {
         while (ntuples < limit && itr.hasNext()) {
 
             anything = true;
-            
+
             byte[] val = (byte[]) itr.next();
-            
+
             if (sendVals)
                 vals[ntuples] = val;
 
@@ -197,29 +276,35 @@ public class ResultSet implements Externalizable {
         this.ntuples = ntuples;
 
         this.lastKey = (anything ? itr.getKey() : null);
-        
-        this.exhausted = ! itr.hasNext();
-        
+
+        this.exhausted = !itr.hasNext();
+
         log.info("ntuples=" + ntuples + ", capacity=" + capacity
                 + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
                 + ", sendVals=" + sendVals);
-        
+
     }
 
     protected static short VERSION0 = 0x0;
-    
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
         final short version = ShortPacker.unpackShort(in);
-        
+
         if (version != VERSION0)
             throw new IOException("Unknown version=" + version);
 
         rangeCount = (int) LongPacker.unpackLong(in);
+
         ntuples = (int) LongPacker.unpackLong(in);
+
         exhausted = in.readBoolean();
+
         final boolean haveKeys = in.readBoolean();
+
         final boolean haveVals = in.readBoolean();
+
         final int lastKeySize = (int) LongPacker.unpackLong(in);
         if (lastKeySize != 0) {
             lastKey = new byte[lastKeySize];
@@ -227,75 +312,104 @@ public class ResultSet implements Externalizable {
         } else {
             lastKey = null;
         }
+
         if (haveKeys) {
-            keys = new byte[ntuples][];
-            for (int i = 0; i < ntuples; i++) {
-                int size = (int) LongPacker.unpackLong(in);
-                byte[] tmp = new byte[size];
-                in.readFully(tmp);
-                keys[i] = tmp;
-            }
+            keys = getKeySerializer().read(in);
         } else {
             keys = null;
         }
+
         if (haveVals) {
-            vals = new byte[ntuples][];
-            for (int i = 0; i < ntuples; i++) {
-                // when lenPlus == 0 the value is null (vs byte[0]).
-                final int lenPlus1 = (int) LongPacker.unpackLong(in);
-                if (lenPlus1 > 0) {
-                    byte[] tmp = new byte[lenPlus1 - 1];
-                    in.readFully(tmp);
-                    vals[i] = tmp;
-                } else
-                    vals[i] = null;
-            }
+            vals = getValSerializer().read(in);
         } else {
             vals = null;
         }
+
+        //            if (haveKeys) {
+        //                keys = new byte[ntuples][];
+        //                for (int i = 0; i < ntuples; i++) {
+        //                    int size = (int) LongPacker.unpackLong(in);
+        //                    byte[] tmp = new byte[size];
+        //                    in.readFully(tmp);
+        //                    keys[i] = tmp;
+        //                }
+        //            } else {
+        //                keys = null;
+        //            }
+
+        //            if (haveVals) {
+        //                vals = new byte[ntuples][];
+        //                for (int i = 0; i < ntuples; i++) {
+        //                    // when lenPlus == 0 the value is null (vs byte[0]).
+        //                    final int lenPlus1 = (int) LongPacker.unpackLong(in);
+        //                    if (lenPlus1 > 0) {
+        //                        byte[] tmp = new byte[lenPlus1 - 1];
+        //                        in.readFully(tmp);
+        //                        vals[i] = tmp;
+        //                    } else
+        //                        vals[i] = null;
+        //                }
+        //            } else {
+        //                vals = null;
+        //            }
+
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
-        /*
-         * @todo once I have some benchmarks for the data service protocol,
-         * try the changes commented out below and see if the performance is
-         * better when I explicitly buffer the writes.
-         */
-//        ByteArrayOutputStream baos = new ByteArrayOutputStream(100 + ntuples
-//                * 512);
-//        DataOutput dos = new DataOutputStream(baos);
+
         DataOutput dos = out;
 
         ShortPacker.packShort(dos, VERSION0);
+
         LongPacker.packLong(dos, rangeCount);
+
         LongPacker.packLong(dos, ntuples);
+
         dos.writeBoolean(exhausted);
+
         dos.writeBoolean(keys != null);
+
         dos.writeBoolean(vals != null);
+
         LongPacker.packLong(dos, lastKey == null ? 0 : lastKey.length);
+
         if (lastKey != null) {
+
             dos.write(lastKey);
-        }
-        if (keys != null) {
-            for (int i = 0; i < ntuples; i++) {
-                // keys are never null.
-                LongPacker.packLong(dos, keys[i].length);
-                dos.write(keys[i]);
-            }
-        }
-        if (vals != null) {
-            for (int i = 0; i < ntuples; i++) {
-                final byte[] val = vals[i];
-                // this differentiates a null value from an empty byte[].
-                final int lenPlus1 = val == null ? 0 : val.length + 1;
-                LongPacker.packLong(dos, lenPlus1);
-                if (val != null) {
-                    dos.write(val);
-                }
-            }
+
         }
 
-        // out.write(baos.toByteArray());
+        if (keys != null) {
+
+            getKeySerializer().write(ntuples, 0/*offset*/, keys, out);
+
+        }
+
+        if (vals != null) {
+
+            getValSerializer().write(ntuples, 0/*offset*/, vals, out);
+
+        }
+
+        //            if (keys != null) {
+        //                for (int i = 0; i < ntuples; i++) {
+        //                    // keys are never null.
+        //                    LongPacker.packLong(dos, keys[i].length);
+        //                    dos.write(keys[i]);
+        //                }
+        //            }
+        //            if (vals != null) {
+        //                for (int i = 0; i < ntuples; i++) {
+        //                    final byte[] val = vals[i];
+        //                    // this differentiates a null value from an empty byte[].
+        //                    final int lenPlus1 = val == null ? 0 : val.length + 1;
+        //                    LongPacker.packLong(dos, lenPlus1);
+        //                    if (val != null) {
+        //                        dos.write(val);
+        //                    }
+        //                }
+        //            }
+
     }
 
 }

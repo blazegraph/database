@@ -120,8 +120,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBTree.class );
         // test fused view operations on ordered list of trees.
         suite.addTestSuite( TestFusedView.class );
-        // test of user-defined functions.
-        suite.addTestSuite( TestUserDefinedFunction.class );
         // test child address serialization.
         suite.addTestSuite( TestAddressSerializer.class );
         suite.addTestSuite( TestPackedAddressSerializer.class );

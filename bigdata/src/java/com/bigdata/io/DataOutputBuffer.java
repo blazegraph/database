@@ -38,8 +38,6 @@ import java.io.ObjectInput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.ITuple;
-
 /**
  * Fast special purpose serialization onto a managed byte[] buffer conforming to
  * the {@link DataOutput} API.
@@ -47,31 +45,10 @@ import com.bigdata.btree.ITuple;
  * Note: The base classes provide all of the same functionality without
  * declaring {@link IOException} as a thrown exception.
  * 
- * FIXME replace use of {@link DataOutputBuffer} with base classes in cases
- * where we are always operating on a byte[], including writing or reading data
- * from a record in the store. This will let us get rid of some
- * {@link IOException} stuff that is just useless. Examples include:
- * <p>
- * {@link ITuple}<br>
- * 
- * @todo The OutputBitStream class from the FAST package would be a possible
- *       replacement for this class in combination with either a backing byte[]
- *       or a FastByteArrayOutputStream. The OutputBitStream provides several
- *       options for coding, including a nibble coding scheme that seems to be a
- *       fair replacement for {@link #packLong(long)} and also allows coding of
- *       signed long integers.
- * 
- * FIXME refactor test suites; examine BitOutputStream as possible replacement
- * for the base class and get better packing (bits and full length short, int
- * and longs) in any case.
- * 
- * @todo rewrite <code>if(len + 1 > buf.lenth)</code> as
- *       <code>if(len==buf.length)</code>?
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataOutputBuffer extends ByteArrayBufferWithPosition implements DataOutput {
+public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
     protected static Logger log = Logger.getLogger(DataOutputBuffer.class);
     
@@ -202,31 +179,6 @@ public class DataOutputBuffer extends ByteArrayBufferWithPosition implements Dat
 
     }
     
-    final public void write(final int b) throws IOException {
-
-        if (len + 1 > buf.length)
-            ensureCapacity(len + 1);
-
-        buf[len++] = (byte) (b & 0xff);
-
-    }
-
-    final public void write(final byte[] b) throws IOException {
-
-        write(b,0,b.length);
-
-    }
-
-    final public void write(final byte[] b, final int off, final int len) throws IOException {
-
-      ensureFree(len);
-      
-      System.arraycopy(b, off, buf, this.len, len);
-      
-      this.len += len;
-
-    }
-
     final public void writeBoolean(final boolean v) throws IOException {
 
         if (len + 1 > buf.length)
@@ -356,4 +308,4 @@ public class DataOutputBuffer extends ByteArrayBufferWithPosition implements Dat
 
     }
 
- }
+}

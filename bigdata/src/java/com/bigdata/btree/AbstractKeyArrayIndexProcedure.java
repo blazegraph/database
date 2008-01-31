@@ -28,9 +28,11 @@
 
 package com.bigdata.btree;
 
+import it.unimi.dsi.fastutil.io.RepositionableStream;
 import it.unimi.dsi.mg4j.io.InputBitStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,20 +43,58 @@ import java.io.OutputStream;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ResultSet;
+import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.isolation.Value;
+import com.bigdata.journal.CommitRecordIndex.ValueSerializer;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Abstract base class supports compact serialization and compression for remote
- * {@link IIndexProcedure} execution (procedures may be executed on a local
- * index, but they are only (de-)serialized when executed on a remote index).
+ * {@link IKeyArrayIndexProcedure} execution (procedures may be executed on a
+ * local index, but they are only (de-)serialized when executed on a remote
+ * index).
  * 
- * @todo reconcile with {@link ResultSet} (sends keys and/or values with some
- *       additional metadata) and with rangeCount. Both query and range count
- *       could be procedures, which would drammatically simplify the
- *       {@link IDataService} API.
+ * FIXME use efficient serialization for the rangeIterator for bigdata-rdf and
+ * validate when applied to a partitioned index. I think that the right way to
+ * do this is to have the key and value serializer specified for the btree used
+ * by the {@link ResultSet}. I believe that this is going to require moving the
+ * {@link Value} into the node/leaf data structures, which is equally difficult
+ * but which appears to be necessary in order to be able to apply custom
+ * serialization and compression to values stored in nodes and leafs for an
+ * index
+ * 
+ * FIXME custom key compression can already be done - all we have to do is to
+ * align the {@link IKeyBuffer}'s serializer with {@link IDataSerializer} and I
+ * will be able to write compressed keys for the RDF statement indices. See
+ * {@link IKeySerializer} and {@link KeyBufferSerializer}. The
+ * {@link ValueSerializer} can be "adapted" to accept a delegate that handles
+ * the byte[] values without changing the btree architecture.
+ * <p>
+ * The main point of misalignment is direct access to the byte[][] vs random
+ * access to the individual keys. That could be fixed by allocating a byte[][]
+ * and copying over the key references before applying an
+ * {@link IDataSerializer}.
+ * <P>
+ * The other mismatch is that {@link DataOutputBuffer} vs an
+ * {@link OutputStream} for serialization. Going to, e.g., a
+ * {@link ByteArrayOutputStream} is going to cause pain since the backing buffer
+ * will wind up NOT being reused for each node or leaf written.
+ * <p>
+ * Add {@link RepositionableStream} to the {@link DataOutputBuffer} or the
+ * fastbytearrayoutputstream and that will allow buffer rewind and reuse.
+ * <p>
+ * 
+ * FIXME logical row scan for the {@link SparseRowStore} using extension of the
+ * {@link RangeIteratorProcedure}. Right now this is not being realized as an
+ * index procedure since there is a bunch of custom logic for re-issuing the
+ * range query until the iterator is exhausted on each index partition in turn.
+ * This is definately limiting the generality of the key range scan since you
+ * can not easily customize it, e.g., to handle logical row scans for the sparse
+ * row store.
+ * 
+ * FIXME term prefix scan.
  * 
  * @todo write prefix scan procedure (aka distinct term scan). possible use for
  *       both the {@link SparseRowStore} and the triple store?
@@ -62,7 +102,26 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class IndexProcedure implements IIndexProcedure, Externalizable {
+// * <pre>
+// * @param R
+// *            The data type of the <em>R</em>esult obtained by applying the
+// *            procedure to a local index or local index view. Instances of this
+// *            interface are logically "mapped" across one or more index
+// *            partitions, with one <em>R</em>esult obtained per index
+// *            partition.
+// * 
+// * @param H
+// *            The data type of the {@link IResultHandler} operation that is
+// *            applied to the <em>R</em>esult obtained for each index
+// *            partition.
+// * 
+// * @param A
+// *            The data type of the <em>A</em>ggregated <em>R</em>esults.
+// * 
+// *    &lt;R, H extends IResultHandler&lt;R, A&gt;, A&gt;
+// * </pre>
+abstract public class AbstractKeyArrayIndexProcedure implements
+        IKeyArrayIndexProcedure, Externalizable {
 
     /**
      * #of keys/values.
@@ -136,43 +195,10 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
     }
 
-    // /**
-    // * Counters for procedure and node/leaf (de-)serialization costs.
-    // *
-    // * @todo in order to instrument we need something that corresponds to the
-    // * RPC connection. Perhaps make it thread-local or even just static.
-    // *
-    // * @todo #keys, #vals, #keyBytes, #valBytes?
-    // *
-    // * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-    // Thompson</a>
-    // * @version $Id$
-    // */
-    // public static class Counters {
-    //        
-    // long nread, nwritten;
-    // long nbytesRead, nbytesWritten;
-    // long readNanos, writeNanos;
-    //        
-    // public String toString() {
-    //            
-    // StringBuilder sb = new StringBuilder();
-    //            
-    // sb.append("#read="+nread+", #bytesRead="+nbytesRead+",
-    // elapsed="+readNanos+"(nanos)\n");
-    // sb.append("#written="+nwritten+", #bytesWritten="+nbytesWritten+",
-    // elapsed="+writeNanos+"(nanos)\n");
-    //
-    // return sb.toString();
-    //            
-    // }
-    //        
-    // };
-
     /**
      * De-serialization constructor.
      */
-    protected IndexProcedure() {
+    protected AbstractKeyArrayIndexProcedure() {
 
     }
 
@@ -192,7 +218,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
      *            The values (optional, must be co-indexed with <i>keys</i>
      *            when non-<code>null</code>).
      */
-    protected IndexProcedure(int n, int offset, byte[][] keys, byte[][] vals) {
+    protected AbstractKeyArrayIndexProcedure(int n, int offset, byte[][] keys, byte[][] vals) {
 
         if (n <= 0)
             throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
@@ -241,14 +267,10 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
     }
 
     /**
-     * Used by some implementations to specify the serializer for the returned
-     * data.
+     * Return the object that will be the result from
+     * {@link IIndexProcedure#apply(IIndex)}.
      */
-    protected IDataSerializer getResultSerializer() {
-
-        return new DefaultDataSerializer();
-        
-    }
+    abstract protected Object newResult();
     
     final public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
@@ -321,13 +343,28 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
         private int n;
         private byte[][] a;
-        private IDataSerializer resultSerializer;
 
         /**
          * De-serialization ctor.
          *
          */
         public ResultBuffer() {
+            
+        }
+
+        /**
+         * Return the object used to (de-)serialize the data.
+         * <p>
+         * Note: this uses {@link DefaultDataSerializer} by default. You can
+         * override this method and {@link AbstractKeyArrayIndexProcedure} in order to
+         * customize the serialization for an index procedure. For example, if
+         * you are using custom serialization to send values to a procedure and
+         * this object is returning values then you can use the same custom
+         * serialization here.
+         */
+        protected IDataSerializer getDataSerializer() {            
+            
+            return DefaultDataSerializer.INSTANCE;
             
         }
         
@@ -337,19 +374,28 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
          *            #of values in <i>a</i> containing data.
          * @param a
          *            The data.
-         * @param resultSerializer
-         *            Used to (de-)serialize the data.
          */
-        public ResultBuffer(int n, byte[][] a, IDataSerializer resultSerializer) {
+        public ResultBuffer(int n, byte[][] a) {
 
-            this.n = n;
-
-            this.a = a;
-         
-            this.resultSerializer = resultSerializer;
+            setResult( n, a );
             
         }
 
+        /**
+         * 
+         * @param n
+         *            #of values in <i>a</i> containing data.
+         * @param a
+         *            The data.
+         */
+        public void setResult(int n, byte[][] a) {
+
+            this.n = n;
+            
+            this.a = a;
+            
+        }
+        
         public int getResultCount() {
             
             return n;
@@ -365,9 +411,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            resultSerializer = (IDataSerializer)in.readObject();
-
-            a = resultSerializer.read(in);
+            a = getDataSerializer().read(in);
             
             n = a.length; // always.
 
@@ -375,9 +419,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            out.writeObject(resultSerializer);
-
-            resultSerializer.write(n, 0/* offset */, a, out);
+            getDataSerializer().write(n, 0/* offset */, a, out);
 
         }
         
@@ -421,6 +463,12 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
          */
         public ResultBitBuffer(int n, boolean[] a) {
 
+            setResult( n, a );
+            
+        }
+        
+        public void setResult(int n, boolean[] a ) {
+            
             this.n = n;
 
             this.a = a;
@@ -442,13 +490,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            /*
-             * @todo this relies on being able to cast to an input stream. in
-             * order to work for the DataInputStream you would obtain the
-             * backing byte[] and pass that along (PROBLEM : we would need to
-             * specify a limit and InputBitStream does not support that).
-             */
-            InputBitStream ibs = new InputBitStream((InputStream) in);
+            InputBitStream ibs = new InputBitStream((InputStream) in,0/*unbuffered*/);
 
             n = ibs.readNibble();
             
@@ -464,16 +506,7 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            /*
-             * @todo The success of this relies on being able to cast to an
-             * OutputStream. That rules out the DataOutputStream since it
-             * has a different base class. Modify the OutputBitStream so
-             * that it is more flexible for us. Also, may be faster with a
-             * backing byte[] but it currently lacks an auto-extend
-             * capability.
-             */
-            final OutputBitStream obs = new OutputBitStream(
-                    (OutputStream) out);
+            final OutputBitStream obs = new OutputBitStream((OutputStream) out,0/*unbuffered!*/);
 
             obs.writeNibble(n);
             
@@ -488,5 +521,5 @@ abstract public class IndexProcedure implements IIndexProcedure, Externalizable 
         }
         
     }
-
+    
 }

@@ -90,6 +90,8 @@ public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore
         // compute the database at once closure.
         store.getInferenceEngine().computeClosure(null/*focusStore*/);
         
+        store.commit();
+        
         } finally {
             
             store.closeAndDelete();

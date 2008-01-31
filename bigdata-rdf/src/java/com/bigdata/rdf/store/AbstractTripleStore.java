@@ -59,17 +59,17 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.IIndexProcedureConstructor;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IResultHandler;
-import com.bigdata.btree.IndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
+import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -91,17 +91,17 @@ import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.IChunkedIterator;
-import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOIterator;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.EmbeddedDataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ResultSet;
 import com.bigdata.service.Split;
 import com.bigdata.text.FullTextIndex;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -117,11 +117,14 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @todo performance improvements:
  *       <p>
- *       Tune serialization for {@link ResultSet}, {@link IndexProcedure}, and
- *       batch operations (reduce network utilization for distributed stores).
- *       <p>
  *       Tune btree record structure using the same mechanisms (reduce disk
- *       utilization).
+ *       utilization) - need to specify the {@link FastRDFKeyCompression} and
+ *       {@link FastRDFValueCompression} objects for the statement indices.
+ *       <p>
+ *       Tune serialization for {@link ResultSet} to use the same key and value
+ *       serializers as the statement indices (should be transparent based on
+ *       the key and value serializers declared for the btree, but those will
+ *       have to be serialized with the {@link ResultSet}).
  *       <p>
  *       Tune inference - when computing closure on a store that supports
  *       concurrent read/write, for each SPO[] chunk from the 1st triple
@@ -139,29 +142,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       load and scale-out architecture with concurrent data load and policy
  *       for deciding which host loads which source files).
  * 
- * @todo maven 2.x builds.
- * 
- * @todo Write and benchmark a distributed bulk RDF data loader (there is
- *       already a concurrent bulk loader, but it only runs multiple threads on
- *       a single host against N data services rather than run the load from M
- *       hosts against N data services). Work through the search for equal
- *       "size" partitions for the statement indices. Note that the actual size
- *       of the statement indices will vary by access path since leading key
- *       compression will have different results for each access path. Ideally
- *       the generated index partitions can be index segments, in which case we
- *       of course need a metadata index that can be used to query them
- *       coherently. It is easy to generate that MDI.
- *       <p>
- *       The terms indices will be scale-out indices, so initially they should
- *       be pre-partitioned.
- *       <p>
- *       As an alternative to indexing the locally loaded data, we could just
- *       fill {@link StatementBuffer}s, convert to {@link ISPOBuffer}s (using
- *       the distributed terms indices), and then write out the long[3] data
- *       into a raw file. Once the local data have been converted to long[]s we
- *       can sort them into total SPO order (by chunks if necessary) and build
- *       the scale-out SPO index. The same process could then be done for each
- *       of the other access paths (OSP, POS).
+ * @todo subversion and maven 2.x builds.
  * 
  * @todo bnodes do not need to be stored in the terms or ids indices if we
  *       presume that an unknown identifier is a bnode. however, we still need
@@ -171,12 +152,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       possibility of an incomplete ids index during data load for the
  *       scale-out solution means that we must either read from a historical
  *       known consistent timestamp or record bnodes in the terms index.)
- * 
- * @todo the only added cost for a quad store is the additional statement
- *       indices. There are only three more statement indices in a quad store.
- *       Since statement indices are so cheap, it is probably worth implementing
- *       them now, even if only as a configuration option. (There may be reasons
- *       to maintain both versions.)
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
@@ -780,7 +755,24 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         value = _Value.deserialize((byte[]) data);
         
-        termCache.put(id, value, false/*dirty*/);
+        synchronized(termCache) {
+
+            /*
+             * Note: This code block is synchronized to address a possible race
+             * condition where concurrent threads resolve the term against the
+             * database. It both threads attempt to insert their resolved term
+             * definitions, which are distinct objects, into the cache then one
+             * will get an IllegalStateException since the other's object will
+             * already be in the cache.
+             */
+            
+            if (termCache.get(id) == null) {
+
+                termCache.put(id, value, false/* dirty */);
+
+            }
+            
+        }
         
         // @todo modify unit test to verify that these fields are being set.
 
@@ -863,9 +855,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *       A term is marked as "known" within a client if it was successfully
      *       asserted against both the terms and ids index (or if it was
      *       discovered on lookup against the ids index).
-     *       <p>
-     *       We should also check the {@link AbstractTripleStore#termCache} for
-     *       known terms.
+     * 
+     * FIXME We should also check the {@link AbstractTripleStore#termCache} for
+     * known terms and NOT cause them to be defined in the database (the
+     * {@link _Value#known} flag needs to be set so that we are assured that the
+     * term is in both the forward and reverse indices). Also, evaluate the
+     * impact on the LRU {@link #termCache} during bulk load operations. Perhaps
+     * that cache should be per thread?
      */
     public void addTerms(RdfKeyBuilder keyBuilder,final _Value[] terms, final int numTerms) {
         
@@ -938,7 +934,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 new IIndexProcedureConstructor() {
 
-                    public IIndexProcedure newInstance(int n, int offset,
+                    public IKeyArrayIndexProcedure newInstance(int n, int offset,
                             byte[][] keys, byte[][] vals) {
 
                         return new AddTerms(n, offset, keys);
@@ -1041,7 +1037,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             new IIndexProcedureConstructor() {
 
-                public IIndexProcedure newInstance(int n, int offset,
+                public IKeyArrayIndexProcedure newInstance(int n, int offset,
                         byte[][] keys, byte[][] vals) {
 
                     return new AddIds(n, offset, keys, vals);
@@ -3207,7 +3203,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         ndx.submit(numToAdd, keys, vals,
                                 new IIndexProcedureConstructor() {
 
-                                    public IIndexProcedure newInstance(int n,
+                                    public IKeyArrayIndexProcedure newInstance(int n,
                                             int offset, byte[][] keys,
                                             byte[][] vals) {
 
@@ -3383,7 +3379,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 
                 ndx.submit(n, keys, null/*vals*/, new IIndexProcedureConstructor(){
 
-                    public IIndexProcedure newInstance(int n,
+                    public IKeyArrayIndexProcedure newInstance(int n,
                                     int offset, byte[][] keys, byte[][] vals) {
                                 
                         return new WriteJustificationsProc(n, offset, keys);
@@ -3410,67 +3406,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
 
-    /**
-     * Procedure for writing {@link Justification}s on an index or index
-     * partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class WriteJustificationsProc extends IndexProcedure implements
-            IParallelizableIndexProcedure  {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -7469842097766417950L;
-
-        /**
-         * De-serialization constructor.
-         *
-         */
-        public WriteJustificationsProc() {
-            
-            super();
-            
-        }
-        
-        public WriteJustificationsProc(int n, int offset, byte[][] keys) {
-            
-            super(n, offset, keys, null/* vals */);
-            
-        }
-        
-        /**
-         * @return The #of justifications actually written on the index as a
-         *         {@link Long}.
-         */
-        public Object apply(IIndex ndx) {
-
-            long nwritten = 0;
-            
-            int n = getKeyCount();
-            
-            for (int i=0; i<n; i++) {
-
-                byte[] key = getKey( i );
-
-                if (!ndx.contains(key)) {
-
-                    ndx.insert(key, null/* no value */);
-
-                    nwritten++;
-
-                }
-
-            }
-            
-            return Long.valueOf(nwritten);
-            
-        }
-        
-    }
-    
     /**
      * Return true iff there is a grounded justification chain in the database
      * for the {@link SPO}.

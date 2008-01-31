@@ -24,7 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.DataInput;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
@@ -49,13 +52,20 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class KeyBufferSerializer implements IKeySerializer {
+public class KeyBufferSerializer implements IKeySerializer, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 7361581167520945586L;
 
+    /**
+     * (De-)serialization ctor.
+     */
+    public KeyBufferSerializer() {
+        
+    }
+    
     /**
      * Original serialization.
      */
@@ -87,7 +97,7 @@ public class KeyBufferSerializer implements IKeySerializer {
      * threshold on the the total length of the keys is appropriate for
      * comtemplating compression.
      */
-    public final int minKeyLengthToCompress = 1024;
+    public final transient int minKeyLengthToCompress = 1024;
     
     /**
      * The minimum compression ratio that will result in the compressed form
@@ -96,7 +106,7 @@ public class KeyBufferSerializer implements IKeySerializer {
      * justify those additional CPU cycles. When this threshold is not reached
      * the uncompressed form is written out instead.
      */
-    public final float minCompressionRatio = .9f;
+    public transient final float minCompressionRatio = .9f;
     
     public static class Counters {
         
@@ -173,12 +183,12 @@ public class KeyBufferSerializer implements IKeySerializer {
         
     }
     
-    public final Counters counters = new Counters();
+    public final transient Counters counters = new Counters();
     
     /**
      * Buffer is reused to minimize memory allocation.
      */
-    private DataOutputBuffer temp_baos = new DataOutputBuffer();
+    private transient DataOutputBuffer temp_baos = new DataOutputBuffer();
 
     public IKeyBuffer getKeys(DataInput is) throws IOException {
 
@@ -278,7 +288,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             counters.nserialized++;
 
             // offset into buffer before writing the data.
-            final int pos = os.position();
+            final int pos = os.pos();
             
             os.packShort(VERSION0);
             
@@ -295,7 +305,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             }
 
             // #of bytes written.
-            counters.bytesWritten += (os.position() - pos);
+            counters.bytesWritten += (os.pos() - pos);
             
             return;
             
@@ -321,7 +331,7 @@ public class KeyBufferSerializer implements IKeySerializer {
             
         }
 
-        counters.bytesWritten += temp_baos.position();
+        counters.bytesWritten += temp_baos.pos();
         
 //        /*
 //         * If the key buffer is long enough, then apply compression.
@@ -372,7 +382,7 @@ public class KeyBufferSerializer implements IKeySerializer {
 
         os.packShort(VERSION0);
         
-        os.write(temp_baos.array(),0,temp_baos.position());
+        os.write(temp_baos.array(),0,temp_baos.pos());
 
     }
     
@@ -522,6 +532,18 @@ public class KeyBufferSerializer implements IKeySerializer {
             
         }
 
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+        // NOP
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        
+        // NOP.
+        
     }
 
 }

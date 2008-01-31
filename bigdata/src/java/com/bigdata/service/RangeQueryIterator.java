@@ -36,15 +36,13 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
-import com.bigdata.io.ByteArrayBufferWithPosition;
+import com.bigdata.btree.ResultSet;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 
 /**
  * Class supports range query across against an unpartitioned index on an
  * {@link IDataService}.
- * 
- * @todo support an optional key and/or value filter that is executed on the
- *       data service.
  * 
  * @todo if unisolated or read-committed, then we may need to re-assess the
  *       toIndex during the query.
@@ -447,7 +445,7 @@ public class RangeQueryIterator implements IEntryIterator {
     private class Tuple implements ITuple {
 
         // begin with an empty buffer.
-        private ByteArrayBufferWithPosition buf = new ByteArrayBufferWithPosition(0);
+        private ByteArrayBuffer buf = new ByteArrayBuffer(0);
         
         public byte[] getKey() {
 

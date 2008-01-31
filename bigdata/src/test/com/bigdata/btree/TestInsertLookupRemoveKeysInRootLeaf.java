@@ -297,19 +297,19 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         /*
          * fill the root leaf.
          */
-        assertNull(btree.insert(4, e4));
-        assertNull(btree.insert(2, e2));
-        assertNull(btree.insert(1, e1));
-        assertNull(btree.insert(3, e3));
+        assertNull(btree.insert(KeyBuilder.asSortKey(4), e4));
+        assertNull(btree.insert(KeyBuilder.asSortKey(2), e2));
+        assertNull(btree.insert(KeyBuilder.asSortKey(1), e1));
+        assertNull(btree.insert(KeyBuilder.asSortKey(3), e3));
 
         /*
          * verify that re-inserting does not split the leaf and returns the old
          * value.
          */
-        assertEquals(e4,btree.insert(4,e4));
-        assertEquals(e2,btree.insert(2,e2));
-        assertEquals(e1,btree.insert(1,e1));
-        assertEquals(e3,btree.insert(3,e3));
+        assertEquals(e4,btree.insert(KeyBuilder.asSortKey(4),e4));
+        assertEquals(e2,btree.insert(KeyBuilder.asSortKey(2),e2));
+        assertEquals(e1,btree.insert(KeyBuilder.asSortKey(1),e1));
+        assertEquals(e3,btree.insert(KeyBuilder.asSortKey(3),e3));
         assertEquals(root,btree.root);
         
         // validate
@@ -317,29 +317,29 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         assertSameIterator(new Object[]{e1,e2,e3,e4}, root.entryIterator());
 
         // remove (2).
-        assertEquals(e2,btree.remove(2));
+        assertEquals(e2,btree.remove(KeyBuilder.asSortKey(2)));
         assertKeys(new int[]{1,3,4},root);
         assertSameIterator(new Object[]{e1,e3,e4}, root.entryIterator());
 
         // remove (1).
-        assertEquals(e1,btree.remove(1));
+        assertEquals(e1,btree.remove(KeyBuilder.asSortKey(1)));
         assertKeys(new int[]{3,4},root);
         assertSameIterator(new Object[]{e3,e4}, root.entryIterator());
 
         // remove (4).
-        assertEquals(e4,btree.remove(4));
+        assertEquals(e4,btree.remove(KeyBuilder.asSortKey(4)));
         assertKeys(new int[]{3},root);
         assertSameIterator(new Object[]{e3}, root.entryIterator());
 
         // remove (3).
-        assertEquals(e3,btree.remove(3));
+        assertEquals(e3,btree.remove(KeyBuilder.asSortKey(3)));
         assertKeys(new int[]{},root);
         assertSameIterator(new Object[]{}, root.entryIterator());
 
-        assertNull(btree.remove(1));
-        assertNull(btree.remove(2));
-        assertNull(btree.remove(3));
-        assertNull(btree.remove(4));
+        assertNull(btree.remove(KeyBuilder.asSortKey(1)));
+        assertNull(btree.remove(KeyBuilder.asSortKey(2)));
+        assertNull(btree.remove(KeyBuilder.asSortKey(3)));
+        assertNull(btree.remove(KeyBuilder.asSortKey(4)));
         
     }
     
@@ -373,16 +373,18 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             int index = r.nextInt(m);
             
-            Integer key = keys[index];
+            final Integer ikey = keys[index];
+            
+            final byte[] key = KeyBuilder.asSortKey(ikey);
             
             SimpleEntry val = vals[index];
             
             if( insert ) {
                 
 //                System.err.println("insert("+key+", "+val+")");
-                SimpleEntry old = expected.put(key, val);
+                SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.insert(key.intValue(), val);
+                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
                 
 //                btree.dump(Level.DEBUG,System.err);
                 
@@ -395,9 +397,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             } else {
                 
 //                System.err.println("remove("+key+")");
-                SimpleEntry old = expected.remove(key);
+                SimpleEntry old = expected.remove(ikey);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.remove(key.intValue());
+                SimpleEntry old2 = (SimpleEntry) btree.remove(key);
                 
 //                btree.dump(Level.DEBUG,System.err);
                 
@@ -419,9 +421,11 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
                     
                     Map.Entry<Integer,SimpleEntry> entry = itr.next();
                     
+                    final byte[] tmp = KeyBuilder.asSortKey(entry.getKey());
+                    
                     assertEquals("lookup(" + entry.getKey() + ")", entry
                             .getValue(), btree
-                            .lookup(entry.getKey().intValue()));
+                            .lookup(tmp));
                     
                 }
                 

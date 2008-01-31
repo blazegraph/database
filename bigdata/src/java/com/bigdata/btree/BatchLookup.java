@@ -28,13 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 
+
 /**
  * Batch lookup operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BatchLookup extends IndexProcedure implements IBatchOperation, IReadOnlyOperation, IParallelizableIndexProcedure {
+public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatchOperation, IReadOnlyOperation, IParallelizableIndexProcedure {
 
     /**
      * 
@@ -55,7 +56,7 @@ public class BatchLookup extends IndexProcedure implements IBatchOperation, IRea
             
         }
         
-        public IIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
+        public IKeyArrayIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
 
             return new BatchLookup(n, offset, keys);
             
@@ -106,9 +107,22 @@ public class BatchLookup extends IndexProcedure implements IBatchOperation, IRea
             i ++;
 
         }
-
-        return new ResultBuffer(n, ret, getResultSerializer());
         
+        ResultBuffer result = (ResultBuffer) newResult();
+
+        result.setResult(n, ret);
+
+        return result;
+
+    }
+
+    /**
+     * Note: Override to customize serialization for the {@link ResultBuffer}.
+     */
+    public ResultBuffer newResult() {
+
+        return new ResultBuffer();
+
     }
     
 }

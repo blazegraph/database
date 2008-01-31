@@ -198,15 +198,18 @@ final public class MyBTree extends AbstractBTree {
 
     }
 
-    public long find(final Object key) {
+    public long find(final Object internalKey) {
 
-        if( key == null ) {
+        if( internalKey == null ) {
 
             throw new IllegalArgumentException();
             
         }
 
-        // Note: implicit conversion to byte[].
+        // Note: conversion to byte[].
+        
+        final byte[] key = KeyBuilder.asSortKey(internalKey);
+        
         final Long recid = (Long) getBTree().lookup(key);
 
         if (recid == null) {
@@ -244,8 +247,11 @@ final public class MyBTree extends AbstractBTree {
         
         final Object val = new Long(oid);
         
-        // Note: implicit conversion of the key to byte[].
-        final Long oldValue = (Long) getBTree().insert(internalKey, val);
+        // Note: conversion of the key to byte[].
+        
+        final byte[] key = KeyBuilder.asSortKey(internalKey);
+        
+        final Long oldValue = (Long) getBTree().insert(key, val);
 
         if (oldValue != null) {
 
@@ -283,9 +289,12 @@ final public class MyBTree extends AbstractBTree {
         /*
          * Remove, returning the old value under that key.
          * 
-         * Note: implicit conversion of the key to byte[].
+         * Note: conversion of the key to byte[].
          */
-        final Long oid = (Long) getBTree().remove(internalKey);
+        
+        final byte[] key = KeyBuilder.asSortKey(internalKey);
+        
+        final Long oid = (Long) getBTree().remove(key);
 
         if (oid == null) {
 

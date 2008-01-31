@@ -55,6 +55,7 @@ import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.ISPOBuffer;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -75,6 +76,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * Note: Closure is NOT maintained during the load operation. However, you can
  * perform a database at once closure afterwards if you are bulk loading some
  * dataset into an empty database.
+ * 
+ * @todo As an alternative to indexing the locally loaded data, we could just
+ *       fill {@link StatementBuffer}s, convert to {@link ISPOBuffer}s (using
+ *       the distributed terms indices), and then write out the long[3] data
+ *       into a raw file. Once the local data have been converted to long[]s we
+ *       can sort them into total SPO order (by chunks if necessary) and build
+ *       the scale-out SPO index. The same process could then be done for each
+ *       of the other access paths (OSP, POS).
  * 
  * @todo if this proves useful promote it into the main source code (it is in
  *       with the test suites right now).

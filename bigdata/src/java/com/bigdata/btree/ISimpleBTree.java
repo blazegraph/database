@@ -27,19 +27,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.isolation.Value;
+import com.bigdata.journal.CommitRecordIndex;
+import com.bigdata.journal.Name2Addr;
+
 /**
  * <p>
- * Interface for non-batch operations on a B+-Tree mapping arbitrary non-null
- * keys to arbitrary values.
+ * Interface for non-batch operations on a B+-Tree mapping non-null variable
+ * length unsigned byte[] keys to arbitrary values.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo re-define this interface for byte[] keys
+ * @todo re-define this interface for byte[] values. The main challenge in doing
+ *       this for the values is transactional isolation depends on storing
+ *       {@link Value} objects. Also, there may be some btrees used by the
+ *       journal for the {@link Name2Addr} and {@link CommitRecordIndex} that
+ *       are storing serialized objects (I don't think so, but check). There are
+ *       a LOT of unit tests that assume the values are simply serializable
+ *       objects - {@link SimpleEntry} in particular. This might be managed by
+ *       adding a package private alternate for the BTree that automatically
+ *       converted a non-byte[] value to a byte[] using {@link SerializerUtil}
+ *       and then adding smart de-serialization as well for lookup and remove.
  * 
- * @see UnicodeKeyBuilder, which may be used to encode one or more primitive data type
- *      values or Unicode strings into a variable length unsigned byte[] key.
+ * @see UnicodeKeyBuilder, which may be used to encode one or more primitive
+ *      data type values or Unicode strings into a variable length unsigned
+ *      byte[] key.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -57,7 +72,7 @@ public interface ISimpleBTree extends IRangeQuery {
      * @return The previous value under that key or <code>null</code> if the
      *         key was not found.
      */
-    public Object insert(Object key, Object value);
+    public Object insert(byte[] key, Object value);
     
     /**
      * Lookup a value for a key.
@@ -65,7 +80,7 @@ public interface ISimpleBTree extends IRangeQuery {
      * @return The value or <code>null</code> if there is no entry for that
      *         key.
      */
-    public Object lookup(Object key);
+    public Object lookup(byte[] key);
 
     /**
      * Return true iff there is an entry for the key.
@@ -86,6 +101,6 @@ public interface ISimpleBTree extends IRangeQuery {
      * @return The value stored under that key or <code>null</code> if the key
      *         was not found.
      */
-    public Object remove(Object key);
+    public Object remove(byte[] key);
 
 }

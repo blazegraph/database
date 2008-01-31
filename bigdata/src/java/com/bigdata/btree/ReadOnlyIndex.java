@@ -29,6 +29,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.service.Split;
 
 
@@ -84,15 +85,15 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         return src.contains(key);
     }
 
-    public Object insert(Object key, Object value) {
+    public Object insert(byte[] key, Object value) {
         throw new UnsupportedOperationException();
     }
 
-    public Object lookup(Object key) {
+    public Object lookup(byte[] key) {
         return src.lookup(key);
     }
 
-    public Object remove(Object key) {
+    public Object remove(byte[] key) {
         throw new UnsupportedOperationException();
     }
 

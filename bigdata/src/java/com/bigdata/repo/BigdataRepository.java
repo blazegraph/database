@@ -37,14 +37,19 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IKeySerializer;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.IByteArrayBuffer;
+import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.isolation.Value;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
@@ -59,6 +64,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.KeyType;
@@ -463,6 +469,11 @@ public class BigdataRepository implements ContentRepository {
      * increase the block size to 64M a non-default split point would have to be
      * specified for the {@link WormAddressManager#DEFAULT_OFFSET_BITS}. 4M at
      * the default split point is [0:4,194,303] while 64M is 67,108,864 bytes.
+     * <P>
+     * There is also a requirement for a streaming API for at least reading
+     * blocks from the {@link IRawStore} and perhaps for writing them as well.
+     * This API should be exposed at the {@link IDataService} layer using
+     * sockets.
      * 
      * @todo is it strictly requires that the block size is shared across across
      *       a federation? I doubt it - it seems that the constraint is mainly
@@ -3312,7 +3323,7 @@ public class BigdataRepository implements ContentRepository {
             final byte[] key = kbuf.array();
             
             // decode the block identifier from the key.
-            block = KeyBuilder.decodeLong(key, kbuf.position()
+            block = KeyBuilder.decodeLong(key, kbuf.pos()
                     - Bytes.SIZEOF_LONG);
             
             log.info("Read "+b.length+" bytes: id="+id+", version="+version+", block="+block);
@@ -3523,9 +3534,12 @@ public class BigdataRepository implements ContentRepository {
     public static class FileDataBTreePartition extends UnisolatedBTreePartition {
 
         public FileDataBTreePartition(IRawStore store, int branchingFactor,
-                UUID indexUUID, PartitionMetadataWithSeparatorKeys pmd) {
+                UUID indexUUID, IKeySerializer keySer, IValueSerializer valSer,
+                IConflictResolver conflictResolver,
+                PartitionMetadataWithSeparatorKeys pmd) {
 
-            super(store, branchingFactor, indexUUID, pmd);
+            super(store, branchingFactor, indexUUID, keySer, valSer,
+                    conflictResolver, pmd);
 
         }
 
@@ -3563,6 +3577,8 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Creates an {@link FileDataBTreePartition} instance.
      * 
+     * @todo specialized key serializer?
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -3588,18 +3604,21 @@ public class BigdataRepository implements ContentRepository {
          *            The branching factor.
          */
         public FileDataBTreePartitionConstructor(int branchingFactor) {
-
-            super( branchingFactor );
+        
+            super(branchingFactor, KeyBufferSerializer.INSTANCE,
+                    Value.Serializer.INSTANCE, null/* conflictResolver */);
             
         }
-        
-        public BTree newInstance(IRawStore store, UUID indexUUID,IPartitionMetadata pmd) {
+
+        public BTree newInstance(IRawStore store, UUID indexUUID,
+                IPartitionMetadata pmd) {
 
             log.info("Creating file data partition#"+pmd.getPartitionId());
-            
+
             return new FileDataBTreePartition(store, branchingFactor, indexUUID,
+                    keySer, valSer, conflictResolver,
                     (PartitionMetadataWithSeparatorKeys) pmd);
-            
+
         }
 
     }
