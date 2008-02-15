@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
@@ -40,6 +41,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -310,17 +312,41 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
         
-        assertEquals("first",n1.nkeys,n2.nkeys);
+        assertEquals("first", n1.nkeys, n2.nkeys);
 
-        assertKeys(n1,n2);
-        
-//        assertEquals("values", n1.values, n2.values);
-        
-        for( int i=0; i<n1.nkeys; i++ ) {
+        assertKeys(n1, n2);
 
-            assertEquals("values[" + i + "]",
-                    (SimpleEntry) n1.values[i],
-                    (SimpleEntry) n2.values[i]);
+        assertEquals("hasDeleteMarkers", n1.hasDeleteMarkers(), n2
+                .hasDeleteMarkers());
+
+        if (n1.hasDeleteMarkers()) {
+
+            for (int i = 0; i < n1.nkeys; i++) {
+
+                assertEquals("deleteMarkers[" + i + "]", n1.getDeleteMarker(i),
+                        n2.getDeleteMarker(i));
+
+            }
+
+        }
+
+        assertEquals("hasVersionTimestamps", n1.hasVersionTimestamps(), n2
+                .hasVersionTimestamps());
+
+        if (n1.hasVersionTimestamps()) {
+
+            for (int i = 0; i < n1.nkeys; i++) {
+
+                assertEquals("versionTimestamps[" + i + "]", n1
+                        .getVersionTimestamp(i), n2.getVersionTimestamp(i));
+                
+            }
+            
+        }
+        
+        for (int i = 0; i < n1.nkeys; i++) {
+
+            assertEquals("values[" + i + "]", n1.values[i], n2.values[i]);
             
         }
         
@@ -468,20 +494,60 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     public BTree getBTree(int branchingFactor) {
         
         IRawStore store = new SimpleMemoryRawStore();
-        
-        final int leafQueueCapacity = 10000;
-        
-        final int nscan = 10;
 
-        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
-                new HardReferenceQueue<PO>(new NoEvictionListener(),
-                        leafQueueCapacity, nscan),
-                KeyBufferSerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE,
-                null // no record compressor
-        );
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBranchingFactor(branchingFactor);
 
-        return btree;
+        // override the BTree class.
+        metadata.setClassName(NoEvictionBTree.class.getName());
+        
+        return (NoEvictionBTree) BTree.create(store,metadata);
+        
+//        BTree btree = new BTree(store, //
+//                branchingFactor, //
+//                UUID.randomUUID(),//
+//                false, //isolatable
+//                null,//conflictResolver
+//                new HardReferenceQueue<PO>(new NoEvictionListener(),
+//                        leafQueueCapacity, nscan),
+//                KeyBufferSerializer.INSTANCE,
+//                ByteArrayValueSerializer.INSTANCE,
+//                null // no record compressor
+//        );
+//
+//        return btree;
+        
+    }
+    
+    /**
+     * Specifies a {@link NoEvictionListener}.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class NoEvictionBTree extends BTree {
+
+        /**
+         * @param store
+         * @param checkpoint
+         * @param metadata
+         */
+        public NoEvictionBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+         
+            super(store, checkpoint, metadata);
+            
+        }
+        
+        protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+
+            return new HardReferenceQueue<PO>(//
+                    new NoEvictionListener(),//
+                    10000,//
+                    10//
+            );
+
+        }
         
     }
     
@@ -743,7 +809,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Verify entries in the expected order.
          */
-        assertSameIterator(entries, btree.getRoot().entryIterator());
+        assertSameIterator(entries, btree.entryIterator());
 
         // remove keys in forward order.
         {
@@ -854,7 +920,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * Verify entries in the expected order.
          */
-        assertSameIterator(reverseEntries, btree.getRoot().entryIterator());
+        assertSameIterator(reverseEntries, btree.entryIterator());
 
         // Note: The height, #of nodes, and #of leaves is path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
@@ -1164,7 +1230,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             /*
              * Verify entries in the expected order.
              */
-            assertSameIterator(entries, btree.getRoot().entryIterator());
+            assertSameIterator(entries, btree.entryIterator());
 
             return btree;
             
@@ -1316,7 +1382,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * presentation order, the entries MUST now be in the original generated
          * order.
          */
-        assertSameIterator(entries,btree.getRoot().entryIterator());
+        assertSameIterator(entries,btree.entryIterator());
 
         // Note: The height, #of nodes, and #of leaves are path dependent.
         assertEquals("#entries", keys.length, btree.nentries);
@@ -1382,7 +1448,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //                System.err.println("insert("+key+", "+val+")");
                 SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
+                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.insert(key, val));
                 
                 assertTrue(btree.dump(Level.ERROR,System.err));
                 
@@ -1393,7 +1459,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 //                System.err.println("remove("+key+")");
                 SimpleEntry old = expected.remove(ikey);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.remove(key);
+                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.remove(key));
                 
                 assertTrue(btree.dump(Level.ERROR,System.err));
                 
@@ -1479,7 +1545,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         /*
          * verify the total order.
          */
-        assertSameIterator(vals, btree.getRoot().entryIterator());
+        assertSameIterator(vals, btree.entryIterator());
         
         assertTrue(btree.dump(Level.ERROR,System.out));
         
@@ -1547,8 +1613,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         assert actual != null;
         
         // Must be the same "index".
-        assertEquals("indexUUID", expected.getIndexUUID(), actual
-                .getIndexUUID());
+        assertEquals("indexUUID", expected.getIndexMetadata().getIndexUUID(),
+                actual.getIndexMetadata().getIndexUUID());
         
         // The #of entries must agree.
         assertEquals("entryCount", expected.getEntryCount(), actual
@@ -1562,7 +1628,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          */
         byte[][] keys = new byte[expected.getEntryCount()][];
         
-        Object[] vals = new Object[expected.getEntryCount()];
+        byte[][] vals = new byte[expected.getEntryCount()][];
         
         getKeysAndValues(expected, keys, vals);
         
@@ -1630,13 +1696,17 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
             
-            Object expectedVal = expectedItr.next();
+            ITuple expectedTuple = expectedItr.next();
             
-            Object actualVal = actualItr.next();
+            ITuple actualTuple = actualItr.next();
+            
+            byte[] expectedVal = expectedTuple.getValue();
+            
+            byte[] actualVal = actualTuple.getValue();
 
-            byte[] expectedKey = expectedItr.getKey();
+            byte[] expectedKey = expectedTuple.getKey();
             
-            byte[] actualKey = expectedItr.getKey();
+            byte[] actualKey = actualTuple.getKey();
 
 //            System.err.println("index="+index+", key="+actualKey+", val="+actualVal);
             
@@ -1701,17 +1771,19 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The values in key order (out).
      */
     static public void getKeysAndValues(AbstractBTree btree, byte[][] keys,
-            Object[] vals) {
+            byte[][] vals) {
         
         IEntryIterator itr = btree.entryIterator();
 
         int i = 0;
         
         while( itr.hasNext() ) {
+
+            ITuple tuple= itr.next();
             
-            Object val = itr.next();
+            byte[] val = tuple.getValue();
             
-            byte[] key = itr.getKey();
+            byte[] key = tuple.getKey();
 
             assert val != null;
             
@@ -1744,7 +1816,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    static public void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
+    static public void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, byte[][] vals) {
         
         int nentries = btree.getEntryCount();
         
@@ -1762,7 +1834,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             byte[] key = keys[entryIndex];
         
-            Object val = btree.lookup(key);
+            byte[] val = btree.lookup(key);
             
             if(val==null && true) {
                 
@@ -1772,7 +1844,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
             
-            Object expectedVal = vals[entryIndex];
+            byte[] expectedVal = vals[entryIndex];
 
             assertEquals(expectedVal,val);
             
@@ -1806,7 +1878,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    static public void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, Object[] vals) {
+    static public void doRandomIndexOfTest(String label, AbstractBTree btree, byte[][] keys, byte[][] vals) {
         
         int nentries = btree.getEntryCount();
         
@@ -1826,7 +1898,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
             assertEquals("indexOf",entryIndex,btree.indexOf(key));
             
-            Object expectedVal = vals[entryIndex];
+            byte[] expectedVal = vals[entryIndex];
 
             assertEquals("keyAt",key,btree.keyAt(entryIndex));
 
@@ -1841,6 +1913,95 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         System.err.println(label + " : " + btree.counters);
          
+    }
+    
+    /**
+     * Method verifies that the <i>actual</i> {@link IEntryIterator} produces the
+     * expected values in the expected order. Errors are reported if too few or
+     * too many values are produced, etc.
+     */
+    static public void assertSameIterator(byte[][] expected, IEntryIterator actual) {
+
+        assertSameIterator("", expected, actual);
+
+    }
+
+    /**
+     * Method verifies that the <i>actual</i> {@link IEntryIterator} produces
+     * the expected values in the expected order. Errors are reported if too few
+     * or too many values are produced, etc.
+     */
+    static public void assertSameIterator(String msg, byte[][] expected,
+            IEntryIterator actual) {
+
+        int i = 0;
+
+        while (actual.hasNext()) {
+
+            if (i >= expected.length) {
+
+                fail(msg + ": The iterator is willing to visit more than "
+                        + expected.length + " values.");
+
+            }
+
+            ITuple tuple = actual.next();
+
+            final byte[] val = tuple.getValue();
+
+            if (expected[i] == null) {
+
+                if (val != null) {
+
+                    /*
+                     * Only do message construction if we know that the assert
+                     * will fail.
+                     */
+                    fail(msg + ": Different values at index=" + i
+                            + ": expected=null" + ", actual="
+                            + Arrays.toString(val));
+
+                }
+
+            } else {
+
+                if (val == null) {
+
+                    /*
+                     * Only do message construction if we know that the assert
+                     * will fail.
+                     */
+                    fail(msg + ": Different values at index=" + i
+                            + ": expected=" + Arrays.toString(expected[i])
+                            + ", actual=null");
+
+                }
+                
+                if (BytesUtil.compareBytes(expected[i], val) != 0) {
+                    
+                    /*
+                     * Only do message construction if we know that the assert
+                     * will fail.
+                     */
+                    fail(msg + ": Different values at index=" + i
+                            + ": expected=" + Arrays.toString(expected[i])
+                            + ", actual=" + Arrays.toString(val));
+                    
+                }
+
+            }
+            
+            i++;
+
+        }
+
+        if (i < expected.length) {
+
+            fail(msg + ": The iterator SHOULD have visited " + expected.length
+                    + " values, but only visited " + i + " values.");
+
+        }
+
     }
 
 }

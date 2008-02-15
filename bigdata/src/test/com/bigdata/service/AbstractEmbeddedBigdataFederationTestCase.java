@@ -28,10 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
-import junit.framework.TestCase2;
-
+import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.repo.BigdataRepository.Options;
 
@@ -43,7 +46,7 @@ import com.bigdata.repo.BigdataRepository.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase2 {
+abstract public class AbstractEmbeddedBigdataFederationTestCase extends AbstractBTreeTestCase {
 
     /**
      * 
@@ -61,13 +64,16 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
 
     protected IBigdataClient client;
     protected IBigdataFederation fed;
+    protected IDataService dataService0;
+    protected IDataService dataService1;
 
     public Properties getProperties() {
         
         Properties properties = new Properties( super.getProperties() );
         
-        // @todo use transient mode for tests if possible.
-        properties.setProperty(Options.BUFFER_MODE,""+BufferMode.Transient);
+        // Note: uses transient mode for tests.
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
+                .toString());
         
         // when the data are persistent use the test to name the data directory.
         properties.setProperty(EmbeddedBigdataFederation.Options.DATA_DIR,
@@ -94,6 +100,10 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
         client = new EmbeddedBigdataClient(getProperties());
         
         fed = client.connect();
+            
+        dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
+
+        dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
         
     }
     
@@ -130,4 +140,90 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
 
     }
     
+    /**
+     * Verifies that two splits have the same data.
+     * 
+     * @param expected
+     * @param actual
+     */
+    final public static void assertEquals(Split expected, Split actual) {
+       
+        assertEquals("partition",expected.pmd,actual.pmd);
+        assertEquals("fromIndex",expected.fromIndex,actual.fromIndex);
+        assertEquals("toIndex",expected.toIndex,actual.toIndex);
+        assertEquals("ntuples",expected.ntuples,actual.ntuples);
+        
+    }
+    
+    /**
+     * Verify that a named index is registered on a specific {@link DataService}
+     * with the specified indexUUID.
+     * 
+     * @param dataService
+     *            The data service.
+     * @param name
+     *            The index name.
+     * @param indexUUID
+     *            The unique identifier assigned to all instances of that index.
+     */
+    final protected void assertIndexRegistered(IDataService dataService, String name,
+            UUID indexUUID) throws IOException {
+
+        IndexMetadata metadata = dataService.getIndexMetadata(name);
+        
+        assertNotNull("metadata",metadata);
+        
+        assertEquals("indexUUID", indexUUID, metadata.getIndexUUID());
+        
+    }
+    
+    /**
+     * Compares two byte[][]s for equality.
+     * 
+     * @param expected
+     * @param actual
+     */
+    final public void assertEquals(byte[][] expected, byte[][] actual ) {
+        
+        assertEquals(null, expected, actual);
+        
+    }
+    
+    /**
+     * Compares two byte[][]s for equality.
+     * 
+     * @param expected
+     * @param actual
+     */
+    final public void assertEquals(String msg,byte[][] expected, byte[][] actual ) {
+        
+        if(msg==null) msg=""; else msg = msg+":";
+        
+        assertEquals(msg+"length", expected.length, actual.length);
+        
+        for( int i=0; i<expected.length; i++ ) {
+
+            if (expected[i] == null) {
+
+                if (actual[i] != null) {
+                    
+                    fail("expected " + i + "th entry to be null.");
+                    
+                }
+                
+            } else {
+
+                if (BytesUtil.compareBytes(expected[i], actual[i]) != 0) {
+
+                    fail("expected=" + BytesUtil.toString(expected[i])
+                            + ", actual=" + BytesUtil.toString(actual[i]));
+
+                }
+
+            }
+            
+        }
+        
+    }
+
 }

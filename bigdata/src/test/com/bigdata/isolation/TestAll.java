@@ -60,41 +60,14 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("isolation");
 
+        // test isolated fused view (handles delete markers).
+        suite.addTestSuite(TestIsolatedFusedView.class);
+        
         // test for state-based validation _concept_
         suite.addTestSuite(TestAccount.class);
         
-        // test version counter and delete marker implementation class.
-        suite.addTestSuite(TestValue.class);
-
-        // test serialization for Value class.
-        suite.addTestSuite(TestValueSerializer.class);
-
-        // @todo test various compression schemes for the Value[]s here.
-        
-        // @todo test btree with IValue values.
-        suite.addTestSuite(TestUnisolatedBTree.class);
-        
-        // test fully isolated btree for use with transactions.
-        suite.addTestSuite(TestIsolatedBTree.class);
-
-        // @todo test conflict resolution, including on the Account problem and
-        // on the TripleStore.
-
-        // @todo test isolatable fused view (handles delete markers).
-//        suite.addTestSuite(TestIsolatableFusedView.class);
-
-        /*
-         * @todo test index segment builder (must indicate whether full
-         * compacting merge or not), or maybe that is use in the metadataindex
-         */
-        /*
-         * test index merge code (merge rule must recognize and handle
-         * deletion markers).
-         */
-//        suite.addTestSuite(TestIndexSegmentMerger.class); 
-        
-        // @todo test isolatable partitioned index.
-//        suite.addTestSuite(TestIsolatablePartitionedIndex.class);
+        // tests of write-write conflict resolution.
+        suite.addTestSuite(TestConflictResolution.class);
 
         return suite;
         

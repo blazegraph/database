@@ -54,7 +54,7 @@ import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.service.DataService;
-import com.bigdata.service.RangeQueryIterator;
+import com.bigdata.service.DataServiceRangeIterator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -63,7 +63,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo write test cases that submit various kinds of operations and verify the
  *       correctness of those individual operations. refactor the services
  *       package to do this, including things such as the
- *       {@link RangeQueryIterator}. this will help to isolate the correctness
+ *       {@link DataServiceRangeIterator}. this will help to isolate the correctness
  *       of the data service "api", including concurrency of operations, from
  *       the {@link DataService}.
  * 

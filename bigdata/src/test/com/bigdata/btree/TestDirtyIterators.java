@@ -36,7 +36,7 @@ import org.apache.log4j.Level;
  * mechanisms.
  * 
  * @see Node#childIterator(boolean)
- * @see AbstractNode#postOrderIterator(boolean)
+ * @see AbstractNode#postOrderNodeIterator(boolean)
  * 
  * @see TestIterators, which handles iterators that do not differentiate between
  *      clear and dirty nodes.
@@ -361,9 +361,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // empty tree visits the root leaf.
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         // fill up the root leaf.
         btree.insert(KeyBuilder.asSortKey(3), v3);
@@ -383,9 +383,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         
         // verify iterator.
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * split another leaf so that there are now three children to visit. at
@@ -406,9 +406,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { a, d, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, d, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * cause another leaf (d) to split, forcing the split to propagate to and
@@ -439,9 +439,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
@@ -464,9 +464,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, e, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { d, e, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove a key (7) from a leaf (b) forcing two leaves to join and
@@ -485,9 +485,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove keys from a leaf forcing the remaining two leaves to join and
@@ -503,9 +503,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
     }
 
@@ -538,9 +538,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // empty tree visits the root leaf.
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         /*
          * write out the root leaf on the store and verify that the dirty
          * iterator does not visit anything while the normal iterator visits the
@@ -548,9 +548,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          */
         btree.writeNodeRecursive(btree.root);
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] {}, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * Fill up the root leaf. Since it was immutable, this will trigger
@@ -562,9 +562,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertNotSame(a,btree.root);
         a = (Leaf)btree.root; // new reference for the root leaf.
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         btree.insert(KeyBuilder.asSortKey(5), v5);
         btree.insert(KeyBuilder.asSortKey(7), v7);
 
@@ -581,9 +581,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         
         // verify iterator.
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * write out (a) and verify the iterator behaviors.
@@ -593,9 +593,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertFalse(b.isPersistent());
         assertFalse(c.isPersistent());
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * write out (c) and verify the iterator behaviors.
@@ -605,9 +605,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertTrue(b.isPersistent());
         assertTrue(c.isPersistent());
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * split another leaf (a) so that there are now three children to visit.
@@ -642,9 +642,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertTrue(b.isPersistent());
         assertFalse(c.isPersistent());
         assertSameIterator(new IAbstractNode[] { a, d, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, d, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * cause another leaf (d) to split, forcing the split to propagate to and
@@ -675,36 +675,36 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { a, d, c, e, f, g }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * write out a subtree and revalidate the iterators.
          */
         btree.writeNodeRecursive(c);
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { e, f, g }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
         /*
          * write out a leaf and revalidate the iterators.
          */
         btree.writeNodeRecursive(e);
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { f, g }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * write out the entire tree and revalidate the iterators.
          */
         btree.writeNodeRecursive(g);
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] {}, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
@@ -735,9 +735,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, e, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { d, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove a key (7) from a leaf (b) forcing two leaves (b,e) into (b) to
@@ -757,17 +757,17 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         /*
          * write out the root and verify the visitation orders.
          */
         btree.writeNodeRecursive(c);
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] {}, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * remove keys from a leaf (b) forcing the remaining two leaves (b,d) to
@@ -794,18 +794,18 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
 
         /*
          * write out the root and reverify the iterators.
          */
         btree.writeNodeRecursive(b);
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator(false));
+                .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] {}, btree.root
-                .postOrderIterator(true));
+                .postOrderNodeIterator(true));
         
     }
 

@@ -34,6 +34,11 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.io.SerializerUtil;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Test insert, lookup, and value scan for leaves.
  * 
@@ -257,11 +262,18 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
                     value, btree.lookup(key));
             
             // verify the values iterator
-            Object[] tmp = new Object[root.nkeys];
+            byte[][] tmp = new byte[root.nkeys][];
             for( int j=0; j<root.nkeys; j++ ) {
                 tmp[j] = root.values[j];
             }
-            assertSameIterator( "values", tmp, root.entryIterator() ); 
+            assertSameIterator( "values", tmp, new Striterator(root.entryIterator()).addFilter(new Resolver(){
+
+                @Override
+                protected Object resolve(Object arg0) {
+                    return ((ITuple)arg0).getValue();
+                }
+                
+            }) ); 
             
         }
 
@@ -384,7 +396,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 //                System.err.println("insert("+key+", "+val+")");
                 SimpleEntry old = expected.put(ikey, val);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.insert(key, val);
+                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.insert(key, val));
                 
 //                btree.dump(Level.DEBUG,System.err);
                 
@@ -399,7 +411,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 //                System.err.println("remove("+key+")");
                 SimpleEntry old = expected.remove(ikey);
                 
-                SimpleEntry old2 = (SimpleEntry) btree.remove(key);
+                SimpleEntry old2 = (SimpleEntry) SerializerUtil.deserialize(btree.remove(key));
                 
 //                btree.dump(Level.DEBUG,System.err);
                 

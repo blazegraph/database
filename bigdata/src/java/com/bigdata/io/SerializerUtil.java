@@ -29,6 +29,7 @@ package com.bigdata.io;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -117,6 +118,30 @@ public class SerializerUtil {
         try {
 
             ObjectInputStream ois = new ObjectInputStream(bais);
+
+            return ois.readObject();
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
+    /**
+     * De-serialize an object using the Java serialization mechansisms.
+     * 
+     * @param is
+     *            The input stream from which to read the serialized data.
+     * 
+     * @return The de-serialized object.
+     */
+    static final public Object deserialize(InputStream is) {
+
+        try {
+
+            ObjectInputStream ois = new ObjectInputStream(is);
 
             return ois.readObject();
 

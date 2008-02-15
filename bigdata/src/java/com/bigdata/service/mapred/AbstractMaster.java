@@ -33,9 +33,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTreeConstructor;
-import com.bigdata.btree.ByteArrayValueSerializer;
-import com.bigdata.btree.KeyBufferSerializer;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -487,11 +485,7 @@ public abstract class AbstractMaster {
                     client.getDataService(dataServices[i])
                             .registerIndex(
                                     name,
-                                    reduceTasks[i],
-                                    new BTreeConstructor(
-                                            KeyBufferSerializer.INSTANCE,
-                                            ByteArrayValueSerializer.INSTANCE),
-                                    null/*pmd*/);
+                                    new IndexMetadata(reduceTasks[i]));
                 } catch (Exception e) {
                     log.warn("Could not create intermediate store: " + e);
                 }
@@ -578,12 +572,15 @@ public abstract class AbstractMaster {
      * @throws InterruptedException
      *             if the excecuting map tasks are interrupted.
      */
+    @SuppressWarnings("unchecked")
     protected double map() throws InterruptedException { 
 
         Iterator<AbstractMapTask> tasks = new Striterator(job
                 .getMapSource().getSources()).addFilter(new Resolver() {
 
-                    protected Object resolve(Object arg0) {
+                    private static final long serialVersionUID = 1L;
+
+                    protected Object resolve(final Object arg0) {
 
                         return job.getMapTask(arg0);
                         

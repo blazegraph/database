@@ -45,6 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
@@ -53,7 +54,6 @@ import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ValidationError;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.EmbeddedBigdataFederation.Options;
 import com.bigdata.test.ExperimentDriver;
@@ -273,7 +273,11 @@ public class StressTestConcurrent extends
      *       something to deploy those files together with the necessary
      *       software onto the cluster. SCA probably addresses this issue.
      * 
-     * @todo allow operations on more than a single data service.
+     * @todo allow operations on more than a single data service and more than a
+     *       single index partition. It would be especially nice to have this
+     *       run against a cluster so that we could characterize throughput as a
+     *       function of the #of machines, but that also requires a distributed
+     *       client otherwise the client may become the bottleneck.
      */
     static public Result doConcurrentClientTest(IBigdataClient client,
             DataService dataService, int nclients, long timeout, int ntrials,
@@ -289,17 +293,20 @@ public class StressTestConcurrent extends
          * Register the scale-out index.
          */
         
-        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
-
-        UUID indexUUID = federation.registerIndex(name, ctor, new byte[][] {//
-                new byte[] {} }, //
-                new UUID[] {//
-                dataService.getServiceUUID(), });
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        
+        metadata.setDeleteMarkers(true);
+        
+        UUID indexUUID = federation.registerIndex(metadata, //
+                new byte[][] { new byte[] {} }, //
+                new UUID[] { dataService.getServiceUUID() }//
+                );
 
         // request index view.
         IIndex ndx = federation.getIndex(ITx.UNISOLATED, name);
         
-        assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+        assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
+                .getIndexUUID());
         
         ExecutorService executorService = Executors.newFixedThreadPool(
                 nclients, DaemonThreadFactory.defaultThreadFactory());

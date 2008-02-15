@@ -32,7 +32,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
@@ -191,7 +191,7 @@ public class RootBlockView implements IRootBlockView {
      *            root addresses was written or 0L if there are no root
      *            addresses (this is true when the store is first created).
      * @param commitRecordIndexAddr
-     *            The address at which the {@link BTreeMetadata} for the
+     *            The address at which the {@link IndexMetadata} for the
      *            {@link CommitRecordIndex} was written or 0L if there are no
      *            historical {@link ICommitRecord}s (this is true when the
      *            store is first created).

@@ -27,20 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.util.UUID;
-
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.IsolatedBTree;
-import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.Tuple;
+import com.bigdata.isolation.IsolatedFusedView;
 
 /**
  * Test suite for fully-isolated read-write transactions.
  * 
  * @todo verify with writes on multiple indices.
- * 
- * @todo Show that abort does not leave anything lying around, both that would
- *       break isolation (unlikely) or just junk that lies around unreclaimed on
- *       the slots (or in the index nodes themselves).
  * 
  * @todo Verify correct abort after 'prepare'.
  * 
@@ -94,8 +91,7 @@ public class TestTx extends ProxyTestCase {
         String name = "abc";
         
         // register index in unisolated scope, but do not commit yet.
-        journal.registerIndex(name, new UnisolatedBTree(journal, 3, UUID
-                .randomUUID()));
+        journal.registerIndex(name);
         
         // start tx1.
         final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
@@ -137,7 +133,7 @@ public class TestTx extends ProxyTestCase {
 
         {
             
-            journal.registerIndex(name, new UnisolatedBTree(journal,UUID.randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
             
@@ -179,8 +175,6 @@ public class TestTx extends ProxyTestCase {
         
         final String name = "abc";
         
-        final int branchingFactor = 3;
-        
         final byte[] k1 = new byte[]{1};
         final byte[] k2 = new byte[]{2};
 
@@ -194,8 +188,7 @@ public class TestTx extends ProxyTestCase {
              * and commit the journal. 
              */
             
-            IIndex index = journal.registerIndex(name, new UnisolatedBTree(
-                    journal, branchingFactor, UUID.randomUUID()));
+            IIndex index = journal.registerIndex(name);
         
             assertNull(index.insert(k1, v1));
             
@@ -287,8 +280,6 @@ public class TestTx extends ProxyTestCase {
         
         final String name = "abc";
         
-        final int branchingFactor = 3;
-        
         final byte[] k1 = new byte[]{1};
 
         final byte[] v1 = new byte[]{1};
@@ -300,8 +291,7 @@ public class TestTx extends ProxyTestCase {
              * register an index and commit the journal. 
              */
             
-            journal.registerIndex(name, new UnisolatedBTree(journal,
-                    branchingFactor, UUID.randomUUID()));
+            journal.registerIndex(name);
             
             assertNotSame(0L,journal.commit());
             
@@ -322,15 +312,14 @@ public class TestTx extends ProxyTestCase {
              * in the unisolated index or in the index as isolated by tx2.
              */
             
-            IsolatedBTree ndx1 = (IsolatedBTree)journal.getIndex(name,tx1);
+            IsolatedFusedView ndx1 = (IsolatedFusedView)journal.getIndex(name,tx1);
             
             assertFalse(ndx1.contains(k1));
             
             assertNull(ndx1.insert(k1,v1));
             
-            // check the version counter in tx1.
-            assertEquals("versionCounter", 0, ndx1.getValue(k1)
-                    .getVersionCounter());
+            // existence check in tx1.
+            assertTrue(ndx1.contains(k1));
             
             // not visible in the other tx.
             assertFalse(journal.getIndex(name,tx2).contains(k1));
@@ -344,7 +333,8 @@ public class TestTx extends ProxyTestCase {
              */
             
             // commit tx1.
-            assertNotSame(0L,journal.commit(tx1));
+            final long commitTime1 = journal.commit(tx1);
+            assertNotSame(0L, commitTime1);
             
             // still not visible in the other tx.
             assertFalse(journal.getIndex(name,tx2).contains(k1));
@@ -352,20 +342,47 @@ public class TestTx extends ProxyTestCase {
             // but now visible in the unisolated index.
             assertTrue(journal.getIndex(name).contains(k1));
 
-            // check the version counter in the unisolated index.
-            assertEquals("versionCounter", 1, ((UnisolatedBTree) journal
-                    .getIndex(name)).getValue(k1).getVersionCounter());
+            // check the version timestamp in the unisolated index.
+            {
+
+                ITuple tuple = ((BTree) journal.getIndex(name)).lookup(k1,
+                        new Tuple(IRangeQuery.ALL));
+                
+                assertNotNull(tuple);
+                
+                assertFalse(tuple.isDeletedVersion());
+                
+                assertEquals("versionTimestamp", commitTime1, tuple
+                        .getVersionTimestamp());
+                
+            }
 
             /*
              * write a conflicting entry in tx2 and verify that validation of
              * tx2 fails.
              */
 
-            assertNull(journal.getIndex(name,tx2).insert(k1,v1a));
+            assertNull(journal.getIndex(name, tx2).insert(k1, v1a));
 
             // check the version counter in tx2.
-            assertEquals("versionCounter", 0, ((IsolatedBTree) journal
-                    .getIndex(name,tx2)).getValue(k1).getVersionCounter());
+            {
+
+                IsolatedFusedView isolatedView = (IsolatedFusedView) journal
+                        .getIndex(name, tx2);
+
+                Tuple tuple = ((BTree) journal.getIndex(name)).lookup(k1,
+                        new Tuple(IRangeQuery.ALL));
+
+                tuple = isolatedView.getWriteSet().lookup(k1, tuple);
+
+                assertNotNull(tuple);
+
+                assertFalse(tuple.isDeletedVersion());
+
+                assertEquals("versionTimestamp", tx2, tuple
+                        .getVersionTimestamp());
+                
+            }
 
             ITx tmp = journal.getTx(tx2);
             
@@ -411,8 +428,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
-                    .randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
 
@@ -429,9 +445,11 @@ public class TestTx extends ProxyTestCase {
         /*
          * Write v0 on tx0.
          */
-        final byte[] id0 = new byte[] { 1 };
+        final byte[] id0 = new byte[] { 0 };
         final byte[] v0 = getRandomData().array();
+        
         journal.getIndex(name,tx0).insert(id0, v0);
+        
         assertEquals(v0, journal.getIndex(name,tx0).lookup(id0));
 
         /*
@@ -440,8 +458,8 @@ public class TestTx extends ProxyTestCase {
          assertFalse(journal.getIndex(name,tx1).contains(id0));
 
          // delete the version.
-         assertEquals(v0, (byte[]) journal.getIndex(name,tx0)
-                .remove(id0));
+         assertEquals(v0, journal.getIndex(name, tx0).
+                 remove(id0));
 
          // no longer visible in that transaction.
          assertFalse(journal.getIndex(name,tx0).contains(id0));
@@ -501,7 +519,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
 
@@ -608,7 +626,7 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID.randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
 
@@ -694,7 +712,7 @@ public class TestTx extends ProxyTestCase {
         final long commitTime0;
         {
             
-            journal.registerIndex(name,new UnisolatedBTree(journal,UUID.randomUUID()));
+            journal.registerIndex(name);
             
             commitTime0 = journal.commit();
             System.err.println("commitTime0: "+journal.getCommitRecord());
@@ -809,7 +827,7 @@ public class TestTx extends ProxyTestCase {
         
         {
             
-            journal.registerIndex(name, new UnisolatedBTree(journal,UUID.randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
             
@@ -844,8 +862,6 @@ public class TestTx extends ProxyTestCase {
         assertTrue(journal.getIndex(name).contains(id0));
         assertEquals(v0, (byte[])journal.getIndex(name).lookup(id0));
 
-        // FIXME IsolatedBTree has remaining problems and needs a better
-        // test suite!
         // data version not visible in transaction.
         assertFalse(journal.getIndex(name,tx0).contains(id0));
         assertNull(journal.getIndex(name,tx0).lookup(id0));

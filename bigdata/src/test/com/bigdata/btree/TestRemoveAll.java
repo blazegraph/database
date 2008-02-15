@@ -119,8 +119,13 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 
         IRawStore store = new SimpleMemoryRawStore();
 
-        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
-                SimpleEntry.Serializer.INSTANCE);
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBranchingFactor(branchingFactor);
+        
+        BTree btree = BTree.create(store,metadata);
+
+//        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID());
 
         KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
         

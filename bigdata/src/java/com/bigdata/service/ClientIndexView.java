@@ -42,11 +42,13 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
@@ -54,6 +56,7 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.ResultSet;
@@ -62,11 +65,12 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadata;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * A client-side view of an index.
@@ -129,9 +133,8 @@ import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
  *       unavailable at the time of the request (continued operation during
  *       partial failure).
  * 
- * @todo The batch CRUD API (contains, insert, lookup, remove) operations could
- *       all execute operations in parallel against the index partitions that
- *       are relevant to their data (except, perhaps, for contains).
+ * @todo support isolated views, share cached data service information between
+ *       isolated and unisolated views.
  * 
  * @todo support failover metadata service discovery.
  * 
@@ -193,7 +196,9 @@ public class ClientIndexView implements IIndex {
     private final long tx;
 
     /**
-     * The transaction identifier for this index view.
+     * The transaction identifier -or- {@link ITx#UNISOLATED} iff the index view
+     * is unisolated -or- <code>- timestamp</code> for a historical read of
+     * the most recent committed state not later than <i>timestamp</i>.
      */
     public long getTx() {
         
@@ -213,16 +218,11 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
-     * The unique index identifier.
+     * The metadata for the {@link MetadataIndex} that manages the scale-out
+     * index. The metadata template for the managed scale-out index is available
+     * as a field on this object.
      */
-    private UUID indexUUID;
-
-    /**
-     * Whether or not the index supports isolation - this is a cached value.
-     * 
-     * @todo invalidate on drop/add.
-     */
-    private Boolean isolatable = null;
+    private final MetadataIndexMetadata metadataIndexMetadata;
     
     /**
      * Obtain the proxy for a metadata service. if this instance fails, then we
@@ -258,7 +258,8 @@ public class ClientIndexView implements IIndex {
      * @param name
      *            The index name.
      */
-    public ClientIndexView(IBigdataFederation fed, long tx, String name) {
+    public ClientIndexView(IBigdataFederation fed, long tx, String name,
+            MetadataIndexMetadata metadataIndexMetadata) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -272,42 +273,27 @@ public class ClientIndexView implements IIndex {
         
         this.name = name;
         
+        this.metadataIndexMetadata = metadataIndexMetadata;
+        
     }
 
     /**
-     * Note: This will fail if the index is not a scale-out index.
+     * Metadata for the {@link MetadataIndex} that manages the scale-out index
+     * (cached).
      */
-    public UUID getIndexUUID() {
-
-        if(indexUUID == null) {
+    public MetadataIndexMetadata getMetadataIndexMetadata() {
+     
+        return metadataIndexMetadata;
         
-            /*
-             * obtain the UUID for the managed scale-out index.
-             * 
-             * @todo do we cache this when we cache the metadata index?
-             */
-            
-            try {
+    }
+    
+    /**
+     * The metadata for the managed scale-out index.
+     */
+    public IndexMetadata getIndexMetadata() {
 
-                this.indexUUID = getMetadataService().getManagedIndexUUID(name);
-                
-                if(indexUUID == null) {
-                    
-                    throw new NoSuchIndexException(name);
-                    
-                }
-                
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
+        return getMetadataIndexMetadata().getManagedIndexMetadata();
 
-
-        }
-        
-        return indexUUID;
-        
     }
 
     /**
@@ -327,7 +313,7 @@ public class ClientIndexView implements IIndex {
          */
         try {
             
-            String _name = MetadataService.getMetadataName(name);
+            String _name = MetadataService.getMetadataIndexName(name);
             
             sb.append("\n" + _name + " : "
                     + getMetadataService().getStatistics(_name));
@@ -350,9 +336,9 @@ public class ClientIndexView implements IIndex {
             
             while(itr.hasNext()) {
                 
-                final byte[] val = (byte[]) itr.next();
+                final ITuple tuple = itr.next();
                 
-                final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil.deserialize(val);
+                final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil.deserialize(tuple.getValueStream());
                 
                 final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
                 
@@ -379,38 +365,6 @@ public class ClientIndexView implements IIndex {
         
     }
 
-    /**
-     * This reports the response for the index partition that contains an byte[]
-     * key (this index partition should always exist).
-     */
-    public boolean isIsolatable() {
-        
-        if (isolatable == null) {
-
-            final byte[] key = new byte[] {};
-
-            IPartitionMetadata pmd = getPartition(key);
-
-            IDataService dataService = getDataService(pmd);
-
-            try {
-
-                isolatable = Boolean.valueOf(dataService
-                        .isIsolatable(DataService.getIndexPartitionName(name,
-                                pmd.getPartitionId())));
-
-            } catch (Exception ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-        }
-        
-        return isolatable.booleanValue();
-        
-    }
-    
     public boolean contains(byte[] key) {
         
         if (batchOnly)
@@ -421,17 +375,29 @@ public class ClientIndexView implements IIndex {
         final BatchContains proc = new BatchContains(//
                 1, // n,
                 0, // offset
-                new byte[][] { (byte[]) key } // keys
+                new byte[][] { key } // keys
         );
 
-        final boolean[] ret = ((ResultBitBuffer) submit((byte[]) key, proc))
-                .getResult();
+        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
 
         return ret[0];
         
     }
-
-    public Object insert(byte[] key, Object value) {
+    
+    /**
+     * Counters are local to a specific index partition and are only available
+     * to unisolated procedures.
+     * 
+     * @throws UnsupportedOperationException
+     *             always
+     */
+    public ICounter getCounter() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    public byte[] insert(byte[] key, byte[] value) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -442,7 +408,7 @@ public class ClientIndexView implements IIndex {
                 1, // n,
                 0, // offset
                 new byte[][] { key }, // keys
-                new byte[][] { (byte[]) value }, // vals
+                new byte[][] { value }, // vals
                 true // returnOldValues
         );
 
@@ -452,7 +418,7 @@ public class ClientIndexView implements IIndex {
 
     }
 
-    public Object lookup(byte[] key) {
+    public byte[] lookup(byte[] key) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -471,7 +437,7 @@ public class ClientIndexView implements IIndex {
 
     }
 
-    public Object remove(byte[] key) {
+    public byte[] remove(byte[] key) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -481,7 +447,7 @@ public class ClientIndexView implements IIndex {
         final BatchRemove proc = new BatchRemove(//
                 1, // n,
                 0, // offset
-                new byte[][] { (byte[]) key }, // keys
+                new byte[][] { key }, // keys
                 true // returnOldValues
         );
 
@@ -549,16 +515,6 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
-     * Submits an index procedure that operations on a single key to the
-     * appropriate index partition returning the result of that procedure.
-     * 
-     * @param key
-     *            The key.
-     * @param proc
-     *            The procedure.
-     * 
-     * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
-     * 
      * @todo run on the {@link #getThreadPool()} in order to limit client
      *       parallelism to the size of the thread pool.
      */
@@ -597,32 +553,6 @@ public class ClientIndexView implements IIndex {
 
     }
     
-    /**
-     * The procedure will be transparently applied against each index partition
-     * spanned by the given key range.
-     * <p>
-     * Note: Since this variant of <i>submit()</i> does not split keys the
-     * <i>fromIndex</i> and <i>toIndex</i> in the {@link Split}s reported to
-     * the {@link IResultHandler} will be zero (0).
-     * 
-     * @param fromKey
-     *            The lower bound (inclusive) -or- <code>null</code> if there
-     *            is no lower bound.
-     * @param toKey
-     *            The upper bound (exclusive) -or- <code>null</code> if there
-     *            is no upper bound.
-     * @param proc
-     *            The procedure. If the procedure implements the
-     *            {@link IParallelizableIndexProcedure} marker interface then it
-     *            MAY be executed in parallel against the relevant index
-     *            partition(s).
-     * @param resultHandler
-     *            When defined, results from each procedure application will be
-     *            reported to this object.
-     * 
-     * @see IParallelizableIndexProcedure
-     * @see IResultHandler
-     */
     public void submit(byte[] fromKey, byte[] toKey,
             final IIndexProcedure proc, final IResultHandler resultHandler) {
 
@@ -1271,4 +1201,15 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /**
+     * This operation is not supported - the resource description of a scale-out
+     * index would include all "live" resources in the corresponding
+     * {@link MetadataIndex}.
+     */
+    public IResourceMetadata[] getResourceMetadata() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

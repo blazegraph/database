@@ -69,8 +69,8 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     /**
      * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
      * holding live data for this partition. The entries in the array reflect
-     * the creation time of the index segments. The earliest segment is listed
-     * first. The most recently created segment is listed last. Only the
+     * the creation time of the resources. The oldest resource is listed first.
+     * The most recent resource is listed last. Only the
      * {@link ResourceState#Live} resources must be read in order to provide a
      * consistent view of the data for the index partition.
      * {@link ResourceState#Dead} resources will eventually be scheduled for
@@ -131,7 +131,9 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     }
 
     public IResourceMetadata[] getResources() {
+        
         return resources;
+        
     }
 
     /**
@@ -184,7 +186,37 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     }
 
     /**
-     * Return an ordered array of the filenames for the live index segments.
+     * Return only the live resources.
+     * 
+     * @return The live resources in order from the oldest to the most recent.
+     */
+    public IResourceMetadata[] getLiveResources() {
+
+        final int n = getLiveCount();
+        
+        IResourceMetadata[] a = new IResourceMetadata[n];
+        
+        int j = 0;
+        
+        for(int i=0; i<resources.length; i++) {
+            
+            if(resources[i].state()==ResourceState.Live) {
+                
+                a[j++] = resources[i];
+                
+            }
+            
+        }
+        
+        return a;
+        
+    }
+    
+    /**
+     * Return an ordered array of the filenames for the live index resources.
+     * 
+     * @todo is this only the live {@link IndexSegment} filenames? Who uses this
+     *       information?
      */
     public String[] getLiveSegmentFiles() {
 

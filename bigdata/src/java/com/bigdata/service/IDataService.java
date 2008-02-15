@@ -29,17 +29,18 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
-import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.rawstore.IBlockStore.IBlock;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -147,14 +148,6 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo add support for reading low-level records from a journal or index
- *       segment in support of the {@link BigdataRepository}. The API should
- *       provide a means to obtain a socket from which record data may be
- *       streamed. The client sends the resource identifier (UUID of the journal
- *       or index segment) and the address of the record and the data service
- *       sends the record data.  This is designed for streaming reads of up to
- *       64M or more.
- * 
  * @todo add support for triggers. unisolated triggers must be asynchronous if
  *       they will take actions with high latency (such as writing on a
  *       different index partition, which could be remote). Low latency actions
@@ -169,6 +162,13 @@ import com.bigdata.sparse.SparseRowStore;
  */
 public interface IDataService extends IRemoteTxCommitProtocol, Remote {
 
+    /**
+     * The unique identifier for this data service.
+     * 
+     * @return The unique data service identifier.
+     */
+    public UUID getServiceUUID() throws IOException;
+    
     /**
      * A description of the journal currently backing the data service.
      * 
@@ -194,20 +194,9 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *            operation is generally performed by the
      *            {@link IMetadataService} which manages scale-out indices).
      * 
-     * @param indexUUID
-     *            The UUID that identifies the index. When the named index
-     *            corresponds to a partition of a scale-out index, then you MUST
-     *            provide the indexUUID for that scale-out index. Otherwise this
-     *            MUST be a random UUID, e.g., using {@link UUID#randomUUID()}.
-     * 
-     * @param ctor
-     *            An object that will be sent to the data service and used to
-     *            create the index to be registered on that data service.
-     * 
-     * @param pmd
-     *            The partition metadata for the index (optional, required only
-     *            when creating an instance of a partitioned index).
-     * 
+     * @param metadata
+     *            The metadata describing the index.
+     *            
      * @return <code>true</code> iff the index was created. <code>false</code>
      *         means that the index was pre-existing, but the metadata specifics
      *         for the index MAY differ from those specified.
@@ -216,22 +205,24 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *       and exception iff not consistent. right now it just silently
      *       succeeds if the index already exists.
      */
-    public void registerIndex(String name, UUID uuid, IIndexConstructor ctor, IPartitionMetadata pmd)
+    public void registerIndex(String name, IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException;
 
     /**
-     * Return the unique index identifier for the named index.
+     * Return the metadata for the named index.
      * 
      * @param name
      *            The index name.
-     *            
-     * @return The index UUID -or- <code>null</code> if the index is not
-     *         registered on this {@link IDataService}.
+     * 
+     * @return The metadata for the named index -or- <code>null</code> if the
+     *         named index is not register on this {@link IDataService}.
      *         
      * @throws IOException
+     * 
+     * @todo should pass tx to this method in case the metadata is updated.
      */
-    public UUID getIndexUUID(String name) throws IOException;
-
+    public IndexMetadata getIndexMetadata(String name) throws IOException;
+    
     /**
      * Return various statistics about the named index.
      * 
@@ -243,27 +234,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @throws IOException
      */
     public String getStatistics(String name) throws IOException;
-    
-    /**
-     * <p>
-     * Return <code>true</code> iff the named index exists and supports
-     * transactional isolation.
-     * </p>
-     * <p>
-     * Note:If you are inquiring about a scale-out index then you MUST provide
-     * the name of an index partition NOT the name of the metadata index.
-     * </p>
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> does not identify a registered index.
-     * 
-     * @throws IOException
-     */
-    public boolean isIsolatable(String name) throws IOException;
-    
+        
     /**
      * Drops the named index.
      * <p>
@@ -293,7 +264,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * is returned or the {@link ResultSet#isLast()} flag is set, indicating
      * that all keys up to (but not including) the <i>startKey</i> have been
      * visited. See {@link ClientIndexView} (scale-out indices) and
-     * {@link RangeQueryIterator} (unpartitioned indices), both of which
+     * {@link DataServiceRangeIterator} (unpartitioned indices), both of which
      * encapsulate this method.
      * </p>
      * 
@@ -423,5 +394,28 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      */
     public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException, IOException;
- 
+
+    /**
+     * @todo This is a first try at adding support for reading low-level records
+     *       from a journal or index segment in support of the
+     *       {@link BigdataRepository}.
+     *       <p>
+     *       The API should provide a means to obtain a socket from which record
+     *       data may be streamed. The client sends the resource identifier
+     *       (UUID of the journal or index segment) and the address of the
+     *       record and the data service sends the record data. This is designed
+     *       for streaming reads of up to 64M or more (a record recorded on the
+     *       store as identified by the address).
+     * 
+     * @param resource
+     *            The description of the resource containing that block.
+     * @param addr
+     *            The address of the block in that resource.
+     *            
+     * @return An object that may be used to read the block from the data
+     *         service.
+     */
+    public IBlock readBlock(IResourceMetadata resource, long addr)
+            throws IOException;
+
 }

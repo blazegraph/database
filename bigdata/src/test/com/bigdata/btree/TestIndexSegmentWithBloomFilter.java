@@ -35,8 +35,9 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -96,7 +97,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * 
      * @return The btree.
      */
-    public BTree getBTree(int branchingFactor) {
+    public BTree getBTree(int branchingFactor, double errorRate) {
 
         Properties properties = getProperties();
 
@@ -116,10 +117,18 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         }
 
         System.err.println("Opening journal: " + filename);
-        Journal journal = new Journal(properties);
+        
+        IRawStore store = new SimpleMemoryRawStore(); 
 
-        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
-                SimpleEntry.Serializer.INSTANCE);
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBranchingFactor(branchingFactor);
+        
+        metadata.setErrorRate(errorRate);
+        
+        BTree btree = BTree.create(store, metadata);
+
+//                BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID());
 
         return btree;
 
@@ -136,7 +145,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * {@link IndexSegment}. However, input trees of different heights also
      * stress different parts of the algorithm.
      */
-    final int[] branchingFactors = new int[]{3,4,5,10,20};//64};//128};//,512};
+    final int[] branchingFactors = new int[]{3,4,5,10,13};//64};//128};//,512};
     
     /**
      * A stress test for building {@link IndexSegment}s. A variety of
@@ -152,14 +161,16 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             
             int m = branchingFactors[i];
             
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m ) );
+            double errorRate = 1/64d;
             
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m ) );
+            
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m ) );
 
-            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m ) );
+            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m*m ) );
 
             // @todo overflows the initial journal extent.
-//            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m*m*m*m ) );
+//            doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m,errorRate), m, m*m*m*m ) );
 
         }
         
@@ -204,7 +215,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         final int m = 3; // for input and output trees.
         
-        BTree btree = getBTree(m);
+        final double errorRate = 1/64d;
+        
+        final BTree btree = getBTree(m,errorRate);
         
         SimpleEntry v3 = new SimpleEntry(3);
         SimpleEntry v5 = new SimpleEntry(5);
@@ -229,8 +242,14 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                 + "), out(m=" + m + ")");
 
+        final long commitTime = System.currentTimeMillis();
+        
         IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
-                tmpDir, btree, m, 1/64.);
+                tmpDir, btree.getEntryCount(), btree.entryIterator(), m, btree
+                        .getIndexMetadata(), commitTime);
+        
+//        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
+//                tmpDir, btree, m, 1/64.);
 
         // the bloom filter instance before serialization.
         BloomFilter bloomFilter = builder2.bloomFilter;
@@ -271,7 +290,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         assertFalse("9",bloomFilter.contains(i2k(9)));
         
         byte[][] keys = new byte[btree.getEntryCount()][];
-        Object[] vals = new Object[btree.getEntryCount()];
+        byte[][] vals = new byte[btree.getEntryCount()][];
 
         getKeysAndValues(btree,keys,vals);
 
@@ -321,18 +340,45 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
             /*
              * Build the index segment.
              */
-            System.err.println("Building index segment (w/o bloom): in(m="
-                    + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
-                    + "), out(m=" + m + ")");
             
-            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
+            final long commitTime = System.currentTimeMillis();
+            
+            {
+                
+                System.err.println("Building index segment (w/o bloom): in(m="
+                        + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
+                        + "), out(m=" + m + ")");
+                
+                IndexMetadata metadata = btree.getIndexMetadata().clone();
+                
+                metadata.setErrorRate(0.0);
 
-            System.err.println("Building index segment (w/ bloom): in(m="
-                    + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
-                    + "), out(m=" + m + ")");
+                new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
+                        btree.entryIterator(), m, metadata, commitTime);
+                
+//              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
+                
+            }
+            
+            final IndexSegmentBuilder builder2;
+            {
 
-            IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
-                    tmpDir, btree, m, 1/64.);
+                System.err.println("Building index segment (w/ bloom): in(m="
+                        + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
+                        + "), out(m=" + m + ")");
+            
+                IndexMetadata metadata = btree.getIndexMetadata().clone();
+                
+                metadata.setErrorRate(1/64d);
+                
+                builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
+                        .getEntryCount(), btree.entryIterator(), m, metadata,
+                        commitTime);
+            
+//            IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
+//                    tmpDir, btree, m, 1/64.);
+                
+            }
 
             /*
              * Verify can load the index file and that the metadata
@@ -359,7 +405,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              */
             
             byte[][] keys = new byte[btree.getEntryCount()][];
-            Object[] vals = new Object[btree.getEntryCount()];
+            byte[][] vals = new byte[btree.getEntryCount()][];
 
             getKeysAndValues(btree,keys,vals);
 

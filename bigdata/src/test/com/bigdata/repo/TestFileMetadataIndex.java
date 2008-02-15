@@ -403,11 +403,6 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
          * Verify that you can still read back the file version data using a
          * historical view of the file data index whose commit time is less than
          * version1's timestamp.
-         * 
-         * FIXME readback from a historical version is failing but I have not
-         * tracked down the reason yet. I assume that the historical read is not
-         * being setup correctly when the task gets executed on the concurrent
-         * journal by the data service, but that could be a red herring.
          */
         {
 

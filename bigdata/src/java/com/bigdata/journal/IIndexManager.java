@@ -82,7 +82,7 @@ public interface IIndexManager extends IIndexStore {
      * @todo The provided {@link BTree} must serve as a prototype so that it is
      *       possible to retain additional metadata.
      */
-    public IIndex registerIndex(String name, IIndex btree);
+    public IIndex registerIndex(String name, BTree btree);
 
     /**
      * Drops the named index (unisolated). The index will no longer participate

@@ -32,9 +32,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.ResourceState;
 
 /**
  * A purely transient append-only implementation useful when data need to be
@@ -127,6 +130,75 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
     
+    /**
+     * Temporary stores do not have resource descriptions.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public IResourceMetadata getResourceMetadata() {
+        
+        return new IResourceMetadata() {
+
+            public boolean equals(IResourceMetadata o) {
+             
+                return this == o;
+                
+            }
+
+            public long getCommitTime() {
+                
+                // does not support commit
+                return 0L;
+                
+            }
+
+            public String getFile() {
+
+                // no backing file.
+                return null;
+                
+            }
+
+            public UUID getUUID() {
+
+                // no UUID.
+                return null;
+                
+            }
+
+            public boolean isIndexSegment() {
+
+                // not index segment.
+                return false;
+                
+            }
+
+            public boolean isJournal() {
+                
+                // not journal.
+                return false;
+                
+            }
+
+            public long size() {
+
+                // #of bytes not available.
+                return 0L;
+                
+            }
+
+            public ResourceState state() {
+
+                // presumed live.
+                return ResourceState.Live;
+                
+            }
+            
+        };
+        
+    }
+
     /**
      * This always returns <code>null</code>.
      */

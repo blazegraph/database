@@ -43,7 +43,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -102,8 +102,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       Note: Most reads are nodes and leaves of {@link BTree}s which are
  *       already cached by the btree and should not stay long in a read cache in
  *       the journal itself - they will only be re-read if we reload the
- *       {@link BTree} from its {@link BTreeMetadata}. Some reads are
- *       {@link BTreeMetadata} records and there are a few {@link ICommitRecord}s.
+ *       {@link BTree} from its {@link IndexMetadata}. Some reads are
+ *       {@link IndexMetadata} records and there are a few {@link ICommitRecord}s.
  *       That is all the different kinds of objects in the store at this time.
  *       If we develop a read/write variant of the store then the metadata for
  *       the allocation blocks will need to be cached.

@@ -382,7 +382,7 @@ abstract public class AbstractTx implements ITx {
                      * create transactions from unisolated operations.
                      */
 
-                    mergeOntoGlobalState();
+                    mergeOntoGlobalState(commitTime);
 
                     // // Atomic commit.
                     // journal.commitNow(commitTime);
@@ -463,7 +463,7 @@ abstract public class AbstractTx implements ITx {
      * successfully prepared and hence is known to have validated successfully.
      * The default implementation is a NOP.
      */
-    protected void mergeOntoGlobalState() {
+    protected void mergeOntoGlobalState(long commitTime) {
     
         assert lock.isHeldByCurrentThread();
         

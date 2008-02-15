@@ -38,14 +38,14 @@ import org.apache.log4j.Level;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.IndexSegmentMerger;
 import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.SimpleEntry;
-import com.bigdata.btree.IndexSegmentMerger.MergedEntryIterator;
-import com.bigdata.btree.IndexSegmentMerger.MergedLeafIterator;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -102,8 +102,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         
     }
     
-    protected final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor(
-            UnisolatedBTreePartition.DEFAULT_BRANCHING_FACTOR);
+    protected final IndexPartitionConstructor ctor = new IndexPartitionConstructor(
+            BTree.DEFAULT_BRANCHING_FACTOR);
     
     /**
      * Test the ability to create and update the metadata for a partition.
@@ -428,8 +428,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, managedIndexUUID,
-                SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
         
         /*
          * populate the btree with some data.
@@ -485,7 +484,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg);
         
@@ -544,8 +542,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, managedIndexUUID,
-                SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
         
         /*
          * populate the btree with some data.
@@ -603,7 +600,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg01 = new IndexSegmentFileStore(outFile01).load();
-        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -616,8 +612,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * create a new btree and insert the other keys/values into this btree.
          */
-        btree = new BTree(store, 3, managedIndexUUID,
-                SimpleEntry.Serializer.INSTANCE);
+        btree = new BTree(store, 3, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
         
 //        btree.insert(new BatchInsert(values2.length, keys2, values2));
         
@@ -642,14 +637,38 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
         assertTrue(!outFile02.exists() || outFile02.delete());
 
-        MergedLeafIterator mergeItr = new IndexSegmentMerger(100, btree, seg01)
-                .merge();
+        /*
+         * Note: This is NOT a compacting merge. It does not remove historical
+         * or deleted versions. Therefore we can use the range count of the
+         * merged view as the #of entries in the output index segment.
+         */
         
-        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile02, null,
-                mergeItr.nentries, new MergedEntryIterator(mergeItr), 100,
-                btree.getNodeSerializer().getValueSerializer(),
-                false/* useChecksum */, null/* recordCompressor */,
-                0d/* errorRate */, btree.getIndexUUID());
+        IIndex merge = new ReadOnlyFusedView(
+                new AbstractBTree[] { btree, seg01 });
+        
+        final long rangeCount = merge.rangeCount(null,null);
+        
+        IEntryIterator src = merge.rangeIterator(//
+                null,//fromKey
+                null,//toKey
+                0,//capacity
+                IRangeQuery.KEYS|IRangeQuery.VALS|IRangeQuery.DELETED,//
+                null//filter @todo history policy?
+        );
+        
+        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(//
+                outFile02,//
+                null,//
+                (int)rangeCount,//
+                src, //
+                100,//m
+                btree.getNodeSerializer().getValueSerializer(),//
+                false,// useChecksum
+                merge.isIsolatable(),//
+                 null,// recordCompressor
+                0d,// errorRate
+                btree.getIndexMetadata().getIndexUUID()//
+                );
 
         /*
          * update the metadata index for this partition.
@@ -669,8 +688,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * data.
          */
         IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
-        // @todo btree.getNodeSerializer().getValueSerializer());
-
+       
         assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                 seg02.entryIterator());
 
@@ -703,13 +721,21 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
     /**
      * A stress test.
      * 
-     * @param ntrials #of trials
-     * @param nops #of mutation operations per trial (insert, remove)
+     * @param ntrials
+     *            #of trials
+     * @param nops
+     *            #of mutation operations per trial (insert, remove)
+     *            
      * @throws IOException
      */
     protected void doStressTest_evictSegments_onePartition_withMerge(int ntrials, int nops) throws IOException {
         
-        // @todo when true only insert operations are performed (does not test merge of deleted keys).
+        /*
+         * When true only insert operations are performed (does not test merge
+         * of deleted keys).
+         * 
+         * @todo test with deletes also!!!
+         */
         final boolean insertOnly = true;
 
         final Random r = new Random();
@@ -756,24 +782,30 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         // The branching factor used on the index segment.
         final int mseg = 4*Bytes.kilobyte32;
         
-        // The branching factor used on the index merge process.
-        final int mseg2 = 4*Bytes.kilobyte32;
+//        // The branching factor used on the index merge process.
+//        final int mseg2 = 4*Bytes.kilobyte32;
 
         // When true, the index segment will be validated in each trial against groundTruth.
         final boolean validateEachTrial = false;
         
-        // ground truth btree.
-        BTree groundTruth = new BTree(store, mmut, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
+        /*
+         * Ground truth btree
+         * 
+         * Note: This is also an isolatable index since we need deletion markers
+         * in the index in order to be able to compare range counts with the
+         * generated index segment.
+         */
+        BTree groundTruth = new BTree(store, mmut, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
 
         // the current index segment and null if there is none yet.
         IndexSegment seg = null;
         
-        int nextSegId = 0;
+//        int nextSegId = 0;
         
         for(int trial=0; trial<ntrials; trial++) {
         
             // test data btree - new tree on each trial!
-            BTree testData = new BTree(store, mmut, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
+            BTree testData = new BTree(store, mmut, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
 
             /*
              * Insert / remove random key/values.
@@ -834,7 +866,10 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 //                    System.err.println("trial="+trial+", op="+i+", remove("+BytesUtil.toString(key)+")");
                     System.err.println("trial="+trial+", op="+i+", remove("+tmp+")");
 
-                    // remove the key from the ground truth
+                    // must be to support deletion markers.
+                    assert groundTruth.isIsolatable();
+                    
+                    // remove the key from the ground truth (writes deletion marker).
                     groundTruth.remove(tmp);
 
                     /* remove the key from the test data.
@@ -887,7 +922,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * open and verify the index segment against the btree data.
                  */
                 seg = new IndexSegmentFileStore(outFile01).load();
-//                        @todo testData.getNodeSerializer().getValueSerializer());
+                assert seg.isIsolatable();
 
                 if(validateEachTrial) assertSameBTree(testData, seg);
 
@@ -910,37 +945,70 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
 
                 assertTrue(!outFile02.exists() || outFile02.delete());
 
-                // merge the data from the btree on the journal and the index
-                // segment.
-                MergedLeafIterator mergeItr = new IndexSegmentMerger(mseg2,
-                        testData, seg).merge();
-
                 /*
-                 * verify #of entries that are passed on by the merge.
-                 * 
-                 * @todo this assertion is failing. the problem may have been
-                 * pre-existing, or it may have been introduced by the changes
-                 * in the IEntryIterator and ITuple API in IndexSegmentMerger. I
-                 * certainly do not recall seeing this problem before I made
-                 * those changes.
-                 * 
-                 * The problem is that it is over-reporting the #of entries.
-                 * 
-                 * junit.framework.AssertionFailedError: entryCount expected:<29894>
+                 * Note: This is NOT a compacting merge. It does not remove historical
+                 * or deleted versions. Therefore we can use the range count of the
+                 * merged view as the #of entries in the output index segment.
                  */
-                assertEquals("entryCount",expectedEntryCount,mergeItr.nentries);
                 
-                // build the merged index segment.
-                IndexSegmentBuilder builder = new IndexSegmentBuilder(
-                        outFile02, null, mergeItr.nentries,
-                        new MergedEntryIterator(mergeItr), mseg, testData
-                                .getNodeSerializer().getValueSerializer(),
-                        false/* useChecksum */, null/* recordCompressor */,
-                        0d/* errorRate */, testData.getIndexUUID());
-
-                // close the merged leaf iterator (and release its buffer/file).
-                // @todo this should be automatic when the iterator is exhausted but I am not seeing that.
-                mergeItr.close();
+                IIndex merge = new ReadOnlyFusedView(
+                        new AbstractBTree[] { testData, seg });
+                
+                final long rangeCount = merge.rangeCount(null,null);
+                
+                IEntryIterator src = merge.rangeIterator(//
+                        null,//fromKey
+                        null,//toKey
+                        0,//capacity
+                        IRangeQuery.KEYS|IRangeQuery.VALS|IRangeQuery.DELETED,//
+                        null//filter @todo history policy?
+                );
+                
+                IndexSegmentBuilder builder = new IndexSegmentBuilder(//
+                        outFile02,//
+                        null,//
+                        (int)rangeCount,//
+                        src, //
+                        100,//m
+                        testData.getNodeSerializer().getValueSerializer(),//
+                        false,// useChecksum
+                        merge.isIsolatable(),//
+                         null,// recordCompressor
+                        0d,// errorRate
+                        testData.getIndexMetadata().getIndexUUID()//
+                        );
+                
+//                // merge the data from the btree on the journal and the index
+//                // segment.
+//                MergedLeafIterator mergeItr = new IndexSegmentMerger(mseg2,
+//                        testData, seg).merge();
+//
+//                /*
+//                 * verify #of entries that are passed on by the merge.
+//                 * 
+//                 * @todo this assertion is failing. the problem may have been
+//                 * pre-existing, or it may have been introduced by the changes
+//                 * in the IEntryIterator and ITuple API in IndexSegmentMerger. I
+//                 * certainly do not recall seeing this problem before I made
+//                 * those changes.
+//                 * 
+//                 * The problem is that it is over-reporting the #of entries.
+//                 * 
+//                 * junit.framework.AssertionFailedError: entryCount expected:<29894>
+//                 */
+//                assertEquals("entryCount",expectedEntryCount,mergeItr.nentries);
+//                
+//                // build the merged index segment.
+//                IndexSegmentBuilder builder = new IndexSegmentBuilder(
+//                        outFile02, null, mergeItr.nentries,
+//                        new MergedEntryIterator(mergeItr), mseg, testData
+//                                .getNodeSerializer().getValueSerializer(),
+//                        false/* useChecksum */, null/* recordCompressor */,
+//                        0d/* errorRate */, testData.getIndexUUID());
+//
+//                // close the merged leaf iterator (and release its buffer/file).
+//                // @todo this should be automatic when the iterator is exhausted but I am not seeing that.
+//                mergeItr.close();
                 
                 // verify #of entries in the index segment plan.
                 assertEquals("entryCount", expectedEntryCount,
@@ -965,7 +1033,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
                  * expected data.
                  */
                 IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
-//                 @todo testData.getNodeSerializer().getValueSerializer());
+                assert seg02.isIsolatable();
 
                 if(validateEachTrial) assertSameBTree(groundTruth,seg02);
                 
@@ -1053,7 +1121,7 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         md.put(new byte[]{}, new PartitionMetadata(0,dataServices));
         
         // btree to be filled with data.
-        BTree btree = new BTree(store, 3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
+        BTree btree = new BTree(store, 3, managedIndexUUID,true/*isolatable*/,null/*conflictResolver*/);
         
         /*
          * populate the btree with some data.
@@ -1110,7 +1178,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg01 = new IndexSegmentFileStore(outFile01).load();
-        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree,seg01);
         
@@ -1123,7 +1190,8 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
         /*
          * create a new btree and insert the other keys/values into this btree.
          */
-        btree = new BTree(store,3, managedIndexUUID, SimpleEntry.Serializer.INSTANCE);
+        btree = new BTree(store, 3, managedIndexUUID, btree.getIndexMetadata()
+                .isIsolatable(), btree.getIndexMetadata().getConflictResolver());
         
 //        btree.insert(new BatchInsert(values2.length, keys2, values2));
 
@@ -1163,7 +1231,6 @@ public class TestMetadataIndex extends AbstractBTreeTestCase {
          * open and verify the index segment against the btree data.
          */
         IndexSegment seg02 = new IndexSegmentFileStore(outFile02).load();
-        // @todo btree.getNodeSerializer().getValueSerializer());
 
         assertSameBTree(btree, seg02);
 

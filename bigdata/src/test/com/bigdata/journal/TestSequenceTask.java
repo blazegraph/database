@@ -33,8 +33,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 
 /**
  * Test suite for {@link SequenceTask}
@@ -92,10 +93,11 @@ public class TestSequenceTask extends ProxyTestCase {
                 
                 new AbstractTask[] {
 
-                new RegisterIndexTask(journal, resource[0],
-                                        new UnisolatedBTree(journal, indexUUID)),
-                new AbstractTask(journal,
-                        ITx.UNISOLATED, false/*readOnly*/, resource) {
+                new RegisterIndexTask(journal, resource[0], BTree.create(
+                        journal, new IndexMetadata(resource[0], indexUUID))),
+                                
+                new AbstractTask(journal, ITx.UNISOLATED, false/* readOnly */,
+                        resource) {
 
                     /**
                      * The task just sets a boolean value and returns the name of the
@@ -168,12 +170,13 @@ public class TestSequenceTask extends ProxyTestCase {
                 
                 new AbstractTask[] {
 
-                new RegisterIndexTask(journal, resource[0],
-                                        new UnisolatedBTree(journal, indexUUID)),
+                new RegisterIndexTask(journal, resource[0], BTree.create(
+                        journal, new IndexMetadata(resource[0], UUID
+                                .randomUUID()))),
 
 
-                new AbstractTask(journal,
-                        ITx.UNISOLATED, false/*readOnly*/, resource) {
+                new AbstractTask(journal, ITx.UNISOLATED, false/* readOnly */,
+                        resource) {
 
                     /**
                      * Write on the index that we just created.

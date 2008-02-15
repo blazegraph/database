@@ -38,6 +38,8 @@ import java.io.ObjectInput;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.Name2Addr;
+
 /**
  * Fast special purpose serialization onto a managed byte[] buffer conforming to
  * the {@link DataOutput} API.
@@ -88,7 +90,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
     /**
      * Reads the entire input stream into the buffer. The data are then
      * available in {@link #buf} from position 0 (inclusive) through position
-     * {@link #len} (exclusive).
+     * {@link #pos} (exclusive).
      */
     public DataOutputBuffer(InputStream in) throws IOException {
 
@@ -112,7 +114,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
     /**
      * Reads the entire input stream into the buffer. The data are then
      * available in {@link #buf} from position 0 (inclusive) through position
-     * {@link #len} (exclusive).
+     * {@link #pos} (exclusive).
      */
     public DataOutputBuffer(ObjectInput in) throws IOException {
 
@@ -171,7 +173,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
             b = in.readByte();
 
-            buf[this.len++] = (byte) (b & 0xff);
+            buf[this.pos++] = (byte) (b & 0xff);
             
             c++;
 
@@ -181,19 +183,19 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
     
     final public void writeBoolean(final boolean v) throws IOException {
 
-        if (len + 1 > buf.length)
-            ensureCapacity(len + 1);
+        if (pos + 1 > buf.length)
+            ensureCapacity(pos + 1);
 
-        buf[len++] = v ? (byte)1 : (byte)0;
+        buf[pos++] = v ? (byte)1 : (byte)0;
 
     }
 
     final public void writeByte(final int v) throws IOException {
 
-        if (len + 1 > buf.length)
-            ensureCapacity(len + 1);
+        if (pos + 1 > buf.length)
+            ensureCapacity(pos + 1);
 
-        buf[len++] = (byte) (v & 0xff);
+        buf[pos++] = (byte) (v & 0xff);
 
     }
 
@@ -236,11 +238,11 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
     final public void writeChar(final int v) throws IOException {
 
-        if (len + 2 > buf.length)
-            ensureCapacity(len + 2);
+        if (pos + 2 > buf.length)
+            ensureCapacity(pos + 2);
 
-        buf[len++] = (byte) (v >>> 8);
-        buf[len++] = (byte) (v >>> 0);
+        buf[pos++] = (byte) (v >>> 8);
+        buf[pos++] = (byte) (v >>> 0);
 
     }
 
@@ -249,8 +251,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         // #of bytes == #of characters (writes only the low bytes).
         final int len = s.length();
 
-        if (this.len + len > buf.length)
-            ensureCapacity(this.len + len);
+        if (this.pos + len > buf.length)
+            ensureCapacity(this.pos + len);
 
         for (int i = 0 ; i < len ; i++) {
             
@@ -265,15 +267,15 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         // #of characters (twice as many bytes).
         final int len = s.length();
         
-        if (this.len + (len * 2) > buf.length)
-            ensureCapacity(this.len + (len * 2));
+        if (this.pos + (len * 2) > buf.length)
+            ensureCapacity(this.pos + (len * 2));
 
         for (int i = 0 ; i < len ; i++) {
 
             final char v = s.charAt(i);
             
-            buf[this.len++] = (byte) (v >>> 8);
-            buf[this.len++] = (byte) (v >>> 0);
+            buf[this.pos++] = (byte) (v >>> 8);
+            buf[this.pos++] = (byte) (v >>> 0);
 
 //            write((v >>> 8) & 0xFF); 
 //            
@@ -289,10 +291,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *       but the use cases for serializing the nodes and leaves of a btree
      *       do not suggest any requirement for Unicode (if you assume that the
      *       application values are already being serialized as byte[]s - which
-     *       is always true when there is a client-server divide). The RDF value
-     *       serializer does use this method right now, but that will be client
-     *       side code as soon we as refactor to isolate the client and the
-     *       server.
+     *       is always true when there is a client-server divide). It is used by
+     *       {@link Name2Addr} to store the index names.
      */
     public void writeUTF(final String str) throws IOException {
         

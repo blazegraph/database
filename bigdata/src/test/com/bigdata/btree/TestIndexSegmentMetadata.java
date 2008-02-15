@@ -34,10 +34,11 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
- * Test suite for {@link IndexSegmentMetadata}.
+ * Test suite for {@link IndexSegmentCheckpoint}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,7 +60,7 @@ public class TestIndexSegmentMetadata extends TestCase {
     }
 
     /**
-     * Test the ability to create an {@link IndexSegmentMetadata} record, write
+     * Test the ability to create an {@link IndexSegmentCheckpoint} record, write
      * it on a file, and read back the same data from the file. The data for
      * this test are somewhat faked since there are assertions on legal metadata
      * and we can not write arbitrary values into the various fields.
@@ -68,49 +69,107 @@ public class TestIndexSegmentMetadata extends TestCase {
      */
     public void test_write_read01() throws IOException {
 
-//        IRawStore store = new SimpleMemoryRawStore();
-
-        int branchingFactor = 3;
-
-        UUID indexUUID = UUID.randomUUID();
-
-//        IValueSerializer valSer = ByteArrayValueSerializer.INSTANCE;
-//        
-//        BTree btree = new BTree(store,branchingFactor,indexUUID,valSer);
-//        
-//        btree.insert(new byte[]{}, new byte[]{1,2,3});
-//
-//        btree.write();
-
-        int offsetBits = 48;
+        /*
+         * Note: allows records up to 64M in length.
+         */
+        final int offsetBits = WormAddressManager.BLOB_OFFSET_BITS;
 
         /*
-         * @todo this probably needs to be a custom address manager for the
-         * IndexSegmentFileStore.
+         * Fake a checkpoint record. The only parts of this that we need are the
+         * addresses of the nodes and blobs. Those addresses MUST be formed as
+         * relative to the BASE region of the file. The offsets encoded within
+         * those addresses will be used to decode addresses in the non-BASE
+         * regions of the file.
+         * 
+         * Note: the checkpoint ctor has a variety of assertions so that
+         * constrains how we can generate this fake checkpoint record.
          */
-        WormAddressManager am = new WormAddressManager(offsetBits);
+        final IndexSegmentCheckpoint checkpoint;
+        final long offsetNodes;
+        final long offsetBlobs;
+        final int sizeNodes;
+        final int sizeBlobs;
+        final int height = 1;
+        final int nleaves = 5;
+        final int nnodes = 1;
+        final int nentries = 29;
+        final int maxNodeOrLeafLength = 128; // arbitrary non-zero value.
+        final long addrLeaves;
+        final long addrNodes;
+        final long addrRoot;
+        final long addrBlobs;
+        final long addrBloom;
+        final long addrMetadata;
+        final long length;
+        final UUID segmentUUID = UUID.randomUUID();
+        final long commitTime = System.currentTimeMillis();
+        {
+
+            // Used to encode the addresses.
+            WormAddressManager am = new WormAddressManager(offsetBits);
+
+            final int sizeLeaves = 216;
+            
+            final long offsetLeaves = IndexSegmentCheckpoint.SIZE;
+            
+            addrLeaves = am.toAddr(sizeLeaves, IndexSegmentRegion.BASE
+                    .encodeOffset(offsetLeaves));
+
+            sizeNodes = 123;
+            
+            offsetNodes = offsetLeaves + sizeLeaves;
+            
+            addrNodes = am.toAddr(sizeNodes, IndexSegmentRegion.BASE
+                    .encodeOffset(offsetNodes));
+
+            // Note: only one node and it is the root, so addrRoot==addrNodes
+            addrRoot = addrNodes;
+            
+            sizeBlobs = Bytes.megabyte32 * 20;
+            
+            offsetBlobs = offsetNodes + sizeNodes;
+            
+            addrBlobs = am.toAddr(sizeBlobs, IndexSegmentRegion.BASE
+                    .encodeOffset(offsetBlobs));
+
+            addrBloom = 0L;
+            
+            final int sizeMetadata = 712;
+            
+            final long offsetMetadata = offsetBlobs + sizeBlobs;
+
+            addrMetadata = am.toAddr(sizeMetadata, IndexSegmentRegion.BASE
+                    .encodeOffset(offsetMetadata));
+
+            length = offsetMetadata + sizeMetadata; 
+            
+            checkpoint = new IndexSegmentCheckpoint(
+                offsetBits,//
+                height,//
+                nleaves,//
+                nnodes,//
+                nentries,//
+                maxNodeOrLeafLength,//
+                addrLeaves,//
+                addrNodes,//
+                addrRoot,//
+                addrMetadata,//
+                addrBloom, //
+                addrBlobs,//
+                length,//
+                segmentUUID,//
+                commitTime//
+                );
         
-        int height = 3; // btree.height;
-        boolean useChecksum = false;
-        int nleaves = 1; //btree.nleaves;
-        int nnodes = 0; // btree.nnodes;
-        int nentries = 1; //btree.nentries;
-        int maxNodeOrLeafLength = 12; // arbitrary non-zero value.u
-        long addrLeaves = am.toAddr(maxNodeOrLeafLength, IndexSegmentMetadata.SIZE);
-        long addrNodes = 0L;
-        long addrRoot = addrLeaves;
-        long addrExtensionMetadata = 0L;
-        long addrBloom = 0L;
-        double errorRate = 0d;
-        long length = IndexSegmentMetadata.SIZE + maxNodeOrLeafLength;
-        UUID segmentUUID = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+            System.err.println("Checkpoint: "+checkpoint);
+            
+        }
         
-        IndexSegmentMetadata expected = new IndexSegmentMetadata(
-                offsetBits, branchingFactor, height, useChecksum, nleaves, nnodes,
-                nentries, maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
-                addrExtensionMetadata, addrBloom, errorRate, length, indexUUID,
-                segmentUUID, timestamp);
+        IndexSegmentCheckpoint expected = new IndexSegmentCheckpoint(
+                offsetBits, height, nleaves, nnodes, nentries,
+                maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
+                addrMetadata, addrBloom, addrBlobs, length, segmentUUID,
+                commitTime);
         
         System.err.println("Expected: "+expected);
         
@@ -122,12 +181,21 @@ public class TestIndexSegmentMetadata extends TestCase {
         
         try {
 
-            // the metadata record (starting at 0L in the file).
+            // the checkpoint record (starting at 0L in the file).
             expected.write(raf);
         
-            // additional bytes for the nodes/leaves.
-            raf.write(new byte[maxNodeOrLeafLength]);
+            // extend to ful size.
+            raf.getChannel().truncate(length);
             
+            // seek near the end.
+            raf.seek(length-128);
+            
+            // write up to the end of the file.
+            raf.write(new byte[128]);
+            
+//            // additional bytes for the nodes/leaves.
+//            raf.write(new byte[maxNodeOrLeafLength]);
+//            
 //            // force to disk.
 //            raf.getChannel().force(true);
 //            
@@ -139,17 +207,13 @@ public class TestIndexSegmentMetadata extends TestCase {
             raf.seek(0L);
             
             // read back from the file.
-            IndexSegmentMetadata actual = new IndexSegmentMetadata(raf);
+            IndexSegmentCheckpoint actual = new IndexSegmentCheckpoint(raf);
 
             System.err.println("Actual: "+actual);
 
             assertEquals("offsetBits",offsetBits,actual.offsetBits);
             
-            assertEquals("branchingFactor",branchingFactor,actual.branchingFactor);
-            
             assertEquals("height",height,actual.height);
-            
-            assertEquals("useChecksum",useChecksum,actual.useChecksum);
             
             assertEquals("nleaves",nleaves,actual.nleaves);
             
@@ -165,19 +229,17 @@ public class TestIndexSegmentMetadata extends TestCase {
 
             assertEquals("addrRoot",addrRoot,actual.addrRoot);
 
-            assertEquals("addrExtensionMetadata",addrExtensionMetadata,actual.addrExtensionMetadata);
+            assertEquals("addrMetadata",addrMetadata,actual.addrMetadata);
 
             assertEquals("addrBloom",addrBloom,actual.addrBloom);
 
-            assertEquals("errorRate",errorRate,actual.errorRate);
+            assertEquals("addrBlobs",addrBlobs,actual.addrBlobs);
 
             assertEquals("length",length,actual.length);
 
-            assertEquals("indexUUID",indexUUID,actual.indexUUID);
-
             assertEquals("segmentUUID",segmentUUID,actual.segmentUUID);
 
-            assertEquals("timestamp",timestamp,actual.timestamp);
+            assertEquals("commitTime",commitTime,actual.commitTime);
 
         } finally {
             

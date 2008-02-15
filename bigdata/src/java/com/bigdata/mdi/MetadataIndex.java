@@ -32,111 +32,75 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.isolation.IsolatedBTree;
-import com.bigdata.isolation.UnisolatedBTree;
+import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.scaleup.PartitionedIndexView;
+import com.bigdata.service.MetadataService;
 
 /**
  * A metadata index for the partitions of a distributed index. There is one
  * metadata index for each distributed index. The keys of the metadata index are
  * the first key that would be directed into the corresponding index segment,
  * e.g., a <em>separator key</em> (this is just the standard btree semantics).
- * The values are {@link PartitionMetadata} objects.
+ * The values are serialized {@link PartitionMetadata} objects.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo the partition identifier counter should be broken down into each
- *       partition of the metadata index so that we can split L0 (the root
- *       metadata index) into a set of L1 metadata index partitions. The int32
- *       partition identifiers may be used to form int64 unique identifiers
- *       within the various data partitions.
- * 
- * @todo mutation operations need to be synchronized.
+ * @todo consider changing the values to
+ *       {@link PartitionMetadataWithSeparatorKeys} objects. the metadata index
+ *       does not to store either separator key since they are redundent with
+ *       the key for an index partition's metadata and the key for its
+ *       successor, but it is handy for clients to get it along with the rest of
+ *       the partition metadata.
  * 
  * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
- *       to support the {@link IsolatedBTree}s in use by a {@link Tx}. Deletes
- *       of old journals and index segments MUST be deferred until no
+ *       to support the {@link IsolatedFusedView}s in use by a {@link Tx}.
+ *       Deletes of old journals and index segments MUST be deferred until no
  *       transaction remains which can read those data. This metadata must be
  *       restart-safe so that resources are eventually deleted.
+ * 
+ * @todo the {@link MetadataIndex} does not support overflow or splits. There
+ *       are several issues to be solved
+ *       <p>
+ *       (a) How to track the next partition identifier to be assigned to an
+ *       index partition for the managed index. Currently this value is written
+ *       in the {@link MetadataIndexCheckpoint} record. Care MUST be applied to
+ *       ensure that this value is not lost during overflow or split. Further,
+ *       if the metadata index is split into partitions then additional care
+ *       MUST be taken to use only the value of that field on the 'meta-meta'
+ *       index.
+ *       <p>
+ *       (b) how to locate the partitions of the metadata index itself.
  */
-public class MetadataIndex extends UnisolatedBTree {
+public class MetadataIndex extends BTree implements IMetadataIndex {
 
-    /**
-     * The name of the managed index.
-     */
-    private final String managedIndexName;
-    
-    /**
-     * The name of the managed index.
-     */
-    final public String getManagedIndexName() {
+    public IndexMetadata getScaleOutIndexMetadata() {
         
-        return managedIndexName;
+        return ((MetadataIndexMetadata) metadata).scaleOutIndexMetadata;
         
     }
     
-    private final UnisolatedBTreePartitionConstructor ctor;
-    
-    /**
-     * The object used to create mutable {@link BTree}s for to absorb writes on
-     * the index partitions of the scale-out index managed by this
-     * {@link MetadataIndex}.
-     */
-    final public UnisolatedBTreePartitionConstructor getIndexConstructor() {
-        
-        return ctor;
-        
-    }
-    
-    /**
-     * The unique identifier for the index whose data metadata is managed by
-     * this {@link MetadataIndex}.
-     * <p>
-     * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
-     * to each mutable and immutable B+Tree having data for any partition of
-     * that scale-out index. This makes it possible to work backwards from the
-     * B+Tree data structures and identify the index to which they belong. This
-     * field is that UUID. Note that the inherited {@link #getIndexUUID()}
-     * method provides the UUID of the metadata index NOT the managed index!
-     * 
-     * @see IIndex#getIndexUUID()
-     */
-    protected final UUID managedIndexUUID;
-
-    /**
-     * The unique identifier for the index whose data metadata is managed by
-     * this {@link MetadataIndex}.
-     * <p>
-     * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
-     * to each mutable and immutable B+Tree having data for any partition of
-     * that scale-out index. This makes it possible to work backwards from the
-     * B+Tree data structures and identify the index to which they belong. This
-     * field is that UUID. Note that the inherited {@link #getIndexUUID()}
-     * method provides the UUID of the metadata index NOT the managed index!
-     * 
-     * @see IIndex#getIndexUUID()
-     */
-    public UUID getManagedIndexUUID() {
-        
-        return managedIndexUUID;
-        
-    }
-
     /**
      * Returns the value to be assigned to the next partition created on this
      * {@link MetadataIndex} and then increments the counter. The counter will
      * be made restart-safe iff the index is dirty, the index is registered as
      * an {@link ICommitter}, and the store on which the index is stored is
      * committed.
+     * <p>
+     * Note: The metadata index uses a 32-bit partition identifier rather than
+     * the {@link #getCounter()}. The reason is that the {@link Counter} uses
+     * the partition identifier in the high word and a partition local counter
+     * in the low word. Therefore we have to centralize the assignment of the
+     * partition identifier, even when the metadata index is itself split into
+     * partitions. Requests for partition identifiers need to be directed to the
+     * root partition (L0) for the {@link MetadataIndex}.
      */
     public int nextPartitionId() {
         
@@ -153,113 +117,162 @@ public class MetadataIndex extends UnisolatedBTree {
      *            The backing store.
      * @param indexUUID
      *            The unique identifier for the metadata index.
-     * @param managedIndexUUID
-     *            The unique identifier for the managed scale-out index.
-     * @param managedIndexName
-     *            The managedIndexName of the managed scale out index.
-     * @param ctor
-     *            The constructor used to create instances of the mutable btree
-     *            indices for the scale-out index.
+     * @param managedIndexMetadata
+     *            The metadata template for the managed scale-out index.
      */
-    public MetadataIndex(IRawStore store, UUID indexUUID,
-            UUID managedIndexUUID, String managedIndexName,
-            UnisolatedBTreePartitionConstructor ctor) {
+    public static MetadataIndex create(IRawStore store, UUID indexUUID,
+            IndexMetadata managedIndexMetadata) {
 
-        super(store, indexUUID );
-        
-        //
-        this.managedIndexUUID = managedIndexUUID;
+        final MetadataIndexMetadata metadata = new MetadataIndexMetadata(
+                managedIndexMetadata.getName(), indexUUID, managedIndexMetadata);
 
-        this.managedIndexName = managedIndexName;
+        /*
+         * Note: the metadata index should probably delete markers so that we
+         * can do compacting merges on it.
+         */
+        
+        metadata.setDeleteMarkers(true);
 
-        this.ctor = ctor;
+        /*
+         * Override the implementation class.
+         */
         
-        // The first partitionId is zero(0).
-        this.nextPartitionId = 0;
-        
-    }
+        metadata.setClassName(MetadataIndex.class.getName());
 
-    public MetadataIndex(IRawStore store, BTreeMetadata metadata) {
+        /*
+         * Override the checkpoint record implementation class.
+         */
+        metadata.setCheckpointClassName(MetadataIndexCheckpoint.class.getName());
         
-        super(store, metadata);
-        
-        managedIndexUUID = ((MetadataIndexMetadata)metadata).getManagedIndexUUID();
-
-        managedIndexName = ((MetadataIndexMetadata)metadata).getName();
-
-        ctor = ((MetadataIndexMetadata)metadata).getIndexConstructor();
-        
-        nextPartitionId = ((MetadataIndexMetadata)metadata).getNextPartitionId();
-        
-    }
-
-    protected BTreeMetadata newMetadata() {
-        
-        return new MetadataIndexMetadata(this);
+        return (MetadataIndex) BTree.create(store, metadata);
         
     }
 
     /**
-     * Extends the {@link BTreeMetadata} record to also hold the managedIndexName of the
-     * partitioned index.
+     * Required ctor.
+     * 
+     * @param store
+     * @param checkpoint
+     * @param metadata
+     */
+    public MetadataIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+        
+        super(store, checkpoint, metadata);
+
+        /*
+         * copy the initial value from the checkpoint record.
+         */
+
+        nextPartitionId = ((MetadataIndexCheckpoint)checkpoint).getNextPartitionId();
+        
+    }
+    
+    /**
+     * Extends the {@link Checkpoint} record to store the next partition
+     * identifier to be assigned by the metadata index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class MetadataIndexMetadata extends UnisolatedBTreeMetadata implements Externalizable {
+    public static class MetadataIndexCheckpoint extends Checkpoint {
 
-        private static final long serialVersionUID = -7309267778881420043L;
-        
-        private String name;
-        private UnisolatedBTreePartitionConstructor ctor;
-        private UUID managedIndexUUID;
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6482587101150014793L;
+
         private int nextPartitionId;
-        
-        /**
-         * The managedIndexName of the metadata index, which is the always the same as the managedIndexName
-         * under which the corresponding {@link PartitionedIndexView} was registered.
-         */
-        public final String getName() {
-            
-            return name;
-            
-        }
-        
-        /**
-         * The object used to create mutable {@link BTree}s for to absorb writes on
-         * the index partitions of the scale-out index managed by this
-         * {@link MetadataIndex}.
-         */
-        final public UnisolatedBTreePartitionConstructor getIndexConstructor() {
-            
-            return ctor;
-            
-        }
-
-        /**
-         * The unique identifier for the index whose data metadata is managed by
-         * this {@link MetadataIndex}.
-         * <p>
-         * When using a scale-out index the same <i>indexUUID</i> MUST be assigned
-         * to each mutable and immutable B+Tree having data for any partition of
-         * that scale-out index. This makes it possible to work backwards from the
-         * B+Tree data structures and identify the index to which they belong. This
-         * field is that UUID. Note that the inherited {@link #getIndexUUID()}
-         * method provides the UUID of the metadata index NOT the managed index!
-         */
-        public final UUID getManagedIndexUUID() {
-            
-            return managedIndexUUID;
-            
-        }
 
         /**
          * The immutable value of the <code>nextPartitionId</code> counter
          * stored in the metadata record.
          */
         public int getNextPartitionId() {
-            
+
             return nextPartitionId;
+
+        }
+        
+        /**
+         * De-serialization constructor.
+         */
+        public MetadataIndexCheckpoint() {
+            
+        }
+        
+        /**
+         * @param btree
+         */
+        public MetadataIndexCheckpoint(BTree btree) {
+            
+            super(btree);
+            
+            nextPartitionId = ((MetadataIndex)btree).nextPartitionId;
+            
+        }
+
+        /**
+         * Create the initial checkpoint record for the initial metadata index.
+         * 
+         * @param metadata
+         */
+        public MetadataIndexCheckpoint(IndexMetadata metadata) {
+
+            super(metadata);
+
+            // The first partitionId is zero(0).
+            nextPartitionId = 0;
+            
+        }
+        
+        final transient private static int VERSION0 = 0x0;
+        
+        @Override
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+            super.readExternal(in);
+            
+            final int version = (int) LongPacker.unpackLong(in);
+
+            if (version != 0)
+                throw new IOException("Unknown version: " + version);
+
+            nextPartitionId = in.readInt();
+            
+        }
+
+        @Override
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+
+            LongPacker.packLong(out, VERSION0);
+
+            out.writeInt(nextPartitionId);
+            
+        }
+
+    }
+
+    /**
+     * Extends the {@link IndexMetadata} record to hold the metadata template
+     * for the managed scale-out index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class MetadataIndexMetadata extends IndexMetadata implements Externalizable {
+
+        private static final long serialVersionUID = -7309267778881420043L;
+        
+        private IndexMetadata scaleOutIndexMetadata;
+        
+        /**
+         * The managed index metadata
+         */
+        public final IndexMetadata getManagedIndexMetadata() {
+            
+            return scaleOutIndexMetadata;
             
         }
         
@@ -269,68 +282,64 @@ public class MetadataIndex extends UnisolatedBTree {
         public MetadataIndexMetadata() {
             
         }
-        
-        /**
-         * @param mdi
-         */
-        protected MetadataIndexMetadata(MetadataIndex mdi) {
 
-            super(mdi);
+        /**
+         * First time constructor.
+         * 
+         * @param name
+         *            The name of the managed index. The name of the metadata
+         *            index is given by
+         *            {@link MetadataService#getMetadataIndexName(String)}
+         * @param indexUUID
+         *            The UUID of the metadata index.
+         * @param managedIndexMetadata
+         *            The metadata template for the managed index.
+         */
+        public MetadataIndexMetadata(String managedIndexName, UUID indexUUID, IndexMetadata managedIndexMetadata) {
+
+            super(MetadataService.getMetadataIndexName(managedIndexName), indexUUID);
             
-            this.name = mdi.getManagedIndexName();
+            if(managedIndexMetadata == null) {
+                
+                throw new IllegalArgumentException();
+                
+            }
             
-            this.ctor = mdi.getIndexConstructor();
-            
-            this.managedIndexUUID = mdi.getManagedIndexUUID();
-            
-            this.nextPartitionId = mdi.nextPartitionId;
+            this.scaleOutIndexMetadata = managedIndexMetadata;
             
         }
 
         private static final transient int VERSION0 = 0x0;
-        
-        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        
+
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
             super.readExternal(in);
-            
-            final int version = (int)LongPacker.unpackLong(in);
-            
+
+            final int version = (int) LongPacker.unpackLong(in);
+
             if (version != VERSION0) {
 
                 throw new IOException("Unknown version: version=" + version);
-                
+
             }
-            
-            name = in.readUTF();
 
-            ctor = (UnisolatedBTreePartitionConstructor)in.readObject();
-            
-            managedIndexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
+            scaleOutIndexMetadata = (IndexMetadata) in.readObject();
 
-            nextPartitionId = (int)LongPacker.unpackLong(in);
-            
         }
-        
+
         public void writeExternal(ObjectOutput out) throws IOException {
 
             super.writeExternal(out);
-            
-            LongPacker.packLong(out,VERSION0);
 
-            out.writeUTF(name);
-            
-            out.writeObject(ctor);
-            
-            out.writeLong(managedIndexUUID.getMostSignificantBits());
-            
-            out.writeLong(managedIndexUUID.getLeastSignificantBits());
-            
-            LongPacker.packLong(out, nextPartitionId);
-            
+            LongPacker.packLong(out, VERSION0);
+
+            out.writeObject(scaleOutIndexMetadata);
+
         }
-        
+
     }
-    
+
     /**
      * Find the index of the partition spanning the given key.
      * 
@@ -468,25 +477,25 @@ public class MetadataIndex extends UnisolatedBTree {
     
     }
 
-    /**
-     * Remove a partition (exact match on the separator key).
-     * 
-     * @param key
-     *            The separator key (the first key that would go into that
-     *            partition).
-     * 
-     * @return The existing partition for that separator key or
-     *         <code>null</code> if there was no entry for that separator key.
-     */
-    public PartitionMetadata remove(byte[] key) {
-        
-        byte[] oldval2 = (byte[])super.remove(key);
-
-        PartitionMetadata oldval = oldval2 == null ? null
-                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
-
-        return oldval;
-        
-    }
+//    /**
+//     * Remove a partition (exact match on the separator key).
+//     * 
+//     * @param key
+//     *            The separator key (the first key that would go into that
+//     *            partition).
+//     * 
+//     * @return The existing partition for that separator key or
+//     *         <code>null</code> if there was no entry for that separator key.
+//     */
+//    public PartitionMetadata remove(byte[] key) {
+//        
+//        byte[] oldval2 = (byte[])super.remove(key);
+//
+//        PartitionMetadata oldval = oldval2 == null ? null
+//                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
+//
+//        return oldval;
+//        
+//    }
 
 }

@@ -37,10 +37,11 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.NameAndExtensionFilter;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
+import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * An implementation that uses an embedded database rather than a distributed
@@ -50,13 +51,6 @@ import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
  * federation starts and stops with the client. An embedded federation may be
  * used to assess or remove the overhead of network operations, to simplify
  * testing of client code, or to deploy a scale-up (vs scale-out) solution.
- * 
- * @todo define variants either statically (two classes) or dynamically (in
- *       code) that allow either a single data service (and no metadata service
- *       is required) or a metadata service and one or more data services.
- * 
- * @todo refactor the tests suites to run the embedded as well as the
- *       distributed versions.
  * 
  * @todo clean up the restart logic and validate with test suites. The service
  *       UUIDs need to be persistent and must define a consistent mapping from
@@ -436,69 +430,71 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
     
-    /**
-     * Note: This does not return an {@link IIndex} since the client does
-     * not provide a transaction identifier when registering an index (
-     * index registration is always unisolated).
-     * 
-     * @see #registerIndex(String, UUID)
-     */
-    public UUID registerIndex(String name,UnisolatedBTreePartitionConstructor ctor) {
-
-        assertOpen();
-
-        return registerIndex(name, ctor, null);
-
-    }
-
-    /**
-     * @todo only statically partitioned indices are supported at this time.
-     */
     public MetadataIndex getMetadataIndex(String name) {
 
         assertOpen();
 
         // The name of the metadata index.
-        final String metadataName = MetadataService.getMetadataName(name);
+        final String metadataName = MetadataService.getMetadataIndexName(name);
 
         // The metadata service.
-        final MetadataService metadataService = (MetadataService)getMetadataService();
+        final MetadataService metadataService = (MetadataService) getMetadataService();
 
         /*
          * @todo this is the live metadata index -- it should be a read-only
          * view according to our method declaration. This must be resolved in
          * order to support dynamic partitioning.
          */
-        return (MetadataIndex)metadataService.journal.getIndex(metadataName);
-        
+        return (MetadataIndex) metadataService.journal.getIndex(metadataName);
+
     }
     
-    /**
-     * Registers a scale-out index and assigns the initial index partition
-     * to the specified data service.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * 
-     * @param dataServiceUUID
-     *            The data service identifier (optional). When
-     *            <code>null</code>, a data service will be selected
-     *            automatically.
-     * 
-     * @return The UUID of the registered index.
-     * 
-     * @deprecated This method and its task on the metadataservice can be
-     *             replaced by
-     *             {@link #registerIndex(String, byte[][], UUID[])}
-     */
-    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor, UUID dataServiceUUID) {
+    public UUID registerIndex(IndexMetadata metadata) {
+
+        assertOpen();
+
+        return registerIndex(metadata, null);
+
+    }
+
+    public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
+
+        assertOpen();
+
+        if (dataServiceUUID == null) {
+            
+            try {
+            
+                dataServiceUUID = getMetadataService()
+                        .getUnderUtilizedDataService();
+
+            } catch (Exception ex) {
+
+                log.error(ex);
+
+                throw new RuntimeException(ex);
+
+            }
+
+        }
+
+        return registerIndex(//
+                metadata, //
+                new byte[][] { new byte[] {} },//
+                new UUID[] { dataServiceUUID } //
+            );
+        
+    }
+
+    public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
+            UUID[] dataServiceUUIDs) {
 
         assertOpen();
 
         try {
 
-            UUID indexUUID = getMetadataService().registerManagedIndex(name,
-                    ctor, dataServiceUUID);
+            UUID indexUUID = getMetadataService().registerScaleOutIndex(
+                    metadata, separatorKeys, dataServiceUUIDs);
 
             return indexUUID;
 
@@ -512,50 +508,19 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
 
-    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor,
-            byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
-
-        assertOpen();
-
-        try {
-
-            UUID indexUUID = getMetadataService().registerManagedIndex(name,
-                    ctor, separatorKeys, dataServiceUUIDs);
-
-            return indexUUID;
-
-        } catch (Exception ex) {
-
-            log.error(ex);
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    /**
-     * Drops the named scale-out index (synchronous).
-     * 
-     * FIXME implement. No new unisolated operation or transaction should be
-     * allowed to read or write on the index. Once there are no more users
-     * of the index, the index must be dropped from each data service,
-     * including both the mutable B+Tree absorbing writes for the index and
-     * any read-only index segments. The metadata index must be dropped on
-     * the metadata service (and from the client's cache).
-     * 
-     * @todo A "safe" version of this operation would schedule the restart
-     *       safe deletion of the mutable btrees, index segments and the
-     *       metadata index so that the operation could be "discarded"
-     *       before the data were actually destroyed (assuming an admin tool
-     *       that would allow you to recover a dropped index before its
-     *       component files were deleted).
-     */
     public void dropIndex(String name) {
 
         assertOpen();
 
-        throw new UnsupportedOperationException();
+        try {
+            
+            getMetadataService().dropScaleOutIndex(name);
+            
+        } catch (Exception e) {
+
+            throw new RuntimeException( e );
+            
+        }
 
     }
 
@@ -567,10 +532,16 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         assertOpen();
 
+        final MetadataIndexMetadata mdmd;
         try {
 
-            if (getMetadataService().getManagedIndexUUID(name) == null) {
+            mdmd = (MetadataIndexMetadata) getMetadataService()
+                    .getIndexMetadata(MetadataService.getMetadataIndexName(name));
+            
+            if (mdmd == null) {
 
+                // No such index.
+                
                 return null;
 
             }
@@ -581,7 +552,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         }
 
-        return new ClientIndexView(this, tx, name);
+        return new ClientIndexView(this, tx, name, mdmd);
 
     }
 

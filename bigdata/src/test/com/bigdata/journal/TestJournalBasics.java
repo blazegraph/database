@@ -94,8 +94,6 @@ public class TestJournalBasics extends TestCase {
         suite.addTestSuite( TestReadOnlyTx.class );
         // tests of read-committed transactions.
         suite.addTestSuite( TestReadCommittedTx.class );
-        // todo tests of write-write conflict resolution.
-        suite.addTestSuite(TestConflictResolution.class);
         
         /*
          * Tests of concurrent execution of readers, writers, and transactions

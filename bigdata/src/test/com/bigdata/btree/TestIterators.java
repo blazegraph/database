@@ -37,18 +37,13 @@ import org.apache.log4j.Level;
  * 
  * @see Leaf#entryIterator()
  * @see Node#childIterator(boolean)
- * @see AbstractNode#postOrderIterator(boolean)
+ * @see AbstractNode#postOrderNodeIterator(boolean)
  * 
  * @see TestDirtyIterators, which handles tests when some nodes or leaves are
  *      NOT dirty and verifies that the iterators do NOT visit such nodes or
- *      leaves. This tests {@link AbstractNode#postOrderIterator()} as well
- *      since that is just {@link AbstractNode#postOrderIterator(boolean)} with
- *      <code>false</code> passed in.
- * 
- * @todo write tests for efficient key range traversals for {@link IndexSegment}.
- * 
- * @todo write a test suite for concurrent modification under traversal and
- *       implement support for that feature in the various iterators.
+ *      leaves. This tests {@link AbstractNode#postOrderNodeIterator()} as well
+ *      since that is just {@link AbstractNode#postOrderNodeIterator(boolean)}
+ *      with <code>false</code> passed in.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -319,7 +314,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // empty tree visits the root leaf.
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
         
         // fill up the root leaf.
         btree.insert(KeyBuilder.asSortKey(3), v3);
@@ -339,7 +334,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         // verify iterator.
         assertSameIterator(new IAbstractNode[] { a, b, c }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
 
         /*
          * split another leaf so that there are now three children to visit. at
@@ -360,7 +355,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { a, d, b, c }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
         
         /*
          * cause another leaf (d) to split, forcing the split to propagate to and
@@ -391,7 +386,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { a, d, c, e, b, f, g }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
 
         /*
          * remove a key (4) from (d) forcing (d,a) to merge into (d) and (a) to
@@ -414,7 +409,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, e, b, c }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
 
         /*
          * remove a key (7) from a leaf (b) forcing two leaves to join and
@@ -433,7 +428,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { d, b, c }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
 
         /*
          * remove keys from a leaf forcing the remaining two leaves to join and
@@ -449,7 +444,7 @@ public class TestIterators extends AbstractBTreeTestCase {
 
         // verify iterator
         assertSameIterator(new IAbstractNode[] { b }, btree.root
-                .postOrderIterator());
+                .postOrderNodeIterator());
 
     }
 
@@ -462,9 +457,9 @@ public class TestIterators extends AbstractBTreeTestCase {
         final byte[] k5 = i2k(5);
         final byte[] k7 = i2k(7);
 
-        final SimpleEntry v3 = new SimpleEntry(3);
-        final SimpleEntry v5 = new SimpleEntry(5);
-        final SimpleEntry v7 = new SimpleEntry(7);
+        final byte[] v3 = new byte[]{3};
+        final byte[] v5 = new byte[]{5};
+        final byte[] v7 = new byte[]{7};
 
         BTree btree = getBTree(3);
 
@@ -475,54 +470,72 @@ public class TestIterators extends AbstractBTreeTestCase {
         final Leaf a = (Leaf) btree.root;
         
         // visit everything in the root leaf.
-        assertSameIterator(new Object[]{v3,v5,v7},btree.entryIterator());
+        assertSameIterator(new byte[][]{v3,v5,v7},btree.entryIterator());
 
         // visit everything in the root leaf.
-        assertSameIterator(new Object[]{v3,v5,v7},btree.rangeIterator(null,null));
+        assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
 
         // visit everything in the root leaf using an explicit EntryIterator ctor.
-        assertSameIterator(new Object[]{v3,v5,v7},new EntryIterator(a,new Tuple(),null,null,null));
+        assertSameIterator(new byte[][] { v3, v5, v7 }, new EntryIterator(a,
+                new Tuple(IRangeQuery.DEFAULT), null, null, null));
         
-        // visit everything exception v3.
-        assertSameIterator(new Object[]{v5,v7},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
-            private static final long serialVersionUID = 1L;
-            public boolean isValid(Object value) {
-                        if (value.equals(v3))
-                            return false;
-                        return true;
-                    }
-        }));
+        /*
+         * FIXME Exceptions will be thrown for all of these filter tests since
+         * they were written with the assumption that the IEntryIterator visited
+         * the values stored under the keys in the index. In fact, it now visits
+         * Tuples (actually, it returns a Tuple that reflects the current index
+         * entry each time you call next()).
+         */
         
-        // visit everything exception v5.
-        assertSameIterator(new Object[]{v3,v7},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
-            private static final long serialVersionUID = 1L;
-            public boolean isValid(Object value) {
-                        if (value.equals(v5))
-                            return false;
-                        return true;
-                    }
-        }));
-        
-        // visit everything exception v7.
-        assertSameIterator(new Object[]{v3,v5},new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
-            private static final long serialVersionUID = 1L;
-            public boolean isValid(Object value) {
-                        if (value.equals(v7))
-                            return false;
-                        return true;
-                    }
-        }));
+        // visit everything except v3.
+        assertSameIterator(new byte[][] { v5, v7 },//
+                a.rangeIterator(null, null, flags, new EntryFilter() {
+                    private static final long serialVersionUID = 1L;
 
-        // visit everything exception v7 using a rangeIterator.
-        assertSameIterator(new Object[]{v3,v5},a.rangeIterator(null,null,flags,new EntryFilter() {
-            private static final long serialVersionUID = 1L;
-            public boolean isValid(Object value) {
-                        if (value.equals(v7))
-                            return false;
-                        return true;
+                    public boolean isValid(ITuple tuple) {
+                        return BytesUtil.compareBytesWithLenAndOffset(0,
+                                v3.length, v3, 0, v3.length, tuple.getValue()) != 0;
                     }
-        }));
-
+                }));
+        
+        // visit everything except v5.
+        assertSameIterator(new byte[][]{v3,v7},//
+                a.rangeIterator(null, null, flags, new EntryFilter() {
+                    private static final long serialVersionUID = 1L;
+                    public boolean isValid(ITuple tuple) {
+                        return BytesUtil.compareBytesWithLenAndOffset(0,
+                                v5.length, v5, 0, v5.length, tuple.getValue()) != 0;
+                    }
+                    }
+                ));
+//        new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
+//            private static final long serialVersionUID = 1L;
+//            public boolean isValid(Object value) {
+//                        if (value.equals(v5))
+//                            return false;
+//                        return true;
+//                    }
+//        }));
+        
+        // visit everything except v7.
+        assertSameIterator(new byte[][]{v3,v5},//
+                a.rangeIterator(null, null, flags, new EntryFilter() {
+                    private static final long serialVersionUID = 1L;
+                    public boolean isValid(ITuple tuple) {
+                        return BytesUtil.compareBytesWithLenAndOffset(0,
+                                v7.length, v7, 0, v7.length, tuple.getValue()) != 0;
+                    }
+                    }
+                ));
+//                new EntryIterator(a,new Tuple(),null,null,new EntryFilter() {
+//            private static final long serialVersionUID = 1L;
+//            public boolean isValid(Object value) {
+//                        if (value.equals(v7))
+//                            return false;
+//                        return true;
+//                    }
+//        }));
+        
     }
     
 }

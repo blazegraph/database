@@ -30,8 +30,8 @@ package com.bigdata.journal;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.SimpleEntry;
 
 /**
  * Test suite for restart-safety of {@link BTree}s backed by an
@@ -115,8 +115,6 @@ public class TestCommitList extends ProxyTestCase {
 
     /**
      * Return a btree backed by a journal with the indicated branching factor.
-     * The serializer requires that values in leaves are {@link SimpleEntry}
-     * objects.
      * 
      * @param branchingFactor
      *            The branching factor.
@@ -125,8 +123,16 @@ public class TestCommitList extends ProxyTestCase {
      */
     public BTree getBTree(int branchingFactor, Journal journal) {
 
-        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
-                SimpleEntry.Serializer.INSTANCE);
+        final BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            btree = BTree.create(journal, metadata);
+            
+        }
 
         return btree;
             

@@ -23,25 +23,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.io.DataInput;
 import java.io.IOException;
 import java.util.UUID;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.CognitiveWeb.extser.ShortPacker;
-
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * BTree mapping commit times to {@link ICommitRecord}s. The keys are the long
@@ -75,11 +70,28 @@ public class CommitRecordIndex extends BTree {
     final private WeakValueCache<Long, ICommitRecord> cache = new WeakValueCache<Long, ICommitRecord>(
             new LRUCache<Long, ICommitRecord>(10));
 
-    public CommitRecordIndex(IRawStore store) {
+//    public CommitRecordIndex(IRawStore store) {
+//
+//        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID());
+//
+//    }
 
-        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                new ValueSerializer());
-
+    /**
+     * Create a new instance.
+     * 
+     * @param store
+     *            The backing store.
+     * 
+     * @return The new instance.
+     */
+    static public CommitRecordIndex create(IRawStore store) {
+    
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setClassName(CommitRecordIndex.class.getName());
+        
+        return (CommitRecordIndex) BTree.create(store, metadata);
+        
     }
 
     /**
@@ -87,12 +99,14 @@ public class CommitRecordIndex extends BTree {
      * 
      * @param store
      *            The backing store.
+     * @param checkpoint
+     *            The {@link Checkpoint} record.
      * @param metadataId
      *            The metadata record for the index.
      */
-    public CommitRecordIndex(IRawStore store, BTreeMetadata metadata) {
+    public CommitRecordIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
-        super(store, metadata);
+        super(store, checkpoint, metadata);
 
     }
     
@@ -149,13 +163,17 @@ public class CommitRecordIndex extends BTree {
             return commitRecord;
 
         // exact match index lookup.
-        final Entry entry = (Entry) super.lookup(getKey(commitTime));
+        final byte[] val = super.lookup(getKey(commitTime));
 
-        if (entry == null) {
+        if (val == null) {
 
+            // nothing under that key.
             return null;
             
         }
+        
+        // deserialize the entry.
+        final Entry entry = deserializeEntry(new DataInputBuffer(val));
 
         /*
          * re-load the commit record from the store.
@@ -205,7 +223,7 @@ public class CommitRecordIndex extends BTree {
          * Retrieve the entry for the commit record from the index.  This
          * also stores the actual commit time for the commit record.
          */
-        Entry entry = (Entry) super.valueAt( index );
+        final Entry entry = deserializeEntry( new DataInputBuffer( super.valueAt( index ) ));
 
         /*
          * Test the cache for this commit record using its actual commit time.
@@ -336,8 +354,9 @@ public class CommitRecordIndex extends BTree {
             
         }
         
-        // add an entry to the persistent index.
-        super.insert(key,new Entry(commitTime,commitRecordAddr));
+        // add a serialized entry to the persistent index.
+        super.insert(key,
+                serializeEntry(new Entry(commitTime, commitRecordAddr)));
         
         // should not be an existing entry for that commit time.
         assert cache.get(commitTime) == null;
@@ -377,85 +396,55 @@ public class CommitRecordIndex extends BTree {
     }
     
     /**
-     * The values are {@link Entry}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * Private buffer used within sychronized contexts to serialize
+     * {@link Entry}s.
      */
-    public static class ValueSerializer implements IValueSerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 8085229450005958541L;
-
-//        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
-
-        final public static transient short VERSION0 = 0x0;
-
-        // FIXME this is not parameterized by the actual offsetBits.
-        final private static transient IAddressManager addressManager = WormAddressManager.INSTANCE;
+    private DataOutputBuffer out = new DataOutputBuffer(Bytes.SIZEOF_LONG*2);
+    
+    /**
+     * Serialize an {@link Entry}.
+     * 
+     * @param entry
+     *            The entry.
+     * 
+     * @return The serialized entry.
+     */
+    protected byte[] serializeEntry(Entry entry) {
         
-        /**
-         * Required to (de-)serialize the addresses.
-         */
-//        protected final transient IRawStore store;
-//        
-//        public ValueSerializer(IRawStore store) {
-//            
-//            if(store==null) throw new IllegalArgumentException();
-//            
-//            this.store = store;
-//            
-//        }
+        out.reset();
 
-        public ValueSerializer() {
-            
-        }
+        out.putLong(entry.commitTime);
         
-        public void putValues(DataOutputBuffer os, Object[] values, int n)
-                throws IOException {
-
-            os.packShort(VERSION0);
-            
-            for (int i = 0; i < n; i++) {
-
-                Entry entry = (Entry) values[i];
-
-//                LongPacker.packLong(os, entry.commitTime);
-//                LongPacker.packLong(os, entry.addr);
-                
-                os.packLong(entry.commitTime);
-                
-                addressManager.packAddr(os, entry.addr);
-//                os.packLong(entry.addr);
-                
-            }
-
-        }
+        out.putLong(entry.addr);
         
-        public void getValues(DataInput is, Object[] values, int n)
-                throws IOException {
-
-            final short version = ShortPacker.unpackShort(is);
-            
-            if (version != VERSION0)
-                throw new RuntimeException("Unknown version: " + version);
-            
-            for (int i = 0; i < n; i++) {
-
-                final long commitTime = LongPacker.unpackLong(is);
-
-//                final long addr = LongPacker.unpackLong(is);
-                
-                final long addr = addressManager.unpackAddr(is);
-                
-                values[i] = new Entry(commitTime,addr);
-
-            }
-
-        }
-
+        return out.toByteArray();
+        
     }
 
+    /**
+     * De-serialize an {@link Entry}.
+     * 
+     * @param is
+     *            The serialized data.
+     *            
+     * @return The {@link Entry}.
+     */
+    protected Entry deserializeEntry(DataInputBuffer is) {
+
+        try {
+
+            long commitTime = is.readLong();
+            
+            long addr = is.readLong();
+            
+            return new Entry(commitTime, addr);
+            
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+    
 }

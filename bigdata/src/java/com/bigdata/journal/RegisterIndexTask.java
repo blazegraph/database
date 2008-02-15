@@ -26,6 +26,7 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 
 /**
@@ -46,7 +47,7 @@ import com.bigdata.btree.IIndex;
  */
 public class RegisterIndexTask extends AbstractTask {
 
-    final private IIndex btree;
+    final private BTree btree;
     
     /**
      * @param journal
@@ -62,7 +63,7 @@ public class RegisterIndexTask extends AbstractTask {
      * 
      * to register a new index that supports isolation.
      */
-    public RegisterIndexTask(ConcurrentJournal journal, String name, IIndex ndx) {
+    public RegisterIndexTask(ConcurrentJournal journal, String name, BTree ndx) {
 
         super(journal, ITx.UNISOLATED, false/*readOnly*/, name);
         
@@ -91,7 +92,7 @@ public class RegisterIndexTask extends AbstractTask {
 
             IIndex ndx = journal.getIndex(name);
 
-            UUID indexUUID = ndx.getIndexUUID();
+            final UUID indexUUID = ndx.getIndexMetadata().getIndexUUID();
 
             log.info("Index exists: name=" + name + ", indexUUID=" + indexUUID);
 
@@ -99,10 +100,12 @@ public class RegisterIndexTask extends AbstractTask {
 
         }
 
-        log.info("Registered index: name=" + name + ", class="
-                + btree.getClass() + ", indexUUID=" + btree.getIndexUUID());
+        final UUID indexUUID = btree.getIndexMetadata().getIndexUUID();
 
-        return btree.getIndexUUID();
+        log.info("Registered index: name=" + name + ", class="
+                + btree.getClass() + ", indexUUID=" + indexUUID);
+
+        return indexUUID;
         
     }
 

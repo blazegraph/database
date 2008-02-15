@@ -106,7 +106,8 @@ abstract public class AbstractAddressSerializerTestCase extends TestCase2 {
         // serialize.
         final byte[] serialized;
         {
-            final int estimatedCapacity = ser.getSize(nchildren);
+            
+            final int estimatedCapacity = 0;// default - will grow as necessary; ser.getSize(nchildren);
 
             DataOutputBuffer os = new DataOutputBuffer(estimatedCapacity);
 

@@ -31,6 +31,7 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * A fast implementation of DataInput designed to read from a byte[].
@@ -42,7 +43,7 @@ import java.io.IOException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataInputBuffer implements DataInput {
+public class DataInputBuffer extends InputStream implements DataInput {
 
     /**
      * The buffer whose contents are being read.
@@ -118,11 +119,30 @@ public class DataInputBuffer implements DataInput {
         if (buf == null)
             throw new IllegalArgumentException();
 
+        setBuffer(buf,0,buf.length);
+        
+    }
+    
+    /**
+     * Replaces the buffer and reset the offset and length to the specified
+     * values.
+     * 
+     * @param buf
+     *            The new buffer.
+     */
+    public void setBuffer(byte[] buf,int off,int len) {
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+
+        if (off + len > buf.length)
+            throw new IllegalArgumentException();
+        
         this.buf = buf;
         
-        this.off = 0;
+        this.off = off;
         
-        this.len = buf.length;
+        this.len = len;;
         
     }
     
@@ -138,6 +158,15 @@ public class DataInputBuffer implements DataInput {
         
     }
 
+    @Override
+    public int read() throws IOException {
+
+        if (off >= len) return -1; // EOF
+        
+        return buf[off++];
+        
+    }
+    
     public byte readByte() throws IOException {
 
         if (off >= len)

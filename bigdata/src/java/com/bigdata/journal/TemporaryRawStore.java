@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IMRMW;
@@ -91,6 +92,18 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
     private boolean open = true;
     private IBufferStrategy buf;
 
+    /**
+     * Temporary stores do not have resource descriptions.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public IResourceMetadata getResourceMetadata() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
     public IBufferStrategy getBufferStrategy() {
         
         return buf;
@@ -113,12 +126,18 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
      */
     public TemporaryRawStore() {
 
-        this(WormAddressManager.DEFAULT_OFFSET_BITS,
+        this(WormAddressManager.DEFAULT_OFFSET_BITS);
+        
+    }
+    
+    public TemporaryRawStore(int offsetBits) {
+
+        this(offsetBits,
                 DEFAULT_INITIAL_IN_MEMORY_EXTENT,
                 DEFAULT_MAXIMUM_IN_MEMORY_EXTENT, false);
         
     }
-    
+
     /**
      * Create a {@link TemporaryRawStore} with the specified configuration.
      * 

@@ -30,6 +30,7 @@ package com.bigdata.btree;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.zip.Deflater;
 
 import junit.framework.TestCase2;
 
@@ -772,7 +773,7 @@ public class TestRecordCompressor extends TestCase2 {
      */
     public void test_recordCompressor01() {
         
-        final RecordCompressor c = new RecordCompressor();
+        final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
         final byte[] expected = getRandomRecord(10000);
 
@@ -785,7 +786,7 @@ public class TestRecordCompressor extends TestCase2 {
      */
     public void test_recordCompressor02() {
         
-        final RecordCompressor c = new RecordCompressor();
+        final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
         final byte[] expected = new byte[]{};
 
@@ -804,7 +805,7 @@ public class TestRecordCompressor extends TestCase2 {
         long sumBytes = 0l;
         long sumCompressed = 0l;
         
-        final RecordCompressor c = new RecordCompressor();
+        final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
         final byte[] expected = getRandomRecord(10000);
         

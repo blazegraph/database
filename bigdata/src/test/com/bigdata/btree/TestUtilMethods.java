@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 
+
 /**
  * Test suite for various utility methods, both static and instance, on
  * {@link AbstractNode}.
@@ -123,8 +124,17 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
         final BTree btree = getBTree(m);
 
         Leaf leaf = new Leaf(btree, 1L, m, new MutableKeyBuffer(nkeys,
-                new byte[][] { new byte[] { 1 }, new byte[] { 2 },
-                        new byte[] { 3 }, null }), new Integer[] { 1, 2, 3, 0 });
+                // keys
+                new byte[][] {//
+                new byte[] { 1 }, //
+                        new byte[] { 2 }, //
+                        new byte[] { 3 },//
+                        null }),//
+                // vals
+                new byte[][] { new byte[]{1}, new byte[]{2}, new byte[]{3}, new byte[]{0} }, //
+                null,// timestamps
+                null// deleteMarkers
+                );
 
         leaf.assertKeysMonotonic();
 

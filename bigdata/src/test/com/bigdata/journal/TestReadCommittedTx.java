@@ -29,8 +29,9 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 
 /**
  * Test suite for read-committed transactions.
@@ -71,8 +72,7 @@ public class TestReadCommittedTx extends ProxyTestCase {
             /*
              * register an index, write on the index, and commit the journal.
              */
-            IIndex ndx = journal.registerIndex(name, new UnisolatedBTree(
-                    journal, UUID.randomUUID()));
+            IIndex ndx = journal.registerIndex(name);
             
             ndx.insert(k1, v1);
 
@@ -173,8 +173,7 @@ public class TestReadCommittedTx extends ProxyTestCase {
             
             // register an index and commit the journal.
 
-            journal.registerIndex(name, new UnisolatedBTree(journal,
-                    UUID.randomUUID()));
+            journal.registerIndex(name);
             
             journal.commit();
             

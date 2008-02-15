@@ -43,6 +43,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IResourceTransfer;
@@ -574,6 +575,10 @@ public class ReplicatedStore implements IRawStore {
         return localStore.isStable();
     }
 
+    public IResourceMetadata getResourceMetadata() {
+        return localStore.getResourceMetadata();
+    }
+    
     public void packAddr(DataOutput out, long addr) throws IOException {
         localStore.packAddr(out, addr);
     }

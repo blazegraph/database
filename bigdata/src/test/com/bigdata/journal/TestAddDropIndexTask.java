@@ -32,8 +32,9 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal.Options;
 
 /**
@@ -82,9 +83,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         {
          
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+
+            final BTree btree = BTree.create(journal, new IndexMetadata(name, indexUUID));
             
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, indexUUID)));
+                    journal, name, btree));
 
             try {
 
@@ -149,7 +152,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
                     IIndex ndx = getIndex(name);
                     
-                    assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+                    assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
+                            .getIndexUUID());
                     
                     return null;
 
@@ -333,8 +337,10 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
+            final BTree btree = BTree.create(journal, new IndexMetadata(name, indexUUID));
+
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, indexUUID)));
+                    journal, name, btree));
 
             assertEquals("indexUUID", indexUUID, (UUID) future.get());
 
@@ -347,8 +353,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
                     journal.getRootBlockView().getCommitCounter());
 
             // verify access to the index.
+     
             assertNotNull(journal.getIndex(name));
-            assertEquals(indexUUID,journal.getIndex(name).getIndexUUID());
+            
+            assertEquals(indexUUID, journal.getIndex(name).getIndexMetadata()
+                    .getIndexUUID());
             
         }
 
@@ -360,8 +369,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
+            final BTree btree = BTree.create(journal, new IndexMetadata(name,
+                    indexUUID));
+
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new UnisolatedBTree(journal, indexUUID)));
+                    journal, name, btree));
 
             // Note: the UUID for the pre-existing index is returned.
             assertEquals("indexUUID", indexUUID, (UUID) future.get());

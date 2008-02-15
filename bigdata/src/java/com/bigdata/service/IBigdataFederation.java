@@ -26,14 +26,16 @@ package com.bigdata.service;
 
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadata;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * The client-facing interface to a bigdata federation.
@@ -44,6 +46,8 @@ import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
  * @todo reconcile with {@link IIndexManager} and {@link IIndexStore}.
  */
 public interface IBigdataFederation {
+
+    public static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
     /**
      * Return the metadata service (or a proxy for the metadata service).
@@ -66,26 +70,45 @@ public interface IBigdataFederation {
     public MetadataIndex getMetadataIndex(String name);
     
     /**
-     * Register a scale-out index with the federation.
+     * Register a scale-out index.
      * 
-     * @param name
-     *            The index name.
-     * @param ctor
-     *            The object used to create mutable {@link BTree}s to absorb
-     *            writes for the index partitions of this scale-out index.
+     * @param metadata
+     *            The metadata template used to create component indices for
+     *            {@link BTree}s this scale-out index (this also specifies the
+     *            name of the scale-out index).
      * 
      * @return The UUID for the scale-out index.
+     * 
+     * @todo Since the index UUID is declared by the provided metadata object it
+     *       does not need to be returned here. However I am not sure what would
+     *       be a better return value.  We can't return an {@link IIndex} since
+     *       we do not have the timestamp to fully qualify the view.
      */
-    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor);
+    public UUID registerIndex(IndexMetadata metadata);
     
     /**
-     * Create and statically partition a scale-out index.
+     * Register a scale-out index and assign the initial index partition to the
+     * specified data service.
      * 
-     * @param name
-     *            The name of the scale-out index.
-     * @param ctor
-     *            The object used to create mutable {@link BTree}s to absorb
-     *            writes for the index partitions of this scale-out index.
+     * @param metadata
+     *            The metadata template used to create component indices for
+     *            {@link BTree}s this scale-out index (this also specifies the
+     *            name of the scale-out index).
+     * @param dataServiceUUID
+     *            The data service identifier (optional). When <code>null</code>,
+     *            a data service will be selected automatically.
+     * 
+     * @return The UUID of the registered index.
+     */
+    public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID);
+    
+    /**
+     * Register and statically partition a scale-out index.
+     * 
+     * @param metadata
+     *            The metadata template used to create component indices for
+     *            {@link BTree}s this scale-out index (this also specifies the
+     *            name of the scale-out index).
      * @param separatorKeys
      *            The array of separator keys. Each separator key is interpreted
      *            as an <em>unsigned byte[]</em>. The first entry MUST be an
@@ -98,8 +121,8 @@ public interface IBigdataFederation {
      * 
      * @return The UUID of the scale-out index.
      */
-    public UUID registerIndex(String name, UnisolatedBTreePartitionConstructor ctor,
-            byte[][] separatorKeys, UUID[] dataServiceUUIDs);
+    public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
+            UUID[] dataServiceUUIDs);
 
     /**
      * Drop a scale-out index.

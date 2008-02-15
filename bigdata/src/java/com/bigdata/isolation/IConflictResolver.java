@@ -29,6 +29,8 @@ package com.bigdata.isolation;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Tx;
 
@@ -89,22 +91,20 @@ public interface IConflictResolver extends Serializable {
      * and the current version within a transaction that is validating.
      * </p>
      * 
-     * @param key
-     *            The key for which the write-write conflict occurred.
+     * @param writeSet
+     *            The view on which conflict resolver must write the resolved
+     *            index entry.
      * 
-     * @param comittedValue
-     *            The historical value committed in the global state with which
-     *            the write-write conflict exists.
+     * @param txTuple
+     *            The tuple written by the transaction that is being validated.
      * 
-     * @param txEntry
-     *            The value written by the transaction that is being validated.
+     * @param currentTuple
+     *            The current tuple committed in the global state with which the
+     *            write-write conflict exists.
      * 
-     * @return A datum in which the conflict has been resolved.
-     * 
-     * @exception WriteWriteConflictException
-     *                if the conflict could not be resolved.
+     * @return true iff the conflict was resolved.
      */
-    public byte[] resolveConflict(byte[] key, Value comittedValue, Value txEntry)
-            throws RuntimeException;
+    public boolean resolveConflict(IIndex writeSet, ITuple txTuple,
+            ITuple currentTuple) throws Exception;
     
 }

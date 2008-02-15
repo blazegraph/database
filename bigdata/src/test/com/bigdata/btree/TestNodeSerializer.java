@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.zip.Deflater;
 
 import org.apache.log4j.Level;
 
@@ -83,18 +84,70 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
      */
     public BTree getBTree(int branchingFactor,boolean useCompression) {
         
-        IRawStore store = new SimpleMemoryRawStore();
+//        IRawStore store = new SimpleMemoryRawStore();
+//
+//        final int leafQueueCapacity = 10000;
+//        
+//        final int nscan = 10;
+        
+        /*
+         * Setup the B+Tree directly so that we can override the hard reference
+         * queue.
+         */
+        final BTree btree; 
+        {
+            
+            IRawStore store = new SimpleMemoryRawStore();
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            metadata.setIsolatable(r.nextBoolean());
+            
+            metadata.setDeleteMarkers(r.nextBoolean());
 
-        final int leafQueueCapacity = 10000;
-        
-        final int nscan = 10;
-        
-        BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
-                new HardReferenceQueue<PO>(new NoEvictionListener(),
-                        leafQueueCapacity, nscan),
-                        KeyBufferSerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE,
-                useCompression ? new RecordCompressor() : null);
+            metadata.setVersionTimestamps(r.nextBoolean());
+            
+            if(useCompression) {
+                
+                metadata.setRecordCompressor(new RecordCompressor(Deflater.BEST_SPEED));
+                
+            }
+            
+            metadata.write(store);
+            
+            Checkpoint checkpoint = metadata.firstCheckpoint();
+            
+            checkpoint.write(store);
+
+            btree = new BTree(store,checkpoint,metadata) {
+                
+                @Override
+                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                    
+                    return new HardReferenceQueue<PO>(//
+                            new NoEvictionListener(),//
+                            10000,//
+                            10//
+                    );
+                    
+                }
+                
+            };
+            
+        }
+
+//        BTree btree = new BTree(store,//
+//                branchingFactor, //
+//                UUID.randomUUID(),//
+//                r.nextBoolean(),// isolatable
+//                null,// conflictResolver
+//                new HardReferenceQueue<PO>(new NoEvictionListener(),
+//                        leafQueueCapacity, nscan),//
+//                KeyBufferSerializer.INSTANCE,//
+//                ByteArrayValueSerializer.INSTANCE,//
+//                useCompression ? new RecordCompressor() : null);
 
         return btree;
         
@@ -279,19 +332,20 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
         NodeSerializer nodeSer = ndx.getNodeSerializer();
         
-//        final int BUF_SIZE = getSize(nodeSer,expected);
-        
-//        ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
-        
+
+        // final int BUF_SIZE = getSize(nodeSer,expected);
+
+        // ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
+
         final ByteBuffer buf;
-        
+
         if (isLeaf) {
 
-            buf = clone(nodeSer.putLeaf((Leaf)expected));
-            
+            buf = clone(nodeSer.putLeaf((Leaf) expected));
+
         } else {
-            
-            buf = clone(nodeSer.putNode((Node)expected));
+
+            buf = clone(nodeSer.putNode((Node) expected));
             
         }
 
@@ -312,7 +366,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         if (verbose)
             actual.dump(Level.DEBUG,System.err);
 
-        assertSameNodeOrLeaf(expected,actual);
+        assertSameNodeOrLeaf(expected, actual);
 
         // write on buf2.
 //        ByteBuffer buf2 = ByteBuffer.allocate(BUF_SIZE);
@@ -719,12 +773,33 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
         final byte[][] keys = getRandomKeys(branchingFactor+1,nkeys);
         
-        final Object[] values = new Object[branchingFactor+1];
+        final byte[][] values = new byte[branchingFactor+1][];
 
+        final boolean[] deleteMarkers = btree.getIndexMetadata()
+                .getDeleteMarkers() ? new boolean[branchingFactor + 1] : null;
+        
+        final long[] versionTimestamps = btree.getIndexMetadata()
+                .getVersionTimestamps() ? new long[branchingFactor + 1] : null;
+        
         for( int i=0; i<nkeys; i++ ) {
 
-            values[i] = new SimpleEntry(r.nextInt());
-        
+            values[i] = new byte[r.nextInt(100)];
+
+            r.nextBytes(values[i]);
+
+            if (deleteMarkers != null) {
+
+                deleteMarkers[i] = r.nextBoolean();
+
+            }
+
+            if (versionTimestamps != null) {
+
+                versionTimestamps[i] = System.currentTimeMillis()
+                        + r.nextInt(10000);
+
+            }
+            
         }
 
         /*
@@ -733,7 +808,10 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
         Leaf leaf = new Leaf(btree, addr, branchingFactor,
                 new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
-                values); // ,previous,next);
+                values,//
+                versionTimestamps,//
+                deleteMarkers//
+                ); // ,previous,next);
         
         btree.root = leaf;
         

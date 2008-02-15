@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -39,14 +42,21 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.FusedView;
+import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexConstructor;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.ReadOnlyFusedView;
+import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.DropIndexTask;
@@ -56,11 +66,10 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.ProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
-import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.ResourceState;
-import com.bigdata.mdi.UnisolatedBTreePartition;
-import com.bigdata.scaleup.PartitionedIndexView;
+import com.bigdata.rawstore.IBlockStore.IBlock;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -73,52 +82,31 @@ import com.bigdata.scaleup.PartitionedIndexView;
  * 
  * @see DataServer, which is used to start this service.
  * 
- * FIXME All methods declared by the {@link IDataService} need to operate at the
- * abstraction where an index may comprise both a mutable {@link BTree} and
- * immutable {@link IndexSegment}s - in fact it may make sense to introduce
- * that abstraction at a layer under the {@link ConcurrentJournal}. See
- * {@link PartitionedIndexView} for an earlier attempt. In fact, the changes
- * should be folded into the {@link UnisolatedBTreePartition} which needs to
- * expose a fused view of the resources for the index partition on read.
+ * FIXME Move the executor services out of the {@link ConcurrentJournal}. This
+ * is fine if there is only a single journal, but with multiple journals the
+ * executor services need to be decoupled from the journal so that the can more
+ * readily survive the opening and closing of journals.
  * <p>
- * Regardless, the data service needs to keep all resources locally for a given
- * index partition. In general, that includes the mutable {@link BTree} on the
- * journal plus zero or more {@link IndexSegment}s. A full compacting merge
- * reduces this to an empty {@link BTree} and a single {@link IndexSegment}.
- * Overflow can introduce a dependency on an old {@link Journal} until data on
- * the old journal can be exported into {@link IndexSegment}s.
- * 
- * @todo Support overflow. Queued tasks should be migrated from the "old"
- *       journal to the "new" journal while running tasks should complete on the
- *       "old" journal. Consider encapsulating this behavior in a base class
- *       using a delegation model. There is a sketch of that kind of a thing in
- *       the "scaleout" package. The specifics should probably be discarded but
- *       parts of the code may be of use. The handling of overflow events needs
- *       to be coordinated with the {@link IMetadataService}.
- *       <p>
- *       MVCC requires a strategy to release old versions that are no longer
- *       accessible to active transactions. bigdata uses a highly efficient
- *       technique in which writes are multiplexed onto append-only
- *       {@link Journal}s and then evicted on overflow into
- *       {@link IndexSegment}s using a bulk index build mechanism. Old journal
- *       and index segment resources are simply deleted from the file system
- *       some time after they are no longer accessible to active transactions.
+ * Support overflow. Queued tasks should be migrated from the "old" journal to
+ * the "new" journal while running tasks should complete on the "old" journal.
+ * Consider encapsulating this behavior in a base class using a delegation
+ * model. There is a sketch of that kind of a thing in the "scaleout" package.
+ * The specifics should probably be discarded but parts of the code may be of
+ * use. The handling of overflow events needs to be coordinated with the
+ * {@link IMetadataService}.
+ * <p>
+ * Make sure that {@link ICounter} state overflows correctly.
+ * <p>
+ * Make sure that we never double-open an {@link IndexSegmentFileStore} or an
+ * {@link IndexSegment} from its {@link IndexSegmentFileStore}.
+ * <p>
+ * Make sure that {@link AbstractTask#getIndex(String)} returns a
+ * {@link FusedView}, {@link IsolatedFusedView}, or {@link ReadOnlyFusedView}
+ * as necessary for index partitions. When the index is not partitioned then it
+ * will return a {@link BTree} or a flavor of {@link ReadOnlyIndex}.
  * 
  * @todo The data service should redirect clients if an index partition has been
  *       moved (shed) while a client has a lease.
- * 
- * @todo Support GOM pre-fetch using a rangeIterator - that will materialize N
- *       records on the client and could minimize trips to the server. I am not
- *       sure about unisolated operations for GOM.... Isolated operations are
- *       straight forward. The other twist is supporting scalable link sets,
- *       link set indices (not named, unless the identity of the object
- *       collecting the link set is part of the key), and non-OID indices
- *       (requires changes to generic-native). I think that link sets might have
- *       to become indices in order to scale (to break the cycle of updating
- *       both the object collecting the link set and the head/tail and
- *       prior/next members in the link set). Or perhaps all those could be
- *       materialized on the client and then an unisolated operation (perhaps
- *       with conflict resolution?!?) would persist the results...
  * 
  * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
  *       with an {@link ITransactionManager} service. The data service needs to
@@ -411,21 +399,18 @@ abstract public class DataService implements IDataService,
         
     }
 
-    public void registerIndex(String name, UUID indexUUID,
-            IIndexConstructor ctor, IPartitionMetadata pmd) throws IOException,
-            InterruptedException, ExecutionException {
+    public void registerIndex(String name, IndexMetadata metadata)
+            throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
 
         try {
 
-            if (indexUUID == null)
+            if (metadata == null)
                 throw new IllegalArgumentException();
 
-            if (ctor == null)
-                throw new IllegalArgumentException();
-
-            BTree btree = ctor.newInstance(journal, indexUUID, pmd);
+            // @todo defer create until inside the RegisterIndexTask?
+            BTree btree = BTree.create(journal, metadata);
 
             journal.submit(new RegisterIndexTask(journal, name, btree)).get();
         
@@ -455,8 +440,8 @@ abstract public class DataService implements IDataService,
         }
 
     }
-    
-    public UUID getIndexUUID(String name) throws IOException {
+   
+    public IndexMetadata getIndexMetadata(String name) throws IOException {
 
         setupLoggingContext();
         
@@ -470,31 +455,7 @@ abstract public class DataService implements IDataService,
                 
             }
             
-            return ndx.getIndexUUID();
-            
-        } finally {
-            
-            clearLoggingContext();
-            
-        }
-        
-    }
-
-    public boolean isIsolatable(String name) throws IOException {
-
-        setupLoggingContext();
-        
-        try {
-
-            final IIndex ndx = journal.getIndex(name);
-            
-            if(ndx == null) {
-                
-                throw new NoSuchIndexException(name);
-                
-            }
-            
-            return ndx.isIsolatable();
+            return ((BTree)ndx).getIndexMetadata();
             
         } finally {
             
@@ -861,7 +822,7 @@ abstract public class DataService implements IDataService,
                 int flags, IEntryFilter filter) {
 
             super(journal, startTime,
-                    (flags & IRangeQuery.DELETE) == 0/* readOnly */, name);
+                    (flags & IRangeQuery.REMOVEALL) == 0/* readOnly */, name);
 
             this.fromKey = fromKey;
             this.toKey = toKey;
@@ -881,10 +842,70 @@ abstract public class DataService implements IDataService,
     }
 
     /**
+     * @todo this operation should be able to abort an
+     *       {@link IBlock#inputStream() read} that takes too long or if there
+     *       is a need to delete the resource.
+     */
+    public IBlock readBlock(IResourceMetadata resource, final long addr) {
+    
+        if(resource.isJournal()) {
+            
+            // @todo support multiple journals (overflow).
+            
+            // @todo efficient (stream-based) read from the journal (IBlockStore API).
+            
+            return new IBlock() {
+
+                public long getAddress() {
+                    return addr;
+                }
+
+                // @todo reuse buffers
+                public InputStream inputStream() {
+
+                    ByteBuffer buf = journal.read(addr);
+                    
+                    return new ByteBufferInputStream(buf);
+                    
+                }
+
+                public int length() {
+                    
+                    return journal.getByteCount(addr);
+                    
+                }
+
+                public OutputStream outputStream() {
+                    
+                    throw new UnsupportedOperationException();
+                    
+                }
+                
+            };
+            
+        } else {
+            
+            /*
+             * @todo read from index segments. make sure that we do not
+             * double-open index segments. in fact, all we need to do for this
+             * is obtain the index segment file store and we can read the block
+             * directly from that (the index segment itself does not need to be
+             * open).
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+    }
+    
+    /**
      * @todo IResourceTransfer is not implemented.
      */
     public void sendResource(String filename, InetSocketAddress sink) {
+    
         throw new UnsupportedOperationException();
+        
     }
     
     /**

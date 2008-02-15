@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.IIsolatableIndex;
-import com.bigdata.isolation.IIsolatedIndex;
 
 /**
  * A read-committed transaction provides a read-only view onto the most recently
@@ -130,7 +128,7 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
 
             }
 
-            return new ReadCommittedIsolatableIndex(this, name);
+            return new ReadCommittedIndex(journal, name);
 
         } finally {
 
@@ -140,48 +138,4 @@ public class ReadCommittedTx extends AbstractTx implements ITx {
         
     }
 
-    /**
-     * Light-weight implementation of a read-committed view of an
-     * {@link IIsolatableIndex}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class ReadCommittedIsolatableIndex extends ReadCommittedIndex
-            implements IIsolatedIndex {
-
-        /**
-         * The transaction.
-         */
-        final protected ReadCommittedTx tx;
-        
-        public ReadCommittedIsolatableIndex(ReadCommittedTx tx, String name) {
-
-            super(tx.journal,name);
-            
-            assert tx.isActive();
-            
-            this.tx = tx;
-            
-        }
-
-        /**
-         * Return the read-committed view of the named index case to an
-         * {@link IIsolatedIndex}.
-         * 
-         * @return The read-committed index view.
-         * 
-         * @exception IllegalStateException
-         *                if the named index is not registered.
-         * @exception ClassCastException
-         *                if the named index is an {@link IIsolatableIndex}.
-         */
-        protected IIsolatableIndex getIndex() {
-            
-            return (IIsolatableIndex) super.getIndex();
-            
-        }
-        
-    }
-    
 }

@@ -30,7 +30,7 @@ package com.bigdata.io;
 
 import java.util.Random;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.rawstore.Bytes;
@@ -43,7 +43,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestByteArrayBuffer extends TestCase {
+public class TestByteArrayBuffer extends TestCase2 {
 
     /**
      * 
@@ -454,6 +454,87 @@ public class TestByteArrayBuffer extends TestCase {
 
         assertEquals(0d,buf.getDouble(pos+Bytes.SIZEOF_DOUBLE));
 
+    }
+
+    /**
+     * Test of reading past the limit on the buffer.
+     */
+    public void test_readPastLimit() {
+        
+        ByteArrayBuffer buf = new ByteArrayBuffer(2);
+
+        assertEquals(0,buf.pos());
+        assertEquals(0,buf.limit());
+        assertEquals(0,buf.remaining());
+        assertEquals(2,buf.capacity());
+        
+        byte expected = (byte)12;
+        
+        buf.putByte( expected );
+        
+        assertEquals(1,buf.pos());
+        assertEquals(1,buf.limit());
+        assertEquals(0,buf.remaining());
+        assertEquals(2,buf.capacity());
+
+        // resets the position, but leaves the read limit alone.
+        buf.flip();
+        
+        assertEquals(0,buf.pos());
+        assertEquals(1,buf.limit());
+        assertEquals(1,buf.remaining());
+        assertEquals(2,buf.capacity());
+        
+        // read expected byte @ pos := 0.
+        assertEquals(expected,buf.getByte());
+        
+        assertEquals(1,buf.pos());
+        assertEquals(1,buf.limit());
+        assertEquals(0,buf.remaining());
+        assertEquals(2,buf.capacity());
+
+        try {
+            buf.getByte( expected );
+            fail("Expecting exception.");
+        } catch(RuntimeException ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
+
+    }
+    
+    public void test_readPastLimit2() {
+        
+        final int capacity = 10;
+        
+        ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
+        
+        for(int i=0; i<5; i++) {
+            
+            buf.putByte((byte)i);
+            
+        }
+        
+        // reset the position, leaving the read limit alone.
+        buf.flip();
+
+        assert buf.pos() == 0;
+        
+        assert buf.limit() == 5;
+
+        for(int i=0; i<5; i++) {
+
+            assertEquals(5,buf.limit()); // unchanged.
+
+            assertEquals(i,buf.pos());
+            
+            assertEquals((byte)i,buf.getByte());
+
+        }
+        
+        assertEquals(5,buf.limit()); // unchanged.
+        assertEquals(buf.pos() ,buf.limit()); // position is at the read limit.
+
+        
     }
     
 }
