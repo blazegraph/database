@@ -26,6 +26,7 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.model.StatementEnum;
@@ -114,14 +115,13 @@ public class SPO {
         assert keyOrder != null;
         assert itr != null;
 
-        // fetch the next entry, obtain the value.
-        final Object val = itr.next();
+        ITuple tuple = itr.next();
 
 //      // clone of the key.
 //      final byte[] key = itr.getKey();
       
         // copy of the key in a reused buffer.
-        final byte[] key = itr.getTuple().getKeyBuffer().array(); 
+        final byte[] key = tuple.getKeyBuffer().array(); 
 
 //        long[] ids = new long[IRawTripleStore.N];
         
@@ -173,8 +173,12 @@ public class SPO {
             throw new UnsupportedOperationException();
 
         }
-
-        type = StatementEnum.deserialize((byte[])val); 
+        
+//        type = StatementEnum.deserialize(tuple.getValue());
+        
+        final byte code = tuple.getValueBuffer().getByte(0);
+        
+        type = StatementEnum.decode( code ); 
         
     }
 

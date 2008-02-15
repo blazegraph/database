@@ -52,7 +52,7 @@ public class ByteArrayValueSerializer implements IValueSerializer {
     
     public static final transient int VERSION0 = 0x0;
 
-    public void putValues(DataOutputBuffer os, Object[] values, int n) throws IOException {
+    public void putValues(DataOutputBuffer os, byte[][] values, int n) throws IOException {
 
         /*
          * Buffer lots of single byte operations.
@@ -71,7 +71,7 @@ public class ByteArrayValueSerializer implements IValueSerializer {
             
             for (int i = 0; i < n; i++) {
 
-                final byte[] value = (byte[])values[i];
+                final byte[] value = values[i];
                 
                 final long len = value == null ? -1 : value.length;
 
@@ -105,7 +105,7 @@ public class ByteArrayValueSerializer implements IValueSerializer {
         
     }
     
-    public void getValues(DataInput is, Object[] values, int n) throws IOException {
+    public void getValues(DataInput is, byte[][] values, int n) throws IOException {
 
         final int version = (int)LongPacker.unpackLong(is);
 
@@ -136,9 +136,10 @@ public class ByteArrayValueSerializer implements IValueSerializer {
          */
         for( int i=0; i<n; i++) {
         
-            final byte[] value = (byte[])values[i];
+            final byte[] value = values[i];
             
-            if( value==null) continue;
+            if (value == null)
+                continue;
             
             is.readFully(value, 0, value.length);
             

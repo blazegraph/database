@@ -24,10 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.Serializable;
-import java.util.UUID;
 
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
-import com.bigdata.isolation.IIsolatableIndex;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.service.Split;
 
 /**
  * <p>
@@ -38,36 +39,74 @@ import com.bigdata.isolation.IIsolatableIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndex extends ISimpleBTree { //, IBatchBTree {
+public interface IIndex extends ISimpleBTree {
+
+    /**
+     * The description of the resources comprising the index view.
+     */
+    public IResourceMetadata[] getResourceMetadata();
     
     /**
-     * The unique identifier for the index whose data is stored in this B+Tree
-     * data structure. When using a scale-out index the same <i>indexUUID</i>
-     * MUST be assigned to each mutable and immutable B+Tree having data for any
-     * partition of that scale-out index. This makes it possible to work
-     * backwards from the B+Tree data structures and identify the index to which
-     * they belong.
+     * The metadata for the index. This is full of good stuff about the index.
      */
-    public UUID getIndexUUID();
-
+    public IndexMetadata getIndexMetadata();
+    
+    /**
+     * A restart-safe counter. For an unpartitioned index, this a single counter
+     * for the entire index with an initial value of zero (0) and it is stored
+     * in the index {@link Checkpoint} record. For a partitioned index, there is a
+     * distinct counter for each index partition, the partition identifier is
+     * used as the high int32 bits of the counter, and the low int32 of the
+     * counter has an initial value of zero (0) in each index partition.
+     */
+    public ICounter getCounter();
+    
     /**
      * Interesting statistics about the index.
      */
     public String getStatistics();
     
     /**
-     * Return <code>true</code> iff the index supports isolation.
-     * <p>
-     * Note: This is declared as a method since the {@link IIsolatableIndex}
-     * interface is not always detectable. For example, a remote client will use
-     * a view of the index. That view does not declare {@link IIsolatableIndex}
-     * but the client can use this method instead to decide whether or not the
-     * index supports transactional isolation.
+     * Submits an index procedure that operations on a single key to the
+     * appropriate index partition returning the result of that procedure.
      * 
-     * @see IIsolatableIndex
+     * @param key
+     *            The key.
+     * @param proc
+     *            The procedure.
+     * 
+     * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
      */
-    public boolean isIsolatable();
-
+    public Object submit(byte[] key, IIndexProcedure proc);
+    
+    /**
+     * The procedure will be transparently applied against each index partition
+     * spanned by the given key range.
+     * <p>
+     * Note: Since this variant of <i>submit()</i> does not split keys the
+     * <i>fromIndex</i> and <i>toIndex</i> in the {@link Split}s reported to
+     * the {@link IResultHandler} will be zero (0).
+     * 
+     * @param fromKey
+     *            The lower bound (inclusive) -or- <code>null</code> if there
+     *            is no lower bound.
+     * @param toKey
+     *            The upper bound (exclusive) -or- <code>null</code> if there
+     *            is no upper bound.
+     * @param proc
+     *            The procedure. If the procedure implements the
+     *            {@link IParallelizableIndexProcedure} marker interface then it
+     *            MAY be executed in parallel against the relevant index
+     *            partition(s).
+     * @param resultHandler
+     *            When defined, results from each procedure application will be
+     *            reported to this object.
+     * 
+     * @todo change type to {@link IKeyRangeIndexProcedure}? 
+     */
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler handler); 
+    
     /**
      * Runs a procedure against an index.
      * <p>

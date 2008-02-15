@@ -44,16 +44,6 @@ import com.bigdata.io.DataOutputBuffer;
 public interface IAddressSerializer {
 
     /**
-     * The maximum size of a sequence of serialized addresses in bytes. This is
-     * used to compute the maximum required size of a buffer to (de-)serialize a
-     * node.
-     * 
-     * @param n
-     *            The #of addresses in the sequence.
-     */
-    public int getSize(int n);
-
-    /**
      * De-serialize the child addresses for a node.
      * 
      * @param is

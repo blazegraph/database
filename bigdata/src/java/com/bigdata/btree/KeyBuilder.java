@@ -1105,6 +1105,40 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /**
+     * Decodes a signed int value as encoded by {@link #append(int)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The signed int value.
+     */
+    static public int decodeInt(byte[] buf,int off) {
+
+        int v = 0;
+        
+        // big-endian.
+        v += (0xffL & buf[off++]) << 24;
+        v += (0xffL & buf[off++]) << 16;
+        v += (0xffL & buf[off++]) <<  8;
+        v += (0xffL & buf[off++]) <<  0;
+
+        if (v < 0) {
+            
+            v = v + 0x80000000;
+
+        } else {
+            
+            v = v - 0x80000000;
+            
+        }
+
+        return v;
+        
+    }
+
+    /**
      * Interface allows us to encapsulate differences between the ICU and JDK
      * libraries for generating sort keys from Unicode strings.
      * 

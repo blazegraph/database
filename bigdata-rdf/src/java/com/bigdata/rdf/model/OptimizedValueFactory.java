@@ -500,10 +500,28 @@ public class OptimizedValueFactory implements ValueFactory {
          * @see {@link #serialize()}
          */
         public static _Value deserialize(byte[] b) {
+
+            return deserialize( new DataInputBuffer(b) );
+            
+        }
+
+        /**
+         * Routine for efficient de-serialization of an RDF {@link _Value}.
+         * 
+         * @param b
+         *            An input stream from which the serialized data may be
+         *            read.
+         * 
+         * @return The {@link _Value}.
+         * 
+         * @throws RuntimeException
+         *             if there is an IO problem.
+         * 
+         * @see {@link #serialize()}
+         */
+        public static _Value deserialize(DataInputBuffer in) {
             
             try {
-
-                DataInputBuffer in = new DataInputBuffer(b);
 
                 final short version = in.unpackShort();
 

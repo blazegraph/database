@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,40 +20,55 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Jan 10, 2007
+ * Created on Feb 14, 2008
  */
 
 package com.bigdata.btree;
 
-import java.util.Iterator;
-
 /**
- * Interface for iterators that visit nodes and leaves rather than entries in
- * leaves.
+ * Iterator disallows {@link #remove()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface INodeIterator extends Iterator<AbstractNode> {
+public class ReadOnlyEntryIterator implements IEntryIterator {
+
+    private final IEntryIterator src;
+    
+    /**
+     * 
+     */
+    public ReadOnlyEntryIterator(IEntryIterator src) {
+        
+        this.src = src;
+        
+    }
+
+    public ITuple next() {
+        
+        return src.next();
+        
+    }
+
+    public boolean hasNext() {
+        
+        return src.hasNext();
+        
+    }
 
     /**
-     * The value of the key for the last entry visited by
-     * {@link Iterator#next()}.
+     * Disallowed.
      * 
-     * @exception IllegalStateException
-     *                if no entries have been visited.
+     * @throws UnsupportedOperationException
+     *             always
      */
-    public Object getKey();
-    
-    /**
-     * The value associated with the last node or leaf visited by
-     * {@link Iterator#next()}.
-     * 
-     * @exception IllegalStateException
-     *                if no entries have been visited.
-     */
-    public AbstractNode getNode();
-    
+    public void remove() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
 }

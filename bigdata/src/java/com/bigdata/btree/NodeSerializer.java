@@ -26,11 +26,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import it.unimi.dsi.mg4j.io.InputBitStream;
+import it.unimi.dsi.mg4j.io.OutputBitStream;
+
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -1116,12 +1120,11 @@ public class NodeSerializer {
         final int branchingFactor = leaf.getBranchingFactor();
         final IKeyBuffer keys = leaf.getKeys();
         /*
-         * @todo if the btree is constrained to have only byte[] values then
-         * modify this array to be typed as byte[][] and check all of the value
-         * serializers for inefficiencies or copying into a byte[][] in order
-         * to align with the IDataSerializer API.
+         * @todo Check all of the value serializers for inefficiencies or
+         * copying into a byte[][] in order to align with the IDataSerializer
+         * API.
          */
-        final Object[] vals = leaf.getValues();
+        final byte[][] vals = leaf.getValues();
         
         /*
          * common data.
@@ -1164,6 +1167,18 @@ public class NodeSerializer {
             // values.
             valueSerializer.putValues(_buf, vals, nkeys);
 
+            if(leaf.hasDeleteMarkers()) {
+                
+                putDeleteMarkers(_buf, leaf);
+                
+            }
+            
+            if(leaf.hasVersionTimestamps()) {
+                
+                putVersionTimestamps(_buf, leaf);
+                
+            }
+            
 //            // Done using the DataOutputStream so flush to the ByteBuffer.
 //            os.flush();
             
@@ -1335,9 +1350,27 @@ public class NodeSerializer {
             
             // values.
 
-            final Object[] values = new Object[branchingFactor + 1];
+            final byte[][] values = new byte[branchingFactor + 1][];
 
             valueSerializer.getValues(is, values, nkeys);
+            
+            // delete markers.
+            final boolean[] deleteMarkers;
+            if(btree.getIndexMetadata().getDeleteMarkers()) {
+                deleteMarkers = new boolean[branchingFactor+1];
+                getDeleteMarkers(is, nkeys, deleteMarkers );
+            } else {
+                deleteMarkers = null;
+            }
+            
+            // version timestamps.
+            final long[] versionTimestamps;
+            if(btree.getIndexMetadata().getVersionTimestamps()) {
+                versionTimestamps = new long[branchingFactor+1];
+                getVersionTimestamps(is, nkeys, versionTimestamps );
+            } else {
+                versionTimestamps = null;
+            }
 
             // verify #of bytes actually read.
             assert buf.position() - pos0 == nbytes;
@@ -1348,7 +1381,7 @@ public class NodeSerializer {
             
             // Done.
             return nodeFactory.allocLeaf(btree, addr, branchingFactor, keys,
-                    values);
+                    values, versionTimestamps, deleteMarkers);
 
         }
 
@@ -1444,31 +1477,107 @@ public class NodeSerializer {
 
     }
 
-//    protected void putTimestamps(DataOutputStream os, long[] timestamps,
-//            int nentries) throws IOException {
-//
-//        for (int i = 0; i < nentries; i++) {
-//
-//            final long timestamp = timestamps[i];
-//
-//            LongPacker.packLong(os, timestamp);
-//
-//        }
-//
-//    }
-//
-//    protected void getTimestamps(DataInputStream is, long[] timestamps,
-//            int nentries) throws IOException {
-//
-//        for (int i = 0; i < nentries; i++) {
-//
-//            final long timestamp = LongPacker.unpackLong(is);
-//
-//            timestamps[i] = timestamp;
-//
-//        }
-//
-//    }
+    /**
+     * Write out the delete markers.
+     * 
+     * @param os
+     * @param leaf
+     * 
+     * @throws IOException
+     */
+    protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
+            throws IOException {
+
+        final int n = leaf.getKeyCount();
+
+        if (n == 0)
+            return;
+
+        OutputBitStream obs = new OutputBitStream(os, 0/* unbuffered! */);
+
+        for (int i = 0; i < n; i++) {
+
+            obs.writeBit(leaf.getDeleteMarker(i));
+
+        }
+
+        obs.flush();
+
+        obs.close();
+
+    }
+
+    /**
+     * Read in the delete markers.
+     * 
+     * @param is
+     * @param n
+     * @param deleteMarkers
+     * 
+     * @throws IOException
+     */
+    protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
+            throws IOException {
+
+        if(n==0) return;
+        
+        InputBitStream ibs = new InputBitStream((InputStream) is, 0/* unbuffered! */);
+
+        for (int i = 0; i < n; i++) {
+
+            deleteMarkers[i] = ibs.readBit() == 0 ? false : true;
+            
+        }
+        
+//        ibs.close();
+        
+    }
+
+    /**
+     * Write out the version timestamps.
+     * 
+     * FIXME Experiment with other serialization schemes. One of the more
+     * obvious would be a huffman encoding of the timestamps since I presume
+     * that they will tend to bunch together a lot. If timestamps are
+     * non-negative then we can also pack them (or use the nibble coding).
+     * 
+     * @param os
+     * @param nentries
+     * @param versionTimestamps
+     * 
+     * @throws IOException
+     */
+    protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
+            throws IOException {
+
+        final int n = leaf.getKeyCount();
+
+        if (n == 0)
+            return;
+
+        for (int i = 0; i < n; i++) {
+
+            final long timestamp = leaf.getVersionTimestamp(i);
+
+            os.writeLong(timestamp);
+
+        }
+
+    }
+
+    protected void getVersionTimestamps(DataInput is, int n,
+            long[] versionTimestamps) throws IOException {
+
+        if (n == 0)
+            return;
+
+        for (int i = 0; i < n; i++) {
+
+            versionTimestamps[i] = is.readLong();
+
+        }
+
+    }
 
     /**
      * Compress a record in the buffer.

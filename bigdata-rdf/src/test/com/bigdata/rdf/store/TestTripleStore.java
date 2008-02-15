@@ -647,19 +647,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             SPOAssertionBuffer buffer = new SPOAssertionBuffer(store, store,
                     null/* filter */, 100/* capacity */, false/*justified*/);
             
-            buffer.add(new SPO(1,2,3,StatementEnum.Explicit));
-            buffer.add(new SPO(2,2,3,StatementEnum.Inferred));
-            buffer.add(new SPO(3,2,3,StatementEnum.Axiom));
-            
+            buffer.add(new SPO(1, 2, 3, StatementEnum.Explicit));
+            buffer.add(new SPO(2, 2, 3, StatementEnum.Inferred));
+            buffer.add(new SPO(3, 2, 3, StatementEnum.Axiom));
+
             buffer.flush();
 
             store.commit();
             
-            assertSameSPOs(new SPO[] {
-                    new SPO(1,2,3,StatementEnum.Explicit),
-                    new SPO(2, 2, 3, StatementEnum.Inferred),
-                    new SPO(3, 2, 3, StatementEnum.Axiom),
-                    },
+            assertSameSPOs(new SPO[] {//
+                    new SPO(1, 2, 3, StatementEnum.Explicit),//
+                    new SPO(2, 2, 3, StatementEnum.Inferred),//
+                    new SPO(3, 2, 3, StatementEnum.Axiom),//
+                    },//
                     store.getAccessPath(NULL,NULL,NULL).iterator()
                     );
 

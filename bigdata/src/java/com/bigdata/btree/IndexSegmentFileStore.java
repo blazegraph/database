@@ -36,11 +36,12 @@ import java.nio.ByteBuffer;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * A read-only store backed by a file. The section of the file containing the
@@ -63,9 +64,13 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
             .getLogger(IndexSegmentFileStore.class);
 
     /**
-     * Used to delegate the {@link IAddressManager} interface.
+     * Used to correct decode region-based addresses. The
+     * {@link IndexSegmentBuilder} encodes region-based addresses using
+     * {@link IndexSegmentRegion}. Those addresses are then transparently
+     * decoded by this class. The {@link IndexSegment} itself knows nothing
+     * about this entire slight of hand.
      */
-    private WormAddressManager addressManager;
+    private IndexSegmentAddressManager addressManager;
     
     /**
      * A buffer containing the disk image of the nodes in the index segment.
@@ -86,14 +91,46 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
     private RandomAccessFile raf;
 
     /**
-     * A read-only view of the metadata record for the index segment.
+     * A read-only view of the checkpoint record for the index segment.
      */
-    protected IndexSegmentMetadata metadata;
+    private IndexSegmentCheckpoint checkpoint;
 
     /**
-     * A read-only view of the extension metadata record for the index segment.
+     * The metadata record for the index segment.
      */
-    protected IndexSegmentExtensionMetadata extensionMetadata;
+    private IndexMetadata metadata;
+    
+    protected void assertOpen() {
+
+        if (!open) {
+            
+            throw new IllegalStateException();
+            
+        }
+
+    }
+    
+    /**
+     * A read-only view of the checkpoint record for the index segment.
+     */
+    public final IndexSegmentCheckpoint getCheckpoint() {
+        
+        assertOpen();
+
+        return checkpoint;
+        
+    }
+
+    /**
+     * The metadata record for the index segment.
+     */
+    public final IndexMetadata getMetadata() {
+    
+        assertOpen();
+        
+        return metadata;
+        
+    }
     
     /**
      * True iff the store is open.
@@ -123,6 +160,16 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
 
     }
 
+    public IResourceMetadata getResourceMetadata() {
+        
+        if(!open) reopen();
+
+        // @todo presumes the index segment is live.
+        return new SegmentMetadata(file.toString(), checkpoint.length,
+                ResourceState.Live, checkpoint.segmentUUID);
+        
+    }
+    
     /**
      * Re-open a closed store. This operation should succeed if the backing file
      * is still accessible.
@@ -149,17 +196,16 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
             // open the file.
             this.raf = new RandomAccessFile(file, "r");
 
-            // read the metadata record from the file.
-            this.metadata = new IndexSegmentMetadata(raf);
+            // read the checkpoint record from the file.
+            this.checkpoint = new IndexSegmentCheckpoint(raf);
 
-            IndexSegment.log.info(metadata.toString());
+            log.info(checkpoint.toString());
 
-            this.addressManager = new WormAddressManager(metadata.offsetBits);
+            // handles transparent decoding of offsets within regions.
+            this.addressManager = new IndexSegmentAddressManager(checkpoint);
             
-            /*
-             * Read in the extension metadata record.
-             */
-            this.extensionMetadata = readExtensionMetadata();
+            // Read the metadata record.
+            this.metadata = readMetadata();
 
             /*
              * Read the index nodes from the file into a buffer. If there are no
@@ -168,7 +214,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
              * be a deserialized object and the file will not be buffered in
              * memory.
              */
-            if(metadata.nnodes == 0) {
+            if(checkpoint.nnodes == 0) {
                 
                 this.buf_nodes = null;
                 
@@ -177,7 +223,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
                 // @todo configurable : we will not buffer more than this much data.
                 final long MAX_NODE_REGION_LENGTH = Bytes.megabyte * 100; 
             
-                final long nodesByteCount = getByteCount(metadata.addrLeaves);
+                final long nodesByteCount = getByteCount(checkpoint.addrLeaves);
                 
                 this.buf_nodes = (nodesByteCount < MAX_NODE_REGION_LENGTH ? bufferIndexNodes(raf)
                         : null);
@@ -211,15 +257,12 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
      *            The store.
      * 
      * @return The {@link IndexSegment} or derived class loaded from that store.
-     * 
-     * @see IndexSegmentExtensionMetadata, which provides a metadata extension
-     *      protocol for the {@link IndexSegment}.
      */
     public IndexSegment load() {
         
         try {
             
-            Class cl = Class.forName(extensionMetadata.getClassName());
+            Class cl = Class.forName(metadata.getClassName());
             
             Constructor ctor = cl
                     .getConstructor(new Class[] { IndexSegmentFileStore.class });
@@ -268,9 +311,8 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
      */
     public void close() {
 
-        if (!open)
-            throw new IllegalStateException();
-
+        assertOpen();
+        
         try {
 
             raf.close();
@@ -279,9 +321,9 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
             
             buf_nodes = null;
 
-            metadata = null;
+            checkpoint = null;
             
-            extensionMetadata = null;
+            metadata = null;
             
             open = false;
 
@@ -328,26 +370,28 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
     }
     
     public long size() {
+
+        assertOpen();
         
-        return metadata.length;
+        return checkpoint.length;
         
     }
 
     /**
-     * Read from the index segment. If the request is in the node region and
-     * the nodes have been buffered then this uses a slice on the node
-     * buffer. Otherwise this reads through to the backing file.
+     * Read a record from the {@link IndexSegmentFileStore}. If the request is
+     * in the node region and the nodes have been buffered then this uses a
+     * slice on the node buffer. Otherwise this reads through to the backing
+     * file.
      */
     public ByteBuffer read(long addr) {
 
-        if (!open)
-            throw new IllegalStateException();
-
+        assertOpen();
+        
         final long offset = addressManager.getOffset(addr);
 
         final int length = addressManager.getByteCount(addr);
         
-        final long offsetNodes = addressManager.getOffset(metadata.addrNodes);
+        final long offsetNodes = addressManager.getOffset(checkpoint.addrNodes);
 
         ByteBuffer dst;
 
@@ -414,15 +458,15 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
     protected ByteBuffer bufferIndexNodes(RandomAccessFile raf)
             throws IOException {
 
-        if(metadata.addrNodes == 0L) {
+        if(checkpoint.addrNodes == 0L) {
             
             throw new IllegalStateException("No nodes.");
             
         }
         
-        final long offset = addressManager.getOffset(metadata.addrNodes);
+        final long offset = addressManager.getOffset(checkpoint.addrNodes);
 
-        final int nbytes = addressManager.getByteCount(metadata.addrLeaves);
+        final int nbytes = addressManager.getByteCount(checkpoint.addrLeaves);
 
         /*
          * Note: The direct buffer imposes a higher burden on the JVM and all
@@ -447,7 +491,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
      */
     protected BloomFilter readBloomFilter() throws IOException {
 
-        final long addr = metadata.addrBloom;
+        final long addr = checkpoint.addrBloom;
         
         if(addr == 0L) {
             
@@ -485,51 +529,22 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
         assert buf.position() == 0;
         assert buf.limit() == len;
 
-//        ByteBufferInputStream bais = new ByteBufferInputStream(buf);
-//        
-////        ByteArrayInputStream bais = new ByteArrayInputStream(buf.array());
-//        
-//        ObjectInputStream ois = new ObjectInputStream(bais);
-//        
-//        try {
-//
-//            BloomFilter bloomFilter = (BloomFilter) ois.readObject();
-//            
-//            log.info("Read bloom filter: minKeys=" + bloomFilter.size()
-//                    + ", entryCount=" + metadata.nentries + ", bytesOnDisk="
-//                    + len + ", errorRate=" + metadata.errorRate);
-//            
-//            return bloomFilter;
-//            
-//        }
-//        
-//        catch(Exception ex) {
-//            
-//            IOException ex2 = new IOException("Could not read bloom filter: "+ex);
-//            
-//            ex2.initCause(ex);
-//            
-//            throw ex2;
-//            
-//        }
+        BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
 
-      BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
-      
-      log.info("Read bloom filter: minKeys=" + bloomFilter.size()
-              + ", entryCount=" + metadata.nentries + ", bytesOnDisk="
-              + len + ", errorRate=" + metadata.errorRate);
-      
-      return bloomFilter;
+        log.info("Read bloom filter: minKeys=" + bloomFilter.size()
+                + ", entryCount=" + checkpoint.nentries + ", bytesOnDisk="
+                + len + ", errorRate=" + metadata.getErrorRate());
+
+        return bloomFilter;
 
     }
-    
-    /**
-     * Reads the {@link IndexSegmentExtensionMetadata} record directly from the
-     * file.
-     */
-    protected IndexSegmentExtensionMetadata readExtensionMetadata() throws IOException {
 
-        final long addr = metadata.addrExtensionMetadata;
+    /**
+     * Reads the {@link IndexMetadata} record directly from the file.
+     */
+    protected IndexMetadata readMetadata() throws IOException {
+
+        final long addr = checkpoint.addrMetadata;
         
         assert addr != 0L;
         
@@ -563,7 +578,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
         assert buf.position() == 0;
         assert buf.limit() == len;
 
-        IndexSegmentExtensionMetadata extensionMetadata = (IndexSegmentExtensionMetadata) SerializerUtil
+        final IndexMetadata extensionMetadata = (IndexMetadata) SerializerUtil
                 .deserialize(buf);
 
         log.info("Read extension metadata: " + extensionMetadata);

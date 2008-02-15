@@ -27,11 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.isolation.Value;
-import com.bigdata.journal.CommitRecordIndex;
-import com.bigdata.journal.Name2Addr;
-
 /**
  * <p>
  * Interface for non-batch operations on a B+-Tree mapping non-null variable
@@ -40,17 +35,6 @@ import com.bigdata.journal.Name2Addr;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo re-define this interface for byte[] values. The main challenge in doing
- *       this for the values is transactional isolation depends on storing
- *       {@link Value} objects. Also, there may be some btrees used by the
- *       journal for the {@link Name2Addr} and {@link CommitRecordIndex} that
- *       are storing serialized objects (I don't think so, but check). There are
- *       a LOT of unit tests that assume the values are simply serializable
- *       objects - {@link SimpleEntry} in particular. This might be managed by
- *       adding a package private alternate for the BTree that automatically
- *       converted a non-byte[] value to a byte[] using {@link SerializerUtil}
- *       and then adding smart de-serialization as well for lookup and remove.
  * 
  * @see UnicodeKeyBuilder, which may be used to encode one or more primitive
  *      data type values or Unicode strings into a variable length unsigned
@@ -65,30 +49,36 @@ public interface ISimpleBTree extends IRangeQuery {
      * Insert or update a value under the key.
      * 
      * @param key
-     *            The key. 
+     *            The key.
      * @param value
      *            The value (may be null).
      * 
      * @return The previous value under that key or <code>null</code> if the
-     *         key was not found.
+     *         key was not found or if the previous entry for that key was
+     *         marked as deleted.
      */
-    public Object insert(byte[] key, Object value);
+    public byte[] insert(byte[] key, byte[] value);
     
     /**
      * Lookup a value for a key.
      * 
-     * @return The value or <code>null</code> if there is no entry for that
-     *         key.
+     * @return The value stored under that key or <code>null</code> if there
+     *         is no entry for that key or if the entry under that key is marked
+     *         as deleted.
      */
-    public Object lookup(byte[] key);
+    public byte[] lookup(byte[] key);
 
     /**
-     * Return true iff there is an entry for the key.
+     * Return <code>true</code> iff there is a (non-deleted) index entry for
+     * the key. An index entry with a <code>null</code> value will cause this
+     * method to return <code>true</code>. A deleted index entry will cause
+     * this method to return <code>false</code>.
      * 
      * @param key
      *            The key.
      * 
-     * @return True if the btree contains an entry for that key.
+     * @return <code>true</code> if the index contains an (un-deleted) entry
+     *         for that key.
      */
     public boolean contains(byte[] key);
         
@@ -99,8 +89,9 @@ public interface ISimpleBTree extends IRangeQuery {
      *            The key.
      * 
      * @return The value stored under that key or <code>null</code> if the key
-     *         was not found.
+     *         was not found or if the previous entry under that key was marked
+     *         as deleted.
      */
-    public Object remove(byte[] key);
+    public byte[] remove(byte[] key);
 
 }

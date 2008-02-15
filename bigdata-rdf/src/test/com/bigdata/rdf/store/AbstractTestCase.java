@@ -46,8 +46,9 @@ import org.openrdf.sail.SailException;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
@@ -327,14 +328,16 @@ abstract public class AbstractTestCase
 
             while (itr.hasNext()) {
 
-                // the term identifier.
-                Object val = itr.next();
+                ITuple tuple = itr.next();
+                
+//                // the term identifier.
+//                Object val = itr.next();
 
                 /*
                  * The sort key for the term. This is not readily decodable. See
                  * RdfKeyBuilder for specifics.
                  */
-                byte[] key = itr.getKey();
+                byte[] key = tuple.getKey();
 
                 /*
                  * deserialize the term identifier (packed long integer).
@@ -343,7 +346,7 @@ abstract public class AbstractTestCase
                 
                 try {
 
-                    id = new DataInputBuffer((byte[]) val).unpackLong();
+                    id = tuple.getValueStream().unpackLong();
 
                 } catch (IOException ex) {
 
@@ -370,16 +373,19 @@ abstract public class AbstractTestCase
 
             while (itr.hasNext()) {
 
-                // the serialized term.
-                Object val = itr.next();
+                ITuple tuple = itr.next();
+                
+//                // the serialized term.
+//                Object val = itr.next();
 
-                // the sort key for the term identifier.
-                byte[] key = itr.getKey();
+//                // the sort key for the term identifier.
+//                byte[] key = itr.getKey();
 
                 // decode the term identifier from the sort key.
-                final long id = KeyBuilder.decodeLong(key, 0);
+                final long id = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
 
-                _Value term = _Value.deserialize((byte[]) val);
+                // deserialize the term.
+                _Value term = _Value.deserialize(tuple.getValueStream());
 
                 System.err.println(id + ":" + term);
 
@@ -423,19 +429,20 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getFullTextIndex();
 
-            IEntryIterator itr = ndx.rangeIterator(null, null);
+            IEntryIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
+                    IRangeQuery.KEYS, null/*filter*/);
 
             while (itr.hasNext()) {
 
                 // next value (we only need the key).
-                itr.next();
+                ITuple tuple = itr.next();
                 
                 /*
                  * The sort key
                  * 
                  * FIXME decode the languageCode, token, and term identifier.
                  */
-                byte[] key = itr.getKey();
+                byte[] key = tuple.getKey();
                 
                 System.err.println(BytesUtil.toString(key));
 
@@ -519,15 +526,15 @@ abstract public class AbstractTestCase
          */
         
         expected = expected.clone();
-        
+
         KeyOrder keyOrder = actual.getKeyOrder();
 
-        if(keyOrder!=null) {
+        if (keyOrder != null) {
 
             Arrays.sort(expected, keyOrder.getComparator());
-            
+
         }
-        
+
         int i = 0;
 
         while (actual.hasNext()) {
@@ -540,7 +547,7 @@ abstract public class AbstractTestCase
             }
 
             SPO g = actual.next();
-            
+
             if (!expected[i].equals(g)) {
                 
                 /*

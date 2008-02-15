@@ -71,10 +71,17 @@ public interface INodeFactory {
      *            A representation of the defined keys in the node.
      * @param values
      *            An array containing the values found in the leaf.
+     * @param versionTimestamps
+     *            An array of the version timestamps (iff the version metadata
+     *            is being maintained).
+     * @param deleteMarkers
+     *            An array of the delete markers (iff the version metadata is
+     *            being maintained).
      * 
      * @return A leaf initialized from those data.
      */
     public ILeafData allocLeaf(IIndex btree, long addr, int branchingFactor,
-            IKeyBuffer keys, Object[] values);
+            IKeyBuffer keys, byte[][] values, long[] versionTimestamps,
+            boolean[] deleteMarkers);
 
 }

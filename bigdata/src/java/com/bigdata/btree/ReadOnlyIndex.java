@@ -30,8 +30,8 @@ package com.bigdata.btree;
 import java.util.UUID;
 
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
-
 
 /**
  * A fly-weight wrapper that does not permit write operations and reads
@@ -40,7 +40,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
+public class ReadOnlyIndex implements IIndex {
 
     private final IIndex src;
     
@@ -55,77 +55,90 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
 
     public UUID getIndexUUID() {
         
-        return src.getIndexUUID();
+        return src.getIndexMetadata().getIndexUUID();
         
     }
     
-    public String getStatistics() {
+    public IndexMetadata getIndexMetadata() {
+        
+        return src.getIndexMetadata();
+        
+    }
+
+    final public String getStatistics() {
         
         return getClass().getSimpleName() + " : "+ src.getStatistics();
         
     }
 
-    public ICounter getCounter() {
-        
-        if(src instanceof IIndexWithCounter) {
-        
-            IIndexWithCounter ndx = (IIndexWithCounter) src;
-            
-            return new ReadOnlyCounter(ndx.getCounter());
-            
-        } else {
+    final public ICounter getCounter() {
+        return new ReadOnlyCounter(src.getCounter());
+    }
+    
+    final public boolean contains(byte[] key) {
+        return src.contains(key);
+    }
+
+    final public byte[] insert(byte[] key, byte[] value) {
+        throw new UnsupportedOperationException();
+    }
+
+    final public byte[] lookup(byte[] key) {
+        return src.lookup(key);
+    }
+
+    final public byte[] remove(byte[] key) {
+        throw new UnsupportedOperationException();
+    }
+
+    final public long rangeCount(byte[] fromKey, byte[] toKey) {
+        return src.rangeCount(fromKey, toKey);
+    }
+
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        return src.rangeIterator(fromKey, toKey);
+    }
+
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        if ((flags & REMOVEALL) != 0) {
+
+            /*
+             * Note: Must be explicitly disabled!
+             */
             
             throw new UnsupportedOperationException();
             
         }
         
+        return new ReadOnlyEntryIterator(src.rangeIterator(fromKey, toKey,
+                capacity, flags, filter));
+        
     }
     
-    public boolean contains(byte[] key) {
-        return src.contains(key);
+    public Object submit(byte[] key, IIndexProcedure proc) {
+        
+        return proc.apply(this);
+        
     }
 
-    public Object insert(byte[] key, Object value) {
-        throw new UnsupportedOperationException();
-    }
+    @SuppressWarnings("unchecked")
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler handler) {
 
-    public Object lookup(byte[] key) {
-        return src.lookup(key);
-    }
-
-    public Object remove(byte[] key) {
-        throw new UnsupportedOperationException();
-    }
-
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
-        return src.rangeCount(fromKey, toKey);
-    }
-
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        return src.rangeIterator(fromKey, toKey);
-    }
-
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
-        return src.rangeIterator(fromKey, toKey, capacity, flags, filter);
+        Object result = proc.apply(this);
+        
+        if(handler!=null) {
+            
+            handler.aggregate(result, new Split(null,0,0));
+            
+        }
+        
     }
     
-//    public void contains(BatchContains op) {
-//        src.contains(op);
-//    }
-//
-//    public void insert(BatchInsert op) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    public void lookup(BatchLookup op) {
-//        src.lookup(op);
-//    }
-//
-//    public void remove(BatchRemove op) {
-//        throw new UnsupportedOperationException();
-//    }
-
-    public void submit(int n, byte[][] keys, byte[][] vals,
+    @SuppressWarnings("unchecked")
+    final public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
@@ -133,10 +146,10 @@ public class ReadOnlyIndex implements IIndexWithCounter, IRangeQuery {
         aggregator.aggregate(result, new Split(null,0,n));
         
     }
-    
-    public boolean isIsolatable() {
-        
-        return src.isIsolatable();
+
+    public IResourceMetadata[] getResourceMetadata() {
+
+        return src.getResourceMetadata();
         
     }
     

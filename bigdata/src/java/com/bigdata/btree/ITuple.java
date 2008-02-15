@@ -28,7 +28,10 @@
 
 package com.bigdata.btree;
 
-import com.bigdata.io.IByteArrayBuffer;
+import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.rawstore.IBlockStore;
+import com.bigdata.rawstore.IBlockStore.IBlock;
 
 /**
  * Interface exposes more direct access to keys and values visited by an
@@ -36,21 +39,49 @@ import com.bigdata.io.IByteArrayBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider only the {@link #getKeyStream()} and {@link #getValueStream()}
+ *       vs the {@link #getKeyBuffer()} and {@link #getValueBuffer()} methods.
+ *       do we need both?
  */
 public interface ITuple {
 
     /**
-     * True iff the keys for the visited entries were requested when the
-     * {@link Tuple} was initialized.
+     * The {@link IRangeQuery} flags
+     * 
+     * <pre>
+     * 
+     * if( (flags & IRangeQuery.KEYS) != 0 ) {
+     * 
+     *   // keys requested.
+     * 
+     * }
+     * 
+     * </pre>
+     */
+    public int flags();
+    
+    /**
+     * True iff {@link IRangeQuery#KEYS} was specified.
      */
     public boolean getKeysRequested();
 
     /**
-     * True iff the values for the visited entries were requested when the
-     * {@link Tuple} was initialized.
+     * True iff {@link IRangeQuery#VALS} was specified.
      */
     public boolean getValuesRequested();
 
+    /**
+     * The index of the source from which the tuple was read. This is zero (0)
+     * if there is only a single source, e.g., a {@link BTree} or
+     * {@link IndexSegment}. When reading on a {@link FusedView} this is the
+     * index of the element of the view which reported the tuple.
+     * 
+     * @throws IllegalStateException
+     *             if nothing has been visited.
+     */
+    public int getSourceIndex();
+    
     /**
      * The #of entries that have been visited so far and ZERO (0) until the
      * first entry has been visited.
@@ -76,6 +107,91 @@ public interface ITuple {
      * @throws UnsupportedOperationException
      *             if keys are not being materialized.
      */
-    public IByteArrayBuffer getKeyBuffer();
+    public ByteArrayBuffer getKeyBuffer();
+
+    /**
+     * Return a stream from which the key may be read.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the keys were not requested.
+     */
+    public DataInputBuffer getKeyStream();
     
+    /**
+     * <code>true</code> iff the value stored under the index entry is
+     * <code>null</code>.
+     */
+    public boolean isNull();
+    
+    /**
+     * The value in the index under the key.
+     * <p>
+     * Note: This causes a heap allocation. See {@link #getValueBuffer()} to
+     * avoid that allocation.
+     * 
+     * @return The value in the index under the key -or- <code>null</code> if
+     *         version metadata is being maintained and the the index entry is
+     *         marked as deleted.
+     * 
+     * @throws UnsupportedOperationException
+     *             if values are not being materialized.
+     */
+    public byte[] getValue();
+    
+    /**
+     * The buffer into which the values are being copied.
+     * <p>
+     * Note: If the index supports delete markers then you MUST test
+     * {@link #isDeletedVersion()} in order to determine whether or not the
+     * value buffer contains data for the current index entry.
+     * 
+     * @return The buffer.
+     * 
+     * @throws UnsupportedOperationException
+     *             if values are not being materialized.
+     * @throws UnsupportedOperationException
+     *             if the value is <code>null</code>.
+     * @throws UnsupportedOperationException
+     *             if the index entry is <code>deleted</code>.
+     */
+    public ByteArrayBuffer getValueBuffer();
+    
+    /**
+     * Return a stream from which the value may be read.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the values were not requested.
+     * @throws UnsupportedOperationException
+     *             if the value is <code>null</code>.
+     * @throws UnsupportedOperationException
+     *             if the index entry is <code>deleted</code>.
+     */
+    public DataInputBuffer getValueStream();
+    
+    /**
+     * Return an object that may be used to perform a streaming read on a large
+     * record from the {@link IBlockStore} that provided this tuple.
+     * 
+     * @param addr
+     *            The address of the record.
+     * 
+     * @return The object that may be used to read that record.
+     */
+    public IBlock readBlock(long addr);
+    
+    /**
+     * Return the timestamp associated with the index entry -or- <code>0L</code>
+     * IFF the index does not support transactional isolation.
+     */
+    public long getVersionTimestamp();
+    
+    /**
+     * Return <code>true</code> iff the index entry was marked as deleted.
+     * <p>
+     * Note: Only indices that support transactional isolation can carry
+     * deletion markers for index entries. If the index does not support
+     * transactional isolation then this method MUST return <code>false</code>.
+     */
+    public boolean isDeletedVersion();
+
 }

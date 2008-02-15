@@ -67,7 +67,7 @@ public interface ILinearList {
     /**
      * Return the key for the identified entry. This performs an efficient
      * search whose cost is essentially the same as
-     * {@link ISimpleBTree#lookup(Object)}.
+     * {@link ISimpleBTree#lookup(byte[])}.
      * 
      * @param index
      *            The index position of the entry (origin zero).
@@ -80,19 +80,20 @@ public interface ILinearList {
      *                if index is greater than or equal to the #of entries.
      * 
      * @see #indexOf(Object)
-     * @see #getValue(int)
+     * @see #valueAt(int)
      */
     public byte[] keyAt(int index);
 
     /**
      * Return the value for the identified entry. This performs an efficient
      * search whose cost is essentially the same as
-     * {@link ISimpleBTree#lookup(Object)}.
+     * {@link ISimpleBTree#lookup(byte[])}.
      * 
      * @param index
      *            The index position of the entry (origin zero).
      * 
-     * @return The value at that index position.
+     * @return The value at that index position -or- <code>null</code> if
+     *         there is a deleted entry at that index position then
      * 
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
@@ -102,6 +103,6 @@ public interface ILinearList {
      * @see #indexOf(Object)
      * @see #keyAt(int)
      */
-    public Object valueAt(int index);
+    public byte[] valueAt(int index);
     
 }

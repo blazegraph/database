@@ -619,31 +619,7 @@ public class Node extends AbstractNode implements INodeData {
 
     }
 
-//    /**
-//     * Insert or update one or more tuples. For each tuple processed, this finds
-//     * the index of the first key in the node whose value is greater than or
-//     * equal to the key associated with that tuple. The insert operation is then
-//     * delegated to the child node or leaf at position <code>index - 1</code>.
-//     * 
-//     * @return The #of tuples processed.
-//     */
-//    public int batchInsert(BatchInsert op) {
-//
-//        assert !deleted;
-//        
-//        if(btree.debug) assertInvariants();
-//
-//        btree.touch(this);
-//
-//        int childIndex = findChild(op.keys[op.tupleIndex]);
-//
-//        AbstractNode child = (AbstractNode) getChild(childIndex);
-//
-//        return child.batchInsert(op);
-//
-//    }
-
-    public Object insert(byte[] key,Object value) {
+    public Tuple insert(byte[] key,byte[] value,boolean delete, long timestamp,Tuple tuple) {
 
         assert !deleted;
         
@@ -655,35 +631,11 @@ public class Node extends AbstractNode implements INodeData {
 
         AbstractNode child = (AbstractNode) getChild(childIndex);
 
-        return child.insert(key,value);
+        return child.insert(key,value,delete,timestamp,tuple);
 
     }
 
-//    /**
-//     * Looks up one or more tuples. For each tuple processed, this finds the
-//     * index of the first key in the node whose value is greater than or equal
-//     * to the key associated with that tuple. The lookup operation is then
-//     * delegated to the child node or leaf at position <code>index - 1</code>.
-//     * 
-//     * @return The #of tuples processed.
-//     */
-//    public int batchLookup(BatchLookup op) {
-//
-//        assert !deleted;
-//        
-//        if(btree.debug) assertInvariants();
-//
-//        btree.touch(this);
-//
-//        final int childIndex = findChild(op.keys[op.tupleIndex]);
-//
-//        AbstractNode child = (AbstractNode)getChild(childIndex);
-//
-//        return child.batchLookup(op);
-//        
-//    }
-    
-    public Object lookup(byte[] key) {
+    public Tuple lookup(byte[] key,Tuple tuple) {
 
         assert !deleted;
         
@@ -695,77 +647,11 @@ public class Node extends AbstractNode implements INodeData {
 
         AbstractNode child = (AbstractNode)getChild(childIndex);
 
-        return child.lookup(key);
+        return child.lookup(key,tuple);
         
     }
     
-//    /**
-//     * Existence test for up one or more tuples. For each tuple processed, this
-//     * finds the index of the first key in the node whose value is greater than
-//     * or equal to the key associated with that tuple. The lookup operation is
-//     * then delegated to the child node or leaf at position
-//     * <code>index - 1</code>.
-//     * 
-//     * @return The #of tuples processed.
-//     */
-//    public int batchContains(BatchContains op) {
-//
-//        assert !deleted;
-//        
-//        if(btree.debug) assertInvariants();
-//
-//        btree.touch(this);
-//
-//        final int childIndex = findChild(op.keys[op.tupleIndex]);
-//
-//        AbstractNode child = (AbstractNode)getChild(childIndex);
-//
-//        return child.batchContains(op);
-//        
-//    }
-    
-    public boolean contains(byte[] searchKey) {
-
-        assert !deleted;
-        
-        if(btree.debug) assertInvariants();
-
-        btree.touch(this);
-
-        final int childIndex = findChild(searchKey);
-
-        AbstractNode child = (AbstractNode)getChild(childIndex);
-
-        return child.contains(searchKey);
-        
-    }
-    
-//    /**
-//     * Remove zero or more tuples. For each tuple processed, this finds the
-//     * index of the first key in the node whose value is greater than or equal
-//     * to the key associated with that tuple. The remove operation is then
-//     * delegated to the child node or leaf at position <code>index - 1</code>.
-//     * 
-//     * @return The #of tuples processed (not necessarily the #of tuples
-//     *         removed).
-//     */
-//    public int batchRemove(BatchRemove op) {
-//
-//        assert !deleted;
-//        
-//        if(btree.debug) assertInvariants();
-//        
-//        btree.touch(this);
-//
-//        int childIndex = findChild(op.keys[op.tupleIndex]);
-//
-//        AbstractNode child = (AbstractNode)getChild(childIndex);
-//
-//        return child.batchRemove(op);
-//        
-//    }
-    
-    public Object remove(byte[] key) {
+    public Tuple remove(byte[] key, Tuple tuple) {
 
         assert !deleted;
         
@@ -777,7 +663,7 @@ public class Node extends AbstractNode implements INodeData {
 
         AbstractNode child = (AbstractNode)getChild(childIndex);
 
-        return child.remove(key);
+        return child.remove(key, tuple);
         
     }
     
@@ -892,7 +778,7 @@ public class Node extends AbstractNode implements INodeData {
      * 
      * @return The value at that entry index.
      */
-    public Object valueAt(final int entryIndex) {
+    public void valueAt(final int entryIndex,Tuple tuple) {
         
         if (entryIndex < 0)
             throw new IndexOutOfBoundsException("negative: "+entryIndex);
@@ -930,7 +816,7 @@ public class Node extends AbstractNode implements INodeData {
 
         AbstractNode child = getChild(childIndex);
 
-        return child.valueAt(remaining);
+        child.valueAt(remaining,tuple);
         
     }
 
@@ -2250,7 +2136,8 @@ public class Node extends AbstractNode implements INodeData {
      * post-order traversal of its children and finally visits this node
      * itself.
      */
-    public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
+    @SuppressWarnings("unchecked")
+    public Iterator<AbstractNode> postOrderNodeIterator(final boolean dirtyNodesOnly) {
 
         if (dirtyNodesOnly && !dirty) {
 
@@ -2273,7 +2160,8 @@ public class Node extends AbstractNode implements INodeData {
      * recursively expanding each child with a post-order traversal of its
      * children and finally visits this node itself.
      */
-    public Iterator postOrderIterator(byte[] fromKey, byte[] toKey) {
+    @SuppressWarnings("unchecked")
+    public Iterator<AbstractNode> postOrderIterator(byte[] fromKey, byte[] toKey) {
 
         /*
          * Iterator append this node to the iterator in the post-order
@@ -2289,7 +2177,8 @@ public class Node extends AbstractNode implements INodeData {
      * Visits the children (recursively) using post-order traversal, but
      * does NOT visit this node.
      */
-    private Iterator postOrderIterator1(final boolean dirtyNodesOnly) {
+    @SuppressWarnings("unchecked")
+    private Iterator<AbstractNode> postOrderIterator1(final boolean dirtyNodesOnly) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -2367,7 +2256,8 @@ public class Node extends AbstractNode implements INodeData {
      * Visits the children (recursively) using post-order traversal, but
      * does NOT visit this node.
      */
-    private Iterator postOrderIterator2(final byte[] fromKey, final byte[] toKey) {
+    @SuppressWarnings("unchecked")
+    private Iterator<AbstractNode> postOrderIterator2(final byte[] fromKey, final byte[] toKey) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -2441,7 +2331,7 @@ public class Node extends AbstractNode implements INodeData {
      * @param dirtyNodesOnly
      *            When true, only the direct dirty child nodes will be visited.
      */
-    public Iterator childIterator(boolean dirtyNodesOnly) {
+    public Iterator<AbstractNode> childIterator(boolean dirtyNodesOnly) {
 
         if( dirtyNodesOnly ) {
             
@@ -2458,7 +2348,7 @@ public class Node extends AbstractNode implements INodeData {
     /**
      * Iterator visits the direct child nodes in the external key ordering.
      */
-    public Iterator childIterator(byte[] fromKey, byte[] toKey) {
+    public Iterator<AbstractNode> childIterator(byte[] fromKey, byte[] toKey) {
         
         return new ChildIterator(this,fromKey,toKey);
         

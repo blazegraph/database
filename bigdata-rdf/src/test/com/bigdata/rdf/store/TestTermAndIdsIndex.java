@@ -36,8 +36,8 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
@@ -163,14 +163,13 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
             
             while(itr.hasNext()) {
                 
-                // the term identifier.
-                byte[] val = (byte[]) itr.next();
+                ITuple tuple = itr.next();
                 
                 /*
                  * The sort key for the term. This is not readily decodable. See
                  * RdfKeyBuilder for specifics.
                  */
-                byte[] key = itr.getKey();
+                byte[] key = tuple.getKey();
 
                 /* 
                  * deserialize the term identifier (packed long integer).
@@ -178,7 +177,7 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
                 final long id;
                 try {
                 
-                    id = new DataInputBuffer(val).unpackLong();
+                    id = tuple.getValueStream().unpackLong();
                     
                 } catch(IOException ex) {
                     
@@ -203,17 +202,13 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
                     null);
             
             while(itr.hasNext()) {
-                
-                // the serialized term.
-                byte[] val = (byte[]) itr.next();
-                
-                // the sort key for the term identifier.
-                byte[] key = itr.getKey();
+
+                ITuple tuple = itr.next();
                 
                 // decode the term identifier from the sort key.
-                final long id = KeyBuilder.decodeLong(key, 0);
+                final long id = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
 
-                _Value term = _Value.deserialize(val);
+                _Value term = _Value.deserialize(tuple.getValueStream());
                 
                 System.err.println( id + ":" + term );
                 

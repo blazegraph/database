@@ -31,10 +31,10 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.NOPSerializer;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
 
@@ -251,11 +251,10 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
      * Create a transient {@link ITripleStore} backed by a
      * {@link TemporaryStore}.
      * <p>
-     * Note: the {@link TempTripleStore} declares its indices as {@link BTree}s
-     * (do not support isolation) rather than {@link UnisolatedBTree} (supports
-     * transactional isolation and purge of historical data). This offers a
-     * significant performance boost when you do not need transactions or the
-     * ability to purge historical data versions from the store as they age.
+     * Note: the {@link TempTripleStore} declares its indices that do NOT
+     * support isolation. This offers a significant performance boost when you
+     * do not need transactions or the ability to purge historical data versions
+     * from the store as they age.
      * <p>
      * Note: Users of the {@link TempTripleStore} may find it worthwhile to turn
      * off a variety of options in order to minimize the time and space burden
@@ -289,57 +288,98 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
         if(lexicon) {
 
-            ndx_termId = (BTree)store.registerIndex(name_termId, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-//                TermIdSerializer.INSTANCE
-                ByteArrayValueSerializer.INSTANCE
-                ));
+            {
 
-            ndx_idTerm = (BTree)store.registerIndex(name_idTerm, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-//                RdfValueSerializer.INSTANCE
-                ByteArrayValueSerializer.INSTANCE
-                ));
+                IndexMetadata metadata = new IndexMetadata(name_termId, UUID
+                        .randomUUID());
+
+                metadata.setBranchingFactor(branchingFactor);
+
+                ndx_termId = (BTree) store.registerIndex(name_termId, BTree
+                        .create(store, metadata));
+                // new BTree(store,
+                // branchingFactor, UUID.randomUUID(),
+                // // TermIdSerializer.INSTANCE
+                // ByteArrayValueSerializer.INSTANCE)
+            }
+
+            {
+                
+                IndexMetadata metadata = new IndexMetadata(name_idTerm, UUID
+                        .randomUUID());
+
+                metadata.setBranchingFactor(branchingFactor);
+
+                ndx_idTerm = (BTree) store.registerIndex(name_idTerm, BTree
+                        .create(store, metadata));
+
+//                new BTree(store,
+//                        branchingFactor, UUID.randomUUID(),
+////                        RdfValueSerializer.INSTANCE
+//                        ByteArrayValueSerializer.INSTANCE
+//                        )
+                }
             
             if(textIndex) {
 
-                ndx_freeText = (BTree)store.registerIndex(name_freeText, new BTree(store,
-                        branchingFactor, UUID.randomUUID(),
-                        NOPSerializer.INSTANCE));
+                IndexMetadata metadata = new IndexMetadata(name_freeText, UUID
+                        .randomUUID());
+
+                metadata.setBranchingFactor(branchingFactor);
+
+                ndx_freeText = (BTree) store.registerIndex(name_freeText, BTree
+                        .create(store, metadata));
+
+//                new BTree(store,
+//                        branchingFactor, UUID.randomUUID(),
+//                        NOPSerializer.INSTANCE)
 
             }
             
         }
 
-        ndx_spo = (BTree)store.registerIndex(name_spo, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-//                StatementSerializer.INSTANCE
-                ByteArrayValueSerializer.INSTANCE
-                ));
+        ndx_spo = registerStatementIndex(name_spo);
 
         if(!oneAccessPath) {
-        
-            ndx_pos = (BTree) store.registerIndex(name_pos, new BTree(store,
-                    branchingFactor, UUID.randomUUID(),
-//                    StatementSerializer.INSTANCE
-                    ByteArrayValueSerializer.INSTANCE
-                    ));
 
-            ndx_osp = (BTree) store.registerIndex(name_osp, new BTree(store,
-                    branchingFactor, UUID.randomUUID(),
-//                    StatementSerializer.INSTANCE
-                    ByteArrayValueSerializer.INSTANCE
-                    ));
+            ndx_pos = registerStatementIndex(name_pos);
+
+            ndx_osp = registerStatementIndex(name_osp);
             
         }
         
         if(justify) {
         
-            ndx_just = (BTree) store.registerIndex(name_just, new BTree(store,
-                branchingFactor, UUID.randomUUID(),
-                                    NOPSerializer.INSTANCE));
+            IndexMetadata metadata = new IndexMetadata(name_just,UUID.randomUUID());
+            
+            metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
+
+            metadata.setValueSerializer(NOPSerializer.INSTANCE);
+            
+            ndx_just = (BTree) store.registerIndex(name_just, 
+                    BTree.create(store, metadata));
+            
+//            new BTree(store,
+//                    branchingFactor, UUID.randomUUID(),
+//                                        NOPSerializer.INSTANCE)
         }
 
+    }
+
+    private BTree registerStatementIndex(String name) {
+        
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        
+        metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
+        
+        return BTree.create(store, metadata);
+        
+//        (BTree) store.registerIndex(name_osp, new BTree(store,
+//                branchingFactor, UUID.randomUUID(),
+////                StatementSerializer.INSTANCE
+//                ByteArrayValueSerializer.INSTANCE
+//                ));
+        
     }
     
     public String usage(){

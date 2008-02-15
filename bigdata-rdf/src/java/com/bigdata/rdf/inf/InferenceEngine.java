@@ -37,7 +37,10 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.NOPSerializer;
 import com.bigdata.journal.TemporaryRawStore;
@@ -1351,13 +1354,27 @@ public class InferenceEngine extends RDFSHelper {
     
                 final TemporaryRawStore tempStore = new TemporaryRawStore();
     
-                BTree subjects = new BTree(tempStore,
-                        BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                        NOPSerializer.INSTANCE);
-    
-                BTree objects = new BTree(tempStore,
-                        BTree.DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                        NOPSerializer.INSTANCE);
+                final BTree subjects;
+                {
+
+                    IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+                    
+                    metadata.setValueSerializer(NOPSerializer.INSTANCE);
+          
+                    subjects = BTree.create(tempStore,metadata);
+                
+                }
+                
+                final BTree objects;
+                {
+                    
+                    IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+                    
+                    metadata.setValueSerializer(NOPSerializer.INSTANCE);
+          
+                    objects = BTree.create(tempStore, metadata);
+                    
+                }
     
                 ret = new Striterator(src);
     
@@ -1596,7 +1613,8 @@ public class InferenceEngine extends RDFSHelper {
 
                 log.info("Will visit "+btree.getEntryCount()+" entries");
 
-                src = btree.rangeIterator(null, null);
+                src = btree.rangeIterator(null, null, 0/* capacity */,
+                        IRangeQuery.KEYS, null/*filter*/);
                                 
             }
             
@@ -1606,11 +1624,9 @@ public class InferenceEngine extends RDFSHelper {
 
         public Long next() {
             
-            src.next();
-
-            byte[] key = src.getKey();
+            ITuple tuple = src.next();
             
-            long v = KeyBuilder.decodeLong(key, 0);
+            long v = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(), 0);
 
             log.info("next="+v);
             

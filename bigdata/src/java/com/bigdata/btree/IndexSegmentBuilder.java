@@ -33,6 +33,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -43,14 +44,11 @@ import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexSegment.CustomAddressSerializer;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.isolation.UnisolatedIndexSegment;
-import com.bigdata.isolation.Value;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IBlockStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -96,12 +94,6 @@ import com.bigdata.rawstore.WormAddressManager;
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
  * 
- * FIXME Make sure that we can build and read index segments that are larger
- * than int32 bytes in length.
- * 
- * FIXME support build from a key range rather than just an entire source tree.
- * this is required to support partitioned indices.
- * 
  * FIXME support efficient prior/next leaf scans.
  * 
  * FIXME use the shortest separator key.
@@ -111,8 +103,7 @@ import com.bigdata.rawstore.WormAddressManager;
  * 
  * @see IndexSegment
  * @see IndexSegmentFile
- * @see IndexSegmentMetadata
- * @see IndexSegmentExtensionMetadata
+ * @see IndexSegmentCheckpoint
  * @see IndexSegmentMerger
  */
 public class IndexSegmentBuilder {
@@ -135,12 +126,12 @@ public class IndexSegmentBuilder {
     final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    /**
-     * The default error rate for a bloom filter.
-     * 
-     * @todo the error rate is only zero or non-zero at this time.
-     */
-    final public static double DEFAULT_ERROR_RATE = 1/128d;
+//    /**
+//     * The default error rate for a bloom filter.
+//     * 
+//     * @todo the error rate is only zero or non-zero at this time.
+//     */
+//    final public static double DEFAULT_ERROR_RATE = 1/128d;
     
     /**
      * The file mode used to open the file on which the {@link IndexSegment} is
@@ -173,34 +164,36 @@ public class IndexSegmentBuilder {
     protected TemporaryRawStore nodeBuffer;
     
     /**
-     * True iff checksums are used for the serialized node and leaf records.
+     * The optional buffer used to hold records referenced by index entries. In
+     * order to use this buffer the {@link IndexMetadata} MUST specify an  
      */
-    final protected boolean useChecksum;
+    protected TemporaryRawStore blobBuffer;
     
-    /**
-     * The record compressor used for node and leaf records or <code>null</code>
-     * if record compression was not used.
-     */
-    final protected RecordCompressor recordCompressor;
+//    /**
+//     * True iff checksums are used for the serialized node and leaf records.
+//     */
+//    final protected boolean useChecksum;
+//    
+//    /**
+//     * True iff the index supports isolation (version metadata).
+//     */
+//    final protected boolean isolatable;
+    
+//    /**
+//     * The record compressor used for node and leaf records or <code>null</code>
+//     * if record compression was not used.
+//     */
+//    final protected RecordCompressor recordCompressor;
 
     /**
      * The unique identifier for the generated {@link IndexSegment} resource.
-     * 
-     * @see #indexUUID
      */
     final public UUID segmentUUID;
-    
+
     /**
-     * The unique identifier for the index whose data is stored in this B+Tree
-     * data structure. When using a scale-out index the same <i>indexUUID</i>
-     * MUST be assigned to each mutable and immutable B+Tree having data for any
-     * partition of that scale-out index. This makes it possible to work
-     * backwards from the B+Tree data structures and identify the index to which
-     * they belong.
-     * 
-     * @see #segmentUUID
+     * A copy of the metadata object provided to the ctor.
      */
-    final public UUID indexUUID;
+    final public IndexMetadata metadata;
     
     /**
      * Used to serialize the nodes and leaves of the output tree.
@@ -208,27 +201,15 @@ public class IndexSegmentBuilder {
     final NodeSerializer nodeSer;
 
     /**
-     * Used to encode and decode the addresses for the nodes and leaves in the
-     * generated index segment. Note that the {@link CustomAddressSerializer} is
-     * used to actually (de-)serialize those addresses since some additional bit
-     * math is used to mark addresses that are nodes vs leaves.
+     * Address managed used to form addresses for the generated file.  Addresses
+     * are formed from a byteCount and an <em>encoded</em> offset comprised of
+     * a relative offset into a known region and the region identifier.
+     * 
+     * @see IndexSegmentRegion
+     * @see IndexSegmentAddressManager
      */
-    final WormAddressManager addressManager = WormAddressManager.INSTANCE;
+    final WormAddressManager addressManager;
 
-    /**
-     * The object that is used to (de-)serialize addresses for nodes and leaves
-     * in the generated {@link IndexSegment}.
-     */
-    final CustomAddressSerializer addressSerializer = new IndexSegment.CustomAddressSerializer(
-            addressManager);
-    
-    /**
-     * The errorRate parameter from the constructor which determines whether or
-     * not we build a bloom filter and what the target false positive error rate
-     * will be for that filter if we do build one.
-     */
-    final double errorRate;
-    
     /**
      * The bloom filter iff we build one (errorRate != 0.0).
      */
@@ -252,7 +233,7 @@ public class IndexSegmentBuilder {
 
     /**
      * Tracks the maximum length of any serialized node or leaf.  This is used
-     * to fill in one of the {@link IndexSegmentMetadata} fields.
+     * to fill in one of the {@link IndexSegmentCheckpoint} fields.
      */
     int maxNodeOrLeafLength = 0;
 
@@ -342,34 +323,86 @@ public class IndexSegmentBuilder {
      */
     final float mbPerSec;
     
+//    /**
+//     * <p>
+//     * Builds an index segment on the disk from a {@link BTree}. The index
+//     * segment will be written on the identified file, which must not exist.
+//     * </p>
+//     * 
+//     * @param outFile
+//     *            The file on which the index segment is written. The file MAY
+//     *            exist but MUST have zero length if it does exist.
+//     * @param tmpDir
+//     *            The temporary directory in which the index nodes are buffered
+//     *            during the build (optional - the default temporary directory
+//     *            is used if this is <code>null</code> and a file buffer is
+//     *            used iff <i>fullyBuffer</i> is false).
+//     * @param btree
+//     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
+//     *            being evicted into an {@link IndexSegment}.
+//     * @param m
+//     *            The branching factor for the generated tree. This can be
+//     *            choosen with an eye to minimizing the height of the generated
+//     *            tree. (Small branching factors are permitted for testing, but
+//     *            generally you want something relatively large.)
+//     * 
+//     * @throws IOException
+//     * 
+//     * @deprecated by the other ctor variant.
+//     */
+//    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
+//            int m) throws IOException {
+//    
+//        /*
+//         * @todo if the entryCount needs to be exact then this will not work
+//         * when there are deleted index entries (i.e., when the btree supports
+//         * isolation) - test for that condition and reject the btree.
+//         * 
+//         * Note: it still makes sense to build an index segment from a btree
+//         * that does not support isolation but only to obtain a "perfect" index -
+//         * you can not use index segments built from unisolatable indices within
+//         * a fused view since they lack the version metadata required to detect
+//         * deleted index entries.
+//         */
+//        this(outFile, tmpDir, btree.getEntryCount(), btree.rangeIterator(null,
+//                null, 0/* capacity */, IRangeQuery.KEYS | IRangeQuery.VALS
+//                        | IRangeQuery.DELETED, null/* filter */),
+//                        m,
+//                        btree.getIndexMetadata(),
+//                        System.currentTimeMillis()
+////                btree.nodeSer.valueSerializer,
+////                btree.getNodeSerializer().useChecksum, btree.isIsolatable(),
+////                null/* new RecordCompressor() */, errorRate, btree.indexUUID
+//                        );
+//        
+//    }
+    
     /**
      * <p>
-     * Builds an index segment on the disk from a {@link BTree}. The index
-     * segment will be written on the identified file, which must not exist. The
-     * caller is responsible for updating the metadata required to locate the
-     * index segment.
+     * Designated constructor builds an index segment for some caller defined
+     * read-only view.
      * </p>
      * <p>
-     * The store on which the btree exists should be read-only, e.g., a frozen
-     * {@link Journal}. The typical scenario is that a {@link Journal} is
-     * frozen when it overflows and a new direct buffer and backing file are
-     * opened to absorb writes. In this scenario frozen journal is still fully
-     * buffered, which means that the index build will perform zero IOs when
-     * reading from the source {@link BTree}. Once all indices on the frozen
-     * journal have been externalized as {@link IndexSegment}s the frozen
-     * journal can be discarded.
+     * Note: The caller must determine whether or not deleted index entries are
+     * present in the view. The <i>entryCount</i> MUST be the exact #of index
+     * entries that are visited by the given iterator. In general, this is not
+     * difficult. However, if a compacting merge is desired (that is, if you are
+     * trying to generate a view containing only the non-deleted entries) then
+     * you MUST explicitly count the #of entries that will be visited by the
+     * iterator, e.g., it will require to passes over the iterator to setup the
+     * index build operation.
      * </p>
      * <p>
-     * With a branching factor of 4096 a tree of height 2 (three levels) could
-     * address 68,719,476,736 entries - well beyond what we want in a given
-     * index segment! Well before that the index segment should be split into
-     * multiple files. The split point should be determined by the size of the
-     * serialized leaves and nodes, e.g., the amount of data on disk required by
-     * the index segment and the amount of memory required to fully buffer the
-     * index nodes. While the size of a serialized node can be estimated easily,
-     * the size of a serialized leaf depends on the kinds of values stored in
-     * that index. The actual sizes are recorded in the
-     * {@link IndexSegmentMetadata} record in the header of the
+     * Note: With a branching factor of 4096 a tree of height 2 (three levels)
+     * could address 68,719,476,736 entries - well beyond what we want in a
+     * given index segment! Well before that the index segment should be split
+     * into multiple files. The split point should be determined by the size of
+     * the serialized leaves and nodes, e.g., the amount of data on disk
+     * required by the index segment and the amount of memory required to fully
+     * buffer the index nodes. While the size of a serialized node can be
+     * estimated easily, the size of a serialized leaf depends on the kinds of
+     * values stored in that index. The actual sizes are recorded in the
+     * {@link IndexSegmentCheckpoint} record in the header of the
      * {@link IndexSegment}.
      * </p>
      * 
@@ -381,119 +414,87 @@ public class IndexSegmentBuilder {
      *            during the build (optional - the default temporary directory
      *            is used if this is <code>null</code> and a file buffer is
      *            used iff <i>fullyBuffer</i> is false).
-     * @param btree
-     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
-     *            being evicted into an {@link IndexSegment}.
-     * @param m
-     *            The branching factor for the generated tree. This can be
-     *            choosen with an eye to minimizing the height of the generated
-     *            tree. (Small branching factors are permitted for testing, but
-     *            generally you want something relatively large.)
-     * 
-     * @param errorRate
-     *            A value in [0:1] that is interpreted as an allowable false
-     *            positive error rate for a bloom filter. When zero, the bloom
-     *            filter is not constructed. The bloom filter provides efficient
-     *            fast rejection of keys that are not in the index. If the bloom
-     *            filter reports that a key is in the index then the index MUST
-     *            be tested to verify that the result is not a false positive.
-     *            Bloom filters are great if you have a lot of point tests to
-     *            perform but they are not used if you are doing range scans.
-     * 
-     * @throws IOException
-     * 
-     * @todo make checksum, and record compression parameters in this
-     *       constructor variant.
-     * 
-     * FIXME test with and without each of these options { useChecksum,
-     * recordCompressor}.
-     */
-    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
-            int m, double errorRate)
-            throws IOException {
-    
-        this(outFile, tmpDir, btree.getEntryCount(), btree.entryIterator(), m,
-                btree.nodeSer.valueSerializer, true/* useChecksum */,
-                null/* new RecordCompressor() */, errorRate, btree.indexUUID);
-        
-    }
-    
-    /**
-     * Variant constructor performs a compacting merge of two btrees.
-     * 
-     * @param outFile
-     *            The file on which the index segment is written. The file MAY
-     *            exist but MUST have zero length if it does exist.
-     * @param tmpDir
-     *            The temporary directory in which the index nodes are buffered
-     *            during the build (optional - the default temporary directory
-     *            is used if this is <code>null</code> and a file buffer is
-     *            used iff <i>fullyBuffer</i> is false).
      * @param entryCount
-     *            The #of entries.
-     * @param leafIterator
-     *            Used to visit the source {@link ILeafData} objects in key
-     *            order.
+     *            The #of entries that will be visited by the iterator.
+     * @param entryIterator
+     *            Visits the index entries in key order that will be written
+     *            onto the {@link IndexSegment}.
      * @param m
      *            The branching factor for the generated tree. This can be
      *            choosen with an eye to minimizing the height of the generated
      *            tree. (Small branching factors are permitted for testing, but
      *            generally you want something relatively large.)
-     * @param valueSerializer
-     *            Used to serialize values in the new {@link IndexSegment}.
-     * @param useChecksum
-     *            Whether or not checksums are computed for nodes and leaves.
-     *            The use of checksums on the read-only indices provides a check
-     *            for corrupt media and definately makes the database more
-     *            robust.
-     * @param recordCompressor
-     *            An object to compress leaves and nodes or <code>null</code>
-     *            if compression is not desired.
-     * @param errorRate
-     *            A value in [0:1] that is interpreted as an allowable false
-     *            positive error rate for a bloom filter. When zero, the bloom
-     *            filter is not constructed. The bloom filter provides efficient
-     *            fast rejection of keys that are not in the index. If the bloom
-     *            filter reports that a key is in the index then the index MUST
-     *            be tested to verify that the result is not a false positive.
-     *            Bloom filters are great if you have a lot of point tests to
-     *            perform but they are not used if you are doing range scans.
-     *            <br>
-     *            Generating the bloom filter is fairly expensive and this
-     *            option should only be enabled if you know that point access
-     *            tests are a hotspot for an index.
-     * @param indexUUID
-     *            The unique identifier for the index whose data is stored in
-     *            this B+Tree data structure. When using a scale-out index the
-     *            same <i>indexUUID</i> MUST be assigned to each mutable and
-     *            immutable B+Tree having data for any partition of that
-     *            scale-out index. This makes it possible to work backwards from
-     *            the B+Tree data structures and identify the index to which
-     *            they belong. See {@link AbstractBTree#getIndexUUID()}.
+     * @param metadata
+     *            The metadata record for the source index. A copy will be made
+     *            of this object. The branching factor in the generated tree
+     *            will be overriden to <i>m</i>.
+     * @param commitTime
+     *            The commit time associated with the view from which the
+     *            {@link IndexSegment} is being generated. This value is written
+     *            into the {@link IndexSegmentCheckpoint}.
      * 
      * @throws IOException
      */
-    public IndexSegmentBuilder(File outFile, File tmpDir, final int entryCount,
-            IEntryIterator entryIterator, final int m,
-            IValueSerializer valueSerializer, boolean useChecksum,
-            RecordCompressor recordCompressor, final double errorRate,
-            final UUID indexUUID
+    public IndexSegmentBuilder(//
+            File outFile,//
+            File tmpDir,//
+            final int entryCount,//
+            IEntryIterator entryIterator, //
+            int m,
+            IndexMetadata metadata,//
+            final long commitTime
             )
             throws IOException {
 
         assert outFile != null;
         assert entryCount > 0;
         assert entryIterator != null;
-        assert m >= AbstractBTree.MIN_BRANCHING_FACTOR;
-        assert valueSerializer != null;
-        assert errorRate >= 0d;
-        assert indexUUID != null;
-        
-        this.useChecksum = useChecksum;
-        this.recordCompressor = recordCompressor;
-        this.segmentUUID = UUID.randomUUID();
-        this.indexUUID = indexUUID;
 
+        // the UUID assigned to this index segment file.
+        this.segmentUUID = UUID.randomUUID();
+
+        // make a copy of the caller's metadata.
+        this.metadata = metadata.clone();
+        
+        /*
+         * Override the branching factor on the index segment.
+         * 
+         * Note: this override is a bit dangerous since it might propagate back
+         * to the mutable btree, which could hurt performance through the use of
+         * a too large branching factor on the journal. However, the metadata
+         * index stores the template metadata for the scale-out index and if you
+         * use either that or the metadata record from an existing BTree then
+         * this should never be a problem.
+         */
+        this.metadata.setBranchingFactor(m);
+        
+        /*
+         * @todo The override of the BTree class name does not make much sense
+         * here. Either we should strongly discourage further subclassing of
+         * BTree and IndexSegment or we should allow the subclass to be named
+         * for both the mutable btree and the read-only index segment.
+         */
+        this.metadata.setClassName(IndexSegment.class.getName());
+
+        /*
+         * Note: The offset bits on the {@link IndexSegmentFileStore} does NOT
+         * have to agree with the offset bits on the source store. However, it
+         * must be large enough to handle the large branching factors typically
+         * associated with an {@link IndexSegment} vs a {@link BTree}. Further,
+         * if blobs are to be copied into the index segment then it generally
+         * must be large enough for those blobs (up to 64M per record).
+         * 
+         * Note: The same #of offset bits MUST be used by the temporary stores
+         * that we use to buffer nodes, leaves, and blobs as are used by the
+         * generated index segment!
+         */
+
+        final int offsetBits = WormAddressManager.BLOB_OFFSET_BITS;
+        
+        this.addressManager = new WormAddressManager(offsetBits);
+        
+        final boolean isolatable = metadata.isIsolatable();
+        
         final long begin = System.currentTimeMillis();
         
         /*
@@ -522,7 +523,7 @@ public class IndexSegmentBuilder {
 
             for (int h = 0; h < plan.height; h++) {
 
-                SimpleNodeData node = new SimpleNodeData(h, m);
+                SimpleNodeData node = new SimpleNodeData(h, plan.m);
 
                 node.max = plan.numInNode[h][0];
 
@@ -532,7 +533,7 @@ public class IndexSegmentBuilder {
 
             // the output leaf (reused for each leaf we populate).
 
-            leaf = new SimpleLeafData(plan.height, m);
+            leaf = new SimpleLeafData(plan.height, plan.m, metadata);
 
             leaf.max = plan.numInNode[plan.height][0];
 
@@ -541,36 +542,40 @@ public class IndexSegmentBuilder {
             /*
              * Setup optional bloom filter.
              */
-            if (errorRate < 0.0 || errorRate > 1.0) {
+            {
+             
+                final double errorRate = metadata.getErrorRate();
 
-                throw new IllegalArgumentException(
-                        "errorRate must be in [0:1], not " + errorRate);
+                if (errorRate < 0.0 || errorRate > 1.0) {
 
-            }
+                    throw new IllegalArgumentException(
+                            "errorRate must be in [0:1], not " + errorRate);
 
-            this.errorRate = errorRate;
+                }
 
-            if (errorRate == 0.0) {
+                if (errorRate == 0.0) {
 
-                bloomFilter = null;
+                    bloomFilter = null;
 
-            } else {
+                } else {
 
-                // @todo compute [d] based on the error rate.
-                bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(
-                        plan.nentries);
+                    // @todo compute [d] based on the error rate.
+                    bloomFilter = new it.unimi.dsi.mg4j.util.BloomFilter(
+                            plan.nentries);
 
+                }
+                
             }
 
             // Used to serialize the nodes and leaves for the output tree.
             nodeSer = new NodeSerializer(NOPNodeFactory.INSTANCE,
-                    m,
+                    plan.m,
                     0, /*initialBufferCapacity - will be estimated. */
-                    addressSerializer,
-                    KeyBufferSerializer.INSTANCE,
-                    valueSerializer,
-                    recordCompressor,
-                    useChecksum
+                    AddressSerializer.INSTANCE, // FIXME Packed address serializer.
+                    metadata.getKeySerializer(),
+                    metadata.getValueSerializer(),
+                    metadata.getRecordCompressor(),
+                    metadata.getUseChecksum()
                     );
 
             elapsed_setup = System.currentTimeMillis() - begin_setup;
@@ -618,7 +623,7 @@ public class IndexSegmentBuilder {
              * the disk we can realize a substantial decrease in latency for the
              * index build operation.
              */
-            leafBuffer = new TemporaryRawStore();
+            leafBuffer = new TemporaryRawStore(offsetBits);
             
             /*
              * Open the node buffer. We only do this if there will be at least
@@ -628,8 +633,16 @@ public class IndexSegmentBuilder {
              * we use a memory-based buffer, otherwise the buffer is an
              * abstraction for a disk file.
              */
-            nodeBuffer = plan.nnodes > 0 ? new TemporaryRawStore() : null;
+            nodeBuffer = plan.nnodes > 0 ? new TemporaryRawStore(offsetBits) : null;
 
+            /*
+             * Open buffer for blobs iff an overflow handler was specified.
+             */
+            IOverflowHandler overflowHandler = metadata.getOverflowHandler();
+            
+            blobBuffer = overflowHandler == null ? null
+                    : new TemporaryRawStore(offsetBits);
+            
             /*
              * Scan the source btree leaves in key order writing output leaves
              * onto the index segment file with the new branching factor. We
@@ -701,9 +714,11 @@ public class IndexSegmentBuilder {
 //                    
 //                    leaf.vals[j] = ((Leaf)sourceLeaf).values[nconsumed];
 
+                    final ITuple tuple;
+
                     try {
                         
-                        leaf.vals[j] = entryIterator.next();
+                        tuple = entryIterator.next();
                         
                         nused++;
                         
@@ -715,6 +730,14 @@ public class IndexSegmentBuilder {
                         
                     }
 
+                    // make sure that the iterator is reporting the data we need. 
+                    assert tuple.getKeysRequested() : "keys not reported by itr.";
+                    assert tuple.getValuesRequested() : "vals not reported by itr.";
+                    assert !isolatable
+                            || (isolatable && ((tuple.flags() & IRangeQuery.DELETED) == 0))
+                            : "version metadata not reported by itr for isolatable index"
+                                ;
+                    
                     /*
                      * @todo modify to copy the key using the tuple once the
                      * internal leaf data structure offers us a place into which
@@ -722,7 +745,29 @@ public class IndexSegmentBuilder {
                      * allocation to obtain a new reference or just reuse the
                      * reference on the source leaf if it happens to be mutable.
                      */
-                    keys.keys[keys.nkeys] = entryIterator.getKey();
+
+                    keys.keys[keys.nkeys] = tuple.getKey();
+
+                    final byte[] val;
+                    
+                    if(overflowHandler!=null) {
+                    
+                        /*
+                         * Provide the handler with the opportunity to copy the
+                         * blob's data onto the buffer and re-write the value,
+                         * which is presumably the blob reference.
+                         */ 
+
+                        val = overflowHandler.handle(tuple,
+                                (IBlockStore) blobBuffer);
+                        
+                    } else {
+                        
+                        val = tuple.getValue();
+                        
+                    }
+                    
+                    leaf.vals[j] = val; 
 
                     if( bloomFilter != null ) {
                         
@@ -768,7 +813,8 @@ public class IndexSegmentBuilder {
             final long begin_write = System.currentTimeMillis();
             
             // write everything out on the outFile.
-            IndexSegmentMetadata md = writeIndexSegment(outChannel);
+            final IndexSegmentCheckpoint checkpoint = writeIndexSegment(
+                    outChannel, commitTime);
             
             /*
              * Flush this channel to disk and close the channel. This also
@@ -788,7 +834,7 @@ public class IndexSegmentBuilder {
             elapsed = System.currentTimeMillis() - begin;
 
             // data rate in MB/sec.
-            mbPerSec = (elapsed == 0 ? 0 : md.length / Bytes.megabyte32
+            mbPerSec = (elapsed == 0 ? 0 : checkpoint.length / Bytes.megabyte32
                     / (elapsed / 1000f));
             
             NumberFormat cf = NumberFormat.getNumberInstance();
@@ -804,14 +850,14 @@ public class IndexSegmentBuilder {
             log.info("finished: total=" + elapsed + "ms := setup("
                     + elapsed_setup + "ms) + build(" + elapsed_build
                     + "ms) +  write(" + elapsed_write + "ms); nentries="
-                    + plan.nentries + ", branchingFactor=" + m + ", nnodes="
+                    + plan.nentries + ", branchingFactor=" + plan.m + ", nnodes="
                     + nnodesWritten + ", nleaves=" + nleavesWritten+
-                    fpf.format(((double) md.length / Bytes.megabyte32))
+                    fpf.format(((double) checkpoint.length / Bytes.megabyte32))
                     + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
 
             // report event
             ResourceManager.buildIndexSegment(null/* name */,
-                    outFile.toString(), plan.nentries, elapsed, md.length);
+                    outFile.toString(), plan.nentries, elapsed, checkpoint.length);
 
         } catch (Throwable ex) {
 
@@ -1119,6 +1165,7 @@ public class IndexSegmentBuilder {
         // serialize.
         ByteBuffer buf = nodeSer.putLeaf(leaf);
 
+        // write leaf on file, returning address.
         final long addr1 = leafBuffer.write(buf);
         
         final int nbytes = addressManager.getByteCount(addr1);
@@ -1129,7 +1176,7 @@ public class IndexSegmentBuilder {
          * which the leaves are being written.
          */
         final long offset = addressManager.getOffset(addr1)
-                + IndexSegmentMetadata.SIZE;
+                + IndexSegmentCheckpoint.SIZE;
         
         assert nbytes == buf.limit();
         
@@ -1153,9 +1200,11 @@ public class IndexSegmentBuilder {
 
         /*
          * Encode the address of the leaf. Since this is a leaf address we know
-         * the absolute offset into the file at which the leaf was written.
+         * the absolute offset into the file at which the leaf was written and
+         * we use the BASE region.
          */
-        final long addr = addressSerializer.encode(nbytes, offset, true);
+        final long addr = addressManager.toAddr(nbytes, IndexSegmentRegion.BASE
+                .encodeOffset(offset));
         
         return addr;
         
@@ -1197,11 +1246,12 @@ public class IndexSegmentBuilder {
         System.err.print("x"); // wrote a node.
 
         /*
-         * Encode the node address. This address is relative to the start of the
-         * region in the file containing the nodes (NOT to the start of the
-         * file).
+         * Encode the node address. Since we do not know the offset of the NODE
+         * region in advance this address gets encoded as relative to the start
+         * of the NODE region in the file.
          */
-        final long addr = addressSerializer.encode(nbytes, offset, false);
+        final long addr = addressManager.toAddr(nbytes, IndexSegmentRegion.NODE
+                .encodeOffset(offset));
         
         node.addr = addr;
         
@@ -1253,12 +1303,12 @@ public class IndexSegmentBuilder {
      * </p>
      * <p>
      * The index segment metadata is divided into a base
-     * {@link IndexSegmentMetadata} record with a fixed format containing only
+     * {@link IndexSegmentCheckpoint} record with a fixed format containing only
      * essential data and additional metadata records written at the end of the
      * file including the optional bloom filter and the required
-     * {@link IndexSegmentExtensionMetadata} record. The latter is where we
-     * write variable length metadata including the _name_ of the index, or
-     * additional metadata defined by a specific class of index.
+     * {@link IndexMetadata} record. The latter is where we write variable
+     * length metadata including the _name_ of the index, or additional metadata
+     * defined by a specific class of index.
      * </p>
      * <p>
      * Once all nodes and leaves have been buffered we are ready to start
@@ -1275,6 +1325,8 @@ public class IndexSegmentBuilder {
      * 
      * @param outChannel
      * 
+     * @param commitTime
+     * 
      * @throws IOException
      * 
      * @todo it would be nice to have the same file format and addresses as the
@@ -1290,7 +1342,8 @@ public class IndexSegmentBuilder {
      *       by the index build operation yet be able to begin mutable
      *       operations on the index using copy-on-write.
      */
-    protected IndexSegmentMetadata writeIndexSegment(FileChannel outChannel) throws IOException {
+    protected IndexSegmentCheckpoint writeIndexSegment(FileChannel outChannel,
+            final long commitTime) throws IOException {
 
         /*
          * All nodes and leaves have been written. If we wrote any nodes
@@ -1311,13 +1364,13 @@ public class IndexSegmentBuilder {
         {
 
             // Skip over the metadata record at the start of the file.
-            outChannel.position(IndexSegmentMetadata.SIZE);
-            
+            outChannel.position(IndexSegmentCheckpoint.SIZE);
+
             // Transfer the leaf buffer en mass onto the output channel.
             long count = leafBuffer.getBufferStrategy().transferTo(out);
-            
+
             // The offset to the start of the node region.
-            offsetNodes = IndexSegmentMetadata.SIZE + count;
+            offsetNodes = IndexSegmentCheckpoint.SIZE + count;
             
             // Close the buffer.
             leafBuffer.close();
@@ -1325,16 +1378,18 @@ public class IndexSegmentBuilder {
             assert outChannel.position() == offsetNodes;
 
             // Address for the contiguous region containing the leaves.
-            addrLeaves = addressManager.toAddr((int)count,IndexSegmentMetadata.SIZE);
+            addrLeaves = addressManager
+                    .toAddr((int) count, IndexSegmentRegion.BASE
+                            .encodeOffset(IndexSegmentCheckpoint.SIZE));
             
         }
-        
+
         /*
-         * Direct copy the node index from the buffer into the output
-         * file. If the buffer was backed by a file then that file will
-         * be deleted as a post-condition on the index build operation.
+         * Direct copy the node index from the buffer into the output file. If
+         * the buffer was backed by a file then that file will be deleted as a
+         * post-condition on the index build operation.
          */
-        if (nodeBuffer!= null) {
+        if (nodeBuffer != null) {
 
             // transfer the nodes en mass onto the output channel.
             long count = nodeBuffer.getBufferStrategy().transferTo(out);
@@ -1342,26 +1397,37 @@ public class IndexSegmentBuilder {
             // Close the buffer.
             nodeBuffer.close();
 
-            /*
-             * The addrRoot is computed from the offset on the tmp channel
-             * at which we wrote the root node plus the offset on the output
-             * channel to which we transferred the contents of the temporary
-             * channel. This provides a correct address for the root node in
-             * the output file.  (The addrRoot is the only _node_ address
-             * that is correct for the output file. All internal node
-             * references require some translation.)
-             */
-            
-            long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
-            
-            long offset = offsetNodes + addressManager.getOffset(addr); // add offset.
-            
-            int nbytes = addressManager.getByteCount(addr); // #of bytes in root node.
-            
-            addrRoot = addressManager.toAddr(nbytes, offset); // form correct addr.
+//            /*
+//             * The addrRoot is computed from the offset on the tmp channel
+//             * at which we wrote the root node plus the offset on the output
+//             * channel to which we transferred the contents of the temporary
+//             * channel. This provides a correct address for the root node in
+//             * the output file.  (The addrRoot is the only _node_ address
+//             * that is correct for the output file. All internal node
+//             * references require some translation.)
+//             */
+//            
+//            long addr = (((SimpleNodeData)stack[0]).addr)>>1; // decode.
+//            
+//            long offset = offsetNodes + addressManager.getOffset(addr); // add offset.
+//            
+//            int nbytes = addressManager.getByteCount(addr); // #of bytes in root node.
+//            
+//            // Address of the root node.
+//            addrRoot = addressManager.toAddr(nbytes, IndexSegmentRegion.BASE
+//                    .encode(offset));
 
-            // Address for the contiguous region containing the nodes.
-            addrNodes = addressManager.toAddr((int)count,offsetNodes);
+            // Note: already encoded relative to NODE region.
+            addrRoot = (((SimpleNodeData)stack[0]).addr);
+
+            /*
+             * Address for the contiguous region containing the nodes.
+             * 
+             * Note: This MUST be encoded relative to the BASE region since the
+             * address is used to translate offsets relative to the NODE region.
+             */
+            addrNodes = addressManager.toAddr((int) count,
+                    IndexSegmentRegion.BASE.encodeOffset(offsetNodes));
 
             log.info("addrRoot(Node): "+addrRoot+", "+addressManager.toString(addrRoot));
             
@@ -1371,13 +1437,50 @@ public class IndexSegmentBuilder {
              * The tree consists of just a root leaf.
              */
 
-            // This MUST be 0L in the metadata record if there are no leaves.
+            // This MUST be 0L if there are no leaves.
             addrNodes = 0L;
             
-            addrRoot = addressManager.toAddr(lastLeafSize, lastLeafOffset);
+            // Address of the root leaf.
+            addrRoot = addressManager.toAddr(lastLeafSize,
+                    IndexSegmentRegion.BASE.encodeOffset(lastLeafOffset));
             
-            log.info("addrRoot(Leaf): "+addrRoot+", "+addressManager.toString(addrRoot));
+            log.info("addrRoot(Leaf): " + addrRoot + ", "
+                    + addressManager.toString(addrRoot));
             
+        }
+
+        /*
+         * Direct copy the optional blobBuffer onto the output file.
+         */
+        final long addrBlobs;
+        
+        if(blobBuffer==null) {
+            
+            addrBlobs = 0L;
+            
+        } else {
+            
+            // #of bytes written so far on the output file.
+            final long offset = out.length(); 
+
+            // seek to the end of the file.
+            out.seek(offset);
+
+            // transfer the nodes en mass onto the output channel.
+            long count = blobBuffer.getBufferStrategy().transferTo(out);
+            
+            // Close the buffer.
+            blobBuffer.close();
+
+            /*
+             * Address for the contiguous region containing the blobs.
+             * 
+             * Note: This MUST be encoded relative to the BASE region since the
+             * address is used to translate offsets into the BLOB region.
+             */
+            addrBlobs = addressManager.toAddr((int) count,
+                    IndexSegmentRegion.BASE.encodeOffset(offset));
+
         }
         
         /*
@@ -1392,8 +1495,10 @@ public class IndexSegmentBuilder {
             
         } else {
 
-            byte[] bloomBytes = serializeBloomFilter(bloomFilter);
+            // serialize the bloom filter.
+            final byte[] bloomBytes = serializeBloomFilter(bloomFilter);
 
+            // #of bytes written so far on the output file.
             final long offset = out.length(); 
 
             // seek to the end of the file.
@@ -1402,84 +1507,53 @@ public class IndexSegmentBuilder {
             // write the serialized bloom filter.
             out.write(bloomBytes, 0, bloomBytes.length);
             
-            // note its address.
-            addrBloom = addressManager.toAddr(bloomBytes.length,offset);
+            // Address of the region containing the bloom filter (one record).
+            addrBloom = addressManager.toAddr(bloomBytes.length,
+                    IndexSegmentRegion.BASE.encodeOffset(offset));
             
         }
         
         /*
-         * Write out the extensible metadata record at the end of the file.
+         * Write out the metadata record.
          */
-        final long addrExtensionMetadata;
+        final long addrMetadata;
         {
 
             /*
-             * Choose the implementation class based on whether or not the index
-             * is isolatable.
-             * 
-             * @todo this test may be too fragile and is not extensible to other
-             * implementation classes.
-             * 
-             * FIXME at a minimum, the BTree class should be accessible and
-             * provided to the extension metadata constructor so that any
-             * interesting metadata may also be stored in the index segment.
+             * Serialize the metadata record.
              */
-            final Class cl = (nodeSer.valueSerializer instanceof Value.Serializer ? UnisolatedIndexSegment.class
-                    : IndexSegment.class);
+            final byte[] metadataBytes = SerializerUtil.serialize(metadata);
 
-            /*
-             * Setup and serialize the extension metadata.
-             */
-            IndexSegmentExtensionMetadata extensionMetadata = new IndexSegmentExtensionMetadata(
-                    cl, nodeSer.keySerializer, nodeSer.valueSerializer,
-                    nodeSer.recordCompressor);
-
-            final byte[] extensionMetadataBytes = SerializerUtil
-                    .serialize(extensionMetadata);
-
+            // #of bytes written so far on the output file.
             final long offset = out.length(); 
 
             // seek to the end of the file.
             out.seek(offset);
             
             // write the serialized extension metadata.
-            out.write(extensionMetadataBytes, 0, extensionMetadataBytes.length);
+            out.write(metadataBytes, 0, metadataBytes.length);
 
-            // note its address.
-            addrExtensionMetadata = addressManager.toAddr(extensionMetadataBytes.length,
-                    offset);
+            // Address of the region containing the metadata record (one record)
+            addrMetadata = addressManager.toAddr(metadataBytes.length,
+                    IndexSegmentRegion.BASE.encodeOffset(offset));
             
         }
         
         /*
-         * FIXME Copy records references from blobs to this location in the
-         * output file. Those addresses (less the offset of the blob region) can
-         * be computed when we scan the btree since we know the size of each
-         * record to be copied. Another pass over the source iterator would be
-         * required to actually copy the data into place - or they can be
-         * buffered on another temporary file and the bulk copied into place.
-         * This is to support the BigdataRepository with 64M blocks without
-         * having to have those blocks be inline in the leaves of the index.
-         * Also the maximum record size for the journal (and the index segment)
-         * must be set to at least 64M (the block size).
-         */
-        
-        /*
-         * Seek to the start of the file and write out the metadata record.
+         * Seek to the start of the file and write out the checkpoint record.
          */
         {
 
-            // timestamp for the index segment.
-            final long now = System.currentTimeMillis();
+//            // timestamp for the index segment.
+//            final long now = System.currentTimeMillis();
             
             outChannel.position(0);
             
-            IndexSegmentMetadata md = new IndexSegmentMetadata(addressManager
-                    .getOffsetBits(), plan.m, plan.height, useChecksum,
-                    plan.nleaves, nnodesWritten, plan.nentries,
-                    maxNodeOrLeafLength, addrLeaves, addrNodes, addrRoot,
-                    addrExtensionMetadata, addrBloom, errorRate, out.length(),
-                    indexUUID, segmentUUID, now);
+            IndexSegmentCheckpoint md = new IndexSegmentCheckpoint(
+                    addressManager.getOffsetBits(), plan.height, plan.nleaves,
+                    nnodesWritten, plan.nentries, maxNodeOrLeafLength,
+                    addrLeaves, addrNodes, addrRoot, addrMetadata, addrBloom,
+                    addrBlobs, out.length(), segmentUUID, commitTime);
 
             md.write(out);
             
@@ -1576,13 +1650,35 @@ public class IndexSegmentBuilder {
         /**
          * The values stored in the leaf.
          */
-        final Object[] vals;
+        final byte[][] vals;
         
-        public SimpleLeafData(int level,int m) {
+        public byte[][] getValues() {
+            
+            return vals;
+            
+        }
+        
+        /**
+         * Allocated iff delete markers are maintained.
+         */
+        final boolean[] deleteMarkers;
+        
+        /**
+         * Allocated iff version timestamps are maintained.
+         */
+        final long[] versionTimestamps;
+
+        public SimpleLeafData(int level,int m, IndexMetadata metadata) {
 
             super(level,m,new byte[m][]);
-            
-            this.vals = new Object[m];
+
+            this.vals = new byte[m][];
+
+            this.deleteMarkers = metadata.getDeleteMarkers() ? new boolean[m]
+                    : null;
+
+            this.versionTimestamps = metadata.getVersionTimestamps() ? new long[m]
+                    : null;
             
         }
         
@@ -1602,11 +1698,11 @@ public class IndexSegmentBuilder {
             
         }
 
-        final public Object[] getValues() {
-            
-            return vals;
-            
-        }
+//        final public Object[] getValues() {
+//            
+//            return vals;
+//            
+//        }
 
         final public boolean isLeaf() {
             
@@ -1619,7 +1715,82 @@ public class IndexSegmentBuilder {
             return keys.getKeyCount();
             
         }
+
+        public void copyKey(int index, OutputStream os) {
+            
+            try {
+                
+                os.write(keys.getKey(index));
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
     
+        final public boolean isNull(int index) {
+            
+            if(vals[index]==null) {
+            
+                return true;
+                
+            }
+            
+            return false;
+            
+        }
+        
+        public void copyValue(int index, OutputStream os) {
+
+            final byte[] val = vals[index];
+
+            if (val == null)
+                throw new UnsupportedOperationException();
+            
+            try {
+                
+                os.write(val);
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+
+        public boolean getDeleteMarker(int index) {
+
+            if (deleteMarkers!=null)
+                throw new UnsupportedOperationException();
+            
+            return deleteMarkers[index];
+            
+        }
+
+        public long getVersionTimestamp(int index) {
+        
+            if (versionTimestamps!=null)
+                throw new UnsupportedOperationException();
+
+            return versionTimestamps[index];
+            
+        }
+
+        public boolean hasDeleteMarkers() {
+            
+            return deleteMarkers!=null;
+            
+        }
+
+        public boolean hasVersionTimestamps() {
+            
+            return versionTimestamps!=null;
+            
+        }
+
     }
 
     /**
@@ -1746,6 +1917,20 @@ public class IndexSegmentBuilder {
             return false;
             
         }
+
+        public void copyKey(int index, OutputStream os) {
+            
+            try {
+                
+                os.write(keys.getKey(index));
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
         
     }
     
@@ -1760,7 +1945,8 @@ public class IndexSegmentBuilder {
         }
 
         public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, Object[] values) {
+                int branchingFactor, IKeyBuffer keys, byte[][] values,
+                long[] versionTimestamps, boolean[] deleteMarkers) {
             
             throw new UnsupportedOperationException();
             

@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.ByteArrayInputStream;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -49,7 +51,7 @@ import com.bigdata.io.ByteBufferInputStream;
  * reduces allocation while maximizing the opportunity for bulk transfers.
  * 
  * @todo define an interface for a record compressor and write the class of the
- *       compressor used into the {@link IndexSegmentMetadata} so that we can
+ *       compressor used into the {@link IndexSegmentCheckpoint} so that we can
  *       experiment with other compression schemes in a backward compatible
  *       manner. If the compressor has parameters then those can be capture by
  *       subclassing or instance data.
@@ -57,7 +59,7 @@ import com.bigdata.io.ByteBufferInputStream;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RecordCompressor implements Serializable {
+public class RecordCompressor implements Externalizable {
 
     /**
      * 
@@ -70,7 +72,7 @@ public class RecordCompressor implements Serializable {
      * operate within a single-threaded environment, we just reuse the same
      * instance for each invocation.
      */
-    final private transient Deflater _deflater;
+    private transient Deflater _deflater;
 
     final private transient Inflater _inflater = new Inflater();
 
@@ -81,6 +83,11 @@ public class RecordCompressor implements Serializable {
      */
     private transient byte[] _buf = new byte[1024];
 
+    /**
+     * The level specified to the ctor.
+     */
+    private int level;
+    
     /**
      * Create a record compressor.
      * 
@@ -94,14 +101,14 @@ public class RecordCompressor implements Serializable {
 
         _deflater = new Deflater(level);
 
+        this.level = level;
+        
     }
 
     /**
-     * Create a record compressor using {@link Deflator#BEST_SPEED}.
+     * De-serialization constructor.
      */
     public RecordCompressor() {
-        
-        this(Deflater.BEST_SPEED);
         
     }
 
@@ -341,6 +348,20 @@ public class RecordCompressor implements Serializable {
 
         return ByteBuffer.wrap(_buf, 0, off).asReadOnlyBuffer();
 
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+        level = in.readInt();
+        
+        _deflater = new Deflater(level);
+
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        out.writeInt(level);
+        
     }
 
 }

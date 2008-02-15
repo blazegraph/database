@@ -34,11 +34,10 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IParallelizableIndexProcedure;
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -139,9 +138,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
      * @return The {@link Result}, which contains the discovered / assigned
      *         term identifiers.
      */
-    public Object apply(IIndex _ndx) {
-
-        final IIndexWithCounter ndx = (IIndexWithCounter)_ndx;
+    public Object apply(IIndex ndx) {
 
         final int numTerms = getKeyCount();
         
@@ -157,7 +154,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
             /*
              * Note: we never assign this value as a term identifier.
              */
-            counter.inc();
+            counter.incrementAndGet();
         }
         
         // used to serialize term identifers.
@@ -170,7 +167,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
             final long termId;
 
             // Lookup in the forward index.
-            Object tmp = ndx.lookup(key);
+            byte[] tmp = ndx.lookup(key);
 
             if (tmp == null) {
                 
@@ -186,7 +183,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
                  * pack the termId in a manner that does not allow negative
                  * integers. a different pack routine would allow us all bits.
                  */
-                long id = counter.inc()<<2;
+                long id = counter.incrementAndGet()<<2;
                 
                 // this byte encodes the kind of term (URI, Literal, BNode, etc.)
                 final byte code = KeyBuilder.decodeByte(key[0]);
@@ -232,7 +229,7 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
 
                 try {
                     
-                    termId = new DataInputBuffer((byte[]) tmp).unpackLong();
+                    termId = new DataInputBuffer(tmp).unpackLong();
                     
                 } catch (IOException ex) {
                     

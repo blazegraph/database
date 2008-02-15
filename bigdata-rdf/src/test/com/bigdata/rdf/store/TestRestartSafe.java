@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
-import java.util.Properties;
 import java.util.UUID;
 
 import org.openrdf.model.vocabulary.RDF;
@@ -37,7 +36,6 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
-import com.bigdata.scaleup.MasterJournal.Options;
 
 /**
  * Test restart safety for the various indices.
@@ -54,16 +52,16 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         super(name);
     }
 
-    public Properties getProperties() {
-        
-        Properties properties = super.getProperties();
-        
-        // force migration of all indices on overflow.
-        properties.setProperty(Options.MIGRATION_THRESHOLD, "0");
-        
-        return properties;
-        
-    }
+//    public Properties getProperties() {
+//        
+//        Properties properties = super.getProperties();
+//        
+////        // force migration of all indices on overflow.
+////        properties.setProperty(Options.MIGRATION_THRESHOLD, "0");
+////        
+//        return properties;
+//        
+//    }
     
     public void test_restartSafe() throws IOException {
 

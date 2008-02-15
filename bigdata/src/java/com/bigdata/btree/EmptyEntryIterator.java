@@ -36,16 +36,17 @@ import java.util.NoSuchElementException;
  * @version $Id$
  */
 public class EmptyEntryIterator implements IEntryIterator {
-    
+
     public static final transient IEntryIterator INSTANCE = new EmptyEntryIterator();
-    
-    private EmptyEntryIterator() {}
+
+    private EmptyEntryIterator() {
+    }
 
     public boolean hasNext() {
         return false;
     }
 
-    public Object next() {
+    public ITuple next() {
         throw new NoSuchElementException();
     }
 
@@ -53,16 +54,4 @@ public class EmptyEntryIterator implements IEntryIterator {
         throw new UnsupportedOperationException();
     }
     
-    public byte[] getKey() {
-        throw new IllegalStateException();
-    }
-
-    public Object getValue() {
-        throw new IllegalStateException();
-    }
-
-    public ITuple getTuple() {
-        throw new IllegalStateException();
-    }
-
 }

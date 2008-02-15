@@ -43,7 +43,7 @@ public class EntryIterator implements IEntryIterator {
     
     private final IEntryFilter filter;
     
-    private int index = 0;
+    private int index;
 
     private int lastVisited = -1;
 
@@ -59,7 +59,7 @@ public class EntryIterator implements IEntryIterator {
 
     public EntryIterator(Leaf leaf) {
 
-        this(leaf, new Tuple(), null, null, null);
+        this(leaf, new Tuple(IRangeQuery.DEFAULT), null, null, null);
 
     }
 
@@ -71,7 +71,7 @@ public class EntryIterator implements IEntryIterator {
 
     public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
 
-        this(leaf, tuple, fromKey, toKey, null);
+        this(leaf, tuple, fromKey, toKey, null/*filter*/);
 
     }
     
@@ -172,58 +172,118 @@ public class EntryIterator implements IEntryIterator {
         // starting index is the lower bound.
         index = fromIndex;
         
-        if (tuple != null && tuple.needKeys
-                && leaf.keys instanceof ImmutableKeyBuffer) {
-
-            /*
-             * Immutable key buffers break the key into a shared prefix and a
-             * per-key remainder. We copy the shared prefix into the buffer and
-             * set the mark on the buffer. We then rewind to the mark for each
-             * visited key and append the remainder such that the full key is
-             * materialized in the buffer without doing any allocations on the
-             * heap.
-             */
-
-            final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
-
-            // reset the buffer.
-            tuple.kbuf.reset();
-
-            // copy the shared prefix into the buffer.
-            tuple.kbuf.put(keys.buf, 0, keys.getPrefixLength());
-            
-            // set the mark - we will reuse the shared prefix for each visited key.
-            tuple.kbuf.mark();
-                
-        }
+//        if (tuple != null && tuple.needKeys
+//                && leaf.keys instanceof ImmutableKeyBuffer) {
+//
+//            /*
+//             * Immutable key buffers break the key into a shared prefix and a
+//             * per-key remainder. We copy the shared prefix into the buffer and
+//             * set the mark on the buffer. We then rewind to the mark for each
+//             * visited key and append the remainder such that the full key is
+//             * materialized in the buffer without doing any allocations on the
+//             * heap.
+//             */
+//
+//            final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
+//
+//            // reset the buffer.
+//            tuple.kbuf.reset();
+//
+//            // copy the shared prefix into the buffer.
+//            tuple.kbuf.put(keys.buf, 0, keys.getPrefixLength());
+//            
+//            // set the mark - we will reuse the shared prefix for each visited key.
+//            tuple.kbuf.mark();
+//                
+//        }
         
     }
 
+    /**
+     * Examines the entry at {@link #index}. If it passes the criteria for an
+     * entry to visit then return true. Otherwise increment the {@link #index}
+     * until either all entries in this leaf have been exhausted -or- the an
+     * entry is identified that passes the various criteria.
+     * <p>
+     * Note: Criteria include (a) the optional {@link IEntryFilter}; and (b)
+     * deleted entries are skipped unless {@link IRangeQuery#DELETED} has
+     * been specified.
+     */
     public boolean hasNext() {
 
-        if(filter == null) {
-            
-            return index >= fromIndex && index < toIndex;
-            
-        }
+//        if(filter == null) {
+//            
+//            return index >= fromIndex && index < toIndex;
+//            
+//        }
 
-        while(index >= fromIndex && index < toIndex) {
+        for( ; index >= fromIndex && index < toIndex; index++) {
          
-            if (filter.isValid(leaf.values[index])) {
+            /*
+             * Skip deleted entries unless specifically requested.
+             */
+            if (leaf.hasDeleteMarkers()
+                    && ((tuple.flags() & IRangeQuery.DELETED) == 0)
+                    && leaf.deleteMarkers[index]) {
                 
-                return true;
+                // skipping a deleted version.
+                
+                continue;
                 
             }
             
-            index++;
+            if (filter != null) {
 
+                /*
+                 * Copy the value from the index entry that is to be considered
+                 * by the filter into a buffer and then expose that buffer as an
+                 * input stream so that the filter can read the value.
+                 * 
+                 * Note: The filter is considering a value that is a successor
+                 * in the leaf order of the last tuple returned by next() (if
+                 * any). We can not reuse the tuple to expose the value to the
+                 * filter since it is already in use exposing the last visited
+                 * value to the iterator consumer.
+                 */
+                
+                if (tmp == null) {
+
+                    // temp tuple copies all available data about the index entry.
+                    tmp = new Tuple(IRangeQuery.KEYS|IRangeQuery.VALS);
+
+                }
+                
+                // copy data from the index entry.
+                tmp.copy(index, leaf);
+                
+                if (!filter.isValid(tmp)) {
+
+                    // skip entry rejected by the filter.
+
+                    continue;
+
+                }
+
+            }
+
+            // entry @ index is next to visit.
+            
+            return true;
+            
         }
+
+        // nothing left to visit in this leaf.
         
         return false;
         
     }
-
-    public Object next() {
+    
+    /**
+     * Used iff an {@link IEntryFilter} was specified.
+     */
+    private Tuple tmp = null;
+    
+    public ITuple next() {
 
         if (!hasNext()) {
 
@@ -233,108 +293,12 @@ public class EntryIterator implements IEntryIterator {
 
         lastVisited = index++;
 
-        // #of entries visited by the iterator.
-        tuple.nvisited++;
-
-        if (tuple.needKeys) {
-
-            // tuple.key = leaf.keys.getKey(lastVisited);
-            if (leaf.keys instanceof MutableKeyBuffer) {
-
-                // reference to the current key.
-                final byte[] key = ((MutableKeyBuffer) leaf.keys).keys[lastVisited];
-
-                // copy the key data into the buffer.
-                tuple.kbuf.reset().put(key);
-
-            } else {
-
-                final ImmutableKeyBuffer keys = ((ImmutableKeyBuffer) leaf.keys);
-
-                // rewind to the end of the shared key prefix.
-                tuple.kbuf.rewind();
-
-                // copy the data for the remainder of the current key.
-                tuple.kbuf.put(keys.buf, keys.offsets[lastVisited], keys
-                        .getRemainderLength(lastVisited));
-
-            }
-
-        }
-
-        if (tuple.needVals) {
-
-            // the current value. @todo when copying values into the leaf this will need to copy the value out!
-            final Object val = filter == null ? leaf.values[lastVisited] : filter
-                    .resolve(leaf.values[lastVisited]); 
-            
-            tuple.val = val;
-            
-            return val;
-            
-        }
+        tuple.copy(lastVisited,leaf);
         
-        // Note: if values not requested then next() always returns null.
-        return null;
-        
-    }
-
-    public Object getValue() {
-        
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        if(!tuple.needVals) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        return tuple.val;
-        
-    }
-    
-    public ITuple getTuple() {
-        
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
-
         return tuple;
         
     }
-    
-    public byte[] getKey() {
-        
-        if( lastVisited == -1 ) {
-            
-            throw new IllegalStateException();
-            
-        }
 
-        if(!tuple.needKeys) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-//        if(tuple != null && tuple.needKeys) {
-        
-            // return the key from the tuple.
-            
-            return tuple.getKey();
-            
-//        }
-//        
-//        return leaf.keys.getKey(lastVisited);
-        
-    }
-    
     /**
      * FIXME Support removal. This is tricky because we have to invoke
      * copy-on-write if the leaf is not dirty. Since copy-on-write can cause the
@@ -346,10 +310,12 @@ public class EntryIterator implements IEntryIterator {
      * The other twist with removal is that it can cause the leaf to underflow,
      * which results in a structural change in the btree.
      * 
-     * @todo Also support update of the value during traversal. This is simpler
-     *       since it does not lead to structural changes (the #of entries in
-     *       the leaf does not change), but it has the same problems with
-     *       needing to invoke copy-on-write if the leaf is not dirty.
+     * @todo Also support update of the value during traversal? This has the
+     *       same problems with needing to invoke copy-on-write if the leaf is
+     *       not dirty.
+     * 
+     * @see ChunkedRangeIterator, which does support removal using a batch
+     *      delete-behind approach
      * 
      * @exception UnsupportedOperationException
      */

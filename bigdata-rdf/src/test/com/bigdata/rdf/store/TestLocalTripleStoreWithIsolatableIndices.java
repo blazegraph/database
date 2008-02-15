@@ -33,14 +33,12 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 
 /**
- * Proxy test suite for {@link LocalTripleStore} when the backing indices are
- * {@link UnisolatedBTree}. This configuration supports full transactions since
- * the various indices are all isolatable.
+ * Proxy test suite for {@link LocalTripleStore} when the backing indices
+ * support transactional isolation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

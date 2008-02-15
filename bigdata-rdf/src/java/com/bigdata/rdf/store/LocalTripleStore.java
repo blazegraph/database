@@ -34,22 +34,19 @@ import java.util.UUID;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.KeyBufferSerializer;
 import com.bigdata.btree.NOPSerializer;
-import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
-import com.bigdata.btree.IDataSerializer.WrappedKeySerializer;
 import com.bigdata.btree.IDataSerializer.WrappedValueSerializer;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ReadCommittedIndex;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.DataService;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
@@ -63,6 +60,19 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     protected final /*Master*/Journal store;
     
+    /**
+     * @todo this property is not useful for the {@link LocalTripleStore} since
+     *       isolation can not benefit that store (it can not use transactions
+     *       since it does not respect concurrency). Beyond that, it probably
+     *       does not make sense for the stores based on a {@link DataService}
+     *       or scale-out indices since isolation needs to be at the level of
+     *       <em>closure</em> of a database for RDF, not just invididual
+     *       writes on that database.
+     *       <p>
+     *       However, the property could be re-interpreted as meaning whether or
+     *       not deletion markers are supported, which would influence whether
+     *       or not indices could be partitioned.
+     */
     private final boolean isolatableIndices;
     
     /*
@@ -102,12 +112,18 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
             } else {
 
-                ndx_termId = ndx = store.registerIndex(name_termId, new BTree(
-                        store, store.getDefaultBranchingFactor(), UUID
-                                .randomUUID(), 
-//                                TermIdSerializer.INSTANCE
-                                ByteArrayValueSerializer.INSTANCE
-                                )
+                IndexMetadata metadata = new IndexMetadata(name_termId,UUID.randomUUID());
+                
+                metadata.setBranchingFactor(store.getDefaultBranchingFactor());
+                
+                ndx_termId = ndx = store.registerIndex(name_termId,
+                        BTree.create(store, metadata)
+//                        new BTree(
+//                        store, store.getDefaultBranchingFactor(), UUID
+//                                .randomUUID(), 
+////                                TermIdSerializer.INSTANCE
+//                                ByteArrayValueSerializer.INSTANCE
+//                                )
                 );
             
             }
@@ -129,20 +145,22 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
 
-            if (isolatableIndices) {
+            IndexMetadata metadata = new IndexMetadata(name_idTerm,UUID.randomUUID());
 
-                ndx_idTerm = ndx = store.registerIndex(name_idTerm);
+            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
 
-            } else {
+            metadata.setIsolatable(isolatableIndices);
 
-                ndx_idTerm = ndx = store.registerIndex(name_idTerm, new BTree(
-                        store, store.getDefaultBranchingFactor(), UUID
-                                .randomUUID(),
-//                                RdfValueSerializer.INSTANCE
-                                ByteArrayValueSerializer.INSTANCE
-                ));
+            ndx_idTerm = ndx = store.registerIndex(name_idTerm, BTree.create(
+                    store, metadata));
+            
+// new BTree(
+//                        store, store.getDefaultBranchingFactor(), UUID
+//                                .randomUUID(),
+////                                RdfValueSerializer.INSTANCE
+//                                ByteArrayValueSerializer.INSTANCE
+//                )
 
-            }
 
         }
 
@@ -159,18 +177,21 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         IIndex ndx = store.getIndex(name_freeText);
         
         if(ndx==null && textIndex) {
+
+            IndexMetadata metadata = new IndexMetadata(name_freeText,UUID.randomUUID());
+
+            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
+
+            metadata.setValueSerializer(NOPSerializer.INSTANCE);
             
-            if (isolatableIndices) {
-
-                ndx_freeText = ndx = store.registerIndex(name_freeText);
-
-            } else {
-
-                ndx_freeText = ndx = store.registerIndex(name_freeText, new BTree(
-                        store, store.getDefaultBranchingFactor(), UUID
-                                .randomUUID(), NOPSerializer.INSTANCE));
+            metadata.setIsolatable(isolatableIndices);
             
-            }
+            ndx_freeText = ndx = store.registerIndex(name_freeText, BTree
+                    .create(store, metadata));
+            
+// new BTree(
+// store, store.getDefaultBranchingFactor(), UUID
+// .randomUUID(), NOPSerializer.INSTANCE)
             
         }
         
@@ -197,30 +218,38 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
 
-            if (isolatableIndices) {
-
-                ndx = store.registerIndex(name);
-
-            } else {
-
                 /*
                  * Note: index does not support isolation.
                  */
                 
-                ndx = store.registerIndex(name, new BTree(store,
-                        store.getDefaultBranchingFactor(), //
-                        UUID.randomUUID(),//
-                        // key serializer
-                        KeyBufferSerializer.INSTANCE,
-////                        new WrappedKeySerializer(DefaultDataSerializer.INSTANCE),
-//                        new WrappedKeySerializer(new FastRDFKeyCompression(N)),
-                        // value serializer
-//                        new WrappedValueSerializer(new FastRDFValueCompression())
-                        ByteArrayValueSerializer.INSTANCE
-                        ));
-//              StatementSerializer.INSTANCE
+                IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+                
+                metadata.setBranchingFactor(store.getDefaultBranchingFactor());
 
-            }
+                metadata.setIsolatable(isolatableIndices);
+                
+                // @todo override key serializer for RDF.
+//                metadata.setKeySerializer(new WrappedKeySerializer(DefaultDataSerializer.INSTANCE));
+//                metadata.setKeySerializer(new WrappedKeySerializer(new FastRDFKeyCompression(N)));
+
+                // @todo override value serializer for RDF.
+//                metadata.setValueSerializer(new WrappedValueSerializer(new FastRDFValueCompression()));
+                
+                ndx = store.registerIndex(name, BTree.create(store, metadata));
+
+//                ndx = store.registerIndex(name, new BTree(store,
+//                        store.getDefaultBranchingFactor(), //
+//                        UUID.randomUUID(),//
+//                        false,//isolatable
+//                        // key serializer
+//                        KeyBufferSerializer.INSTANCE,
+//////                        new WrappedKeySerializer(DefaultDataSerializer.INSTANCE),
+////                        new WrappedKeySerializer(new FastRDFKeyCompression(N)),
+//                        // value serializer
+////                        new WrappedValueSerializer(new FastRDFValueCompression())
+//                        ByteArrayValueSerializer.INSTANCE
+//                        ));
+//              StatementSerializer.INSTANCE
 
         }
 
@@ -261,19 +290,22 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         if (ndx == null) {
 
-            if (isolatableIndices) {
+            IndexMetadata metadata = new IndexMetadata(name_just,UUID.randomUUID());
+            
+            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
 
-                ndx_just = ndx = store.registerIndex(name_just);
-
-            } else {
-
-                ndx_just = ndx = store
-                        .registerIndex(name_just, new BTree(store,
-                                store.getDefaultBranchingFactor(), UUID
-                                        .randomUUID(),
-                                NOPSerializer.INSTANCE));
-
-            }
+            metadata.setIsolatable(isolatableIndices);
+            
+            metadata.setValueSerializer(NOPSerializer.INSTANCE);
+            
+            ndx_just = ndx = store.registerIndex(name_just, BTree.create(store,
+                    metadata));
+            
+// new BTree(store,
+// store.getDefaultBranchingFactor(), UUID
+//                                        .randomUUID(),
+//                                NOPSerializer.INSTANCE)
+                        
 
         }
 
@@ -384,10 +416,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     public static interface Options extends AbstractTripleStore.Options {
         
         /**
-         * When true, the terms, ids, and statement indices will be registered
-         * as {@link UnisolatedBTree} and will support transactions. Otherwise
-         * the indices will be registered as {@link BTree} and will NOT support
-         * isolation by transactions.
+         * When <code>true</code>, the terms, ids, and statement indices will
+         * support isolation and maintain version metadata. Version metadata is
+         * required for both transactions and scale-out indices. Otherwise the
+         * indices will NOT support isolation by transactions.
          */
         public static final String ISOLATABLE_INDICES = "isolatableIndices";
 

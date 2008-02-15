@@ -31,6 +31,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.NOPSerializer;
 import com.bigdata.journal.TemporaryRawStore;
@@ -282,26 +285,32 @@ public class Justification implements Comparable<Justification> {
     }
     
     /**
-     * Deserialize a justification from an index key.
+     * Deserialize a justification from an index entry.
      * 
-     * @param key
-     *            The key.
+     * @param itr
+     *            The iterator visiting the index entries.
      */
-    public Justification(byte[] key) {
+    public Justification(IEntryIterator itr) {
+        
+        final ITuple tuple = itr.next();
+        
+        final int keyLen = tuple.getKeyBuffer().pos();
+        
+        final byte[] data = tuple.getKeyBuffer().array();
         
         this.rule = null; // Not persisted.
         
         // verify key is even multiple of (N*sizeof(long)).
-        assert key.length % (N * Bytes.SIZEOF_LONG) == 0;
+        assert keyLen % (N * Bytes.SIZEOF_LONG) == 0;
 
         // #of term identifiers in the key.
-        final int m = key.length / Bytes.SIZEOF_LONG;
+        final int m = keyLen / Bytes.SIZEOF_LONG;
 
         ids = new long[m];
         
-        for(int i=0; i<m; i++) {
+        for (int i = 0; i < m; i++) {
 
-            ids[i] = KeyBuilder.decodeLong(key, i*8);
+            ids[i] = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
             
         }
         
@@ -448,7 +457,8 @@ public class Justification implements Comparable<Justification> {
 
             sb.append("(");
 
-            for (int i = 0; i < N; i++) {
+            // Note: test on i<ids.length useful when unit tests report errors
+            for (int i = 0; i < N && i<ids.length; i++) {
 
                 long id = ids[i];
                 
@@ -656,7 +666,7 @@ public class Justification implements Comparable<Justification> {
              * grounded then the statement is still entailed by the database.
              */
             
-            SPOJustificationIterator itr = new SPOJustificationIterator(db,head);
+            FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(db,head);
             
             while(itr.hasNext()) {
                 
@@ -730,7 +740,13 @@ public class Justification implements Comparable<Justification> {
 
         public VisitedSPOSet(TemporaryRawStore tempStore) {
             
-            btree = new BTree(tempStore,32,UUID.randomUUID(),NOPSerializer.INSTANCE);
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(32);
+            
+            metadata.setValueSerializer(NOPSerializer.INSTANCE);
+  
+            btree = BTree.create(tempStore,metadata);
             
         }
 

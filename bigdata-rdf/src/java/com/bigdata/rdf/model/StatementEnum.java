@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.model;
 
+import java.io.IOException;
+
+import com.bigdata.io.DataInputBuffer;
+
 /**
  * The basic statement types are: axioms, explicit, inferred.
  * 
@@ -116,6 +120,20 @@ public enum StatementEnum {
 
     }
     
+//    static public StatementEnum deserialize(DataInputBuffer in) {
+//        
+//        try {
+//
+//            return decode(in.readByte());
+//            
+//        } catch(IOException ex) {
+//            
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//        
+//    }
+
     static public StatementEnum deserialize(byte[] val) {
         
         if(val.length!=1) {

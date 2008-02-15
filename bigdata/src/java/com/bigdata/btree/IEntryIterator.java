@@ -31,62 +31,31 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Interface exposes the key and value associated with the object most recently
- * visited an {@link Iterator}.
+ * Interface visits {@link ITuple}s populated with the data and metadata for
+ * visited index entries.
+ * 
+ * @see IRangeQuery
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IEntryIterator extends Iterator {
+public interface IEntryIterator extends Iterator<ITuple> {
 
     /**
-     * The value for the next entry.
+     * Advance the iterator and return the {@link ITuple} from which you can
+     * extract the data and metadata for next entry.
+     * <p>
+     * Note: An {@link IEntryIterator}s will generally return the <em>same</em>
+     * {@link ITuple} reference on on each invocation of this method. The caller
+     * is responsible for copying out any data or metadata of interest before
+     * calling {@link #next()} again.
      * 
-     * @return The value for the next entry -or- <code>null</code> if values
-     *         were not requested when the iterator was provisioned.
+     * @return The {@link ITuple} containing the data and metadata for the
+     *         current index entry.
      * 
      * @throws NoSuchElementException
      *             if there is no next entry.
      */
-    public Object next();
-    
-    /**
-     * The key for the last entry visited by {@link Iterator#next()}.
-     * <p>
-     * Note: {@link Tuple#getKeyBuffer()} is potentially much more efficient.
-     * 
-     * @throws IllegalStateException
-     *             if no entries have been visited.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the iterator was not provisioned to return the keys.
-     * 
-     * @see #getTuple()
-     * @see Tuple#getKeyBuffer()
-     */
-    public byte[] getKey();
-    
-    /**
-     * The value associated with the last entry visited by
-     * {@link Iterator#next()}.
-     * 
-     * @throws IllegalStateException
-     *             if no entries have been visited.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the iterator was not provisioned to return the values.
-     */
-    public Object getValue();
-    
-    /**
-     * The {@link Tuple} exposes a lower-level interface to the keys and values
-     * that may be used to access them without causing allocations on the heap.
-     * 
-     * @return The current {@link Tuple}.
-     * 
-     * @throws IllegalStateException
-     *             if no entries have been visited.
-     */
-    public ITuple getTuple();
+    public ITuple next();
     
 }

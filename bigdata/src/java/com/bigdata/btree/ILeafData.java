@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.OutputStream;
+
 /**
  * Interface for low-level data access for the leaves of a B+-Tree.
  * 
@@ -36,8 +38,8 @@ package com.bigdata.btree;
 public interface ILeafData extends IAbstractNodeData {
 
     /**
-     * The #of values in the leaf (this MUST be equal to
-     * {@link IAbstractNodeData#getKeyCount()}.
+     * The #of values in the leaf (this MUST be equal to the #of keys for a
+     * leaf).
      * 
      * @return The #of values in the leaf.
      */
@@ -54,7 +56,66 @@ public interface ILeafData extends IAbstractNodeData {
      * to perform only read-only operations against the returned array.
      * 
      * @return The backing array in which the values are stored.
+     * 
+     * @deprecated this will be replaced by a random access API suitable for
+     *             storing compressed keys.
+     * 
+     * @see AbstractNode#copyKey(int, OutputStream)
      */
-    public Object[] getValues();
+    public byte[][] getValues();
+    
+    /**
+     * Return <code>true</code> iff the value stored at the specified index is
+     * <code>null</code>.
+     * 
+     * @param index
+     *            The index into the leaf.
+     */
+    public boolean isNull(int index);
+    
+    /**
+     * Copy the indicated value onto the callers stream.
+     * 
+     * @param index
+     *            The index of the value in the leaf.
+     * 
+     * @param os
+     *            The stream onto which to copy the value.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the value stored at that index is <code>null</code>.
+     * 
+     * @see #isNull(int)
+     */
+    public void copyValue(int index,OutputStream os);
+
+    /**
+     * The timestamp for the entry at the specified index.
+     * 
+     * @return The timestamp for the index entry.
+     * 
+     * @throws UnsupportedOperationException
+     *             if timestamps are not being maintained.
+     */
+    public long getVersionTimestamp(int index);
+    
+    /**
+     * Return <code>true</code> iff the entry at the specified index is marked
+     * as deleted.
+     * 
+     * @throws UnsupportedOperationException
+     *             if delete markers are not being maintained.
+     */
+    public boolean getDeleteMarker(int index);
+    
+    /**
+     * Return <code>true</code> iff the leaf maintains version timestamps.
+     */
+    public boolean hasVersionTimestamps();
+    
+    /**
+     * Return <code>true</code> iff the leaf maintains delete markers.
+     */
+    public boolean hasDeleteMarkers();
     
 }

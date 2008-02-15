@@ -28,6 +28,7 @@ import java.util.NoSuchElementException;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.spo.SPO;
@@ -41,7 +42,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOJustificationIterator implements IJustificationIterator {
+public class FullyBufferedJustificationIterator implements IJustificationIterator {
 
     /** the database. */
     private final AbstractTripleStore db;
@@ -72,7 +73,7 @@ public class SPOJustificationIterator implements IJustificationIterator {
      * @param db
      * @param head The statement whose justifications will be materialized.
      */
-    public SPOJustificationIterator(AbstractTripleStore db, SPO head) {
+    public FullyBufferedJustificationIterator(AbstractTripleStore db, SPO head) {
         
         assert db != null;
         
@@ -107,15 +108,14 @@ public class SPOJustificationIterator implements IJustificationIterator {
          * Materialize the matching justifications.
          */
         
-        IEntryIterator itr = ndx.rangeIterator(fromKey,toKey);
+        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey,
+                0/* capacity */, IRangeQuery.KEYS, null/* filter */);
 
         int i = 0;
 
         while (itr.hasNext()) {
 
-            itr.next();
-
-            Justification jst = new Justification(itr.getKey());;
+            Justification jst = new Justification(itr);
 
             // @todo comment out and make ids private.
             assert jst.ids[0] == head.s;

@@ -59,7 +59,7 @@ import org.CognitiveWeb.generic.core.ndx.Successor;
 import org.CognitiveWeb.generic.core.om.BaseObject;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
@@ -76,7 +76,7 @@ import com.bigdata.rawstore.Bytes;
  * BTree on the journal. In particular, methods that change the state of the
  * BTree cause this object to be {@link #update() marked as dirty} so that we
  * will flush the {@link BTree} to the journal in {@link #saveBTree()} and have
- * the current {@link BTreeMetadata} record on hand when this object is
+ * the current {@link IndexMetadata} record on hand when this object is
  * serialized. This works fine until we start using partitioned indices in the
  * journal - the problem in that case is that the low-level integration will not
  * be able to keep track of the partitioned indices.
@@ -144,7 +144,7 @@ final public class MyBTree extends AbstractBTree {
     public MyBTree(BaseObject container, BTree btree, Coercer coercer,
             Successor successor, Comparator comparator) {
 
-        super(container, btree.getMetadata().getMetadataAddr(),
+        super(container, btree.getCheckpoint().getCheckpointAddr(),
                 false/* storeOidOnly */, coercer, successor, comparator);
 
         this.btree = btree;
@@ -210,9 +210,9 @@ final public class MyBTree extends AbstractBTree {
         
         final byte[] key = KeyBuilder.asSortKey(internalKey);
         
-        final Long recid = (Long) getBTree().lookup(key);
+        final byte[] val = getBTree().lookup(key);
 
-        if (recid == null) {
+        if (val == null) {
 
             /*
              * The key was not found.
@@ -222,7 +222,7 @@ final public class MyBTree extends AbstractBTree {
 
         }
 
-        return recid.longValue();
+        return KeyBuilder.decodeLong(val, 0/*off*/);
         
     }
 
@@ -245,13 +245,13 @@ final public class MyBTree extends AbstractBTree {
          * generic object.
          */
         
-        final Object val = new Long(oid);
+        final byte[] val = KeyBuilder.asSortKey(oid);
         
         // Note: conversion of the key to byte[].
         
         final byte[] key = KeyBuilder.asSortKey(internalKey);
         
-        final Long oldValue = (Long) getBTree().insert(key, val);
+        final byte[] oldValue = getBTree().insert(key, val);
 
         if (oldValue != null) {
 
@@ -294,9 +294,9 @@ final public class MyBTree extends AbstractBTree {
         
         final byte[] key = KeyBuilder.asSortKey(internalKey);
         
-        final Long oid = (Long) getBTree().remove(key);
+        final byte[] oldVal = getBTree().remove(key);
 
-        if (oid == null) {
+        if (oldVal == null) {
 
             // nothing found under that key.
             
@@ -312,7 +312,7 @@ final public class MyBTree extends AbstractBTree {
 
         update();
 
-        return oid.longValue();
+        return KeyBuilder.decodeLong(oldVal, 0/*off*/);
         
     }
 
@@ -528,7 +528,11 @@ final public class MyBTree extends AbstractBTree {
         
     }
     
-    // @todo should be a configurable instance, probably on the PersistenceStore or the OM.
+    /*
+     * @todo should be a configurable instance, probably on the PersistenceStore
+     * or the OM. Likewise, it should probably be thread-local to support
+     * concurrent operations on different btrees.
+     */
     private static final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(); 
 
     public static byte[] _newCompositeKey(Object coercedKey,long oid) {

@@ -31,7 +31,6 @@ package com.bigdata.rdf.store;
 import java.util.Iterator;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -77,10 +76,10 @@ public interface IAccessPath extends Iterable<SPO> {
      * The maximum #of statements that could be returned for the specified
      * triple pattern.
      * <p>
-     * Note: This is an upper bound since {@link IIsolatableIndex} indices
-     * will report entries that have been deleted but not yet purged from
-     * the index in the range count. If the index does not support isolation
-     * then this will be an exact count.
+     * Note: This is an upper bound since scale-out indices use delete markers
+     * and therefore will report entries that have been deleted but not yet
+     * purged from the index in the range count. If the index does not support
+     * delete markers then this will be an exact count.
      */
     public long rangeCount();
 

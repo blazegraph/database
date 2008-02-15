@@ -30,8 +30,6 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.isolation.IValue;
-
 /**
  * Interface for filtering key range scans.
  * 
@@ -52,26 +50,27 @@ public interface IEntryFilter extends Serializable {
     public void add(IEntryFilter filter);
     
     /**
-     * Return true iff the value should be visited.
+     * Return <code>true</code> iff the index entry should be visited.
      * 
-     * @param value
-     *            A value that is being considered by the iterator for
-     *            visitation. 
-     * @return
+     * @param tuple
+     *            A tuple revealing data from the next index entry to be visited
+     *            by the iterator.
+     * 
+     * @return <code>true</code> iff the index entry should be visited.
      */
-    public boolean isValid(Object value);
-    
+    public boolean isValid(ITuple tuple);
+
     /**
-     * Resolve the value that the iterator would visit. This can be used to
-     * return an application value encapsulated by an {@link IValue}, to
-     * de-serialize application values, etc. The default implementation is a
-     * NOP. This method is applied <em>after</em> {@link #isValid(Object)}.
+     * Method may (re-)write the value associated with an {@link ITuple} that
+     * the iterator would visit. The default implementation is a NOP. This
+     * method is applied <em>after</em> {@link #isValid(ITuple)}. The
+     * operation does not have a side-effect on the value stored in the index.
      * 
-     * @param value
-     *            The value that would be visited.
+     * @param tuple
+     *            A tuple that will be visited by the iterator.
      * 
      * @return The value that will be visited.
      */
-    public Object resolve(Object value);
-    
+    public void rewrite(ITuple tuple);
+
 }

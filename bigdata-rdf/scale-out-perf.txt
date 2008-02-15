@@ -418,7 +418,209 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            on the statement index more often.  However, note that this
            is true even though the TERMS index is 3x larger than the
            SPO index.
-      
+
+    - BTree
+
+	   Going to work converting values to byte[]s throughout the
+	   api, exposing versionCounter and deletion marker metadata
+	   via the ITuple and IEntryIterator interface and moving
+	   their data into the leaf, copying data into/out of leafs
+	   (rather than by reference), fused views that process
+	   version counters (never implemented before and required for
+	   compacting merges of isolatable indices), and better
+	   alignment of the various serialization apis.  This will
+	   also set the stage for a compacting btree node or leaf data
+	   structure which should help with long-term GC problems.
+
+	 - Update UnisolatedBTree, IsolatedBTree.
+
+	 - Update the fused views for these classes.  There is a
+           single unifying model: the IsolatedBTree should be a fused
+           view of the read-only historical state of an index
+           partition and the btree on which the write set is isolated.
+           Right now it is stated just in terms of the UnisolatedBTree
+           (the historical state of the index as of the transaction
+           start) and is not generalized to an index partition view.
+           The rangeIterator for the fused view will examine the
+           version metadata.
+
+         - support copy in/out of key, val, and optional metadata
+           including version counter and deleted marker in lookup(),
+           insert(), remove(), and rangeIterator so that we can (a) be
+           more efficient in handling keys and vals by copying; (b)
+           handle keys and vals that are byte aligned or bit aligned
+           in the node or leaf; (c) reduce GC by converting to a
+           compacting record for the node/leaf; and (d) expose the
+           version counter and deletion marker for fused views of
+           indices with isolation.
+
+	   I can keep the simple btree api and extend the semantics on
+	   the abstract btree, node and leaf directly and then roll
+	   them into the rest of the system incrementally.
+
+	   This will also make it easy to convert the values stored
+	   under the keys to byte[]s since they are no longer going to
+	   be wrapped by Value objects.
+
+	   That will make it easier to align the serialization?
+
+	 - Write test suites for fused view processing with isolatable
+           indices, especially focusing on the fused iterator view.
+           Define VERSION to report the version counter and deletion
+           marker metadata out to the ITuple and the rangeIterator.
+
+	 - change version counters to long (commit timestamps).
+
+	 - Life nodes and leaves require a random access API for
+           copying keys and values out of a node or leaf.  This could
+           be getTuple(byte[] key), which would be the basis for
+           lookup( byte[] key ).  Note that serialization can get by
+           with a sequential access or an array[] reference access,
+           but not if we want to directly read from the serialized
+           record as our immutable node/leaf data structure.  The
+           changes here are to ILeafData, Leaf, INodeData, Node,
+           ITuple, IKeySerializer, IValueSerializer, and
+           IDataSerializer.
+
+    - Tune serialization:
+
+	 - Test WrappedKeySerializer allowing the use of the
+           FastRDFKeyCompression class to serialize the keys of the
+           statement indices.  Make sure that we can do this for all
+           of the stores (temp, local, embedded data service, and
+           scale-out federation).  This will require the key and value
+           serializers to get passed along when creating both local
+           and remote indices.
+	   
+	 - Test use of FastRDFValueCompression to write the values for
+	   the statement indices.
+
+	 - Adapt the ResultSet for the remote rangeIterator to use the
+           key and value serializer for the index.
+
+	 - Note: if the btree will internally use an order preserving
+           compression technique (ala hu-tucker) then it may make
+           sense to use special key and value serializers when
+           transferring data to/from an index procedures or the range
+           iterator since order preserving compression is never
+           required in those situations.
+
+	 - Make sure that the InputBitStream and the OutputBitStream
+           are drawing on a pool of byte[]s for their internal buffers
+           so that we are not challenging the heap by creating and
+           destroying a lot of those objects (actually, they are not
+           using an internal buffer so MAKE SURE that the are reading
+           / writing on streams backed by a byte[] or a highly
+           buffered socket (in the case of RMI)).
+
+	 - See more items to be done in
+           AbstractKeyArrayIndexProcedure, IDataSerializer, and
+           UnisolatedBTree (MUST wrap up the caller's value serializer
+           in one that handles version counters and deletion markers).
+           Make sure to run TestScaleOutTripleStoreWithJiniFederation
+           for testing since that is the only thing that forces
+           serialization of the index procedures.
+
+	 - Look at how to do prefix coding using the mg4j and fast
+           classes.  That could be used as the default key
+           serialization and only overridden in special cases like RDF
+           where we can do even better with less effort.
+
+	 - Compare fast rdf key/val compression against the
+           KeyBufferSerializer and ByteArrayValueSerializer for some
+           data sets.  How do they stack up?
+
+	   Summary: the "fast" rdf serializers definately write (and
+	   read) less data resulting in a smaller store and less IO.
+	   However, they are also without a doubt SLOWER.
+
+	   It is hard to tell to what extend the throughput drop is
+	   due to the work required to compute the compressed codes
+	   and to what extent it is due to the additional allocation
+	   and copying that we need to do to align the IDataSerializer
+	   API with the IKeySerializer API, with the IValueSerializer
+	   API, and with the use of the ImmutableKeyBuffer class in
+	   the BTree.
+
+	   Those API misalignments need to be reduced before we can
+	   figure out whether the "fast" rdf serialization is faster
+	   overall.  (There is SOME evidence that the API misalignment
+	   is causing problems since only using the "fast" value
+	   serializer is slower than using the byte[] value serializer
+	   and there is very little "computation" to be done -
+	   especially when compared to the "fast" key serializer which
+	   computes a code for each long term identifier used in the
+	   leaf.)
+
+	   Also, note that most of the time is on the SPO and JUST
+	   indices during closure (I would expect that) and on the
+	   statement indices (rather than the lexicon) during load
+	   (which is NOT what I would have expected for load).
+
+	   I should also try some other data sets, with more memory
+	   free on the machine, and on a server platform with more
+	   CPUs and memory.
+
+	   nciOncology:
+
+	   fast 1 : Loaded 1 resources: 464841 stmts added in 31.922 secs, rate= 14561, commitLatency=203ms; bytesWritten=?
+	   fast 1 : Computed closure in 289703ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=1300; bytesWritten=?
+
+	   fast 2 : Loaded 1 resources: 464841 stmts added in 26.094 secs, rate= 17814, commitLatency=172ms, bytesWritten=95,703,361, bytesRead=42,603,290
+	   fast 2 : Computed closure in 135313ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2785, bytesWritten=581,338,696, bytesRead=742,823,674
+
+	   fast 3 : Loaded 1 resources: 464841 stmts added in 26.265 secs, rate= 17698, commitLatency=172ms
+	   fast 3 : Computed closure in 136875ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=2753
+
+	   kbs  1 : Loaded 1 resources: 464841 stmts added in 28.828 secs, rate= 16124, commitLatency=250ms, bytesWritten=109,833,180
+	   kbs  1 : Computed closure in 124860ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3018; bytesWritten=??? (not reported)
+
+	   kbs  2 : Loaded 1 resources: 464841 stmts added in 23.594 secs, rate= 19701, commitLatency=250ms, bytesWritten=109,829,813, bytesRead=44,865,353
+	   kbs  2 : Computed closure in 123500ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3051, bytesWritten=653,911,378, bytesRead=862,234,149
+
+
+Loaded 1 resources: 464841 stmts added in 25.218 secs, rate= 18432, commitLatency=391ms
+Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences, entailmentsPerSec=3007
+
+    - Distributed file repository
+
+         - handle overflow of blocks to the index segments.
+
+	 - provide streaming socket api on data service for reading
+           blocks.
+
+	 - range delete
+
+	 - full text indexing.
+
+	 - logical row scan for headers of documents in a key range.
+
+    - Map/Reduce demo jobs.
+
+      - Download, prepare, extract.
+
+    - Full text indexing
+
+    - Quad store.
+
+    - Metadata index
+    
+      - Merge (evict view onto index segment with history policy IFF
+        sparse row store, since that is the only data model with the
+        necessary timestamps on the data - version counters are NOT
+        sufficient for this purpose).
+
+      - Overflow (generate index segment from btree and update view defn).
+
+      - Snap (generate new view by creating a new btree and making the
+        old one "immutable").
+
+      - Split (generate N partitions from one partition)
+
+      - Join (generate 1 partition from 2 partitions).
+
+      - Move (move partition to another data service).
+
     - Tune network IO
 
       - AddTerms and AddIds
