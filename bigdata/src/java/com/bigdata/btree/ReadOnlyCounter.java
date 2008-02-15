@@ -48,7 +48,7 @@ public class ReadOnlyCounter implements ICounter {
 
     }
 
-    public long inc() {
+    public long incrementAndGet() {
 
         throw new UnsupportedOperationException();
 

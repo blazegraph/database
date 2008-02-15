@@ -34,17 +34,9 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeySerializer;
-import com.bigdata.btree.IValueSerializer;
-import com.bigdata.btree.KeyBufferSerializer;
-import com.bigdata.btree.UnisolatedBTreeConstructor;
-import com.bigdata.btree.IDataSerializer.WrappedKeySerializer;
-import com.bigdata.isolation.Value;
-import com.bigdata.isolation.Value.ValueSerializer;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
@@ -152,27 +144,34 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
         public Object call() throws Exception {
             
-            IKeySerializer keySer = KeyBufferSerializer.INSTANCE;
-            
-            IValueSerializer valSer = Value.Serializer.INSTANCE;
+//            IKeySerializer keySer = KeyBufferSerializer.INSTANCE;
+//            
+//            IValueSerializer valSer = ByteArrayValueSerializer.INSTANCE;
             
 //            if(name.equals(name_spo)||name.equals(name_pos)||name.equals(name_osp)) {
-//
-//                // FIXME make sure custom key/val serializers are always specified for statement indices.
 //                
 //                keySer = new WrappedKeySerializer(new FastRDFKeyCompression(N));
 //                
 //                valSer = new ValueSerializer(new FastRDFValueCompression());
 //                
 //            }
+
+            /*
+             * FIXME make sure custom key/val serializers are always specified
+             * for statement indices and that the value serializer is a NOP for
+             * the full text and justifications indices.
+             */
+            IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
             
-            dataService
-                    .registerIndex(
-                            name,
-                            UUID.randomUUID(),
-                            new UnisolatedBTreeConstructor(branchingFactor,
-                                    keySer, valSer, null/* conflictResolver */),
-                            null/* pmd */);
+            dataService.registerIndex(name, metadata);
+            
+//            dataService
+//                    .registerIndex(
+//                            name,
+//                            UUID.randomUUID(),
+//                            new UnisolatedBTreeConstructor(branchingFactor,
+//                                    keySer, valSer, null/* conflictResolver */),
+//                            null/* pmd */);
             
             return null;
             
@@ -182,6 +181,10 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     
     /**
      * Registers the various indices that will be made available to the client.
+     * 
+     * FIXME Custom registration of key and value serializers for various
+     * indices. Also, the branching factor parameter got dropped by the
+     * refactor.
      */
     private void registerIndices() {
         

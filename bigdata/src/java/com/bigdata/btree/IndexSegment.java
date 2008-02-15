@@ -23,18 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import java.io.DataInput;
 import java.io.IOException;
 
-import org.CognitiveWeb.extser.LongPacker;
-
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ResourceManager;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
@@ -73,7 +64,7 @@ public class IndexSegment extends AbstractBTree {
      * is restricted to {@link IndexSegment}s since they are read-only data
      * structures.
      */
-    it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
+    protected it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
 
     /**
      * Text of a message used in exceptions for mutation operations on the index
@@ -85,7 +76,7 @@ public class IndexSegment extends AbstractBTree {
 
         reopen();
 
-        return fileStore.metadata.branchingFactor;
+        return fileStore.getMetadata().getBranchingFactor();
 
     }
 
@@ -93,7 +84,7 @@ public class IndexSegment extends AbstractBTree {
 
         reopen();
 
-        return fileStore.metadata.height;
+        return fileStore.getCheckpoint().height;
 
     }
 
@@ -101,7 +92,7 @@ public class IndexSegment extends AbstractBTree {
 
         reopen();
 
-        return fileStore.metadata.nleaves;
+        return fileStore.getCheckpoint().nleaves;
 
     }
 
@@ -109,7 +100,7 @@ public class IndexSegment extends AbstractBTree {
 
         reopen();
 
-        return fileStore.metadata.nnodes;
+        return fileStore.getCheckpoint().nnodes;
 
     }
 
@@ -117,16 +108,7 @@ public class IndexSegment extends AbstractBTree {
 
         reopen();
 
-        return fileStore.metadata.nentries;
-
-    }
-
-    public IndexSegment(IndexSegmentFileStore fileStore) {
-
-        this(fileStore, new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN));
+        return fileStore.getCheckpoint().nentries;
 
     }
 
@@ -135,40 +117,36 @@ public class IndexSegment extends AbstractBTree {
      * 
      * @param fileStore
      *            The store containing the {@link IndexSegment}.
-     * @param hardReferenceQueue
-     *            The index segment is read only so we do not need to do IO on
-     *            eviction. All the listener needs to do is count queue
-     *            evictions to collect statistics on the index performance. The
-     *            capacity should be relatively low and the #of entries to scan
-     *            should be relatively high since each entry is relatively
-     *            large, e.g., try with 100 and 20 respectively.
-     * @param valSer
-     * 
-     * @throws IOException
      * 
      * @todo explore good defaults for the hard reference queue, which should
      *       probably be much smaller as the branching factor grows larger.
+     *       <p>
+     *       The index segment is read only so we do not need to do IO on
+     *       eviction. All the listener needs to do is count queue evictions to
+     *       collect statistics on the index performance. The capacity should be
+     *       relatively low and the #of entries to scan should be relatively
+     *       high since each entry is relatively large, e.g., try with 100 and
+     *       20 respectively.
+     *       <p>
+     *       Consider whether we can use only a read-retention queue for an
+     *       index segment.
+     * 
+     * @see IndexSegmentFileStore#load()
      */
-    protected IndexSegment(IndexSegmentFileStore fileStore,
-            HardReferenceQueue<PO> hardReferenceQueue) {
+    public IndexSegment(IndexSegmentFileStore fileStore) {
 
-        super(fileStore, fileStore.metadata.branchingFactor,
-                fileStore.metadata.maxNodeOrLeafLength, hardReferenceQueue,
-                new CustomAddressSerializer(fileStore.metadata),
-                fileStore.extensionMetadata.getKeySerializer(),
-                fileStore.extensionMetadata.getValueSerializer(),
+        super(fileStore,
                 ImmutableNodeFactory.INSTANCE,
-                fileStore.extensionMetadata.getRecordCompressor(),
-                fileStore.metadata.useChecksum, fileStore.metadata.indexUUID);
+                // FIXME use packed address serializer.
+                AddressSerializer.INSTANCE,
+//                new CustomAddressSerializer(fileStore.getCheckpoint()),
+                fileStore.getMetadata()
+                );
 
         // Type-safe reference to the backing store.
         this.fileStore = (IndexSegmentFileStore) fileStore;
 
         _open();
-
-        // report on the event.
-        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
-                .toString(), fileStore.size());
 
     }
 
@@ -220,9 +198,9 @@ public class IndexSegment extends AbstractBTree {
     synchronized private void _open() {
 
         // Read the root node.
-        this.root = readNodeOrLeaf(fileStore.metadata.addrRoot);
+        this.root = readNodeOrLeaf(fileStore.getCheckpoint().addrRoot);
 
-        if (fileStore.metadata.addrBloom == 0L) {
+        if (fileStore.getCheckpoint().addrBloom == 0L) {
 
             /*
              * No bloom filter.
@@ -247,6 +225,10 @@ public class IndexSegment extends AbstractBTree {
             }
 
         }
+
+        // report on the event.
+        ResourceManager.openIndexSegment(null/* name */, fileStore.getFile()
+                .toString(), fileStore.size());
 
     }
 
@@ -284,9 +266,19 @@ public class IndexSegment extends AbstractBTree {
      */
 
     /**
+     * Operation is disallowed - the counter is always stored in the mutable
+     * btree.
+     */
+    public ICounter getCounter() {
+        
+        throw new UnsupportedOperationException(MSG_READ_ONLY);
+        
+    }
+    
+    /**
      * Operation is disallowed.
      */
-    public Object insert(byte[] key, Object entry) {
+    public Tuple insert(byte[] key, byte[] value, boolean delete, long timestamp, Tuple tuple) {
 
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -295,7 +287,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Operation is disallowed.
      */
-    public Object remove(byte[] key) {
+    public Tuple remove(byte[] key, Tuple tuple) {
 
         throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -316,9 +308,8 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            // test the index.
-            return super.contains(key);
-
+            // fall through.
+            
         }
 
         // test the index.
@@ -330,102 +321,32 @@ public class IndexSegment extends AbstractBTree {
      * Applies the optional bloom filter if it exists. If the bloom filter
      * exists and reports true, then looks up the value for the key in the index
      * (note that the key might not exist in the index since a bloom filter
-     * allows false positives).
+     * allows false positives, further the key might exist for a deleted entry).
      */
-    public Object lookup(byte[] key) {
-
+    public Tuple lookup(byte[] key, Tuple tuple) {
+        
         if (bloomFilter != null) {
 
-            byte[] _key;
-
-            if (key instanceof byte[]) {
-
-                _key = (byte[]) key;
-
-            } else {
-                
-                _key = KeyBuilder.asSortKey(key);
-
-            }
-
-            if (!containsKey(_key)) {
+            if (!containsKey(key)) {
 
                 // rejected by the bloom filter.
+
                 return null;
 
             }
 
-            /*
-             * Test the index (may be a false positive and we need the value
-             * paired to the key in any case).
-             */
-            return super.lookup(_key);
+            // fall through.
 
         }
-
-        // test the index.
-        return super.lookup(key);
+        
+        /*
+         * Lookup against the index (may be a false positive, may be paired to a
+         * deleted entry, and we need the tuple paired to the key in any case).
+         */
+        
+        return super.lookup(key, tuple);
 
     }
-
-//    /*
-//     * IBatchBTree (disallows mutation operations, applies optional bloom filter
-//     * for batch operations).
-//     */
-//
-//    /**
-//     * Disallowed.
-//     */
-//    public void insert(BatchInsert op) {
-//
-//        throw new UnsupportedOperationException(MSG_READ_ONLY);
-//
-//    }
-//
-//    /**
-//     * Disallowed.
-//     */
-//    public void remove(BatchRemove op) {
-//
-//        throw new UnsupportedOperationException(MSG_READ_ONLY);
-//
-//    }
-//
-//    /**
-//     * Apply a batch lookup operation. The bloom filter is used iff it is
-//     * defined.
-//     */
-//    public void lookup(BatchLookup op) {
-//
-//        if( bloomFilter != null ) {
-//            
-//            op.apply(this);
-//            
-//        } else {
-//            
-//            super.lookup(op);
-//            
-//        }
-//        
-//    }
-//
-//    /**
-//     * Apply a batch existence test operation. The bloom filter is used iff it
-//     * is defined.
-//     */
-//    public void contains(BatchContains op) {
-//
-//        if( bloomFilter != null ) {
-//            
-//            op.apply(this);
-//            
-//        } else {
-//            
-//            super.contains(op);
-//            
-//        }
-//
-//    }
 
     /*
      * INodeFactory
@@ -442,10 +363,12 @@ public class IndexSegment extends AbstractBTree {
         }
 
         public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, Object[] values) {
+                int branchingFactor, IKeyBuffer keys, byte[][] values,
+                long[] versionTimestamps, boolean[] deleteMarkers) {
 
             return new ImmutableLeaf((AbstractBTree) btree, addr,
-                    branchingFactor, keys, values);
+                    branchingFactor, keys, values, versionTimestamps,
+                    deleteMarkers);
 
         }
 
@@ -492,13 +415,13 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            public Object insert(Object key, Object val) {
+            public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
 
             }
 
-            public Object remove(Object key) {
+            public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -525,9 +448,11 @@ public class IndexSegment extends AbstractBTree {
              * @param values
              */
             protected ImmutableLeaf(AbstractBTree btree, long addr,
-                    int branchingFactor, IKeyBuffer keys, Object[] values) {
+                    int branchingFactor, IKeyBuffer keys, byte[][] values,
+                    long[] versionTimestamps, boolean[] deleteMarkers) {
 
-                super(btree, addr, branchingFactor, keys, values);
+                super(btree, addr, branchingFactor, keys, values,
+                        versionTimestamps, deleteMarkers);
 
             }
 
@@ -537,13 +462,13 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            public Object insert(Object key, Object val) {
+            public Tuple insert(byte[] key, byte[] val, boolean deleted, long timestamp, Tuple tuple) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
 
             }
 
-            public Object remove(Object key) {
+            public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(MSG_READ_ONLY);
 
@@ -553,273 +478,4 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    /**
-     * <p>
-     * A custom serializer class provides a workaround for node offsets (which
-     * are relative to the start of the nodes block) in contrast to leaf offsets
-     * (which are relative to a known offset from the start of the index segment
-     * file). This condition arises as a side effect of serializing nodes at the
-     * same time that the {@link IndexSegmentBuilder} is serializing leaves such
-     * that we can not both group the nodes and leaves into distinct regions and
-     * know the absolute offset to each node or leave as it is serialized.
-     * </p>
-     * <p>
-     * Addresses are required to be left-shifted by one bit on the
-     * {@link INodeData} interface during serialization and the low bit must be
-     * a one (1) iff the address is of a child node and a zero (0) iff the
-     * address is of a child leaf. During de-serialization, the low bit is
-     * examined so that the address may be appropriately decoded and the addr is
-     * then right shifted one bit. A leaf address does not require further
-     * decoding. Decoding for a node address requires that we add in the offset
-     * of the start of the nodes in the file, which is recorded in
-     * {@link IndexSegmentMetadata#offsetNodes} and is specified as a parameter
-     * to the {@link CustomAddressSerializer} constructor.
-     * </p>
-     * <p>
-     * Note: This practice essentially discards the high bit of the long integer
-     * encoding the address.  This means that only N-1 offsetBits are actually
-     * available to the {@link IndexSegmentFileStore}.  The #of offsetBits MUST
-     * therefore be choosen to be one larger than would otherwise be necessary 
-     * for the #of distinct index records to be addressed.
-     * </p>
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class CustomAddressSerializer implements IAddressSerializer {
-
-        /**
-         * The object that knows how to encoding a byte offset and byte count
-         * into a long integer for the {@link IndexSegmentFileStore}.
-         */
-        protected final IAddressManager am;
-        
-        /**
-         * The offset within the file of the first node. All nodes are written
-         * densely on the file beginning at this offset. The child addresses for
-         * a node are relative to this offset and must be corrected during
-         * decoding (this is handled automatically by this class).
-         */
-        protected final long offsetNodes;
-
-        /**
-         * Constructor variant used when the offset of the nodes is not known.
-         * This is used by the {@link IndexSegmentBuilder}. When using this
-         * constructor de-serialization of addresses is disabled.
-         * 
-         * @param am
-         *            The object that knows how to encoding a byte offset and
-         *            byte count into a long integer for the
-         *            {@link IndexSegmentFileStore}.
-         */
-        public CustomAddressSerializer(IAddressManager am) {
-
-            if(am==null) throw new IllegalArgumentException();
-            
-            this.am = am;
-            
-            this.offsetNodes = 0;
-
-        }
-
-//        /**
-//         * 
-//         * @param am
-//         *            The object that knows how to encoding a byte offset and
-//         *            byte count into a long integer for the
-//         *            {@link IndexSegmentFileStore}. This object may be
-//         *            constructed using {@link IndexSegmentMetadata#offsetBits}
-//         *            and {@link WormAddressManager#WormAddressManager(int)}.
-//         * @param nodesOffset
-//         *            The offset within the file of the first node. All nodes
-//         *            are written densely on the file beginning at this offset.
-//         *            The child addresses for a node are relative to this offset
-//         *            and must be corrected during decoding (this is handled
-//         *            automatically by this class). When zero(0) node
-//         *            deserialization is not permitted (the nodesOffset will be
-//         *            zero in the metadata record iff no nodes were generated by
-//         *            the index segment builder).
-//         * 
-//         * @see IndexSegmentMetadata#offsetNodes
-//         */
-//        public CustomAddressSerializer(IAddressManager am, long offsetNodes) {
-        
-        /**
-         * Constructor variant used when opening an
-         * {@link IndexSegmentFileStore}.
-         */
-        public CustomAddressSerializer(IndexSegmentMetadata metadata) {
-            
-//            if(am==null) throw new IllegalArgumentException();
-//            
-//            this.am = am;
-
-            this.am = new WormAddressManager(metadata.offsetBits);
-            
-            this.offsetNodes = am.getOffset(metadata.addrNodes);
-            
-//            /*
-//             * Note: trim to int (we restrict the maximum size of the segment).
-//             */
-//            this.offsetNodes = (int) offsetNodes;
-
-            // System.err.println("offsetNodes="+offsetNodes);
-
-        }
-
-        /**
-         * This over-estimates the space requirements.
-         */
-        public int getSize(int n) {
-
-            return Bytes.SIZEOF_LONG * n;
-
-        }
-
-        /**
-         * Packs the addresses, which MUST already have been encoded according
-         * to the conventions of this class.
-         */
-        public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
-                int nchildren) throws IOException {
-
-            for (int i = 0; i < nchildren; i++) {
-
-                long addr = childAddr[i];
-
-                /*
-                 * Children MUST have assigned persistent identity.
-                 */
-                if (addr == 0L) {
-
-                    throw new RuntimeException(
-                            "Child is not persistent: index=" + i);
-
-                }
-
-                // test the low bit. when set this is a node; otherwise a leaf.
-                final boolean isLeaf = (addr & 1) == 0;
-
-                // strip off the low bit.
-                addr >>= 1;
-
-                final long offset = am.getOffset(addr);
-
-                final int nbytes = am.getByteCount(addr);
-
-                final long adjustedOffset = (isLeaf ? (offset << 1)
-                        : ((offset << 1) | 1));
-
-                // write the adjusted offset (requires decoding).
-//                LongPacker.packLong(os, adjustedOffset);
-                os.packLong(adjustedOffset);
-
-                // write the #of bytes (does not require decoding).
-//                LongPacker.packLong(os, nbytes);
-                os.packLong(nbytes);
-
-            }
-
-        }
-
-        /**
-         * Unpacks and decodes the addresses.
-         */
-        public void getChildAddresses(DataInput is, long[] childAddr,
-                int nchildren) throws IOException {
-
-            // check that we know the offset for deserialization.
-            assert offsetNodes > 0;
-
-            for (int i = 0; i < nchildren; i++) {
-
-                /*
-                 * Note: the Address is packed as two long integers. The first
-                 * is the offset. The way the packed values are written, the
-                 * offset is left-shifted by one and its low bit indicates
-                 * whether the referent is a node (1) or a leaf (0).
-                 */
-
-                /*
-                 * offset (this field must be decoded).
-                 */
-                long v = LongPacker.unpackLong(is);
-
-                // test the low bit. when set this is a node; otherwise a leaf.
-                final boolean isLeaf = (v & 1) == 0;
-
-                // right shift by one to remove the low bit.
-                v >>= 1;
-
-                // compute the real offset into the file.
-                final long offset = isLeaf ? v : v + offsetNodes;
-
-                /*
-                 * nbytes (this field does not need any further interpretation).
-                 */
-
-                v = LongPacker.unpackLong(is);
-
-                assert v <= Integer.MAX_VALUE;
-
-                final int nbytes = (int) v;
-
-                /*
-                 * combine into the correct address.
-                 */
-                final long addr = am.toAddr(nbytes, offset);
-
-                if (addr == 0L) {
-
-                    throw new RuntimeException(
-                            "Child does not have persistent address: index="
-                                    + i);
-
-                }
-
-                childAddr[i] = addr;
-
-            }
-
-        }
-
-        /**
-         * Encode an address. The address is left shifted by one bit. If the
-         * address is of a node then the low bit is set to one (1) otherwise it
-         * will be zero(0).
-         * 
-         * @param nbytes
-         *            The #of bytes in the allocation.
-         * @param offset
-         *            The offset of the allocation.
-         * @param isLeaf
-         *            true iff this is the address of a leaf and false iff this
-         *            is the address of a node.
-         * 
-         * @return The encoded address.
-         */
-        public long encode(int nbytes, long offset, boolean isLeaf) {
-
-            long addr = am.toAddr(nbytes, offset);
-
-            addr <<= 1; // (addr << 1)
-
-            if (!isLeaf) {
-
-                addr |= 1; // addr++;
-
-            }
-
-            return addr;
-
-        }
-
-    }
-
-    public boolean isIsolatable() {
-        
-        return this instanceof IIsolatableIndex;
-        
-    }
-    
 }

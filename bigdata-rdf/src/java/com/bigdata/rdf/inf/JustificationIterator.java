@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -221,7 +222,7 @@ public class JustificationIterator implements IJustificationIterator {
 
         this.capacity = capacity;
 
-        this.src = ndx.rangeIterator(null, null);
+        this.src = ndx.rangeIterator(null, null,0/*capacity*/,IRangeQuery.KEYS,null/*filter*/);
 
         this.buffer = new ArrayBlockingQueue<Justification>(capacity);
 
@@ -263,9 +264,7 @@ public class JustificationIterator implements IJustificationIterator {
 
             while (src.hasNext()) {
 
-                src.next();
-
-                Justification t = new Justification(src.getKey());
+                Justification t = new Justification(src);
 
                 try {
 
@@ -319,9 +318,7 @@ public class JustificationIterator implements IJustificationIterator {
 
             while (src.hasNext() && buffer.remainingCapacity() > 0) {
 
-                src.next();
-
-                Justification jst = new Justification(src.getKey());
+                Justification jst = new Justification(src);
 
                 try {
 

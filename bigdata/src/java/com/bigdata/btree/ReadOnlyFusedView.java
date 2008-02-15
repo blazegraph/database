@@ -27,46 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.util.UUID;
-
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
-import com.bigdata.service.Split;
-
 /**
  * <p>
- * A fused view providing read-only operations on multiple B+-Trees mapping
- * variable length unsigned byte[] keys to arbitrary values. This class does NOT
- * handle version counters or deletion markers.
+ * A read-only fused view.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo support N sources for a {@link ReadOnlyFusedView} by chaining together
- *       multiple {@link ReadOnlyFusedView} instances if not in a more efficient
- *       manner.
  */
-public class ReadOnlyFusedView implements IIndex, IFusedView {
-
-    /**
-     * Holds the various btrees that are the sources for the view.
-     */
-    public final AbstractBTree[] srcs;
-    
-    /**
-     * True iff all sources support isolation.
-     */
-    private final boolean isolatable;
-    
-    public AbstractBTree[] getSources() {
-        
-        return srcs;
-        
-    }
+public class ReadOnlyFusedView extends FusedView {
     
     public ReadOnlyFusedView(AbstractBTree src1, AbstractBTree src2) {
         
-        this(new AbstractBTree[] { src1, src2 });
+        super(src1,src2);
         
     }
     
@@ -81,200 +54,58 @@ public class ReadOnlyFusedView implements IIndex, IFusedView {
      * @exception IllegalArgumentException
      *                if a source is used more than once.
      * @exception IllegalArgumentException
-     *                unless all sources have the same
-     *                {@link IIndex#getIndexUUID()}
+     *                unless all sources have the same index UUID.
+     * @exception IllegalArgumentException
+     *                unless all sources support delete markers.
      */
     public ReadOnlyFusedView(final AbstractBTree[] srcs) {
-        
-        if (srcs == null)
-            throw new IllegalArgumentException("sources is null");
 
-        if (srcs.length < 2) {
-            throw new IllegalArgumentException(
-                    "at least two sources are required");
-        }
-
-        if(srcs.length>2) {
-            // @todo generalize to N>2 sources.
-            throw new UnsupportedOperationException(
-                    "Only two sources are supported.");
-        }
-        
-        boolean isolatable = false; // arbitrary initial value.
-        
-        for( int i=0; i<srcs.length; i++) {
-            
-            if (srcs[i] == null)
-                throw new IllegalArgumentException("a source is null");
-
-            if(i==0) {
-                
-                isolatable = srcs[0].isIsolatable();
-                
-            }
-            
-            for(int j=0; j<i; j++) {
-                
-                if (srcs[i] == srcs[j])
-                    
-                    throw new IllegalArgumentException(
-                            "Source used more than once"
-                            );
-                
-
-                if (! srcs[i].getIndexUUID().equals(srcs[j].getIndexUUID())) {
-                    
-                    throw new IllegalArgumentException(
-                            "Sources have different index UUIDs"
-                            );
-                    
-                }
-             
-                if( isolatable && ! srcs[i].isIsolatable() ) {
-                    
-                    throw new IllegalArgumentException(
-                            "Sources are not all same: isIsolatable()"
-                            );
-                    
-                }
-                
-            }
-            
-        }
-
-        this.srcs = srcs.clone();
-        
-        this.isolatable = isolatable;
-        
-    }
-    
-    public UUID getIndexUUID() {
-       
-        return srcs[0].getIndexUUID();
-        
-    }
-
-    public String getStatistics() {
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.append(getClass().getSimpleName());
-        
-        for(AbstractBTree ndx : srcs ) {
-        
-            sb.append("\n"+ndx.getStatistics());
-            
-        }
-        
-        return sb.toString();
-        
-    }
-
-    public Object insert(byte[] key, Object value) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    public Object remove(byte[] key) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    /**
-     * Return the first value for the key in an ordered search of the trees in
-     * the view.
-     */
-    public Object lookup(byte[] key) {
-        
-        for( int i=0; i<srcs.length; i++) {
-            
-            Object ret = srcs[i].lookup(key);
-            
-            if (ret != null)
-                return ret;
-            
-        }
-
-        return null;
+        super(srcs);
         
     }
 
     /**
-     * Returns true if any tree in the view has an entry for the key.
-     */
-    public boolean contains(byte[] key) {
-        
-        for( int i=0; i<srcs.length; i++) {
-            
-            if (srcs[i].contains(key))
-                return true;
-            
-        }
-
-        return false;
-        
-    }
-    
-    /**
-     * Returns the sum of the range count on each index in the view. This is the
-     * maximum #of entries that could lie within that key range. However, the
-     * actual number could be less if there are entries for the same key in more
-     * than one source index.
+     * Disabled.
      * 
-     * @todo this could be done using concurrent threads.
-     * @todo watch for overflow of {@link Long#MAX_VALUE}
+     * @throws UnsupportedOperationException
+     *             always
      */
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
-        
-        long count = 0;
-        
-        for (int i = 0; i < srcs.length; i++) {
-            
-            count += srcs[i].rangeCount(fromKey, toKey);
-            
-        }
-        
-        return count;
-        
+    final public byte[] insert(byte[] key, byte[] value) {
+
+        throw new UnsupportedOperationException();
+
+    }
+    
+    /**
+     * Disabled.
+     * 
+     * @throws UnsupportedOperationException always
+     */
+    final public byte[] remove(byte[] key) {
+
+        throw new UnsupportedOperationException();
+
     }
 
     /**
-     * Returns an iterator that visits the distinct entries. When an entry
-     * appears in more than one index, the entry is choosen based on the order
-     * in which the indices were declared to the constructor.
+     * Iterator is read-only.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-
-        return rangeIterator(fromKey, toKey, 0/* capacity */,
-                KEYS | VALS/* flags */, null/*filter*/);
-        
-    }
-
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter) {
 
-        return new FusedEntryIterator(srcs, fromKey, toKey, capacity, flags, filter);
+        if ((flags & REMOVEALL) != 0) {
+
+            /*
+             * Note: Must be explicitly disabled!
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        return new ReadOnlyEntryIterator(super.rangeIterator(fromKey, toKey,
+                capacity, flags, filter));
 
     }
-    
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
-        
-        aggregator.aggregate(result, new Split(null,0,n));
-        
-    }
-
-    /**
-     * <code>true</code> iff all sources support isolation.
-     */
-    public boolean isIsolatable() {
-        
-        return isolatable;
-        
-    }
-    
 }

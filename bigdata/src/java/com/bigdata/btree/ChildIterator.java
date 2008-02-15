@@ -150,7 +150,7 @@ class ChildIterator implements INodeIterator {
 
     }
 
-    public IAbstractNode next() {
+    public AbstractNode next() {
 
         if (!hasNext()) {
 
@@ -164,7 +164,7 @@ class ChildIterator implements INodeIterator {
         
     }
 
-    public IAbstractNode getNode() {
+    public AbstractNode getNode() {
     
         if( lastVisited == -1 ) {
             

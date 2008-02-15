@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Arrays;
+
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.io.IByteArrayBuffer;
+import com.bigdata.rawstore.IBlockStore.IBlock;
 
 /**
  * A key-value pair used to facilitate some iterator constructs.
@@ -39,38 +42,36 @@ import com.bigdata.io.IByteArrayBuffer;
  */
 public class Tuple implements ITuple {
 
-    /**
-     * True iff the keys for the visited entries are required by the application
-     * consuming the iterator.
-     */
-    final /*public*/ boolean needKeys;
+    final private int flags;
     
-    /**
-     * True iff the values for the visited entries are required by the application
-     * consuming the iterator.
-     */
-    final /*public*/ boolean needVals;
+    final private boolean needKeys;
     
-    /**
-     * True iff the keys for the visited entries were requested when the
-     * {@link Tuple} was initialized.
-     */
+    final private boolean needVals;
+    
+    public int getSourceIndex() {
+        
+        return 0;
+        
+    }
+    
+    public int flags() {
+        
+        return flags;
+        
+    }
+    
     public boolean getKeysRequested() {
         
         return needKeys;
         
     }
     
-    /**
-     * True iff the values for the visited entries were requested when the
-     * {@link Tuple} was initialized.
-     */
     public boolean getValuesRequested() {
         
         return needVals;
         
     }
-    
+
     /**
      * Reused for each key that is materialized and <code>null</code> if keys
      * are not being requested. Among other things, the {@link #kbuf} access may
@@ -84,37 +85,111 @@ public class Tuple implements ITuple {
      * is used to efficiently copy keys that have been broken into a shared
      * prefix and a per-key remainder.
      */
-    final /*public*/ ByteArrayBuffer kbuf;
+    final private DataOutputBuffer kbuf;
     
-    final public IByteArrayBuffer getKeyBuffer() {
+    final public ByteArrayBuffer getKeyBuffer() {
         
-        if(!needKeys) throw new UnsupportedOperationException();
+        if (!needKeys)
+            throw new UnsupportedOperationException();
         
         return kbuf;
         
     }
-    
-//    /**
-//     * Reused for each value that is materialized and <code>null</code> if
-//     * values are not being requested.
-//     * 
-//     * @todo this can only be used when the values are byte[]s. when they are
-//     *       Java objects (other than a byte[]) we need to just store the
-//     *       reference to the deserialized object.
-//     */
-//    final /*public*/ DataOutputBuffer vbuf;
 
     /**
-     * Package private counter is updated by the iterator to reflect the #of
-     * entries that have been visited. This will be ZERO (0) until the first
-     * entry has been visited, at which point it is incremented to ONE (1), etc.
-     * <p>
-     * Note: This is package private since {@link IEntryIterator}s that produce
-     * a fused view from multiple source {@link IEntryIterator}s are not able
-     * to directly report the total #of visited enties using a field -- a method
-     * call is required.
+     * Return a stream from which the key may be read.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the keys were not requested.
      */
-    /*public*/ int nvisited = 0;
+    final public DataInputBuffer getKeyStream() {
+
+        if(!needKeys)
+            throw new UnsupportedOperationException();
+       
+        if(keyStream==null) {
+            
+            // setup the input stream.
+            
+            keyStream = new DataInputBuffer(kbuf.array(), 0/* offset */, kbuf
+                    .limit()/*len*/);
+            
+        } else {
+
+            // reset the buffer.
+            
+            keyStream.setBuffer(kbuf.array(), 0, kbuf.limit());
+            
+        }
+        
+        return keyStream;
+        
+    }
+    private DataInputBuffer keyStream = null;
+    
+    /**
+     * Return a stream from which the value may be read.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the values were not requested.
+     */
+    final public DataInputBuffer getValueStream() {
+
+        if(!needVals)
+            throw new UnsupportedOperationException();
+       
+        if(isNull) 
+            throw new UnsupportedOperationException();
+
+        if(versionDeleted) 
+            throw new UnsupportedOperationException();
+        
+        if (valStream == null) {
+            
+            // setup the input stream.
+            
+            valStream = new DataInputBuffer(vbuf.array(),0/*offset*/,vbuf.limit()/*len*/);
+            
+        } else {
+
+            // reset the buffer.
+            
+            valStream.setBuffer(vbuf.array(),0,vbuf.limit());
+            
+        }
+        
+        return valStream;
+        
+    }
+    private DataInputBuffer valStream = null;
+    
+    /**
+     * Reused for each value that is materialized and <code>null</code> if
+     * values are not being requested.
+     */
+    final private DataOutputBuffer vbuf;
+
+    /**
+     * <code>true</code> iff the iterator is visiting an index entry with a
+     * <code>null</code> value.
+     */
+    private boolean isNull;
+    
+    private long versionTimestamp = 0L;
+
+    /**
+     * Note: The default of <code>false</code> has the correct semantics if
+     * the btree does not support isolation since entries are can not be marked
+     * as deleted unless the index supports isolation.
+     */
+    private boolean versionDeleted = false;
+    
+    /**
+     * The #of entries that have been visited. This will be ZERO (0) until the
+     * first entry has been visited, at which point it is incremented to ONE
+     * (1), etc.
+     */
+    private int nvisited = 0;
     
     /**
      * The #of entries that have been visited so far and ZERO (0) until the
@@ -126,13 +201,16 @@ public class Tuple implements ITuple {
         
     }
     
-    public Tuple() {
+    /** Disallowed. */
+    private Tuple() {
         
-        this(IRangeQuery.KEYS|IRangeQuery.VALS);
+        throw new UnsupportedOperationException();
         
     }
 
     public Tuple(int flags) {
+        
+        this.flags = flags;
         
         needKeys = (flags & IRangeQuery.KEYS) != 0;
         
@@ -157,35 +235,152 @@ public class Tuple implements ITuple {
             
         }
         
-//        vbuf = null;
+        if(needVals) {
+
+            vbuf = new DataOutputBuffer(128);
+            
+        } else {
+            
+            vbuf = null;
+            
+        }
+        
+    }
+
+    public byte[] getKey() {
+
+        if (!needKeys)
+            throw new UnsupportedOperationException();
+
+        return kbuf.toByteArray();
+
+    }
+
+    public boolean isNull() {
+    
+        return isNull;
+        
+    }
+    
+    public byte[] getValue() {
+
+        if (!needVals)
+            throw new UnsupportedOperationException();
+
+        if (versionDeleted || isNull)
+            return null;
+
+        return vbuf.toByteArray();
+
+    }
+
+    public ByteArrayBuffer getValueBuffer() {
+
+        if(versionDeleted)
+            throw new UnsupportedOperationException();
+
+        if (isNull)
+            throw new UnsupportedOperationException();
+        
+        return vbuf;
         
     }
 
     /**
-     * Returns a copy of the current key.
-     * <p>
-     * Note: This causes a heap allocation. See {@link #kbuf} to avoid that
-     * allocation.
-     * 
-     * @throws UnsupportedOperationException
-     *             if keys are not being materialized.
+     * @todo Implement. In order to work the tuple needs to know the source
+     *       store from which the index entry was read. In the context of a
+     *       fused view this is the element of that view that supplied the tuple
+     *       binding (blocks may be stored on journals or index segments). In
+     *       the context of a scale-out index, the state must include enough
+     *       information to locate the data service for the index view and then
+     *       the source index within that view.
+     *       <p>
+     *       Consider the notion of leases for the read back from a data
+     *       service. If you do not read on the block soon enough the lease is
+     *       gone and you will get an error if you try to read on the block. The
+     *       lease can be used to limit the time that an index partition is
+     *       locked to a data service.
      */
-    public byte[] getKey() {
-        
-        if(!needKeys) throw new UnsupportedOperationException();
+    public IBlock readBlock(long addr) {
 
-        return kbuf.toByteArray();
+        throw new UnsupportedOperationException();
         
     }
     
-//    public Object getValue() {
-//        
-//        if(!needVals) throw new UnsupportedOperationException();
-//
-//        return vbuf.toByteArray();
-//        
-//    }
-    
-    public Object val;
+    public long getVersionTimestamp() {
+
+        return versionTimestamp;
+        
+    }
+
+    public boolean isDeletedVersion() {
+
+        return versionDeleted;
+        
+    }
+
+    /**
+     * Copy data and metadata for the index entry from the {@link Leaf} into the
+     * {@link Tuple} and increment the counter of the #of visited entries.
+     * 
+     * @param index
+     *            The index entry.
+     * @param leaf
+     *            The leaf.
+     */
+    public void copy(int index, ILeafData leaf) {
+        
+        nvisited++;
+        
+        /*
+         * true iff delete markers are enabled and this entry is marked deleted.
+         */
+        versionDeleted = leaf.hasDeleteMarkers() && leaf.getDeleteMarker(index);
+        
+        /*
+         * the version timestamp iff timestamps are enabled and otherwise 0L.
+         */
+        versionTimestamp = leaf.hasVersionTimestamps() ? leaf
+                .getVersionTimestamp(index) : 0L;
+
+        if (needKeys) {
+
+            kbuf.reset();
+
+            leaf.copyKey(index, kbuf);
+
+        }
+
+        if (needVals) {
+
+            vbuf.reset();
+
+            if (!versionDeleted) {
+             
+                isNull = leaf.isNull(index);
+                
+                if(!isNull) {
+
+                    leaf.copyValue(index, vbuf);
+                    
+                }
+                
+            }
+
+        }
+        
+    }
+
+    public String toString() {
+        
+        return super.toString()+
+        "{nvisited="+nvisited+
+        (versionDeleted ? ", deleted" : "")+
+        (versionTimestamp == 0L ? "" : ", timestamp="+ getVersionTimestamp())+
+        ", key="+(getKeysRequested()?Arrays.toString(getKey()):"N/A")+
+        ", val="+(getValuesRequested()?(isNull()?"null":Arrays.toString(getValue())):"N/A")+
+        "}";
+        
+    }
     
 }

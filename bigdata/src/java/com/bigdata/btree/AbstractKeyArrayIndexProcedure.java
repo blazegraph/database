@@ -45,8 +45,6 @@ import org.CognitiveWeb.extser.LongPacker;
 import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.Value;
-import com.bigdata.journal.CommitRecordIndex.ValueSerializer;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -60,10 +58,9 @@ import com.bigdata.sparse.SparseRowStore;
  * validate when applied to a partitioned index. I think that the right way to
  * do this is to have the key and value serializer specified for the btree used
  * by the {@link ResultSet}. I believe that this is going to require moving the
- * {@link Value} into the node/leaf data structures, which is equally difficult
- * but which appears to be necessary in order to be able to apply custom
- * serialization and compression to values stored in nodes and leafs for an
- * index
+ * timestamp and delete markers into the node/leaf data structures -- this
+ * appears to be necessary in order to be able to apply custom serialization and
+ * compression to values stored in nodes and leafs for an index
  * 
  * FIXME custom key compression can already be done - all we have to do is to
  * align the {@link IKeyBuffer}'s serializer with {@link IDataSerializer} and I

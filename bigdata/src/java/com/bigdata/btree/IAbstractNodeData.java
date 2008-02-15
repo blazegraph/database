@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.OutputStream;
+
 /**
  * Interface for low-level data access.
  * 
@@ -66,7 +68,20 @@ public interface IAbstractNodeData {
     
     /**
      * The object used to contain and manage the keys.
+     * 
+     * @deprecated in favor of {@link #copyKey(int, OutputStream)}
      */
     public IKeyBuffer getKeys();
     
+    /**
+     * Copy the indicated key onto the callers stream.
+     * 
+     * @param index
+     *            The index of the key in the node or leaf.
+     * 
+     * @param os
+     *            The stream onto which to copy the key.
+     */
+    public void copyKey(int index,OutputStream os);
+
 }

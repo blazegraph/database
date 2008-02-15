@@ -27,23 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-
 import net.jini.core.lookup.ServiceID;
-
-import com.bigdata.btree.RangeCountProcedure;
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.mdi.IPartitionMetadata;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}
- * 
- * @todo add tests of all methods on the {@link IMetadataService} api, e.g.,
- *       {@link IMetadataService#getPartition(String, byte[]) and friends.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -255,128 +242,6 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
                         .dataServiceMap.getServiceItemByID(dataService1ID));
 
             }
-
-        }
-
-    }
-
-    /**
-     * Registers a scale-out index and pre-partitions it to have data on each
-     * of two {@link DataService} instances.
-     */
-    public void test_registerScaleOutIndex() throws Exception {
-
-        // wait for the service to be ready.
-        getServiceID(dataServer1);
-
-        // wait for the service to be ready.
-        ServiceID metadataServiceID = getServiceID(metadataServer0);
-
-        // get proxy for this metadata service.
-        final IMetadataService metadataServiceProxy = (IMetadataService) lookupDataService(metadataServiceID);
-
-        assertNotNull("service not discovered", metadataServiceProxy);
-
-        /*
-         * wait until we get the serviceID as an indication that the data
-         * service is running.
-         */
-
-        startDataServer0();
-
-        // wait for the service to be ready.
-        ServiceID dataService0ID = getServiceID(dataServer0);
-
-        try {
-
-            // lookup proxy for dataService0
-            final IDataService dataService0Proxy = lookupDataService(dataService0ID); 
-
-            // should be null since the index was not registered.
-            assertNull("indexUUID", dataService0Proxy.getIndexUUID("xyz"));
-            
-            /*
-             * This should fail since the index was never registered.
-             */
-            dataService0Proxy
-                    .submit(
-                            ITx.UNISOLATED,
-                            DataService
-                                    .getIndexPartitionName("xyz", 0/* partitionId */),
-                            new RangeCountProcedure(null/* fromKey */, null/* toKey */));
-
-        } catch (ExecutionException ex) {
-            
-            assertNotNull("cause",ex.getCause());
-            
-            ex.getCause().printStackTrace();
-            
-            assertTrue(ex.getCause() instanceof NoSuchIndexException);
-            
-            log.info("Ignoring expected exception: " + ex);
-            
-        }
-
-        //
-        assertNotNull(metadataServiceProxy.getUnderUtilizedDataService());
-
-        /*
-         * register a scale-out index.
-         */
-        final String indexName = "testIndex";
-        
-        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
-
-        UUID indexUUID = metadataServiceProxy.registerManagedIndex(indexName,
-                ctor, null);
-        
-        log.info("Registered scale-out index: indexUUID="+indexUUID);
-        
-        /*
-         * Request the index partition metadata for the initial partition of the
-         * scale-out index.
-         */
-
-        IPartitionMetadata pmd;
-        
-        {
-
-            byte[][] data = metadataServiceProxy.getPartition(indexName,
-                    new byte[] {});
-
-            assertNotNull(data);
-
-            // left separator key.
-            assertEquals(new byte[]{},data[0]);
-            
-            // partition metadata.
-            pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
-            
-            // right separator key.
-            assertEquals(null,data[2]);
-            
-        }
-
-        /*
-         * Resolve the data service to which the initial index partition was
-         * mapped and verify that we can invoke an operation on that index on
-         * that data service (i.e., that the data service recognizes that it
-         * has an index registered by that name).
-         */
-        {
-
-            ServiceID serviceID = JiniUtil.uuid2ServiceID(pmd.getDataServices()[0]);
-
-            // lookup the data service (does not use a cache).
-            IDataService proxy = lookupDataService(serviceID);
-
-            /*
-             * Note: this will be null iff the index is not registered with this
-             * data service.
-             */
-            
-            assertNotNull("indexUUID", proxy.getIndexUUID(DataService
-                    .getIndexPartitionName(indexName, pmd.getPartitionId())));
 
         }
 

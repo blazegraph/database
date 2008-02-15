@@ -34,7 +34,7 @@ package com.bigdata.btree;
  * entire index. A partitioned index exposes a counter per index partition and
  * the partition identified forms the high int32 for the counter.
  * 
- * @see IIndexWithCounter
+ * @see IIndex#getCounter()
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -47,10 +47,9 @@ public interface ICounter {
     public long get();
     
     /**
-     * Return and increment the current value of the counter.
-     * 
-     * @todo change semantics to incrementAndGet()?
+     * Increment the current value of the counter and then return its value
+     * (atomic).
      */
-    public long inc();
+    public long incrementAndGet();
     
 }

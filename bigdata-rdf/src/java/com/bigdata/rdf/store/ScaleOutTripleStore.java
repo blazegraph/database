@@ -31,9 +31,9 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
@@ -142,11 +142,36 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         final IBigdataClient client = fed.getClient();
         
         /*
-         * @todo consider if any of the indices could do without isolation
-         * (probably not since we need it for compacting merges).
+         * Note: Do not use isolation (only deletion markers are required).
          */
-        final UnisolatedBTreePartitionConstructor ctor = new UnisolatedBTreePartitionConstructor();
         
+        final IndexMetadata idTermMetadata;
+        {
+            IndexMetadata md = new IndexMetadata(name_idTerm, UUID.randomUUID());
+            
+            md.setDeleteMarkers(true);
+            
+            idTermMetadata = md;
+        }
+        
+        final IndexMetadata termIdMetadata;
+        {
+            IndexMetadata md = new IndexMetadata(name_termId, UUID.randomUUID());
+            
+            md.setDeleteMarkers(true);
+            
+            termIdMetadata = md;
+        }
+
+        final IndexMetadata justMetadata;
+        {
+            IndexMetadata md = new IndexMetadata(name_just, UUID.randomUUID());
+            
+            md.setDeleteMarkers(true);
+            
+            justMetadata = md;
+        }
+
         // all known data service UUIDs.
         final UUID[] uuids = client.getDataServiceUUIDs(0);
     
@@ -176,22 +201,11 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
             log.warn("Special case allocation for two data services");
             
-            fed.registerIndex(name_termId, ctor, new byte[][] { new byte[] {} },
-                    new UUID[] { uuids[0] });
+            fed.registerIndex(termIdMetadata,
+                    new byte[][] { new byte[] {} }, new UUID[] { uuids[0] });
             
-            fed.registerIndex(name_idTerm, ctor, new byte[][] { new byte[] {} },
-                    new UUID[] { uuids[1] });
-            
-            if(justify) {
-                /*
-                 * @todo review this decision when tuning the scale-out store
-                 * for inference.  also, consider the use of bloom filters for
-                 * inference since there appears to be a large number of queries
-                 * resulting in small result sets (0 to 5 statements).
-                 */
-                fed.registerIndex(name_just, ctor, new byte[][] { new byte[] {} },
-                        new UUID[] { uuids[1] });
-            }
+            fed.registerIndex(idTermMetadata,
+                    new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
             
             /*
              * @todo could pre-partition based on the expected #of statements
@@ -217,52 +231,75 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * separator keys would have to be changed.
              */
             
-            fed.registerIndex(name_spo, ctor, new byte[][] { new byte[] {} },
-                    new UUID[] { uuids[0] });
-            
-            fed.registerIndex(name_pos, ctor, new byte[][] { new byte[] {} },
-                    new UUID[] { uuids[1] });
-            
-            fed.registerIndex(name_osp, ctor, new byte[][] { new byte[] {} },
-                    new UUID[] { uuids[1] });
-            
-            return;
-            
-        }
-        
-        /*
-         * Allocation of index partitions to data services is governed by the
-         * metadata service.
-         */
-        
-        if(lexicon) {
+            fed.registerIndex(newStatementIndexMetadata(name_spo),
+                    new byte[][] { new byte[] {} }, new UUID[] { uuids[0] });
 
-            fed.registerIndex(name_termId, ctor);
-        
-            fed.registerIndex(name_idTerm, ctor);
+            fed.registerIndex(newStatementIndexMetadata(name_pos),
+                    new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
 
-        }
-
-        if (oneAccessPath) {
-
-            fed.registerIndex(name_spo, ctor);
+            fed.registerIndex(newStatementIndexMetadata(name_osp),
+                    new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
             
+            if(justify) {
+                /*
+                 * @todo review this decision when tuning the scale-out store
+                 * for inference.  also, consider the use of bloom filters for
+                 * inference since there appears to be a large number of queries
+                 * resulting in small result sets (0 to 5 statements).
+                 */
+                fed.registerIndex(justMetadata, new byte[][] { new byte[] {} },
+                        new UUID[] { uuids[1] });
+            }
+
         } else {
-            
-            fed.registerIndex(name_spo, ctor);
-            
-            fed.registerIndex(name_pos, ctor);
-            
-            fed.registerIndex(name_osp, ctor);
-            
+
+            /*
+             * Allocation of index partitions to data services is governed by
+             * the metadata service.
+             */
+
+            if (lexicon) {
+
+                fed.registerIndex(termIdMetadata);
+
+                fed.registerIndex(idTermMetadata);
+
+            }
+
+            fed.registerIndex(newStatementIndexMetadata(name_spo));
+
+            if(!oneAccessPath) {
+
+                fed.registerIndex(newStatementIndexMetadata(name_pos));
+
+                fed.registerIndex(newStatementIndexMetadata(name_osp));
+
+            }
+
+            if (justify) {
+
+                fed.registerIndex(justMetadata );
+
+            }
+
         }
 
-        if(justify) {
+    }
+    
+    private IndexMetadata newStatementIndexMetadata(String name) {
+        
+        IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+        
+        md.setDeleteMarkers(true);
 
-            fed.registerIndex(name_just, ctor);
-            
-        }
-
+        // @todo enable key and value compression (API alignment required).
+        
+//        md.setKeySerializer(new FastRDFKeyCompression(N));
+//
+//        md.setValueSerializer(new FastRDFValueCompression());
+        
+        return md;
+        
     }
     
     /**

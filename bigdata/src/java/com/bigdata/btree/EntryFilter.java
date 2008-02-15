@@ -28,14 +28,8 @@ package com.bigdata.btree;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import cutthecrap.utils.striterators.Striterator;
-
 /**
- * Abstract base class used to filter objects in an {@link EntryIterator}.
- * 
- * @todo The isValid() and resolve() methods should be abstract on this class
- *       and the {@link IEntryIterator} itself should allow adding either
- *       filters or resolvers ala the {@link Striterator} framework.
+ * Abstract base class used to filter objects in an {@link IEntryIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -91,7 +85,7 @@ public abstract class EntryFilter implements IEntryFilter {
         
     }
     
-    public boolean isValid(Object value) {
+    public boolean isValid(ITuple tuple) {
         
         if (filters == null)
             return true;
@@ -102,7 +96,7 @@ public abstract class EntryFilter implements IEntryFilter {
 
             IEntryFilter filter = itr.next();
             
-            if(!filter.isValid(value)) {
+            if(!filter.isValid(tuple)) {
                 
                 return false;
                 
@@ -114,10 +108,13 @@ public abstract class EntryFilter implements IEntryFilter {
         
     }
 
-    public Object resolve(Object value) {
+    public void rewrite(ITuple tuple) {
 
-        if (filters == null)
-            return value;
+        if (filters == null) {
+         
+            return;
+            
+        }
 
         Iterator<IEntryFilter> itr = filters.iterator();
         
@@ -125,11 +122,9 @@ public abstract class EntryFilter implements IEntryFilter {
 
             IEntryFilter filter = itr.next();
             
-            value = filter.resolve(value);
+            filter.rewrite(tuple);
             
         }
-
-        return value;
         
     }
     

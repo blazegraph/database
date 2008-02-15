@@ -40,9 +40,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.IByteArrayBuffer;
-import com.bigdata.journal.Journal;
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
 
@@ -75,13 +75,24 @@ import cutthecrap.utils.striterators.Striterator;
  * shortest separator key in order to further shorten the keys in the nodes of
  * the tree.
  * </p>
+ * <p>
+ * The B+Tree can optionally maintain version metadata (a version timestamp and
+ * deletion marker). Version metadata MUST be enabled (a) if the index will be
+ * used with transactional isolation; or (b) if the index is part of a scale-out
+ * index. In both cases the version timestamps and deletion markers play a
+ * critical role when reading from a fused view of an ordered set of indices
+ * describing an index or an index partition. Note that the existence of
+ * deletion markers means that {@link #rangeCount(byte[], byte[])} and
+ * {@link #getEntryCount()} are upper bounds as deleted entries will be reported
+ * until they are purged from the index by a compacting merge of the view.
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @see KeyBuilder
  */
-abstract public class AbstractBTree implements IIndex, ILinearList {
+abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     /**
      * Log for btree opeations.
@@ -114,6 +125,72 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     final protected boolean debug = DEBUG;
 
+//    /**
+//     * Flags that may be specified when create an index.
+//     * 
+//     * @todo refactor into use.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static interface IIndexFlags {
+//
+//        /**
+//         * When specified the {@link IIndex} will support deletion markers.
+//         * <p>
+//         * Note: this option MUST be enabled for scale-out (aka partitioned)
+//         * indices. The presence of delete markers is required when reading from
+//         * a fused view for an index partition. Without the delete markers
+//         * entries that had been deleted would magically "re-appear" if they
+//         * were on an {@link IndexSegment} for the view since the read would
+//         * "miss" on the mutable {@link BTree} but "hit" on the
+//         * {@link IndexSegment}.
+//         * <p>
+//         * When <code>true</code> deleting an index index entry causes the
+//         * value under the key to be removed and the "delete" flag set for the
+//         * index entry. Unless an immortal store is desired, deleted index
+//         * entries are periodically flushed by compacting merges.
+//         * <p>
+//         * When <code>false</code> deleting an index entry causes the entry to
+//         * be removed from the {@link BTree}. This option makes sense when you
+//         * do not need partitioned indices.
+//         */
+//        public final int DELETE_MARKERS = 1<<0;
+//        
+//        /**
+//         * When specified the {@link IIndex} will permit timestamps to be
+//         * associated with index entries. Timestamps are required to support
+//         * transactional isolation. See {@link IsolatedFusedView} for a
+//         * description of how timestamps are used to detect write-write
+//         * conflicts.
+//         */
+//        public final int VERSION_TIMESTAMPS = 1<<1;
+//        
+////        /**
+////         * 
+////         */
+////        public final int ISOLATABLE = (DELETE_MARKERS|VERSION_TIMESTAMPS);
+//
+//        /**
+//         * When specified the {@link IIndex} will use write checksums on records
+//         * written on the backing {@link IRawStore} and will validate those
+//         * checksums when the records are deserialized.
+//         * 
+//         * @todo consider separate bit flags for the mutable btrees vs the index
+//         *       segments.
+//         * 
+//         * @todo expose the choice of checksum behavior to the application as a
+//         *       configuration option. checksums are relatively expensive to
+//         *       compute and make the most sense for long-term read-only data
+//         *       (the index segments) and the least sense for fully buffered
+//         *       journals (since the data are fully buffered, reads occur
+//         *       against memory and disk checksum errors would not be detected
+//         *       in any case).
+//         */
+//        public final int USE_CHECKSUMS = 1<<2;
+//        
+//    };
+    
     /**
      * Counters tracking various aspects of the btree.
      */
@@ -124,15 +201,15 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     final protected IRawStore store;
 
-    /**
-     * The unique identifier for the index whose data is stored in this B+Tree
-     * data structure. When using a scale-out index the same <i>indexUUID</i>
-     * MUST be assigned to each mutable and immutable B+Tree having data for any
-     * partition of that scale-out index. This makes it possible to work
-     * backwards from the B+Tree data structures and identify the index to which
-     * they belong.
-     */
-    final protected UUID indexUUID;
+//    /**
+//     * The unique identifier for the index whose data is stored in this B+Tree
+//     * data structure. When using a scale-out index the same <i>indexUUID</i>
+//     * MUST be assigned to each mutable and immutable B+Tree having data for any
+//     * partition of that scale-out index. This makes it possible to work
+//     * backwards from the B+Tree data structures and identify the index to which
+//     * they belong.
+//     */
+//    final private UUID indexUUID;
 
     /**
      * The branching factor for the btree.
@@ -220,7 +297,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * split may occur without forcing eviction of either node participating in
      * the split.
      * <p>
-     * Note: The code in {@link Node#postOrderIterator(boolean)} and
+     * Note: The code in {@link Node#postOrderNodeIterator(boolean)} and
      * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
      * those iterators are used when persisting a node using a post-order
      * traversal. If a hard reference queue eviction drives the serialization of
@@ -313,7 +390,8 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     public String getStatistics() {
         
         StringBuilder sb = new StringBuilder();
-        
+
+        // Note: This is basically the checkpoint record plus queue stats.
         sb.append(   "#entries=" + getEntryCount());
         sb.append( ", branchingFactor="+getBranchingFactor());
         sb.append( ", height=" + getHeight());
@@ -322,7 +400,6 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         sb.append( ", #(nodes+leaves)=" + (getNodeCount() + getLeafCount()));
         sb.append( ", #distinctOnQueue=" + getWriteRetentionQueueDistinctCount());
         sb.append( ", queueCapacity=" + getWriteRetentionQueueCapacity() );
-        sb.append( ", isolatable="+isIsolatable());
         sb.append( ", class="+getClass().getName());
 
         sb.append(counters.toString());
@@ -347,116 +424,111 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     /**
      * @param store
      *            The persistence store.
-     * @param branchingFactor
-     *            The branching factor is the #of children in a node or values
-     *            in a leaf and must be an integer greater than or equal to
-     *            three (3). Larger branching factors result in trees with fewer
-     *            levels. However there is a point of diminishing returns at
-     *            which the amount of copying performed to move the data around
-     *            in the nodes and leaves exceeds the performance gain from
-     *            having fewer levels.
-     * @param initialBufferCapacity
-     *            When non-zero, this is the initial buffer capacity used by the
-     *            {@link NodeSerializer}. When zero the initial buffer capacity
-     *            will be estimated based on the branching factor, the key
-     *            serializer, and the value serializer. The initial estimate is
-     *            not critical and the buffer will be resized by the
-     *            {@link NodeSerializer} if necessary.
-     * @param headReferenceQueue
-     *            The hard reference queue.
+     * @param nodeFactory
+     *            Object that provides a factory for node and leaf objects.
      * @param addrSer
      *            Object that knows how to (de-)serialize the child addresses in
      *            an {@link INodeData}.
-     * @param keySer
-     *            Object that knows how to (de-)serialize the keys in a node or
-     *            leaf.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the values in an
-     *            {@link ILeafData}.
-     * @param nodeFactory
-     *            Object that provides a factory for node and leaf objects.
-     * @param recordCompressor
-     *            Object that knows how to (de-)compress serialized nodes and
-     *            leaves (optional).
-     * @param useChecksum
-     *            When true, computes and verifies checksum of serialized nodes
-     *            and leaves. This option is not recommended for use with a
-     *            fully buffered store, such as a {@link Journal}, since all
-     *            reads are against memory which is presumably already parity
-     *            checked.
-     * @param indexUUID
-     *            The unique identifier for the index whose data is stored in
-     *            this B+Tree data structure. When using a scale-out index the
-     *            same <i>indexUUID</i> MUST be assigned to each mutable and
-     *            immutable B+Tree having data for any partition of that
-     *            scale-out index. This makes it possible to work backwards from
-     *            the B+Tree data structures and identify the index to which
-     *            they belong.
      */
-    protected AbstractBTree(IRawStore store, int branchingFactor,
-            int initialBufferCapacity,
-            HardReferenceQueue<PO> hardReferenceQueue,
-            IAddressSerializer addrSer,
-            IKeySerializer keySer,
-            IValueSerializer valueSer,
-            INodeFactory nodeFactory,
-            RecordCompressor recordCompressor,
-            boolean useChecksum,
-            UUID indexUUID
+    protected AbstractBTree(//
+            IRawStore store,//
+            INodeFactory nodeFactory,//
+            IAddressSerializer addrSer,//
+            IndexMetadata metadata//
             ) {
 
         assert store != null;
 
-        assert branchingFactor >= MIN_BRANCHING_FACTOR;
-
-        assert hardReferenceQueue != null;
-
         assert addrSer != null;
 
-        assert keySer != null;
+        assert metadata != null;
+
+
+        // save a reference to the immutable metadata record.
+        this.metadata = metadata;
         
-        assert valueSer != null;
+        this.branchingFactor = metadata.getBranchingFactor();
+
+        assert branchingFactor >= MIN_BRANCHING_FACTOR;
+        
+//        assert hardReferenceQueue != null;
+
+//        assert keySer != null;
+//        
+//        assert valueSer != null;
 
         assert nodeFactory != null;
 
-        if (indexUUID == null)
-            throw new IllegalArgumentException("indexUUID");
+//        if (indexUUID == null)
+//            throw new IllegalArgumentException("indexUUID");
 
         this.store = store;
 
-        this.branchingFactor = branchingFactor;
+//        this.branchingFactor = branchingFactor;
 
-        this.writeRetentionQueue = hardReferenceQueue;
+        this.writeRetentionQueue = newWriteRetentionQueue();
+
+        this.readRetentionQueue = newReadRetentionQueue();
+
+        /*
+         * Note: there is less need to use checksum for stores that are fully
+         * buffered since the data are always read from memory which we presume
+         * is already parity checked. While a checksum on a fully buffered store
+         * could detect an overwrite, the journal architecture makes that
+         * extremely unlikely and one has never been observed.
+         */
+        final boolean useChecksum = metadata.getUseChecksum() && !store.isFullyBuffered();
+        
+        this.nodeSer = new NodeSerializer(//
+                nodeFactory,//
+                branchingFactor,//
+                0, //initialBufferCapacity
+                addrSer, //
+                metadata.getKeySerializer(), //
+                metadata.getValueSerializer(),//
+                metadata.getRecordCompressor(),//
+                useChecksum//metadata.getUseChecksum()//
+                );
+
+//        this.indexUUID = metadata.getIndexUUID();
+        
+//        this.isolatable = metadata.isIsolatable();
+
+    }
+
+    protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+
+        return new HardReferenceQueue<PO>(//
+                new DefaultEvictionListener(),//
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,//
+                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN//
+        );
+
+    }
+    
+    protected HardReferenceQueue<PO> newReadRetentionQueue() {
 
         if (BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY != 0) {
 
-            this.readRetentionQueue = new HardReferenceQueue<PO>(
+            return new HardReferenceQueue<PO>(
                     NOPEvictionListener.INSTANCE,
                     BTree.DEFAULT_READ_RETENTION_QUEUE_CAPACITY,
                     BTree.DEFAULT_READ_RETENTION_QUEUE_SCAN);
             
-        } else {
-            
-            this.readRetentionQueue = null;
-            
         }
         
-        this.nodeSer = new NodeSerializer(nodeFactory, branchingFactor,
-                initialBufferCapacity, addrSer, keySer, valueSer,
-                recordCompressor, useChecksum);
-
-        this.indexUUID = indexUUID;
-
+        return null;
+        
     }
-
+    
     /**
-     * The contract for close is to reduce the resource burden of the index (by
-     * discarding buffers) while not rendering the index inoperative. An index
-     * that has been {@link #close() closed} MAY be {@link #reopen() reopened}
-     * at any time (conditional on the continued availability of the backing
-     * store). The index reference remains valid after a {@link #close()}. A
-     * closed index is transparently restored by either {@link #getRoot()} or
-     * {@link #reopen()}.
+     * The contract for {@link #close()} is to reduce the resource burden of the
+     * index (by discarding buffers) while not rendering the index inoperative.
+     * An index that has been {@link #close() closed} MAY be
+     * {@link #reopen() reopened} at any time (conditional on the continued
+     * availability of the backing store). The index reference remains valid
+     * after a {@link #close()}. A closed index is transparently restored by
+     * either {@link #getRoot()} or {@link #reopen()}.
      * <p>
      * This implementation clears the hard reference queue (releasing all node
      * references), releases the hard reference to the root node, and releases
@@ -554,6 +626,72 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
+    final public IResourceMetadata[] getResourceMetadata() {
+        
+        return new IResourceMetadata[]{
+          
+                store.getResourceMetadata()
+                
+        };
+        
+    }
+    
+    /**
+     * Returns the metadata record for this btree.
+     * 
+     * @return The metadata record for this btree and never <code>null</code>.
+     */
+    public IndexMetadata getIndexMetadata() {
+
+        return metadata;
+        
+    }
+    
+    /**
+     * Verify that the key lies within the partition.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @exception RuntimeException
+     *                if the key does not lie within the partition.
+     * 
+     * @todo offer option to turn this on, perhaps use in asserts so that it is
+     *       conditionally enabled?
+     */
+    public void rangeCheck(byte[] key) {
+
+        if(key==null) throw new IllegalArgumentException();
+
+        final PartitionMetadataWithSeparatorKeys pmd = metadata.getPartitionMetadata();
+        
+        if(pmd==null) return; // nothing to check.
+        
+        final byte[] leftSeparatorKey = pmd.getLeftSeparatorKey();
+
+        final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
+
+        if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
+
+            throw new RuntimeException("KeyBeforePartition");
+
+        }
+
+        if (rightSeparatorKey != null
+                && BytesUtil.compareBytes(key, rightSeparatorKey) >= 0) {
+
+            throw new RuntimeException("KeyAfterPartition");
+
+        }
+            
+    }
+        
+    /**
+     * The metadata record for the index. This data does not change during the
+     * life of the {@link BTree} object.
+     */
+    protected final IndexMetadata metadata;
+    
     /**
      * The branching factor for the btree.
      */
@@ -609,10 +747,12 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      * partition of that scale-out index. This makes it possible to work
      * backwards from the B+Tree data structures and identify the index to which
      * they belong.
+     * 
+     * @deprecated by {@link #getIndexMetadata()}
      */
     final public UUID getIndexUUID() {
 
-        return indexUUID;
+        return metadata.getIndexUUID();
 
     }
 
@@ -658,135 +798,13 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
         while (itr.hasNext()) {
 
-            Object val = itr.next();
-
-            byte[] key = itr.getKey();
-
-            insert(key, val);
-
+            ITuple tuple = itr.next();
+            
+            insert(tuple.getKey(), tuple.getValue());
+            
         }
 
     }
-
-//    public void insert(BatchInsert op) {
-//
-//        final int ntuples = op.n;
-//
-//        while (op.tupleIndex < ntuples) {
-//
-//            /*
-//             * Each call MAY process more than one tuple.
-//             */
-//            int nused = getRoot().batchInsert(op);
-//
-//            assert nused > 0;
-//
-//            /*
-//             * Note: it is legal to reuse a key iff the data in the key is
-//             * unchanged. Unfortunately it is tricky to do a fast test for this
-//             * condition.
-//             */
-//            // {
-//            // /*
-//            // * detect if the caller reuses the same byte[] key from one
-//            // * insert to the next. This is an error since the key needs to
-//            // * be donated to the btree. This problem only exists for
-//            // * insert().
-//            // */
-//            //                    
-//            // byte[] key = keys[tupleIndex];
-//            //
-//            // if (key == lastKey) {
-//            //
-//            // throw new IllegalArgumentException(
-//            // "keys must not be reused.");
-//            //
-//            // } else {
-//            //
-//            // lastKey = key;
-//            //
-//            // }
-//            //
-//            // }
-//            counters.ninserts += nused;
-//
-//            op.tupleIndex += nused;
-//
-//        }
-//
-//    }
-//
-//    public void lookup(BatchLookup op) {
-//
-//        final int ntuples = op.n;
-//
-//        while (op.tupleIndex < ntuples) {
-//
-//            /*
-//             * Each call MAY process more than one tuple.
-//             */
-//            int nused = getRoot().batchLookup(op);
-//
-//            assert nused > 0;
-//
-//            counters.nfinds += nused;
-//
-//            op.tupleIndex += nused;
-//
-//        }
-//
-//    }
-//
-//    public void contains(BatchContains op) {
-//
-//        final int ntuples = op.n;
-//
-//        while (op.tupleIndex < ntuples) {
-//
-//            // skip tuples already marked as true.
-//            if (op.contains[op.tupleIndex]) {
-//
-//                op.tupleIndex++;
-//
-//                continue;
-//
-//            }
-//
-//            /*
-//             * Each call MAY process more than one tuple.
-//             */
-//            int nused = getRoot().batchContains(op);
-//
-//            assert nused > 0;
-//
-//            counters.nfinds += nused;
-//
-//            op.tupleIndex += nused;
-//
-//        }
-//
-//    }
-//
-//    public void remove(BatchRemove op) {
-//
-//        final int ntuples = op.n;
-//
-//        while (op.tupleIndex < ntuples) {
-//
-//            /*
-//             * Each call MAY process more than one tuple.
-//             */
-//            int nused = getRoot().batchRemove(op);
-//
-//            assert nused > 0;
-//
-//            counters.nremoves += nused;
-//
-//            op.tupleIndex += nused;
-//
-//        }
-//
-//    }
 
     /**
      * Returns the node or leaf to be used for search. This implementation is
@@ -862,65 +880,277 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    public Object insert(byte[] key, Object value) {
+    /**
+     * Private instance used for mutation operations (insert, remove) which are
+     * single threaded.
+     */
+    protected final Tuple writeTuple = new Tuple(/*KEYS|*/VALS);
+
+    /**
+     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
+     * associated with a key out of the btree during lookup operations.
+     */
+    protected final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+
+        @Override
+        protected com.bigdata.btree.Tuple initialValue() {
+
+            return new Tuple(VALS);
+            
+        }
+        
+    };
+
+    /**
+     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
+     * The tuple does not copy either the keys or the values. Contains is
+     * implemented as a lookup operation that either return this tuple or
+     * <code>null</code>. When isolation is supported, the version metadata
+     * is examined to determine if the matching entry is flagged as deleted in
+     * which case contains() will report "false".
+     */
+    protected final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+
+        @Override
+        protected com.bigdata.btree.Tuple initialValue() {
+
+            return new Tuple(0);
+
+        }
+        
+    };
+    
+    final public byte[] insert(Object key, Object value) {
+
+        if (!(key instanceof byte[])) {
+
+            key = KeyBuilder.asSortKey(key);
+
+        }
+
+        if( !(value instanceof byte[])) {
+            
+            value = SerializerUtil.serialize(value);
+            
+        }
+        
+        return insert((byte[])key,(byte[])value);
+        
+    }
+
+    final public byte[] insert(byte[] key, byte[] value) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        final Tuple tuple = insert(key, value, false/* deleted */,
+                0L/* timestamp */, writeTuple);
+
+        return tuple == null || tuple.isDeletedVersion() ? null : tuple
+                .getValue();
+
+    }
+
+    /**
+     * Core method for inserting or updating a value under a key.
+     * 
+     * @param key
+     *            The variable length unsigned byte[] key.
+     * @param value
+     *            The variable length byte[] value (MAY be <code>null</code>).
+     * @param delete
+     *            <code>true</code> iff the index entry should be marked as
+     *            deleted (this behavior is supported iff the btree supports
+     *            delete markers).
+     * @param timestamp
+     *            The timestamp to be associated with the new or updated index
+     *            entry (required iff the btree supports transactional isolation
+     *            and otherwise 0L).
+     * @param tuple
+     *            Data and metadata for the old value under the key will be
+     *            copied onto this object (optional).
+     * 
+     * @return <i>tuple</i> -or- <code>null</code> if there was no entry
+     *         under that key. See {@link ITuple#isDeletedVersion()} to
+     *         determine whether or not the entry is marked as deleted.
+     */
+    public Tuple insert(byte[] key, byte[] value, boolean delete,
+            long timestamp, Tuple tuple) {
+
+        assert delete == false || getIndexMetadata().getDeleteMarkers();
+
+        assert delete == false || value == null;
+        
+        assert timestamp == 0L
+                || (getIndexMetadata().getVersionTimestamps() && timestamp != 0L);
 
         if (key == null)
             throw new IllegalArgumentException();
 
         counters.ninserts++;
-//
-//        if (!(key instanceof byte[])) {
-//
-//            key = KeyBuilder.asSortKey(key);
-//
-//        }
 
-        return getRootOrFinger( key).insert( key, value);
+        return getRootOrFinger(key)
+                .insert(key, value, delete, timestamp, tuple);
 
     }
 
-    public Object lookup(byte[] key) {
+    final public byte[] remove(Object key) {
+
+        if (!(key instanceof byte[])) {
+
+            key = KeyBuilder.asSortKey(key);
+
+        }
+        
+        return remove((byte[]) key);
+        
+    }
+
+    final public byte[] remove(byte[] key) {
+
+        final Tuple tuple;
+        
+        if (getIndexMetadata().getDeleteMarkers()) {
+            
+            tuple = insert(key, null/* val */, true/* delete */,
+                    0L/* timestamp */, writeTuple);
+            
+        } else {
+        
+            tuple = remove(key, writeTuple);
+            
+        }
+
+        return tuple == null || tuple.isDeletedVersion() ? null : tuple
+                .getValue();
+
+    }
+
+    /**
+     * Core method for deleting a value under a key. If there is an entry under
+     * the key then it is removed from the index. It is an error to use this
+     * method if delete markers are being maintained. {@link #remove(byte[])}
+     * uses {@link #insert(byte[], byte[], boolean, long, Tuple)} instead of
+     * this method to mark the index entry as deleted when delete markers are
+     * being maintained.
+     * 
+     * @param key
+     *            The search key.
+     * @param tuple
+     *            An object that will be used to report data and metadata for
+     *            the pre-existing version (optional).
+     * 
+     * @return <i>tuple</i> or <code>null</code> if there was no version
+     *         under that key.
+     * 
+     * @throws UnsupportedOperationException
+     *             if delete markers are being maintained.
+     */
+    public Tuple remove(byte[] key, Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        counters.nfinds++;
+        if(getIndexMetadata().getDeleteMarkers()) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+        counters.nremoves++;
 
-//        if (!(key instanceof byte[])) {
-//
-//            key = KeyBuilder.asSortKey(key);
-//
-//        }
-
-        return getRootOrFinger(key).lookup(key);
+        return getRootOrFinger(key).remove(key,tuple);
 
     }
 
+    public byte[] lookup(Object key) {
+
+        if (!(key instanceof byte[])) {
+
+            key = KeyBuilder.asSortKey(key);
+
+        }
+
+        return lookup((byte[])key);
+
+    }
+
+    public byte[] lookup(byte[] key) {
+
+        final Tuple tuple = lookup(key, lookupTuple.get());
+
+        return tuple == null || tuple.isDeletedVersion() ? null : tuple
+                .getValue();
+
+    }
+    
+    /**
+     * Core method for retrieving a value under a key. This method allows you to
+     * differentiate an index entry whose value is <code>null</code> from a
+     * missing index entry or (when delete markers are enabled) from a deleted
+     * index entry.
+     * 
+     * @param key
+     *            The search key.
+     * @param tuple
+     *            An object that will be used to report data and metadata for
+     *            the pre-existing version (required).
+     * 
+     * @return <i>tuple</i> or <code>null</code> if there is no entry in the
+     *         index under the key.
+     */
+    public Tuple lookup(byte[] key, Tuple tuple) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        if (tuple == null)
+            throw new IllegalArgumentException();
+
+        // Note: Sometimes we pass in the containsTuple so this assert is too strong.
+//        assert tuple.getValuesRequested() : "tuple does not request values.";
+        
+        counters.nfinds++;
+
+        return getRootOrFinger(key).lookup(key,tuple);
+
+    }
+
+    public boolean contains(Object key) {
+        
+        if (!(key instanceof byte[])) {
+
+            key = KeyBuilder.asSortKey(key);
+
+        }
+ 
+        return contains((byte[]) key);
+        
+    }
+
+    /**
+     * Core method to decide whether the index has a (non-deleted) entry under a
+     * key.
+     * <p>
+     * True iff the key does not exist. Or, if the btree supports isolation, if
+     * the key exists but it is marked as "deleted".
+     * 
+     * @todo add unit test to btree suite w/ and w/o delete markers.
+     */
     public boolean contains(byte[] key) {
 
         if (key == null)
             throw new IllegalArgumentException();
 
-        counters.nfinds++;
-
-        return getRootOrFinger(key).contains(key);
-
-    }
-
-    public Object remove(byte[] key) {
-
-        if (key == null)
-            throw new IllegalArgumentException();
-
-        counters.nremoves++;
-
-//        if (!(key instanceof byte[])) {
-//
-//            key = KeyBuilder.asSortKey(key);
-//
-//        }
-
-        return getRootOrFinger(key).remove(key);
+        final ITuple tuple = getRootOrFinger(key).lookup(key, containsTuple.get());
+        
+        if(tuple == null || tuple.isDeletedVersion()) {
+            
+            return false;
+            
+        }
+        
+        return true;
 
     }
 
@@ -951,7 +1181,17 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
-    public Object valueAt(int index) {
+    public byte[] valueAt(int index) {
+
+        final Tuple tuple = lookupTuple.get();
+        
+        getRoot().valueAt(index, tuple);
+
+        return tuple.isDeletedVersion() ? null : tuple.getValue();
+
+    }
+
+    public byte[] valueAt(int index,Tuple tuple) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException("less than zero");
@@ -959,239 +1199,36 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
         if (index >= getEntryCount())
             throw new IndexOutOfBoundsException("too large");
 
+        if (tuple == null || !tuple.getValuesRequested())
+            throw new IllegalArgumentException();
+        
         counters.ngetKey++;
 
-        return getRoot().valueAt(index);
+        getRoot().valueAt(index, tuple);
+
+        return tuple.isDeletedVersion() ? null : tuple.getValue();
 
     }
 
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        
-        return rangeIterator(fromKey, toKey, 0/* capacity */,
-                KEYS | VALS/* flags */, null/* filter */);
-        
-    }
-
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
-
-        if((flags & DELETE) == 0) {
-
-            /*
-             * Simple case since we will not be writing on the btree.
-             */
-            
-            return getRoot().rangeIterator(fromKey, toKey, flags, filter);
-
-        }
-        
-        /*
-         * The iterator will write on the btree (it will in effect "delete
-         * behind"). Since the btree does not (yet) support concurrent
-         * modification from the iterator directly we wrap up the iterator with
-         * a buffer.
-         * 
-         * @todo modify the EntryIterator to accept [capacity], e.g., a limit on
-         * the #of entries that it will visit.  This is important with the DELETE
-         * flag since we may only want to delete the head of something.
-         * 
-         * @todo write unit tests for the DELETE flag.
-         * 
-         * @todo modify the EntryIterator to support remove so that we do not
-         * have to buffer the results here.
-         */
-        
-        // places a limit on the #of entries to be deleted.
-        final int rangeCount = capacity == 0 ? (int) rangeCount(fromKey, toKey)
-                : capacity;
-        
-        IEntryIterator src = getRoot().rangeIterator(fromKey, toKey,
-                flags | KEYS// Note: we need the keys for the delete operation
-                , filter);
-        
-        BufferedEntryIterator buf = new BufferedEntryIterator(rangeCount,
-                flags, src);
-
-        for (int i = 0; i < buf.n; i++) {
-
-            // delete behind.
-            
-            remove(buf.keys[i]);
-
-        }
-        
-        // return iterator.
-        
-        return buf;
-        
-    }
-
-    /**
-     * Helper class provides a delete behind capability by fully buffering the
-     * iterator result.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @deprecated This will go away once {@link EntryIterator#remove()} is
-     *             supported.
+    /*
+     * IRangeQuery
      */
-    private static class BufferedEntryIterator implements IEntryIterator {
-
-        /** #of tuples. */
-        final int n;
-        
-        /** from the ctor. */
-        final int flags;
-        
-        /** iff values were copied. */
-        final boolean needVals;
-
-        /** the keys (always copied). */
-        final byte[][] keys;
-
-        /** the values (iff copied). */
-        final Object[] vals;
-        
-        /**
-         * the current tuple index into {@link #keys}[] and {@link #vals}[].
-         */
-        private int i = 0;
-
-        private class Tuple implements ITuple {
-
-            IByteArrayBuffer kbuf;
-            
-            public byte[] getKey() {
-
-                return BufferedEntryIterator.this.getKey();
-                
-            }
-
-            public IByteArrayBuffer getKeyBuffer() {
-                
-                byte[] key = getKey();
-                
-                return new ByteArrayBuffer(key.length,key);
-                
-            }
-
-            public boolean getKeysRequested() {
-
-                return (flags & KEYS) != 0;
-
-            }
-
-            public boolean getValuesRequested() {
-
-                return (flags & VALS) != 0;
-                
-            }
-
-            public long getVisitCount() {
-                
-                return i;
-                
-            }
-            
-        }
-        
-        final Tuple tuple = new Tuple();
-        
-        public BufferedEntryIterator(int limit, int flags,
-                IEntryIterator src) {
-
-            this.flags = flags;
-            
-            int n = 0;
-            
-            needVals = (flags & VALS) == 0;
-
-            keys = new byte[limit][];
-
-            vals = needVals ? new Object[limit][] : null;
-
-            while (src.hasNext() && n < limit) {
-        
-                Object val = src.next();
-                
-                keys[n] = src.getKey(); 
-                
-                if(needVals) {
-                    
-                    vals[n] = val;
-                    
-                }
-                
-                n++;
-                
-            }
-            
-            this.n = n;
-            
-        }
-        
-        public boolean hasNext() {
-
-            return i < n;
-            
-        }
-
-        public Object next() {
-
-            if(needVals) {
-                
-                return vals[i++];
-                
-            }
-            
-            i++;
-            
-            return null;
-            
-        }
-
-        public ITuple getTuple() {
-
-            return tuple;
-            
-        }
-
-        public byte[] getKey() {
-
-            if (i == 0)
-                throw new IllegalStateException();
-            
-            return keys[i - 1];
-            
-        }
-
-        public Object getValue() {
-            
-            if (i == 0)
-                throw new IllegalStateException();
-
-            if(needVals) {
-                
-                return vals[i-1];
-                
-            }
-            
-            return null;
-            
-        }
-
-        public void remove() {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
     
     public long rangeCount(byte[] fromKey, byte[] toKey) {
 
-        AbstractNode root = getRoot();
+        if (fromKey == null && toKey == null) {
+
+            /*
+             * Note: this assumes that getEntryCount() is more efficient. Both
+             * the BTree and the IndexSegment record the entryCount in a field
+             * and just return the value of that field.
+             */
+
+            return getEntryCount();
+
+        }
+        
+        final AbstractNode root = getRoot();
 
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
@@ -1217,6 +1254,346 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
 
     }
 
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+        
+        return rangeIterator(fromKey, toKey, 0/* capacity */,
+                KEYS | VALS/* flags */, null/* filter */);
+        
+    }
+
+    /**
+     * Returns a {@link ChunkedLocalRangeIterator} that supports
+     * {@link Iterator#remove()}.
+     */
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, IEntryFilter filter) {
+
+        if((flags & REMOVEALL) == 0) {
+
+            /*
+             * Simple case since we will not be writing on the btree.
+             */
+            
+            return getRoot().rangeIterator(fromKey, toKey, flags, filter);
+
+        }
+        
+        /*
+         * The iterator will populate its buffers up to the capacity and then
+         * delete behind once the buffer is full or as soon as the iterator is
+         * exhausted.
+         * 
+         * Note: This would cause a stack overflow if the caller is already
+         * using a chunked range iterator. The problem is that the ResultSet is
+         * populated using IIndex#rangeIterator(...). This situation is handled
+         * by explicitly turning off the REMOVEALL flag when forming the
+         * iterator for the ResultSet.  See ChunkedRangeIterator.
+         */
+        return new ChunkedLocalRangeIterator(this, fromKey, toKey, capacity, KEYS
+                | flags, filter);
+        
+//        /*
+//         * The iterator will write on the btree (it will in effect "delete
+//         * behind"). Since the btree does not (yet) support concurrent
+//         * modification from the iterator directly we wrap up the iterator with
+//         * a buffer.
+//         * 
+//         * @todo modify the EntryIterator to accept [capacity], e.g., a limit on
+//         * the #of entries that it will visit. This is important with the REMOVE
+//         * flag since we may only want to delete the head of something.
+//         * 
+//         * @todo write unit tests for the REMOVE flag.
+//         * 
+//         * @todo modify the EntryIterator to support remove so that we do not
+//         * have to buffer the results here.
+//         */
+//        
+//        // places a limit on the #of entries to be deleted.
+//        final int rangeCount = capacity == 0 ? (int) rangeCount(fromKey, toKey)
+//                : capacity;
+//        
+//        IEntryIterator src = getRoot().rangeIterator(fromKey, toKey,
+//                flags | KEYS// Note: we need the keys for the delete operation
+//                , filter);
+//        
+//        BufferedEntryIterator buf = new BufferedEntryIterator(rangeCount,
+//                flags, src);
+//
+//        for (int i = 0; i < buf.n; i++) {
+//
+//            // delete behind.
+//            
+//            remove(buf.keys[i]);
+//
+//        }
+//        
+//        // return iterator.
+//        
+//        return buf;
+//        
+//    }
+//
+//    /**
+//     * Helper class provides a delete behind capability by fully buffering the
+//     * iterator result.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * 
+//     * @deprecated This will go away once {@link EntryIterator#remove()} is
+//     *             supported.
+//     */
+//    private static class BufferedEntryIterator implements IEntryIterator {
+//
+//        /** #of tuples. */
+//        final int n;
+//        
+//        /** from the ctor. */
+//        final int flags;
+//        
+//        /** iff values were copied. */
+//        final boolean needVals;
+//        
+//        /** iff version metadata was copied. */
+//        final boolean needMetadata;
+//
+//        /** the keys (always copied). */
+//        final byte[][] keys;
+//
+//        /** the values (iff copied). */
+//        final byte[][] vals;
+//        
+//        final long[] versionTimestamps;
+//        final boolean[] deleteMarkers;
+//        
+//        /**
+//         * the current tuple index into {@link #keys}[] and {@link #vals}[].
+//         */
+//        private int i = 0;
+//
+//        private final ByteArrayBuffer kbuf = new ByteArrayBuffer();
+//        private final ByteArrayBuffer vbuf;
+//
+//        private class Tuple implements ITuple {
+//
+//            public byte[] getKey() {
+//
+//                if (i == 0)
+//                    throw new IllegalStateException();
+//
+//                if (keys == null)
+//                    throw new UnsupportedOperationException();
+//                
+//                return keys[i - 1];
+//                
+//            }
+//
+//            public ByteArrayBuffer getKeyBuffer() {
+//                
+//                kbuf.reset().put(getKey());
+//                
+//                return kbuf;
+//                
+//            }
+//
+//            public boolean getKeysRequested() {
+//
+//                return (flags & KEYS) != 0;
+//
+//            }
+//
+//            public boolean getValuesRequested() {
+//
+//                return (flags & VALS) != 0;
+//                
+//            }
+//
+//            public boolean getMetadataRequested() {
+//
+//                return (flags & METADATA) != 0;
+//                
+//            }
+//
+//            public long getVisitCount() {
+//                
+//                return i;
+//                
+//            }
+//
+//            public byte[] getValue() {
+//             
+//                if (i == 0)
+//                    throw new IllegalStateException();
+//
+//                if (!needVals)
+//                    throw new UnsupportedOperationException();
+//
+//                return vals[i-1];
+//                
+//            }
+//
+//            public ByteArrayBuffer getValueBuffer() {
+//
+//                if (!needVals)
+//                    throw new UnsupportedOperationException();
+//
+//                vbuf.reset().put(getValue());
+//                
+//                return vbuf;
+//                
+//            }
+//
+//            public long getVersionTimestamp() {
+//                
+//                if (i == 0)
+//                    throw new IllegalStateException();
+//
+//                if (!needMetadata)
+//                    throw new UnsupportedOperationException();
+//
+//                return versionTimestamps[i-1];
+//                
+//            }
+//
+//            public boolean isDeletedVersion() {
+//
+//                if (i == 0)
+//                    throw new IllegalStateException();
+//
+//                if (!needMetadata)
+//                    throw new UnsupportedOperationException();
+//
+//                return deleteMarkers[i-1];
+//                
+//            }
+//
+//        }
+//        
+//        final Tuple tuple = new Tuple();
+//        
+//        public BufferedEntryIterator(int limit, int flags, IEntryIterator src) {
+//
+//            this.flags = flags;
+//            
+//            int n = 0;
+//
+//            needVals = (flags & VALS) == 0;
+//            
+//            needMetadata = (flags & METADATA) == 0;
+//
+//            keys = new byte[limit][];
+//
+//            vals = needVals ? new byte[limit][] : null;
+//
+//            vbuf = needVals ? new ByteArrayBuffer() : null;
+//            
+//            versionTimestamps = needMetadata ? new long[limit] : null;
+//
+//            deleteMarkers = needMetadata ? new boolean[limit] : null;
+//            
+//            while (src.hasNext() && n < limit) {
+//        
+//                ITuple tmp = src.next();
+//
+//                keys[n] = tmp.getKey();
+//                
+//                if(needVals) {
+//                    
+//                    vals[n] = tmp.getValue();
+//                    
+//                }
+//                
+//                if(needMetadata) {
+//                    
+//                    versionTimestamps[n] = tmp.getVersionTimestamp();
+//                    
+//                    deleteMarkers[n] = tmp.isDeletedVersion();
+//                    
+//                }
+//                
+//                n++;
+//                
+//            }
+//            
+//            this.n = n;
+//            
+//        }
+//        
+//        public boolean hasNext() {
+//
+//            return i < n;
+//            
+//        }
+//
+//        public ITuple next() {
+//
+//            if (!hasNext())
+//                throw new NoSuchElementException();
+//            
+//            i++;
+//            
+//            return tuple;
+//            
+//        }
+//
+//        public void remove() {
+//            
+//            throw new UnsupportedOperationException();
+//            
+//        }
+        
+    }
+
+//    public long removeAll(byte[] fromKey, byte[] toKey, long _limit) {
+//        
+//        if (_limit < 0)
+//            throw new IllegalArgumentException();
+//        
+//        // Note: entry count is integer for a single B+Tree instance.
+//        final int limit = (int)_limit;
+//        
+//        // iterator will buffer remove() requests.
+//        final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
+//                this, fromKey, toKey, limit, KEYS/* flags */, null/* filter */);
+//
+//        int nremoved = 0;
+//
+//        while (itr.hasNext() && nremoved < limit) {
+//
+//            itr.next();
+//
+//            itr.remove();
+//
+//        }
+//
+//        // flush buffered remove() requests.
+//        itr.flush();
+//        
+//        return nremoved;
+//        
+//    }
+
+    public Object submit(byte[] key, IIndexProcedure proc) {
+        
+        return proc.apply(this);
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler handler) {
+
+        Object result = proc.apply(this);
+        
+        if(handler!=null) {
+            
+            handler.aggregate(result, new Split(null,0,0));
+            
+        }
+        
+    }
+    
+    @SuppressWarnings("unchecked")
     public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
@@ -1227,13 +1604,19 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
     }
     
     /**
-     * Visits all entries in key order.
+     * Visits all entries in key order. This is identical to
+     * 
+     * <pre>
+     * rangeIterator(null, null)
+     * </pre>
      * 
      * @return An iterator that will visit all entries in key order.
+     * 
+     * @todo rename as rangeIterator and promote to IRangeQuery interface.
      */
-    public IEntryIterator entryIterator() {
+    final public IEntryIterator entryIterator() {
 
-        return getRoot().entryIterator();
+        return rangeIterator(null, null);
 
     }
 
@@ -1247,7 +1630,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
      */
     protected Iterator leafIterator() {
 
-        return new Striterator(getRoot().postOrderIterator())
+        return new Striterator(getRoot().postOrderNodeIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -1492,7 +1875,7 @@ abstract public class AbstractBTree implements IIndex, ILinearList {
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        Iterator itr = node.postOrderIterator(true);
+        Iterator itr = node.postOrderNodeIterator(true);
 
         while (itr.hasNext()) {
 

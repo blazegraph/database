@@ -56,6 +56,7 @@ import org.CognitiveWeb.generic.core.LinkSetIndex;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 
 /**
@@ -65,10 +66,6 @@ import com.bigdata.btree.KeyBuilder;
  * </p>
  * 
  * @todo Support traversal with concurrent modification and {@link #remove()}.
- * 
- * @todo Refactor into a shared base class for iterators over the values of a
- *       BTree in key order that support concurrent removal and use for scans of
- *       property class definitions as well.
  */
 public class LinkSetIndexIterator implements ILinkSetIndexIterator {
 
@@ -81,11 +78,11 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
     // internally created.
     private final IEntryIterator itr;
 
-    // parameter to the constructor.
-    private final Object m_fromKey;
-
-    // parameter to the constructor.
-    private final Object m_toKey;
+//    // parameter to the constructor.
+//    private final Object m_fromKey;
+//
+//    // parameter to the constructor.
+//    private final Object m_toKey;
 
     // parameter to the constructor.
     private final boolean m_resolve;
@@ -94,7 +91,7 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
      * The last key visited (this is the internal form of the key - internal
      * keys are always distinct).
      */
-    private Object m_curKey;
+    private byte[] m_curKey;
 
     /**
      * The last value visited (an object identifier).
@@ -156,9 +153,9 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
         
         m_linkSetIndex = linkSetIndex;
 
-        m_fromKey = fromKey;
-
-        m_toKey = toKey;
+//        m_fromKey = fromKey;
+//
+//        m_toKey = toKey;
 
         m_resolve = resolve;
 
@@ -192,9 +189,11 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
 
         }
 
-        m_curVal = (Long) itr.next();
+        final ITuple tuple = itr.next();
+        
+        m_curVal = KeyBuilder.decodeLong(tuple.getValueBuffer().array(), 0);
 
-        m_curKey = itr.getKey();
+        m_curKey = tuple.getKey();
 
         Object ret = m_curVal;
 
@@ -227,10 +226,7 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
      * Removes the current entry from the {@link BTree}.
      * </p>
      * 
-     * @todo I do not believe that traversal is allowed with concurrent
-     *       structural modification, so doing this will probably cause an
-     *       error. Currently this throws an {@link
-     *       UnsupportedOperationException}.
+     * @todo currently throws {@link UnsupportedOperationException}
      */
     public void remove() {
 

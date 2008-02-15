@@ -39,11 +39,11 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.serializers.StatementSerializer;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -347,10 +347,17 @@ abstract class BaseAxioms implements Axioms {
              * close the BaseAxioms class. Also, all data should be fully
              * buffered in the leaf of the btree so the btree will never touch
              * the store after it has been populated.
+             * 
+             * @todo use FastRDFValueCompression once API is aligned.
              */
-            btree = new BTree(new SimpleMemoryRawStore(),
-                    branchingFactor, UUID.randomUUID(),
-                    StatementSerializer.INSTANCE);
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+            
+//            btree = new BTree(new SimpleMemoryRawStore(), branchingFactor, UUID
+//                    .randomUUID(), ByteArrayValueSerializer.INSTANCE);
 
             // SPO[] exposed by our StatementBuffer subclass.
             SPO[] stmts = ((MyStatementBuffer)buffer).stmts;

@@ -27,12 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.lang.reflect.Constructor;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.isolation.IIsolatableIndex;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -218,7 +217,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, ICommitter {
+public class BTree extends AbstractBTree implements IIndex, ICommitter {
     
     /**
      * The default branching factor.
@@ -296,21 +295,40 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
     /**
      * Returns a mutable counter. All {@link ICounter}s returned by this method
      * report and increment the same underlying counter.
+     * <p>
+     * Note: When the {@link BTree} is part of a scale-out index then the
+     * counter will assign values within a namespace defined by the partition
+     * identifier.
+     * 
+     * FIXME verify correct handling of the counter during overflow!  It must
+     * be propagated to the checkpoint record for the new {@link BTree}.
      */
     public ICounter getCounter() {
-        
-        return new Counter(this);
-        
+
+        final PartitionMetadataWithSeparatorKeys pmd = metadata.getPartitionMetadata();
+
+        if (pmd == null) {
+
+            return new Counter(this);
+
+        } else {
+
+            return new PartitionedCounter(pmd.getPartitionId(), new Counter(
+                    this));
+
+        }
+
     }
     
     /**
-     * The metadata record used to load the last state of the index that was
-     * written by {@link #write()}. When an index is loaded this is set to the
-     * metadata specified to the constructor. When a new index is created, this
-     * is initially <code>null</code>.
+     * The constructor sets this field initially based on a template for an
+     * empty {@link Checkpoint} record containing the address of the
+     * {@link IndexMetadata} for the index. Thereafter this reference is
+     * maintained as the {@link Checkpoint} record last written by
+     * {@link #write()} or read by {@link #load(IRawStore, long)}.
      */
-    protected BTreeMetadata metadata = null;
-
+    protected Checkpoint checkpoint = null;
+    
 //    /**
 //     * The root of the btree. This is initially a leaf until the leaf is split,
 //     * at which point it is replaced by a node. The root is also replaced each
@@ -347,143 +365,84 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
     /**
      * The mutable counter exposed by #getCounter()}.
      */
-    protected long counter;
-
+    protected AtomicLong counter;
+  
     /**
-     * Constructor for a new B+Tree with a default hard reference queue policy
-     * and no record compression.
+     * Load a {@link BTree} from the store using a {@link Checkpoint} record.
      * 
      * @param store
-     *            The persistence store.
-     * @param branchingFactor
-     *            The branching factor.
-     * @param indexUUID
-     *            The unique identifier for the index. All B+Tree objects having
-     *            data for the same scale-out index MUST have the same
-     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
-     *            used.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the values in a
-     *            {@link Leaf}.
+     *            The store.
+     * @param checkpoint
+     *            A {@link Checkpoint} record for that {@link BTree}.
+     * @param metadata
+     *            The metadata record for that {@link BTree}.
+     * 
+     * @see #create(IRawStore, IndexMetadata)
+     * @see #load(IRawStore, long)
+     * 
+     * @todo move the address serializer into the md record?
+     * 
+     * @todo move the node factor into the md record?
+     * 
+     * @todo change signature on the base class to also accept checkpoint and
+     *       metadata records if I can line up the index segment metadata as
+     *       well.
      */
-    public BTree(IRawStore store, int branchingFactor, UUID indexUUID, IValueSerializer valSer) {
-        
-        this(store,branchingFactor,indexUUID,KeyBufferSerializer.INSTANCE,valSer);
-        
-    }
-    
-    /**
-     * Constructor for a new B+Tree with a default hard reference queue policy
-     * and no record compression and a specified key and value (de-)serializer.
-     * 
-     * @param store
-     *            The persistence store.
-     * @param branchingFactor
-     *            The branching factor.
-     * @param indexUUID
-     *            The unique identifier for the index. All B+Tree objects having
-     *            data for the same scale-out index MUST have the same
-     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
-     *            used.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the keys in a
-     *            {@link Node} or {@link Leaf}.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the values in a
-     *            {@link Leaf}.
-     */
-    public BTree(IRawStore store, int branchingFactor, UUID indexUUID,
-            IKeySerializer keySer, IValueSerializer valSer) {
-    
-        this(store, branchingFactor, indexUUID, new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(),
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                BTree.DEFAULT_WRITE_RETENTION_QUEUE_SCAN),
-                keySer,
-                valSer,
-                null// recordCompressor
-                );
-        
-    }
-    
-    /**
-     * Constructor for a new B+Tree.
-     * 
-     * @param store
-     *            The persistence store.
-     * @param branchingFactor
-     *            The branching factor.
-     * @param indexUUID
-     *            The unique identifier for the index. All B+Tree objects having
-     *            data for the same scale-out index MUST have the same
-     *            indexUUID. Otherwise a {@link UUID#randomUUID()} SHOULD be
-     *            used.
-     * @param headReferenceQueue
-     *            The hard reference queue. The minimum capacity is 2 to avoid
-     *            cache evictions of the leaves participating in a split. A
-     *            reasonable capacity is specified by
-     *            {@link #DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY}.
-     * @param valueSer
-     *            Object that knows how to (de-)serialize the values in a
-     *            {@link Leaf}.
-     * @param recordCompressor
-     *            Object that knows how to (de-)compress a serialized node or
-     *            leaf (optional).
-     * 
-     * @todo change record compressor to an interface.
-     * 
-     * @todo expose the choice of checksum behavior to the application as a
-     *       configuration option. checksums are relatively expensive to compute
-     *       and make the most sense for long-term read-only data (the index
-     *       segments) and the least sense for fully buffered journals (since
-     *       the data are fully buffered, reads occur against memory and disk
-     *       checksum errors would not be detected in any case).
-     */
-    public BTree(
-            IRawStore store,
-            int branchingFactor,
-            UUID indexUUID,
-            HardReferenceQueue<PO> hardReferenceQueue,
-            IKeySerializer keySer,
-            IValueSerializer valueSer,
-            RecordCompressor recordCompressor )
-    {
+    public BTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
         super(store, 
-                branchingFactor,
-                0/* initialBufferCapacity will be estimated */,
-                hardReferenceQueue,
-//                FIXME new PackedAddressSerializer(store),
-                AddressSerializer.INSTANCE,
-                keySer,
-                valueSer,
                 NodeFactory.INSTANCE, //
-                recordCompressor, //
-                /*
-                 * Note: there is less need to use checksum for stores that are
-                 * fully buffered since the data are always read from memory
-                 * which we presume is already parity checked. While a checksum
-                 * on a fully buffered store could detect an overwrite, the
-                 * journal architecture makes that extremely unlikely and one
-                 * has never been observed.
-                 */
-                !store.isFullyBuffered(),/* useChecksum */
-                indexUUID
+                // FIXME new PackedAddressSerializer(store),
+                AddressSerializer.INSTANCE,
+                metadata
                 );
+        
+        assert checkpoint != null;
 
+        assert checkpoint.getMetadataAddr() == metadata.getMetadataAddr(); // must agree.
+
+        if (metadata.getConflictResolver() != null && !metadata.isIsolatable()) {
+
+            throw new IllegalArgumentException(
+                    "Conflict resolver may only be used with isolatable indices");
+            
+        }
+
+        // initialize mutable fields from the checkpoint record.
+        this.checkpoint = checkpoint; // save reference.
+        this.height = checkpoint.getHeight();
+        this.nnodes = checkpoint.getNodeCount();
+        this.nleaves = checkpoint.getLeafCount();
+        this.nentries = checkpoint.getEntryCount();
+        this.counter = new AtomicLong( checkpoint.getCounter() );
+        
         /*
          * Note: the mutable BTree has a limit here so that split() will always
          * succeed. That limit does not apply for an immutable btree.
          */
-        assert hardReferenceQueue.capacity() >= MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY;
+        assert writeRetentionQueue.capacity() >= MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY;
 
         /*
-         * Setup the initial root leaf.
+         * Setup the root leaf.
          */
-        newRootLeaf();
-        
-    }
+        if (checkpoint.getRootAddr() == 0L) {
 
+            /*
+             * Create the root leaf.
+             */
+            newRootLeaf();
+            
+        } else {
+            
+            /*
+             * Read the root node of the btree.
+             */
+            reopen();
+            
+        }
+
+    }
+    
     /**
      * Creates and sets new root {@link Leaf} on the B+Tree and (re)sets the
      * various counters to be consistent with that root.  This is used both
@@ -503,7 +462,7 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         
         nleaves = 1;
         
-        counter = 0L;
+        counter = new AtomicLong( 0L );
 
         if(!wasDirty) {
             
@@ -513,75 +472,6 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         
     }
 
-    /**
-     * Load an existing B+Tree from the store.
-     * 
-     * @param store
-     *            The persistence store.
-     * @param metadata
-     *            The btree metadata record.
-     * @param hardReferenceQueue
-     *            The hard reference queue for {@link Leaf}s.
-     * 
-     * @see #load(IRawStore, long), which will re-load a {@link BTree} or
-     *      derived class from the address of its {@link BTreeMetadata metadata}
-     *      record.
-     * 
-     * @see #newMetadata(), which must be overriden if you subclass
-     *      {@link BTreeMetadata}
-     */
-    protected BTree(IRawStore store, BTreeMetadata metadata,
-            HardReferenceQueue<PO> hardReferenceQueue) {
-
-        super(store, metadata.getBranchingFactor(),
-                0/* initialBufferCapacity will be estimated */,
-                hardReferenceQueue, 
-//                FIXME new PackedAddressSerializer(store),
-                AddressSerializer.INSTANCE,
-                metadata.getKeySerializer(),
-                metadata.getValueSerializer(),
-                NodeFactory.INSTANCE,
-                metadata.getRecordCompressor(),//
-                metadata.getUseChecksum(), // use checksum iff used on create.
-                metadata.getIndexUUID()
-                );
-        
-        // save a reference to the immutable metadata record.
-        this.metadata = metadata;
-        
-        // initialize mutable fields from the immutable metadata record.
-        this.height = metadata.getHeight();
-        this.nnodes = metadata.getNodeCount();
-        this.nleaves = metadata.getLeafCount();
-        this.nentries = metadata.getEntryCount();
-        this.counter  = metadata.getCounter();
-        
-        /*
-         * Read the root node of the btree.
-         */
-//        this.root = readNodeOrLeaf( metadata.addrRoot );
-        reopen();
-
-    }
-
-    /**
-     * Load from the store (required de-serialization constructor).
-     * 
-     * @param store
-     *            The backing store.
-     * 
-     * @param metadata
-     *            The metadata record.
-     */
-    public BTree(IRawStore store, BTreeMetadata metadata) {
-
-        this(store, metadata, new HardReferenceQueue<PO>(
-                new DefaultEvictionListener(), DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                DEFAULT_WRITE_RETENTION_QUEUE_SCAN));
-        
-    }
-    
-    
     /**
      * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
      * update the metadata so we can clear the hard reference queue and release
@@ -623,7 +513,7 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
 
             synchronized(this) {
             
-                root = readNodeOrLeaf(metadata.getRootAddr());
+                root = readNodeOrLeaf(checkpoint.getRootAddr());
                 
             }
 
@@ -677,18 +567,25 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
     }
     
     /**
-     * Writes dirty nodes using a post-order traversal that first writes any
-     * dirty leaves and then (recursively) their parent nodes. The parent nodes
-     * are guarenteed to be dirty if there is a dirty child so the commit never
-     * triggers copy-on-write. This is basically a checkpoint -- it is NOT an
-     * atomic commit. The commit protocol is at the store level and involves the
-     * use of alternating root blocks and (for transactions) validating and
-     * merging down onto the corresponding global index.
+     * Checkpoint operation writes dirty nodes using a post-order traversal that
+     * first writes any dirty leaves and then (recursively) their parent nodes.
+     * The parent nodes are guarenteed to be dirty if there is a dirty child so
+     * the commit never triggers copy-on-write.
+     * <p>
+     * Note: This is NOT an atomic commit. The commit protocol is at the store
+     * level and involves the use of alternating root blocks and (for
+     * transactions) validating and merging down onto the corresponding global
+     * index.
      * 
-     * @return The address at which the metadata record for the btree was
-     *         written onto the store. The btree can be reloaded from this
-     *         metadata record. A reference to the metadata record is set on
-     *         {@link #metadata}.
+     * @return The address at which the {@link Checkpoint} record for the
+     *         {@link BTree} was written onto the store. The {@link BTree} can
+     *         be reloaded from this {@link Checkpoint} record.
+     * 
+     * @see #load(IRawStore, long)
+     * 
+     * @todo this could be modified to return the {@link Checkpoint} object but
+     *       I have not yet seen a situation where that was more interesting
+     *       than the address of the written {@link Checkpoint} record.
      */
     public long write() {
         
@@ -700,75 +597,49 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
             
         }
 
-        /*
-         * Note: In order to give users the ability to derive and use subclasses
-         * of the BTreeMetadata class we have to wait until the constructor
-         * chain has finished initialization before writing out the metadata
-         * record. Therefore, the BTree is responsible for writing out the
-         * metadata record. This has a few implications: first, the
-         * [addrMetadata] field on the metadata record is not itself persistent
-         * since we do not have its value until we have written out the record;
-         * second, the [addrMetadata] field is not [final] since we can not
-         * assign its value until we are outside of the constructor.
-         */
-        final BTreeMetadata metadata = newMetadata();
+        // create new checkpoint record.
+        checkpoint = metadata.newCheckpoint(this);
         
-        metadata.addrMetadata = metadata.write(this,store);
+        // write it on the store.
+        checkpoint.write(store);
         
-        this.metadata = metadata;
+        // return address of that checkpoint record.
+        return checkpoint.getCheckpointAddr();
         
-        return metadata.addrMetadata;
-
     }
     
     /**
-     * Returns the most recent metadata record for this btree.
+     * Returns the most recent {@link Checkpoint} record for this btree.
      * 
-     * @return The most recent metadata record for this btree and
-     *         <code>null</code> if the btree has never written a metadata
-     *         record on the store.
+     * @return The most recent {@link Checkpoint} record for this btree and
+     *         never <code>null</code>.
      */
-    public BTreeMetadata getMetadata() {
+    final public Checkpoint getCheckpoint() {
 
-        return metadata;
+        return checkpoint;
         
     }
     
     /**
-     * Method returns the metadata record persisted by {@link #write()}.
-     * <p>
-     * Note: In order to persist additional metadata with the btree you MUST
-     * override this method to return a subclass of {@link BTreeMetadata}.
+     * Return true iff the state of this B+Tree has been modified since the last
+     * {@link Checkpoint} record associated with the given address.
      * 
-     * @return A new metadata object that can be used to restore the btree.
-     */
-    protected BTreeMetadata newMetadata() {
-        
-        assert root != null; // i.e., isOpen().
-        
-        return new BTreeMetadata(this);
-        
-    }
-    
-    /**
-     * Return true iff the state of this B+Tree has been modified since the
-     * state associated with a given metadata address.
-     * 
-     * @param metadataAddr
+     * @param checkpointAddr
      *            The historical metadata address for this B+Tree.
      * 
      * @return true iff the B+Tree has been modified since the identified
      *         historical version.
      * 
-     * @see #getMetadata()
-     * @see BTreeMetadata#getMetadataAddr()
+     * @see #getCheckpoint()
+     * @see Checkpoint#getMetadataAddr()
      * 
      * @todo this test might not work with overflow() handling since the
-     *       metadata addresses would be independent in each store file.
+     *       {@link Checkpoint} addresses would be independent in each store
+     *       file.
      */
-    public boolean modifiedSince(long metadataAddr) {
+    public boolean modifiedSince(long checkpointAddr) {
         
-        return needsWrite() || metadata.getMetadataAddr() != metadataAddr;
+        return needsWrite() || checkpoint.getMetadataAddr() != checkpointAddr;
         
     }
 
@@ -802,8 +673,8 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         if (metadata != null && //
                 (root == null || //
                         ( !root.dirty //
-                        && metadata.getRootAddr() == root.identity //
-                        && metadata.getCounter() == counter)
+                        && checkpoint.getRootAddr() == root.identity //
+                        && checkpoint.getCounter() == counter.get())
                 )
         ) {
             
@@ -823,8 +694,8 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
      * Note: In order to avoid needless writes the existing metadata record is
      * always returned if {@link #needsWrite()} is <code>false</code>.
      * 
-     * @return The address of a metadata record from which the btree may be
-     *         reloaded.
+     * @return The address of a {@link Checkpoint} record from which the btree
+     *         may be reloaded.
      */
     public long handleCommit() {
 
@@ -845,23 +716,22 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
          * disabled.
          */
 
-        return metadata.addrMetadata;
+        return checkpoint.addrCheckpoint;
         
     }
     
     /**
      * Remove all entries in the B+Tree.
      * <p>
-     * This implementation simply replaces the root with a new root leaf and
-     * resets the counters (height, #of nodes, #of leaves, etc). to be
-     * consistent with that new root. If the btree is then made restart-safe by
-     * the commit protocol of the backing store then the effect is as if all
-     * entries had been deleted. Old nodes and leaves will be swept from the
-     * store eventually when the journal overflows.
+     * When delete markers are not enabled this simply replaces the root with a
+     * new root leaf and resets the counters (height, #of nodes, #of leaves,
+     * etc). to be consistent with that new root. If the btree is then made
+     * restart-safe by the commit protocol of the backing store then the effect
+     * is as if all entries had been deleted. Old nodes and leaves will be swept
+     * from the store eventually when the journal overflows.
      * <p>
-     * Note: This implementation is overriden in the
-     * <code>com.btree.isolation</code> package since isolation requires
-     * writing explicit delete markers for each entry in the B+Tree.
+     * When delete markers are enabled all un-deleted entries in the index are
+     * overwritten with a delete marker.
      * <p>
      * Note: The {@link IIndexManager} defines methods for registering (adding)
      * and dropping indices vs removing the entries in an individual
@@ -869,64 +739,176 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
      */
     public void removeAll() {
 
-        /*
-         * Clear the hard reference cache (sets the head, tail and count to
-         * zero).
-         * 
-         * Note: This is important since the cache will typically contain dirty
-         * nodes and leaves. If those get evicted then an exception will be
-         * thrown since their parents are not grounded on the new root leaf.
-         * 
-         * Note: By clearing the references to null we also facilitate garbage
-         * collection of the nodes and leaves in the cache.
-         */
-        writeRetentionQueue.clear(true/*clearRefs*/);
-        if(readRetentionQueue!=null) {
-            readRetentionQueue.clear(true/*clearRefs*/);
+        if (getIndexMetadata().getDeleteMarkers()) {
+            
+            /*
+             * Write deletion markers for each non-deleted entry. When the
+             * transaction commits, those delete markers will have to validate
+             * against the global state of the tree. If the transaction
+             * validates, then the merge down onto the global state will cause
+             * the corresponding entries to be removed from the global tree.
+             * 
+             * Note: This operation can change the tree structure by triggering
+             * copy-on-write for immutable node or leaves.
+             */
+
+            final IEntryIterator itr = rangeIterator(null, null,
+                    0/* capacity */, REMOVEALL/* flags */, null/* filter */);
+
+            while (itr.hasNext()) {
+
+                itr.next();
+
+            }
+            
+        } else {
+
+            /*
+             * Clear the hard reference cache (sets the head, tail and count to
+             * zero).
+             * 
+             * Note: This is important since the cache will typically contain
+             * dirty nodes and leaves. If those get evicted then an exception
+             * will be thrown since their parents are not grounded on the new
+             * root leaf.
+             * 
+             * Note: By clearing the references to null we also facilitate
+             * garbage collection of the nodes and leaves in the cache.
+             */
+            writeRetentionQueue.clear(true/* clearRefs */);
+            if (readRetentionQueue != null) {
+                readRetentionQueue.clear(true/* clearRefs */);
+            }
+
+            /*
+             * Replace the root with a new root leaf.
+             */
+
+            newRootLeaf();
+
         }
-        
-        /*
-         * Replace the root with a new root leaf.
-         */
- 
-        newRootLeaf();
         
     }
 
     /**
-     * Re-load the {@link BTree} or derived class from the store. The
-     * {@link BTree} or derived class MUST provide a public constructor with the
+     * Create a new {@link BTree} or derived class. This method works by writing
+     * the {@link IndexMetadata} record on the store and then loading the
+     * {@link BTree} from the {@link IndexMetadata} record.
+     * 
+     * @param store
+     *            The store.
+     * 
+     * @param metadata
+     *            The metadata record.
+     * 
+     * @return The newly created {@link BTree}.
+     * 
+     * @see #load(IRawStore, long)
+     * 
+     * @exception IllegalStateException
+     *                If you attempt to create two btree objects from the same
+     *                metadata record since the metadata address will have
+     *                already been noted on the {@link IndexMetadata} object.
+     *                You can use {@link IndexMetadata#clone()} to obtain a new
+     *                copy of the metadata object with the metadata address set
+     *                to <code>0L</code>.
+     */
+    public static BTree create(IRawStore store, IndexMetadata metadata) {
+        
+        if (metadata.getMetadataAddr() != 0L) {
+
+            /*
+             */
+            
+            throw new IllegalStateException("Metadata record already in use");
+            
+        }
+        
+        /*
+         * Write metadata record on store. The address of that record is set as
+         * a side-effect on the metadata object.
+         */
+        metadata.write(store);
+        
+        /*
+         * Create checkpoint for the new B+Tree.
+         */
+        final Checkpoint firstCheckpoint = metadata.firstCheckpoint();
+        
+        /*
+         * Write the checkpoint record on the store. The address of the
+         * checkpoint record is set on the object as a side effect.
+         */
+        firstCheckpoint.write(store);
+        
+        /*
+         * Load the B+Tree from the store using that checkpoint record.
+         */
+        return load(store, firstCheckpoint.getCheckpointAddr());
+        
+    }
+
+    /**
+     * Re-load an instance of a {@link BTree} or derived class from the store.
+     * The {@link BTree} or derived class MUST declare a constructor with the
      * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * <i>className</i>(IRawStore store, ..., Checkpoint checkpoint, BTreeMetadata metadata)
      * 
      * </code>
      * 
      * @param store
      *            The store.
-     * @param addr
-     *            The address of the {@link BTreeMetadata} record for that
-     *            class.
+     * 
+     * @param addrCheckpoint
+     *            The address of a {@link Checkpoint} record for the index.
      * 
      * @return The {@link BTree} or derived class loaded from that
-     *         {@link BTreeMetadata} record.
+     *         {@link Checkpoint} record.
      * 
-     * @see BTree#newMetadata(), which MUST be overloaded if you subclass
-     *      {@link BTreeMetadata} in order to store extended metadata.
+     * @todo review all uses and make sure that {@link Checkpoint} records are
+     *       being used.
+     * 
+     * @todo javadoc update wrt the ctor.
      */
-    public static BTree load(IRawStore store, long addr) {
-        
-        BTreeMetadata metadata = BTreeMetadata.read(store, addr);
-        
+    public static BTree load(IRawStore store, long addrCheckpoint) {
+
+        /*
+         * Read checkpoint record from store.
+         */
+        final Checkpoint checkpoint = Checkpoint.load(store,addrCheckpoint);
+
+        /*
+         * Read metadata record from store.
+         */
+        final IndexMetadata metadata = IndexMetadata.read(store,
+                checkpoint.getMetadataAddr());
+
+        /*
+         * Create B+Tree object instance.
+         */
         try {
             
             Class cl = Class.forName(metadata.getClassName());
             
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor for a class derived from
+             * BTree.
+             */
             Constructor ctor = cl.getConstructor(new Class[] {
-                    IRawStore.class, BTreeMetadata.class });
-            
-            BTree btree = (BTree) ctor.newInstance(new Object[] { store,
-                    metadata });
+                    IRawStore.class,//
+//                    HardReferenceQueue.class, //
+                    Checkpoint.class,//
+                    IndexMetadata.class //
+                    });
+
+            BTree btree = (BTree) ctor.newInstance(new Object[] { //
+                    store,//
+//                    hardReferenceQueue, //
+                    checkpoint, //
+                    metadata //
+                    });
             
             return btree;
             
@@ -937,7 +919,7 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         }
         
     }
-
+    
     /**
      * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
      */
@@ -949,10 +931,11 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         }
 
         public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, Object[] values) {
+                int branchingFactor, IKeyBuffer keys, byte[][] values,
+                long[] versionTimestamp, boolean[] deleteMarkers) {
 
-            return new Leaf((BTree) btree, addr, branchingFactor, keys,
-                    values);
+            return new Leaf((BTree) btree, addr, branchingFactor, keys, values,
+                    versionTimestamp, deleteMarkers);
 
         }
 
@@ -987,21 +970,79 @@ public class BTree extends AbstractBTree implements IIndex, IIndexWithCounter, I
         
         public long get() {
             
-            return btree.counter;
+            return btree.counter.get();
             
         }
 
-        public long inc() {
+        public long incrementAndGet() {
             
-            return btree.counter++;
+            final long counter = btree.counter.incrementAndGet();
+            
+            if (counter == Long.MAX_VALUE) {
+
+                /*
+                 * Actually, the counter would overflow on the next call but
+                 * this eager error makes the test for overflow atomic.
+                 */
+                
+                throw new RuntimeException("Counter overflow");
+
+            }
+            
+            return counter;
             
         }
         
     }
 
-    public boolean isIsolatable() {
+    /**
+     * Places the counter values into a namespace formed by the partition
+     * identifier. The partition identifier is found in the high int32 word and
+     * the counter value from the underlying {@link BTree} is found in the low
+     * int32 word.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class PartitionedCounter implements ICounter {
+
+        private final int partitionId;
+        private final ICounter src;
         
-        return this instanceof IIsolatableIndex;
+        public PartitionedCounter(int partitionId, ICounter src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            this.partitionId = partitionId;
+            
+            this.src = src;
+            
+        }
+        
+        public long get() {
+            
+            return src.get();
+            
+        }
+
+        public long incrementAndGet() {
+            
+            final long tmp = src.incrementAndGet();
+
+            if (tmp > Integer.MAX_VALUE) {
+
+                throw new RuntimeException("Counter overflow");
+
+            }
+
+            /*
+             * Place the partition identifier into the high int32 word and place
+             * the truncated counter value into the low int32 word.
+             */
+            return partitionId << 32 | (int) tmp;
+            
+        }
         
     }
     

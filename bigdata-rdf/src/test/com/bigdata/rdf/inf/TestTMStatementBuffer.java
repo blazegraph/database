@@ -46,7 +46,6 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.isolation.Value;
 import com.bigdata.rdf.inf.TMStatementBuffer.BufferEnum;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -1068,7 +1067,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
      * <p>
      * Pre-condition: The term identifiers for the graphs MUST be consistently
      * assigned since the statements are not being materialized as RDF
-     * {@link Value} objects.
+     * {@link org.openrdf.model.Value} objects.
      * 
      * @param expected
      *            A copy of the statements made after the data set was loaded

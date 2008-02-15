@@ -31,7 +31,6 @@ import java.io.DataInput;
 import java.io.IOException;
 
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 
@@ -57,15 +56,6 @@ public class PackedAddressSerializer implements IAddressSerializer {
         
     }
     
-    /**
-     * This over-estimates the space requirements.
-     */
-    public int getSize(int n) {
-        
-        return Bytes.SIZEOF_LONG * n;
-        
-    }
-
     public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
             int nchildren) throws IOException {
 

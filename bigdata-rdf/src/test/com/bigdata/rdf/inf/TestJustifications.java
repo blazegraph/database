@@ -30,7 +30,6 @@ package com.bigdata.rdf.inf;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.IEntryIterator;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
@@ -158,21 +157,12 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
                 
                 while(itr.hasNext()) {
                     
-                    // index only stores keys, not values.
-                    assertNull( itr.next() );
-                    
-                    // get the key from the index.
-                    final byte[] key = itr.getKey();
-                    
-                    // verify that we are reading back the same key that we should have written.
-                    assertEquals(jst.getKey(new KeyBuilder()),key);
-                    
                     // de-serialize the justification from the key.
-                    Justification tmp = new Justification(key);
+                    Justification tmp = new Justification(itr);
                     
                     // verify the same.
-                    assertEquals(jst,tmp);
-                    
+                    assertEquals(jst, tmp);
+
                     // no more justifications in the index.
                     assertFalse(itr.hasNext());
                     
@@ -185,7 +175,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             {
              
-                SPOJustificationIterator itr = new SPOJustificationIterator(store,head);
+                FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(store,head);
                 
                 assertTrue(itr.hasNext());
                 
@@ -222,8 +212,9 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
             /*
              * remove the justified statements.
              */
-            
-            assertEquals(1,store.getAccessPath(head.s, head.p, head.o).removeAll());
+
+            assertEquals(1, store.getAccessPath(head.s, head.p, head.o)
+                    .removeAll());
 
             /*
              * verify that the justification for that statement is gone.

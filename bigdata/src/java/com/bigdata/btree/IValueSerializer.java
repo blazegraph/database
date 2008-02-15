@@ -53,7 +53,7 @@ public interface IValueSerializer extends Serializable {
      *            [0:n-1] are defined and must be read from the buffer and
      *            written on the array.
      */
-    public void getValues(DataInput is, Object[] values, int nvals)
+    public void getValues(DataInput is, byte[][] values, int nvals)
             throws IOException;
 
     /**
@@ -67,7 +67,7 @@ public interface IValueSerializer extends Serializable {
      *            The #of valid values in the array. The values in indices
      *            [0:n-1] are defined and must be written.
      */
-    public void putValues(DataOutputBuffer os, Object[] values, int nvals)
+    public void putValues(DataOutputBuffer os, byte[][] values, int nvals)
             throws IOException;
 
 }

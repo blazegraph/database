@@ -48,9 +48,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.isolation.Value;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
@@ -67,9 +65,14 @@ import com.bigdata.rawstore.IRawStore;
  * order to minimize heap churn and since we have the expectation that they are
  * writing/reading on buffered streams.
  * 
- * FIXME Support dictionary compression.
+ * @todo support compression (hu-tucker, huffman, delta-coding of keys,
+ *       application defined compression, etc.)
+ *       <p>
+ *       user-defined tokenization into symbols (hu-tucker, huffman)
  * 
- * FIXME reconcile with btree node and leaf serialization.
+ * FIXME reconcile with btree node and leaf serialization, including
+ * {@link IKeyBuffer} and {@link IKeySerializer}. Since everything is now
+ * byte[]s we should be able to make this work out more efficiently.
  * 
  * @todo test suites for each of the {@link IDataSerializer}s, including when
  *       the reference is a null byte[][], when it has zero length, and when
@@ -82,28 +85,6 @@ import com.bigdata.rawstore.IRawStore;
  *       That should be changed as part of a move toward greater efficiency of
  *       the heap such that we can do, e.g., insert(key,off,len,val,off,len) and
  *       thereby reuse buffers consistently throughout.
- * 
- * @todo support compression (hu-tucker, huffman, delta-coding of keys,
- *       application defined compression, etc.)
- *       <p>
- *       user-defined tokenization into symbols (hu-tucker, huffman)
- * 
- * @todo reconcile with {@link IKeyBuffer} and the use of {@link Value}s for
- *       isolation.
- *       <p>
- *       In order to use the {@link IDataSerializer}s for the {@link BTree} we
- *       have to do two things: <br>
- *       (a) NOT convert to the immutable key buffer representation when it a
- *       node becomes immutable or gets serialized (it makes it more expensive
- *       to serialize the KEYS for the node since we need to convert them back
- *       to a byte[][]); and <br>
- *       (b) the VALUES are objects in the general case rather than just byte[]s -
- *       in particular, handling of isolation {@link Value}s is going to make
- *       dictionary based encoding of the values difficult or impossible.
- *       <p>
- *       Perhaps the {@link BTree} should be forced to (byte[],byte[]) for both
- *       keys and values and the version counters or deletion markers should be
- *       handled directly by the {@link Leaf}?
  *       <p>
  *       Another twist is that it is more efficient from the perspective of the
  *       garbage collector to use a single byte[] to represent all of the keys
@@ -111,14 +92,15 @@ import com.bigdata.rawstore.IRawStore;
  *       byte[] buffer with a maximum capacity and an append only strategy with
  *       compaction when the buffer would overflow.
  *       <p>
- *       So, yet another reconcilation plan is to use an iterator strategy in
- *       which the caller gets an updated {byte[],off,len} tuple each time they
- *       call next(). This would allow us to reconcile the various ways in which
- *       the data might be stored - except for the one where the prefix is
- *       factored out, which might be treated purely as a serialization form.
- *       So, there should also be a method that reports whether the data are
- *       sorted, and another to either access the data randomly or to compute
- *       the prefix for any two indices.
+ *       So, one approach is to use an iterator strategy in which the caller
+ *       gets an updated {byte[],off,len} tuple each time they call next(). This
+ *       would allow us to reconcile the various ways in which the data might be
+ *       stored - except for the one where the prefix is factored out, which
+ *       might be treated purely as a serialization form. So, there should also
+ *       be a method that reports whether the data are sorted, and another to
+ *       either access the data randomly or to compute the prefix for any two
+ *       indices. This might be doable by a variant of the ITuple-based methods
+ *       on the {@link AbstractBTree}.
  *       <p>
  *       One last refinement is to make the interpretation of {byte[],off,len}
  *       in terms of <i>bits</i> so that we can store non-aligned keys if
@@ -397,11 +379,7 @@ public interface IDataSerializer extends Serializable {
             
         }
 
-        /**
-         * @throws ClassCastException
-         *             if the values are not byte[]s.
-         */
-        public void getValues(DataInput is, Object[] values, int nvals)
+        public void getValues(DataInput is, byte[][] values, int nvals)
                 throws IOException {
 
             // read values.
@@ -418,29 +396,11 @@ public interface IDataSerializer extends Serializable {
 
         }
 
-        /**
-         * @throws ClassCastException
-         *             if the values are not byte[]s.
-         */
-        public void putValues(DataOutputBuffer os, Object[] values,
+        public void putValues(DataOutputBuffer os, byte[][] values,
                 final int nvals) throws IOException {
 
-            /*
-             * @todo This copies references into a new byte[][] since values
-             * was allocated as an Object[].  If that is changes then this
-             * can just pass through the (possibly cast) reference to the
-             * (byte[][])values).
-             */
-            final byte[][] a = new byte[nvals][];
-            
-            for(int i=0; i<nvals; i++) {
-                
-                a[i] = (byte[])values[i];
-                
-            }
-
             // write values.
-            delegate.write(nvals, 0/* offset */, a, os);
+            delegate.write(nvals, 0/* offset */, values, os);
 
         }
         

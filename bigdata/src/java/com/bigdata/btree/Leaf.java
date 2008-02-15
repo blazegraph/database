@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -40,10 +42,19 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * A leaf.
  * </p>
  * <p>
- * Note: Leaves are NOT chained together for the object index since that
- * forms cycles that make it impossible to set the persistent identity for
- * both the prior and next fields of a leaf.
+ * Note: Leaves are NOT chained together for the object index since that forms
+ * cycles that make it impossible to set the persistent identity for both the
+ * prior and next fields of a leaf.
  * </p>
+ * 
+ * FIXME write detailed unit tests when version metadata is being maintained
+ * since the behavior of the leaf is quite different. In particular, the
+ * behavior of remove() needs to be examined when deletion markers are and are
+ * not supported.
+ * 
+ * FIXME modify to copy the keys and values by value (not reference) and to use
+ * a compact (and compacting) record in order minimize both de-serialization
+ * costs and GC costs.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -61,8 +72,42 @@ public class Leaf extends AbstractNode implements ILeafData {
      * the split point and performing the split.
      * </p>
      */
-    protected Object[] values;
+    protected byte[][] values;
+    
+    /**
+     * The deletion markers IFF isolation is supported by the {@link BTree}.
+     */
+    protected boolean[] deleteMarkers;
+    
+    /**
+     * The version timestamps IFF isolation is supported by the {@link BTree}.
+     */
+    protected long[] versionTimestamps;
+    
+    public final long getVersionTimestamp(int index) {
 
+        if (versionTimestamps == null)
+            throw new UnsupportedOperationException();
+
+        return versionTimestamps[index];
+
+    }
+    
+    public final boolean getDeleteMarker(int index) {
+
+        if (deleteMarkers == null)
+            throw new UnsupportedOperationException();
+
+        return deleteMarkers[index];
+
+    }
+    
+    public byte[][] getValues() {
+        
+        return values;
+        
+    }
+    
     /**
      * De-serialization constructor.
      * <p>
@@ -87,7 +132,8 @@ public class Leaf extends AbstractNode implements ILeafData {
      *            corresponding to the insert key that forces a split.
      */
     protected Leaf(AbstractBTree btree, long addr, int branchingFactor, 
-            IKeyBuffer keys, Object[] values) {
+            IKeyBuffer keys, byte[][] values, long[] versionTimestamps,
+            boolean[] deleteMarkers) {
         
         super(btree, branchingFactor, false /* The leaf is NOT dirty. */);
 
@@ -104,6 +150,10 @@ public class Leaf extends AbstractNode implements ILeafData {
         this.keys = keys; // steal reference.
         
         this.values = values; // steal reference.
+
+        this.versionTimestamps = versionTimestamps;
+        
+        this.deleteMarkers = deleteMarkers;
         
 //        // must clear the dirty since we just de-serialized this leaf.
 //        setDirty(false);
@@ -125,7 +175,19 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         keys = new MutableKeyBuffer( branchingFactor+1 );
 
-        values = new Object[branchingFactor+1];
+        values = new byte[branchingFactor+1][];
+        
+        if(btree.getIndexMetadata().isIsolatable()) {
+            
+            versionTimestamps = new long[branchingFactor+1];
+
+        }
+        
+        if(btree.getIndexMetadata().getDeleteMarkers()) {
+
+            deleteMarkers = new boolean[branchingFactor+1];
+            
+        }
         
 //        /*
 //         * Add to the hard reference queue. If the queue is full, then this will
@@ -157,6 +219,10 @@ public class Leaf extends AbstractNode implements ILeafData {
         // steal reference and clear reference on the source node.
         values = src.values;
 
+        versionTimestamps = src.versionTimestamps;
+        
+        deleteMarkers = src.deleteMarkers;
+        
 //        // Add to the hard reference queue.
 //        btree.touch(this);
 
@@ -166,9 +232,13 @@ public class Leaf extends AbstractNode implements ILeafData {
         
         super.delete();
 
-        // release the value references.
-        // @todo clear the refs in values[]?
+        // clear references.
+        
         values = null;
+        
+        versionTimestamps = null;
+        
+        deleteMarkers = null;
         
     }
     
@@ -196,22 +266,77 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
     
-    final public Object[] getValues() {
+    final public boolean isNull(int index) {
         
-        return values;
+        return values[index] == null;
+        
+    }
+    
+    final public void copyValue(int index, OutputStream os) {
+        
+        if(deleteMarkers!=null && deleteMarkers[index]) {
+            
+            // deleted.
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        final byte[] val = values[index];
+        
+        if (val == null) {
+
+            // no value (null).
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        try {
+         
+            // copy the value.
+            
+            os.write( val );
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+    
+    final public boolean hasDeleteMarkers() {
+        
+        return deleteMarkers != null; 
+        
+    }
+    
+    final public boolean hasVersionTimestamps() {
+        
+        return versionTimestamps != null; 
         
     }
     
     /**
-     * Insert or update an entry in the leaf. The caller MUST ensure by
-     * appropriate navigation of parent nodes that the key for the next tuple
-     * either exists in or belongs in this leaf. If the leaf overflows then it
-     * is split after the insert.
-     * 
-     * @return The old value or null if there was no entry for that key.
+     * Insert or update an entry in the leaf as appropriate. The caller MUST
+     * ensure by appropriate navigation of parent nodes that the key for the
+     * next tuple either exists in or belongs in this leaf. If the leaf
+     * overflows then it is split after the insert.
      */
-    public Object insert(byte[] searchKey, Object newval) {
+    public Tuple insert(byte[] searchKey, byte[] newval, boolean delete, long timestamp, Tuple tuple) {
 
+        if(delete && deleteMarkers==null) {
+            
+            /*
+             * You may not specify the delete flag unless delete markers are
+             * being maintained.
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         if(btree.debug) assertInvariants();
         
         btree.touch(this);
@@ -226,7 +351,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.insert(searchKey,newval);
+            return copy.insert(searchKey, newval, delete, timestamp, tuple);
             
         }
 
@@ -247,14 +372,34 @@ public class Leaf extends AbstractNode implements ILeafData {
              * existing entry.
              */
             
-            // the old value for the search key.
-            Object oldval = this.values[entryIndex];            
+            if (tuple != null) {
+
+                /*
+                 * Copy data and metadata for the old value stored under the
+                 * search key.
+                 */
+
+                tuple.copy(entryIndex, this);
+                
+            }
             
             // update the entry on the leaf.
             this.values[entryIndex] = newval;
 
+            if (deleteMarkers != null) {
+
+                this.deleteMarkers[entryIndex] = delete;
+
+            }
+
+            if (versionTimestamps != null) {
+
+                this.versionTimestamps[entryIndex] = timestamp;
+
+            }
+
             // return the old value.
-            return oldval;
+            return tuple;
 
         }
 
@@ -262,8 +407,6 @@ public class Leaf extends AbstractNode implements ILeafData {
          * The insert goes into this leaf.
          */
         
-        Object oldval = null;
-
         // Convert the position to obtain the insertion point.
         entryIndex = -entryIndex - 1;
 
@@ -293,6 +436,12 @@ public class Leaf extends AbstractNode implements ILeafData {
 //            copyKey(entryIndex, searchKeys, tupleIndex);
             keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
             this.values[entryIndex] = newval;
+            if (deleteMarkers != null) {
+                deleteMarkers[entryIndex] = delete;
+            }
+            if (versionTimestamps != null) {
+                versionTimestamps[entryIndex] = timestamp;
+            }
 
             nkeys++; keys.nkeys++;
 
@@ -333,11 +482,12 @@ public class Leaf extends AbstractNode implements ILeafData {
         // assert invarients post-split.
         if(btree.debug) assertInvariants();
 
-        return oldval;
+        // return null since there was no pre-existing entry.
+        return null;
         
     }
-    
-    public Object lookup(byte[] searchKey) {
+
+    public Tuple lookup(byte[] searchKey, Tuple tuple) {
 
         btree.touch(this);
 
@@ -353,28 +503,10 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         // Found.
         
-        return values[entryIndex];
+        tuple.copy(entryIndex, this);
         
-    }
-
-    public boolean contains(byte[] searchKey) {
-
-        btree.touch(this);
+        return tuple;
         
-        final int entryIndex = this.keys.search(searchKey);
-
-        if (entryIndex < 0) {
-
-            // Not found.
-
-            return false;
-            
-        }
-
-        // Found.
-        
-        return true;
-
     }
 
     public int indexOf(byte[] key) {
@@ -397,7 +529,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         
     }
 
-    public Object valueAt(int entryIndex) {
+    public void valueAt(int entryIndex, Tuple tuple) {
         
         if (entryIndex < 0)
             throw new IndexOutOfBoundsException("negative: "+entryIndex);
@@ -405,7 +537,7 @@ public class Leaf extends AbstractNode implements ILeafData {
         if (entryIndex >= nkeys)
             throw new IndexOutOfBoundsException("too large: "+entryIndex);
         
-        return values[entryIndex];
+        tuple.copy(entryIndex, this);
         
     }
 
@@ -487,9 +619,19 @@ public class Leaf extends AbstractNode implements ILeafData {
             
             rightSibling.values[j] = values[i];
 
+            if (deleteMarkers != null) {
+                rightSibling.deleteMarkers[j] = deleteMarkers[i];
+            }
+
+            if (versionTimestamps != null) {
+                rightSibling.versionTimestamps[j] = versionTimestamps[i];
+            }
+            
             // clear out the old keys and values.
             keys.zeroKey(i);
             values[i] = null;
+            if(deleteMarkers!=null) deleteMarkers[i] = false;
+            if(versionTimestamps!=null) versionTimestamps[i] = 0L;
 
             nkeys--; keys.nkeys--; // one less key here.
             rightSibling.nkeys++; skeys.nkeys++; // more more key there.
@@ -605,14 +747,22 @@ public class Leaf extends AbstractNode implements ILeafData {
 //            setKey(nkeys, s.getKey(0));
             copyKey(nkeys,s.keys,0);
             values[nkeys] = s.values[0];
+            if(deleteMarkers!=null) deleteMarkers[nkeys] = s.deleteMarkers[0];
+            if(versionTimestamps!=null) versionTimestamps[nkeys] = s.versionTimestamps[0];
             
             // copy down the keys on the right sibling to cover up the hole.
             System.arraycopy(skeys.keys, 1, skeys.keys, 0, s.nkeys-1);
             System.arraycopy(s.values, 1, s.values, 0, s.nkeys-1);
+            if(deleteMarkers!=null)
+                System.arraycopy(s.deleteMarkers, 1, s.deleteMarkers, 0, s.nkeys-1);
+            if(versionTimestamps!=null)
+                System.arraycopy(s.versionTimestamps, 1, s.versionTimestamps, 0, s.nkeys-1);
 
             // erase exposed key/value on rightSibling that is no longer defined.
             skeys.zeroKey(s.nkeys-1);
             s.values[s.nkeys-1] = null;
+            if(deleteMarkers!=null) s.deleteMarkers[s.nkeys-1] = false;
+            if(versionTimestamps!=null) s.versionTimestamps[s.nkeys-1] = 0L;
 
             s.nkeys--; skeys.nkeys--;
             this.nkeys++; keys.nkeys++;
@@ -644,13 +794,23 @@ public class Leaf extends AbstractNode implements ILeafData {
             // copy down by one.
             System.arraycopy(keys.keys, 0, keys.keys, 1, nkeys);
             System.arraycopy(values, 0, values, 1, nkeys);
+            if(deleteMarkers!=null)
+                System.arraycopy(deleteMarkers, 0, deleteMarkers, 1, nkeys);
+            if(versionTimestamps!=null)
+                System.arraycopy(versionTimestamps, 0, versionTimestamps, 1, nkeys);
             
-            // move the last key/value from the leftSibling to this leaf.
+            // move the last key/value from the leftSibling to this leaf (copy, then clear).
+            // copy.
 //            setKey(0, s.getKey(s.nkeys-1));
             copyKey(0,s.keys,s.nkeys-1);
             values[0] = s.values[s.nkeys-1];
+            if(deleteMarkers!=null) deleteMarkers[0] = s.deleteMarkers[s.nkeys-1];
+            if(versionTimestamps!=null) versionTimestamps[0] = s.versionTimestamps[s.nkeys-1];
+            // clear
             skeys.zeroKey(s.nkeys-1);
             s.values[s.nkeys-1] = null;
+            if(deleteMarkers!=null) s.deleteMarkers[s.nkeys-1] = false;
+            if(versionTimestamps!=null) s.versionTimestamps[s.nkeys-1] = 0L;
             s.nkeys--; skeys.nkeys--;
             this.nkeys++; keys.nkeys++;
             
@@ -753,6 +913,14 @@ public class Leaf extends AbstractNode implements ILeafData {
             System.arraycopy(skeys.keys, 0, keys.keys, nkeys, s.nkeys);
             
             System.arraycopy(s.values, 0, this.values, nkeys, s.nkeys);
+
+            if(deleteMarkers!=null) {
+                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, nkeys, s.nkeys);
+            }
+
+            if(versionTimestamps!=null) {
+                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, nkeys, s.nkeys);
+            }
             
             /* 
              * Adjust the #of keys in this leaf.
@@ -793,10 +961,22 @@ public class Leaf extends AbstractNode implements ILeafData {
             // move keys and values down by sibling.nkeys positions.
             System.arraycopy(keys.keys, 0, keys.keys, s.nkeys, this.nkeys);
             System.arraycopy(this.values, 0, this.values, s.nkeys, this.nkeys);
+            if(deleteMarkers!=null) {
+                System.arraycopy(this.deleteMarkers, 0, this.deleteMarkers, s.nkeys, this.nkeys);
+            }
+            if(versionTimestamps!=null) {
+                System.arraycopy(this.versionTimestamps, 0, this.versionTimestamps, s.nkeys, this.nkeys);
+            }
             
             // copy keys and values from the sibling to index 0 of this leaf.
             System.arraycopy(skeys.keys, 0, keys.keys, 0, s.nkeys);
             System.arraycopy(s.values, 0, this.values, 0, s.nkeys);
+            if(deleteMarkers!=null) {
+                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, 0, s.nkeys);
+            }
+            if(versionTimestamps!=null) {
+                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, 0, s.nkeys);
+            }
             
             this.nkeys += s.nkeys; keys.nkeys += s.nkeys;
 
@@ -836,192 +1016,45 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         System.arraycopy(values, entryIndex, values, entryIndex + 1, count);
 
+        if (deleteMarkers != null) {
+
+            System.arraycopy(deleteMarkers, entryIndex, deleteMarkers,
+                    entryIndex + 1, count);
+
+        }
+
+        if (versionTimestamps != null) {
+
+            System.arraycopy(versionTimestamps, entryIndex, versionTimestamps,
+                    entryIndex + 1, count);
+        }
+        
         /*
          * Clear the entry at the index. This is partly a paranoia check and
-         * partly critical. Some per-key elements MUST be cleared and it is
-         * much safer (and quite cheap) to clear them during copyDown()
-         * rather than relying on maintenance elsewhere.
+         * partly critical. Some per-key elements MUST be cleared and it is much
+         * safer (and quite cheap) to clear them during copyDown() rather than
+         * relying on maintenance elsewhere.
          */
 
         keys.zeroKey(entryIndex);
 
         values[entryIndex] = null;
+
+        if(deleteMarkers!=null) {
+        
+            deleteMarkers[entryIndex] = false;
+        
+        }
+        
+        if(versionTimestamps!=null) {
+            
+            versionTimestamps[entryIndex] = 0L;
+            
+        }
         
     }
 
-//    /**
-//     * Removes zero or more tuples from this leaf. The values are set to the
-//     * existing values when a tuple is removed and <code>null</code>
-//     * otherwise.
-//     * 
-//     * @return The #of tuples processed.
-//     * 
-//     * @todo optimize batch remove.
-//     */
-//    public int batchRemove(BatchRemove op) {
-//        
-//        final int tupleIndex = op.tupleIndex;
-//        
-//        assert tupleIndex < op.n;
-//        
-//        if(btree.debug) assertInvariants();
-//        
-//        btree.touch(this);
-//
-//        final int entryIndex = keys.search(op.keys[tupleIndex]);
-//
-//        if (entryIndex < 0) {
-//
-//            // Not found.
-//
-//            op.values[tupleIndex] = null;
-//            
-//            return 1;
-//
-//        }
-//
-//        /*
-//         * Note: This is one of the few gateways for mutation of a leaf via
-//         * the main btree API (insert, lookup, delete). By ensuring that we
-//         * have a mutable leaf here, we can assert that the leaf must be
-//         * mutable in other methods.
-//         */
-//
-//        Leaf copy = (Leaf) copyOnWrite();
-//
-//        if (copy != this) {
-//
-//            return copy.batchRemove(op);
-//
-//        }
-//
-//        // The value that is being removed.
-//        op.values[tupleIndex] = this.values[entryIndex];
-//
-////        if (INFO) {
-////            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
-////            if(DEBUG) {
-////                System.err.println("this"); dump(Level.DEBUG,System.err);
-////            }
-////        }
-//
-//        /*
-//         * Copy over the hole created when the key and value were removed
-//         * from the leaf.
-//         * 
-//         * Given: 
-//         * keys : [ 1 2 3 4 ]
-//         * vals : [ a b c d ]
-//         * 
-//         * Remove(1):
-//         * index := 0
-//         * length = nkeys(4) - index(0) - 1 = 3;
-//         * 
-//         * Remove(3):
-//         * index := 2;
-//         * length = nkeys(4) - index(2) - 1 = 1;
-//         * 
-//         * Remove(4):
-//         * index := 3
-//         * length = nkeys(4) - index(3) - 1 = 0;
-//         * 
-//         * Given: 
-//         * keys : [ 1      ]
-//         * vals : [ a      ]
-//         * 
-//         * Remove(1):
-//         * index := 0
-//         * length = nkeys(1) - index(0) - 1 = 0;
-//         */
-//
-//        /*
-//         * Copy down to cover up the hole.
-//         */
-//        final int length = nkeys - entryIndex - 1;
-//
-//        // Tunnel through to the mutable keys object.
-//        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
-//
-//        if (length > 0) {
-//
-//            System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
-//                    length);
-//
-//            System.arraycopy(this.values, entryIndex + 1, this.values,
-//                    entryIndex, length);
-//
-//        }
-//
-//        /* 
-//         * Erase the key/value that was exposed by this operation.
-//         */
-//        keys.zeroKey(nkeys - 1);
-//        this.values[nkeys - 1] = null;
-//
-//        // One less entry in the tree.
-//        ((BTree)btree).nentries--;
-//        assert ((BTree)btree).nentries >= 0;
-//
-//        // One less key in the leaf.
-//        nkeys--; keys.nkeys--;
-//                
-//        if( btree.root != this ) {
-//
-//            /*
-//             * this is not the root leaf.
-//             */
-//        
-//            // update entry count on ancestors.
-//            
-//            parent.get().updateEntryCount(this,-1);
-//            
-//            if( nkeys < minKeys ) {
-//                
-//                /*
-//                 * The leaf is deficient. Join it with a sibling, causing their
-//                 * keys to be redistributed such that neither leaf is deficient.
-//                 * If there is only one other sibling and it has only the
-//                 * minimum #of values then the two siblings will be merged into
-//                 * a single leaf and their parent will have only a single child.
-//                 * Since the minimum #of children is two (2), having a single
-//                 * child makes the parent of this node deficient and it will be
-//                 * joined with one of its siblings. If necessary, this process
-//                 * will continue recursively up the tree. The root leaf never
-//                 * has any siblings and never experiences underflow so it may be
-//                 * legally reduced to zero values.
-//                 * 
-//                 * Note that the minmum branching factor (3) and the invariants
-//                 * together guarentee that there is at least one sibling. Also
-//                 * note that the minimum #of children for a node with the
-//                 * minimum branching factor is two (2) so a valid tree never has
-//                 * a node with a single sibling.
-//                 * 
-//                 * Note that we must invoked copy-on-write before modifying a
-//                 * sibling.  However, the parent of the leave MUST already be
-//                 * mutable (aka dirty) since that is a precondition for removing
-//                 * a key from the leaf.  This means that copy-on-write will not
-//                 * force the parent to be cloned.
-//                 */
-//                
-//                join();
-//                
-//            }
-//            
-//        }
-//            
-//        if(btree.debug) assertInvariants();
-//        
-//        return 1;
-//        
-//    }
-
-    /**
-     * Removes the entry from the leaf if found.
-     * 
-     * @return The old value for the key (may be null) or null if the key was
-     *         not found.
-     */
-    public Object remove(byte[] key) {
+    public Tuple remove(byte[] key, Tuple tuple) {
         
         if(btree.debug) assertInvariants();
         
@@ -1048,20 +1081,42 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         if (copy != this) {
 
-            return copy.remove(key);
+            return copy.remove(key, tuple);
 
         }
 
-        // The value that is being removed.
-        final Object oldval = this.values[entryIndex];
+//        // The value that is being removed.
+//        final Object oldval = this.values[entryIndex];
 
-//        if (INFO) {
-//            log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
-//            if(DEBUG) {
+        if (tuple != null) {
+            
+            /*
+             * Copy data and metadata for the index entry that is being removed.
+             */
+        
+            tuple.copy(entryIndex, this);
+            
+        }
+
+        if (deleteMarkers != null) {
+
+            /*
+             * This operation is not allowed when delete markers are being
+             * maintained. You use an insert(...) instead and specify delete :=
+             * true.
+             */
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
+// if (INFO) {
+// log.info("this="+this+", key="+key+", value="+entry+", index="+entryIndex);
+// if(DEBUG) {
 //                System.err.println("this"); dump(Level.DEBUG,System.err);
 //            }
 //        }
-
+        
         /*
          * Copy over the hole created when the key and value were removed
          * from the leaf.
@@ -1107,6 +1162,13 @@ public class Leaf extends AbstractNode implements ILeafData {
             System.arraycopy(this.values, entryIndex + 1, this.values,
                     entryIndex, length);
 
+            if (versionTimestamps != null) {
+
+                System.arraycopy(this.versionTimestamps, entryIndex + 1, this.versionTimestamps,
+                    entryIndex, length);
+                
+            }
+
         }
 
         /* 
@@ -1114,6 +1176,9 @@ public class Leaf extends AbstractNode implements ILeafData {
          */
         keys.zeroKey(nkeys - 1);
         this.values[nkeys - 1] = null;
+        if(versionTimestamps!=null) {
+            this.versionTimestamps[nkeys - 1] = 0L;
+        }
 
         // One less entry in the tree.
         ((BTree)btree).nentries--;
@@ -1168,11 +1233,12 @@ public class Leaf extends AbstractNode implements ILeafData {
             
         if(btree.debug) assertInvariants();
         
-        return oldval;
+        return tuple;
         
     }
 
-    public Iterator postOrderIterator(final boolean dirtyNodesOnly) {
+    @SuppressWarnings("unchecked")
+    public Iterator<AbstractNode> postOrderNodeIterator(final boolean dirtyNodesOnly) {
 
         if (dirtyNodesOnly && ! isDirty() ) {
 
@@ -1186,7 +1252,8 @@ public class Leaf extends AbstractNode implements ILeafData {
 
     }
 
-    public Iterator postOrderIterator(byte[] fromKey, byte[] toKey) {
+    @SuppressWarnings("unchecked")
+    public Iterator<AbstractNode> postOrderIterator(byte[] fromKey, byte[] toKey) {
 
         return new SingleValueIterator(this);
 
@@ -1261,6 +1328,18 @@ public class Leaf extends AbstractNode implements ILeafData {
             out.println(indent(height) + "  keys=" + keys);
         
             out.println(indent(height) + "  vals=" + Arrays.toString(values));
+            
+            if(deleteMarkers!=null) {
+                
+                out.println(indent(height) + "  deleted=" + Arrays.toString(deleteMarkers));
+                
+            }
+            
+            if(versionTimestamps!=null) {
+                
+                out.println(indent(height) + "  timestamps=" + Arrays.toString(versionTimestamps));
+                
+            }
             
         }
 

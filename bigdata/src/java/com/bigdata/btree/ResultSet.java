@@ -24,19 +24,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import it.unimi.dsi.mg4j.io.InputBitStream;
+import it.unimi.dsi.mg4j.io.OutputBitStream;
+
 import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.Serializable;
+import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
 
 /**
  * An object used to stream key scan results back to the client.
@@ -65,6 +71,14 @@ public class ResultSet implements Externalizable {
 
     private byte[][] vals;
 
+    private long[] versionTimestamps;
+    
+    private byte[] deleteMarkers;
+
+    private byte[] sourceIndices;
+    
+    private IResourceMetadata[] sources;
+    
     /**
      * Total #of key-value pairs within the key range (approximate).
      */
@@ -75,7 +89,7 @@ public class ResultSet implements Externalizable {
     /**
      * Actual #of key-value pairs in the {@link ResultSet}
      */
-    public int getNumTuples() {
+    final public int getNumTuples() {
         return ntuples;
     }
 
@@ -124,16 +138,64 @@ public class ResultSet implements Externalizable {
      * The visited keys iff the keys were requested.
      */
     public byte[][] getKeys() {
+        
         return keys;
+        
     }
 
     /**
      * The visited values iff the values were requested.
      */
     public byte[][] getValues() {
+        
         return vals;
+        
     }
 
+    /**
+     * The visited version timestamps iff the index maintains version
+     * timestamps.
+     * 
+     * @return The version timestamps -or- <code>null</code> iff the index
+     *         does not maintain version timestamps.
+     */
+    public long[] getVersionTimestamps() {
+        
+        return versionTimestamps;
+        
+    }
+    
+    /**
+     * The visited delete markers iff the the index maintains delete markers.
+     * The bytes are coded as ONE (1) is true and ZERO (0) is false.
+     * 
+     * @return The delete markers -or- <code>null</code> iff the index does
+     *         not maintain delete markers.
+     */
+    public byte[] getDeleteMarkers() {
+        
+        return deleteMarkers;
+        
+    }
+
+    /**
+     * The values returned by {@link ITuple#getSourceIndex()} for each visited
+     * index entry.
+     */
+    public int getSourceIndex(int index) {
+        
+        if (sources.length == 1) {
+
+            // One source - the index is always zero.
+            
+            return 0;
+
+        }
+
+        return sourceIndices[index];
+        
+    }
+    
     /**
      * Deserialization constructor.
      */
@@ -164,46 +226,20 @@ public class ResultSet implements Externalizable {
 
     }
 
-//    /**
-//     * Interface used to construct instances of {@link ResultSet}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static interface IResultSetConstructor extends Serializable {
-//
-//        public ResultSet newResultSet(IIndex ndx, byte[] fromKey, byte[] toKey,
-//                int capacity, int flags, IEntryFilter filter);
-//
-//    }
-//
-//    /**
-//     * Default implementation.
-//     * <p>
-//     * Note: Derived implementations can return a subclass of {@link ResultSet}
-//     * that uses custom serialization for the keys and/or values.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class DefaultResultSetConstructor implements
-//            IResultSetConstructor {
-//
-//        /**
-//         * 
-//         */
-//        private static final long serialVersionUID = -237842375057508872L;
-//
-//        public static transient IResultSetConstructor INSTANCE = new DefaultResultSetConstructor();
-//        
-//        public ResultSet newResultSet(IIndex ndx, byte[] fromKey, byte[] toKey,
-//                int capacity, int flags, IEntryFilter filter) {
-//            
-//            return new ResultSet(ndx, fromKey, toKey, capacity, flags, filter);
-//            
-//        }
-//        
-//    }
+    /**
+     * Return the ordered array of sources from which the iterator read and the
+     * {@link ResultSet} was populated.
+     * <p>
+     * The values returned by {@link ITuple#getSourceIndex()} may be used to
+     * identify the resource from which a given tuple was read. That information
+     * is used to direct {@link ITuple#readBlock(long)} requests to the correct
+     * resource on the {@link IDataService}.
+     */
+    public IResourceMetadata[] getSources() {
+        
+        return sources;
+        
+    }
     
     /**
      * Constructor used by the {@link DataService} to populate the
@@ -237,6 +273,25 @@ public class ResultSet implements Externalizable {
         keys = (sendKeys ? new byte[limit][] : null);
 
         vals = (sendVals ? new byte[limit][] : null);
+        
+        if(ndx.getIndexMetadata().getDeleteMarkers()) {
+            
+            // index has delete markers so we send them along.
+            deleteMarkers = new byte[limit];
+            
+        }
+
+        if(ndx.getIndexMetadata().getVersionTimestamps()) {
+
+            // index has version timestamps so we send them along.
+            versionTimestamps = new long[limit];
+
+        }
+
+        sources = ndx.getResourceMetadata();
+
+        // if one source then the index is always zero.
+        sourceIndices = sources.length > 1 ? new byte[limit] : null;
 
         /*
          * Iterator that will visit the key range.
@@ -256,18 +311,55 @@ public class ResultSet implements Externalizable {
          */
         boolean anything = false;
 
+        /*
+         * @todo we could directly serialize the keys and values into a compact
+         * data model as they are copied out of the tuple.
+         */
+        ITuple tuple = null;
+        
+        if((flags&IRangeQuery.REMOVEALL)!=0) {
+            
+            log.info("Iterator will remove up to " + capacity
+                    + " entries (capacity=" + capacity + ", rangeCount="
+                    + rangeCount + ")");
+            
+        }
+        
         while (ntuples < limit && itr.hasNext()) {
 
             anything = true;
 
-            byte[] val = (byte[]) itr.next();
+            tuple = itr.next();
+            
+            if (sendKeys)
+                keys[ntuples] = tuple.getKey();
 
             if (sendVals)
-                vals[ntuples] = val;
+                vals[ntuples] = tuple.getValue();
 
-            if (sendKeys)
-                keys[ntuples] = itr.getKey();
+            if (deleteMarkers != null) {
 
+                deleteMarkers[ntuples] = (byte) (tuple.isDeletedVersion() ? 1
+                        : 0);
+
+            }
+
+            if (versionTimestamps != null) {
+
+                versionTimestamps[ntuples] = tuple.getVersionTimestamp();
+
+            }
+
+            if (sourceIndices != null) {
+                
+                final int sourceIndex = tuple.getSourceIndex();
+                
+                assert sourceIndex < Byte.MAX_VALUE;
+                
+                sourceIndices[ntuples] = (byte) sourceIndex;
+                
+            }
+            
             // #of results that will be returned.
             ntuples++;
 
@@ -275,13 +367,15 @@ public class ResultSet implements Externalizable {
 
         this.ntuples = ntuples;
 
-        this.lastKey = (anything ? itr.getKey() : null);
+        this.lastKey = (anything ? tuple.getKey() : null);
 
         this.exhausted = !itr.hasNext();
 
         log.info("ntuples=" + ntuples + ", capacity=" + capacity
                 + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
-                + ", sendVals=" + sendVals);
+                + ", sendVals=" + sendVals + ", deleteMarkers="
+                + (deleteMarkers != null ? true : false) + ", timestamps="
+                + (versionTimestamps != null ? true : false));
 
     }
 
@@ -299,11 +393,19 @@ public class ResultSet implements Externalizable {
 
         ntuples = (int) LongPacker.unpackLong(in);
 
+        final int nsources = (int) LongPacker.unpackLong(in);
+
+        sources = new IResourceMetadata[nsources];
+        
         exhausted = in.readBoolean();
 
         final boolean haveKeys = in.readBoolean();
 
         final boolean haveVals = in.readBoolean();
+
+        final boolean haveDeleteMarkers = in.readBoolean();
+
+        final boolean haveVersionTimestamps = in.readBoolean();
 
         final int lastKeySize = (int) LongPacker.unpackLong(in);
         if (lastKeySize != 0) {
@@ -313,6 +415,20 @@ public class ResultSet implements Externalizable {
             lastKey = null;
         }
 
+        for (int i = 0; i < sources.length; i++) {
+                
+            sources[i] = (IResourceMetadata) in.readObject();
+
+        }
+        
+// if (ntuples == 0) {
+//
+//            // Nothing more to read.
+//            
+//            return;
+//            
+//        }
+        
         if (haveKeys) {
             keys = getKeySerializer().read(in);
         } else {
@@ -324,35 +440,55 @@ public class ResultSet implements Externalizable {
         } else {
             vals = null;
         }
+        
+        if (haveDeleteMarkers) {
+            
+            deleteMarkers = new byte[ntuples];
 
-        //            if (haveKeys) {
-        //                keys = new byte[ntuples][];
-        //                for (int i = 0; i < ntuples; i++) {
-        //                    int size = (int) LongPacker.unpackLong(in);
-        //                    byte[] tmp = new byte[size];
-        //                    in.readFully(tmp);
-        //                    keys[i] = tmp;
-        //                }
-        //            } else {
-        //                keys = null;
-        //            }
+            if (ntuples > 0) {
 
-        //            if (haveVals) {
-        //                vals = new byte[ntuples][];
-        //                for (int i = 0; i < ntuples; i++) {
-        //                    // when lenPlus == 0 the value is null (vs byte[0]).
-        //                    final int lenPlus1 = (int) LongPacker.unpackLong(in);
-        //                    if (lenPlus1 > 0) {
-        //                        byte[] tmp = new byte[lenPlus1 - 1];
-        //                        in.readFully(tmp);
-        //                        vals[i] = tmp;
-        //                    } else
-        //                        vals[i] = null;
-        //                }
-        //            } else {
-        //                vals = null;
-        //            }
+                InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
 
+                // @todo ibs.read() does not handle ntuples==0 gracefully.
+                
+                ibs.read(deleteMarkers, ntuples/* len */);
+
+                // ibs.close();
+
+            }
+            
+        }
+
+        if (haveVersionTimestamps) {
+            
+            versionTimestamps = new long[ntuples];
+            
+            for(int i=0; i<ntuples; i++) {
+                
+                versionTimestamps[i] = in.readLong();
+                
+            }
+            
+        }
+
+        if (sources.length > 1) {
+            
+            sourceIndices = new byte[ntuples];
+            
+            // FIXME use a compressed encoding, e.g., bit length or huffman.
+            for(int i=0; i<ntuples; i++) {
+                
+                sourceIndices[i] = in.readByte();
+                
+            }
+            
+        } else {
+            
+            // The source index is always zero if there is just one source.
+            sourceIndices = null;
+            
+        }
+        
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -365,11 +501,18 @@ public class ResultSet implements Externalizable {
 
         LongPacker.packLong(dos, ntuples);
 
+        LongPacker.packLong(dos, sources.length);
+
+        // @todo write as bits?
         dos.writeBoolean(exhausted);
 
         dos.writeBoolean(keys != null);
 
         dos.writeBoolean(vals != null);
+
+        dos.writeBoolean(deleteMarkers != null);
+        
+        dos.writeBoolean(versionTimestamps != null);
 
         LongPacker.packLong(dos, lastKey == null ? 0 : lastKey.length);
 
@@ -379,6 +522,20 @@ public class ResultSet implements Externalizable {
 
         }
 
+        for (int i = 0; i < sources.length; i++) {
+
+                out.writeObject(sources[i]);
+
+        }
+        
+// if (ntuples == 0) {
+//
+//            // Nothing more to write.
+//            
+//            return;
+//            
+//        }
+            
         if (keys != null) {
 
             getKeySerializer().write(ntuples, 0/*offset*/, keys, out);
@@ -390,26 +547,48 @@ public class ResultSet implements Externalizable {
             getValSerializer().write(ntuples, 0/*offset*/, vals, out);
 
         }
+        
+        if (deleteMarkers != null && ntuples > 0) {
+            
+            OutputBitStream obs = new OutputBitStream((OutputStream) out, 0/* unbuffered! */);
+            
+            obs.write(deleteMarkers, ntuples/*len*/);
+            
+            obs.flush();
+            
+        }
+        
+        /*
+         * @todo reuse the timestamp serialization logic from the NodeSerializer
+         * once something efficient has been identifier, e.g., huffman encoding
+         * of timestamps.
+         */
 
-        //            if (keys != null) {
-        //                for (int i = 0; i < ntuples; i++) {
-        //                    // keys are never null.
-        //                    LongPacker.packLong(dos, keys[i].length);
-        //                    dos.write(keys[i]);
-        //                }
-        //            }
-        //            if (vals != null) {
-        //                for (int i = 0; i < ntuples; i++) {
-        //                    final byte[] val = vals[i];
-        //                    // this differentiates a null value from an empty byte[].
-        //                    final int lenPlus1 = val == null ? 0 : val.length + 1;
-        //                    LongPacker.packLong(dos, lenPlus1);
-        //                    if (val != null) {
-        //                        dos.write(val);
-        //                    }
-        //                }
-        //            }
+        if (versionTimestamps != null) {
+            
+            for (int i = 0; i < ntuples; i++) {
 
+                out.writeLong(versionTimestamps[i]);
+                
+            }
+            
+        }
+
+        if (sources.length > 1) {
+
+            /*
+             * Note: if only one source then we do not need the source indices
+             * since the source index is always zero.
+             */
+            
+            for(int i=0; i<ntuples; i++) {
+                
+                out.writeByte(sourceIndices[i]);
+                
+            }
+            
+        }
+        
     }
 
 }

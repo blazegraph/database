@@ -59,12 +59,12 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.ResultSet;
@@ -75,13 +75,13 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.InferenceEngine;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
 import com.bigdata.rdf.inf.Rule;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
-import com.bigdata.rdf.inf.SPOJustificationIterator;
 import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
@@ -821,7 +821,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
         
         // lookup in the forward index.
-        final Object tmp = ndx.lookup(val.key);
+        final byte[] tmp = ndx.lookup(val.key);
         
         if (tmp == null) {
 
@@ -831,7 +831,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         try {
 
-            val.termId = new DataInputBuffer((byte[])tmp).unpackLong();
+            val.termId = new DataInputBuffer(tmp).unpackLong();
 
         } catch (IOException ex) {
 
@@ -1524,63 +1524,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-        /**
-         * FIXME This currently sucks everything into an array. Get traversal
-         * with concurrent modification working for {@link IEntryIterator} and
-         * then modify this to use {@link SPOIterator}, which uses asynchronous
-         * reads and buffers a reasonable number of statements in memory.
-         * <p>
-         * Note: the {@link Rule}s basically assume that they can traverse the
-         * statement indices with concurrent modification of those indices (the
-         * {@link SPOAssertionBuffer} incrementally flushes the results to the database,
-         * which means that it is writing on the statement indices at the same
-         * time as we are reading from those indices).
-         * <p>
-         * However, the underlying {@link BTree} does NOT support traversal with
-         * concurrent modification.
-         * <p>
-         * There are several ways to accomplish this ranging from: (a) the data
-         * service, which issues a series of range queries in order to
-         * incrementally cover a range and which would support interleaving of
-         * range query and update operations; (b) a specialization akin to
-         * isolation in which writes are absorbed onto an isolated index while
-         * reads traverse the primary index (or writes are absorbed onto the
-         * live index while reads traverse a historical version, which does not
-         * cause double buffering but means that your writes are not visible to
-         * the reader until you commit); and (c) modifying the {@link BTree} to
-         * support traversal with concurrent modification, which could be as
-         * simple as restarting the iterator from the successor of the last
-         * visited key if the tree has been modified.
-         * <p>
-         * Updated position: There are two uses to support. One is remove() on
-         * IEntryIterator with a single-thread accessing the BTree. This case is
-         * easy enough since we only need to support "delete behind." It can be
-         * handled with restarting the iterator if necessary to accomodate a
-         * delete which causes a structural modification (leaves to merge).
-         * <p>
-         * The second use case is logically concurrent tasks that read and write
-         * on the same unisolated index(s). This use case is already supported
-         * by the concurrency control mechanisms in the concurrent journal.
-         * However, the refactor should wait on a change to the concurrency
-         * control to: (a) check point the indices at the each of each write so
-         * that we can abort individual tasks without throwing away the work of
-         * other tasks; and (b) add an "awaitCommit" property to the task so
-         * that tasks may execute without either forcing a commit or awaiting a
-         * commit. When false, "awaitCommit" does NOT mean that the application
-         * can rely on the data to NOT be durable, it simply means that the
-         * application does not require an immediate commit (ie, is willing to
-         * discover that the data were not durable on restart). This would be
-         * useful in an embedded application such as the RDF database which
-         * performs a lot of write tasks on the unisolated indices before it has
-         * completed an atomic operation from the application perspective. Note
-         * that "awaitCommit" probably is only viable in an environment without
-         * application level concurrency since partial writes would be visible
-         * immediately and COULD be restart safe. However, an application such
-         * as the {@link ScaleOutTripleStore} already manages concurrency at the
-         * application level using a "consistent" data approach (but this issue
-         * has not been solved for computing closure or truth maintenance on
-         * statement removal.)
-         */
         public ISPOIterator iterator(ISPOFilter filter) {
 
             if (allBound) {
@@ -1989,7 +1932,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                                 // will visit justifications for that statement.
                                 // FIXME use chunks.
-                                SPOJustificationIterator itr = new SPOJustificationIterator(
+                                FullyBufferedJustificationIterator itr = new FullyBufferedJustificationIterator(
                                         AbstractTripleStore.this, spo);
                                 
                                 if(DEBUG) {
@@ -2152,7 +2095,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
          */
         public Iterator<Long> distinctTermScan() {
 
-            ArrayList<Long> ids = new ArrayList<Long>(1000);
+            int capacity = 10000;
+            
+            ArrayList<Long> ids = new ArrayList<Long>(capacity);
             
             byte[] fromKey = null;
             
@@ -2160,26 +2105,27 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             IIndex ndx = getStatementIndex();
             
-            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
+                    IRangeQuery.KEYS, null/* filter */);
             
 //            long[] tmp = new long[IRawTripleStore.N];
             
             while(itr.hasNext()) {
                 
-                itr.next();
+                ITuple tuple = itr.next();
                 
                 // clone of the key.
 //                final byte[] key = itr.getKey();
                 
                 // copy of the key in a reused buffer.
-                final byte[] key = itr.getTuple().getKeyBuffer().array();
+//                final byte[] key = tuple.getKeyBuffer().array();
                 
                 // extract the term ids from the key. 
 //                RdfKeyBuilder.key2Statement( key , tmp);
 //                
 //                final long id = tmp[0];
                 
-                final long id = KeyBuilder.decodeLong( key, 0);
+                final long id = KeyBuilder.decodeLong( tuple.getKeyBuffer().array(), 0);
                 
                 // append tmp[0] to the output list.
                 ids.add(id);
@@ -2193,7 +2139,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 fromKey = keyBuilder.statement2Key(nextId, NULL, NULL);
                 
                 // new iterator.
-                itr = ndx.rangeIterator(fromKey, toKey);
+                itr = ndx.rangeIterator(fromKey, toKey, capacity,
+                        IRangeQuery.KEYS, null/* filter */);
                 
             }
             
@@ -2547,9 +2494,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             while(itrj.hasNext()) {
                 
-                itrj.next();
-                
-                Justification jst = new Justification(itrj.getKey());
+                Justification jst = new Justification(itrj);
                 
                 System.err.println("#" + (njust + 1) + "\t"
                         + jst.toString(resolveTerms));
@@ -2575,12 +2520,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * 
      * @see #termIterator()
      */
+    @SuppressWarnings("unchecked")
     public Iterator<Value> idTermIndexScan() {
 
         final IIndex ndx = getIdTermIndex();
 
-        return new Striterator(ndx.rangeIterator(null, null))
-                .addFilter(new Resolver() {
+        return new Striterator(ndx.rangeIterator(null, null, 0/* capacity */,
+                IRangeQuery.VALS, null/* filter */)).addFilter(new Resolver() {
 
             private static final long serialVersionUID = 1L;
 
@@ -2590,7 +2536,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              */
             protected Object resolve(Object val) {
                 
-                _Value term = _Value.deserialize((byte[]) val);
+                ITuple tuple = (ITuple)val;
+                
+                _Value term = _Value.deserialize(tuple.getValueStream());
 
                 return term;
                 
@@ -2604,11 +2552,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * Iterator visits all term identifiers in order by the <em>term</em> key
      * (efficient index scan).
      */
+    @SuppressWarnings("unchecked")
     public Iterator<Long> termIdIndexScan() {
 
         final IIndex ndx = getTermIdIndex();
 
-        return new Striterator(ndx.rangeIterator(null, null))
+        return new Striterator(ndx.rangeIterator(null, null, 0/* capacity */,
+                IRangeQuery.VALS, null/* filter */))
                 .addFilter(new Resolver() {
 
             private static final long serialVersionUID = 1L;
@@ -2618,15 +2568,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              * 
              * @param val The serialized term identifier.
              */
-            protected Object resolve(Object val) {
+            protected Object resolve(final Object val) {
 
+                final ITuple tuple = (ITuple) val;
+                
                 final long id;
                 
                 try {
 
-                    id = new DataInputBuffer((byte[]) val).unpackLong();
+                    id = tuple.getValueStream().unpackLong();
 
-                } catch (IOException ex) {
+                } catch (final IOException ex) {
 
                     throw new RuntimeException(ex);
 
@@ -2654,6 +2606,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * indices are not mutually ordered, that resolution will result in random
      * hits on the id:term index.
      */
+    @SuppressWarnings("unchecked")
     public Iterator<Value> termIterator() {
 
         // visit term identifiers in term order.

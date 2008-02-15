@@ -120,8 +120,15 @@ public class AccessPathFusedView implements IAccessPath {
          * and filter through everywhere might have broken FusedEntryIterator
          * for this call in the case where the source iterators are not
          * requesting either the keys or the values.
+         * 
+         * FIXME This MUST specify ALLVERSIONS for the source iterators in order
+         * for the fused view to be able to recognize a deleted index entry and
+         * discard a historical undeleted entry later in the predence order for
+         * the view.
          */
-        return new FusedEntryIterator( new IEntryIterator[] {
+        return new FusedEntryIterator(
+                false, // ALLVERSIOSN
+                new IEntryIterator[] {
                 path1.rangeQuery(),//
                 path2.rangeQuery()//
                 }

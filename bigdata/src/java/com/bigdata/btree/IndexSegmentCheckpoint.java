@@ -30,38 +30,42 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexSegment.CustomAddressSerializer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
- * The metadata record for an {@link IndexSegment}.
+ * The checkpoint record for an {@link IndexSegment}.
  * <p>
- * The commit point for the index segment file should be a metadata record at
- * the head of the file having identical timestamps at the start and end of its
- * data section. Since the file format is immutable it is ok to have what is
- * essentially only a single root block. If the timestamps do not agree then the
- * build was not successfully completed.
+ * The checkpoint record for the index segment file is written at the head of
+ * the file. It should have identical timestamps at the start and end of the
+ * checkpoint record (e.g., it doubles as a root block). Since the file format
+ * is immutable it is ok to have what is essentially only a single root block.
+ * If the timestamps do not agree then the build was not successfully completed.
+ * <p>
+ * Similar to the {@link BTree}'s {@link Checkpoint} record, this record
+ * contains only data that pertains specifically to the {@link IndexSegment}
+ * checkpoint or data otherwise required to bootstrap the load of the
+ * {@link IndexSegment} from the file. General purpose metadata is stored in the
+ * extension metadata record.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME The {@link IAddressManager} needs to be customized for the
- * {@link IndexSegmentFileStore}.  See {@link CustomAddressSerializer}.
- * 
  * @todo the checksum of the index segment file should be stored in the
  *       partitioned index so that it can be validated after being moved around,
- *       etc. it would also be good to checksum the {@link IndexSegmentMetadata}
+ *       etc. If we do this then it might not be necessary to checksum the
+ *       individual records within the {@link IndexSegment}.
+ *       <p>
+ *       it would also be good to checksum the {@link IndexSegmentCheckpoint}
  *       record.
  */
-public class IndexSegmentMetadata {
+public class IndexSegmentCheckpoint {
 
     /**
      * Logger.
      */
     protected static final Logger log = Logger
-            .getLogger(IndexSegmentMetadata.class);
+            .getLogger(IndexSegmentCheckpoint.class);
 
     static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
     static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
@@ -74,12 +78,12 @@ public class IndexSegmentMetadata {
     static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
 
     /**
-     * The #of unused bytes in the metadata record format. Note that the unused
-     * space occurs between the file size and the final timestamp in the record.
+     * The #of unused bytes in the checkpoint record format. Note that the
+     * unused space occurs <em>before</em> the final timestamp in the record.
      * As the unused bytes are allocated in new versions the value in this field
      * MUST be adjusted down from its original value of 256.
      */
-    static final int SIZEOF_UNUSED = 239;
+    static final int SIZEOF_UNUSED = 256;
 
     /**
      * The #of bytes required by the current metadata record format.
@@ -90,14 +94,10 @@ public class IndexSegmentMetadata {
             Bytes.SIZEOF_LONG + // timestamp0
             Bytes.SIZEOF_UUID + // segment UUID.
             SIZEOF_OFFSET_BITS + // #of bits used to represent a byte offset.
-            SIZEOF_BRANCHING_FACTOR + // branchingFactor
             SIZEOF_COUNTS * 4 + // height, #leaves, #nodes, #entries
             SIZEOF_NBYTES + // max record length
-            Bytes.SIZEOF_BYTE + // useChecksum
-            SIZEOF_ADDR * 5 + // leaves, nodes, root, ext metadata, bloomFilter
-            Bytes.SIZEOF_DOUBLE + // errorRate
+            SIZEOF_ADDR * 6 + // leaves, nodes, root, metadata, bloomFilter, blobs
             Bytes.SIZEOF_LONG + // file size
-            Bytes.SIZEOF_UUID + // index UUID. 
             SIZEOF_UNUSED + // available bytes for future versions.
             Bytes.SIZEOF_LONG // timestamp1
     ;
@@ -115,8 +115,6 @@ public class IndexSegmentMetadata {
     /**
      * UUID for this {@link IndexSegment} (it is a unique identifier for
      * the index segment resource).
-     * 
-     * @see #indexUUID
      */
     final public UUID segmentUUID;
 
@@ -130,12 +128,7 @@ public class IndexSegmentMetadata {
      * The {@link IAddressManager} used to interpret addresses in the
      * {@link IndexSegmentFileStore}.
      */
-    final IAddressManager am;
-    
-    /**
-     * Branching factor for the index segment.
-     */
-    final public int branchingFactor;
+    final IndexSegmentAddressManager am;
     
     /**
      * Height of the index segment (origin zero, so height := 0 means that
@@ -166,14 +159,10 @@ public class IndexSegmentMetadata {
     /**
      * The maximum #of bytes in any node or leaf stored on the index
      * segment.
+     * 
+     * @todo this appears to be unused now - perhaps it should go away?
      */
     final public int maxNodeOrLeafLength;
-    
-    /**
-     * When true, the checksum was computed and stored for the nodes and leaves
-     * in the file and will be verified on de-serialization.
-     */
-    final public boolean useChecksum;
     
     /**
      * The address of the contiguous region containing the serialized leaves in
@@ -181,7 +170,7 @@ public class IndexSegmentMetadata {
      * <p>
      * Note: The offset component of this address must be equal to {@link #SIZE}
      * since the leaves are written immediately after the
-     * {@link IndexSegmentMetadata} record.
+     * {@link IndexSegmentCheckpoint} record.
      */
     final public long addrLeaves;
     
@@ -197,9 +186,9 @@ public class IndexSegmentMetadata {
     final public long addrRoot;
 
     /**
-     * The address of the {@link IndexSegmentExtensionMetadata} record.
+     * The address of the {@link IndexMetadata} record.
      */
-    final public long addrExtensionMetadata;
+    final public long addrMetadata;
     
     /**
      * Address of the optional bloom filter and 0L iff no bloom filter
@@ -208,10 +197,9 @@ public class IndexSegmentMetadata {
     final public long addrBloom;
     
     /**
-     * The target error rate for the optional bloom filter and 0.0 iff
-     * the bloom filter was not constructed.
+     * Address of the optional records to be resolved by blob references.
      */
-    final public double errorRate;
+    final public long addrBlobs;
     
     /**
      * Length of the file in bytes.
@@ -219,23 +207,13 @@ public class IndexSegmentMetadata {
     final public long length;
     
     /**
-     * The unique identifier for the index whose data is on this
-     * {@link IndexSegment}.
-     * <p>
-     * All {@link AbstractBTree}s having data for the same index will have the
-     * same {@link #indexUUID}. A partitioned index is comprised of mutable
-     * {@link BTree}s and historical read-only {@link IndexSegment}s, all of
-     * which will have the same {@link #indexUUID} if they have data for the
-     * same scale-out index.
-     * 
-     * @see #segmentUUID
+     * The commit time associated with the view from which the
+     * {@link IndexSegment} was generated. This field is written at the head and
+     * tail of the {@link IndexSegmentCheckpoint} record. If the timestamps on
+     * that record do not agree then the build operation probably failed while
+     * writing the checkpoint record.
      */
-    final public UUID indexUUID;
-    
-    /**
-     * Timestamp when the {@link IndexSegment} was generated.
-     */
-    final public long timestamp;
+    final public long commitTime;
 
     /**
      * Reads the metadata record for the {@link IndexSegment} from the current
@@ -246,7 +224,7 @@ public class IndexSegmentMetadata {
      * 
      * @throws IOException
      */
-    public IndexSegmentMetadata(RandomAccessFile raf) throws IOException {
+    public IndexSegmentCheckpoint(RandomAccessFile raf) throws IOException {
 
 //        raf.seek(0);
         
@@ -256,8 +234,6 @@ public class IndexSegmentMetadata {
             throw new IOException("Bad magic: actual=" + magic
                     + ", expected=" + MAGIC);
         }
-
-        // @todo add assertions here parallel to those in the other ctor.
 
         final int version = raf.readInt();
         
@@ -273,10 +249,6 @@ public class IndexSegmentMetadata {
 
         offsetBits = raf.readByte();
         
-        am = new WormAddressManager(offsetBits); 
-        
-        branchingFactor = raf.readInt();
-
         height = raf.readInt();
         
         nleaves = raf.readInt();
@@ -287,28 +259,26 @@ public class IndexSegmentMetadata {
 
         maxNodeOrLeafLength = raf.readInt();
         
-        useChecksum = raf.readBoolean();
-                
         addrLeaves = raf.readLong();
 
         addrNodes = raf.readLong();
         
         addrRoot = raf.readLong();
 
-        addrExtensionMetadata = raf.readLong();
+        addrMetadata = raf.readLong();
 
         addrBloom = raf.readLong();
         
-        errorRate = raf.readDouble();
+        addrBlobs = raf.readLong();
         
         length = raf.readLong();
         
         if (length != raf.length()) {
-            throw new IOException("Length differs: actual="
-                    + raf.length() + ", expected=" + length);
+
+            throw new IOException("Length differs: actual=" + raf.length()
+                    + ", expected=" + length);
+
         }
-        
-        indexUUID = new UUID(raf.readLong()/*MSB*/, raf.readLong()/*LSB*/);
         
         raf.skipBytes(SIZEOF_UNUSED);
         
@@ -320,10 +290,14 @@ public class IndexSegmentMetadata {
             
         }
         
-        this.timestamp = timestamp0;
+        this.commitTime = timestamp0;
+        
+        am = new IndexSegmentAddressManager(this); 
+        
+        validate();
 
         log.info(this.toString());
-        
+
     }
 
     /**
@@ -332,18 +306,66 @@ public class IndexSegmentMetadata {
      * 
      * @todo javadoc.
      */
-    public IndexSegmentMetadata(int offsetBits,int branchingFactor, int height,
-            boolean useChecksum, int nleaves, int nnodes, int nentries,
-            int maxNodeOrLeafLength, long addrLeaves, long addrNodes,
-            long addrRoot, long addrExtensionMetadata, long addrBloom,
-            double errorRate, long length, UUID indexUUID, UUID segmentUUID,
-            long timestamp) {
+    public IndexSegmentCheckpoint(int offsetBits, int height, int nleaves,
+            int nnodes, int nentries, int maxNodeOrLeafLength, long addrLeaves,
+            long addrNodes, long addrRoot, long addrMetadata, long addrBloom,
+            long addrBlobs, long length, UUID segmentUUID, long commitTime) {
+
+        /*
+         * Copy the various fields to initialize the checkpoint record.
+         */
         
-//        assert WormAddressManager.assertOffsetBits(offsetBits);
+        this.segmentUUID = segmentUUID;
+
+        this.offsetBits = offsetBits;
         
-        am = new WormAddressManager(offsetBits);
+        this.height = height;
+
+        this.nleaves = nleaves;
         
-        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+        this.nnodes = nnodes;
+        
+        this.nentries = nentries;
+
+        this.maxNodeOrLeafLength = maxNodeOrLeafLength;
+        
+        this.addrLeaves = addrLeaves;
+        
+        this.addrNodes = addrNodes;
+        
+        this.addrRoot = addrRoot;
+
+        this.addrMetadata = addrMetadata;
+
+        this.addrBloom = addrBloom;
+
+        this.addrBlobs = addrBlobs;
+        
+        this.length = length;
+        
+        this.commitTime = commitTime;
+        
+        /*
+         * Create the address manager using this checkpoint record (requires
+         * that certain fields are initialized on the checkpoint record).
+         */
+        
+        am = new IndexSegmentAddressManager(this);
+        
+        validate();
+        
+        log.info(this.toString());
+        
+    }
+
+    /**
+     * Test validity of the checkpoint record.
+     * 
+     * @todo this uses asserts which may be disabled.
+     */
+    public void validate() {
+        
+//        assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
         
         assert height >= 0;
         
@@ -353,8 +375,8 @@ public class IndexSegmentMetadata {
         
         // index may not be empty.
         assert nentries > 0;
-        // #entries must fit within the tree height.
-        assert nentries <= Math.pow(branchingFactor,height+1);
+//        // #entries must fit within the tree height.
+//        assert nentries <= Math.pow(branchingFactor,height+1);
         
         assert maxNodeOrLeafLength > 0;
         
@@ -376,56 +398,21 @@ public class IndexSegmentMetadata {
             assert am.getOffset(addrRoot) < length;
         }
 
-        if( addrBloom == 0L ) assert errorRate == 0.;
+        /*
+         * @todo validate the blob, bloom, and metadata addresses as well and
+         * the total length of the file.
+         */
         
-        if( errorRate != 0.) assert addrBloom != 0L;
+//        if( addrBloom == 0L ) assert errorRate == 0.;
+//        
+//        if( errorRate != 0.) assert addrBloom != 0L;
         
-        assert timestamp != 0L;
+        assert commitTime != 0L;
         
         assert segmentUUID != null;
-        
-        assert indexUUID != null;
-        
-        this.segmentUUID = segmentUUID;
-
-        this.offsetBits = offsetBits;
-        
-        this.branchingFactor = branchingFactor;
-
-        this.height = height;
-
-        this.nleaves = nleaves;
-        
-        this.nnodes = nnodes;
-        
-        this.nentries = nentries;
-
-        this.maxNodeOrLeafLength = maxNodeOrLeafLength;
-        
-        this.useChecksum = useChecksum;
-        
-        this.addrLeaves = addrLeaves;
-        
-        this.addrNodes = addrNodes;
-        
-        this.addrRoot = addrRoot;
-
-        this.addrExtensionMetadata = addrExtensionMetadata;
-
-        this.addrBloom = addrBloom;
-        
-        this.errorRate = errorRate;
-        
-        this.length = length;
-        
-        this.indexUUID = indexUUID;
-        
-        this.timestamp = timestamp;
-        
-        log.info(this.toString());
 
     }
-
+    
     /**
      * Write the metadata record on the current position of the file.
      * 
@@ -444,15 +431,13 @@ public class IndexSegmentMetadata {
 
         raf.writeInt(VERSION0);
 
-        raf.writeLong(timestamp);
+        raf.writeLong(commitTime);
         
         raf.writeLong(segmentUUID.getMostSignificantBits());
 
         raf.writeLong(segmentUUID.getLeastSignificantBits());
 
         raf.writeByte(offsetBits);
-        
-        raf.writeInt(branchingFactor);
                         
         raf.writeInt(height);
         
@@ -464,25 +449,19 @@ public class IndexSegmentMetadata {
 
         raf.writeInt(maxNodeOrLeafLength);
         
-        raf.writeBoolean(useChecksum);
-        
         raf.writeLong(addrLeaves);
         
         raf.writeLong(addrNodes);
 
         raf.writeLong(addrRoot);
 
-        raf.writeLong(addrExtensionMetadata);
+        raf.writeLong(addrMetadata);
         
         raf.writeLong(addrBloom);
         
-        raf.writeDouble(errorRate);
+        raf.writeLong(addrBlobs);
         
         raf.writeLong(length);
-        
-        raf.writeLong(indexUUID.getMostSignificantBits());
-
-        raf.writeLong(indexUUID.getLeastSignificantBits());
 
         /*
          * skip over this many bytes. Note that skipBytes() does not seem to
@@ -494,7 +473,7 @@ public class IndexSegmentMetadata {
 //        raf.write(new byte[SIZEOF_UNUSED]);
         raf.seek(raf.getFilePointer()+SIZEOF_UNUSED);
         
-        raf.writeLong(timestamp);
+        raf.writeLong(commitTime);
 
         log.info("wrote: pos="+raf.getFilePointer());
         
@@ -510,22 +489,19 @@ public class IndexSegmentMetadata {
         sb.append("magic="+Integer.toHexString(MAGIC));
         sb.append(", segmentUUID="+segmentUUID);
         sb.append(", offsetBits="+offsetBits);
-        sb.append(", branchingFactor="+branchingFactor);
         sb.append(", height=" + height);
         sb.append(", nleaves=" + nleaves);
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", useChecksum=" + useChecksum);
         sb.append(", addrLeaves=" + am.toString(addrLeaves));
         sb.append(", addrNodes=" + am.toString(addrNodes));
         sb.append(", addrRoot=" + am.toString(addrRoot));
-        sb.append(", addrExtensionMetadata=" + am.toString(addrExtensionMetadata));
+        sb.append(", addrMetadata=" + am.toString(addrMetadata));
         sb.append(", addrBloom=" + am.toString(addrBloom));
-        sb.append(", errorRate=" + errorRate);
+        sb.append(", addrBlobs=" + am.toString(addrBlobs));
         sb.append(", length=" + length);
-        sb.append(", indexUUID="+indexUUID);
-        sb.append(", timestamp=" + new Date(timestamp));
+        sb.append(", commitTime=" + new Date(commitTime));
 
         return sb.toString();
     }

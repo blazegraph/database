@@ -134,7 +134,7 @@ class DirtyChildIterator implements INodeIterator {
 
     }
 
-    public IAbstractNode next() {
+    public AbstractNode next() {
 
         if (!hasNext()) {
 
@@ -146,7 +146,7 @@ class DirtyChildIterator implements INodeIterator {
 
         assert child.isDirty();
 
-        IAbstractNode tmp = child;
+        AbstractNode tmp = child;
 
         // advance the index where the scan will start next() time.
         lastVisited = index++;
@@ -158,7 +158,7 @@ class DirtyChildIterator implements INodeIterator {
 
     }
 
-    public IAbstractNode getNode() {
+    public AbstractNode getNode() {
         
         if( lastVisited == -1 ) {
             

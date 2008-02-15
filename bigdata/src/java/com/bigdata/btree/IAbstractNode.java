@@ -46,6 +46,6 @@ public interface IAbstractNode {
      * 
      * @return Iterator visiting {@link IAbstractNode}s.
      */
-    public Iterator postOrderIterator();
+    public Iterator<AbstractNode> postOrderNodeIterator();
 
 }

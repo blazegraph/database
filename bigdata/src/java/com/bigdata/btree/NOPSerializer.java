@@ -47,11 +47,11 @@ public class NOPSerializer implements IValueSerializer {
     
     public NOPSerializer() {}
     
-    public void getValues(DataInput is, Object[] values, int n) throws IOException {
+    public void getValues(DataInput is, byte[][] values, int n) throws IOException {
 
     }
 
-    public void putValues(DataOutputBuffer os, Object[] values, int n) throws IOException {
+    public void putValues(DataOutputBuffer os, byte[][] values, int n) throws IOException {
 
     }
 

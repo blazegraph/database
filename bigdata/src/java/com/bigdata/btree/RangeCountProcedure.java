@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import com.bigdata.isolation.UnisolatedBTree;
-
 /**
  * This procedure computes a range count on an index.
  */
@@ -64,13 +62,12 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      * Range count of entries in a key range for the index.
      * </p>
      * <p>
-     * Note: This method reports the upper bound estimate of the #of key-value
-     * pairs in the key range of the index. The cost of computing this estimate
-     * is comparable to two index lookup probes. The estimate is an upper bound
-     * because deleted entries in an {@link UnisolatedBTree} or a view thereof
-     * that have not been eradicated through a suitable compacting merge will be
-     * reported. An exact count may be obtained using a range iterator by NOT
-     * requesting either the keys or the values.
+     * Note: When the index {@link IndexMetadata#getDeleteMarkers()} this method
+     * reports the upper bound estimate of the #of key-value pairs in the key
+     * range of the index. The estimate is an upper bound because deleted
+     * entries in that have not been eradicated through a suitable compacting
+     * merge will be reported. An exact count may be obtained using a range
+     * iterator by NOT requesting either the keys or the values.
      * </p>
      * 
      * @return The upper bound estimate of the #of key-value pairs in the key

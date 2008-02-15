@@ -31,7 +31,6 @@ import java.io.DataInput;
 import java.io.IOException;
 
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Serializes each address as a long integer and does not attempt to pack or
@@ -45,15 +44,6 @@ public class AddressSerializer implements IAddressSerializer {
     public static final IAddressSerializer INSTANCE = new AddressSerializer();
     
     private AddressSerializer() {}
-
-    /**
-     * This returns the exact space requirements.
-     */
-    public int getSize(int n) {
-        
-        return Bytes.SIZEOF_LONG * n;
-        
-    }
 
     public void putChildAddresses(DataOutputBuffer os, long[] childAddr,
             int nchildren) throws IOException {

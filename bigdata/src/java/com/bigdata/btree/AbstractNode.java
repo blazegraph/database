@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
@@ -37,6 +39,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -566,9 +569,9 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
     }
 
-    public Iterator postOrderIterator() {
+    public Iterator<AbstractNode> postOrderNodeIterator() {
 
-        return postOrderIterator(false);
+        return postOrderNodeIterator(false);
 
     }
 
@@ -583,11 +586,12 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            
      * @return Iterator visiting {@link AbstractNode}s.
      */
-    abstract public Iterator postOrderIterator(boolean dirtyNodesOnly);
+    abstract public Iterator<AbstractNode> postOrderNodeIterator(boolean dirtyNodesOnly);
 
     public IEntryIterator entryIterator() {
 
-        return new PostOrderEntryIterator(postOrderIterator());
+        return rangeIterator(null/* fromKey */, null/* toKey */,
+                IRangeQuery.DEFAULT, null/*filter*/);
         
     }
 
@@ -631,7 +635,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * 
      * @return Iterator visiting {@link AbstractNode}s.
      */
-    abstract public Iterator postOrderIterator(byte[] fromKey, byte[] toKey);
+    abstract public Iterator<AbstractNode> postOrderIterator(byte[] fromKey, byte[] toKey);
 
     /**
      * Helper class expands a post-order node and leaf traversal to visit the
@@ -654,71 +658,43 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * extent that it can follow the change from the persistent reference for a
      * node to the new mutable reference for that node.
      */
-    private static class PostOrderEntryIterator extends Striterator implements IEntryIterator {
+    private static class PostOrderEntryIterator implements IEntryIterator {
         
-        /**
-         * The key-value for each entry are set as a side-effect on a private
-         * {@link Tuple} field so that this class can implement
-         * {@link IEntryIterator}.
-         * 
-         * @see EntryIterator#EntryIterator(Leaf, Tuple)
-         */
-        final Tuple tuple;
+        private final Tuple tuple;
         
-        public PostOrderEntryIterator(Iterator postOrderIterator) {
+        private final IStriterator src;
+
+        public boolean hasNext() {
             
-            super(postOrderIterator);
+            return src.hasNext();
             
-            this.tuple = new Tuple();
-            
-            addFilter(new Expander() {
-
-                private static final long serialVersionUID = 1L;
-
-                /*
-                 * Expand the value objects for each leaf visited in the
-                 * post-order traversal.
-                 */
-                protected Iterator expand(Object childObj) {
-                    /*
-                     * A child of this node.
-                     */
-                    AbstractNode child = (AbstractNode) childObj;
-
-                    if (child instanceof Leaf) {
-
-                        Leaf leaf = (Leaf) child;
-                        
-                        if (leaf.nkeys == 0) {
-
-                            return EmptyEntryIterator.INSTANCE;
-
-                        }
-
-                        return new EntryIterator(leaf,tuple);
-
-//                        return ((Leaf)child).entryIterator();
-
-                    } else {
-
-                        return EmptyEntryIterator.INSTANCE;
-
-                    }
-                }
-
-            });
-        
         }
+        
+        public ITuple next() {
+            
+            // Note: Expanded converts from node iterator to tuple iterator.
 
-        public PostOrderEntryIterator(Iterator postOrderIterator,
+            return (ITuple) src.next();
+            
+        }
+        
+        public void remove() {
+            
+            src.remove();
+            
+        }
+        
+        public PostOrderEntryIterator(Iterator postOrderNodeIterator,
                 final byte[] fromKey, final byte[] toKey, int flags,
                 final IEntryFilter filter) {
             
-            super(postOrderIterator);
+            assert postOrderNodeIterator != null;
             
             this.tuple = new Tuple(flags);
             
-            addFilter(new Expander() {
+            this.src = new Striterator(postOrderNodeIterator);
+            
+            src.addFilter(new Expander() {
 
                 private static final long serialVersionUID = 1L;
 
@@ -727,9 +703,8 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
                  * post-order traversal.
                  */
                 protected Iterator expand(Object childObj) {
-                    /*
-                     * A child of this node.
-                     */
+                    
+                    // A child of this node.
                     AbstractNode child = (AbstractNode) childObj;
 
                     if (child instanceof Leaf) {
@@ -755,31 +730,6 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
             });
         
-        }
-
-        /**
-         * @todo getKey(), getValue() and getTuple() should throw
-         *       IllegalStateException if nothing has been visited. We can
-         *       probably do that by overriding {@link Striterator#next()} to
-         *       note whether or not next() has been called (or the #of entries
-         *       processed) but I want to verify that is correct first.
-         */
-        public byte[] getKey() {
-            
-            return tuple.getKey();
-            
-        }
-
-        public Object getValue() {
-            
-            return tuple.val;
-            
-        }
-        
-        public final ITuple getTuple() {
-            
-            return tuple;
-            
         }
 
     }
@@ -875,7 +825,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * Copy a key from the source node into this node. This method does not
      * modify the source node. This method does not update the #of keys in this
      * node.
-     * 
+     * <p>
      * Note: Whenever possible the key reference is copied rather than copying
      * the data. This optimization is valid since we never modify the contents
      * of a key.
@@ -916,6 +866,20 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         return keys;
         
+    }
+    
+    final public void copyKey(int index,OutputStream os) {
+        
+        try {
+            
+            os.write(keys.getKey(index));
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+
     }
     
     /**
@@ -1141,46 +1105,54 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            The key (non-null).
      * @param val
      *            The value (may be null).
+     * @param delete
+     *            <code>true</code> iff the entry is to marked as deleted
+     *            (delete markers must be supported for if this is true).
+     * @param timestamp
+     *            The timestamp associated with the version (the value is
+     *            ignored unless version metadata is being maintained).
+     * @param tuple
+     *            A tuple that may be used to obtain the data and metadata for
+     *            the pre-existing index entry overwritten by the insert
+     *            operation (optional).
      * 
-     * @return The old value (may be null) or null if there was no entry for
-     *         that key.
+     * @return The <i>tuple</i> iff there was a pre-existing entry under that
+     *         key and <code>null</code> otherwise.
      */
-    abstract public Object insert(byte[] key,Object val);
-    
-    /**
-     * Lookup a single key.
-     * 
-     * @param key
-     *            The key.
-     *            
-     * @return The value associated with that key (which may be null) or null if
-     *         there is no entry for that key.
-     */
-    abstract public Object lookup(byte[] key);
-    
-    /**
-     * Return true iff there is an entry for the search key (this method should
-     * be used in place of lookup if null keys are allowed for an index).
-     * 
-     * @param searchKey
-     *            The search key.
-     * 
-     * @return True iff the search key is found in the index.
-     */
-    abstract public boolean contains(byte[] searchKey);
-    
+    abstract public Tuple insert(byte[] key, byte[] val, boolean delete, long timestamp,
+            Tuple tuple);
+
     /**
      * Recursive search locates the appropriate leaf and removes the entry for
-     * the key (if any) returning the old value for that entry or null if the
-     * key was not found.
+     * the key.
+     * <p>
+     * Note: It is an error to call this method if delete markers are in use.
      * 
      * @param searchKey
      *            The search key.
+     * @param tuple
+     *            A tuple that may be used to obtain the data and metadata for
+     *            the pre-existing index entry that was either removed by the
+     *            remove operation (optional).
      * 
-     * @return The old value for the search key (may be null) or null if the key
-     *         was not found.
+     * @return The <i>tuple</i> iff there was a pre-existing entry under that
+     *         key and <code>null</code> otherwise.
      */
-    abstract public Object remove(byte[] searchKey);
+    abstract public Tuple remove(byte[] searchKey,Tuple tuple);
+    
+    /**
+     * Lookup a key.
+     * 
+     * @param searchKey
+     *            The search key.
+     * @param tuple
+     *            A tuple that may be used to obtain the data and metadata for
+     *            the pre-existing index entry (required).
+     * 
+     * @return The <i>tuple</i> iff there was a pre-existing entry under that
+     *         key and <code>null</code> otherwise.
+     */
+    abstract public Tuple lookup(byte[] searchKey, Tuple tuple);
     
     /**
      * Recursive search locates the appropriate leaf and returns the index
@@ -1222,15 +1194,16 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param index
      *            The index position of the entry (origin zero and relative to
      *            this node or leaf).
-     * 
-     * @return The value at that index position.
+     * @param tuple 
+     *            A tuple that may be used to obtain the data and metadata for
+     *            the pre-existing index entry (required).
      * 
      * @exception IndexOutOfBoundsException
      *                if index is less than zero.
      * @exception IndexOutOfBoundsException
      *                if index is greater than the #of entries.
      */
-    abstract public Object valueAt(int index);
+    abstract public void valueAt(int index, Tuple tuple);
     
     /**
      * Dump the data onto the {@link PrintStream} (non-recursive).

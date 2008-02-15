@@ -47,8 +47,6 @@ Modifications:
 
 package com.bigdata.gom;
 
-import java.io.DataInput;
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -57,7 +55,6 @@ import java.util.Properties;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.IExtensibleSerializer;
-import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.generic.IPropertyClass;
 import org.CognitiveWeb.generic.core.AbstractBTree;
 import org.CognitiveWeb.generic.core.IBlob;
@@ -85,11 +82,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
@@ -101,13 +96,26 @@ import com.bigdata.journal.Options;
  * Integration for bigdata.
  * 
  * FIXME integrate extSer. use unisolated reads and writes on the extSer index.
+ *
+ * @todo Support GOM pre-fetch using a rangeIterator - that will materialize N
+ *       records on the client and could minimize trips to the server. I am not
+ *       sure about unisolated operations for GOM.... Isolated operations are
+ *       straight forward. The other twist is supporting scalable link sets,
+ *       link set indices (not named, unless the identity of the object
+ *       collecting the link set is part of the key), and non-OID indices
+ *       (requires changes to generic-native). I think that link sets might have
+ *       to become indices in order to scale (to break the cycle of updating
+ *       both the object collecting the link set and the head/tail and
+ *       prior/next members in the link set). Or perhaps all those could be
+ *       materialized on the client and then an unisolated operation (perhaps
+ *       with conflict resolution?!?) would persist the results...
  * 
  * @todo see gom-for-jdbm or generic-native for UML models.
  * 
  * @todo variant of extSer that supports even more compact serialization using
  *       mg4j bit output streams and bit coding of long identifiers using
  *       hu-tucker or non-alpha variant of hu-tucker.
- *       
+ * 
  * @todo extser integration that supports scale-out.
  * 
  * @todo split distributed cache
@@ -466,8 +474,14 @@ public class PersistenceStore implements IPersistentStore
         
 //        BTree ndx = new UnisolatedBTree(m_journal, branchingFactor, UUID.randomUUID());
         
-        BTree ndx = new BTree(m_journal, branchingFactor, UUID.randomUUID(),
-                ByteArrayValueSerializer.INSTANCE);
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+
+        metadata.setBranchingFactor(branchingFactor);
+        
+        BTree ndx = BTree.create(m_journal, metadata); 
+        
+//        BTree ndx = new BTree(m_journal, branchingFactor, UUID.randomUUID(),
+//                ByteArrayValueSerializer.INSTANCE);
         
         return (BTree) m_journal.registerIndex(name,ndx);
         
@@ -726,13 +740,13 @@ public class PersistenceStore implements IPersistentStore
      */
     public long insert(BaseObject container, BaseObject obj) {
         
-        long oid = oid_ndx.getCounter().inc();
+        long oid = oid_ndx.getCounter().incrementAndGet();
         
         if (oid == 0L) {
 
             // Never assign 0L, which is the 1st value for the counter.
             
-            oid = oid_ndx.getCounter().inc();
+            oid = oid_ndx.getCounter().incrementAndGet();
 
         }
 
@@ -1085,7 +1099,7 @@ public class PersistenceStore implements IPersistentStore
             
         }
         
-        final long tmp = str_id_ndx.getCounter().inc();
+        final long tmp = str_id_ndx.getCounter().incrementAndGet();
         
 //        if(tmp==0L) {
 //            
@@ -1314,7 +1328,7 @@ public class PersistenceStore implements IPersistentStore
         /*
          * The values are always object identifiers.
          */
-        final IValueSerializer valueSerializer = OidSerializer.INSTANCE;
+//        final IValueSerializer valueSerializer = OidSerializer.INSTANCE;
         
         /*
          * The type constraint associated with the property value (may be null).
@@ -1466,15 +1480,21 @@ public class PersistenceStore implements IPersistentStore
         
 //        String name = ndx.getLinkPropertyClass().identity();
 
-        BTree btree;
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBranchingFactor(m_journal.getDefaultBranchingFactor());
+        
+        final BTree btree;
 //        btree = (BTree) m_journal.getIndex(name);
         
 //        if(btree==null) {
+
+        btree = BTree.create(m_journal, metadata);
         
-            btree = new BTree(m_journal, m_journal.getDefaultBranchingFactor(),
-                    UUID.randomUUID(), valueSerializer);
+//            btree = new BTree(m_journal, m_journal.getDefaultBranchingFactor(),
+//                    UUID.randomUUID(), valueSerializer);
             
-            // force the btree to the store so that we can get its metadata record.
+            // force the btree to the store so that we can get its checkpoint record.
             btree.write();
 
 //            m_journal.registerIndex(name, btree);
@@ -1491,62 +1511,62 @@ public class PersistenceStore implements IPersistentStore
         
     }
 
-    /**
-     * The value is a <code>long</code> integer that is the term identifier.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    static private class OidSerializer implements IValueSerializer {
-
-        private static final long serialVersionUID = 1815999481920227061L;
-
-        public static transient final IValueSerializer INSTANCE = new OidSerializer();
-        
-        final static boolean packedLongs = true;
-        
-        public OidSerializer() {}
-        
-        public void getValues(DataInput is, Object[] values, int n)
-                throws IOException {
-
-            for(int i=0; i<n; i++) {
-                
-                if (packedLongs) {
-
-                    values[i] = Long.valueOf(LongPacker.unpackLong(is));
-
-                } else {
-
-                    values[i] = Long.valueOf(is.readLong());
-
-                }
-                
-            }
-            
-        }
-
-        public void putValues(DataOutputBuffer os, Object[] values, int n)
-                throws IOException {
-
-            for(int i=0; i<n; i++) {
-
-                if(packedLongs) {
-
-//                    LongPacker.packLong(os, ((Long) values[i]).longValue());
-                    os.packLong(((Long) values[i]).longValue());
-                    
-                } else {
-
-                    os.writeLong(((Long) values[i]).longValue());
-                
-                }
-                
-            }
-            
-        }
-        
-    }
+//    /**
+//     * The value is a <code>long</code> integer that is the term identifier.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     * @version $Id$
+//     */
+//    static private class OidSerializer implements IValueSerializer {
+//
+//        private static final long serialVersionUID = 1815999481920227061L;
+//
+//        public static transient final IValueSerializer INSTANCE = new OidSerializer();
+//        
+//        final static boolean packedLongs = true;
+//        
+//        public OidSerializer() {}
+//        
+//        public void getValues(DataInput is, Object[] values, int n)
+//                throws IOException {
+//
+//            for(int i=0; i<n; i++) {
+//                
+//                if (packedLongs) {
+//
+//                    values[i] = Long.valueOf(LongPacker.unpackLong(is));
+//
+//                } else {
+//
+//                    values[i] = Long.valueOf(is.readLong());
+//
+//                }
+//                
+//            }
+//            
+//        }
+//
+//        public void putValues(DataOutputBuffer os, Object[] values, int n)
+//                throws IOException {
+//
+//            for(int i=0; i<n; i++) {
+//
+//                if(packedLongs) {
+//
+////                    LongPacker.packLong(os, ((Long) values[i]).longValue());
+//                    os.packLong(((Long) values[i]).longValue());
+//                    
+//                } else {
+//
+//                    os.writeLong(((Long) values[i]).longValue());
+//                
+//                }
+//                
+//            }
+//            
+//        }
+//        
+//    }
     
 }
