@@ -30,9 +30,7 @@ package com.bigdata.btree;
 
 import junit.framework.TestCase;
 
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**

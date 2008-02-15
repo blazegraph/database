@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -79,16 +81,49 @@ public class TestTouch extends AbstractBTreeTestCase {
         assertEquals(queueScan,leafQueue.nscan());
         assertEquals(listener,leafQueue.getListener());
         
+        /*
+         * Setup the B+Tree directly so that we can override the hard reference
+         * queue.
+         */
+        final BTree btree; 
+        {
+            
+            IRawStore store = new SimpleMemoryRawStore();
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            metadata.write(store);
+            
+            Checkpoint checkpoint = metadata.firstCheckpoint();
+            
+            checkpoint.write(store);
+
+            btree = new BTree(store,checkpoint,metadata) {
+              
+                @Override
+                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                    
+                    return leafQueue;
+                    
+                }
+                
+            };
+            
+        }
         // The btree.
-        final BTree btree = new BTree(
-                new SimpleMemoryRawStore(),
-                branchingFactor,
-                UUID.randomUUID(),
-                leafQueue,
-                KeyBufferSerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE,
-                null // no record compressor
-                );
+//        final BTree btree = new BTree(
+//                new SimpleMemoryRawStore(),
+//                branchingFactor,
+//                UUID.randomUUID(),
+//                false,//isolatable
+//                null,//conflictResolver
+//                leafQueue,
+//                KeyBufferSerializer.INSTANCE,
+//                ByteArrayValueSerializer.INSTANCE,
+//                null // no record compressor
+//                );
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -152,16 +187,49 @@ public class TestTouch extends AbstractBTreeTestCase {
         assertEquals(queueScan,leafQueue.nscan());
         assertEquals(listener,leafQueue.getListener());
         
-        // The btree.
-        final BTree btree = new BTree(
-                new SimpleMemoryRawStore(),
-                branchingFactor,
-                UUID.randomUUID(),
-                leafQueue,
-                KeyBufferSerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE,
-                null // no record compressor
-        );
+        /*
+         * Setup the B+Tree directly so that we can override the hard reference
+         * queue.
+         */
+        final BTree btree; 
+        {
+            
+            IRawStore store = new SimpleMemoryRawStore();
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            metadata.write(store);
+            
+            Checkpoint checkpoint = metadata.firstCheckpoint();
+            
+            checkpoint.write(store);
+            
+            btree = new BTree(store,checkpoint,metadata) {
+                
+                @Override
+                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                    
+                    return leafQueue;
+                    
+                }
+                
+            };
+
+        }
+//        // The btree.
+//        final BTree btree = new BTree(
+//                new SimpleMemoryRawStore(),
+//                branchingFactor,
+//                UUID.randomUUID(),
+//                false,//isolatable
+//                null,//conflictResolver
+//                leafQueue,
+//                KeyBufferSerializer.INSTANCE,
+//                ByteArrayValueSerializer.INSTANCE,
+//                null // no record compressor
+//        );
         
         /*
          * verify the initial conditions - the root leaf is on the queue and
@@ -225,16 +293,49 @@ public class TestTouch extends AbstractBTreeTestCase {
         assertEquals(queueScan,leafQueue.nscan());
         assertEquals(listener,leafQueue.getListener());
         
-        // The btree.
-        final BTree btree = new BTree(
-                new SimpleMemoryRawStore(),
-                branchingFactor,
-                UUID.randomUUID(),
-                leafQueue,
-                KeyBufferSerializer.INSTANCE,
-                SimpleEntry.Serializer.INSTANCE,
-                null // no record compressor
-        ); 
+        /*
+         * Setup the B+Tree directly so that we can override the hard reference
+         * queue.
+         */
+        final BTree btree; 
+        {
+            
+            IRawStore store = new SimpleMemoryRawStore();
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            metadata.write(store);
+            
+            Checkpoint checkpoint = metadata.firstCheckpoint();
+            
+            checkpoint.write(store);
+            
+            btree = new BTree(store,checkpoint,metadata) {
+                
+                @Override
+                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                    
+                    return leafQueue;
+                    
+                }
+                
+            };
+            
+        }
+//        // The btree.
+//        final BTree btree = new BTree(
+//                new SimpleMemoryRawStore(),
+//                branchingFactor,
+//                UUID.randomUUID(),
+//                false,//isolatable
+//                null,//conflictResolver
+//                leafQueue,
+//                KeyBufferSerializer.INSTANCE,
+//                ByteArrayValueSerializer.INSTANCE,
+//                null // no record compressor
+//        ); 
         
         /*
          * verify the initial conditions - the root leaf is on the queue and

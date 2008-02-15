@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.IsolatedBTree;
+import com.bigdata.isolation.IsolatedFusedView;
 
 /**
  * Interface for transactional reading and writing of persistent data.
@@ -173,13 +173,13 @@ public interface ITx extends IIndexStore {
      * Return an isolated view onto a named index. The index will be isolated at
      * the same level as this transaction. Changes on the index will be made
      * restart-safe iff the transaction successfully commits. Writes on the
-     * returned index will be isolated in an {@link IsolatedBTree}. Reads that
-     * miss on the {@link IsolatedBTree} will read through named index as of the
+     * returned index will be isolated in an {@link IsolatedFusedView}. Reads that
+     * miss on the {@link IsolatedFusedView} will read through named index as of the
      * ground state of this transaction. If the transaction is read-only then
      * the index will not permit writes.
      * <p>
      * During {@link #prepare(long)}, the write set of each
-     * {@link IsolatedBTree} will be validated against the then current commited
+     * {@link IsolatedFusedView} will be validated against the then current commited
      * state of the named index.
      * <p>
      * During {@link #commit()}, the validated write sets will be merged down

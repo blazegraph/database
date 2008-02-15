@@ -59,6 +59,7 @@ import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 
@@ -770,10 +771,10 @@ public class FullTextIndex {
                 while(itr.hasNext()) {
                     
                     // next entry (value is ignored).
-                    itr.next();
+                    ITuple tuple = itr.next();
                     
                     // the key contains the term identifier.
-                    final byte[] key = itr.getKey();
+                    final byte[] key = tuple.getKey();
                     
                     // decode the term identifier (aka docId).
                     final long termId = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);

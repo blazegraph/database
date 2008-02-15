@@ -66,7 +66,7 @@ public class TestCommitRecordIndex extends AbstractCommitRecordTestCase {
         
         IRawStore store = new SimpleMemoryRawStore();
         
-        CommitRecordIndex ndx = new CommitRecordIndex(store);
+        CommitRecordIndex ndx = CommitRecordIndex.create(store);
         
         final ICommitRecord cr1 = getRandomCommitRecord(); 
 

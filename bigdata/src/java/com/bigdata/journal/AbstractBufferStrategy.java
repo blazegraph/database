@@ -31,6 +31,7 @@ import java.text.NumberFormat;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -439,6 +440,18 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
                 + "ms");
 
         return count;
+        
+    }
+
+    /**
+     * Not supported - this is available on the {@link AbstractJournal}.
+     * 
+     * @throws UnsupportedOperationException
+     *             always
+     */
+    public IResourceMetadata getResourceMetadata() {
+        
+        throw new UnsupportedOperationException();
         
     }
     

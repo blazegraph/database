@@ -30,7 +30,7 @@ package com.bigdata.journal;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -89,23 +89,29 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
 
         assert name2Addr == null;
         
-        name2Addr = new Name2Addr(this);
+        name2Addr = Name2Addr.create(this);
 
     }
 
     /**
-     * Registers a {@link BTree} whose values are variable length byte[]s.
+     * Registers a {@link BTree} whose values are variable length byte[]s and
+     * which does NOT support isolation.
      */
     public IIndex registerIndex(String name) {
-    
-        return registerIndex(name, new BTree(this,
-                BTree.DEFAULT_BRANCHING_FACTOR, // @todo configurable.
-                UUID.randomUUID(),
-                ByteArrayValueSerializer.INSTANCE));
+
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        BTree btree = BTree.create(this, metadata);
+
+        return registerIndex(name,btree);
+        
+//        return registerIndex(name, new BTree(this,
+//                BTree.DEFAULT_BRANCHING_FACTOR, // @todo configurable.
+//                UUID.randomUUID()));
         
     }
     
-    public IIndex registerIndex(String name, IIndex btree) {
+    public IIndex registerIndex(String name, BTree btree) {
 
         synchronized (name2Addr) {
 

@@ -30,8 +30,8 @@ package com.bigdata.journal;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
-import com.bigdata.scaleup.MasterJournal;
 
 /**
  * Test suite for api supporting registration, lookup, use, and atomic commit
@@ -74,9 +74,17 @@ public class TestNamedIndices extends ProxyTestCase {
         final String name = "abc";
         
         final UUID indexUUID = UUID.randomUUID();
-        
-        BTree btree = new BTree(journal, 3, indexUUID,
-                SimpleEntry.Serializer.INSTANCE);
+
+        BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(indexUUID);
+            
+            metadata.setBranchingFactor( 3 );
+            
+            btree = BTree.create(journal, metadata);
+            
+        }
         
         assertNull(journal.getIndex(name));
         
@@ -104,7 +112,7 @@ public class TestNamedIndices extends ProxyTestCase {
             btree = (BTree) journal.getIndex(name);
 
             assertNotNull("btree", btree);
-            assertEquals("indexUUID", indexUUID, btree.getIndexUUID() );
+            assertEquals("indexUUID", indexUUID, btree.getIndexMetadata().getIndexUUID() );
             assertEquals("entryCount", 1, btree.getEntryCount());
             assertEquals(v0, btree.lookup(k0));
 

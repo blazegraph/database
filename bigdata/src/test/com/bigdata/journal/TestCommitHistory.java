@@ -433,7 +433,7 @@ public class TestCommitHistory extends ProxyTestCase {
         /*
          * The re-load address for the live index as of that commit record.
          */
-        final long liveIndexAddr0 = liveIndex.getMetadata().getMetadataAddr();
+        final long liveIndexAddr0 = liveIndex.getCheckpoint().getCheckpointAddr();
         
         /*
          * write a record on the store, commit the store, and note the commit
@@ -457,7 +457,7 @@ public class TestCommitHistory extends ProxyTestCase {
          * we did NOT write on the named index, so its address in the store must
          * not change.
          */
-        assertEquals(liveIndexAddr0,liveIndex.getMetadata().getMetadataAddr());
+        assertEquals(liveIndexAddr0,liveIndex.getCheckpoint().getCheckpointAddr());
         
         // obtain the commit record for that commit timestamp.
         ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);

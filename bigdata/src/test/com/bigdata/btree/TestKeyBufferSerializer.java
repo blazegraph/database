@@ -117,7 +117,7 @@ public class TestKeyBufferSerializer extends AbstractKeyBufferTestCase {
 //
 //        DataInputStream dis = new DataInputStream(bais);
 
-        DataInput dis = new DataInputBuffer(dos.array(),0,dos.pos());
+        DataInput dis = new DataInputBuffer(dos.array(),0,dos.limit());
 
         ImmutableKeyBuffer actual = (ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
                 .getKeys(dis);
@@ -146,7 +146,7 @@ public class TestKeyBufferSerializer extends AbstractKeyBufferTestCase {
         
 //        bais = new ByteArrayInputStream(dos.buf);
 
-        dis = new DataInputBuffer(dos.array(),0,dos.pos());
+        dis = new DataInputBuffer(dos.array(),0,dos.limit());
 
         actual = (ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
                 .getKeys(dis);

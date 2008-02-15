@@ -3,6 +3,7 @@
  */
 package com.bigdata.repo;
 
+import java.io.DataInput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,42 +30,29 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.EntryFilter;
-import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.IKeySerializer;
 import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IValueSerializer;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.KeyBufferSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.io.IByteArrayBuffer;
-import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.isolation.Value;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
-import com.bigdata.mdi.UnisolatedBTreePartition;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IBlockStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.KeyType;
@@ -197,17 +185,15 @@ import cutthecrap.utils.striterators.Striterator;
  * and since the file data must reside on the index partition(s) identified by
  * its file version.
  * 
+ * @todo it should be possible to run against a {@link DataServiceIndex} and not
+ *       only against an {@link IBigdataFederation}. I will have to modify the
+ *       setup to support both.
+ * 
+ * @todo journal size and index segment sizes should be at least 500M when 64M
+ *       blocks being stored - perhaps raise that threshold throughout?
+ * 
  * @todo implement "zones" and their various policies (replication, retention,
  *       and media indexing). access control could also be part of the zones.
- * 
- * @todo compacting merge policies. consider how data is eradicated from the
- *       metadata and data indices and that it might not be "atomically"
- *       eradicated so it is quite possible that only some data will remain
- *       available after a period of time. the policy can set the minimum
- *       criteria, e.g., in terms of time and #of versions to be retained. After
- *       those criteria have been met you may still find your data or not. You
- *       can read blocks directly for a file version and blocks that have not
- *       been eradicated will still have valid data.
  * 
  * @todo should compression be applied? applications are obviously free to apply
  *       their own compression, but it could be convienent to stored compressed
@@ -216,34 +202,20 @@ import cutthecrap.utils.striterators.Striterator;
  *       compression method would be written into a block header. blocks can
  *       always be decompressed by examining the header.
  * 
- * @todo Full text indexing support. Perhaps the best way to handle this is to
- *       queue document metadata up for a distributed full text indexing
- *       service. The service accepts metadata for documents from the queue and
- *       decides whether or not the document should be indexed based on its
- *       metadata and how the document should be processed if it is to be
- *       indexed. Those business rules would be registered with the full text
- *       indexing service. (Alternatively, they can be configured with the
- *       {@link BigdataRepository} and applied locally as the blocks of the file
- *       are written into the repository. That's certainly easier right off the
- *       bat.)
- * 
- * @todo ensure that index partitions do not break across the metadata record
- *       for a file.
- * 
  * @todo there should be some constraints on the file identifier but it general
  *       it represents a client determined absolute file path name. It is
  *       certainly possible to use a flat file namespace, but you can just as
  *       readily use a hierarchical one. Unicode characters are supported in the
  *       file identifiers.
  * 
- * @todo create an abstract base class and derive two versions: one runs against
- *       and embedded data service (supports restart but does not use jini) and
- *       the other runs against a federation (scale-out deployment).
- * 
- * @todo do we need a global lock mechanism to prevent concurrent
+ * @todo do we need a global lock mechanism to prevent concurrent high-level
  *       create/update/delete of the same file? a distributed lease-based lock
  *       system derived from jini or built ourselves? Can this be supported with
  *       the historical and not yet purged timestamped metadata for the file?
+ * 
+ * @todo use {@link IBlockStore} and {@link IBlock} for streamed writes? Make
+ *       the read API more stream-based as well? This will only matter if the
+ *       underlying {@link IBlockStore} API gets implemented and used.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -464,27 +436,8 @@ public class BigdataRepository implements ContentRepository {
      *            The client.
      * @param properties
      *            See {@link Options}.
-     * 
-     * FIXME The {@link #BLOCK_SIZE} is set to 4M-1 bytes right now. In order to
-     * increase the block size to 64M a non-default split point would have to be
-     * specified for the {@link WormAddressManager#DEFAULT_OFFSET_BITS}. 4M at
-     * the default split point is [0:4,194,303] while 64M is 67,108,864 bytes.
-     * <P>
-     * There is also a requirement for a streaming API for at least reading
-     * blocks from the {@link IRawStore} and perhaps for writing them as well.
-     * This API should be exposed at the {@link IDataService} layer using
-     * sockets.
-     * 
-     * @todo is it strictly requires that the block size is shared across across
-     *       a federation? I doubt it - it seems that the constraint is mainly
-     *       in the journal's record size - and in the addressing scheme choosen
-     *       for an {@link IndexSegment}. There should be little reason why a
-     *       client could not operate at whatever the maximum record size for a
-     *       journal was - except that you have to query the journal for that
-     *       which makes the value potentially different for each data service
-     *       (or each journal created by each data service).
      */
-    public BigdataRepository(IBigdataFederation fed,Properties properties) {
+    public BigdataRepository(IBigdataFederation fed, Properties properties) {
         
         this.fed = fed;
         
@@ -492,7 +445,11 @@ public class BigdataRepository implements ContentRepository {
         this.properties = (Properties) properties.clone();
      
         /*
-         * This is the value for the default split point (4M-1 bytes).
+         * FIXME The {@link #BLOCK_SIZE} is set to 4M-1 bytes right now. In
+         * order to increase the block size to 64M a different value would have
+         * to be specified for the
+         * {@link WormAddressManager#DEFAULT_OFFSET_BITS}. 4M is [0:4,194,303]
+         * (42 offset bits) while 64M is 67,108,864 bytes (38 offset bits).
          */
         BLOCK_SIZE = WormAddressManager
                 .getMaxByteCount(WormAddressManager.DEFAULT_OFFSET_BITS) - 1;
@@ -515,8 +472,7 @@ public class BigdataRepository implements ContentRepository {
 
         if (metadataIndex == null) {
 
-            IIndex ndx = (ClientIndexView) fed.getIndex(
-                    ITx.UNISOLATED, METADATA_NAME);
+            IIndex ndx = fed.getIndex(ITx.UNISOLATED, METADATA_NAME);
 
             metadataIndex = new SparseRowStore(ndx);
             
@@ -533,8 +489,7 @@ public class BigdataRepository implements ContentRepository {
 
         if (dataIndex == null) {
 
-            dataIndex = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
-                    DATA_NAME);
+            dataIndex = fed.getIndex(ITx.UNISOLATED, DATA_NAME);
 
         }
 
@@ -546,35 +501,64 @@ public class BigdataRepository implements ContentRepository {
      * Registers the scale-out indices.
      * 
      * @todo make this an atomic operation.
+     * 
+     * @todo parameterize the namespace for the file metadata and file data
+     *       indices so that you can have more than one repository instance.
      */
     public void registerIndices() {
 
         final int branchingFactor = Integer.parseInt(properties.getProperty(
                 Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
-        
+
         // setup metadata index.
         {
 
-            fed.registerIndex(METADATA_NAME,
-                    new UnisolatedBTreePartitionConstructor(branchingFactor));
+            /*
+             * FIXME specify an appropriate split handler (keeps the row
+             * together). This is a hard requirement. The atomic read/update
+             * guarentee depends on this.
+             */
 
-            IIndex ndx = (ClientIndexView) fed.getIndex(
-                    ITx.UNISOLATED, METADATA_NAME);
+            IndexMetadata md = new IndexMetadata(METADATA_NAME, UUID
+                    .randomUUID());
+
+            md.setBranchingFactor(branchingFactor);
+
+            md.setDeleteMarkers(true);
+
+            fed.registerIndex(md);
+
+            IIndex ndx = fed.getIndex(ITx.UNISOLATED, METADATA_NAME);
 
             metadataIndex = new SparseRowStore(ndx);
-            
+
         }
 
         // setup data index.
         {
 
-            // Note: resolves addrs -> blocks on the journal.
-            fed.registerIndex(DATA_NAME,
-                    new FileDataBTreePartitionConstructor(branchingFactor));
+            /*
+             * @todo specify split handler that tends to keep the blocks for a
+             * file together (soft requirement).
+             */
 
-            dataIndex = (ClientIndexView) fed.getIndex(
-                        ITx.UNISOLATED, DATA_NAME);
+            IndexMetadata md = new IndexMetadata(DATA_NAME, UUID.randomUUID());
+
+            md.setBranchingFactor(branchingFactor);
+
+            md.setDeleteMarkers(true);
             
+            /*
+             * @todo unit tests for correct copying of blobs during overflow.
+             * See {@link IOverflowHandler}.
+             */
+            md.setOverflowHandler(new BlobOverflowHandler());
+            
+            // register the index.
+            fed.registerIndex(md);
+
+            dataIndex = fed.getIndex(ITx.UNISOLATED, DATA_NAME);
+
         }
 
     }
@@ -1098,7 +1082,7 @@ public class BigdataRepository implements ContentRepository {
                 .getKey();
 
         final IEntryIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
-                0/* capacity */, IRangeQuery.DELETE, null/* filter */);
+                0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);
 
         while (itr.hasNext()) {
 
@@ -1196,7 +1180,8 @@ public class BigdataRepository implements ContentRepository {
      * @todo expose history policy for a file (from its zone metadata, which is
      *       replicated onto the index partition metadata). Make sure that the
      *       zone metadata is consistent for the file version metadata and file
-     *       version data.
+     *       version data. This means looking up the {@link IndexMetadata} for
+     *       the index partition in which the file data is stored.
      */
     public ITPV[] getAllVersionInfo(String id) {
         
@@ -1266,51 +1251,39 @@ public class BigdataRepository implements ContentRepository {
      * Efficient delete of file metadata and file data for all files and file
      * versions spanned by the specified file identifiers.
      * 
-     * @todo write tests.
-     * 
      * @todo run this in two threads?
-     * 
-     * @todo parallelize operations across data services?
      */
     public long deleteAll(String fromId, String toId) {
+        
+        IKeyBuilder keyBuilder = getKeyBuilder();
+
+        // the key for {fromId}
+        final byte[] fromKey = keyBuilder.reset().appendText(fromId,
+                true/* unicode */, false/* successor */).getKey();
+
+        // the key for {successor(toId)}
+        final byte[] toKey = keyBuilder.reset().appendText(toId,
+                true/* unicode */, true/* successor */).getKey();
+
 
         // delete file metadata
         long ndeleted = 0;
         {
 
             /*
-             * FIXME Delete file metadata.
-             * 
-             * Consider that the sparse row store may need to use a delete
-             * rather than an insert (key,null) to delete a property value. The
-             * ITPV interface would then need an isDeleted() method, various
-             * javadoc and some code in both SRS and this class would need to be
-             * updated, and we could then do a rangeIterator with the DELETE
-             * flag set to wipe out a range of stuff.
+             * Delete file version metadata.
              */
-            
-            
-            
-            if(true) throw new UnsupportedOperationException();
+            getMetadataIndex().getIndex().submit(fromKey, toKey,
+                    new FileVersionDeleteProc(fromId, toId), null/* handler */);
             
         }
         
         // delete file blocks.
         {
-            
-            IKeyBuilder keyBuilder = getKeyBuilder();
-
-            // the key for {fromId}
-            final byte[] fromKey = keyBuilder.reset().appendText(fromId,
-                    true/* unicode */, false/* successor */).getKey();
-
-            // the key for {successor(toId)}
-            final byte[] toKey = keyBuilder.reset().appendText(toId,
-                    true/* unicode */, true/* successor */).getKey();
 
             final IEntryIterator itr = getDataIndex()
                     .rangeIterator(fromKey, toKey, 0/* capacity */,
-                            IRangeQuery.DELETE, null/* filter */);
+                            IRangeQuery.REMOVEALL, null/* filter */);
 
             long blockCount = 0;
 
@@ -1333,14 +1306,13 @@ public class BigdataRepository implements ContentRepository {
      * versions within the key range as deleted (by storing a null property
      * value for the {@link MetadataSchema#VERSION}).
      * 
-     * @todo the caller will have to submit this procedure to each index
-     *       partition spanned by the key range. That logic should be
-     *       encapsulated within the {@link ClientIndexView}.
+     * @todo Make sure that overflow handling for the {@link SparseRowStore}
+     *       causes the deleted file versions to be left behind eventually.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class VersionDeleteProc implements IIndexProcedure {
+    protected static class FileVersionDeleteProc implements IIndexProcedure {
 
         /**
          * 
@@ -1350,7 +1322,7 @@ public class BigdataRepository implements ContentRepository {
         private String fromId;
         private String toId;
         
-        public VersionDeleteProc(String fromId, String toId) {
+        public FileVersionDeleteProc(String fromId, String toId) {
         
             this.fromId = fromId;
             
@@ -1359,8 +1331,9 @@ public class BigdataRepository implements ContentRepository {
         }
         
         public Object apply(IIndex ndx) {
-            // TODO Auto-generated method stub
-            return null;
+
+            throw new UnsupportedOperationException();
+            
         }
         
     }
@@ -1375,6 +1348,16 @@ public class BigdataRepository implements ContentRepository {
      * the indexer since it depends on the metadata index to know whether or not
      * a file version should be indexed. However you could explicitly submit a
      * file version for indexing.
+     * <p>
+     * Perhaps the best way to handle this is to queue document metadata up for
+     * a distributed full text indexing service. The service accepts metadata
+     * for documents from the queue and decides whether or not the document
+     * should be indexed based on its metadata and how the document should be
+     * processed if it is to be indexed. Those business rules would be
+     * registered with the full text indexing service. (Alternatively, they can
+     * be configured with the {@link BigdataRepository} and applied locally as
+     * the blocks of the file are written into the repository. That's certainly
+     * easier right off the bat.)
      * 
      * @todo crawl or query job obtains a set of URLs, writing them onto a file.
      *       <p>
@@ -1400,10 +1383,6 @@ public class BigdataRepository implements ContentRepository {
      *       concurrent batch load of rdf/xml into scale-out knowledge base. the
      *       input is a single file comprised of blocks, each of which is an
      *       rdf/xml file.
-     * 
-     * @todo journal size and index segment sizes should be at least 500M when
-     *       file blocks are stored on the journal - perhaps raise that
-     *       threshold throughout?
      */
     public Iterator<String> search(String query) {
 
@@ -1536,7 +1515,7 @@ public class BigdataRepository implements ContentRepository {
 
                 // @todo promote this interface onto IIndex?
                 // @todo verify iface implemented for index partition view.
-                final ILinearList tmp = (ILinearList)ndx;
+                final ILinearList tmp = (ILinearList) ndx;
                 
                 /*
                  * Index of the first key after this file version.
@@ -1592,8 +1571,9 @@ public class BigdataRepository implements ContentRepository {
                     log.debug("Insertion point is before all entries in the index partition: id="
                                     + id + ", version=" + version);
                     
-                    final byte[] leftSeparator = ((UnisolatedBTreePartition) ndx)
-                            .getPartitionMetadata().getLeftSeparatorKey();
+                    final byte[] leftSeparator = ((BTree) ndx)
+                            .getIndexMetadata().getPartitionMetadata()
+                            .getLeftSeparatorKey();
 
                     block = getNextBlockFromPriorKey(keyBuilder, leftSeparator);
                     
@@ -2040,10 +2020,6 @@ public class BigdataRepository implements ContentRepository {
      * <p>
      * Note: This may be used to efficiently distribute blocks among a
      * population of clients, e.g., in a map/reduce paradigm.
-     * 
-     * @todo consider writing blocks out of line for the {@link IndexSegment}s
-     *       as well so that the block identifier key scan will move less data
-     *       (not having to read the blocks in with the leaves).
      */
     public Iterator<Long> blocks(String id,int version) {
         
@@ -2114,9 +2090,9 @@ public class BigdataRepository implements ContentRepository {
 
         public Long next() {
 
-            src.next();
+            ITuple tuple = src.next();
             
-            byte[] key = src.getKey();
+            byte[] key = tuple.getKey();
             
             long block = KeyBuilder.decodeLong(key, key.length
                     - Bytes.SIZEOF_LONG);
@@ -2266,30 +2242,32 @@ public class BigdataRepository implements ContentRepository {
         final IIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
                 block, b, off, len);
 
-        if (getDataIndex() instanceof ClientIndexView) {
-            
-            /*
-             * Remote index - figure out which index partition will get the
-             * write.
-             */
+        // the key for the {file,version,block}
+        final byte[] key = getKeyBuilder().reset().appendText(id,
+                true/* unicode */, false/* successor */).append(version)
+                .append(block).getKey();
 
-            // the key for the {file,version,block}
-            final byte[] key = getKeyBuilder().reset().appendText(id,
-                    true/* unicode */, false/* successor */).append(version)
-                    .append(block).getKey();
+        return (Boolean) getDataIndex().submit(key, proc);
 
-            return (Boolean) ((ClientIndexView) getDataIndex()).submit(key,
-                    proc);
-
-        } else {
-
-            /*
-             * Run on a local index.
-             */
-
-            return ((Boolean) proc.apply(getDataIndex())).booleanValue();
-
-        }
+//        if (getDataIndex() instanceof ClientIndexView) {
+//            
+//            /*
+//             * Remote index - figure out which index partition will get the
+//             * write.
+//             */
+//
+//            return (Boolean) ((ClientIndexView) getDataIndex()).submit(key,
+//                    proc);
+//
+//        } else {
+//
+//            /*
+//             * Run on a local index.
+//             */
+//
+//            return ((Boolean) proc.apply(getDataIndex())).booleanValue();
+//
+//        }
 
     }
 
@@ -2305,7 +2283,9 @@ public class BigdataRepository implements ContentRepository {
      *         if nothing was deleted.
      */
     public long deleteHead(String id, int version) {
-        
+
+        log.info("id="+id+", version="+version);
+
         IKeyBuilder keyBuilder = getKeyBuilder();
 
         // the key for {file,version}
@@ -2318,21 +2298,26 @@ public class BigdataRepository implements ContentRepository {
                 true/* unicode */, false/* successor */).append(
                 version + 1).getKey();
 
+        /*
+         * The REMOVALL flag together with a limit of ONE (1) is used to obtain
+         * an atomic delete of the first block for this file version.
+         */
+
         final IEntryIterator itr = getDataIndex()
                 .rangeIterator(fromKey, toKey,
                 1, // Note: limit is ONE block!
-                IRangeQuery.KEYS|IRangeQuery.DELETE, null/* filter */);
+                IRangeQuery.KEYS|IRangeQuery.REMOVEALL, null/* filter */);
         
-        if(!itr.hasNext()) {
+        if (!itr.hasNext()) {
 
-            log.warn("Nothing to delete: id="+id+", version="+version);
-            
+            log.warn("Nothing to delete: id=" + id + ", version=" + version);
+
             return -1L;
-            
+
         }
         
         /*
-         * consume the iterator but note that the block was already deleted if
+         * Consume the iterator but note that the block was already deleted if
          * this was a remote request.
          */
         
@@ -2379,18 +2364,11 @@ public class BigdataRepository implements ContentRepository {
                 .append(block).getKey();
         
         /*
-         * Note: When the block is on the journal then the return value is just
-         * the address of that block on the journal (8 bytes).
-         * 
-         * @todo Depending on how overflow onto the IndexSegment is handled this
-         * sends MIGHT back the entire deleted block. For example, if the block
-         * is inline with the leaf in the index segment then the entire block's
-         * data will be sent back. If this is the case, then modify this code to
-         * submit an index procedure that performs the delete and sends back
-         * only a boolean.
+         * Note: The return value is just the serialized address of that block
+         * on the journal (8 bytes).
          */
         
-        boolean deleted = getDataIndex().remove(key) != null;
+        final boolean deleted = getDataIndex().remove(key) != null;
         
         return deleted;
         
@@ -2438,19 +2416,7 @@ public class BigdataRepository implements ContentRepository {
 
         }
 
-        // the block's data.
-        final byte[] data = (byte[]) itr.next();
-
-        final byte[] key = itr.getKey();
-        
-        // decode the block identifier.
-        final long block = KeyBuilder.decodeLong(key, key.length
-                - Bytes.SIZEOF_LONG);  
-            
-        log.info("id=" + id + ", version=" + version + " : " + data.length
-                + " bytes read from block#" + block);
-
-        return data;
+        return readBlock(id, version, itr.next());
         
     }
     
@@ -2463,10 +2429,12 @@ public class BigdataRepository implements ContentRepository {
      *            The version identifier.
      * @param block
      *            The block identifier.
-     *            
+     * 
      * @return The contents of the block -or- <code>null</code> iff the block
      *         does not exist. Note that an empty block will return an empty
      *         byte[] rather than <code>null</code>.
+     * 
+     * @todo offer a variant that returns an {@link InputStream}?
      */
     public byte[] readBlock(String id, int version, long block) {
         
@@ -2503,15 +2471,88 @@ public class BigdataRepository implements ContentRepository {
 
         }
 
-        final byte[] data = (byte[]) itr.next();
+        return readBlock(id, version, itr.next());
+        
+    }
 
+    /**
+     * Helper to read a block from an {@link ITuple}.
+     * 
+     * @param id
+     * @param version
+     * @param tuple
+     * @return
+     */
+    private byte[] readBlock(String id, int version, ITuple tuple) {
+        
+        final byte[] key = tuple.getKey();
+        
+        // decode the block identifier from the key.
+//        block = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(),
+//                tuple.getKeyBuffer().pos() - Bytes.SIZEOF_LONG);
+        long block = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);
+
+        final long addr;
+        try {
+
+            DataInput in = tuple.getValueStream();
+        
+            addr = in.readLong();
+            
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+        
+        if (addr == 0L) {
+
+            /*
+             * Note: empty blocks are allowed and are recorded with 0L as
+             * their address.
+             */
+
+            log.info("id=" + id + ", version=" + version + ", block=" + block
+                    + " : empty block.");
+
+            return new byte[]{};
+
+        }
+        
+        /*
+         * Read the block from the backing store.
+         */
+        final IBlock tmp = tuple.readBlock(addr);
+
+        final int len = tmp.length();
+        
         log.info("id=" + id + ", version=" + version + ", block=" + block
-                + " : " + data.length + " bytes read");
+                + " : " + len + " bytes");
 
+        // @todo reuse buffers, but must return {byte[],off,len} tuple.
+        final byte[] data = new byte[len];
+        
+        try {
+
+            final int nread = tmp.inputStream().read(data, 0, len);
+
+            if (nread != len) {
+
+                throw new RuntimeException("Expecting to read " + len
+                        + " bytes but read " + nread + " bytes");
+
+            }
+            
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+        
         return data;
 
     }
-    
+
     /**
      * Atomic append of a block to a file version.
      * 
@@ -2563,42 +2604,42 @@ public class BigdataRepository implements ContentRepository {
         final IIndexProcedure proc = new AtomicBlockAppendProc(this, id, version, b,
                 off, len);
 
-        if (getDataIndex() instanceof ClientIndexView) {
+        // the last possible key for this file
+        final byte[] key = getKeyBuilder().reset().appendText(id,
+                true/* unicode */, true/* successor */).append(version)
+                .append(-1L).getKey();
 
-            /*
-             * Figure out which index partition will absorb writes on the end of
-             * the file. We do this by finding the index partition that would
-             * contain the successor of the id and then considering its
-             * leftSeparator. If the leftSeparator is greater than the id then
-             * the id does not enter this index partition and we use the prior
-             * index partition. Otherwise the id enters this partition and we
-             * use it.
-             * 
-             * Note: File versions allow us to avoid painful edge cases when a
-             * file has been deleted that spans more than one index partition.
-             * Since we never attempt to write on the deleted file version we
-             * are not faced with the problem of locating the largest index
-             * partition that actually has data for that file. When a large file
-             * has been deleted there can be EMPTY index partitions (containing
-             * only deleted entries) until the next compacting merge.
-             */
+        /*
+         * Figure out which index partition will absorb writes on the end of the
+         * file. We do this by finding the index partition that would contain
+         * the successor of the id and then considering its leftSeparator. If
+         * the leftSeparator is greater than the id then the id does not enter
+         * this index partition and we use the prior index partition. Otherwise
+         * the id enters this partition and we use it.
+         * 
+         * Note: File versions allow us to avoid painful edge cases when a file
+         * has been deleted that spans more than one index partition. Since we
+         * never attempt to write on the deleted file version we are not faced
+         * with the problem of locating the largest index partition that
+         * actually has data for that file. When a large file has been deleted
+         * there can be EMPTY index partitions (containing only deleted entries)
+         * until the next compacting merge.
+         */
+        return (Long) getDataIndex().submit(key, proc);
 
-            // the last possible key for this file
-            final byte[] key = getKeyBuilder().reset().appendText(id,
-                    true/* unicode */, true/* successor */).append(version)
-                    .append(-1L).getKey();
-
-            return (Long) ((ClientIndexView) getDataIndex()).submit(key, proc);
-            
-        } else {
-
-            /*
-             * Run on a local index.
-             */
-            
-            return (Long) proc.apply( getDataIndex() );
-            
-        }
+// if (getDataIndex() instanceof ClientIndexView) {
+//
+// return (Long) ((ClientIndexView) getDataIndex()).submit(key, proc);
+//            
+//        } else {
+//
+//            /*
+//             * Run on a local index.
+//             */
+//            
+//            return (Long) proc.apply( getDataIndex() );
+//            
+//        }
         
     }
 
@@ -2787,7 +2828,7 @@ public class BigdataRepository implements ContentRepository {
      *         version is deleted until the deleted blocks are eradicated from
      *         the file data index.
      */
-    public FileVersionInputStream inputStream(String id,int version, long tx) {
+    public FileVersionInputStream inputStream(String id, int version, long tx) {
 
         log.info("id=" + id + ", version=" + version + ", tx=" + tx);
 
@@ -2822,70 +2863,52 @@ public class BigdataRepository implements ContentRepository {
                 .getKey();
 
         /*
-         * The capacity is essentially the #of blocks to transfer at a time.
+         * The capacity is essentially the #of block addresses to transfer at a
+         * time, not the #of blocks. I've set a moderately low limit here since
+         * the blocks themselves need to be transferred as well, so there is
+         * little point in buffering too many block addresses.
          * 
-         * Note: since the block size is so large this iterator limits its
-         * capacity to avoid an undue burden on the heap. E.g., we do NOT want
-         * it to buffer and transmit large numbers of 64M blocks at a time! In
-         * practice, the buffering is per data service, but that could still be
-         * hundreds of megabytes!
+         * The addresses associated with a block identifier are updated when the
+         * block is re-written, so if you buffer a lot of block addresses here
+         * then updates to the blocks for the buffered identifiers will not be
+         * visible to the client.
          * 
-         * FIXME Work out a means to (a) inline block into the index segments;
-         * (b) store "blobs" consisting of the resource identifier (UUID) and
-         * the address within that resource; (c) return byte[]s the caller when
-         * the block is small and otherwise the blob; and (d) have the caller
-         * use a socket level API to stream blocks from the data service (make
-         * available on the result set) by specifying the UUID of the resource
-         * and the address of the block. At that point the capacity can be left
-         * to its default value and we will never have problems with buffering
-         * large amounts of data in the result set.
+         * Finally, for very large files you may find that the block addresses
+         * grow stale (the resource on which they were written may be moved or
+         * deleted following a compacting merge), forcing a re-start of the read
+         * from the last visited block identifier.
          * 
-         * In order to do this we will also have to: (a) overflow the blocks
-         * from the journal onto the index segment; and (b) return an error
-         * (re-try) when the resource identified by the UUID has be deleted
-         * following a merge or compacting merge such that the block must now be
-         * read from another resource (if it still exists). This case should
-         * never arise when the caller processes the result set quickly and
-         * could be minimized by keeping the result set size down in the 100s.
-         * The case can in general be handled by re-issuing the query starting
-         * with the key for the block whose fetch failed.
-         * 
-         * Note: The socket-level api should share code with aspects of the media
-         * replication system.
+         * @todo handle automatic restart of the read from the next block
+         * identifier if we learn that the resource on which a block was written
+         * has been deleted.
          */
-        final int capacity = 20;
+        final int capacity = 1000;
         
         // both keys and values.
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
         final IEntryIterator itr;
         
-        final IIndex dataIndex = getDataIndex();
+        final IIndex dataIndex;
         
         if (tx == ITx.UNISOLATED) {
-            
-            itr = dataIndex.rangeIterator(fromKey, toKey, capacity,
-                    flags, null/*filter*/);
-            
+
+            dataIndex = getDataIndex();
+
         } else {
-            
-            if(dataIndex instanceof ClientIndexView) {
-                
-                final ClientIndexView ndx = new ClientIndexView(fed, tx,
-                        DATA_NAME);
 
-                itr = ndx
-                        .rangeIterator(fromKey, toKey, capacity, flags, null/* filter */);
+            /*
+             * Obtain the index view for that historical timestamp or isolated
+             * by the specified transaction.
+             */
 
-            } else {
-                
-                // @todo lookup the index on the journal.
-                throw new UnsupportedOperationException();
-                
-            }
+            throw new UnsupportedOperationException();
             
         }
-        
+
+        itr = dataIndex
+                .rangeIterator(fromKey, toKey, capacity, flags, null/* filter */);
+
         return new FileVersionInputStream(id, version, itr);
         
     }
@@ -3217,6 +3240,8 @@ public class BigdataRepository implements ContentRepository {
          * from the first block by the ctor. When no more data is available it
          * is set to <code>null</code> to indicate that the input stream has
          * been exhausted.
+         * 
+         * @todo reuse buffers sized out to the block size.
          */
         private byte[] b;
         
@@ -3281,7 +3306,7 @@ public class BigdataRepository implements ContentRepository {
             
             assert b == null || off == len;
             
-            if(!src.hasNext()) {
+            if (!src.hasNext()) {
 
                 log.info("No more blocks: id="+id+", version="+version);
                 
@@ -3295,38 +3320,79 @@ public class BigdataRepository implements ContentRepository {
                 
             }
             
+            final ITuple tuple = src.next();
+            
             /*
-             * The next block's data
-             * 
-             * FIXME offer a no-copy variant of next()!!! It's 64M per copy!
-             * 
-             * The most obvious way to handle this is to NOT translate the addr
-             * to the block's data automatically in the iterator but to do it
-             * explicitly here. E.g., by returning storing a "blob" in the index
-             * (UUID of the resource and the addr of the block) and returning the
-             * "blob" from the iterator.  The client then fetches the blob using
-             * a socket-based streaming API.
+             * decode the block address.
              */
-            b = (byte[]) src.next();
+            final long addr;
+            try {
+
+                DataInput in = tuple.getValueStream();
             
-            off = 0;
+                addr = in.readLong();
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
             
-            len = b.length;
-            
-            assert b != null;
-//            assert b.length > 0; // zero length blocks are allowed.
-            
-            // the key buffer.
-            final IByteArrayBuffer kbuf = src.getTuple().getKeyBuffer();
-            
-            // the backing byte[].
-            final byte[] key = kbuf.array();
-            
-            // decode the block identifier from the key.
-            block = KeyBuilder.decodeLong(key, kbuf.pos()
-                    - Bytes.SIZEOF_LONG);
-            
-            log.info("Read "+b.length+" bytes: id="+id+", version="+version+", block="+block);
+            if (addr == 0L) {
+
+                /*
+                 * Note: empty blocks are allowed and are recorded with 0L as
+                 * their address.
+                 */
+
+                b = new byte[] {};
+                
+                off = 0;
+                
+                len = 0;
+                
+                log.info("Read zero bytes: id="+id+", version="+version+", block="+block);
+                
+            } else {
+             
+                byte[] key = tuple.getKey();
+                
+                // decode the block identifier from the key.
+//                block = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(),
+//                        tuple.getKeyBuffer().pos() - Bytes.SIZEOF_LONG);
+                block = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);
+                
+                final IBlock tmp = tuple.readBlock(addr);
+                
+                final int nbytes = tmp.length();
+                
+                // @todo reuse buffer!
+                b = new byte[nbytes];
+                
+                off = 0;
+                
+                len = nbytes;
+                
+                try {
+
+                    final int nread = tmp.inputStream().read(b,off,len);
+                    
+                    if (nread != len) {
+
+                        throw new RuntimeException("Expecting " + len
+                                + " bytes but read " + nread);
+                        
+                    }
+
+                } catch (IOException e) {
+
+                    throw new RuntimeException(e);
+                    
+                }
+                
+                log.info("Read "+b.length+" bytes: id="+id+", version="+version+", block="+block);
+                
+            }
             
             return true;
             
@@ -3402,57 +3468,49 @@ public class BigdataRepository implements ContentRepository {
         }
         
     }
- 
+
     /**
-     * This resolves the address of the block to the block on the journal.
-     * <p>
-     * Note: This filter can ONLY be applied on the data service side since you
-     * need to already have the journal reference on hand.
+     * Copies blocks onto the target store during overflow handling. Blocks that
+     * are no longer referenced by the file data index will be left behind on
+     * the journal and eventually discarded with the journal.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class BlockResolver extends EntryFilter {
+    public static class BlobOverflowHandler implements IOverflowHandler {
 
         /**
          * 
          */
-        private static final long serialVersionUID = 1L;
-
-        private final IRawStore store;
+        private static final long serialVersionUID = -8180664203349900189L;
 
         /**
-         * Used to decode the address from the visited values.
+         * De-serialization constructor.
          */
-        private final DataInputBuffer in = new DataInputBuffer(new byte[]{});
-       
-        private static transient final byte[] EMPTY_BLOCK = new byte[]{};
-        
-        /**
-         * 
-         * @param store
-         *            The store against which the block's address will be
-         *            resolved.
-         */
-        public BlockResolver(IRawStore store) {
+        public BlobOverflowHandler() {
             
-            this.store = store;
+        }
+
+        byte[] buf;
+        
+        public void close() {
+            
+            buf = null;
             
         }
         
-        public Object resolve(Object val) {
-            
-            final byte[] b = (byte[])val;
-            
-            assert b != null;
-            assert b.length == 8 :
-                "Expecting 8 bytes not "+b.length;// +" : "+Arrays.toString(b);
-            
-            in.setBuffer(b);
+        public byte[] handle(ITuple tuple, IBlockStore target) {
+
+            if(buf==null) {
+                
+                buf = new byte[Bytes.kilobyte32*10];
+                
+            }
             
             final long addr;
-            
             try {
+
+                DataInput in = tuple.getValueStream();
             
                 addr = in.readLong();
                 
@@ -3469,158 +3527,82 @@ public class BigdataRepository implements ContentRepository {
                  * their address.
                  */
                 
-                return EMPTY_BLOCK;
+                return KeyBuilder.asSortKey(0L);
 
             }
-            
-            /*
-             * @todo This is a great example of when passing in the buffer makes
-             * sense. The code here jumps through some hoops to avoid double
-             * copying the data.  However, when the buffer is readOnly we need
-             * to copy it anyway - and it generally is to prevent modifications
-             * to the data on the journal!
-             * 
-             * Note: hasArray() will not return true if the buffer is marked
-             * [readOnly].
-             */
-            
-            log.info("Reading block from addr="+store.toString(addr));
-            
-            final ByteBuffer buffer = store.read(addr);
 
-            if(buffer.hasArray() && buffer.arrayOffset()==0) {
+            // read block from underlying source store.
+            final IBlock block = tuple.readBlock(addr);
+            
+            // #of bytes in the block.
+            final int len = block.length();
+            
+            // write block on the target store.
+            final IBlock block2 = target.writeBlock( len );
+            
+            final InputStream bin = block.inputStream();
 
-                return buffer.array();
+            final OutputStream bout = block2.outputStream();
+
+            // the address on which the block will be written.
+            final long addr2 = block2.getAddress();
+            
+            try {
+
+                // #of bytes read so far.
+                long n = 0;
                 
-            }
-            
-            // log a notice since this is so annoying.
-            log.warn("Cloning data in block: len="+buffer.limit());
-            
-            // allocate array into which we will copy the data.
-            byte[] dst = new byte[buffer.limit()];
-            
-            // copy the data.
-            buffer.get(dst);
-            
-            return dst;
-            
-        }
-        
-    }
-    
-    /**
-     * Class is specialized to store blocks on the raw journal with only the
-     * address of the block in the entry value. However, when the entry value is
-     * requested the block is de-referenced (read off the journal) and returned
-     * instead.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * FIXME This optimizes the performance of the mutable {@link BTree} by
-     * writing the blocks onto raw records on the journal and recording the
-     * offset of the blocks in the {@link BTree}. Therefore, on overflow, the
-     * export of the {@link BTree} MUST be overriden so as to serialize the
-     * blocks themselves rather than the offsets in the {@link IndexSegment}
-     * (alternatively, we could embed the blocks in the
-     * {@link IndexSegmentFileStore}). This is designed to maximize the
-     * performance of both the mutable {@link BTree} and the read-only
-     * {@link IndexSegment}.
-     * 
-     * @see AtomicBlockAppendProc
-     * @see AtomicBlockWriteProc
-     */
-    public static class FileDataBTreePartition extends UnisolatedBTreePartition {
+                while (len - n > 0) {
 
-        public FileDataBTreePartition(IRawStore store, int branchingFactor,
-                UUID indexUUID, IKeySerializer keySer, IValueSerializer valSer,
-                IConflictResolver conflictResolver,
-                PartitionMetadataWithSeparatorKeys pmd) {
+                    // read source into buffer.
+                    final int nread = bin.read(buf);
 
-            super(store, branchingFactor, indexUUID, keySer, valSer,
-                    conflictResolver, pmd);
+                    if (nread == -1) {
 
-        }
+                        throw new RuntimeException(
+                                "Premature end of block after n=" + n
+                                        + " bytes out of " + len);
 
-        /**
-         * @param store
-         * @param metadata
-         */
-        public FileDataBTreePartition(IRawStore store, BTreeMetadata metadata) {
+                    }
 
-            super(store, metadata);
+                    // write buffer onto sink.
+                    bout.write(buf, 0, nread);
 
-        }
+                    n += nread;
 
-        /**
-         * Overriden to automatically resolve addresses of blocks to the block's
-         * data which is read from the backing store.
-         */
-        public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-                int capacity, int flags, IEntryFilter filter) {
+                }
 
-            final IEntryFilter f = new BlockResolver(getStore());
+                bout.flush();
 
-            if (filter != null) {
+            } catch(IOException ex) {
+                
+                log.warn(
+                        "Problem copying block: addr=" + addr + ", len=" + len,
+                        ex);
+                
+                throw new RuntimeException(ex);
+                
+            } finally {
 
-                f.add(filter);
+                try {
+                    bout.close();
+                } catch (IOException ex) {
+                    log.warn(ex);
+                }
+
+                try {
+                    bin.close();
+                } catch (IOException ex) {
+                    log.warn(ex);
+                }
 
             }
 
-            return super.rangeIterator(fromKey, toKey, capacity, flags, f);
-
-        }
-        
-    }
-
-    /**
-     * Creates an {@link FileDataBTreePartition} instance.
-     * 
-     * @todo specialized key serializer?
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class FileDataBTreePartitionConstructor extends UnisolatedBTreePartitionConstructor {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -8590231817525371488L;
-
-        /**
-         * De-serialization constructor.
-         */
-        public FileDataBTreePartitionConstructor() {
-
-            super();
+            // the address of the block on the target store.
+            return KeyBuilder.asSortKey(addr2);
             
         }
 
-        /**
-         * 
-         * @param branchingFactor
-         *            The branching factor.
-         */
-        public FileDataBTreePartitionConstructor(int branchingFactor) {
-        
-            super(branchingFactor, KeyBufferSerializer.INSTANCE,
-                    Value.Serializer.INSTANCE, null/* conflictResolver */);
-            
-        }
-
-        public BTree newInstance(IRawStore store, UUID indexUUID,
-                IPartitionMetadata pmd) {
-
-            log.info("Creating file data partition#"+pmd.getPartitionId());
-
-            return new FileDataBTreePartition(store, branchingFactor, indexUUID,
-                    keySer, valSer, conflictResolver,
-                    (PartitionMetadataWithSeparatorKeys) pmd);
-
-        }
-
     }
-    
+
 }

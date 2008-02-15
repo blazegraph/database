@@ -41,11 +41,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexWithCounter;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
-import com.bigdata.isolation.IIsolatedIndex;
 
 /**
  * Abstract base class for tasks that may be submitted to the
@@ -152,7 +151,7 @@ public abstract class AbstractTask implements Callable<Object> {
      * 
      * @see #getIndex(String name)
      */
-    final private Map<String,IIndexWithCounter> indexCache;
+    final private Map<String,IIndex> indexCache;
 
     /**
      * Flag is cleared if the task is aborted.  This is used to refuse
@@ -195,7 +194,7 @@ public abstract class AbstractTask implements Callable<Object> {
      *            operation is NOT isolated by a transaction -or-
      *            <code> - tx </code> to read from the most recent commit point
      *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time). *
+     *            isolated read-only transaction using a historical start time).
      * @param readOnly
      *            True iff the task is read-only.
      * @param resource
@@ -242,7 +241,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         this.resource = resource;
 
-        this.indexCache = new HashMap<String,IIndexWithCounter>(resource.length);
+        this.indexCache = new HashMap<String,IIndex>(resource.length);
         
         if (startTime > ITx.UNISOLATED) {
 
@@ -771,8 +770,19 @@ public abstract class AbstractTask implements Callable<Object> {
      * 
      * @exception IllegalStateException
      *                if the named index was not declared to the constructor.
+     * 
+     * FIXME When the named {@link BTree} is an index partition (its metadata
+     * record has a non-null partition metadata field) then this method MUST
+     * return fused view that reads the resources for the index partition. The
+     * necessary resources are described in that partition metadata (except that
+     * it also needs a commitTime field).
+     * <p>
+     * Make sure that the {@link IndexSegment}s are not re-opened all the time
+     * and that we never have a given {@link IndexSegment} "double open". This
+     * MIGHT require coordindation by the data service, which should introduce
+     * additional tasks for overflow and compacting merges.
      */
-    final public IIndexWithCounter getIndex(String name) {
+    final public IIndex getIndex(String name) {
 
         if (name == null) {
 
@@ -797,7 +807,7 @@ public abstract class AbstractTask implements Callable<Object> {
          */
         {
 
-            final IIndexWithCounter index = indexCache.get(name);
+            final IIndex index = indexCache.get(name);
 
             if (index != null) {
 
@@ -811,7 +821,7 @@ public abstract class AbstractTask implements Callable<Object> {
         // validate that this is a declared index.
         assertResource(name);
         
-        final IIndexWithCounter tmp;
+        final IIndex tmp;
 
         if (fullyIsolated) {
 
@@ -822,8 +832,7 @@ public abstract class AbstractTask implements Callable<Object> {
              * index.
              */
 
-            final IIsolatedIndex isolatedIndex = (IIsolatedIndex) tx
-                    .getIndex(name);
+            final IIndex isolatedIndex = (IIndex) tx.getIndex(name);
 
             if (isolatedIndex == null) {
 
@@ -831,7 +840,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
             }
 
-            tmp = (IIndexWithCounter) isolatedIndex;
+            tmp = (IIndex) isolatedIndex;
 
         } else {
 

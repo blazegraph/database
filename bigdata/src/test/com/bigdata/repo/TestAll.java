@@ -116,8 +116,12 @@ public class TestAll extends TestCase {
          * a set of index partitions.
          */
         suite.addTestSuite( TestFileMetadataIndex.class );
- 
-        // @todo test document metadata range scan and range delete.
+        
+        // test document metadata range scan.
+        suite.addTestSuite( TestRangeScan.class );
+        
+        // test range delete of file versions.
+        suite.addTestSuite( TestRangeDelete.class );
         
         /* 
          * @todo test full text indexing and search.

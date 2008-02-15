@@ -34,6 +34,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITuple;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -301,7 +302,7 @@ public class DumpJournal {
                 
             } else {
             
-                System.err.println(ndx.getMetadata().toString());
+                System.err.println(ndx.getIndexMetadata().toString());
                 
                 if(dumpIndices) dumpIndex(ndx);
                 
@@ -313,15 +314,18 @@ public class DumpJournal {
 
     private static void dumpIndex(BTree btree) {
 
+        // @todo offer the version metadata also if the index supports isolation.
         IEntryIterator itr = btree.rangeIterator(null, null);
         
         int i = 0;
         
         while(itr.hasNext()) {
             
-            Object val = itr.next();
+            ITuple tuple = itr.next();
+
+            byte[] key = tuple.getKey();
             
-            Object key = itr.getKey();
+            byte[] val = tuple.getValue();
             
             System.err.println("rec="+i+"\n key="+dumpKey(key)+"\n val="+dumpVal(val));
             

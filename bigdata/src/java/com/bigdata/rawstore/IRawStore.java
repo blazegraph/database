@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.mdi.IResourceMetadata;
 
 /**
  * <p>
@@ -237,8 +238,15 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
     /**
      * The backing file -or- <code>null</code> if there is no backing file
      * for the store.
+     * 
+     * @todo replace with {@link #getResourceMetadata()}? 
      */
     public File getFile();
+    
+    /**
+     * A description of this store in support of the scale-out architecture.
+     */
+    public IResourceMetadata getResourceMetadata();
     
     /**
      * True iff backed by stable storage.

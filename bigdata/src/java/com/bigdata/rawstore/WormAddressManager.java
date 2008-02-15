@@ -36,6 +36,7 @@ import java.text.NumberFormat;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.IndexSegmentAddressManager;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 
@@ -74,7 +75,7 @@ public class WormAddressManager implements IAddressManager {
     /**
      * Used to represent a null reference by {@link #toString(long)}.
      */
-    private static final String _NULL_ = "NULL";
+    protected static final String _NULL_ = "NULL";
 
     /**
      * The minimum #of bits that may be used to encode an offset as an unsigned
@@ -102,6 +103,11 @@ public class WormAddressManager implements IAddressManager {
      * address on a single file system.
      */
     public static final int DEFAULT_OFFSET_BITS = 42;
+    
+    /**
+     * The #of offset bits that must be used in order to support 64M blobs.
+     */
+    public static final int BLOB_OFFSET_BITS = 38;
     
     /**
      * The #of bits allocated to the byte offset (this is the sole input to the
@@ -396,7 +402,10 @@ public class WormAddressManager implements IAddressManager {
 
     }
 
-    final public long getOffset(final long addr) {
+    /**
+     * Note: overriden by {@link IndexSegmentAddressManager}.
+     */
+    public long getOffset(final long addr) {
 
         return (offsetMask & addr) >>> byteCountBits;
 
@@ -524,7 +533,7 @@ public class WormAddressManager implements IAddressManager {
         
     }
 
-    final public String toString(final long addr) {
+    public String toString(final long addr) {
         
         if(addr==0L) return _NULL_;
         

@@ -30,14 +30,16 @@ package com.bigdata.journal;
 
 import java.util.UUID;
 
+import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexWithCounter;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
 /**
@@ -58,7 +60,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadCommittedIndex implements IIndexWithCounter {
+public class ReadCommittedIndex implements IIndex {
 
     /**
      * The journal.
@@ -145,39 +147,51 @@ public class ReadCommittedIndex implements IIndexWithCounter {
             throw new IllegalStateException("Index not defined: "+name);
             
         }
-        
-        return index;
-        
-    }
-    
-    public UUID getIndexUUID() {
 
-        return getIndex().getIndexUUID();
+        if (index.getIndexMetadata().getPartitionMetadata() != null) {
+
+            /*
+             * FIXME The view is a view of multiple index resources. Use the
+             * same code that is used to create such views elsewhere (currently
+             * on the journal) to prevent double-opening of btrees or index
+             * segments.
+             */
+
+            throw new UnsupportedOperationException();
+            
+//            return new ReadOnlyFusedView(pmd);
+
+        }
+
+        return index;
+
+    }
+    
+    final public UUID getIndexUUID() {
+
+        return getIndex().getIndexMetadata().getIndexUUID();
+        
+    }
+
+    final public IndexMetadata getIndexMetadata() {
+        
+        return getIndex().getIndexMetadata();
         
     }
     
-    public String getStatistics() {
+    final public String getStatistics() {
         
         return getClass().getSimpleName() + " : "+ getIndex().getStatistics();
         
     }
 
-    public boolean contains(byte[] key) {
+    final public boolean contains(byte[] key) {
         
         return getIndex().contains(key);
         
     }
 
-    /**
-     * @exception UnsupportedOperationException always.
-     */
-    public Object insert(byte[] key, Object value) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
-    public Object lookup(byte[] key) {
+    final public byte[] lookup(byte[] key) {
         
         return getIndex().lookup(key);
         
@@ -186,52 +200,64 @@ public class ReadCommittedIndex implements IIndexWithCounter {
     /**
      * @exception UnsupportedOperationException always.
      */
-    public Object remove(byte[] key) {
+    final public byte[] insert(byte[] key, byte[] value) {
+
         throw new UnsupportedOperationException();
+        
     }
 
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    /**
+     * @exception UnsupportedOperationException always.
+     */
+    final public byte[] remove(byte[] key) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public long rangeCount(byte[] fromKey, byte[] toKey) {
+        
         return getIndex().rangeCount(fromKey, toKey);
+        
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return getIndex().rangeIterator(fromKey, toKey, 0/* capacity */,
                 KEYS|VALS/* flags */, null/* filter */);
         
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
+    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter) {
         
         return getIndex()
                 .rangeIterator(fromKey, toKey, capacity, flags, filter);
         
     }
+    
+    public Object submit(byte[] key, IIndexProcedure proc) {
+        
+        return proc.apply(this);
+        
+    }
 
-//    public void contains(BatchContains op) {
-//        getIndex().contains(op);
-//    }
-//
-//    /**
-//     * @exception UnsupportedOperationException always.
-//     */
-//    public void insert(BatchInsert op) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    public void lookup(BatchLookup op) {
-//        getIndex().lookup(op);
-//    }
-//
-//    /**
-//     * @exception UnsupportedOperationException always.
-//     */
-//    public void remove(BatchRemove op) {
-//        throw new UnsupportedOperationException();
-//    }
+    @SuppressWarnings("unchecked")
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler handler) {
 
-    public void submit(int n, byte[][] keys, byte[][] vals,
+        Object result = proc.apply(this);
+        
+        if(handler!=null) {
+            
+            handler.aggregate(result, new Split(null,0,0));
+            
+        }
+        
+    }
+    
+    @SuppressWarnings("unchecked")
+    final public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(getIndex());
@@ -240,27 +266,18 @@ public class ReadCommittedIndex implements IIndexWithCounter {
 
     }
 
-    public ICounter getCounter() {
-        
-        IIndex src = getIndex();
-        
-        if(src instanceof IIndexWithCounter) {
-        
-            IIndexWithCounter ndx = (IIndexWithCounter) src;
-            
-            return new ReadOnlyCounter(ndx.getCounter());
-            
-        } else {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
+    final public ICounter getCounter() {
+        return new ReadOnlyCounter(getIndex().getCounter());
     }
 
-    public boolean isIsolatable() {
-        
-        return getIndex().isIsolatable();
-        
+    /**
+     * Note: The definition of this view can evolve since it is not based
+     * on a fixed time but on the last committed state of the index.
+     */
+    public IResourceMetadata[] getResourceMetadata() {
+
+        return getIndex().getResourceMetadata();
+
     }
+
 }

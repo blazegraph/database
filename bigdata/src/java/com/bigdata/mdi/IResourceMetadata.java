@@ -25,8 +25,9 @@ package com.bigdata.mdi;
 
 import java.util.UUID;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentMetadata;
+import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.journal.Journal;
 
 /**
@@ -68,9 +69,22 @@ public interface IResourceMetadata {
 
     /**
      * The unique identifier for the resource (the UUID found in either the
-     * journal root block or the {@link IndexSegmentMetadata}).
+     * journal root block or the {@link IndexSegmentCheckpoint}).
      */
     public UUID getUUID();
+    
+    /**
+     * The commit time associated with the described index. When the index is an
+     * {@link IndexSegment} this is the commit time of the view from which that
+     * {@link IndexSegment} was generated. When the index is a {@link BTree} on
+     * a {@link Journal}, the commit time is the commit time associated with
+     * the {@link BTree} revision of interest. The use of commit times for index
+     * revisions on the {@link Journal} is required in order to identify the
+     * specific {@link BTree} revision of interest for some view when it is
+     * other than the most recent revision of that {@link BTree}. This
+     * facilites certain kinds of overflow operations.
+     */
+    public long getCommitTime();
     
     /**
      * The hash code of the {@link #getUUID() resource UUID}.

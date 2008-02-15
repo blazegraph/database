@@ -112,14 +112,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexCounter.class );
         // test iterator semantics.
         suite.addTestSuite( TestIterators.class );
+        // test chunked iterator semantics.
+        suite.addTestSuite(TestChunkedIterators.class);
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );
         // test contract for BTree#touch(node) w/o IO.
         suite.addTestSuite( TestTouch.class );
         // stress test basic tree operations w/o IO.
         suite.addTestSuite( TestBTree.class );
-        // test fused view operations on ordered list of trees.
-        suite.addTestSuite( TestFusedView.class );
         // test child address serialization.
         suite.addTestSuite( TestAddressSerializer.class );
         suite.addTestSuite( TestPackedAddressSerializer.class );
@@ -131,6 +131,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIncrementalWrite.class );
         // test copy-on-write scenarios.
         suite.addTestSuite( TestCopyOnWrite.class );
+        
+        /*
+         * test with delete markers.
+         * 
+         * Note: tests with timestamps and delete markers are done in the
+         * isolation package.
+         */
+        suite.addTestSuite( TestDeleteMarkers.class );
         
         /*
          * test persistence protocols. 
@@ -148,7 +156,7 @@ public class TestAll extends TestCase {
         // test static methods for the index builder.
         suite.addTestSuite( TestIndexSegmentPlan.class );
         // test encoding and decoding of child node/leaf addresses.
-        suite.addTestSuite( TestIndexSegmentAddressSerializer.class );
+        suite.addTestSuite( TestIndexSegmentAddressManager.class );
         // test write and read back of the index segment metadata record.
         suite.addTestSuite( TestIndexSegmentMetadata.class );
         // test with small known examples in detail.
@@ -159,8 +167,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexSegmentWithBloomFilter.class );
         // test of the fast forward and reverse leaf scans.
         suite.addTestSuite( TestIndexSegmentFastLeafScan.class );
-        // test compacting merge of two index segments.
-        suite.addTestSuite( TestIndexSegmentMerger.class );
+
+        /*
+         * test fused views, including iterators for the fused view.
+         */
+        suite.addTestSuite( TestFusedView.class );
         
         return suite;
         

@@ -72,8 +72,13 @@ public class TestCommit extends TestCase2 {
         final long rootId;
         {
 
-            BTree btree = new BTree(store, branchingFactor, UUID.randomUUID(),
-                    SimpleEntry.Serializer.INSTANCE);
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(branchingFactor);
+            
+            BTree btree = BTree.create(store, metadata);
+            
+//            BTree btree = new BTree(store, branchingFactor, UUID.randomUUID());
             
             assertTrue(btree.root.isDirty());
 

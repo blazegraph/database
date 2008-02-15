@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
@@ -36,18 +35,21 @@ import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.RangeCountProcedure;
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 
 /**
  * A view onto an unpartitioned index living inside an embedded
@@ -79,8 +81,9 @@ public class DataServiceIndex implements IIndex {
     private final EmbeddedDataService dataService;
 
     /**
-     * The transaction identifier for this index view -or-
-     * {@link ITx#UNISOLATED} if the index view is not transactional.
+     * The transaction identifier -or- {@link ITx#UNISOLATED} iff the index
+     * view is unisolated -or- <code>- timestamp</code> for a historical read
+     * of the most recent committed state not later than <i>timestamp</i>.
      * 
      * @return The transaction identifier for the index view.
      */
@@ -123,8 +126,10 @@ public class DataServiceIndex implements IIndex {
      * @param name
      *            The index name.
      * @param tx
-     *            The transaction -or- {@link ITx#UNISOLATED} to use
-     *            unisolated atomic index operations.
+     *            The transaction identifier -or- {@link ITx#UNISOLATED} iff the
+     *            index view is unisolated -or- <code>- timestamp</code> for a
+     *            historical read of the most recent committed state not later
+     *            than <i>timestamp</i>.
      * @param dataService
      *            The data service.
      */
@@ -138,11 +143,11 @@ public class DataServiceIndex implements IIndex {
         
     }
     
-    public UUID getIndexUUID() {
+    public IndexMetadata getIndexMetadata() {
 
         try {
 
-            return dataService.getIndexUUID(name);
+            return dataService.getIndexMetadata(name);
 
         } catch (IOException ex) {
 
@@ -166,20 +171,6 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public boolean isIsolatable() {
-
-        final IIndex ndx = dataService.getJournal().getIndex(name);
-        
-        if(ndx == null) {
-            
-            throw new NoSuchIndexException(name);
-            
-        }
-        
-        return ndx.isIsolatable();
-
-    }
-
     public boolean contains(byte[] key) {
         
         if (batchOnly)
@@ -190,17 +181,29 @@ public class DataServiceIndex implements IIndex {
         final BatchContains proc = new BatchContains(//
                 1, // n,
                 0, // offset
-                new byte[][] { (byte[]) key } // keys
+                new byte[][] { key } // keys
         );
 
-        final boolean[] ret = ((ResultBitBuffer) submit((byte[]) key, proc))
-                .getResult();
+        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
 
         return ret[0];
         
     }
 
-    public Object insert(byte[] key, Object value) {
+    /**
+     * Counters are local to a specific index partition and are only available
+     * to unisolated procedures.
+     * 
+     * @throws UnsupportedOperationException
+     *             always
+     */
+    public ICounter getCounter() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    public byte[] insert(byte[] key, byte[] value) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -211,7 +214,7 @@ public class DataServiceIndex implements IIndex {
                 1, // n,
                 0, // offset
                 new byte[][] { key }, // keys
-                new byte[][] { (byte[]) value }, // vals
+                new byte[][] { value }, // vals
                 true // returnOldValues
         );
 
@@ -221,7 +224,7 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public Object lookup(byte[] key) {
+    public byte[] lookup(byte[] key) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -240,7 +243,7 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public Object remove(byte[] key) {
+    public byte[] remove(byte[] key) {
 
         if (batchOnly)
             throw new RuntimeException(NON_BATCH_API);
@@ -260,22 +263,47 @@ public class DataServiceIndex implements IIndex {
 
     }
 
+    public long rangeCount(byte[] fromKey, byte[] toKey) {
+
+        // final LongAggregator handler = new LongAggregator();
+
+        final RangeCountProcedure proc = new RangeCountProcedure(fromKey, toKey);
+
+        final long rangeCount;
+
+        try {
+
+            rangeCount = (Long) dataService.submit(tx, name, proc);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+        return rangeCount;
+
+    }
+  
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
+                | IRangeQuery.VALS, null/* filter */);
+
+    }
+
+    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+
+        return new DataServiceRangeIterator(dataService, name, tx, fromKey, toKey,
+                capacity, flags, filter);
+
+    }
+
     /**
-     * Submits an index procedure to the embedded data service returning the
-     * result of that procedure.
-     * <p>
-     * Note: This is parallel to
-     * {@link ClientIndexView#submit(byte[], IIndexProcedure)} so that some code
-     * can be shared by both classes.
-     * 
-     * @param key
-     *            The key (unused).
-     * @param proc
-     *            The procedure.
-     * 
-     * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
+     * @todo run on the {@link #getThreadPool()} in order to limit client
+     *       parallelism to the size of the thread pool.
      */
-    public Object submit(byte[] key,IIndexProcedure proc) {
+    public Object submit(byte[] key, IIndexProcedure proc) {
 
         try {
 
@@ -289,42 +317,32 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    @SuppressWarnings("unchecked")
+    public void submit(byte[] fromKey, byte[] toKey,
+            final IIndexProcedure proc, final IResultHandler handler) {
 
-//        final LongAggregator handler = new LongAggregator();
-        
-        final RangeCountProcedure proc = new RangeCountProcedure(fromKey,toKey);
-
-        final long rangeCount;
+        if (proc == null)
+            throw new IllegalArgumentException();
 
         try {
+            
+            Object result = dataService.submit(tx, name, proc);
 
-            rangeCount = (Long) dataService.submit(tx,name,proc);
-        
+            if(handler!=null) {
+                
+                handler.aggregate(result, new Split(null,0,0));
+                
+            }
+
         } catch (Exception ex) {
-        
+
             throw new RuntimeException(ex);
-        
+
         }
-
-        return rangeCount;
-
-    }
-    
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-
-        return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
-                | IRangeQuery.VALS, null/* filter */);
-
+        
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
-
-        return new RangeQueryIterator(dataService, name, tx, fromKey, toKey,
-                capacity, flags, filter);
-
-    }
-
+    @SuppressWarnings("unchecked")
     public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
@@ -340,6 +358,18 @@ public class DataServiceIndex implements IIndex {
             throw new RuntimeException(ex);
 
         }
+
+    }
+
+    /**
+     * The 'live' resources associated with the cached {@link IndexMetadata}.
+     */
+    public IResourceMetadata[] getResourceMetadata() {
+
+        PartitionMetadataWithSeparatorKeys pmd = getIndexMetadata()
+                .getPartitionMetadata();
+
+        return pmd.getLiveResources();
 
     }
 

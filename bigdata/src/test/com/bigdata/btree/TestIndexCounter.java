@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 /**
- * Test suite for the {@link IIndexWithCounter} interface.
+ * Test suite for the {@link IIndex#getCounter()} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,10 +60,10 @@ public class TestIndexCounter extends AbstractBTreeTestCase {
         // get() does not have a side-effect on the counter.
         assertEquals(0,counter.get());
         
-        // inc() returns the value and _then_ increments the counter.
-        assertEquals(0,counter.inc());
+        // inc() increments the value and _then_ returns the counter.
+        assertEquals(1,counter.incrementAndGet());
         assertEquals(1,counter.get());
-        assertEquals(1,counter.inc());
+        assertEquals(2,counter.incrementAndGet());
 
     }
     

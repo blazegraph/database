@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -31,27 +34,25 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IValueSerializer;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.io.DataInputBuffer;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * BTree mapping index names to the last metadata record committed for the named
  * index. The keys are Unicode strings using the default {@link Locale}. The
  * values are {@link Entry} objects recording the name of the index and the last
- * known address of the {@link BTreeMetadata} record for the named index.
+ * known address of the {@link IndexMetadata} record for the named index.
  * <p>
  * Note: The {@link Journal} maintains an instance of this class that evolves
  * with each {@link Journal#commit()}. However, the journal also makes use of
@@ -197,30 +198,48 @@ public class Name2Addr extends BTree {
         }
 
     }
+
+    /**
+     * Create a new instance.
+     * 
+     * @param store
+     *            The backing store.
+     * 
+     * @return The new instance.
+     */
+    static public Name2Addr create(IRawStore store) {
     
-    public Name2Addr(IRawStore store) {
-
-        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID(),
-                new ValueSerializer());
-
-        // Note: code shared by both constructors.
-        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
-
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setClassName(Name2Addr.class.getName());
+        
+        return (Name2Addr) BTree.create(store, metadata);
+        
     }
+    
+//    public Name2Addr(IRawStore store) {
+//
+//        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID());
+//
+//        // Note: code shared by both constructors.
+//        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
+//
+//    }
 
     /**
      * Load from the store (de-serialization constructor).
      * 
      * @param store
      *            The backing store.
+     * @param checkpoint
+     *            The {@link Checkpoint} record.
      * @param metadataId
      *            The metadata record for the index.
      */
-    public Name2Addr(IRawStore store, BTreeMetadata metadata) {
+    public Name2Addr(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
-        super(store, metadata);
+        super(store, checkpoint, metadata);
         
-        // Note: code shared by both constructors.
         indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
 
     }
@@ -266,13 +285,18 @@ public class Name2Addr extends BTree {
             final byte[] key = getKey(name);
             
             // lookup the current entry (if any) for that index.
-            Entry oldValue = (Entry) lookup(key);
+            final byte[] val = lookup(key);
+
+            // de-serialize iff entry was found.
+            final Entry oldValue = (val == null ? null
+                    : EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(
+                            val)));
             
             // if there is no existing entry or if the addr has changed.
             if (oldValue == null || oldValue.addr != addr) {
 
                 // then update persistent mapping.
-                insert(key, new Entry(name, addr));
+                insert(key, EntrySerializer.INSTANCE.serialize(new Entry(name, addr)));
                 
             }
             
@@ -326,13 +350,16 @@ public class Name2Addr extends BTree {
         if (btree != null)
             return btree;
 
-        final Entry entry = (Entry) super.lookup(getKey(name));
+        final byte[] val = super.lookup(getKey(name));
 
-        if (entry == null) {
+        if (val == null) {
 
             return null;
             
         }
+        
+        // deserialize entry.
+        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
 
 //        /*
 //         * Reload the index from the store using the object cache to ensure a
@@ -386,13 +413,16 @@ public class Name2Addr extends BTree {
 
             if (addr == null) {
 
-                final Entry entry = (Entry) super.lookup(getKey(name));
+                final byte[] val = super.lookup(getKey(name));
 
-                if (entry == null) {
+                if (val == null) {
 
                     addr = 0L;
                     
                 } else {
+
+                    // deserialize entry.
+                    final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
                     
                     addr = entry.addr;
                     
@@ -454,8 +484,8 @@ public class Name2Addr extends BTree {
         // flush btree to the store to get the metadata record address.
         final long addr = ((ICommitter)btree).handleCommit();
         
-        // add an entry to the persistent index.
-        super.insert(key,new Entry(name,addr));
+        // add a serialized entry to the persistent index.
+        super.insert(key,EntrySerializer.INSTANCE.serialize(new Entry(name,addr)));
         
 //        // touch the btree in the journal's object cache.
 //        journal.touch(addr, btree);
@@ -541,7 +571,7 @@ public class Name2Addr extends BTree {
         public final String name;
         
         /**
-         * The address of the last known {@link BTreeMetadata} record for the
+         * The address of the last known {@link IndexMetadata} record for the
          * index with that name.
          */
         public final long addr;
@@ -555,91 +585,59 @@ public class Name2Addr extends BTree {
         }
         
     }
-    
+
     /**
      * The values are {@link Entry}s.
      *
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class ValueSerializer implements IValueSerializer {
+    protected static class EntrySerializer {
 
-        private static final long serialVersionUID = 6428956857269979589L;
+        public static transient final EntrySerializer INSTANCE = new EntrySerializer();
 
-//        public static transient final IValueSerializer INSTANCE = new ValueSerializer();
+        private EntrySerializer() {
 
-        final public static transient short VERSION0 = 0x0;
-
-        // FIXME This is not parameterized by the actual offsetBits. 
-//        final protected transient IRawStore store;
-        final private static transient IAddressManager addressManager = WormAddressManager.INSTANCE;
-
-        public ValueSerializer() {
-            
         }
-        
-//        public ValueSerializer(IRawStore store) {
-//            
-//            if(store==null) throw new IllegalArgumentException();
-//            
-//            this.store = store;
-//            
-//        }
 
-        public void putValues(DataOutputBuffer os, Object[] values, int n)
-                throws IOException {
+        public byte[] serialize(Entry entry) {
 
-            os.packShort(VERSION0);
+            try {
 
-            for (int i = 0; i < n; i++) {
-
-                Entry entry = (Entry) values[i];
+                // estimate capacity
+                final int capacity = Bytes.SIZEOF_LONG + entry.name.length() * 2;
+                
+                ByteArrayOutputStream baos = new ByteArrayOutputStream(capacity);
+                
+                DataOutput os = new DataOutputStream(baos);
+                
+                os.writeLong(entry.addr);
 
                 os.writeUTF(entry.name);
+                
+                return baos.toByteArray();
 
-                addressManager.packAddr(os, entry.addr);
-
-//                if (packedLongs) {
-//
-//                    LongPacker.packLong(os, entry.addr);
-//
-//                } else {
-//
-//                    os.writeLong(entry.addr);
-//
-//                }
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
                 
             }
 
         }
-        
-        public void getValues(DataInput is, Object[] values, int n)
-                throws IOException {
 
-            final short version = ShortPacker.unpackShort(is);
-            
-            if (version != VERSION0)
-                throw new RuntimeException("Unknown version: " + version);
+        public Entry deserialize(DataInput in) {
 
-            for (int i = 0; i < n; i++) {
+            try {
 
-                final String name = is.readUTF();
-                
-                final long addr;
-                
-//                if (packedLongs) {
-//
-//                    addr = Long.valueOf(LongPacker.unpackLong(is));
-//
-//                } else {
-//
-//                    addr = Long.valueOf(is.readLong());
-//
-//                }
-                
-                addr = addressManager.unpackAddr(is);
-                
-                values[i] = new Entry(name,addr);
+                final long addr = in.readLong();
+
+                final String name = in.readUTF();
+
+                return new Entry(name, addr);
+
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
 
             }
 

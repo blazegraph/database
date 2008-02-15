@@ -36,6 +36,10 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.journal.Journal;
+
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -64,12 +68,31 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     private UUID uuid;
     
     /**
+     * The commit time associated with the described index. When the index is an
+     * {@link IndexSegment} this is the commit time of the view from which that
+     * {@link IndexSegment} was generated. When the index is a {@link BTree} on
+     * a {@link Journal}, the commit time is the commit time associated with
+     * the {@link BTree} revision of interest.
+     */
+    private long commitTime;
+    
+    /**
      * De-serialization constructor.
      */
     public AbstractResourceMetadata() {
         
     }
 
+    
+    /**
+     * FIXME set the commitTime field here.
+     * <p>
+     * Together with the last commit time on the journal this supports purging
+     * old resources by a transaction manager.
+     * <p>
+     * Also, using this field a post-commit handler can replace the metadata
+     * record for a btree with a new one where newView := (oldbTree, oldView)
+     */ 
     public AbstractResourceMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
 
         if (filename == null || state == null || uuid == null)
@@ -85,7 +108,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         this.state = state;
         
         this.uuid = uuid;
-        
+
     }
 
     public int hashCode() {
@@ -104,7 +127,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         // Note: compares UUIDs first.
 
         if (uuid.equals(o.getUUID()) && filename.equals(o.getFile())
-                && nbytes == o.size() && state == o.state()) {
+                && nbytes == o.size() && state == o.state()
+                && commitTime == o.getCommitTime()) {
 
             return true;
             
@@ -137,6 +161,12 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         return uuid;
         
     }
+
+    final public long getCommitTime() {
+        
+        return commitTime;
+        
+    }
     
     private static transient short VERSION0 = 0x0;
     
@@ -152,6 +182,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         state = ResourceState.valueOf(ShortPacker.unpackShort(in));
         
         uuid = new UUID(in.readLong(),in.readLong());
+        
+        commitTime = in.readLong();
         
         filename = in.readUTF();
         
@@ -169,6 +201,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
 
         out.writeLong(uuid.getLeastSignificantBits());
 
+        out.writeLong(commitTime);
+        
         out.writeUTF(filename);
         
     }
@@ -183,6 +217,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         ", state="+state()+
         ", filename="+getFile()+
         ", uuid="+getUUID()+
+        ", commitTime="+getCommitTime()+
         "}";
         
     }

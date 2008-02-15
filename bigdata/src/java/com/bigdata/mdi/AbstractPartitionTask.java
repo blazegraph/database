@@ -30,19 +30,19 @@ import java.util.Iterator;
 import java.util.concurrent.Executors;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.RecordCompressor;
-import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.isolation.Value;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.scaleup.MasterJournal.Options;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -85,17 +85,17 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      */
     protected final int tmpFileBranchingFactor = Bytes.kilobyte32*4;
 
-    /**
-     * When true, pre-record checksum are generated for the output
-     * {@link IndexSegment}.
-     */
-    protected final boolean useChecksum = false;
+//    /**
+//     * When true, pre-record checksum are generated for the output
+//     * {@link IndexSegment}.
+//     */
+//    protected final boolean useChecksum = false;
     
-    /**
-     * When non-null, a {@link RecordCompressor} will be applied to the
-     * output {@link IndexSegment}.
-     */
-    protected final RecordCompressor recordCompressor = null;
+//    /**
+//     * When non-null, a {@link RecordCompressor} will be applied to the
+//     * output {@link IndexSegment}.
+//     */
+//    protected final RecordCompressor recordCompressor = null;
         
     /**
      * Return the desired filename for a segment in a partition of a named
@@ -212,6 +212,12 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      */
     public AbstractPartitionTask(Journal journal, String name) {
 
+        /*
+         * @todo does not have to be unisolated - we can run against a
+         * historical commit record for a btree if we re-define the view
+         * appropriately.
+         */
+
         super(journal, ITx.UNISOLATED, false/* readOnly */, name);
         
     }
@@ -227,7 +233,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * constrains its index partition separators such that
      * 
      * @see IIndex
-     * @see UnisolatedBTreePartition
+     * @see 
      * @see PartitionMetadataWithSeparatorKeys
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -241,12 +247,12 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          * to be created from the given index.
          * <p>
          * Note: The factory is given a reference to an {@link IIndex}, which
-         * is typically a fused view of an index partition extending
-         * {@link UnisolatedBTreePartition}. Fused views do NOT implement the
-         * {@link AbstractBTree#keyAt(int)} method which relies on a total
-         * ordering rather than a merge of total orderings. As a result the
-         * {@link Iterator}s returned by the factory typically need to perform
-         * a key range scan to identify suitable index partition separators.
+         * is typically a {@link FusedView} of an index partition. Fused views
+         * do NOT implement the {@link AbstractBTree#keyAt(int)} method which
+         * relies on a total ordering rather than a merge of total orderings. As
+         * a result the {@link Iterator}s returned by the factory typically
+         * need to perform a key range scan to identify suitable index partition
+         * separators.
          * <p>
          * An index partition separator is a key that forms the
          * <em>leftSeparator</em> key for that index partition. The
@@ -308,10 +314,10 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * approximately M entries each.
      * 
      * <pre>
-     *        
-     *        n = round( rangeCount / m ) - the integer #of index partitions to be created.
-     *        
-     *        m' = round( rangeCount / n ) - the integer #of entries per partition.
+     *         
+     *         n = round( rangeCount / m ) - the integer #of index partitions to be created.
+     *         
+     *         m' = round( rangeCount / n ) - the integer #of entries per partition.
      * </pre>
      * 
      * To a first approximation, the splits are every m' index entries.
@@ -329,9 +335,9 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      *       {@link AbstractBTree} and {@link AbstractBTree#keyAt(int)} can be
      *       used.
      * 
-     * @todo make sure that {@link UnisolatedBTreePartition} does not expose
-     *       keyAt() - this may break a lot of code assumptions - or at least
-     *       throws an exception for it.
+     * @todo make sure that view of the index partition does not expose keyAt() -
+     *       this may break a lot of code assumptions - or at least throws an
+     *       exception for it.
      * 
      * FIXME when the index partition is a fused view we do not have a keyAt()
      * implementation. (It's possible that this could be achieved using keyAt()
@@ -360,7 +366,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * 
      * @todo rule variants that attempt to divide the index partition into equal
      *       size (#of bytes) splits.
-     *       
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -437,13 +443,17 @@ abstract public class AbstractPartitionTask extends AbstractTask {
     }
     
     /**
-     * Task builds an {@link IndexSegment} from (a key-range of) an index
-     * partition. When the key range is unspecified (null, null) the index
-     * segment will contain all data in the source index partition (a full
-     * merge). If the index partition is to be split into two index partitions
-     * then the key range should be specified as (null, splitKey) for the left
-     * sibling and (splitKey, null) for the right sibling. This can be
-     * generalized into an N-way split simply by choosing N-1 useful keys.
+     * Task builds an {@link IndexSegment} from an index partition. When the key
+     * range is unspecified (null, null) the index segment will contain all data
+     * in the source index partition (a full merge). If the index partition is
+     * to be split into two index partitions then the key range should be
+     * specified as (null, splitKey) for the left sibling and (splitKey, null)
+     * for the right sibling. This can be generalized into an N-way split simply
+     * by choosing N-1 useful keys.
+     * 
+     * @todo A flag may be used to specify that deleted versions should not
+     *       appear in the generated view (but note that the transaction manager
+     *       or history policy generally will make this decision).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -456,10 +466,9 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * constraints. The same "rule" could potentially be used to count logical
      * "rows" for the {@link SparseRowStore} row iterator.
      * 
-     * FIXME A merge rule that knows about deletion markers and is only usable
-     * when the input is an {@link UnisolatedBTree}. The output
-     * {@link IndexSegment} will contain timestamps and deletion markers and
-     * support isolation.
+     * FIXME A merge rule that knows about version timestamps and deletion
+     * markers. The output {@link IndexSegment} will contain timestamps and
+     * deletion markers and support isolation.
      * 
      * FIXME write a "split" task that finds the split points for an index
      * partition and then runs N merge tasks, one per split point. this is very
@@ -499,7 +508,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      *       scheduled operations MUST abort and new operations with the correct
      *       separator keys must be scheduled.
      * 
-     * @todo do I need a full timestamp for the {@link Value}s in order to
+     * @todo do I need a full timestamp for the index entries in order to
      *       support history policies based on age? If the timestamp is the time
      *       at which the commit group begins then the timestamps can be
      *       compressed readily using a dictionary since there will tend to be
@@ -508,7 +517,6 @@ abstract public class AbstractPartitionTask extends AbstractTask {
     public static class MergeTask extends AbstractPartitionTask {
 
         protected final int branchingFactor;
-        protected final double errorRate;
         protected final String name;
         protected final int partId;
         protected final byte[] fromKey;
@@ -524,16 +532,12 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          *            partition.
          * @param branchingFactor
          *            The branching factor for the new {@link IndexSegment}.
-         * @param errorRate
-         *            The error rate for the bloom filter for the new
-         *            {@link IndexSegment} -or- zero(0d) if no bloom filter is
-         *            desired.
          */
         public MergeTask(Journal journal, String name, int partId,
-                int branchingFactor, double errorRate) {
+                int branchingFactor) {
 
-            this(journal, name, partId, branchingFactor, errorRate,
-                    null/* fromKey */, null/* toKey */);
+            this(journal, name, partId, branchingFactor, null/* fromKey */,
+                    null/* toKey */);
 
         }
 
@@ -548,10 +552,6 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          *            partition.
          * @param branchingFactor
          *            The branching factor for the new {@link IndexSegment}.
-         * @param errorRate
-         *            The error rate for the bloom filter for the new
-         *            {@link IndexSegment} -or- zero(0d) if no bloom filter is
-         *            desired.
          * @param fromKey
          *            The first key that would be accepted into that partition
          *            (aka the separator key for that partition).<br>
@@ -567,15 +567,13 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          *            sibling).
          */
         public MergeTask(Journal journal, String name, int partId,
-                int branchingFactor, double errorRate, byte[] fromKey,
-                byte[] toKey) {
+                int branchingFactor, byte[] fromKey, byte[] toKey) {
 
             super(journal, name);
 
             this.name = name;
             this.partId = partId;
             this.branchingFactor = branchingFactor;
-            this.errorRate = errorRate;
             this.fromKey = fromKey;
             this.toKey = toKey;
 
@@ -587,18 +585,25 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          */
         public Object doTask() throws Exception {
 
-            final UnisolatedBTreePartition src;
-            try {
-
-                src = (UnisolatedBTreePartition) getIndex(name);
-                
-            } catch(ClassCastException ex) {
-                
-                throw new RuntimeException("Not an index partition: " + name,
-                        ex);
-
-            }
+            // The source view.
+            final IIndex src = getIndex(name);
             
+            // @todo from the mutable btree when the source is a view.
+            final IndexMetadata metadata = ((BTree)src).getIndexMetadata();
+
+            /*
+             * @todo review assumptions - this MUST be the timestamp of the
+             * commit record from for the source view. In fact, it probably has
+             * different semantics and a method should be exposed on
+             * AbstractTask to return the necessary timestamp. This value is
+             * written onto the generated index segment and MUST correspond to
+             * the timestamp associated with the updated partition metadata. So
+             * another should for this is to have the caller specify it and to
+             * use a historical read when building the index segment.
+             */
+            final long commitTime = startTime;
+            
+            // the file to be generated.
             final File outFile = getSegmentFile(name, partId);
 
             // Note: truncates nentries to int.
@@ -607,19 +612,29 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             /*
              * Note: in order to see both version counters and deletion markers
              * this needs to use an IEntryIterator that does NOT filter out
-             * deleted entries and which does NOT resolve {@link Value}s to
-             * their datums. That iterator MUST be defined for the fused view
+             * deleted entries. That iterator MUST be defined for the fused view
              * for the index partition.
              */
-            final IEntryIterator itr = src
-                    .rangeIterator2(fromKey, toKey, 0/* capacity */,
-                            IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
+            final IEntryIterator itr = src.rangeIterator(fromKey, toKey,
+                    0/* capacity */, IRangeQuery.KEYS | IRangeQuery.VALS
+                            | IRangeQuery.DELETED, null/* filter */);
 
             // Build index segment.
-            final IndexSegmentBuilder builder = new IndexSegmentBuilder(
-                    outFile, journal.tmpDir, nentries, itr, branchingFactor,
-                    src.getNodeSerializer().getValueSerializer(), useChecksum,
-                    recordCompressor, errorRate, src.getIndexUUID());
+            final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
+                    outFile, //
+                    journal.tmpDir, //
+                    nentries,//
+                    itr, //
+                    branchingFactor,//
+                    metadata,//
+                    commitTime//
+//                    src.getNodeSerializer().getValueSerializer(), 
+//                    useChecksum,
+//                    src.isIsolatable(),
+//                    recordCompressor,
+//                    errorRate,
+//                    src.getIndexUUID()
+                    );
 
             /*
              * Describe the index segment.

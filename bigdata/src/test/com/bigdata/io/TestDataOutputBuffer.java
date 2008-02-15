@@ -66,7 +66,7 @@ public class TestDataOutputBuffer extends TestCase2
             assertNotNull(buf.buf);
             assertEquals(DataOutputBuffer.DEFAULT_INITIAL_CAPACITY,
                     buf.buf.length);
-            assertEquals(0, buf.len);
+            assertEquals(0, buf.pos);
 
         }
 
@@ -74,21 +74,21 @@ public class TestDataOutputBuffer extends TestCase2
             DataOutputBuffer buf = new DataOutputBuffer(0);
             assertNotNull(buf.buf);
             assertEquals(0, buf.buf.length);
-            assertEquals(0, buf.len);
+            assertEquals(0, buf.pos);
         }
 
         {
             DataOutputBuffer buf = new DataOutputBuffer(20);
             assertNotNull(buf.buf);
             assertEquals(20, buf.buf.length);
-            assertEquals(0, buf.len);
+            assertEquals(0, buf.pos);
         }
 
         {
             final byte[] expected = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
             DataOutputBuffer buf = new DataOutputBuffer(4, expected);
             assertNotNull(buf.buf);
-            assertEquals(4, buf.len);
+            assertEquals(4, buf.pos);
             assertEquals(10, buf.buf.length);
             assertTrue(expected == buf.buf);
         }
@@ -137,7 +137,7 @@ public class TestDataOutputBuffer extends TestCase2
          */
         byte[] tmp = new byte[] { 4, 5, 6, 7, 8, 9 };
         DataOutputBuffer.write(tmp, 2, 2);
-        assertEquals(7, DataOutputBuffer.len);
+        assertEquals(7, DataOutputBuffer.pos);
         assertEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7 }, DataOutputBuffer.buf);
         assertEquals(0, BytesUtil.compareBytes(
                 new byte[] { 1, 2, 3, 4, 5, 6, 7 }, DataOutputBuffer.buf));
@@ -146,18 +146,18 @@ public class TestDataOutputBuffer extends TestCase2
         tmp = new byte[] { 8, 9, 10 };
         byte[] expected = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
         DataOutputBuffer.write(tmp);
-        assertEquals(10, DataOutputBuffer.len);
+        assertEquals(10, DataOutputBuffer.pos);
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
-                expected.length, expected, 0, DataOutputBuffer.len,
+                expected.length, expected, 0, DataOutputBuffer.pos,
                 DataOutputBuffer.buf));
 
         // possible overflow (old and new capacity are unknown).
         tmp = new byte[] { 11, 12 };
         expected = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
         DataOutputBuffer.write(tmp);
-        assertEquals(12, DataOutputBuffer.len);
+        assertEquals(12, DataOutputBuffer.pos);
         assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
-                expected.length, expected, 0, DataOutputBuffer.len,
+                expected.length, expected, 0, DataOutputBuffer.pos,
                 DataOutputBuffer.buf));
 
     }
@@ -200,12 +200,12 @@ public class TestDataOutputBuffer extends TestCase2
 
         DataOutputBuffer DataOutputBuffer = new DataOutputBuffer(5, expected);
 
-        assertEquals(5, DataOutputBuffer.len);
+        assertEquals(5, DataOutputBuffer.pos);
         assertTrue(expected == DataOutputBuffer.buf);
 
         assertTrue(DataOutputBuffer == DataOutputBuffer.reset());
 
-        assertEquals(0, DataOutputBuffer.len);
+        assertEquals(0, DataOutputBuffer.pos);
         assertTrue(expected == DataOutputBuffer.buf);
 
     }

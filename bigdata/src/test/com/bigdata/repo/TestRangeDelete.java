@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,28 +20,38 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on May 14, 2007
+ * Created on Feb 15, 2008
  */
 
-package com.bigdata.isolation;
-
-import com.bigdata.btree.ReadOnlyIndex;
+package com.bigdata.repo;
 
 /**
- * This class presents a read-only view of an unisolated index that is used to
- * prevent writes on an unisolated index by an operation that has been declared
- * to be read-only.
+ * Test suite for {@link BigdataRepository#deleteAll(String, String)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIsolatableIndex extends ReadOnlyIndex {
+public class TestRangeDelete extends AbstractRepositoryTestCase {
 
-    public ReadOnlyIsolatableIndex(IIsolatableIndex src){
+    /**
+     * 
+     */
+    public TestRangeDelete() {
+    }
+
+    /**
+     * @param arg0
+     */
+    public TestRangeDelete(String arg0) {
+        super(arg0);
+    }
+
+    public void test_rangeDelete() {
         
-        super(src);
+        fail("write test");
         
     }
     

@@ -43,9 +43,10 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -131,7 +132,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             
             final UUID indexUUID = UUID.randomUUID();
 
-            UnisolatedBTree ndx = new UnisolatedBTree(journal, indexUUID);
+            final BTree ndx = BTree.create(journal, new IndexMetadata(resource,
+                    indexUUID));
             
             ndx.write();
             
@@ -198,7 +200,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                     
                     final UUID indexUUID = UUID.randomUUID();
 
-                    UnisolatedBTree ndx = new UnisolatedBTree(journal, indexUUID);
+                    final BTree ndx = BTree.create(journal, new IndexMetadata(
+                            resource, indexUUID));
                     
                     journal.registerIndex(resource, ndx);
 
@@ -227,7 +230,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                     
                     final UUID indexUUID = UUID.randomUUID();
 
-                    UnisolatedBTree ndx = new UnisolatedBTree(journal, indexUUID);
+                    final BTree ndx = BTree.create(journal, new IndexMetadata(
+                            resource, indexUUID));
 
                     journal.registerIndex(resource, ndx);
 
@@ -383,9 +387,9 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             
             tasks.add( SequenceTask.newSequence(new AbstractTask[]{
 
-                    new RegisterIndexTask(journal, resource,
-                            new UnisolatedBTree(journal, indexUUID)),
-     
+                    new RegisterIndexTask(journal, resource, BTree.create(
+                            journal, new IndexMetadata(resource, indexUUID))),
+
                     new AbstractTask(journal, ITx.UNISOLATED,
                             false/* readOnly */, resource) {
                         

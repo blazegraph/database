@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -45,23 +44,30 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.isolation.ReadOnlyIsolatedIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.Name2Addr.EntrySerializer;
+import com.bigdata.mdi.IPartitionMetadata;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.ResourceState;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.scaleup.MasterJournal;
-import com.bigdata.scaleup.SlaveJournal;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -954,11 +960,13 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          */
         synchronized(name2Addr) {
             
-            Iterator itr = name2Addr.entryIterator();
+            IEntryIterator itr = name2Addr.entryIterator();
 
             while (itr.hasNext()) {
 
-                Entry entry = (Entry) itr.next();
+                ITuple tuple = itr.next();
+                
+                Entry entry = EntrySerializer.INSTANCE.deserialize(tuple.getValueStream());
                 
                 IIndex ndx = name2Addr.get(entry.name);
                 
@@ -1081,6 +1089,14 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
 
+    public IResourceMetadata getResourceMetadata() {
+        
+        // @todo assumes the journal is live - handle overflow.
+        
+        return new JournalMetadata(this,ResourceState.Live);
+        
+    }
+    
     public boolean isOpen() {
 
         return _bufferStrategy.isOpen();
@@ -1689,7 +1705,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
              */
 
             // create btree mapping names to addresses.
-            name2Addr = new Name2Addr(this);
+            name2Addr = Name2Addr.create(this);
 
         } else {
 
@@ -1736,7 +1752,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
              */
 
             // create btree mapping names to addresses.
-            ndx = new CommitRecordIndex(this);
+            ndx = CommitRecordIndex.create(this);
 
         } else {
 
@@ -1781,8 +1797,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * Note: The caller MUST take care not to permit writes since they could be
      * visible to other users of the same read-only index. This is typically
      * accomplished by wrapping the returned object in class that will throw an
-     * exception for writes such as {@link ReadOnlyIndex},
-     * {@link ReadOnlyIsolatedIndex}, or {@link ReadCommittedIndex}.
+     * exception for writes such as {@link ReadOnlyIndex} or
+     * {@link ReadCommittedIndex}.
      * 
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
@@ -1818,7 +1834,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * Name2Addr objects springing into existance for the same commit
          * record.
          */
-        Name2Addr name2Addr = (Name2Addr)getIndex(metaAddr);
+        final Name2Addr name2Addr = (Name2Addr)getIndex(metaAddr);
         
         /*
          * The address at which the named index was written for that historical
@@ -1826,14 +1842,20 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          */
         final long indexAddr = name2Addr.getAddr(name);
         
-        // No such index by name for that historical state.
-        if(indexAddr==0L) return null;
+        if (indexAddr == 0L) {
+
+            // No such index by name for that historical state.
+
+            return null;
+            
+        }
         
         /*
          * Resolve the named index using the object cache to impose a
          * canonicalizing mapping on the historical named indices based on the
          * address on which it was written in the store.
          */
+
         return getIndex(indexAddr);
 
     }
@@ -1936,7 +1958,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 //    }
 
     /**
-     * Registers an {@link UnisolatedBTree} that will support transactional
+     * Registers an index that will support scale-out and transactional
      * isolation.
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
@@ -1945,8 +1967,26 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * @see Options#BRANCHING_FACTOR
      */
     public IIndex registerIndex(String name) {
+
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+
+        metadata.setBranchingFactor(defaultBranchingFactor);
         
-        return registerIndex(name, new UnisolatedBTree(this, defaultBranchingFactor, UUID.randomUUID()));
+        metadata.setIsolatable(true);
+        
+        BTree btree = BTree.create(this, metadata);
+
+        return registerIndex(name,btree);
+        
+//        return registerIndex(name, //
+//                new BTree(this, //
+//                        defaultBranchingFactor, //
+//                        UUID.randomUUID(), //
+//                        true, // isolatable
+//                        null,// conflictResolver
+//                        KeyBufferSerializer.INSTANCE,//
+//                        ByteArrayValueSerializer.INSTANCE//
+//                ));
         
     }
     
@@ -1954,7 +1994,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
-    public IIndex registerIndex(String name, IIndex ndx) {
+    public IIndex registerIndex(String name, BTree ndx) {
 
         assertOpen();
 
@@ -2060,6 +2100,125 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
     }
 
+    /**
+     * Return the sources for a view of a partitioned index.
+     * 
+     * FIXME refactor the concurrency control and the resource management for
+     * the journals and the index segments into a separate class. Make sure that
+     * we never double-open an index segment or double-create a view of an
+     * index. Handle synchronization as part of that.
+     * 
+     * @todo support views for a historical time. this will require either
+     *       IIndex to record the timestamp from which the index was loaded or
+     *       the caller to provide that information.
+     * 
+     * @param name
+     *            The name of the index.
+     * @param timestamp
+     *            The startTime of an active transaction, <code>0L</code> for
+     *            the current unisolated index view, or <code>-timestamp</code>
+     *            for a historical view no later than the specified timestamp.
+     * 
+     * @return The sources for the index view or <code>null</code> if the
+     *         index was not defined as of the timestamp.
+     * 
+     * @todo try {} catch{} should close indices if there are any problems
+     *       opening all required by the view.
+     * 
+     * @see FusedView
+     * @see IPartitionMetadata
+     */
+    public AbstractBTree[] openSources(String name, long timestamp) {
+
+        final BTree btree;
+        
+        if (timestamp == 0L) {
+
+            // unisolated view.
+            
+            btree = (BTree) getIndex(name);
+            
+        } else if (timestamp < 0) {
+
+            // historical view.
+            
+            ICommitRecord commitRecord = getCommitRecord(-timestamp);
+            
+            btree = (BTree) getIndex(name,commitRecord);
+
+        } else {
+         
+            /*
+             * historical view isolated by a transaction.
+             * 
+             * FIXME this code branch will not work. there is a cyclic
+             * dependency between the transaction and getIndex() as to how the
+             * view is defined. also tx.getIndex() will return a read only index
+             * if the transaction does not allow writes.
+             */
+            
+            btree = (BTree) getIndex(name, timestamp);
+            
+        }
+        
+        if (btree == null) {
+
+            // No such index.
+            
+            return null;
+            
+        }
+
+        // get the partition metadata (if any).
+        final PartitionMetadataWithSeparatorKeys pmd = btree.getIndexMetadata()
+                .getPartitionMetadata();
+
+        if (pmd == null) {
+
+            // An unpartitioned index.
+
+            throw new UnsupportedOperationException("Index not partitioned: "
+                    + name + ", timestamp=" + timestamp);
+            
+        }
+
+        // indices in order from most recent to oldest.
+        final AbstractBTree[] sources;
+        {
+            
+            // live resources in order from oldest to most recent.
+            IResourceMetadata[] a = pmd.getLiveResources();
+            
+            sources = new AbstractBTree[a.length];
+
+            // the most recent is this btree.
+            sources[0] = btree;
+
+            // backwards, excluding the most recent which we already have.
+            for (int i = a.length - 1; i > 0; i--) {
+                
+                IResourceMetadata md = a[i];
+                
+                if( md.isIndexSegment() ) {
+                    
+                    // Open an index segment.
+                    sources[i] = new IndexSegmentFileStore(new File(md.getFile())).load();
+                    
+                } else {
+
+                    // Read from either this journal or a historical journal.
+                    throw new UnsupportedOperationException();
+                    
+                }
+                
+            }
+            
+        }
+        
+        return sources;
+        
+    }
+    
     /*
      * transaction support.
      */

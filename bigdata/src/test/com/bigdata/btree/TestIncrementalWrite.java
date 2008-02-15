@@ -58,21 +58,90 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         super(name);
     }
        
-    public BTree getBTree(int branchingFactor, int queueCapacity, int queueScan) {
+    protected BTree getBTree(int branchingFactor, final int queueCapacity, final int queueScan) {
         
         IRawStore store = new SimpleMemoryRawStore();
         
-        BTree btree = new BTree(store,
-                branchingFactor,
-                UUID.randomUUID(),
-                new MyHardReferenceQueue<PO>(new DefaultEvictionListener(),
-                        queueCapacity, queueScan),
-                        KeyBufferSerializer.INSTANCE,
-                        SimpleEntry.Serializer.INSTANCE,
-                        null // no record compressor
-                        );
+        IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+        
+        md.setBranchingFactor(branchingFactor);
+
+        /*
+         * Note: This jumps through hoops to create the BTree instance with the
+         * appropriate parameterization of the hard reference queue.
+         */
+        
+//        // Note: override the btree class.
+//        md.setClassName(TestBTree.class.getName());
+
+        md.write(store);
+        
+        Checkpoint checkpoint = md.firstCheckpoint();
+        
+        checkpoint.write(store);
+        
+        BTree btree = new TestBTree(store, checkpoint, md) {
+
+            @Override
+            int getQueueCapacity() {
+                return queueCapacity;
+            }
+
+            @Override
+            int getQueueScan() {
+                return queueScan;
+            }
+            
+        };
+        
+//        BTree btree = new BTree(store,
+//                branchingFactor,
+//                UUID.randomUUID(),
+//                false,//isolatable
+//                null,//conflictResolver
+//                new MyHardReferenceQueue<PO>(new DefaultEvictionListener(),
+//                        queueCapacity, queueScan),//
+//                KeyBufferSerializer.INSTANCE,//
+//                ByteArrayValueSerializer.INSTANCE, //
+//                null // no record compressor
+//        );
 
         return btree;
+        
+    }
+
+    /**
+     * Custom hard reference queue.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private abstract static class TestBTree extends BTree {
+
+        abstract int getQueueCapacity();
+        
+        abstract int getQueueScan();
+        
+        /**
+         * @param store
+         * @param checkpoint
+         * @param metadata
+         */
+        public TestBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+         
+            super(store, checkpoint, metadata);
+            
+        }
+        
+        protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+
+            return new MyHardReferenceQueue<PO>(//
+                    new DefaultEvictionListener(),//
+                    getQueueCapacity(),//
+                    getQueueScan()//
+            );
+
+        }
         
     }
 

@@ -32,8 +32,9 @@ import java.util.UUID;
 
 import junit.framework.TestSuite;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 
 /**
  * Test suite for the state machine governing the transaction {@link RunState}
@@ -462,8 +463,7 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         {
 
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
-                    .randomUUID()));
+            journal.registerIndex(name);
         
             journal.commit();
             

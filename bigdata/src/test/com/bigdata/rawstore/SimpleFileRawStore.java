@@ -33,6 +33,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.mdi.IResourceMetadata;
 
 
 /**
@@ -117,6 +118,18 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
     
+    /**
+     * Temporary stores do not have resource descriptions.
+     * 
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public IResourceMetadata getResourceMetadata() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
     /**
      * This also releases the lock if any obtained by the constructor.
      */

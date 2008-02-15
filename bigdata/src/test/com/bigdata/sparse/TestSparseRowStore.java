@@ -39,20 +39,26 @@ import java.util.Vector;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.DataService;
 import com.bigdata.util.CSVReader;
 
 /**
  * Test suite for {@link SparseRowStore}.
+ * 
+ * FIXME clean up this test suite. it's not got much to offer. a lot of the
+ * pragmatic tests are being done by the {@link BigdataRepository} which uses
+ * the {@link SparseRowStore} for its file metadata index.
  * 
  * @todo test with auto-generated timestamps.
  * 
@@ -65,8 +71,8 @@ import com.bigdata.util.CSVReader;
  * @todo verify atomic read/write/scan of rows
  * 
  * @todo specialized compression for the keys using knowledge of schema and
- *       column names?  can we directly produce a compressed representation
- *       that is order preserving?
+ *       column names? can we directly produce a compressed representation that
+ *       is order preserving?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -75,7 +81,7 @@ public class TestSparseRowStore extends TestCase2 {
 
     protected IKeyBuilder keyBuilder;
     protected IRawStore store;
-    protected UnisolatedBTree btree;
+    protected BTree btree;
     
     public Properties getProperties() {
         
@@ -90,12 +96,16 @@ public class TestSparseRowStore extends TestCase2 {
     public void setUp() {
         
         Properties properties = getProperties();
-        
+
         keyBuilder = KeyBuilder.newUnicodeInstance(properties);
-        
+
         store = new Journal(properties);
-        
-        btree = new UnisolatedBTree(store,UUID.randomUUID());
+
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+        metadata.setDeleteMarkers(true);
+
+        btree = BTree.create(store, metadata);
         
     }
     
@@ -244,9 +254,11 @@ public class TestSparseRowStore extends TestCase2 {
             
             while(itr.hasNext()) {
             
-                final byte[] val = (byte[])itr.next();
+                ITuple tuple = itr.next();
                 
-                final byte[] key = itr.getKey();
+                final byte[] val = tuple.getValue();
+                
+                final byte[] key = tuple.getKey();
 
                 KeyDecoder keyDecoder = new KeyDecoder(schema,key,offsetColumnName);
                 

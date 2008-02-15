@@ -33,9 +33,9 @@ import java.util.UUID;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.btree.IIndexWithCounter;
-import com.bigdata.btree.IValueSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.ICounter;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.rawstore.IRawStore;
 
@@ -129,9 +129,17 @@ public class TestRestartSafe extends ProxyTestCase {
      */
     public BTree getBTree(int branchingFactor, Journal journal) {
 
-        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
-                SimpleEntry.Serializer.INSTANCE);
-
+        BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor( branchingFactor );
+            
+            btree = BTree.create(journal, metadata);
+            
+        }
+        
         return btree;
             
     }
@@ -248,7 +256,7 @@ public class TestRestartSafe extends ProxyTestCase {
     }
     
     /**
-     * Test verifies that the {@link IIndexWithCounter} is restart-safe.
+     * Test verifies that the {@link ICounter} is restart-safe.
      */
     public void test_restartSafeCounter() {
        
@@ -264,7 +272,7 @@ public class TestRestartSafe extends ProxyTestCase {
             final BTree btree = getBTree(m,journal);
             
             assertEquals(0,btree.getCounter().get());
-            assertEquals(0,btree.getCounter().inc());
+            assertEquals(1,btree.getCounter().incrementAndGet());
             assertEquals(1,btree.getCounter().get());
             
             addr1 = btree.write();
@@ -321,8 +329,21 @@ public class TestRestartSafe extends ProxyTestCase {
 
         {
 
-            final BTree btree = new MyBTree(journal, m, UUID.randomUUID(),
-                    SimpleEntry.Serializer.INSTANCE);
+            final MyBTree btree;
+            {
+                
+                IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+                
+                metadata.setBranchingFactor( m );
+                
+                // Note: override implementation class.
+                metadata.setClassName(MyBTree.class.getName());
+                
+                btree = (MyBTree)BTree.create(journal, metadata);
+                
+            }
+
+//            final BTree btree = new MyBTree(journal, m, UUID.randomUUID());
 
             byte[][] keys = new byte[][] { new byte[] { 5 }, new byte[] { 6 },
                     new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
@@ -375,21 +396,15 @@ public class TestRestartSafe extends ProxyTestCase {
 
     public static class MyBTree extends BTree {
 
-        public MyBTree(IRawStore store, int branchingFactor, UUID indexUUID,
-                IValueSerializer valSer) {
-            
-            super(store, branchingFactor, indexUUID, valSer);
-            
-        }
-        
         /**
          * @param store
+         * @param checkpoint
          * @param metadata
          */
-        public MyBTree(IRawStore store, BTreeMetadata metadata) {
-            super(store, metadata);
+        public MyBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+            super(store, checkpoint, metadata);
         }
-        
+
     }
     
 }

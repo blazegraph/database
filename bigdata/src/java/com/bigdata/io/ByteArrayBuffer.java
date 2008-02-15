@@ -31,13 +31,12 @@ package com.bigdata.io;
 import it.unimi.dsi.fastutil.io.RepositionableStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import org.apache.log4j.Logger;
-
-import com.bigdata.btree.KeyBuilder;
 
 /**
  * A view on a mutable byte[] that may be extended.
@@ -53,9 +52,18 @@ import com.bigdata.btree.KeyBuilder;
  * an {@link OutputBitStream}. Likewise it implements
  * {@link RepositionableStream} so that you can rewind the
  * {@link OutputBitStream}.
+ * <p>
+ * Note: The concept of {@link #limit()} and {@link #capacity()} are slightly
+ * different than for {@link ByteBuffer} since the limit and the capacity may be
+ * transparently extended on write. However, neither the limit nor the capacity
+ * will be extended on read (this prevents you from reading bad data). The
+ * relative <i>put</i> operations always set the limit to the position as a
+ * post-condition of the operation. The absolute get/put operations ignore the
+ * limit entirely.
  * 
  * @todo consider method signature conformance with {@link ByteBuffer} for ease
- *       of migrating code (misaligned only on getByte/putByte).
+ *       of migrating code (misaligned only on {@link #getByte()}/{@link #putByte(byte)},
+ *       and {@link #pos()}).
  * 
  * @todo packed coding for short, int, and long only makes sense in the context
  *       of variable length fields. should those methods be introduced here or
@@ -63,22 +71,14 @@ import com.bigdata.btree.KeyBuilder;
  * 
  * @todo add put/get char methods?
  * 
- * @todo support insertion sort maintenance on a region with fields of a fixed
- *       length. _if_ it is allowable for the region size to change then an
- *       extension may require updates of other offsets into the byte[]. the
- *       adaptive packed memory array is another extreme in which holes are left
- *       in the buffer to minimize copying.
- * 
- * @todo test suite for get/set methods - refactor from {@link DataOutputBuffer}
- *       and {@link KeyBuilder} test suites.
- * 
  * @todo consider an offset (aka base) for the absolute positioning so that a
  *       view on a larger array may be used.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, RepositionableStream {
+public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
+        RepositionableStream {
 
     protected static Logger log = Logger.getLogger(ByteArrayBuffer.class);
 
@@ -88,8 +88,8 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     final public static int DEFAULT_INITIAL_CAPACITY = 1024;
 
     /**
-     * The buffer. This is re-allocated whenever the capacity of the buffer
-     * is too small and reused otherwise.
+     * The buffer. This is re-allocated whenever the capacity of the buffer is
+     * too small and reused otherwise.
      */
     protected byte[] buf;
 
@@ -449,6 +449,31 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         
     }
 
+    /**
+     * Return a copy of the data written on the buffer (the bytes in [0:pos]).
+     * 
+     * @return A new array containing data in the buffer.
+     * 
+     * @see #wrap()
+     * 
+     * @todo this returns the data in [0:pos], which is essentially the data
+     *       written on the buffer using relative put operations but without
+     *       requiring a {@link #flip()} to set the pos to zero while leaving
+     *       the read limit alone. that is at odds with the rest of the relative
+     *       api but there is a lot of use of this method already. perhaps it
+     *       can be moved to the {@link DataOutputBuffer} where it would share
+     *       semantics with {@link ByteArrayOutputStream#toByteArray()}?
+     */
+    final public byte[] toByteArray() {
+        
+        byte[] tmp = new byte[this.pos];
+        
+        System.arraycopy(buf, 0, tmp, 0, this.pos);
+        
+        return tmp;
+        
+    }
+
     /*
      * Sequential operations (position, limit, capacity)
      */
@@ -457,7 +482,13 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      * A non-negative integer specifying the #of bytes of data in the buffer
      * that contain valid data starting from position zero(0).
      */
-    protected int len = 0;
+    protected int pos = 0;
+
+    /**
+     * The read limit (there is no write limit on the buffer since the capacity
+     * will be automatically extended on overflow).
+     */
+    protected int limit;
     
     /**
      * An optional mark to which the buffer can be rewound and <code>0</code>
@@ -466,6 +497,9 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     private int mark = 0;
     
     /**
+     * Create a new buffer backed by the given array. The position will be zero,
+     * the limit will be the capacity, and the mark will be zero.
+     * 
      * @param len
      *            The #of bytes of data in the provided buffer.
      * @param buf
@@ -483,16 +517,19 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         if (len > buf.length)
             throw new IllegalArgumentException("len>buf.length");
 
-        this.len = len;
+        this.pos = len;
+        
+        this.limit = buf.length;
 
     }
     
     /**
-     * The #of bytes remaining in the buffer before it would overflow.
+     * The #of bytes remaining in the buffer for relative read operations (limit -
+     * pos).
      */
     final public int remaining() {
        
-        return buf.length - len;
+        return limit - pos;
         
     }
 
@@ -501,12 +538,12 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public int pos() {
         
-        return len;
+        return pos;
         
     }
 
     /**
-     * Set the position in the buffer.
+     * Set the position in the buffer (does not change the limit).
      * 
      * @param pos
      *            The new position, must be in [0:{@link #capacity()}).
@@ -524,22 +561,52 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         if (pos < 0 || pos >= buf.length)
             throw new IllegalArgumentException();
 
-        int v = this.len;
+        int v = this.pos;
 
-        this.len = pos;
+        this.pos = pos;
 
         return v;
 
     }
+
+    /**
+     * The read limit (there is no write limit on the buffer since the capacity
+     * will be automatically extended on overflow).
+     */
+    final public int limit() {
+        
+        return limit;
+        
+    }
+
+    /**
+     * Sets the position to zero but leaves the read limit at the old position.
+     * After invoking this method you can use relative get methods to read all
+     * data up to the read limit.
+     */
+    final public void flip() {
+        
+        /*
+         * @todo remove this assertion -- it's here to be triggered if relative
+         * put methods fail to update the limit with the position, but it is not
+         * an absolute requirement since you can change the position
+         * independently of the limit using pos().
+         */  
+        assert limit == pos : "pos="+pos+", limit="+limit;
+        
+        pos = 0;
+        
+    }
     
     /**
-     * Prepares the buffer for new data by resetting the length to zero.
+     * Prepares the buffer for new data by resetting the position and limit to
+     * zero.
      * 
      * @return This buffer.
      */
     public ByteArrayBuffer reset() {
         
-        len = 0;
+        pos = limit = 0;
         
         return this;
         
@@ -563,7 +630,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public void ensureFree(final int len) {
         
-        ensureCapacity(this.len + len);
+        ensureCapacity(this.pos + len);
         
     }
 
@@ -576,44 +643,56 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         
         final int tmp = mark;
         
-        mark = len;
+        mark = pos;
         
         return tmp;
         
     }
 
     /**
-     * Rewinds the buffer to the mark.
+     * Rewinds the buffer to the mark.  Does not change the limit.
      * 
      * @return The new {@link #pos()}.
      */
     final public int rewind() {
         
-        len = mark;
+        pos = mark;
         
-        return len;
+        return pos;
         
     }
 
     /**
-     * Return a copy of the valid data in the buffer.
+     * Relative copy of data into <i>this</i> buffer. 
      * 
-     * @return A new array containing data in the buffer.
+     * @param src
+     *            The source.
      * 
-     * @see #wrap()
+     * @return The #of bytes copied.
      */
-    final public byte[] toByteArray() {
+    final public int copy(ByteBuffer src) {
         
-        byte[] tmp = new byte[this.len];
+        final int n = src.remaining();
+
+        if (n > 0) {
+
+            ensureFree(n);
+
+            src.get(buf, pos, n);
+
+            this.pos += n;
+
+            this.limit = this.pos;
+            
+        }
         
-        System.arraycopy(buf, 0, tmp, 0, this.len);
-        
-        return tmp;
+        return n;
         
     }
-
+    
     /**
-     * Wraps up a reference to the data in a {@link ByteBuffer}
+     * Wraps up a reference to the data in a {@link ByteBuffer} between the
+     * position and the limit.
      * 
      * @return A {@link ByteBuffer} encapsulating a reference to the data in the
      *         current buffer. The data will be overwritten if {@link #reset()}
@@ -621,7 +700,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public ByteBuffer wrap() {
 
-        return ByteBuffer.wrap(buf, 0, len);
+        return ByteBuffer.wrap(buf, pos, limit);
         
     }
 
@@ -633,9 +712,11 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public void put(final byte[] b) {
 
-        put(this.len/*pos*/, b, 0, b.length);
+        put(this.pos/*pos*/, b, 0, b.length);
         
-        this.len += b.length;
+        this.pos += b.length;
+
+        this.limit = this.pos;
         
     }
     
@@ -652,9 +733,11 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public void put(final byte[] b, final int off, final int len) {
 
-        put(this.len/*pos*/, b, off, len);
+        put(this.pos/*pos*/, b, off, len);
         
-        this.len += len;
+        this.pos += len;
+        
+        this.limit = pos;
         
     }
     
@@ -666,9 +749,9 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      */
     final public void putByte(final byte v) {
 
-        putByte(len, v);
+        putByte(pos, v);
         
-        len++;
+        limit = ++pos;
 
     }
 
@@ -676,12 +759,18 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
      * Relative <i>get</i> method for reading a byte value.
      * 
      * @return The value.
+     * 
+     * @exception IndexOutOfBoundsException
+     *                if the position is greater than or equal to the limit.
      */
     final public byte getByte() {
         
-        final byte v = getByte(len);
+        if (pos >= limit)
+            throw new IndexOutOfBoundsException();
         
-        len++;
+        final byte v = getByte(pos);
+        
+        pos++;
         
         return v;
         
@@ -689,17 +778,22 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     
     final public void putShort(final short v) {
 
-        putShort(len, v);
+        putShort(pos, v);
         
-        len += 2;
+        pos += 2;
+        
+        limit = pos;
 
     }
 
     final public short getShort() {
         
-        final short v = getShort(len);
+        if (pos +2 >= limit)
+            throw new IndexOutOfBoundsException();
+
+        final short v = getShort(pos);
         
-        len += 2;
+        pos += 2;
         
         return v;
         
@@ -707,17 +801,22 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     
     final public void putInt(final int v) {
 
-        putInt(len, v);
+        putInt(pos, v);
         
-        len += 4;
+        pos += 4;
 
+        limit = pos;
+        
     }
-
+    
     final public int getInt() {
         
-        final int v = getInt(len);
+        if (pos + 4 >= limit)
+            throw new IndexOutOfBoundsException();
         
-        len += 4;
+        final int v = getInt(pos);
+        
+        pos += 4;
         
         return v;
         
@@ -725,17 +824,22 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     
     final public void putFloat(final float v) {
 
-        putFloat(len, v);
+        putFloat(pos, v);
         
-        len += 4;
+        pos += 4;
 
+        limit = pos;
+        
     }
 
     final public float getFloat() {
         
-        final float v = getFloat(len);
+        if (pos + 4 >= limit)
+            throw new IndexOutOfBoundsException();
+
+        final float v = getFloat(pos);
         
-        len += 4;
+        pos += 4;
         
         return v;
         
@@ -743,17 +847,22 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     
     final public void putLong(final long v) {
 
-        putLong(len, v);
+        putLong(pos, v);
         
-        len += 8;
+        pos += 8;
+        
+        limit = pos;
 
     }
 
     final public long getLong() {
         
-        final long v = getLong(len);
+        if (pos + 8 >= limit)
+            throw new IndexOutOfBoundsException();
         
-        len += 8;
+        final long v = getLong(pos);
+        
+        pos += 8;
         
         return v;
         
@@ -761,17 +870,22 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
     
     final public void putDouble(final double v) {
 
-        putDouble(len, v);
+        putDouble(pos, v);
         
-        len += 8;
+        pos += 8;
+        
+        limit = pos;
 
     }
 
     final public double getDouble() {
         
-        final double v = getDouble(len);
+        if (pos + 8 >= limit)
+            throw new IndexOutOfBoundsException();
         
-        len += 8;
+        final double v = getDouble(pos);
+        
+        pos += 8;
         
         return v;
         
@@ -974,36 +1088,39 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         }
         if( v > 127 ) {
             // the value requires two bytes.
-            if (len + 2 > buf.length)
-                ensureCapacity(len + 2);
-            buf[len++] = ( (byte)((0xff & (v >> 8))|0x80) ); // note: set the high bit.
-            buf[len++] = ( (byte)(0xff & v) );
+            if (pos + 2 > buf.length)
+                ensureCapacity(pos + 2);
+            buf[pos++] = ( (byte)((0xff & (v >> 8))|0x80) ); // note: set the high bit.
+            buf[pos++] = ( (byte)(0xff & v) );
             return 2;
         } else {
             // the value fits in one byte.
-            if (len + 1 > buf.length)
-                ensureCapacity(len + 1);
-            buf[len++] = ( (byte)(0xff & v) );
+            if (pos + 1 > buf.length)
+                ensureCapacity(pos + 1);
+            buf[pos++] = ( (byte)(0xff & v) );
             return 1;
         }
     }
 
     /*
-     * OutputStream integration.
+     * OutputStream integration.  Operations all set the read limit to the
+     * position as a post-condition (they are treated as relative puts).
      */
     
     final public void write(final int b) throws IOException {
 
-        if (len + 1 > buf.length)
-            ensureCapacity(len + 1);
+        if (pos + 1 > buf.length)
+            ensureCapacity(pos + 1);
 
-        buf[len++] = (byte) (b & 0xff);
+        buf[pos++] = (byte) (b & 0xff);
+        
+        limit = pos;
 
     }
 
     final public void write(final byte[] b) throws IOException {
 
-        write(b,0,b.length);
+        write(b, 0, b.length);
 
     }
 
@@ -1011,9 +1128,11 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
         if(len==0) return;
       ensureFree(len);
       
-      System.arraycopy(b, off, buf, this.len, len);
+      System.arraycopy(b, off, buf, this.pos, len);
       
-      this.len += len;
+      this.pos += len;
+      
+      this.limit = this.pos;
 
     }
 
@@ -1027,7 +1146,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
 
     public long position() throws IOException {
     
-        return (int) len;
+        return (int) pos;
         
     }
     
@@ -1039,7 +1158,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer, R
 
         }
 
-        this.len = (int) v;
+        this.pos = (int) v;
         
     }
 

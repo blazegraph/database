@@ -31,8 +31,6 @@ package com.bigdata.repo;
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.isolation.UnisolatedBTree;
-
 /**
  * Test atomic append operations on the file data index for the
  * {@link BigdataRepository}. This also tests the correct assignment of block
@@ -53,9 +51,8 @@ import com.bigdata.isolation.UnisolatedBTree;
  *       to do this is to run an iterator over the data and aggregate the block
  *       lengths.
  * 
- * @todo test atomic append behavior after a file version has been deleted. Note
- *       that a kind of {@link UnisolatedBTree} is being used so it stores
- *       versioned data.
+ * @todo test atomic append behavior after a file version has been deleted. the
+ *       index will use delete markers but should not store version timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

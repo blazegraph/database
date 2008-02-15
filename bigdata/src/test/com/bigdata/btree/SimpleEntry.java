@@ -26,11 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.io.DataInput;
-import java.io.IOException;
 import java.io.Serializable;
 
-import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.SerializerUtil;
 
 
 /**
@@ -40,6 +38,11 @@ import com.bigdata.io.DataOutputBuffer;
  * @version $Id$
  */
 public class SimpleEntry implements Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     private transient static int nextId = 1;
 
@@ -72,89 +75,36 @@ public class SimpleEntry implements Serializable {
         
     }
 
+    /**
+     * Note: <code>equals</code> has been overriden to transparently
+     * de-serialize the given object when it is a <code>byte[]</code>. This
+     * is a hack that provides backwards compatibility for some of the unit
+     * tests when assume that objects (and not byte[]s) are stored in the
+     * B+Tree and visited by the {@link IEntryIterator}.
+     */
     public boolean equals(Object o) {
         
         if( this == o ) return true;
         
         if( o == null ) return false;
         
+        if(o instanceof ITuple) {
+            
+            // hack to convert return from IEntryIterator to byte[].
+            
+            o = ((ITuple)o).getValue();
+            
+        }
+        
+        if(o instanceof byte[]) {
+
+            // hack to deserialize a byte[].
+            return id == ((SimpleEntry) SerializerUtil.deserialize((byte[])o)).id;
+            
+        }
+        
         return id == ((SimpleEntry)o).id;
         
-    }
-    
-    
-    /**
-     * (De-)serializer an array of {@link SimpleEntry}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class Serializer implements IValueSerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 4515322522558633041L;
-        
-        public transient static final Serializer INSTANCE = new Serializer();
-        
-        public Serializer() {}
-
-        public void putValues(DataOutputBuffer os, Object[] values, int n)
-                throws IOException {
-
-            for (int i = 0; i < n; i++) {
-
-                os.writeInt(((SimpleEntry) values[i]).id);
-
-            }
-
-        }
-
-        public void getValues(DataInput is, Object[] values, int n)
-                throws IOException {
-
-            for (int i = 0; i < n; i++) {
-
-                values[i] = new SimpleEntry(is.readInt());
-
-            }
-
-        }
-
-    }
-
-    /**
-     * A (De-)serializer that always throws exceptions.  This is used when we
-     * are testing in a context in which incremental IOs are disabled, e.g.,
-     * by the {@link NoEvictionListener}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class NoSerializer implements IValueSerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -6467578720380911380L;
-        
-        public transient static final NoSerializer INSTANCE = new NoSerializer();
-        
-        public NoSerializer() {}
-        
-        public void getValues(DataInput is, Object[] values, int n) throws IOException {
-
-            throw new UnsupportedOperationException();
- 
-        }
-
-        public void putValues(DataOutputBuffer os, Object[] values, int n) throws IOException {
-
-            throw new UnsupportedOperationException();
-
-        }
-
     }
 
 }

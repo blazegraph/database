@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.service.DataService;
 
 /**
@@ -97,11 +96,11 @@ public interface ITransactionManager extends ITimestampService {
      * Create a new transaction.
      * <p>
      * The concurrency control algorithm is MVCC, so readers never block and
-     * only write-write conflicts can arise. It is possible to register an
-     * {@link UnisolatedBTree} with an {@link IConflictResolver} in order to
-     * present the application with an opportunity to validate write-write
-     * conflicts using state-based techniques (i.e., by looking at the records
-     * and timestamps and making an informed decision).
+     * only write-write conflicts can arise. It is possible to register an index
+     * with an {@link IConflictResolver} in order to present the application
+     * with an opportunity to validate write-write conflicts using state-based
+     * techniques (i.e., by looking at the records and timestamps and making an
+     * informed decision).
      * 
      * @param level
      *            The isolation level. The following isolation levels are

@@ -32,11 +32,10 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
-import com.bigdata.mdi.UnisolatedBTreePartitionConstructor;
 
 /**
  * A metadata service for a named index.
@@ -89,19 +88,12 @@ public interface IMetadataService extends IDataService, Remote {
     public IDataService getDataServiceByUUID(UUID serviceUUID)
             throws IOException;
 
-    /*
-     * methods that do not require direct access to the metadata server for
-     * their implementation.
-     */
-
     /**
      * Register and statically partition a scale-out index.
      * 
-     * @param name
-     *            The name of the scale-out index.
-     * @param ctor
-     *            The object used to create the mutable {@link BTree} instances
-     *            on the {@link DataService}s.
+     * @param metadata
+     *            The metadata template describing the scale-out index,
+     *            including the name to be assigned to that index.
      * @param separatorKeys
      *            The array of separator keys. Each separator key is interpreted
      *            as an <em>unsigned byte[]</em>. The first entry MUST be an
@@ -118,158 +110,18 @@ public interface IMetadataService extends IDataService, Remote {
      * @throws IOException
      * @throws InterruptedException
      * @throws ExecutionException
-     * 
-     * @todo Add a method to let a client cache the partitions of a scale-out
-     *       index - its use will be limited to a statically partitioned index
-     *       at this time and the #of expected partitions will be small enough
-     *       that it makes sense for clients to pre-fetch and cache the entire
-     *       set of partition definitions for a scale-out index.
      */
-    public UUID registerManagedIndex(String name,
-            UnisolatedBTreePartitionConstructor ctor, byte[][] separatorKeys,
-            UUID[] dataServices) throws IOException, InterruptedException,
-            ExecutionException;
+    public UUID registerScaleOutIndex(IndexMetadata metadata,
+            byte[][] separatorKeys, UUID[] dataServices) throws IOException,
+            InterruptedException, ExecutionException;
     
     /**
-     * Register a scale-out index with single initial partition. As the index
-     * grows, the initial partition will be split and the various partitions may
-     * be re-distributed among the available {@link DataService}s.
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @param dataService
-     *            The identifier of the {@link DataService} that will be
-     *            assigned to the initial index partition (optional). When
-     *            <code>null</code>, the {@link MetadataService} will choose
-     *            the initial {@link DataService} automatically.
-     * 
-     * @return The UUID for that index.
-     */
-    public UUID registerManagedIndex(String name,
-            UnisolatedBTreePartitionConstructor ctor, UUID dataService)
-            throws IOException, InterruptedException, ExecutionException;
-    
-    /**
-     * Return the unique identifier for the managed index.
-     * 
-     * @param name
-     *            The name of the managed index.
-     * 
-     * @return The managed index UUID -or- <code>null</code> if there is no
-     *         managed scale-out index with that name.
-     *         
-     * @throws IOException
-     */
-    public UUID getManagedIndexUUID(String name) throws IOException;
-
-    /**
-     * Find the index of the partition spanning the given key.
-     * 
-     * @return The index of the partition spanning the given key or
-     *         <code>-1</code> iff there are no partitions defined.
-     * 
-     * @exception IllegalStateException
-     *                if there are partitions defined but no partition spans the
-     *                key. In this case the {@link MetadataIndex} lacks an entry
-     *                for the key <code>new byte[]{}</code>.
-     */
-    public int findIndexOfPartition(String name,byte[] key) throws IOException;
-    
-    /**
-     * Return the metadata for the index partition (and the left- and
-     * right-separator keys for that index partition) in which the specified key
-     * would be found.
+     * Drop the named scale-out index.
      * 
      * @param name
      *            The name of the scale-out index.
-     * 
-     * @param key
-     *            A key for that scale-out index (the key may or may not exist
-     *            in the index).
-     * 
-     * @return An byte[3][] array containing
-     *         <dl>
-     *         <dt>byte[0][]</dt>
-     *         <dd>The left separator key for the index partition. This is the
-     *         first key that would enter the index partition. The left most
-     *         separator key for a partitioned index is always an empty byte[]
-     *         since that is the smallest key that may be defined for any index.</dd>
-     *         <dt>byte[1][]</dt>
-     *         <dd>The byte[] containing the serialized
-     *         {@link IPartitionMetadata} for the index partition that spans the
-     *         given key.</dd>
-     *         <dt>byte[2][]</dt>
-     *         <dd>The right separator key for the index partition -or-
-     *         <code>null</code> if there is no right sibling for the index
-     *         partition (a null has the semantics of no upper bound for the
-     *         index partition).</dd>
-     *         </dl>
-     *         If the metadata index is empty (no partitions are defined) then
-     *         this method will return <code>null</code>. Note that this is
-     *         NOT a normal circumstance. The metadata index should always have
-     *         at least one partition once it has been registered.
      */
-    public byte[][] getPartition(String name, byte[] key)
-            throws IOException;
-    
-    /**
-     * The partition at that index together with its left- and right-separator
-     * keys.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * @param index
-     *            The entry index in the metadata index.
-     * 
-     * @return An byte[3][] array containing
-     *         <dl>
-     *         <dt>byte[0][]</dt>
-     *         <dd>The left separator key for the index partition. This is the
-     *         first key that would enter the index partition. The left most
-     *         separator key for a partitioned index is always an empty byte[]
-     *         since that is the smallest key that may be defined for any index.</dd>
-     *         <dt>byte[1][]</dt>
-     *         <dd>The byte[] containing the serialized
-     *         {@link IPartitionMetadata} for the index partition that spans the
-     *         given key.</dd>
-     *         <dt>byte[2][]</dt>
-     *         <dd>The right separator key for the index partition -or-
-     *         <code>null</code> if there is no right sibling for the index
-     *         partition (a null has the semantics of no upper bound for the
-     *         index partition).</dd>
-     *         </dl>
-     *         If the metadata index is empty (no partitions are defined) then
-     *         this method will return <code>null</code>. Note that this is
-     *         NOT a normal circumstance. The metadata index should always have
-     *         at least one partition once it has been registered.
-     * 
-     * @throws IOException
-     */
-    public byte[][] getPartitionAtIndex(String name, int index ) throws IOException;
-    
-    /**
-     * Create a new partition for a scale-out index.
-     * 
-     * @param name
-     *            The index name.
-     * @param key
-     *            The separator key for the new partition.
-     * @param dataServiceUUID
-     *            The data service to which the new partition will be mapped.
-     * 
-     * @return The partition metadata for the new partition.
-     * 
-     * @throws IOException
-     * @throws InterruptedException
-     * @throws ExecutionException
-     * 
-     * @todo change return signature to byte[][] or byte[] to consistent with
-     *       the other methods in this interface and send back a serialized
-     *       {@link PartitionMetadataWithSeparatorKeys}
-     */
-    public IPartitionMetadata createPartition(String name, byte[] key,
-            UUID dataServiceUUID) throws IOException, InterruptedException,
-            ExecutionException;
+    public void dropScaleOutIndex(String name) throws IOException,
+            InterruptedException, ExecutionException;
     
 }

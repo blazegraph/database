@@ -133,9 +133,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      */
     public void test_buildOrder3() throws IOException {
 
-        BTree btree = getProblem1();
+        final BTree btree = getProblem1();
+
+        final long commitTime = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
 
          /*
           * Verify can load the index file and that the metadata
@@ -144,17 +147,22 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                // setup reference queue to hold all leaves and nodes.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        7, 7),
-//                // take the other parameters from the btree.
-//                @todo btree.nodeSer.valueSerializer);
-        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
-        TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(4,seg.getLeafCount());
-        TestIndexSegmentPlan.assertEquals(3,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
+        
+        final IndexSegmentFileStore fileStore = new IndexSegmentFileStore(outFile);
+        
+        assertEquals(commitTime,fileStore.getCheckpoint().commitTime);
+        assertEquals(2,fileStore.getCheckpoint().height);
+        assertEquals(4,fileStore.getCheckpoint().nleaves);
+        assertEquals(3,fileStore.getCheckpoint().nnodes);
+        assertEquals(10,fileStore.getCheckpoint().nentries);
+        
+        final IndexSegment seg = fileStore.load();
+        
+        assertEquals(3,seg.getBranchingFactor());
+        assertEquals(2,seg.getHeight());
+        assertEquals(4,seg.getLeafCount());
+        assertEquals(3,seg.getNodeCount());
+        assertEquals(10,seg.getEntryCount());
 
         // test index segment structure.
         dumpIndexSegment(seg);
@@ -207,9 +215,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      */
     public void test_buildOrder9() throws IOException {
         
-        BTree btree = getProblem1();
+        final BTree btree = getProblem1();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,9,0.);
+        final long commitTime = System.currentTimeMillis();
+        
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .entryIterator(), 9/* m */, btree.getIndexMetadata(), commitTime);
+
+//        new IndexSegmentBuilder(outFile,tmpDir,btree,9,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -219,17 +232,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * specifics of the length of serialized nodes or leaves).
           */
         final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                // setup reference queue to hold all leaves and nodes.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        3, 3),
-//                // take the other parameters from the btree.
-//                @todo btree.nodeSer.valueSerializer
-//                );
-        TestIndexSegmentPlan.assertEquals(9,seg.getBranchingFactor());
-        TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(2,seg.getLeafCount());
-        TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
+
+        assertEquals(9,seg.getBranchingFactor());
+        assertEquals(1,seg.getHeight());
+        assertEquals(2,seg.getLeafCount());
+        assertEquals(1,seg.getNodeCount());
+        assertEquals(10,seg.getEntryCount());
 
         // test index segment structure.
         dumpIndexSegment(seg);
@@ -267,9 +275,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      */
     public void test_buildOrder10() throws IOException {
         
-        BTree btree = getProblem1();
+        final BTree btree = getProblem1();
+
+        final long commitTime = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile, tmpDir, btree, 10, 0.);
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .entryIterator(), 10/* m */, btree.getIndexMetadata(), commitTime);
+
+//        new IndexSegmentBuilder(outFile, tmpDir, btree, 10, 0.);
 
          /*
              * Verify can load the index file and that the metadata associated
@@ -279,17 +292,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
              * of serialized nodes or leaves).
              */
         final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                // setup reference queue to hold all leaves and nodes.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        1, 1),
-//                // take the other parameters from the btree.
-//                        @todo btree.nodeSer.valueSerializer
-//                );
-        TestIndexSegmentPlan.assertEquals(10,seg.getBranchingFactor());
-        TestIndexSegmentPlan.assertEquals(0,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(1,seg.getLeafCount());
-        TestIndexSegmentPlan.assertEquals(0,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(10,seg.getEntryCount());
+
+        assertEquals(10,seg.getBranchingFactor());
+        assertEquals(0,seg.getHeight());
+        assertEquals(1,seg.getLeafCount());
+        assertEquals(0,seg.getNodeCount());
+        assertEquals(10,seg.getEntryCount());
         
         // test index segment structure.
         dumpIndexSegment(seg);
@@ -346,11 +354,16 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
      */
     public void test_problem2_buildOrder3() throws IOException {
         
-        BTree btree = getProblem2();
+        final BTree btree = getProblem2();
         
-        btree.dump(Level.DEBUG,System.err);
+        btree.dump(Level.DEBUG,System.err);        
+
+        final long commitTime = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
+        
+//        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -360,16 +373,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * specifics of the length of serialized nodes or leaves).
           */
         final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                // setup reference queue to hold all leaves and nodes.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        3, 3),
-//                        @todo btree.nodeSer.valueSerializer
-//                );
-        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
-        TestIndexSegmentPlan.assertEquals(1,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(3,seg.getLeafCount());
-        TestIndexSegmentPlan.assertEquals(1,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(9,seg.getEntryCount());
+
+        assertEquals(3,seg.getBranchingFactor());
+        assertEquals(1,seg.getHeight());
+        assertEquals(3,seg.getLeafCount());
+        assertEquals(1,seg.getNodeCount());
+        assertEquals(9,seg.getEntryCount());
         
         // test index segment structure.
         dumpIndexSegment(seg);
@@ -442,8 +451,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
         final BTree btree = getProblem3();
 
         btree.dump(Level.DEBUG,System.err);
+
+        final long commitTime = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
+        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+                .entryIterator(), 3/* m */, btree.getIndexMetadata(), commitTime);
+
+//        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
          /*
           * Verify can load the index file and that the metadata
@@ -453,16 +467,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * specifics of the length of serialized nodes or leaves).
           */
         final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
-//                // setup reference queue to hold all leaves and nodes.
-//                new HardReferenceQueue<PO>(new DefaultEvictionListener(),
-//                        11, 11),
-//                        @todo btree.nodeSer.valueSerializer
-//                );
-        TestIndexSegmentPlan.assertEquals(3,seg.getBranchingFactor());
-        TestIndexSegmentPlan.assertEquals(2,seg.getHeight());
-        TestIndexSegmentPlan.assertEquals(7,seg.getLeafCount());
-        TestIndexSegmentPlan.assertEquals(4,seg.getNodeCount());
-        TestIndexSegmentPlan.assertEquals(20,seg.getEntryCount());
+
+        assertEquals(3,seg.getBranchingFactor());
+        assertEquals(2,seg.getHeight());
+        assertEquals(7,seg.getLeafCount());
+        assertEquals(4,seg.getNodeCount());
+        assertEquals(20,seg.getEntryCount());
 
         // test index segment structure.
         dumpIndexSegment(seg);

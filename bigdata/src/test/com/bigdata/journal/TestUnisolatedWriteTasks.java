@@ -33,10 +33,11 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.isolation.UnisolatedBTree;
 
 /**
  * Correctness test suite for unisolated writes on one or more indices. The
@@ -110,8 +111,10 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         // submit task to create index and do batch insert on that index.
         journal.submit(SequenceTask.newSequence(new AbstractTask[]{
                 
-                new RegisterIndexTask(journal, resource[0],
-                                new UnisolatedBTree(journal, indexUUID)),
+                new RegisterIndexTask(journal, //
+                                resource[0],//
+                                BTree.create(journal, new IndexMetadata(
+                                        resource[0], indexUUID))),
                 
                 new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
 
@@ -119,7 +122,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                         
                         IIndex ndx = getIndex(getOnlyResource());
 
-                        assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+                        assertEquals("indexUUID",indexUUID,ndx.getIndexMetadata().getIndexUUID());
                         
 //                        // Note: clone values since replaced with old values by the batch op.
 //                        ndx.insert(new BatchInsert(ninserts, keys, vals.clone()));
@@ -153,7 +156,8 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
                         IIndex ndx = getIndex(getOnlyResource());
 
-                        assertEquals("indexUUID",indexUUID,ndx.getIndexUUID());
+                        assertEquals("indexUUID", indexUUID, ndx
+                                .getIndexMetadata().getIndexUUID());
 
                         // verify write is disallowed on the index.
                         try {
@@ -249,11 +253,13 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         // submit task to create index and do batch insert on that index.
         journal.submit(SequenceTask.newSequence(new AbstractTask[]{
                 
-                new RegisterIndexTask(journal, resource[0],
-                        new UnisolatedBTree(journal, indexUUID1)),
-        
-                new RegisterIndexTask(journal, resource[1],
-                        new UnisolatedBTree(journal, indexUUID2)),
+                new RegisterIndexTask(journal, resource[0], BTree
+                                .create(journal, new IndexMetadata(resource[0],
+                                        indexUUID1))),
+
+                        new RegisterIndexTask(journal, resource[1], BTree
+                                .create(journal, new IndexMetadata(resource[1],
+                                        indexUUID2))),
                 
                 new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
 
@@ -264,7 +270,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             IIndex ndx = getIndex("foo");
 
                             assertEquals("indexUUID", indexUUID1, ndx
-                                    .getIndexUUID());
+                                    .getIndexMetadata().getIndexUUID());
 
 //                            // Note: clone values since replaced with
 //                            // old values by the batch op.
@@ -284,7 +290,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             IIndex ndx = getIndex("bar");
 
                             assertEquals("indexUUID", indexUUID2, ndx
-                                    .getIndexUUID());
+                                    .getIndexMetadata().getIndexUUID());
 
 //                            // Note: clone values since replaced with
 //                            // old values by the batch op.
@@ -325,7 +331,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             IIndex ndx = getIndex("foo");
 
                             assertEquals("indexUUID", indexUUID1, ndx
-                                    .getIndexUUID());
+                                    .getIndexMetadata().getIndexUUID());
 
                             // verify write is disallowed on the index.
                             try {
@@ -368,7 +374,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             IIndex ndx = getIndex("bar");
 
                             assertEquals("indexUUID", indexUUID2, ndx
-                                    .getIndexUUID());
+                                    .getIndexMetadata().getIndexUUID());
 
                             // verify write is disallowed on the index.
                             try {
@@ -506,9 +512,12 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                         
                         for(int i=0; i<nindices; i++) {
                             
-                            journal.registerIndex(indices[i].name,
-                                            new UnisolatedBTree(journal,
-                                                    indices[i].indexUUID));
+                            journal.registerIndex(//
+                                    indices[i].name,//
+                                    BTree.create(//
+                                            journal,//
+                                            new IndexMetadata(indices[i].name,indices[i].indexUUID)
+                                    ));
                             
                         }
                         
@@ -527,7 +536,10 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             
                             IIndex ndx = getIndex(indices[i].name);
 
-                            assertEquals("indexUUID",indices[i].indexUUID,ndx.getIndexUUID());
+                            assertEquals("indexUUID",
+                                            indices[i].indexUUID, ndx
+                                                    .getIndexMetadata()
+                                                    .getIndexUUID());
                             
 //                            // Note: clone values since replaced with old values
 //                            // by the batch op.
@@ -573,7 +585,8 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             
                             IIndex ndx = getIndex(stuff.name);
 
-                            assertEquals("indexUUID", stuff.indexUUID, ndx.getIndexUUID());
+                            assertEquals("indexUUID", stuff.indexUUID, ndx
+                                    .getIndexMetadata().getIndexUUID());
 
                             /*
                              * verify the written data from the prior task.

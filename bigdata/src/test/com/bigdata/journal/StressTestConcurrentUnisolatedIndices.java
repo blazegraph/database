@@ -44,8 +44,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.journal.ConcurrentJournal.Options;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
@@ -189,7 +190,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
                 resources[i] = "index#"+i;
                 
-                journal.registerIndex(resources[i], new UnisolatedBTree(journal, UUID.randomUUID()));
+                journal.registerIndex(resources[i], BTree.create(journal,
+                        new IndexMetadata(resources[i], UUID.randomUUID())));
                 
             }
             

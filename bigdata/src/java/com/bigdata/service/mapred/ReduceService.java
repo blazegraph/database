@@ -39,12 +39,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.DataServiceRangeIterator;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.RangeQueryIterator;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by
@@ -148,7 +149,7 @@ abstract public class ReduceService
             final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
 
             // index scan.
-            IEntryIterator itr = new RangeQueryIterator(ds, name,
+            IEntryIterator itr = new DataServiceRangeIterator(ds, name,
                     ITx.UNISOLATED, null/* fromKey */, null/* toKey */,
                     capacity, flags, null/*filter*/);
 
@@ -162,9 +163,11 @@ abstract public class ReduceService
             
             while(itr.hasNext()) {
                 
-                byte[] val = (byte[])itr.next();
+                ITuple tuple = itr.next();
                 
-                byte[] key = itr.getKey();
+                byte[] key = tuple.getKey();
+                
+                byte[] val = tuple.getValue();
                 
                 int len = key.length;
                 

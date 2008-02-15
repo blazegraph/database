@@ -36,7 +36,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.scaleup.MasterJournal;
 
 /**
  * This class is responsible for integrating events that report on resource

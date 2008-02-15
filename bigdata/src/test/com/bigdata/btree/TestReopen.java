@@ -69,7 +69,13 @@ public class TestReopen extends AbstractBTreeTestCase {
         /*
          * The btree under test.
          */
-        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+        final BTree btree;
+        {
+            IndexMetadata md = new IndexMetadata(indexUUID);
+            md.setBranchingFactor(3);
+            
+            btree = BTree.create(store, md);
+        }
 
         assertTrue(btree.isOpen());
 
@@ -102,7 +108,13 @@ public class TestReopen extends AbstractBTreeTestCase {
         /*
          * The btree under test.
          */
-        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+        final BTree btree;
+        {
+            IndexMetadata md = new IndexMetadata(indexUUID);
+            md.setBranchingFactor(3);
+            
+            btree = BTree.create(store, md);
+        }
 
         btree.insert(KeyBuilder.asSortKey(1), new SimpleEntry(1));
         btree.insert(KeyBuilder.asSortKey(2), new SimpleEntry(2));
@@ -137,7 +149,8 @@ public class TestReopen extends AbstractBTreeTestCase {
         btree.dump(Level.DEBUG,System.out);
 
         // reload the tree from the store.
-        final BTree btree2 = BTree.load(store, btree.getMetadata().getMetadataAddr());
+        final BTree btree2 = BTree.load(store, btree.getCheckpoint()
+                .getCheckpointAddr());
 
         // verify same data.
         assertSameBTree(btree, btree2);
@@ -161,7 +174,14 @@ public class TestReopen extends AbstractBTreeTestCase {
          * be forced when this tree is closed (node evictions are not permitted
          * by the default fixture factory).
          */
-        final BTree btree = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+//        final BTree btree = new BTree(store, 3, indexUUID);
+        final BTree btree;
+        {
+            IndexMetadata md = new IndexMetadata(indexUUID);
+            md.setBranchingFactor(3);
+            
+            btree = BTree.create(store, md);
+        }
 
         /*
          * The btree used to maintain ground truth.
@@ -170,7 +190,14 @@ public class TestReopen extends AbstractBTreeTestCase {
          * eventually overflow the hard reference queue and begin evicting nodes
          * and leaves onto the store.
          */
-        final BTree groundTruth = new BTree(store, 3, indexUUID, SimpleEntry.Serializer.INSTANCE);
+//        final BTree groundTruth = new BTree(store, 3, indexUUID);
+        final BTree groundTruth;
+        {
+            IndexMetadata md = new IndexMetadata(indexUUID);
+            md.setBranchingFactor(3);
+            
+            groundTruth = BTree.create(store, md);
+        }
 
         final int limit = 10000;
         final int keylen = 6;

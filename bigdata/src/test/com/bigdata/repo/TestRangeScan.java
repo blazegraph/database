@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,53 +20,44 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Feb 14, 2007
+ * Created on Feb 15, 2008
  */
 
-package com.bigdata.isolation;
+package com.bigdata.repo;
+
+import com.bigdata.sparse.SparseRowStore;
 
 /**
- * An instance of this class should be thrown by an {@link IConflictResolver} if
- * it is unable to resolve a write-write conflict.
+ * Test suite for {@link BigdataRepository#getDocumentHeaders(String, String)}.
+ * <p>
+ * Note: The correct behavior of this method depends on the
+ * {@link SparseRowStore}'s logical row iterator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class WriteWriteConflictException extends RuntimeException {
+public class TestRangeScan extends AbstractRepositoryTestCase {
 
     /**
      * 
      */
-    private static final long serialVersionUID = 7148598373790053847L;
-
-    /**
-     * 
-     */
-    public WriteWriteConflictException() {
+    public TestRangeScan() {
     }
 
     /**
-     * @param message
+     * @param arg0
      */
-    public WriteWriteConflictException(String message) {
-        super(message);
+    public TestRangeScan(String arg0) {
+        super(arg0);
     }
 
-    /**
-     * @param cause
-     */
-    public WriteWriteConflictException(Throwable cause) {
-        super(cause);
+    public void test_rangeScan() {
+        
+        fail("write test");
+        
     }
-
-    /**
-     * @param message
-     * @param cause
-     */
-    public WriteWriteConflictException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
+    
 }

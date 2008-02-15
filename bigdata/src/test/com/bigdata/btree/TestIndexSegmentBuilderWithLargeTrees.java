@@ -87,8 +87,11 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
 
         Journal journal = new Journal(getProperties());
 
-        BTree btree = new BTree(journal, branchingFactor, UUID.randomUUID(),
-                SimpleEntry.Serializer.INSTANCE);
+        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        
+        metadata.setBranchingFactor(branchingFactor);
+        
+        BTree btree = BTree.create(journal,metadata);
 
         return btree;
 
@@ -247,8 +250,13 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
             System.err.println("Building index segment: in(m="
                     + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                     + "), out(m=" + m + ")");
+
+            final long commitTime = System.currentTimeMillis();
             
-            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
+            new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
+                    btree.entryIterator(), m, btree.getIndexMetadata(), commitTime);
+            
+//            new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
 
             /*
              * Verify can load the index file and that the metadata associated

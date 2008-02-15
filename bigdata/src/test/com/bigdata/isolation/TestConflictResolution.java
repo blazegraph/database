@@ -25,13 +25,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 17, 2007
  */
 
-package com.bigdata.journal;
+package com.bigdata.isolation;
 
+import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.isolation.UnisolatedBTree;
-import com.bigdata.isolation.Value;
+import junit.framework.TestCase2;
+
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITuple;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.IsolationEnum;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
+import com.bigdata.journal.ValidationError;
 
 /**
  * Tests of write-write conflict resolution.
@@ -82,7 +92,7 @@ import com.bigdata.isolation.Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestConflictResolution extends ProxyTestCase {
+public class TestConflictResolution extends TestCase2 {
 
     /**
      * 
@@ -97,6 +107,16 @@ public class TestConflictResolution extends ProxyTestCase {
         super(name);
     }
 
+    public Properties getProperties() {
+        
+        Properties properties = new Properties(super.getProperties());
+        
+        properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
+        
+        return properties;
+        
+    }
+    
     /**
      * Test correct detection of a write-write conflict. An index is registered
      * and the journal is committed. Two transactions (tx1, tx2) are then
@@ -121,8 +141,13 @@ public class TestConflictResolution extends ProxyTestCase {
              * register an index and commit the journal.
              */
             
-            journal.registerIndex(name, new UnisolatedBTree(journal, UUID
-                    .randomUUID()));
+            IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+            
+            metadata.setIsolatable(true);
+            
+            // Note: No conflict resolver.
+            
+            journal.registerIndex(name, BTree.create(journal,metadata) );
 
             journal.commit();
 
@@ -196,8 +221,14 @@ public class TestConflictResolution extends ProxyTestCase {
              * journal.
              */
             
-            journal.registerIndex(name, new UnisolatedBTree(journal,
-                    UUID.randomUUID(), new SingleValueConflictResolver(k1, v1c)));
+            IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+            
+            metadata.setIsolatable(true);
+            
+            metadata.setConflictResolver(new SingleValueConflictResolver(k1,
+                    v1c));
+            
+            journal.registerIndex(name, BTree.create(journal,metadata) );
 
             journal.commit();
 
@@ -323,16 +354,22 @@ public class TestConflictResolution extends ProxyTestCase {
             this.resolvedValue = resolvedValue;
             
         }
-        
-        public byte[] resolveConflict(byte[] key, Value comittedValue,
-                Value txEntry) throws RuntimeException {
- 
-            assertEquals("key",expectedKey,key);
+        public boolean resolveConflict(IIndex writeSet, ITuple txTuple, ITuple currentTuple) throws Exception {
+
+            // The key must be the same for both tuples.
+            assertEquals(txTuple.getKey(),currentTuple.getKey());
             
-            return resolvedValue;
+            // the key for the conflicting writes.
+            final byte[] key = txTuple.getKey();
+            
+            assertEquals("key", expectedKey, key );
+            
+            writeSet.insert(key, resolvedValue);
+            
+            return true;
             
         }
-        
+
     }
-    
+
 }

@@ -40,12 +40,10 @@ import junit.framework.TestCase2;
 import junit.framework.TestSuite;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ByteArrayValueSerializer;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.isolation.IIsolatableIndex;
-import com.bigdata.isolation.UnisolatedBTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
@@ -187,8 +185,6 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      * <p>
      * Note: A higher branching factor can be choosen for this test since the
      * btree writes use monotoically increasing keys.
-     * 
-     * @see UnisolatedBTree#DEFAULT_BRANCHING_FACTOR
      */
     protected int getBranchingFactor() {
         
@@ -278,8 +274,18 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         // register named index that does NOT support isolation.
         String name = "abc";
 
-        journal.registerIndex(name, new BTree(journal, getBranchingFactor(),
-                UUID.randomUUID(), ByteArrayValueSerializer.INSTANCE));
+        final BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(getBranchingFactor());
+
+            btree = BTree.create(journal, metadata);
+            
+        }
+        
+        journal.registerIndex(name, btree);
 
         journal.commit();
 
@@ -301,7 +307,20 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
         // register named index that can support isolation.
         String name = "abc";
 
-        journal.registerIndex(name, new UnisolatedBTree(journal,getBranchingFactor(),UUID.randomUUID()));
+        final BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(getBranchingFactor());
+
+            metadata.setIsolatable(true);
+            
+            btree = BTree.create(journal, metadata);
+            
+        }
+
+        journal.registerIndex(name, btree );
 
         journal.commit();
 
@@ -310,7 +329,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         // run test.
         doIndexWriteRateTest(name, tx, 128);
-        
+
     }
 
     /**
@@ -318,11 +337,24 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
      * integer keys and 128 byte values for the index entries.
      */
     public void testIsolatedIndexWriteRate() throws IOException {
-        
+
         // register named index that can support isolation.
         String name = "abc";
 
-        journal.registerIndex(name, new UnisolatedBTree(journal,getBranchingFactor(),UUID.randomUUID()));
+        final BTree btree;
+        {
+            
+            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            
+            metadata.setBranchingFactor(getBranchingFactor());
+
+            metadata.setIsolatable(true);
+            
+            btree = BTree.create(journal, metadata);
+            
+        }
+
+        journal.registerIndex(name, btree );
 
         journal.commit();
 
@@ -430,7 +462,7 @@ abstract public class BenchmarkJournalWriteRate extends TestCase2 {
 
         System.err.println("Begin: index write rate, isolated="
                 + (tx == 0 ? "no" : "yes") + ", isolatable="
-                + (ndx instanceof IIsolatableIndex) + ", bufferMode="
+                + ndx.getIndexMetadata().isIsolatable() + ", bufferMode="
                 + journal.getBufferStrategy().getBufferMode());
 
         // target percentage full to avoid journal overflow.

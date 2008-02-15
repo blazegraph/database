@@ -913,7 +913,7 @@ public class MasterJournal implements IJournal {
 
             IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
                     tmpDir, oldIndex.btree.getEntryCount(), oldIndex.btree
-                            .getRoot().entryIterator(), mseg, oldIndex
+                            .entryIterator(), mseg, oldIndex
                             .getBTree().getNodeSerializer()
                             .getValueSerializer(), true/* useChecksum */,
                     null/* new RecordCompressor() */, 0d, oldIndex.btree
