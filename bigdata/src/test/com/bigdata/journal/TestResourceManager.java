@@ -695,12 +695,16 @@ public class TestResourceManager extends TestCase2 {
                 // format the value.
                 buf.reset().putInt(j);
 
+                // insert values.
                 ndx.insert(KeyBuilder.asSortKey(j), buf.toByteArray());
 
+                // bump the counter. 
+                ndx.getCounter().incrementAndGet();
+                
             }
 
             // commit data on the journal
-            final long commitTime = journal.commit();
+            journal.commit();
 
         }
 
@@ -735,6 +739,20 @@ public class TestResourceManager extends TestCase2 {
             assertNotNull("sources",sources);
             
             assertEquals("#sources",2,sources.length);
+
+            assertTrue(sources[0] != sources[1]);
+            
+            // entries are still on the old index.
+            assertEquals(nentries,sources[1].getEntryCount());
+
+            // verify counter on the old index is unchanged.
+            assertEquals(nentries,sources[1].getCounter().get());
+
+            // verify no entries yet on the new index.
+            assertEquals(0,sources[0].getEntryCount());
+
+            // verify counter was carried forward to the new index(!)
+            assertEquals(nentries,sources[0].getCounter().get());
             
         }
         

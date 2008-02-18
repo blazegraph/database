@@ -27,6 +27,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -56,9 +57,6 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     /**
      * The ordered list of data services on which data for this partition will
      * be written and from which data for this partition may be read.
-     * 
-     * @todo refactor into a dataService UUID (required) and an array of zero or
-     *       more media replication services for failover.
      */
     private UUID[] dataServices;
     
@@ -143,7 +141,9 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     }
 
     public int getPartitionId() {
+        
         return partId;
+        
     }
 
     public IResourceMetadata[] getResources() {
@@ -171,11 +171,11 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
      * from the primary to the secondaries in the same order as they appear in
      * this array.
      * 
-     * @return A copy of the array of data service identifiers.
+     * @return An array of the data service identifiers.
      */
     public UUID[] getDataServices() {
         
-        return dataServices.clone();
+        return dataServices;
         
     }
     
@@ -300,7 +300,12 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
 
     public String toString() {
 
-        return "" + partId;
+        return 
+            "{ partitionId="+partId+
+            ", dataServices="+Arrays.toString(dataServices)+
+            ", resourceMetadata="+Arrays.toString(resources)+
+            "}"
+            ;
 
     }
 

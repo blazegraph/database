@@ -379,14 +379,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * 
      * @see #create(IRawStore, IndexMetadata)
      * @see #load(IRawStore, long)
-     * 
-     * @todo move the address serializer into the md record?
-     * 
-     * @todo move the node factor into the md record?
-     * 
-     * @todo change signature on the base class to also accept checkpoint and
-     *       metadata records if I can line up the index segment metadata as
-     *       well.
      */
     public BTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
@@ -447,6 +439,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * Creates and sets new root {@link Leaf} on the B+Tree and (re)sets the
      * various counters to be consistent with that root.  This is used both
      * by the constructor for a new {@link BTree} and by {@link #removeAll()}.
+     * <p>
+     * Note: The {@link #getCounter()} is NOT changed by this method.
      */
     private void newRootLeaf() {
 
@@ -462,7 +456,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
         nleaves = 1;
         
-        counter = new AtomicLong( 0L );
+        // Note: Counter is unchanged!
+//        counter = new AtomicLong( 0L );
 
         if(!wasDirty) {
             
@@ -849,11 +844,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
 
     /**
-     * Re-load an instance of a {@link BTree} or derived class from the store.
-     * The {@link BTree} or derived class MUST declare a constructor with the
+     * Load an instance of a {@link BTree} or derived class from the store. The
+     * {@link BTree} or derived class MUST declare a constructor with the
      * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, ..., Checkpoint checkpoint, BTreeMetadata metadata)
+     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
      * 
      * </code>
      * 
@@ -865,11 +860,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * 
      * @return The {@link BTree} or derived class loaded from that
      *         {@link Checkpoint} record.
-     * 
-     * @todo review all uses and make sure that {@link Checkpoint} records are
-     *       being used.
-     * 
-     * @todo javadoc update wrt the ctor.
      */
     public static BTree load(IRawStore store, long addrCheckpoint) {
 
@@ -898,14 +888,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
              */
             Constructor ctor = cl.getConstructor(new Class[] {
                     IRawStore.class,//
-//                    HardReferenceQueue.class, //
                     Checkpoint.class,//
                     IndexMetadata.class //
                     });
 
             BTree btree = (BTree) ctor.newInstance(new Object[] { //
                     store,//
-//                    hardReferenceQueue, //
                     checkpoint, //
                     metadata //
                     });

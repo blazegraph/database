@@ -41,8 +41,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -61,7 +61,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 
 /**
@@ -104,25 +103,20 @@ import com.bigdata.service.MetadataService;
  * <li>transactions per second</li>
  * </ol>
  * 
- * FIXME Move the executor services out of the {@link ConcurrentJournal}. This
- * is fine if there is only a single journal, but with multiple journals the
- * executor services need to be decoupled from the journal so that the can more
- * readily survive the opening and closing of journals.
- * <p>
- * Support overflow. Queued tasks should be migrated from the "old" journal to
- * the "new" journal while running tasks should complete on the "old" journal.
- * Consider encapsulating this behavior in a base class using a delegation
- * model. There is a sketch of that kind of a thing in the "scaleout" package.
- * The specifics should probably be discarded but parts of the code may be of
- * use. The handling of overflow events needs to be coordinated with the
- * {@link IMetadataService}.
- * <p>
- * Make sure that {@link ICounter} state overflows correctly.
- * <p>
- * Make sure that {@link AbstractTask#getIndex(String)} returns a
- * {@link FusedView}, {@link IsolatedFusedView}, or {@link ReadOnlyFusedView}
- * as necessary for index partitions. When the index is not partitioned then it
- * will return a {@link BTree} or a flavor of {@link ReadOnlyIndex}.
+ * @todo be careful during the refactor - I would rather not break the ability
+ *       to use concurrency control on unpartitioned indices, but overflow
+ *       handling will only work on partitioned indices.
+ * 
+ * @todo Move the executor services out of the {@link ConcurrentJournal}. This
+ *       is fine if there is only a single journal, but with multiple journals
+ *       the executor services need to be decoupled from the journal so that the
+ *       can more readily survive the opening and closing of journals.
+ *       <p>
+ *       Make sure that {@link AbstractTask#getIndex(String)} returns a
+ *       {@link FusedView}, {@link IsolatedFusedView}, or
+ *       {@link ReadOnlyFusedView} as necessary for index partitions. When the
+ *       index is not partitioned then it will return a {@link BTree} or a
+ *       flavor of {@link ReadOnlyIndex}.
  * 
  * @todo review use of synchronization and make sure that there is no way in
  *       which we can double-open a store or index.
@@ -516,7 +510,7 @@ public class ResourceManager {
     /**
      * A hard reference to the live journal.
      */
-    private AbstractJournal journal;
+    private AbstractJournal liveJournal;
    
     /**
      * A map over the journal histories. The map is transient and is
@@ -815,20 +809,24 @@ public class ResourceManager {
             tempProperties.setProperty(Options.FILE, file.toString());
             
             // Create/open journal.
-            journal = new Journal(tempProperties);
+            liveJournal = new Journal(tempProperties);
             
             if(newJournal) {
 
                 // put the first commit timestamp on the journal.
-                journal.commit();
+                liveJournal.commit();
                 
                 // add to index since not found on file scan.
-                journalIndex.add(journal.getResourceMetadata());
+                journalIndex.add(liveJournal.getResourceMetadata());
                 
             }
             
             // add to set of open stores.
-            openStores.put(journal.getRootBlockView().getUUID(), journal);
+            if(openStores.put(liveJournal.getRootBlockView().getUUID(), liveJournal)!=null) {
+                
+                throw new AssertionError();
+                
+            }
             
         }
         
@@ -1018,7 +1016,7 @@ public class ResourceManager {
      */
     public AbstractJournal getLiveJournal() {
 
-        return journal;
+        return liveJournal;
         
     }
 
@@ -1074,35 +1072,55 @@ public class ResourceManager {
         // check to see if the given resource is already open.
         IRawStore store = openStores.get(uuid);
 
-        if (store != null && !store.isOpen()
-                && store instanceof IndexSegmentFileStore) {
+        if (store != null) {
 
-            /*
-             * We can simply re-open an index segment's store file.
-             */
+            if (!store.isOpen()) {
 
-            // Note: relative to the data directory!
-            final File file = resourceFiles.get(uuid);
+                if (store instanceof IndexSegmentFileStore) {
 
-            if (file == null) {
+                    /*
+                     * We can simply re-open an index segment's store file.
+                     */
 
-                throw new RuntimeException("Unknown resource: uuid=" + uuid);
+                    // Note: relative to the data directory!
+                    final File file = resourceFiles.get(uuid);
 
+                    if (file == null) {
+
+                        throw new RuntimeException("Unknown resource: uuid="
+                                + uuid);
+
+                    }
+
+                    if (!file.exists()) {
+
+                        throw new RuntimeException(
+                                "Resource file missing? uuid=" + uuid
+                                        + ", file=" + file);
+
+                    }
+
+                    // re-open the store file.
+                    ((IndexSegmentFileStore) store).reopen();
+
+                    // done.
+                    return store;
+
+                } else {
+
+                    /*
+                     * Journals should not be closed without also removing them
+                     * from the list of open resources.
+                     */
+                    
+                    throw new UnsupportedOperationException();
+                    
+                }
+            
             }
-
-            if (!file.exists()) {
-
-                throw new RuntimeException("Resource file missing? uuid="
-                        + uuid + ", file=" + file);
-
-            }
-
-            // re-open the store file.
-            ((IndexSegmentFileStore) store).reopen();
-
-            // done.
+            
             return store;
-
+            
         }
 
         if (store == null) {
@@ -1157,7 +1175,7 @@ public class ResourceManager {
             if (!actualUUID.equals(uuid)) {
 
                 // close the resource.
-                journal.close();
+                store.close();
 
                 throw new RuntimeException("Wrong UUID: file=" + file
                         + ", expecting=" + uuid + ", actual=" + actualUUID);
@@ -1173,7 +1191,11 @@ public class ResourceManager {
         }
         
         // cache the reference.
-        openStores.put(uuid, store);
+        if(openStores.put(uuid, store)!=null) {
+            
+            throw new AssertionError();
+            
+        }
         
         // return the reference to the open store.
         return store;
@@ -1291,6 +1313,8 @@ public class ResourceManager {
      */
     public AbstractBTree[] openIndexPartition(String name, long timestamp) {
 
+        log.info("name="+name+", timestamp="+timestamp);
+        
         /*
          * Open the index on the journal for that timestamp.
          */
@@ -1302,6 +1326,8 @@ public class ResourceManager {
 
             btree = openIndex(name, timestamp, journal);
 
+            log.info("View base on "+journal.getResourceMetadata());
+            
         }
         
         if (btree == null) {
@@ -1345,11 +1371,35 @@ public class ResourceManager {
             sources = new AbstractBTree[a.length];
 
             // the most recent is this btree.
-            sources[0] = btree;
+            sources[0/* j */] = btree;
 
-            // backwards, excluding the most recent which we already have.
-            for (int i = a.length - 1; i > 0; i--) {
+            /*
+             * Note: the index partition view is defined in terms of an array of
+             * resources in increasing temporal order (from oldest to newest).
+             * 
+             * However, the return from this method is designed to mesh with the
+             * FusedView, which requires the reverse order (from newest to
+             * oldest).
+             * 
+             * So, this loop is written to reverse the order while it does the
+             * index lookups.
+             * 
+             * i := index into resources (IResourceMetadata[]) (old to new)
+             * 
+             * j := index into sources (AbstractBTree[]) (new to old)
+             * 
+             * Plus, we already have sources[0], which should correspond to
+             * resources[length-1].
+             * 
+             * resources[] = [t0,t1]
+             * 
+             * sources[] = [t1,t0]
+             * 
+             * @todo this loop could use some more unit tests.
+             */
+            for (int j = sources.length - 1, i = 0; j > 0; i++, j--) {
                 
+                // resources in reverse temporary order (new to old).
                 final IResourceMetadata resource = a[i];
 
                 final IRawStore store = openStore(resource.getUUID());
@@ -1365,7 +1415,10 @@ public class ResourceManager {
                     
                 }
                 
-                sources[i] = ndx;
+                log.info("Added to view: "+resource);
+                
+                // sources in reverse temporary order (new to old).
+                sources[j] = ndx;
 
             }
             
@@ -1444,17 +1497,21 @@ public class ResourceManager {
             
             while(itr.hasNext()) {
                 
-                ITuple tuple = itr.next();
+                final ITuple tuple = itr.next();
+
+                final Entry entry = EntrySerializer.INSTANCE
+                        .deserialize(new DataInputBuffer(tuple.getValue()));
                 
-                Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(tuple.getValue()));
+                // old index
+                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.addr);
                 
-                BTree btree = (BTree) oldJournal.getIndex(entry.addr);
+                // clone index metadata.
+                final IndexMetadata indexMetadata = oldBTree.getIndexMetadata().clone();
                 
-                IndexMetadata indexMetadata = btree.getIndexMetadata().clone();
+                // old partition metadata.
+                final PartitionMetadataWithSeparatorKeys oldpmd = indexMetadata.getPartitionMetadata();
                 
-                PartitionMetadataWithSeparatorKeys oldpmd = indexMetadata.getPartitionMetadata();
-                
-                if(oldpmd==null) {
+                if (oldpmd == null) {
 
                     /*
                      * @todo this is a bit brittle when using an embedded
@@ -1489,19 +1546,67 @@ public class ResourceManager {
                         oldpmd.getRightSeparatorKey()//
                         ));
 
-                // create and register the index with the new view on the new journal.
-                newJournal.registerIndex(entry.name, BTree.create(newJournal, indexMetadata));
-                
+                /*
+                 * Create and register the index with the new view on the new
+                 * journal.
+                 * 
+                 * Note: This is essentially a variant of BTree#create() where
+                 * we need to propagate the counter from the old BTree to the
+                 * new BTree.
+                 */
+                {
+                    
+                    /*
+                     * Write metadata record on store. The address of that
+                     * record is set as a side-effect on the metadata object.
+                     */
+                    indexMetadata.write(newJournal);
+
+                    // Propagate the counter to the new B+Tree.
+                    final long oldCounter = oldBTree.getCounter().get();
+
+                    log.info("Propagating counter="+oldCounter+" for "+entry.name);
+                    
+                    // Create checkpoint for the new B+Tree.
+                    final Checkpoint overflowCheckpoint = indexMetadata
+                            .overflowCheckpoint(oldCounter);
+
+                    /*
+                     * Write the checkpoint record on the store. The address of
+                     * the checkpoint record is set on the object as a side
+                     * effect.
+                     */
+                    overflowCheckpoint.write(newJournal);
+
+                    /*
+                     * Load the B+Tree from the store using that checkpoint
+                     * record.
+                     */
+                    final BTree newBTree = BTree.load(newJournal,
+                            overflowCheckpoint.getCheckpointAddr());
+
+                    assert newBTree.getCounter().get() == oldCounter;
+                    
+                    /*
+                     * Register the new B+Tree on the new journal.
+                     */
+                    newJournal.registerIndex(entry.name, newBTree);
+                    
+                }
+
                 log.info("Did overflow: " + noverflow + " of " + nindices
                         + " : " + entry.name);
-                
+
                 noverflow++;
-                
+
             }
-            
-            log.info("Did overflow of "+noverflow+" indices");
+
+            log.info("Did overflow of " + noverflow + " indices");
             
             assert nindices == noverflow;
+
+            // make the index declarations restart safe on the new journal.
+            newJournal.commit();
             
         }
 
@@ -1510,11 +1615,16 @@ public class ResourceManager {
          */
         {
 
-            this.journal = newJournal;
+            this.liveJournal = newJournal;
             
             this.journalIndex.add(newJournal.getResourceMetadata());
-            
-            this.openStores.put(newJournal.getRootBlockView().getUUID(), newJournal);
+
+            if (this.openStores.put(newJournal.getRootBlockView().getUUID(),
+                    newJournal) != null) {
+
+                throw new AssertionError();
+
+            }
 
             log.info("Changed over to a new live journal");
             
