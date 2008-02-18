@@ -565,7 +565,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      *             constructor rather than one of the constructor variants that
      *             accept the required UUID parameter.
      */
-    protected void write(IRawStore store) {
+    public void write(IRawStore store) {
 
         if (addrMetadata != 0L) {
 
@@ -788,12 +788,30 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * public constructor with the following method signature
      * 
      * <pre>
-     *  ...( BTreeMetadata metadata )
+     *  ...( IndexMetadata metadata, long counter )
      * </pre>
+     * 
+     * @param 
      * 
      * @return The {@link Checkpoint}.
      */
     final public Checkpoint firstCheckpoint() {
+
+        return overflowCheckpoint(0L/* counter */);
+
+    }
+    
+    /**
+     * Variant used when an index overflows onto a new backing store.
+     * 
+     * @param counter
+     *            The value of the {@link ICounter} to be propagated to the new
+     *            index instance.
+     *            
+     * @return The first {@link Checkpoint} for the index on the new backing
+     *         store.
+     */
+    final public Checkpoint overflowCheckpoint(long counter) {
         
         try {
             
@@ -805,12 +823,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
              */
             
             Constructor ctor = cl.getConstructor(new Class[] {
-                    IndexMetadata.class //
+                    IndexMetadata.class, //
+                    Long.class//
                     });
 
             Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
-                    this //
+                    this, //
+                    Long.valueOf(counter)//
                     });
+            
+            assert checkpoint.getCounter() == counter;
             
             return checkpoint;
             
@@ -868,5 +890,52 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         }
         
     }
+    
+//    /**
+//     * Create a {@link Checkpoint} for a {@link BTree}.
+//     * <p>
+//     * The caller is responsible for writing the {@link Checkpoint} record onto
+//     * the store.
+//     * <p>
+//     * The class identified by {@link #getCheckpointClassName()} MUST declare a
+//     * public constructor with the following method signature
+//     * 
+//     * <pre>
+//     *   ...( BTree btree )
+//     * </pre>
+//     * 
+//     * @param btree
+//     *            The {@link BTree}.
+//     * 
+//     * @return The {@link Checkpoint}.
+//     */
+//    final public Checkpoint overflowCheckpoint(BTree btree) {
+//        
+//        try {
+//            
+//            Class cl = Class.forName(getCheckpointClassName());
+//            
+//            /*
+//             * Note: A NoSuchMethodException thrown here means that you did not
+//             * declare the required public constructor.
+//             */
+//            
+//            Constructor ctor = cl.getConstructor(new Class[] {
+//                    BTree.class //
+//                    });
+//
+//            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
+//                    btree //
+//                    });
+//            
+//            return checkpoint;
+//            
+//        } catch(Exception ex) {
+//            
+//            throw new RuntimeException(ex);
+//            
+//        }
+//        
+//    }
     
 }

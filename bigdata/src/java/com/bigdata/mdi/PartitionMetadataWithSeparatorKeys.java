@@ -123,6 +123,19 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
         
     }
     
+    public String toString() {
+
+        return 
+        "{ partitionId="+getPartitionId()+
+        ", dataServices="+Arrays.toString(getDataServices())+
+        ", resourceMetadata="+Arrays.toString(getResources())+
+        ", leftSeparator="+Arrays.toString(getLeftSeparatorKey())+
+        ", rightSeparator="+(getRightSeparatorKey()==null?"null":Arrays.toString(getRightSeparatorKey()))+
+        "}"
+        ;
+
+    }
+    
     private static final transient short VERSION0 = 0x0;
     
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {

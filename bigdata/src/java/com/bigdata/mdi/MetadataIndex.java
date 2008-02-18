@@ -216,9 +216,9 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          * 
          * @param metadata
          */
-        public MetadataIndexCheckpoint(IndexMetadata metadata) {
+        public MetadataIndexCheckpoint(IndexMetadata metadata, long counter) {
 
-            super(metadata);
+            super(metadata, counter);
 
             // The first partitionId is zero(0).
             nextPartitionId = 0;
