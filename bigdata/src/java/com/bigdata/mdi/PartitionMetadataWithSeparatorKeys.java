@@ -27,10 +27,13 @@ package com.bigdata.mdi;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+
+import com.bigdata.btree.BytesUtil;
 
 
 /**
@@ -68,6 +71,20 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
         
         // Note: rightSeparatorKey MAY be null.
         
+        if(rightSeparatorKey!=null) {
+            
+            if(BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey)>=0) {
+                
+                throw new IllegalArgumentException(
+                        "Separator keys are out of order: left="
+                                + Arrays.toString(leftSeparatorKey)
+                                + ", right="
+                                + Arrays.toString(rightSeparatorKey));
+                
+            }
+            
+        }
+        
         this.leftSeparatorKey = leftSeparatorKey;
         
         this.rightSeparatorKey = rightSeparatorKey;
@@ -90,7 +107,9 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
      * defined.
      */
     public byte[] getLeftSeparatorKey() {
-       return leftSeparatorKey; 
+
+        return leftSeparatorKey;
+        
     }
     
     /**
@@ -99,7 +118,9 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
      * null has the semantics of no upper bound).
      */
     public byte[] getRightSeparatorKey() {
+        
         return rightSeparatorKey;
+        
     }
     
     private static final transient short VERSION0 = 0x0;
@@ -121,40 +142,40 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
         final int rightLen = (int) LongPacker.unpackLong(in);
 
         leftSeparatorKey = new byte[leftLen];
-        
+
         in.read(leftSeparatorKey);
-        
-        if(rightLen!=0) {
-            
+
+        if (rightLen != 0) {
+
             rightSeparatorKey = new byte[rightLen];
 
             in.read(rightSeparatorKey);
 
         } else {
-            
+
             rightSeparatorKey = null;
-            
+
         }
-        
+
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
-        
+
         ShortPacker.packShort(out, VERSION0);
-        
+
         LongPacker.packLong(out, leftSeparatorKey.length);
 
         LongPacker.packLong(out, rightSeparatorKey == null ? 0
                 : rightSeparatorKey.length);
-    
+
         out.write(leftSeparatorKey);
-        
-        if(rightSeparatorKey!=null) {
-            
+
+        if (rightSeparatorKey != null) {
+
             out.write(rightSeparatorKey);
-            
+
         }
         
     }

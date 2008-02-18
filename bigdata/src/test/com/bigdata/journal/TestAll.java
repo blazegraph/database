@@ -110,6 +110,9 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
+        // tests of the resource manager
+        suite.addTestSuite( TestResourceManager.class );
+
         return suite;
         
     }

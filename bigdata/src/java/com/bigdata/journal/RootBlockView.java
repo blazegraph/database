@@ -203,7 +203,8 @@ public class RootBlockView implements IRootBlockView {
      */
     RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
             long firstCommitTime, long lastCommitTime, long commitCounter,
-            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid, ChecksumUtility checker) {
+            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
+            ChecksumUtility checker) {
 
         WormAddressManager.assertOffsetBits(offsetBits);
 

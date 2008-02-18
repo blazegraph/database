@@ -34,8 +34,8 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 
 import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IBlockStore.IBlock;
 
 /**
  * Chunked range iterator running against a local index or index view.
@@ -173,12 +173,6 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
                     final IRawStore store = ((AbstractBTree)ndx).getStore();
                     
                     return store.getByteCount(addr);
-                    
-                }
-
-                public OutputStream outputStream() {
-
-                    throw new UnsupportedOperationException();
                     
                 }
                 

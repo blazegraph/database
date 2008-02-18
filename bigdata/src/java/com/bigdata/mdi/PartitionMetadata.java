@@ -37,10 +37,6 @@ import com.bigdata.journal.Journal;
 
 /**
  * An immutable object whose state describes an index partition.
- *  
- * @todo provide a persistent event log or just integrate the state changes over
- *       the historical states of the partition description in the metadata
- *       index?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -107,7 +103,10 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
      *            this partition may be read.
      * @param resources
      *            A description of each {@link Journal} or {@link IndexSegment}
-     *            resource associated with that partition.
+     *            resource associated with that partition. The entries in the
+     *            array reflect the creation time of the resources. The earliest
+     *            resource is listed first. The most recently created resource
+     *            is listed last.
      */
     public PartitionMetadata(int partId, UUID[] dataServices,
             IResourceMetadata[] resources) {
@@ -123,6 +122,23 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
         this.dataServices = dataServices;
         
         this.resources = resources;
+
+        long lastTimestamp = Long.MIN_VALUE;
+
+        for (int i = 0; i < resources.length; i++) {
+
+            final long thisTimestamp = resources[i].getCommitTime();
+            
+            if ( thisTimestamp <= lastTimestamp) {
+
+                throw new RuntimeException(
+                        "Resources are out of timestamp order @ index=" + i+", lastTimestamp="+lastTimestamp+", this timestamp="+thisTimestamp);
+
+            }
+
+            lastTimestamp = resources[i].getCommitTime();
+            
+        }
 
     }
 
@@ -328,9 +344,11 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
 
             UUID uuid = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
+            long commitTime = in.readLong();
+            
             resources[j] = (isIndexSegment ? new SegmentMetadata(
-                    filename, nbytes, state, uuid)
-                    : new JournalMetadata(filename, nbytes, state, uuid));
+                    filename, nbytes, state, uuid, commitTime)
+                    : new JournalMetadata(filename, nbytes, state, uuid, commitTime));
 
         }
         
@@ -388,6 +406,8 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
             out.writeLong(resourceUUID.getMostSignificantBits());
             
             out.writeLong(resourceUUID.getLeastSignificantBits());
+            
+            out.writeLong(rmd.getCommitTime());
 
         }
 

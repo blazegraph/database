@@ -53,7 +53,8 @@ public interface IResourceMetadata {
     public boolean isJournal();
     
     /**
-     * The name of the file containing the resource.
+     * The name of the file containing the resource (this is always relative to
+     * some local data directory).
      */
     public String getFile();
     
@@ -93,7 +94,9 @@ public interface IResourceMetadata {
 
     /**
      * Compares two resource metadata objects for consistent state.
+     *
      * @param o
+     * 
      * @return
      */
     public boolean equals(IResourceMetadata o);

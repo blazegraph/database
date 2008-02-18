@@ -215,8 +215,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * @todo consider allowing distinct values for the branching factor, the
      * class name, and possibly some other properties (record compression,
      * checksum) for the index segments vs the mutable btrees.
-     * 
-     * @todo store booleans as bit flags.
      */
 
     private UUID indexUUID;
@@ -229,10 +227,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private IValueSerializer valSer;
     private IConflictResolver conflictResolver;
     private RecordCompressor recordCompressor;
+    // @todo store booleans as bit flags.
     private boolean useChecksum;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
-//    private boolean isolatable;
     private double errorRate;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
@@ -567,18 +565,24 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      *             constructor rather than one of the constructor variants that
      *             accept the required UUID parameter.
      */
-    protected void write(/*BTree btree,*/IRawStore store) {
+    protected void write(IRawStore store) {
 
-        if (addrMetadata != 0L)
+        if (addrMetadata != 0L) {
+
             throw new IllegalStateException("Already written.");
-
-        if(indexUUID==null) {
-            throw new IllegalStateException("No indexUUID : wrong constructor?");
+            
         }
-        
+
+        if (indexUUID == null) {
+            
+            throw new IllegalStateException("No indexUUID : wrong constructor?");
+            
+        }
+
+        // write on the store, setting address as side-effect.
         this.addrMetadata = store.write(ByteBuffer.wrap(SerializerUtil
                 .serialize(this)));
-        
+
     }
 
     /**
@@ -612,7 +616,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         StringBuilder sb = new StringBuilder();
 
         // transient
-        sb.append("addrMetadata=" + addrMetadata);//store.toString(addrMetadata));
+        sb.append("addrMetadata=" + addrMetadata);
 
         // persistent
         sb.append(", name=" + (name == null ? "N/A" : name));
@@ -652,11 +656,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      */
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
-//        final IStoreObjectInputStream is = (IStoreObjectInputStream)in;
-//
-//        // transient
-//        store = is.getStore();
-      
         final int version = (int) LongPacker.unpackLong(in);
 
         if (version != VERSION0) {

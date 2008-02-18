@@ -38,7 +38,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 
 /**
  * Class supports range query across against an unpartitioned index on an

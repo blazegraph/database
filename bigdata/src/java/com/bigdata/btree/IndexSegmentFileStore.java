@@ -166,7 +166,8 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
 
         // @todo presumes the index segment is live.
         return new SegmentMetadata(file.toString(), checkpoint.length,
-                ResourceState.Live, checkpoint.segmentUUID);
+                ResourceState.Live, checkpoint.segmentUUID,
+                checkpoint.commitTime);
         
     }
     

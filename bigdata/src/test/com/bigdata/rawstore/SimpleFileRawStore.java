@@ -31,9 +31,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.ResourceState;
 
 
 /**
@@ -118,15 +120,66 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
     
-    /**
-     * Temporary stores do not have resource descriptions.
-     * 
-     * @throws UnsupportedOperationException
-     *             always.
-     */
     public IResourceMetadata getResourceMetadata() {
         
-        throw new UnsupportedOperationException();
+        return new IResourceMetadata() {
+
+            public boolean equals(IResourceMetadata o) {
+             
+                return this == o;
+                
+            }
+
+            public long getCommitTime() {
+                
+                // does not support commit
+                return 0L;
+                
+            }
+
+            public String getFile() {
+
+                // no backing file.
+                return file.toString();
+                
+            }
+
+            public UUID getUUID() {
+
+                // no UUID.
+                return null;
+                
+            }
+
+            public boolean isIndexSegment() {
+
+                // not index segment.
+                return false;
+                
+            }
+
+            public boolean isJournal() {
+                
+                // not journal.
+                return false;
+                
+            }
+
+            public long size() {
+
+                // #of bytes not available.
+                return 0L;
+                
+            }
+
+            public ResourceState state() {
+
+                // presumed live.
+                return ResourceState.Live;
+                
+            }
+            
+        };
         
     }
 

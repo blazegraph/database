@@ -59,10 +59,11 @@ public class SegmentMetadata extends AbstractResourceMetadata {
         
     }
 
-    public SegmentMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
+    public SegmentMetadata(String filename, long nbytes, ResourceState state,
+            UUID uuid, long commitTime) {
 
-        super(filename,nbytes,state,uuid);
-        
+        super(filename, nbytes, state, uuid, commitTime);
+
     }
 
 }

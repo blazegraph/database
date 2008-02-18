@@ -26,6 +26,7 @@ package com.bigdata.mdi;
 import java.io.File;
 import java.util.UUID;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 
@@ -62,21 +63,13 @@ public class JournalMetadata extends AbstractResourceMetadata {
      *            The journal.
      *
      * @return The file.
-//     * 
-//     * @exception IllegalArgumentException
-//     *                if the journal is not persistent.
      */
     private static String getFileString(IJournal journal) {
     
-//        if(journal.getFile()==null) {
-//            
-//            throw new IllegalArgumentException("Journal is not persistent.");
-//            
-//        }
-        
         File file = journal.getFile();
-        
-        if(file==null) return "";
+
+        if (file == null)
+            return "";
         
         return file.toString();
                 
@@ -94,17 +87,18 @@ public class JournalMetadata extends AbstractResourceMetadata {
      * estimate the #of bytes on the journal dedicated to a given partition of a
      * named index.
      */
-    public JournalMetadata(IJournal journal, ResourceState state) {
+    public JournalMetadata(AbstractJournal journal, ResourceState state) {
 
-        super(getFileString(journal), 0L, state,
-                journal.getRootBlockView().getUUID());
+        super(getFileString(journal), journal.getBufferStrategy().getExtent(),
+                state, journal.getRootBlockView().getUUID(), journal
+                        .getRootBlockView().getFirstCommitTime());
 
     }
 
     public JournalMetadata(String file, long nbytes, ResourceState state,
-            UUID uuid) {
+            UUID uuid, long commitTime) {
 
-        super(file, nbytes, state, uuid);
+        super(file, nbytes, state, uuid, commitTime);
 
     }
 

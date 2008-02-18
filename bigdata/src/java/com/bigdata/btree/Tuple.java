@@ -32,7 +32,7 @@ import java.util.Arrays;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 
 /**
  * A key-value pair used to facilitate some iterator constructs.

@@ -47,8 +47,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IBlockStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 
@@ -169,22 +171,6 @@ public class IndexSegmentBuilder {
      */
     protected TemporaryRawStore blobBuffer;
     
-//    /**
-//     * True iff checksums are used for the serialized node and leaf records.
-//     */
-//    final protected boolean useChecksum;
-//    
-//    /**
-//     * True iff the index supports isolation (version metadata).
-//     */
-//    final protected boolean isolatable;
-    
-//    /**
-//     * The record compressor used for node and leaf records or <code>null</code>
-//     * if record compression was not used.
-//     */
-//    final protected RecordCompressor recordCompressor;
-
     /**
      * The unique identifier for the generated {@link IndexSegment} resource.
      */
@@ -322,61 +308,7 @@ public class IndexSegmentBuilder {
      * The data throughput rate in megabytes per second.
      */
     final float mbPerSec;
-    
-//    /**
-//     * <p>
-//     * Builds an index segment on the disk from a {@link BTree}. The index
-//     * segment will be written on the identified file, which must not exist.
-//     * </p>
-//     * 
-//     * @param outFile
-//     *            The file on which the index segment is written. The file MAY
-//     *            exist but MUST have zero length if it does exist.
-//     * @param tmpDir
-//     *            The temporary directory in which the index nodes are buffered
-//     *            during the build (optional - the default temporary directory
-//     *            is used if this is <code>null</code> and a file buffer is
-//     *            used iff <i>fullyBuffer</i> is false).
-//     * @param btree
-//     *            Typically, a {@link BTree} on a frozen {@link Journal} that is
-//     *            being evicted into an {@link IndexSegment}.
-//     * @param m
-//     *            The branching factor for the generated tree. This can be
-//     *            choosen with an eye to minimizing the height of the generated
-//     *            tree. (Small branching factors are permitted for testing, but
-//     *            generally you want something relatively large.)
-//     * 
-//     * @throws IOException
-//     * 
-//     * @deprecated by the other ctor variant.
-//     */
-//    public IndexSegmentBuilder(File outFile, File tmpDir, AbstractBTree btree,
-//            int m) throws IOException {
-//    
-//        /*
-//         * @todo if the entryCount needs to be exact then this will not work
-//         * when there are deleted index entries (i.e., when the btree supports
-//         * isolation) - test for that condition and reject the btree.
-//         * 
-//         * Note: it still makes sense to build an index segment from a btree
-//         * that does not support isolation but only to obtain a "perfect" index -
-//         * you can not use index segments built from unisolatable indices within
-//         * a fused view since they lack the version metadata required to detect
-//         * deleted index entries.
-//         */
-//        this(outFile, tmpDir, btree.getEntryCount(), btree.rangeIterator(null,
-//                null, 0/* capacity */, IRangeQuery.KEYS | IRangeQuery.VALS
-//                        | IRangeQuery.DELETED, null/* filter */),
-//                        m,
-//                        btree.getIndexMetadata(),
-//                        System.currentTimeMillis()
-////                btree.nodeSer.valueSerializer,
-////                btree.getNodeSerializer().useChecksum, btree.isIsolatable(),
-////                null/* new RecordCompressor() */, errorRate, btree.indexUUID
-//                        );
-//        
-//    }
-    
+        
     /**
      * <p>
      * Designated constructor builds an index segment for some caller defined
@@ -408,12 +340,13 @@ public class IndexSegmentBuilder {
      * 
      * @param outFile
      *            The file on which the index segment is written. The file MAY
-     *            exist but MUST have zero length if it does exist.
+     *            exist but MUST have zero length if it does exist (this permits
+     *            you to use the temporary file facility to create the output
+     *            file).
      * @param tmpDir
-     *            The temporary directory in which the index nodes are buffered
-     *            during the build (optional - the default temporary directory
-     *            is used if this is <code>null</code> and a file buffer is
-     *            used iff <i>fullyBuffer</i> is false).
+     *            The temporary directory in data are buffered during the build
+     *            (optional - the default temporary directory is used if this is
+     *            <code>null</code>).
      * @param entryCount
      *            The #of entries that will be visited by the iterator.
      * @param entryIterator
@@ -431,7 +364,7 @@ public class IndexSegmentBuilder {
      * @param commitTime
      *            The commit time associated with the view from which the
      *            {@link IndexSegment} is being generated. This value is written
-     *            into the {@link IndexSegmentCheckpoint}.
+     *            into {@link IndexSegmentCheckpoint#commitTime}.
      * 
      * @throws IOException
      */
@@ -447,6 +380,7 @@ public class IndexSegmentBuilder {
             throws IOException {
 
         assert outFile != null;
+        assert tmpDir != null;
         assert entryCount > 0;
         assert entryIterator != null;
 
@@ -758,8 +692,7 @@ public class IndexSegmentBuilder {
                          * which is presumably the blob reference.
                          */ 
 
-                        val = overflowHandler.handle(tuple,
-                                (IBlockStore) blobBuffer);
+                        val = overflowHandler.handle(tuple, blobBuffer);
                         
                     } else {
                         
@@ -1559,12 +1492,31 @@ public class IndexSegmentBuilder {
             
             if(INFO)
                 log.info(md.toString());
+
+            // save the index segment resource description for the caller.
+            this.segmentMetadata = new SegmentMetadata(outFile.toString(), out
+                    .length(), ResourceState.Live, segmentUUID, commitTime);
             
             return md;
             
         }
 
     }
+
+    /**
+     * The description of the constructed {@link IndexSegment} resource.
+     * 
+     * @throws IllegalStateException
+     *             if requested before the build operation is complete.
+     */
+    public IResourceMetadata getSegmentMetadata() {
+        
+        if(segmentMetadata==null) throw new IllegalStateException();
+        
+        return segmentMetadata;
+        
+    }
+    private SegmentMetadata segmentMetadata = null;
     
     /**
      * Abstract base class for classes used to construct and serialize nodes and
@@ -1763,20 +1715,20 @@ public class IndexSegmentBuilder {
 
         public boolean getDeleteMarker(int index) {
 
-            if (deleteMarkers!=null)
+            if (deleteMarkers == null)
                 throw new UnsupportedOperationException();
-            
+
             return deleteMarkers[index];
-            
+
         }
 
         public long getVersionTimestamp(int index) {
-        
-            if (versionTimestamps!=null)
+
+            if (versionTimestamps == null)
                 throw new UnsupportedOperationException();
 
             return versionTimestamps[index];
-            
+
         }
 
         public boolean hasDeleteMarkers() {
