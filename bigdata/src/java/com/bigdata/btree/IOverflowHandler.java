@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.rawstore.IBlockStore;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * An interface that allows you to inspect index entries during an
@@ -50,9 +50,9 @@ public interface IOverflowHandler extends Serializable {
      *            The target store on which you can write additional data.
      * 
      * @return The new value to be stored under the key in the generated
-     *         indexsegment.
+     *         {@link IndexSegment}.
      */
-    public byte[] handle(ITuple tuple,IBlockStore target);
+    public byte[] handle(ITuple tuple, IRawStore target);
 
     /**
      * Notified when overflow processing is done for a given source and

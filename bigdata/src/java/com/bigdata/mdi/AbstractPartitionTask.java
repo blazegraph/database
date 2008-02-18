@@ -325,7 +325,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * However, the split rule then needs to examine the actual keys at and
      * around those split points and adjust them as necessary.
      * 
-     * The running over/under run in cum(m') is maintained and the suggested
+     * The running over/under run in sum(m') is maintained and the suggested
      * split points are adjusted by that over/under run.
      * 
      * Repeat until all split points have been identifed and validated by the
@@ -450,6 +450,30 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * specified as (null, splitKey) for the left sibling and (splitKey, null)
      * for the right sibling. This can be generalized into an N-way split simply
      * by choosing N-1 useful keys.
+     * 
+     * FIXME Most recent thinking on merge rules - they have to be written
+     * differently depending on the nature of the index. (a) The
+     * {@link SparseRowStore} puts timestamps in the keys, so you can prune
+     * history explicitly each time an index segment is built by copying in only
+     * those timestamp-property-values that you want to retain. (b) A fully
+     * isolated index uses timestamps on index entries and the transaction
+     * manager will apply a policy determining when to delete behind old
+     * resources, but only the most current value is ever copied into an index
+     * segment. (c) An index with only delete markers supports scale-out and
+     * history policies are managed on the resource level, just like a fully
+     * isolated index, so only the most recent value is copied into an index
+     * segment during a build. A zero history policy can be used for (c) in
+     * which case resources that are no longer part of the current view are
+     * immediately available for delete (in the case of an index segment; in the
+     * case of a journal it is available for delete once no index partition has
+     * data on that journal). The file system zones are an application of (c)
+     * where the zone (set of index partitions with a common policy) causes
+     * resources to be maintained for some amount of time (there is no way to
+     * handle "some number of versions" outside of the sparse row store with the
+     * timestamps in the keys, just age of the resources). If isolated and
+     * unisolated indices will be mixed on a journal then the retention policy
+     * for that journal needs to be the maximum (AND) of the recommendations of
+     * the individual policies.
      * 
      * @todo A flag may be used to specify that deleted versions should not
      *       appear in the generated view (but note that the transaction manager
@@ -610,10 +634,14 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             final int nentries = (int) src.rangeCount(fromKey, toKey);
             
             /*
-             * Note: in order to see both version counters and deletion markers
-             * this needs to use an IEntryIterator that does NOT filter out
-             * deleted entries. That iterator MUST be defined for the fused view
-             * for the index partition.
+             * Note: If a full compacting merge is to performed then the input
+             * is the fused view of an index partition as of some timestamp and
+             * the output is an equivalent compact view. Old index entries and
+             * delete markers are dropped when building the compact view.
+             * 
+             * Otherwise delete markers need to be preserved, in which case we
+             * MUST choose an iterator that visits delete markers so that they
+             * can be propagated to the index segment.
              */
             final IEntryIterator itr = src.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.KEYS | IRangeQuery.VALS
@@ -642,12 +670,13 @@ abstract public class AbstractPartitionTask extends AbstractTask {
              * @todo return only the SegmentMetadata?
              */
             final IResourceMetadata[] resources = new SegmentMetadata[] { //
-            
+                    
                     new SegmentMetadata(//
                             "" + outFile, //
                             outFile.length(),//
                             ResourceState.New,//
-                            builder.segmentUUID//
+                            builder.segmentUUID,//
+                            commitTime
                             )//
                     
             };

@@ -130,12 +130,6 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
     
-    /**
-     * Temporary stores do not have resource descriptions.
-     * 
-     * @throws UnsupportedOperationException
-     *             always.
-     */
     public IResourceMetadata getResourceMetadata() {
         
         return new IResourceMetadata() {

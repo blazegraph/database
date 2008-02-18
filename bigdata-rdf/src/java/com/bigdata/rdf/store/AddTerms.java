@@ -33,6 +33,7 @@ import java.io.ObjectOutput;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+import org.openrdf.model.BNode;
 
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.ICounter;
@@ -126,11 +127,11 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
     
     /**
      * For each term whose serialized key is mapped to the current index
-     * partition, lookup the term in the <em>terms</em> index. If it is
-     * there then note its assigned termId. Otherwise, use the partition
-     * local counter to assign the term identifier, note the term identifer
-     * so that it can be communicated back to the client, and insert the
-     * {term,termId} entry into the <em>terms</em> index.
+     * partition, lookup the term in the <em>terms</em> index. If it is there
+     * then note its assigned termId. Otherwise, use the partition local counter
+     * to assign the term identifier, note the term identifer so that it can be
+     * communicated back to the client, and insert the {term,termId} entry into
+     * the <em>terms</em> index.
      * 
      * @param ndx
      *            The terms index.

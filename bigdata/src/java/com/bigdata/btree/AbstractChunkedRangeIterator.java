@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
 
 /**

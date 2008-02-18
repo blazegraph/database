@@ -54,10 +54,11 @@ public interface IPartitionMetadata {
     /**
      * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
      * holding live data for this partition. The entries in the array reflect
-     * the creation time of the index segments. The earliest resource is listed
-     * first. The most recently created resource is listed last. Only the
-     * {@link ResourceState#Live} resources must be read in order to provide a
-     * consistent view of the data for the index partition.
+     * the creation time of the resources. The earliest resource is listed
+     * first. The most recently created resource is listed last.
+     * <p>
+     * Note: Only the {@link ResourceState#Live} resources must be read in order
+     * to provide a consistent view of the data for the index partition.
      * {@link ResourceState#Dead} resources will eventually be scheduled for
      * restart-safe deletion.
      * 

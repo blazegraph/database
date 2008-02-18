@@ -40,7 +40,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
 

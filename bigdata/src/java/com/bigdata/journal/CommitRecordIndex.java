@@ -70,12 +70,6 @@ public class CommitRecordIndex extends BTree {
     final private WeakValueCache<Long, ICommitRecord> cache = new WeakValueCache<Long, ICommitRecord>(
             new LRUCache<Long, ICommitRecord>(10));
 
-//    public CommitRecordIndex(IRawStore store) {
-//
-//        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID());
-//
-//    }
-
     /**
      * Create a new instance.
      * 
@@ -318,14 +312,13 @@ public class CommitRecordIndex extends BTree {
     }
     
     /**
-     * Add an entry for a commit record..
-     * 
-     * @param commitRecord
-     *            The commit record.
+     * Add an entry for a commit record.
      * 
      * @param commitRecordAddr
      *            The address at which that commit record was written on the
      *            store.
+     * @param commitRecord
+     *            The commit record.
      * 
      * @exception IllegalArgumentException
      *                if <i>commitRecord</i> is <code>null</code>.

@@ -48,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -131,48 +132,59 @@ import cutthecrap.utils.striterators.Striterator;
  *       pattern, create an array of binding[]s and process each binding in
  *       parallel.
  * 
- * @todo Add 3+1, 4, and 4+1 stores (+1 indicates statement identifiers and 4
- *       indicates a quad store).
+ * @todo {@link BNode} SHOULD NOT be entered into the reverse (id->term) index.
+ *       We can decide that a termId is a {@link BNode} by direct inspection of
+ *       the term identifier using {@link #isBNode(long)}. We know whether or
+ *       not it is the same {@link BNode} by simply comparing the term
+ *       identifier. In fact, the only reason to enter {@link BNode} into the
+ *       foward (term->id) index is during data load. We can do without bnodes
+ *       in the forward index also as long as we (a) keep a hash or btree whose
+ *       scope is the data load (a btree would be required for very large
+ *       files); and (b) we hand the {@link BNode}s to {@link AddTerms}s but
+ *       it only assigns a one up term identifier and does NOT enter the bnode
+ *       into the index. The local (file load scope only) bnode resolution is
+ *       the only context in which it is possible for two {@link BNode}
+ *       {@link BNode#getID() ID}s to be interpreted as the ID and therefore
+ *       assigned the same term identifier. In all other cases we will assign a
+ *       new term identifier.
  * 
- * @todo finish the full text indexing support.
+ * @todo Do the quad store. Make some of the indices optional such that we still
+ *       have good access patterns but store less data when the quad is used as
+ *       a statement identifier (by always using a distinct {@link BNode} as its
+ *       value). There is no need for a pure triple store and the "bnode" trick
+ *       can be used to model eagerly assigned statement identifiers. One
+ *       question is whether the quad position can be left open (0L aka NULL).
+ *       It seems that SPARQL might allow this, in which case we can save a lot
+ *       of term identifiers that would otherwise be gobbled up eagerly. The
+ *       quad position could of course be bound to some constant, in which case
+ *       it would not be a statement identifier - more the context model.
  * 
- * @todo sesame 2.x TCL (technology compatibility kit).
+ * @todo parameterize the rdf database constructor such that you can have more
+ *       than on graph in the same database instance, e.g., by specifying a
+ *       namespace prefix for the indices for that graph.
+ * 
+ * @todo finish the full text indexing support. We may also need
+ *       (case-insensitive) "exact" matching on literals.
+ * 
+ * @todo sesame 2.x TCK (technology compatibility kit).
  * 
  * @todo retest on 1B+ triples (single host single threaded and concurrent data
  *       load and scale-out architecture with concurrent data load and policy
  *       for deciding which host loads which source files).
  * 
- * @todo subversion and maven 2.x builds.
+ * @todo get dynamic partitioning working and test on 10, 20, 40 nodes...
  * 
- * @todo bnodes do not need to be stored in the terms or ids indices if we
- *       presume that an unknown identifier is a bnode. however, we still need
- *       to ensure that bnode identifiers are distinct or the same when and
- *       where appropriate, so we need to assign identifiers to bnodes in a
- *       restart-safe manner even if we "forget" the term-id mapping. (The
- *       possibility of an incomplete ids index during data load for the
- *       scale-out solution means that we must either read from a historical
- *       known consistent timestamp or record bnodes in the terms index.)
+ * @todo subversion and maven 2.x builds.
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
  * 
  * @todo explore possible uses of bitmap indices
  * 
- * @todo examine role for semi joins for a Sesame 2.x integration (quad store
- *       with real query operators). semi-joins (join indices) can be declared
- *       for various predicate combinations and then maintained. The
- *       declarations can be part of the scale-out index metadata. The logic
- *       that handles batch data load can also maintain the join indices. While
- *       triggers could be used for this purpose, there would need to be a means
- *       to aggregate and order the triggered events and then redistribute them
- *       against the partitions of the join indices. If the logic is in the
- *       client, then we need to make sure that newly declared join indices are
- *       fully populated (e.g., clients are notified to start building the join
- *       index and then we start the index build from existing data to remove
- *       any chance that the join index would be incomplete - the index would be
- *       ready as soon as the index build completes and client operations would
- *       be in a maintenance role).
- * 
+ * @todo examine role for semi joins (join indices) - these can be declared for
+ *       various predicate combinations and then maintained, effectively by
+ *       rules using the existing TM mechanisms.
+ *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

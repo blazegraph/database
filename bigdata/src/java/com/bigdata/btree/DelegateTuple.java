@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 
 /**
  * An {@link ITuple} wrapping a delegate that may be used to override some of

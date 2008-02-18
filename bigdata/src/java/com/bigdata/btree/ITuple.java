@@ -30,8 +30,8 @@ package com.bigdata.btree;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IBlockStore;
-import com.bigdata.rawstore.IBlockStore.IBlock;
 
 /**
  * Interface exposes more direct access to keys and values visited by an

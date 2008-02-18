@@ -29,7 +29,6 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Properties;
@@ -42,7 +41,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
@@ -50,6 +48,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.ReadOnlyFusedView;
@@ -69,7 +68,7 @@ import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.ResourceState;
-import com.bigdata.rawstore.IBlockStore.IBlock;
+import com.bigdata.rawstore.IBlock;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -82,30 +81,7 @@ import com.bigdata.rawstore.IBlockStore.IBlock;
  * 
  * @see DataServer, which is used to start this service.
  * 
- * FIXME Move the executor services out of the {@link ConcurrentJournal}. This
- * is fine if there is only a single journal, but with multiple journals the
- * executor services need to be decoupled from the journal so that the can more
- * readily survive the opening and closing of journals.
- * <p>
- * Support overflow. Queued tasks should be migrated from the "old" journal to
- * the "new" journal while running tasks should complete on the "old" journal.
- * Consider encapsulating this behavior in a base class using a delegation
- * model. There is a sketch of that kind of a thing in the "scaleout" package.
- * The specifics should probably be discarded but parts of the code may be of
- * use. The handling of overflow events needs to be coordinated with the
- * {@link IMetadataService}.
- * <p>
- * Make sure that {@link ICounter} state overflows correctly.
- * <p>
- * Make sure that we never double-open an {@link IndexSegmentFileStore} or an
- * {@link IndexSegment} from its {@link IndexSegmentFileStore}.
- * <p>
- * Make sure that {@link AbstractTask#getIndex(String)} returns a
- * {@link FusedView}, {@link IsolatedFusedView}, or {@link ReadOnlyFusedView}
- * as necessary for index partitions. When the index is not partitioned then it
- * will return a {@link BTree} or a flavor of {@link ReadOnlyIndex}.
- * 
- * @todo The data service should redirect clients if an index partition has been
+@todo The data service should redirect clients if an index partition has been
  *       moved (shed) while a client has a lease.
  * 
  * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
@@ -872,12 +848,6 @@ abstract public class DataService implements IDataService,
                 public int length() {
                     
                     return journal.getByteCount(addr);
-                    
-                }
-
-                public OutputStream outputStream() {
-                    
-                    throw new UnsupportedOperationException();
                     
                 }
                 

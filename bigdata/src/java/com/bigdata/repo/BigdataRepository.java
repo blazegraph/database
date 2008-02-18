@@ -48,9 +48,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IBlockStore;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.rawstore.IBlockStore.IBlock;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
@@ -3491,7 +3492,7 @@ public class BigdataRepository implements ContentRepository {
             
         }
 
-        byte[] buf;
+        DataOutputBuffer buf;
         
         public void close() {
             
@@ -3499,11 +3500,11 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
-        public byte[] handle(ITuple tuple, IBlockStore target) {
+        public byte[] handle(ITuple tuple, IRawStore target) {
 
             if(buf==null) {
                 
-                buf = new byte[Bytes.kilobyte32*10];
+                buf = new DataOutputBuffer();
                 
             }
             
@@ -3536,43 +3537,46 @@ public class BigdataRepository implements ContentRepository {
             
             // #of bytes in the block.
             final int len = block.length();
+
+            // make sure buffer has sufficient capacity.
+            buf.ensureCapacity(len);
             
-            // write block on the target store.
-            final IBlock block2 = target.writeBlock( len );
+            // prepare buffer for write.
+            buf.reset();
             
             final InputStream bin = block.inputStream();
 
-            final OutputStream bout = block2.outputStream();
-
-            // the address on which the block will be written.
-            final long addr2 = block2.getAddress();
-            
+//            // the address on which the block will be written.
+//            final long addr2 = block2.getAddress();
+            final long addr2;
             try {
 
-                // #of bytes read so far.
-                long n = 0;
-                
-                while (len - n > 0) {
+//                // #of bytes read so far.
+//                long n = 0;
+//                
+//                while (len - n > 0) {
 
                     // read source into buffer.
-                    final int nread = bin.read(buf);
+                    final int nread = bin.read(buf.array(),0,len);
 
-                    if (nread == -1) {
+                    if (nread != len) {
 
                         throw new RuntimeException(
-                                "Premature end of block after n=" + n
-                                        + " bytes out of " + len);
+                                "Premature end of block: expected="+len+", actual="+nread);
 
                     }
 
-                    // write buffer onto sink.
-                    bout.write(buf, 0, nread);
+                    // write on the target store.
+                    addr2 = target.write(buf.wrap());
+                    
+//                    // write buffer onto sink.
+//                    bout.write(buf, 0, nread);
 
-                    n += nread;
+//                    n += nread;
+//
+//                }
 
-                }
-
-                bout.flush();
+//                bout.flush();
 
             } catch(IOException ex) {
                 
@@ -3584,11 +3588,11 @@ public class BigdataRepository implements ContentRepository {
                 
             } finally {
 
-                try {
-                    bout.close();
-                } catch (IOException ex) {
-                    log.warn(ex);
-                }
+//                try {
+//                    bout.close();
+//                } catch (IOException ex) {
+//                    log.warn(ex);
+//                }
 
                 try {
                     bin.close();

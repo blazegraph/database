@@ -31,6 +31,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.HashMap;
 import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
@@ -83,23 +84,18 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
     }
 
-    
-    /**
-     * FIXME set the commitTime field here.
-     * <p>
-     * Together with the last commit time on the journal this supports purging
-     * old resources by a transaction manager.
-     * <p>
-     * Also, using this field a post-commit handler can replace the metadata
-     * record for a btree with a new one where newView := (oldbTree, oldView)
-     */ 
-    public AbstractResourceMetadata(String filename,long nbytes,ResourceState state, UUID uuid ) {
+    protected AbstractResourceMetadata(String filename, long nbytes,
+            ResourceState state, UUID uuid, long commitTime) {
 
         if (filename == null || state == null || uuid == null)
             throw new IllegalArgumentException();
 
-        if (nbytes < 0)
-            throw new IllegalArgumentException();
+        if (nbytes <= 0)
+            throw new IllegalArgumentException(
+                    "Store file size is non-positive");
+
+        if (commitTime == 0L)
+            throw new IllegalArgumentException("Commit time is zero?");
         
         this.filename = filename;
         
@@ -109,20 +105,33 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
         this.uuid = uuid;
 
+        this.commitTime = commitTime;
+        
     }
 
-    public int hashCode() {
+    final public int hashCode() {
         
         return uuid.hashCode();
         
     }
     
     /**
+     * Note: The JDK {@link HashMap} implementation requires that we define this
+     * method in order for {@link HashMap#get(Object)} to work correctly!
+     */
+    final public boolean equals(Object o) {
+        
+        return equals((IResourceMetadata)o);
+        
+    }
+    
+    /**
      * Compares two resource metadata objects for consistent state.
      */
-    public boolean equals(IResourceMetadata o) {
+    final public boolean equals(IResourceMetadata o) {
         
-        if(this == o)return true;
+        if (this == o)
+            return true;
         
         // Note: compares UUIDs first.
 
