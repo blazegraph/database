@@ -77,6 +77,9 @@ public class StressTestLockContention extends ProxyTestCase {
      * resources.
      * 
      * @throws InterruptedException
+     * 
+     * @todo I will sometimes see errors reported by this test when running as
+     *       part of the total test suite but never when run by itself.
      */
     public void test_lockContention() throws InterruptedException {
 

@@ -216,7 +216,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          * 
          * @param metadata
          */
-        public MetadataIndexCheckpoint(IndexMetadata metadata, long counter) {
+        public MetadataIndexCheckpoint(IndexMetadata metadata, Long counter) {
 
             super(metadata, counter);
 

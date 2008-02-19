@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 
 /**
  * Register a named index (unisolated write operation).
@@ -47,30 +48,26 @@ import com.bigdata.btree.IIndex;
  */
 public class RegisterIndexTask extends AbstractTask {
 
-    final private BTree btree;
+    final private IndexMetadata metadata;
     
     /**
      * @param journal
      * @param name
-     * @param ndx
-     *            The index object. Use
-     * 
-     * <pre>
-     * UUID indexUUID = UUID.randomUUID();
-     * 
-     * new UnisolatedBTree(journal, indexUUID)
-     * </pre>
+     *            The name under which to register the index.
+     * @param metadata
+     *            The index metadata.
      * 
      * to register a new index that supports isolation.
      */
-    public RegisterIndexTask(ConcurrentJournal journal, String name, BTree ndx) {
+    public RegisterIndexTask(ConcurrentJournal journal, String name,
+            IndexMetadata metadata) {
 
-        super(journal, ITx.UNISOLATED, false/*readOnly*/, name);
-        
-        if (ndx == null)
+        super(journal, ITx.UNISOLATED, false/* readOnly */, name);
+
+        if (metadata == null)
             throw new NullPointerException();
         
-        this.btree = ndx;
+        this.metadata = metadata;
         
     }
 
@@ -83,14 +80,9 @@ public class RegisterIndexTask extends AbstractTask {
 
         String name = getOnlyResource();
 
-        try {
-
-            // register the index.
-            journal.registerIndex(name, btree);
-
-        } catch (IndexExistsException ex) {
-
-            IIndex ndx = journal.getIndex(name);
+        IIndex ndx = getLiveJournal().getIndex(name);
+            
+        if (ndx != null) {
 
             final UUID indexUUID = ndx.getIndexMetadata().getIndexUUID();
 
@@ -99,6 +91,12 @@ public class RegisterIndexTask extends AbstractTask {
             return indexUUID;
 
         }
+
+        // create index instance.
+        final BTree btree = BTree.create(getLiveJournal(), metadata);
+
+        // register the index.
+        getLiveJournal().registerIndex(name, btree);
 
         final UUID indexUUID = btree.getIndexMetadata().getIndexUUID();
 

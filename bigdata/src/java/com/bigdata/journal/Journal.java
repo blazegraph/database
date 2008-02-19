@@ -69,8 +69,8 @@ public class Journal extends ConcurrentJournal implements ITransactionManager {
      */
 
     /**
-     * A private instance is used so that different code paths will not touch
-     * the same underlying factory.
+     * A static instance is used so that different journals on the same JVM will
+     * all use the same underlying time source.
      */
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 

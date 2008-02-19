@@ -100,7 +100,7 @@ public class SequenceTask extends AbstractTask {
         
         if(tasks[0]==null) throw new NullPointerException();
         
-        final ConcurrentJournal journal = tasks[0].journal;
+        final AbstractJournal journal = tasks[0].getLiveJournal();
         
         final long startTime = tasks[0].startTime; 
         
@@ -114,20 +114,25 @@ public class SequenceTask extends AbstractTask {
             
             AbstractTask task = tasks[i];
             
-            if(task==null) throw new NullPointerException();
-            
-            if(task.journal!=journal) throw new IllegalArgumentException();
+            if (task == null)
+                throw new NullPointerException();
 
-            if(task.startTime!=startTime) throw new IllegalArgumentException();
-            
-            if(task.readOnly!=readOnly) throw new IllegalArgumentException();
+            if (task.getLiveJournal() != journal)
+                throw new IllegalArgumentException();
+
+            if (task.startTime != startTime)
+                throw new IllegalArgumentException();
+
+            if (task.readOnly != readOnly)
+                throw new IllegalArgumentException();
             
             resources.addAll(Arrays.asList(task.getResource()));
             
         }
         
-        return new SequenceTask(journal, startTime, readOnly, resources
-                .toArray(new String[resources.size()]), tasks);
+        return new SequenceTask((ConcurrentJournal) journal, startTime,
+                readOnly, resources.toArray(new String[resources.size()]),
+                tasks);
         
     }
     

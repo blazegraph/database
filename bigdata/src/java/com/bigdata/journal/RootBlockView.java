@@ -58,8 +58,16 @@ public class RootBlockView implements IRootBlockView {
     static final transient short SIZEOF_COUNTER    = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_OFFSET     = Bytes.SIZEOF_LONG;
     static final transient short SIZEOF_CHECKSUM   = Bytes.SIZEOF_INT;
-    // Note: a chunk of reserved bytes.
-    static final transient short SIZEOF_UNUSED     = 256-Bytes.SIZEOF_UUID-Bytes.SIZEOF_BYTE;
+    /**
+     * This is a chunk of reserved bytes from which new fields in the root block
+     * are allocated from time to time.
+     */
+    static final transient short SIZEOF_UNUSED = 256 - (//
+            Bytes.SIZEOF_UUID + // uuid
+            Bytes.SIZEOF_BYTE + // offsetBits
+            SIZEOF_TIMESTAMP  + // createTime
+            SIZEOF_TIMESTAMP    // closeTime
+            );
     
     static final transient short OFFSET_CHALLIS0   = 0;
     static final transient short OFFSET_MAGIC      = OFFSET_CHALLIS0  + SIZEOF_TIMESTAMP;
@@ -72,7 +80,10 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_COMMIT_CTR = OFFSET_LAST_CMIT   + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_COMMIT_REC = OFFSET_COMMIT_CTR  + SIZEOF_COUNTER;
     static final transient short OFFSET_COMMIT_NDX = OFFSET_COMMIT_REC  + SIZEOF_ADDR;
-    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
+    static final transient short OFFSET_CREATE_TIME= OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
+    static final transient short OFFSET_CLOSE_TIME = OFFSET_CREATE_TIME + SIZEOF_TIMESTAMP;
+    static final transient short OFFSET_UNUSED     = OFFSET_CLOSE_TIME  + SIZEOF_TIMESTAMP;
+//    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
     static final transient short OFFSET_UUID       = OFFSET_UNUSED      + SIZEOF_UNUSED;
     static final transient short OFFSET_CHALLIS1   = OFFSET_UUID        + Bytes.SIZEOF_UUID;
     static final transient short OFFSET_CHECKSUM   = OFFSET_CHALLIS1    + SIZEOF_TIMESTAMP;  
@@ -195,16 +206,29 @@ public class RootBlockView implements IRootBlockView {
      *            {@link CommitRecordIndex} was written or 0L if there are no
      *            historical {@link ICommitRecord}s (this is true when the
      *            store is first created).
-     * @param segmentUUID
+     * @param uuid
      *            The unique journal identifier.
      * @param checker
      *            An object that is used to compute the checksum to be stored in
      *            the root block (required).
+     * @param createTime
+     *            The timestamp of the creation event for the journal. This is
+     *            mainly used by the {@link ResourceManager} to impose a
+     *            chronological order on the journals.
+     * @param closeTime
+     *            ZERO(0L) unless the journal has been closed for write
+     *            operations, in which case this is the timestamp of the event
+     *            that disallowed further writes on this journal. This is mainly
+     *            used by the {@link ResourceManager} to indicate that a journal
+     *            is no longer available for writing (because it has been
+     *            superceded by another journal).
      */
     RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
             long firstCommitTime, long lastCommitTime, long commitCounter,
             long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
-            ChecksumUtility checker) {
+            long createTime, long closeTime, ChecksumUtility checker) {
+
+        assert SIZEOF_UNUSED > 0 : "Out of unused space in the root block? : "+SIZEOF_UNUSED;
 
         WormAddressManager.assertOffsetBits(offsetBits);
 
@@ -295,6 +319,20 @@ public class RootBlockView implements IRootBlockView {
             
         }
 
+        if (createTime == 0L) {
+
+            throw new IllegalArgumentException("Create time is zero.");
+            
+        }
+        
+        if (closeTime != 0L && closeTime < createTime) {
+            
+            throw new IllegalArgumentException(
+                    "Close time proceeds create time: closeTime=" + closeTime
+                            + ", createTime=" + createTime);
+            
+        }
+        
         if(checker == null) {
             
             throw new IllegalArgumentException("Checker is null");
@@ -338,12 +376,15 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(commitCounter);
         buf.putLong(commitRecordAddr);
         buf.putLong(commitRecordIndexAddr);
+        buf.putLong(createTime);
+        buf.putLong(closeTime);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
         buf.putLong(uuid.getMostSignificantBits());
         buf.putLong(uuid.getLeastSignificantBits());
         buf.putLong(challisField);
         buf.putInt(calcChecksum(checker)); // checksum of the proceeding bytes.
 
+        assert buf.position() == SIZEOF_ROOT_BLOCK : "position="+buf.position()+" but root block is "+SIZEOF_ROOT_BLOCK+" bytes";
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
 
         buf.position(0);
@@ -539,11 +580,25 @@ public class RootBlockView implements IRootBlockView {
 
     public UUID getUUID() {
         
-        return new UUID(buf.getLong(OFFSET_UUID)/* MSB */, buf
-                .getLong(OFFSET_UUID + 8)/*LSB*/);
+        return new UUID(//
+                buf.getLong(OFFSET_UUID), // MSB
+                buf.getLong(OFFSET_UUID + Bytes.SIZEOF_LONG) //LSB
+                );
         
     }
 
+    public long getCreateTime() {
+        
+        return buf.getLong(OFFSET_CREATE_TIME);
+        
+    }
+    
+    public long getCloseTime() {
+        
+        return buf.getLong(OFFSET_CLOSE_TIME);
+        
+    }
+    
     /**
      * Return the checksum store in the root block (excluding only the field
      * including the checksum value itself).

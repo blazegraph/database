@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -38,7 +40,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.io.NameAndExtensionFilter;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -51,15 +52,6 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  * federation starts and stops with the client. An embedded federation may be
  * used to assess or remove the overhead of network operations, to simplify
  * testing of client code, or to deploy a scale-up (vs scale-out) solution.
- * 
- * @todo clean up the restart logic and validate with test suites. The service
- *       UUIDs need to be persistent and must define a consistent mapping from
- *       the service UUID to the data stored by that service. In JINI, that is
- *       handled by the service registrar. Perhaps the easiest way to finese
- *       this issue here is to save the data files in metadataService/UUID/*.jnl
- *       and dataService/UUID/*.jnl directories. The service UUIDs can then be
- *       assigned using a property or parameter when the service is first
- *       started.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -156,12 +148,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         /**
          * The name of the optional property whose value is the #of data
-         * services that will be (re-)started. The data services will be named
-         * with a base name suffix pattern "_#" where # is an integer in
-         * [0:ndataServices).
-         * 
-         * @todo work through restart - are the #of data services read from the
-         *       metadata service, the file system, or from the properties?
+         * services that will be (re-)started.
          */
         public static String NDATA_SERVICES = "ndataServices";
 
@@ -172,8 +159,8 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         
         /**
          * <code>data.dir</code> - The property whose value is the name of the
-         * directory in which the store files will be created (default is the
-         * current working directory).
+         * directory under which the data services will store their state (their
+         * service ID, journals, and index segments).
          */
         public static final String DATA_DIR = "data.dir";
 
@@ -198,12 +185,6 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
     
-    // The basename of the journal file for the metadata service.
-    private final String metadataBasename = "metadataService";
-
-    // The basename of the journal file for the data service.
-    private final String dataBasename = "dataService";
-    
     /**
      * Start or restart an embedded bigdata federation.
      * 
@@ -220,12 +201,20 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         
         this.client = client;
 
+        // isolate caller from any changes we may make.
+        properties = new Properties(properties);
+        
         // true iff the federation is diskless.
         final boolean isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
         log.warn("federation is "+(isTransient?"not ":"")+"persistent");
         
+        // true if temp files are being requested.
+        final boolean createTempFile = Boolean.parseBoolean(properties
+                .getProperty(Options.CREATE_TEMP_FILE,
+                        ""+Options.DEFAULT_CREATE_TEMP_FILE));
+
         /*
          * The directory in which the data files will reside.
          */
@@ -233,22 +222,47 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
             dataDir = null;
             
+            /*
+             * Always do first time startup since there is no persistent state.
+             */
+            ndataServices = createFederation(properties);
+
         } else {
-            
-            String val = properties.getProperty(Options.DATA_DIR,
-                    Options.DEFAULT_DATA_DIR);
-            
-            log.info(Options.DATA_DIR+"="+val);
-            
-            dataDir = new File(val);
 
-            if (dataDir.exists() && !dataDir.isDirectory()) {
+            if (createTempFile) {
 
-                throw new RuntimeException(
-                        "Regular file exists with that name: "
-                                + dataDir.getAbsolutePath());
+                // files will be created in a temporary directory.
+                File tmpDir = new File(properties.getProperty(Options.TMP_DIR, System
+                        .getProperty("java.io.tmpdir")));
+                
+                try {
+
+                    // create temp file.
+                    dataDir = File.createTempFile("bigdata", "fed", tmpDir);
+                    
+                    // delete temp file.
+                    dataDir.delete();
+                    
+                    // re-create as directory.
+                    dataDir.mkdir();
+                    
+                } catch (IOException e) {
+
+                    throw new RuntimeException(e);
+                    
+                }
+
+                // unset this property so that it does not propagate to the journal ctor.
+                properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+                
+            } else {
+
+                dataDir = new File(properties.getProperty(Options.DATA_DIR,
+                        Options.DEFAULT_DATA_DIR));
 
             }
+
+            log.info(Options.DATA_DIR + "=" + dataDir);
 
             if (!dataDir.exists()) {
 
@@ -261,70 +275,134 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
             }
 
-        }
+            if (!dataDir.isDirectory()) {
 
-        if(isTransient) {
-            
-            /*
-             * First time startup.
-             */
-            ndataServices = createFederation(properties);
+                throw new RuntimeException(
+                        "Regular file exists with that name: "
+                                + dataDir.getAbsolutePath());
 
-            return;
-            
-        } else {
+            }
 
             /*
-             * Look for pre-existing data files.
+             * Persistent (re-)start.
              * 
-             * @todo if we are supporting overflow then there will be multiple
-             * versions of the files per the master journal. In that case it is
-             * better to place each (meta)data service into its own
-             * subdirectory.
+             * Look for pre-existing (meta)data services. Each service stores
+             * its state in a subdirectory named by the serviceUUID. We
+             * recognize these directories by the ability to parse the directory
+             * name as a UUID (the embedded services do not store a service.id
+             * file - that is just the jini services). In addition a ".mds" file
+             * is created in the service directory that corresponds to the
+             * metadata service.
              */
 
-            /*
-             * Scan the data directory for metadata service data files.
-             */
+            final File[] serviceDirs = dataDir.listFiles(new FileFilter() {
 
-            File[] metadataFiles = new NameAndExtensionFilter(new File(dataDir,
-                    metadataBasename).toString(), Options.JNL).getFiles();
+                public boolean accept(File pathname) {
+                    
+                    if(!pathname.isDirectory()) {
+                        
+                        log.info("Ignoring normal file: "+pathname);
+                        
+                        return false;
+                        
+                    }
+                    
+                    final String name = pathname.getName();
+                    
+                    try {
+                        
+                        UUID.fromString(name);
 
-            /*
-             * Scan the data directory for data service data files.
-             */
-
-            File[] dataFiles = new NameAndExtensionFilter(new File(dataDir,
-                    dataBasename).toString(), Options.JNL).getFiles();
-
-            if (metadataFiles.length == 0) {
-
-                if (dataFiles.length != 0) {
-
-                    throw new RuntimeException(
-                            "Data files found, but no metadata files.");
-
+                        log.info("Found service directory: "+pathname);
+                        
+                        return true;
+                        
+                    } catch(IllegalArgumentException ex) {
+                        
+                        log.info("Ignoring directory: "+pathname);
+                        
+                        return false;
+                        
+                    }
+                    
                 }
-
+                
+            });
+            
+            if (serviceDirs.length == 0) {
+                
                 /*
                  * First time startup.
                  */
                 ndataServices = createFederation(properties);
 
             } else {
-
+                
                 /*
-                 * Re-start.
+                 * Reload services from disk.
                  */
 
-                ndataServices = dataFiles.length;
+                // expected #of data services.
+                dataService = new DataService[serviceDirs.length - 1];
 
-                // @todo support restart.
-                throw new UnsupportedOperationException(
-                        "Restart not supported yet");
+                int ndataServices = 0;
+                int nmetadataServices = 0;
+                for(File serviceDir : serviceDirs ) {
+                    
+                    final UUID serviceUUID = UUID.fromString(serviceDir.getName());
 
+                    final Properties p = new Properties(properties);
+
+                    p.setProperty(Options.FILE, new File(serviceDir, "journal"
+                            + Options.JNL).toString());
+
+                    if(new File(serviceDir,".mds").exists()) {
+                        
+                        /*
+                         * metadata service.
+                         */
+                        metadataService = new EmbeddedMetadataService(this,
+                                serviceUUID, p);
+                        
+                        nmetadataServices++;
+                        
+                        if (nmetadataServices > 1) {
+
+                            throw new RuntimeException(
+                                    "Not expecting more than one metadata service");
+                            
+                        }
+                        
+                    } else {
+                        
+                        /*
+                         * data service.
+                         */
+                        
+                        final DataService dataService = new EmbeddedMetadataService(
+                                this, serviceUUID, p);
+
+                        if (ndataServices == this.dataService.length) {
+
+                            throw new RuntimeException(
+                                    "Too many data services?");
+                            
+                        }
+
+                        this.dataService[ndataServices++] = dataService;
+                     
+                        dataServiceByUUID.put(serviceUUID, dataService);
+                        
+                    }
+                    
+                }
+
+                assert ndataServices == this.dataService.length;
+                
+                this.ndataServices = ndataServices;
+                
             }
-
+            
         }
 
     }
@@ -359,26 +437,38 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         
         }
 
-        // true if temp files are being requested.
-        final boolean createTempFile = Boolean.parseBoolean(properties
-                .getProperty(Options.CREATE_TEMP_FILE,
-                        ""+Options.DEFAULT_CREATE_TEMP_FILE));
-        
         /*
          * Start the metadata service.
          */
         {
 
-            Properties p = new Properties(properties);
+            final Properties p = new Properties(properties);
             
-            // name of the metadata journal.
-            if (!createTempFile) {
-                p.setProperty(Options.FILE, new File(dataDir, metadataBasename
-                        + Options.JNL).toString());
+            final UUID serviceUUID = UUID.randomUUID();
+
+            final File serviceDir = new File(dataDir, serviceUUID.toString());
+
+            serviceDir.mkdirs();
+
+            /*
+             * Create ".mds" file to mark this as the metadata service
+             * directory.
+             */
+            try {
+
+                new RandomAccessFile(new File(serviceDir, ".mds"), "rw")
+                        .close();
+
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
+
             }
-            
-            metadataService = new EmbeddedMetadataService(this, UUID
-                    .randomUUID(), p);
+
+            p.setProperty(Options.FILE, new File(serviceDir, "journal"
+                    + Options.JNL).toString());
+                   
+            metadataService = new EmbeddedMetadataService(this, serviceUUID, p);
             
         }
         
@@ -391,35 +481,20 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
             for (int i = 0; i < ndataServices; i++) {
 
-                Properties p = new Properties(properties);
+                final Properties p = new Properties(properties);
 
-                // name of the data journal.
-                if (!createTempFile) {
-                    p.setProperty(Options.FILE, new File(dataDir, dataBasename
-                            + "_" + i + Options.JNL).toString());
-                }
-                
-                dataService[i] = new EmbeddedDataService(UUID
-                        .randomUUID(), p);
-                
-                final UUID serviceUUID;
-                
-                try {
-                    
-                    serviceUUID = dataService[i].getServiceUUID();
-                
-                } catch(IOException ex) {
-                    
-                    /*
-                     * Note: IOException is declared for RMI
-                     * compatability, but the embedded federation does
-                     * not use RMI.
-                     */
+                final UUID serviceUUID = UUID.randomUUID();
 
-                    throw new RuntimeException(ex);
-                    
-                }
-                
+                final File serviceDir = new File(dataDir, serviceUUID
+                        .toString());
+
+                serviceDir.mkdirs();
+
+                p.setProperty(Options.FILE, new File(serviceDir, "journal"
+                        + Options.JNL).toString());
+
+                dataService[i] = new EmbeddedDataService(serviceUUID, p);
+
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
 
             }

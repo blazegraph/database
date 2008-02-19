@@ -88,17 +88,26 @@ public abstract class AbstractTask implements Callable<Object> {
     private final AtomicBoolean submitted = new AtomicBoolean(false);
     
     /**
+     * The live journal.
+     */
+    private final ConcurrentJournal journal;
+    
+    /**
      * The journal against which the operation will be carried out.
      * <p>
      * Note: This exposes unconstrained access to the journal that could be used
      * to violate the concurrency control mechanisms, therefore you SHOULD NOT
-     * use this field unless you have a clear idea what you are about. You
-     * should be able to write all application level tasks in terms of
+     * use this unless you have a clear idea what you are about. You should be
+     * able to write all application level tasks in terms of
      * {@link #getIndex(String)} and operations on the returned index. Using
      * {@link SequenceTask} you can combine application specific unisolated
      * write tasks with tasks that add or drop indices into atomic operations.
      */
-    protected final ConcurrentJournal journal;
+    protected final AbstractJournal getLiveJournal() {
+        
+        return journal;
+        
+    }
 
     /**
      * The transaction identifier -or- {@link ITx#UNISOLATED} IFF the operation

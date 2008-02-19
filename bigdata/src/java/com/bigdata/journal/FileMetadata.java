@@ -128,6 +128,16 @@ public class FileMetadata {
     final boolean readOnly;
 
     /**
+     * The timestamp from the createTime field in the root block.
+     */
+    final long createTime;
+    
+    /**
+     * The timestamp from the closeTime field in the root block.
+     */
+    final long closeTime;
+    
+    /**
      * Offset of the first root block in the file.
      */
     static final int OFFSET_ROOT_BLOCK0 = SIZE_MAGIC + SIZE_VERSION;
@@ -213,9 +223,13 @@ public class FileMetadata {
      *            encode the byte offset as an unsigned integer. The remaining
      *            bits are used to encode the byte count (aka record length) as
      *            an unsigned integer.
+     * @param createTime
+     *            The create time to be assigned to the root block iff a new
+     *            file is created.
      * @param validateChecksum
      *            When true, the checksum stored in the root blocks of an
-     *            existing file will be validated when the file is opened.  See {@link Options}
+     *            existing file will be validated when the file is opened. See
+     *            {@link Options}
      * @param checker
      *            The object used to compute the checksum of the root blocks.
      * @throws RuntimeException
@@ -226,7 +240,7 @@ public class FileMetadata {
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
             ForceEnum forceWrites, int offsetBits, boolean validateChecksum,
-            ChecksumUtility checker) throws RuntimeException {
+            long createTime, ChecksumUtility checker) throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -303,7 +317,7 @@ public class FileMetadata {
             /*
              * Open/create the file.
              */
-            this.raf = openFile(file,fileMode,bufferMode); 
+            this.raf = openFile(file, fileMode, bufferMode); 
                 
             if (exists) {
     
@@ -408,6 +422,18 @@ public class FileMetadata {
                  * written.
                  */
                 this.nextOffset = rootBlock.getNextOffset();
+                
+                this.createTime = rootBlock.getCreateTime();
+
+                this.closeTime = rootBlock.getCloseTime();
+                
+                if (closeTime != 0L && !readOnly) {
+
+                    throw new RuntimeException(
+                            "Journal is closed for writes: closedTime="
+                                    + closeTime);
+                    
+                }
                 
                 switch (bufferMode) {
                 case Direct: {
@@ -526,15 +552,21 @@ public class FileMetadata {
                 final long lastCommitTime = 0L;
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
-                final UUID uuid = UUID.randomUUID();
+                final UUID uuid = UUID.randomUUID(); // journal's UUID.
+                if(createTime == 0L) {
+                    throw new IllegalArgumentException("Create time may not be zero.");
+                }
+                this.createTime = createTime;
+                this.closeTime = 0L;
                 IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                         nextOffset, firstCommitTime, lastCommitTime,
                         commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                        uuid, checker);
+                        uuid, createTime, closeTime, checker);
                 IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
                         lastCommitTime, commitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, uuid, checker);
+                        commitRecordIndexAddr, uuid, createTime, closeTime,
+                        checker);
                 FileChannel channel = raf.getChannel();
                 channel.write(rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
                 channel.write(rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);

@@ -446,8 +446,10 @@ abstract public class MetadataService extends DataService implements
                 
                 // override the partition metadata.
                 md.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
-                        separatorKeys[i], pmd,
-                        i + 1 < npartitions ? separatorKeys[i + 1] : null));
+                        separatorKeys[i],// leftSeparator
+                        pmd,//
+                        i + 1 < npartitions ? separatorKeys[i + 1] : null) // rightSeparator
+                    );
                 
                 dataServices[i].registerIndex(DataService
                         .getIndexPartitionName(scaleOutIndexName, pmd.getPartitionId()), md);

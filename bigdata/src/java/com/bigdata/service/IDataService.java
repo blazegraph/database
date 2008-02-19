@@ -154,11 +154,6 @@ import com.bigdata.sparse.SparseRowStore;
  *       might include emitting asynchronous messages. transactional triggers
  *       can have more flexibility since they are under less of a latency
  *       constraint.
- * 
- * @todo add protocol / service version information to this interface and
- *       provide for life switch-over from service version to service version so
- *       that you can update or rollback the installed service versions with
- *       100% uptime.
  */
 public interface IDataService extends IRemoteTxCommitProtocol, Remote {
 

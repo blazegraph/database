@@ -386,6 +386,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Return some "statistics" about the btree.
      * 
      * @todo fold in {@link #getUtilization()} here.
+     * 
+     * @todo use an object or XML to send this data around with an eye towards
+     *       telemetry for the distributed database.
      */
     public String getStatistics() {
         

@@ -34,6 +34,8 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.journal.Journal;
 
 
 /**
@@ -60,6 +62,30 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
         
     }
     
+    /**
+     * 
+     * @param partId
+     *            The unique partition identifier assigned by the
+     *            {@link MetadataIndex}.
+     * @param dataServices
+     *            The ordered array of data service identifiers on which data
+     *            for this partition will be written and from which data for
+     *            this partition may be read.
+     * @param resources
+     *            A description of each {@link Journal} or {@link IndexSegment}
+     *            resource associated with that partition. The entries in the
+     *            array reflect the creation time of the resources. The earliest
+     *            resource is listed first. The most recently created resource
+     *            is listed last.
+     * @param leftSeparatorKey
+     *            The first key that can enter this index partition. The left
+     *            separator key for the first index partition is always
+     *            <code>new byte[]{}</code>. The left separator key MAY NOT
+     *            be <code>null</code>.
+     * @param rightSeparatorKey
+     *            The first key that is excluded from this index partition or
+     *            <code>null</code> iff there is no upper bound.
+     */
     public PartitionMetadataWithSeparatorKeys(int partitionId,
             UUID[] dataServices, IResourceMetadata[] resources,
             byte[] leftSeparatorKey, byte[] rightSeparatorKey) {

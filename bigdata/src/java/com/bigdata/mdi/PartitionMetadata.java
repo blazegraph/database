@@ -82,15 +82,6 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     }
 
     /**
-     * @deprecated this is used by the test suite only.
-     */
-    public PartitionMetadata(int partId, UUID[] dataServices ) {
-
-        this(partId, dataServices, new IResourceMetadata[] {});
-
-    }
-
-    /**
      * 
      * @param partId
      *            The unique partition identifier assigned by the
@@ -101,10 +92,18 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
      *            this partition may be read.
      * @param resources
      *            A description of each {@link Journal} or {@link IndexSegment}
-     *            resource associated with that partition. The entries in the
-     *            array reflect the creation time of the resources. The earliest
-     *            resource is listed first. The most recently created resource
-     *            is listed last.
+     *            resource associated with that partition. The order of the
+     *            resources corresponds to the order in which a fused view of
+     *            the index partition will be read. Reads begin with the most
+     *            "recent" data for the index partition and stop as soon as
+     *            there is a "hit" on one of the resources (including a hit on a
+     *            deleted index entry).
+     *            <p>
+     *            Note: In particular, an index segment created off of a journal
+     *            which continues to be "live" MUST be ordered after the journal
+     *            from which it was derived (and before any other resources).
+     *            This is because subsequent writes on the same index on the
+     *            journal MUST occlude those on the index segment.
      */
     public PartitionMetadata(int partId, UUID[] dataServices,
             IResourceMetadata[] resources) {
@@ -112,8 +111,14 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
         if (dataServices == null)
             throw new IllegalArgumentException();
 
+        if (dataServices.length == 0)
+            throw new IllegalArgumentException("No data services?");
+
         if (resources == null)
             throw new IllegalArgumentException();
+        
+        if (resources.length == 0)
+            throw new IllegalArgumentException("No resources?");
         
         this.partId = partId;
         
@@ -121,20 +126,61 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
         
         this.resources = resources;
 
-        long lastTimestamp = Long.MIN_VALUE;
-
-        for (int i = 0; i < resources.length; i++) {
-
-            final long thisTimestamp = resources[i].getCommitTime();
+        {
             
-            if ( thisTimestamp <= lastTimestamp) {
+            /*
+             * This is the "live" journal.
+             * 
+             * Note: The "live" journal is still available for writes. Index
+             * segments created off of this journal will therefore have a
+             * createTime that is greater than the firstCommitTime of this
+             * journal while being LTE to the lastCommitTime of the journal and
+             * strictly LT the commitTime of any other resource for this index
+             * partition.
+             */
+            
+            // @todo can there be cases where there is no live journal?
+            
+            IResourceMetadata resource = resources[0];
+            
+            if (!(resource instanceof JournalMetadata)) {
 
                 throw new RuntimeException(
-                        "Resources are out of timestamp order @ index=" + i+", lastTimestamp="+lastTimestamp+", this timestamp="+thisTimestamp);
+                        "Expecting a journal as the first resource");
 
             }
+            
+            if (resource.state() != ResourceState.Live) {
+                
+                throw new RuntimeException("Expecting first resource to be "
+                        + ResourceState.Live + ", but is " + resource.state());
+                
+            }
+            
+        }
+        
+        // scan from 1 to n-1 - these are historical resources (non-writable).
+        {
+            
+            long lastTimestamp = Long.MIN_VALUE;
 
-            lastTimestamp = resources[i].getCommitTime();
+            for (int i = 1; i < resources.length; i++) {
+
+                // createTime of the resource.
+                final long thisTimestamp = resources[i].getCreateTime();
+
+                if (thisTimestamp <= lastTimestamp) {
+
+                    throw new RuntimeException(
+                            "Resources are out of timestamp order @ index=" + i
+                                    + ", lastTimestamp=" + lastTimestamp
+                                    + ", this timestamp=" + thisTimestamp);
+
+                }
+
+                lastTimestamp = resources[i].getCreateTime();
+
+            }
             
         }
 
@@ -204,22 +250,22 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
     /**
      * Return only the live resources.
      * 
-     * @return The live resources in order from the oldest to the most recent.
+     * @return The live resources in order.
      */
     public IResourceMetadata[] getLiveResources() {
 
         final int n = getLiveCount();
-        
+
         IResourceMetadata[] a = new IResourceMetadata[n];
-        
+
         int j = 0;
-        
-        for(int i=0; i<resources.length; i++) {
-            
-            if(resources[i].state()==ResourceState.Live) {
-                
+
+        for (int i = 0; i < resources.length; i++) {
+
+            if (resources[i].state() == ResourceState.Live) {
+
                 a[j++] = resources[i];
-                
+
             }
             
         }
@@ -228,34 +274,6 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
         
     }
     
-    /**
-     * Return an ordered array of the filenames for the live index resources.
-     * 
-     * @todo is this only the live {@link IndexSegment} filenames? Who uses this
-     *       information?
-     */
-    public String[] getLiveSegmentFiles() {
-
-        final int n = getLiveCount();
-
-        String[] files = new String[n];
-
-        int k = 0;
-        
-        for (int i = 0; i < resources.length; i++) {
-
-            if (resources[i].state() == ResourceState.Live) {
-
-                files[k++] = resources[i].getFile();
-                
-            }
-
-        }
-
-        return files;
-
-    }
-
     // The hash code of an int is the int.
     public int hashCode() {
         
@@ -412,7 +430,7 @@ public class PartitionMetadata implements IPartitionMetadata, Externalizable {
             
             out.writeLong(resourceUUID.getLeastSignificantBits());
             
-            out.writeLong(rmd.getCommitTime());
+            out.writeLong(rmd.getCreateTime());
 
         }
 

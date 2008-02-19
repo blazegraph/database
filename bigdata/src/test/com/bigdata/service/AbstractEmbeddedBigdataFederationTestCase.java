@@ -100,7 +100,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         client = new EmbeddedBigdataClient(getProperties());
         
         fed = client.connect();
-            
+
         dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
 
         dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
@@ -117,7 +117,8 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
      * Recursively removes any files and subdirectories and then removes the
      * file (or directory) itself.
      * 
-     * @param f A file or directory.
+     * @param f
+     *            A file or directory.
      */
     private void recursiveDelete(File f) {
         

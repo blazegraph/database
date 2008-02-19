@@ -2899,7 +2899,7 @@ public class BigdataRepository implements ContentRepository {
         } else {
 
             /*
-             * Obtain the index view for that historical timestamp or isolated
+             * @todo Obtain the index view for that historical timestamp or isolated
              * by the specified transaction.
              */
 

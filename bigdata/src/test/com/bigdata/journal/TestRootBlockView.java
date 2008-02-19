@@ -64,6 +64,8 @@ public class TestRootBlockView extends TestCase2 {
         super(arg0);
     }
 
+    private final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+    
     /**
      * Constructor correct acceptance stress test.
      */
@@ -80,9 +82,9 @@ public class TestRootBlockView extends TestCase2 {
             final boolean rootBlock0 = r.nextBoolean();
 //            final int segmentId = r.nextInt();
             final boolean anyTransactions = r.nextInt(100)>90;
-            final long firstCommitTime = anyTransactions?NanosecondTimestampFactory.nextNanoTime():0L;
+            final long firstCommitTime = anyTransactions?timestampFactory.nextMillis():0L;
             // note: always greater than or equal to the first transaction timestamp.
-            final long lastCommitTime = anyTransactions?NanosecondTimestampFactory.nextNanoTime():0L;
+            final long lastCommitTime = anyTransactions?timestampFactory.nextMillis():0L;
             // any legal value for offsetBits.
             final int offsetBits = r.nextInt(WormAddressManager.MAX_OFFSET_BITS
                     - WormAddressManager.MIN_OFFSET_BITS)
@@ -93,11 +95,13 @@ public class TestRootBlockView extends TestCase2 {
             final long commitRecordAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final long commitRecordIndexAddr = anyTransactions?TestWormAddressManager.nextNonZeroAddr(r, am,nextOffset):0L;
             final UUID uuid = UUID.randomUUID();
+            final long createTime = timestampFactory.nextMillis();
+            final long closeTime = (r.nextInt(100)<10?(createTime+r.nextInt(10000)):0L);
             
             RootBlockView rootBlock = new RootBlockView(rootBlock0, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, 
                     commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                    uuid, checker);
+                    uuid, createTime, closeTime, checker);
 
             System.err.println("pass=" + i + " of " + nrounds + " : challisField="
                     + rootBlock.getChallisField());
@@ -285,25 +289,25 @@ public class TestRootBlockView extends TestCase2 {
         final long lastCommitTimeOk = 0L;
 //        final long commitTimeOk = 0L;
         //
-        final long firstCommitTimeOk2 = NanosecondTimestampFactory.nextNanoTime();
-        final long lastCommitTimeOk2 = NanosecondTimestampFactory.nextNanoTime();
+        final long firstCommitTimeOk2 = timestampFactory.nextMillis();
+        final long lastCommitTimeOk2 = timestampFactory.nextMillis();
 //        final long commitTimeOk2 = TimestampFactory.nextNanoTime();
         //
-        final long firstCommitTimeBad1 = NanosecondTimestampFactory.nextNanoTime();
+        final long firstCommitTimeBad1 = timestampFactory.nextMillis();
         final long lastCommitTimeBad1 = 0L;
 //        final long commitTimeBad1 = TimestampFactory.nextNanoTime();
         //
         final long firstCommitTimeBad2 = 0L;
-        final long lastCommitTimeBad2 = NanosecondTimestampFactory.nextNanoTime();
+        final long lastCommitTimeBad2 = timestampFactory.nextMillis();
 //        final long commitTimeBad2 = TimestampFactory.nextNanoTime();
         //
-        final long lastCommitTimeBad3 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
-        final long firstCommitTimeBad3 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
+        final long lastCommitTimeBad3 = timestampFactory.nextMillis(); // note: out of order.
+        final long firstCommitTimeBad3 = timestampFactory.nextMillis(); // note: out of order.
 //        final long commitTimeBad3 = TimestampFactory.nextNanoTime();
         //
 //        final long commitTimeBad4 = TimestampFactory.nextNanoTime(); // note: out of order.
-        final long lastCommitTimeBad4 = NanosecondTimestampFactory.nextNanoTime(); // note: out of order.
-        final long firstCommitTimeBad4 = NanosecondTimestampFactory.nextNanoTime();
+        final long lastCommitTimeBad4 = timestampFactory.nextMillis(); // note: out of order.
+        final long firstCommitTimeBad4 = timestampFactory.nextMillis();
         //
         // @todo present bad combinations of {commitCounter, rootsAddr, and commitRecordIndex}.
         //
@@ -322,35 +326,49 @@ public class TestRootBlockView extends TestCase2 {
         final UUID uuidOk = UUID.randomUUID();
         final UUID uuidBad = null;
         //
+        final long createTimeOk = timestampFactory.nextMillis();
+        final long createTimeBad = 0L;
+        //
+        final long closeTimeOk = 0L;
+        final long closeTimeOk2 = createTimeOk + 1;
+        final long closeTimeBad = createTimeOk - 1;
+        //
         final ChecksumUtility checkerOk = new ChecksumUtility();
         final ChecksumUtility checkerBad = null;
         
         // legit.
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
                 lastCommitTimeOk, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
-                uuidOk, checkerOk);
+                uuidOk, createTimeOk, closeTimeOk, checkerOk);
         // legit (firstCommitTimeOk2,lastCommitTimeOk2).
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk2,
                 lastCommitTimeOk2, commitCounterOk, rootsAddrOk, commitRecordIndexOk,
-                uuidOk, checkerOk);
+                uuidOk, createTimeOk, closeTimeOk, checkerOk);
         // legit (rootsAddr2, commitRecordIndex2)
         new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
                 lastCommitTimeOk, commitCounterOk, rootsAddrOk2, commitRecordIndexOk2,
-                uuidOk, checkerOk);
+                uuidOk, createTimeOk, closeTimeOk, checkerOk);
+        // legit (closeTime2)
+        new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                closeTimeOk2, checkerOk);
 
         // bad offsetBits.
         try {
-            new RootBlockView(rootBlock0, offsetBitsBad, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsBad, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsBad2, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsBad2, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -360,41 +378,46 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetBad,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
-                    rootsAddrOk, commitRecordIndexOk,uuidOk, checkerOk);
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
-        
+
         // bad first,last transaction start timestamps and commit timestamp.
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad1,
-                    lastCommitTimeBad1, commitCounterOk, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeBad1, lastCommitTimeBad1, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad2,
-                    lastCommitTimeBad2, commitCounterOk, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeBad2, lastCommitTimeBad2, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad3,
-                    lastCommitTimeBad3, commitCounterOk, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeBad3, lastCommitTimeBad3, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeBad4,
-                    lastCommitTimeBad4, commitCounterOk, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeBad4, lastCommitTimeBad4, commitCounterOk,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -402,17 +425,19 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad commit counter
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterBad, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterBad,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterBad2, rootsAddrOk,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterBad2,
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -420,17 +445,19 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad {commit record, commit record index} combinations.
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrOk2,
-                    commitRecordIndexBad, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrOk2, commitRecordIndexBad, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -440,9 +467,10 @@ public class TestRootBlockView extends TestCase2 {
              * Note: this combination is illegal since the commit record index
              * address is 0L while the commit record addr is defined.
              */
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrOk2,
-                    commitRecordIndexOk, uuidOk, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrOk2, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -450,9 +478,32 @@ public class TestRootBlockView extends TestCase2 {
 
         // bad UUID.
         try {
-            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk, firstCommitTimeOk,
-                    lastCommitTimeOk, commitCounterOk, rootsAddrBad,
-                    commitRecordIndexOk2, uuidBad, checkerOk);
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidBad, createTimeOk,
+                    closeTimeOk, checkerOk);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+
+        // bad createTime.
+        try {
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidBad, createTimeBad,
+                    closeTimeOk, checkerOk);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            System.err.println("Ignoring expected exception: " + ex);
+        }
+
+        // bad closeTime.
+        try {
+            new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
+                    firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
+                    rootsAddrBad, commitRecordIndexOk2, uuidBad, createTimeOk,
+                    closeTimeBad, checkerOk);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
@@ -462,12 +513,13 @@ public class TestRootBlockView extends TestCase2 {
         try {
             new RootBlockView(rootBlock0, offsetBitsOk, nextOffsetOk,
                     firstCommitTimeOk, lastCommitTimeOk, commitCounterOk,
-                    rootsAddrOk, commitRecordIndexOk,uuidOk, checkerBad);
+                    rootsAddrOk, commitRecordIndexOk, uuidOk, createTimeOk,
+                    closeTimeOk, checkerBad);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expected exception: " + ex);
         }
-        
+
     }
 
 }

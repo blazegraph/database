@@ -382,7 +382,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
             for (int i = 0; i < resource.length; i++) {
 
-                indices[i] = journal.getIndex(resource[i]);
+                indices[i] = getLiveJournal().getIndex(resource[i]);
 
                 if (btrees.put(indices[i], Thread.currentThread()) != null) {
 

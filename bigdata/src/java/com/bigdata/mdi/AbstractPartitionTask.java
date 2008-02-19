@@ -128,7 +128,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
 //        }
 //        
 
-        File parent = journal.getFile().getParentFile();
+        File parent = getLiveJournal().getFile().getParentFile();
         
         try {
 
@@ -650,7 +650,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             // Build index segment.
             final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
                     outFile, //
-                    journal.tmpDir, //
+                    getLiveJournal().tmpDir, //
                     nentries,//
                     itr, //
                     branchingFactor,//

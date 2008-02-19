@@ -387,8 +387,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             
             tasks.add( SequenceTask.newSequence(new AbstractTask[]{
 
-                    new RegisterIndexTask(journal, resource, BTree.create(
-                            journal, new IndexMetadata(resource, indexUUID))),
+                    new RegisterIndexTask(journal, resource, 
+                            new IndexMetadata(resource, indexUUID)),
 
                     new AbstractTask(journal, ITx.UNISOLATED,
                             false/* readOnly */, resource) {

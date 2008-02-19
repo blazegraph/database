@@ -130,7 +130,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
                 
             }
 
-            public long getCommitTime() {
+            public long getCreateTime() {
                 
                 // does not support commit
                 return 0L;
