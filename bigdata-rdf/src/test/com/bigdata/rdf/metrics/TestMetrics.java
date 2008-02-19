@@ -830,7 +830,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
         
         System.err.println(usage);
         
-        ResourceManager.log.warn(usage);
+        log.warn(usage);
 
     }
     

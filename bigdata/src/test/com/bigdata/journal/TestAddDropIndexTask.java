@@ -32,9 +32,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ConcurrentJournal.Options;
 
 /**
@@ -84,10 +83,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            final BTree btree = BTree.create(journal, new IndexMetadata(name, indexUUID));
-            
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, btree));
+                    journal, name, new IndexMetadata(name, indexUUID)));
 
             try {
 
@@ -337,10 +334,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            final BTree btree = BTree.create(journal, new IndexMetadata(name, indexUUID));
-
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, btree));
+                    journal, name, new IndexMetadata(name, indexUUID)));
 
             assertEquals("indexUUID", indexUUID, (UUID) future.get());
 
@@ -369,11 +364,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            final BTree btree = BTree.create(journal, new IndexMetadata(name,
-                    indexUUID));
-
             Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, btree));
+                    journal, name, new IndexMetadata(name, indexUUID)));
 
             // Note: the UUID for the pre-existing index is returned.
             assertEquals("indexUUID", indexUUID, (UUID) future.get());

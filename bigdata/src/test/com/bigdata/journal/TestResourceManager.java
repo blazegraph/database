@@ -214,17 +214,17 @@ public class TestResourceManager extends TestCase2 {
          
             Journal journal = new Journal(properties);
             
-            // commit the journal to assign [firstCommitTime].
-            journal.commit();
+//            // commit the journal to assign [firstCommitTime].
+//            journal.commit();
 
-            // wait for at least one more distinct timestamp to go by.
+            // wait for at least one distinct timestamp to go by.
             journal.nextTimestamp();
 
             journalMetadata1 = journal.getResourceMetadata();
             
             journal.shutdownNow();
             
-            assertTrue(journalMetadata1.getCommitTime() > 0L);
+            assertTrue(journalMetadata1.getCreateTime() > 0L);
             
         }
 
@@ -245,15 +245,15 @@ public class TestResourceManager extends TestCase2 {
          
             Journal journal = new Journal(properties);
             
-            // commit the journal to assign [firstCommitTime].
-            journal.commit();
+//            // commit the journal to assign [firstCommitTime].
+//            journal.commit();
 
             journalMetadata2 = journal.getResourceMetadata();
             
             journal.shutdownNow();
             
-            assertTrue(journalMetadata1.getCommitTime() < journalMetadata2
-                    .getCommitTime());
+            assertTrue(journalMetadata1.getCreateTime() < journalMetadata2
+                    .getCreateTime());
             
         }
 
@@ -329,10 +329,10 @@ public class TestResourceManager extends TestCase2 {
          
             Journal journal = new Journal(properties);
             
-            // commit the journal to assign [firstCommitTime].
-            journal.commit();
+//            // commit the journal to assign [firstCommitTime].
+//            journal.commit();
 
-            // wait for at least one more distinct timestamp to go by.
+            // wait for at one distinct timestamp to go by.
             journal.nextTimestamp();
 
             journalMetadata = journal.getResourceMetadata();
@@ -355,6 +355,7 @@ public class TestResourceManager extends TestCase2 {
 
                     }
 
+                    // commit data on the journal.
                     final long commitTime = journal.commit();
 
                     final File outFile = new File(segmentsDir, "ndx" + i
@@ -375,7 +376,7 @@ public class TestResourceManager extends TestCase2 {
             
             journal.shutdownNow();
             
-            assertTrue(journalMetadata.getCommitTime() > 0L);
+            assertTrue(journalMetadata.getCreateTime() > 0L);
             
         }
 
@@ -454,10 +455,10 @@ public class TestResourceManager extends TestCase2 {
          
             Journal journal = new Journal(properties);
             
-            // commit the journal to assign [firstCommitTime].
-            journal.commit();
+//            // commit the journal to assign [firstCommitTime].
+//            journal.commit();
 
-            // wait for at least one more distinct timestamp to go by.
+            // wait for at one distinct timestamp to go by.
             journal.nextTimestamp();
 
             journalMetadata = journal.getResourceMetadata();
@@ -532,9 +533,17 @@ public class TestResourceManager extends TestCase2 {
                         new UUID[]{//dataService UUIDs
                                 UUID.randomUUID() // 
                         },//
+                        /*
+                         * Note: The journal gets listed first since it can
+                         * continue to receive writes and therefore logically
+                         * comes before the index segment in the resource
+                         * ordering since any writes on the live index on the
+                         * journal will be more recent than the data on the
+                         * index segment.
+                         */
                         new IResourceMetadata[]{// resource metadata[].
                                 journal.getResourceMetadata(),//
-                                segmentMetadata//
+                                segmentMetadata //
                         },//
                         new byte[]{}, // left separator (first valid key)
                         null // right separator (no upper bound)
@@ -564,7 +573,7 @@ public class TestResourceManager extends TestCase2 {
             
             journal.shutdownNow();
             
-            assertTrue(journalMetadata.getCommitTime() > 0L);
+            assertTrue(journalMetadata.getCreateTime() > 0L);
             
         }
 
@@ -621,12 +630,12 @@ public class TestResourceManager extends TestCase2 {
             assertEquals("#sources", 2, sources.length);
 
             // mutable btree on journal is empty.
-            assertEquals(0, sources[0].getEntryCount());
             assertTrue(sources[0] instanceof BTree);
+            assertEquals(0, sources[0].getEntryCount());
 
             // immutable index segment holds all of the data.
-            assertEquals(nentries, sources[1].getEntryCount());
             assertTrue(sources[1] instanceof IndexSegment);
+            assertEquals(nentries, sources[1].getEntryCount());
 
         }
 
@@ -719,6 +728,7 @@ public class TestResourceManager extends TestCase2 {
             
             assertEquals(1, rmgr.getJournalCount());
 
+            // do overflow.
             rmgr.overflow();
 
             assertEquals(2, rmgr.getJournalCount());

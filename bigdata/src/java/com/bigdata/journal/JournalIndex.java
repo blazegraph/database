@@ -255,17 +255,17 @@ public class JournalIndex extends BTree {
         if (resourceMetadata == null)
             throw new IllegalArgumentException();
 
-        final long commitTime = resourceMetadata.getCommitTime();
+        final long createTime = resourceMetadata.getCreateTime();
 
-        if (commitTime == 0L)
+        if (createTime == 0L)
             throw new IllegalArgumentException();
 
-        final byte[] key = getKey(commitTime);
+        final byte[] key = getKey(createTime);
         
         if(super.contains(key)) {
             
             throw new IllegalArgumentException("entry exists: timestamp="
-                    + commitTime);
+                    + createTime);
             
         }
         

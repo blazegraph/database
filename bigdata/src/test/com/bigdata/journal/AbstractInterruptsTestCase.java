@@ -235,7 +235,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             ndx.write();
             
             // force flush of store to disk.
-            journal.force(true);
+            getLiveJournal().force(true);
 
             } catch(Exception ex) {
 

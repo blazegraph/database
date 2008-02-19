@@ -74,6 +74,9 @@ public class TestAll extends TestCase {
         // test range iterators (within and across index partitions).
         suite.addTestSuite( TestRangeQuery.class );
         
+        // test ability to re-open an embedded federation.
+        suite.addTestSuite( TestRestartSafe.class );
+        
         /*
          * Stress test of concurrent clients writing on a single data service.
          */

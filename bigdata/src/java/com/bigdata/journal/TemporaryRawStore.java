@@ -385,6 +385,9 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         // The store is never pre-existing so we do not have a checksum to validate.
         final boolean validateChecksum = false;
         
+        // the local system time.
+        final long createTime = System.currentTimeMillis();
+        
         // We still need an object to compute the checksum to be stored in the root blocks.
         final ChecksumUtility checker = new ChecksumUtility();
         
@@ -394,7 +397,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         FileMetadata fileMetadata = new FileMetadata(file, BufferMode.Disk,
                 useDirectBuffers, initialExtent, maximumDiskExtent, create,
                 isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                getOffsetBits(), validateChecksum, checker);
+                getOffsetBits(), validateChecksum, createTime, checker);
         
         // Open the disk-based store file.
         DiskOnlyStrategy diskBuf = new DiskOnlyStrategy(Bytes.gigabyte * 2,

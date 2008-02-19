@@ -41,21 +41,14 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
-import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.io.ByteBufferInputStream;
-import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrentJournal;
 import com.bigdata.journal.DropIndexTask;
@@ -81,7 +74,7 @@ import com.bigdata.rawstore.IBlock;
  * 
  * @see DataServer, which is used to start this service.
  * 
-@todo The data service should redirect clients if an index partition has been
+ * @todo The data service should redirect clients if an index partition has been
  *       moved (shed) while a client has a lease.
  * 
  * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
@@ -385,10 +378,8 @@ abstract public class DataService implements IDataService,
             if (metadata == null)
                 throw new IllegalArgumentException();
 
-            // @todo defer create until inside the RegisterIndexTask?
-            BTree btree = BTree.create(journal, metadata);
-
-            journal.submit(new RegisterIndexTask(journal, name, btree)).get();
+            journal.submit(new RegisterIndexTask(journal, name, metadata))
+                    .get();
         
         } finally {
             
@@ -407,8 +398,6 @@ abstract public class DataService implements IDataService,
         
             journal.submit(new DropIndexTask(journal, name)).get();
 
-//            journal.dropIndex(name);
-        
         } finally {
             
             clearLoggingContext();
@@ -464,134 +453,6 @@ abstract public class DataService implements IDataService,
         }
         
     }
-
-//    /**
-//     * @todo modify to allow vals[] as null when index does not use values to
-//     *       save on network IO.
-//     */
-//    public byte[][] batchInsert(long tx, String name, int ntuples,
-//            byte[][] keys, byte[][] vals, boolean returnOldValues)
-//            throws IOException, InterruptedException, ExecutionException {
-//
-//        setupLoggingContext();
-//
-//        try {
-//
-//            BatchInsert op = new BatchInsert(ntuples, keys, vals);
-//    
-//            batchOp(tx, name, op);
-//    
-//            return returnOldValues ? (byte[][]) op.values : null;
-//
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//            
-//    }
-//
-//    public boolean[] batchContains(long tx, String name, int ntuples,
-//            byte[][] keys) throws IOException, InterruptedException,
-//            ExecutionException {
-//
-//        setupLoggingContext();
-//        
-//        try {
-//
-//            BatchContains op = new BatchContains(ntuples, keys, new boolean[ntuples]);
-//            
-//            batchOp( tx, name, op );
-//    
-//            return op.contains;
-//            
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//        
-//    }
-//    
-//    public byte[][] batchLookup(long tx, String name, int ntuples, byte[][] keys)
-//            throws IOException, InterruptedException, ExecutionException {
-//
-//        setupLoggingContext();
-//        
-//        try {
-//
-//            BatchLookup op = new BatchLookup(ntuples,keys,new byte[ntuples][]);
-//            
-//            batchOp(tx, name, op);
-//            
-//            return (byte[][])op.values;
-//
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//
-//    }
-//    
-//    public byte[][] batchRemove(long tx, String name, int ntuples,
-//            byte[][] keys, boolean returnOldValues) throws IOException,
-//            InterruptedException, ExecutionException {
-//        
-//        setupLoggingContext();
-//        
-//        try {
-//        
-//            BatchRemove op = new BatchRemove(ntuples,keys,new byte[ntuples][]);
-//            
-//            batchOp(tx, name, op);
-//            
-//            return returnOldValues ? (byte[][])op.values : null;
-//        
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//
-//    }
-//    
-//    /**
-//     * Executes a batch operation on a named btree.
-//     * 
-//     * @param tx
-//     *            The transaction identifier -or- zero (0L) IFF the operation is
-//     *            NOT isolated by a transaction.
-//     * @param name
-//     *            The index name (required).
-//     * @param op
-//     *            The batch operation.
-//     * 
-//     * @exception InterruptedException
-//     *                if the operation was interrupted (typically by
-//     *                {@link #shutdownNow()}.
-//     * @exception ExecutionException
-//     *                If the operation caused an error. See
-//     *                {@link ExecutionException#getCause()} for the underlying
-//     *                error.
-//     */
-//    protected void batchOp(long tx, String name, IBatchOperation op)
-//            throws InterruptedException, ExecutionException {
-//        
-//        if( name == null ) throw new IllegalArgumentException();
-//        
-//        if( op == null ) throw new IllegalArgumentException();
-//        
-//        final boolean isolated = tx != 0L;
-//        
-//        final boolean readOnly = (op instanceof IReadOnlyOperation)
-//                || (isolated && isReadOnly(tx));
-//
-//        // submit the task and wait for it to complete.
-//
-//        journal.submit(new BatchTask(journal, tx, readOnly, name, op)).get();
-//        
-//    }    
     
     public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException {
@@ -615,27 +476,6 @@ abstract public class DataService implements IDataService,
 
     }
 
-//    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-//            throws InterruptedException, ExecutionException {
-//
-//        setupLoggingContext();
-//        
-//        try {
-//
-//            final RangeCountTask task = new RangeCountTask(journal, tx, name, fromKey, toKey);
-//
-//            // submit the task and wait for it to complete.
-//            
-//            return (Long) journal.submit(task).get();
-//
-//        } finally {
-//            
-//            clearLoggingContext();
-//            
-//        }
-//
-//    }
-    
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IEntryFilter filter)
             throws InterruptedException, ExecutionException {
@@ -659,125 +499,6 @@ abstract public class DataService implements IDataService,
         }
             
     }
-
-//    /**
-//     * Abstract class for tasks that execute batch api operations. There are
-//     * various concrete subclasses, each of which MUST be submitted to the
-//     * appropriate service for execution.
-//     * <p>
-//     * Note: While this does verify that the first/last key are inside of the
-//     * specified index partition, it does not verify that the keys are sorted -
-//     * this is the responsibility of the client. Therefore it is possible that
-//     * an incorrect client providing unsorted keys could execute an operation
-//     * that read or wrote data on the data service that lay outside of the
-//     * indicated partitionId.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static protected class BatchTask extends AbstractTask {
-//        
-//        private final IBatchOperation op;
-//        
-//        public BatchTask(ConcurrentJournal journal, long startTime,
-//                boolean readOnly, String name, IBatchOperation op) {
-//
-//            super(journal, startTime, readOnly, name);
-//            
-//            if (op == null)
-//                throw new IllegalArgumentException();
-//            
-//            this.op = op;
-//            
-//        }
-//        
-//        final protected Object doTask() throws Exception {
-//        
-//            IIndexWithCounter ndx = getIndex(getOnlyResource());
-//            
-//            final int ntuples = op.getTupleCount();
-//            
-//            final byte[][] keys = op.getKeys();
-//
-//            if(ndx instanceof UnisolatedBTreePartition) {
-//
-//                /*
-//                 * If this is an index partition, then test the keys against the
-//                 * separator keys for the partition. All client keys must lie
-//                 * within the partition ( left <= key < right ).
-//                 * 
-//                 * @todo this is not verifying the partition unless we are doing
-//                 * a write since otherwise we do not see the
-//                 * UnisolatedBTreePartition class directly but rather some
-//                 * wrapper object.
-//                 */
-//             
-//                ((UnisolatedBTreePartition)ndx).rangeCheck(keys[0]);
-//                
-//                ((UnisolatedBTreePartition)ndx).rangeCheck(keys[ntuples-1]);
-//
-//            }
-//            
-//            if( op instanceof BatchContains ) {
-//
-//                ndx.contains((BatchContains) op);
-//                
-//            } else if( op instanceof BatchLookup ) {
-//
-//                ndx.lookup((BatchLookup) op);
-//
-//            } else if( op instanceof BatchInsert ) {
-//
-//                ndx.insert((BatchInsert) op);
-//
-//            } else if( op instanceof BatchRemove ) {
-//
-//                ndx.remove((BatchRemove) op);
-//
-//            } else {
-//
-//                /*
-//                 * Extension batch mutation operation.
-//                 */ 
-//
-//                op.apply(ndx);
-//                
-//            }
-//            
-//            return null;
-//            
-//        }
-//        
-//    }
-
-//    /**
-//     * Task for running a rangeCount operation.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static protected class RangeCountTask extends AbstractTask {
-//
-//        private final byte[] fromKey;
-//        private final byte[] toKey;
-//        
-//        public RangeCountTask(ConcurrentJournal journal,long startTime, String name,
-//                byte[] fromKey, byte[] toKey) {
-//            
-//            super(journal,startTime,true/*readOnly*/,name);
-//            
-//            this.fromKey = fromKey;
-//            this.toKey = toKey;
-//            
-//        }
-//
-//        public Object doTask() throws Exception {
-//            
-//            return new Long(getIndex(getOnlyResource()).rangeCount(fromKey, toKey));
-//            
-//        }
-//        
-//    }
 
     /**
      * Task for running a rangeIterator operation.

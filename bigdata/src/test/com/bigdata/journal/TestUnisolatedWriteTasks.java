@@ -113,8 +113,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                 
                 new RegisterIndexTask(journal, //
                                 resource[0],//
-                                BTree.create(journal, new IndexMetadata(
-                                        resource[0], indexUUID))),
+                                new IndexMetadata(resource[0], indexUUID)),
                 
                 new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
 
@@ -253,13 +252,11 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         // submit task to create index and do batch insert on that index.
         journal.submit(SequenceTask.newSequence(new AbstractTask[]{
                 
-                new RegisterIndexTask(journal, resource[0], BTree
-                                .create(journal, new IndexMetadata(resource[0],
-                                        indexUUID1))),
+                new RegisterIndexTask(journal, resource[0], //
+                        new IndexMetadata(resource[0], indexUUID1)),
 
-                        new RegisterIndexTask(journal, resource[1], BTree
-                                .create(journal, new IndexMetadata(resource[1],
-                                        indexUUID2))),
+                        new RegisterIndexTask(journal, resource[1], //
+                                new IndexMetadata(resource[1], indexUUID2)),
                 
                 new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
 
@@ -512,10 +509,10 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                         
                         for(int i=0; i<nindices; i++) {
                             
-                            journal.registerIndex(//
+                            getLiveJournal().registerIndex(//
                                     indices[i].name,//
                                     BTree.create(//
-                                            journal,//
+                                            getLiveJournal(),//
                                             new IndexMetadata(indices[i].name,indices[i].indexUUID)
                                     ));
                             

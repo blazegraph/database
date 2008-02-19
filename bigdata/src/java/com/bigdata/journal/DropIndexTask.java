@@ -59,7 +59,7 @@ public class DropIndexTask extends AbstractTask {
 
         try {
 
-            journal.dropIndex(name);
+            getLiveJournal().dropIndex(name);
 
         } catch (NoSuchIndexException ex) {
 

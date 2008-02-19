@@ -25,7 +25,6 @@ package com.bigdata.mdi;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.journal.Journal;
@@ -75,17 +74,29 @@ public interface IResourceMetadata {
     public UUID getUUID();
     
     /**
-     * The commit time associated with the described index. When the index is an
-     * {@link IndexSegment} this is the commit time of the view from which that
-     * {@link IndexSegment} was generated. When the index is a {@link BTree} on
-     * a {@link Journal}, the commit time is the commit time associated with
-     * the {@link BTree} revision of interest. The use of commit times for index
-     * revisions on the {@link Journal} is required in order to identify the
-     * specific {@link BTree} revision of interest for some view when it is
-     * other than the most recent revision of that {@link BTree}. This
-     * facilites certain kinds of overflow operations.
+     * The commit time associated with the creation of this resource. When the
+     * index is an {@link IndexSegment} this is the commit time of the view from
+     * which that {@link IndexSegment} was generated. When the resource is a
+     * {@link Journal}, the create time is the commit time associated with the
+     * journal creation, which is generally an overflow operation. Regardless,
+     * the create time MUST be assigned by the same time source that is used to
+     * assign commit timestamps.
      */
-    public long getCommitTime();
+    public long getCreateTime();
+    
+//    * The use of commit times for index revisions on the {@link Journal} is
+//    * required in order to identify the specific {@link BTree} revision of
+//    * interest for some view when it is other than the most recent revision of
+//    * that {@link BTree}. This facilites certain kinds of overflow operations.
+//    /**
+//     * The commit time for the index view. This is always the same as the
+//     * {@link #getCreateTime()} for an {@link IndexSegment}. However, a
+//     * {@link Journal} may have many versions of a {@link BTree} and this field
+//     * identifies which version is in use by the view.
+//     * 
+//     * @return
+//     */
+//    public long getCommitTime();
     
     /**
      * The hash code of the {@link #getUUID() resource UUID}.

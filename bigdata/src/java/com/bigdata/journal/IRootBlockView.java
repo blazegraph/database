@@ -198,6 +198,17 @@ public interface IRootBlockView {
     public int getOffsetBits();
     
     /**
+     * The timestamp assigned as the creation time for the journal.
+     */
+    public long getCreateTime();
+    
+    /**
+     * The timestamp assigned as the time at which writes were disallowed for
+     * the journal.
+     */
+    public long getCloseTime();
+    
+    /**
      * A read-only buffer whose contents are the root block. The position,
      * limit, and mark will be independent for each {@link ByteBuffer} that is
      * returned by this method.

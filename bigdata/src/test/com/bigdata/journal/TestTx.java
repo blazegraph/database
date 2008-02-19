@@ -833,7 +833,7 @@ public class TestTx extends ProxyTestCase {
             
         }
         
-        final byte[] id0 = new byte[]{1};
+        final byte[] id0 = new byte[] { 1 };
 
         final byte[] v0 = getRandomData().array();
 
@@ -844,27 +844,27 @@ public class TestTx extends ProxyTestCase {
         journal.getIndex(name).insert(id0, v0);
 
         // data version visible in global scope.
-        assertEquals(v0, (byte[])journal.getIndex(name).lookup(id0));
+        assertEquals(v0, journal.getIndex(name).lookup(id0));
 
         // commit the unisolated write.
         journal.commit();
-        
+
         // start transaction.
         final long tx0 = journal.newTx(IsolationEnum.ReadWrite);
 
         // data version visible in the transaction.
-        assertEquals(v0, (byte[])journal.getIndex(name,tx0).lookup(id0));
+        assertEquals(v0, journal.getIndex(name, tx0).lookup(id0));
 
         // delete version in transaction scope.
-        assertEquals(v0,(byte[])journal.getIndex(name,tx0).remove(id0));
+        assertEquals(v0, journal.getIndex(name, tx0).remove(id0));
 
         // data version still visible in global scope.
         assertTrue(journal.getIndex(name).contains(id0));
-        assertEquals(v0, (byte[])journal.getIndex(name).lookup(id0));
+        assertEquals(v0, journal.getIndex(name).lookup(id0));
 
         // data version not visible in transaction.
-        assertFalse(journal.getIndex(name,tx0).contains(id0));
-        assertNull(journal.getIndex(name,tx0).lookup(id0));
+        assertFalse(journal.getIndex(name, tx0).contains(id0));
+        assertNull(journal.getIndex(name, tx0).lookup(id0));
 
         // commit.
         journal.commit(tx0);

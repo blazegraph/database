@@ -44,14 +44,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
@@ -59,10 +57,8 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
-import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.mdi.ResourceState;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
@@ -670,8 +666,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          */
 
         File file;
-        
-        if(bufferMode==BufferMode.Transient) {
+
+        if (bufferMode == BufferMode.Transient) {
             
             file = null;
             
@@ -719,6 +715,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
          * Create the appropriate IBufferStrategy object.
          */
 
+        final long createTime = Long.parseLong(properties.getProperty(
+                Options.CREATE_TIME, "" + nextTimestamp()));
+        
         switch (bufferMode) {
 
         case Transient: {
@@ -749,13 +748,16 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
             final long commitCounter = 0L;
             final long commitRecordAddr = 0L;
             final long commitRecordIndexAddr = 0L;
-            final UUID uuid = UUID.randomUUID();
+            final UUID uuid = UUID.randomUUID(); // Journal's UUID.
+            final long closedTime = 0L;
             IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, checker);
+                    commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
+                    closedTime, checker);
             IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, checker);
+                    commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
+                    closedTime, checker);
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -775,7 +777,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
                     BufferMode.Direct, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites, offsetBits, validateChecksum,
-                    checker);
+                    createTime, checker);
 
             _bufferStrategy = new DirectBufferStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -796,7 +798,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites, offsetBits, validateChecksum,
-                    checker);
+                    createTime, checker);
 
             /*
              * Note: the maximumExtent is a hard limit in this case only since
@@ -822,7 +824,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
                     BufferMode.Disk, useDirectBuffers, initialExtent,
                     maximumExtent, create, isEmptyFile, deleteOnExit,
                     readOnly, forceWrites, offsetBits, validateChecksum,
-                    checker);
+                    createTime, checker);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata,
@@ -938,6 +940,9 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * Statistics describing the journal including IO, indices, etc.
      * 
      * @todo expose getStatistics on all buffer strategies.
+     * 
+     * @todo use an object or XML to send this data around with an eye to
+     *       telemetry for the distributed database.
      */
     public String getStatistics() {
 
@@ -1035,6 +1040,38 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         ResourceManager.deleteJournal(getFile() == null ? null : getFile()
                 .toString());
 
+    }
+    
+    /**
+     * Sets the "closeTime" on the root block such that the journal will no
+     * longer accept writes and then closes the journal.
+     * <p>
+     * Note: The caller MUST have exclusive access to the journal.
+     * <p>
+     * Note: This does NOT perform a commit - any uncommitted writes will be
+     * discarded.
+     * 
+     * @todo write unit tests for this. Make sure that the journal can not be
+     *       re-opened in a read-write mode (only as a read-only journal).
+     */
+    public void close(long closeTime) {
+        
+        IRootBlockView old = _rootBlock;
+        
+        // Create the final root block.
+        IRootBlockView newRootBlock = new RootBlockView(!old.isRootBlock0(),
+                old.getOffsetBits(), old.getNextOffset(), old
+                        .getFirstCommitTime(), old.getLastCommitTime(), old
+                        .getCommitCounter(), old.getCommitRecordAddr(), old
+                        .getCommitRecordIndexAddr(), old.getUUID(), old
+                        .getCreateTime(), closeTime, checker);
+
+        // write it on the store.
+        _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+
+        // close down the journal.
+        close();
+        
     }
     
     /**
@@ -1508,6 +1545,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
                     !old.isRootBlock0(), old.getOffsetBits(), nextOffset,
                     firstCommitTime, lastCommitTime, newCommitCounter,
                     commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                    old.getCreateTime(), old.getCloseTime(),
                     checker);
 
             _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);

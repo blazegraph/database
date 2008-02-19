@@ -29,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
+import org.apache.log4j.lf5.util.Resource;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
@@ -168,7 +170,16 @@ public interface Options {
      * journal will be created.
      */
     public static final String CREATE = "create";
-        
+
+    /**
+     * <code>createTime</code> - An optional property allowed iff a new
+     * journal is being created whose value is the timestamp to be written in
+     * the {@link IRootBlockView#getCreateTime()} field of the root block. This
+     * is used by the {@link ResourceManager} to place consistent createTime
+     * timestamps on its managed journal resources.
+     */
+    public static final String CREATE_TIME = "createTime";
+    
     /**
      * <code>readOnly</code> - When true, the journal must pre-exist and
      * will be read-only (optional, default is <code>false</code>).

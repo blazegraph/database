@@ -686,7 +686,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 runState.compareAndSet(0, 1);
 
                 // low-level write so there is some data to be committed.
-                journal.write(getRandomData());
+                getLiveJournal().write(getRandomData());
 
                 // wait more before exiting.
                 {
@@ -725,7 +725,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 log.warn("Running task that will force abort of the commit group.");
                 
                 // low-level write.
-                journal.write(getRandomData());
+                getLiveJournal().write(getRandomData());
 
                 throw new PrivateException("Forcing abort of the commit group.");
                 

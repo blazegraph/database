@@ -76,12 +76,6 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  * A client-side view of an index.
  * <p>
  * 
- * @todo change the {@link IDataService} API so that we can provide custom
- *       serialization for the various methods. For example, we are relying on
- *       default marshalling of the arguments for the batch operations. This is
- *       especially bad since the arguments are things like byte[][] and not
- *       IKeyBuffer.
- * 
  * @todo We should be able to transparently use either a hash mod N approach to
  *       distributed index partitions or a dynamic approach based on overflow.
  *       This could even be decided on a per-index basis. The different
@@ -124,10 +118,6 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  *       with the proviso that some cache entries represent missing partition
  *       definitions (aka the lower bounds for known partitions where the left
  *       sibling partition is not known to the client).
- * 
- * @todo offer alternatives for the batch insert and remove methods that do not
- *       return the old values to the client so that the client may opt to
- *       minimize network traffic for data that it does not need.
  * 
  * @todo develop and offer policies for handling index partitions that are
  *       unavailable at the time of the request (continued operation during
@@ -344,7 +334,6 @@ public class ClientIndexView implements IIndex {
                 
                 sb.append("\npartition: " + _name);
                 sb.append("\nresources: " + Arrays.toString(pmd.getResources()));
-                sb.append("\nliveFiles: " + Arrays.toString(pmd.getLiveSegmentFiles()));
                 sb.append("\ndataServices: " + Arrays.toString(pmd.getDataServices()));
                 
                 String _stats;
@@ -595,8 +584,13 @@ public class ClientIndexView implements IIndex {
 
             final IPartitionMetadata pmd = getPartitionAtIndex(index);
 
+            assert pmd != null : "No partition metadata? name=" + name
+                    + " @ index=" + index;
+            
             final IDataService dataService = getDataService(pmd);
         
+            assert dataService != null : "No data service? pmd="+pmd;
+            
             final Split split = new Split(pmd, 0/* fromIndex */, 0/* toIndex */);
             
             tasks.add(new DataServiceProcedureTask(split, dataService,
@@ -1129,67 +1123,32 @@ public class ClientIndexView implements IIndex {
 
         }
 
-        return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
-                (PartitionMetadata) SerializerUtil.deserialize(val),
+        final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil
+                .deserialize(val);
+
+        return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey, pmd,
                 rightSeparatorKey);
 
     }
-
-    //        public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(long tx, String name, int index) {
-    //
-    //            IPartitionMetadata pmd;
-    //
-    //            byte[][] data;
-    //
-    //            try {
-    //                
-    //                data = getMetadataService().getPartitionAtIndex(name, index);
-    //                
-    //                if (data == null)
-    //                    return null;
-    //                
-    //                pmd = (IPartitionMetadata) SerializerUtil.deserialize(data[1]);
-    //                
-    //            } catch(Exception ex) {
-    //                
-    //                throw new RuntimeException(ex);
-    //                
-    //            }
-    //
-    //            return new PartitionMetadataWithSeparatorKeys(data[0],pmd,data[2]);
-    //
-    //        }
-
-    //        private Map<String, Map<Integer, IDataService>> indexCache = new ConcurrentHashMap<String, Map<Integer, IDataService>>(); 
-    //
-    //        synchronized(indexCache) {
-    //      
-    //          Map<Integer,IDataService> partitionCache = indexCache.get(name);
-    //       
-    //          if(partitionCache==null) {
-    //              
-    //              partitionCache = new ConcurrentHashMap<Integer, IDataService>();
-    //              
-    //              indexCache.put(name, partitionCache);
-    //              
-    //          }
-    //          
-    //          IDataService dataService = 
-    //          
-    //      }
 
     /**
      * Resolve the data service to which the index partition is mapped.
      */
     public IDataService getDataService(IPartitionMetadata pmd) {
 
-        final UUID serviceID = pmd.getDataServices()[0];
+        final UUID [] dataServiceUUIDs = pmd.getDataServices();
 
+        assert dataServiceUUIDs.length > 0: "No DataService UUIDs? : pmd="+pmd;
+
+        final UUID serviceUUID = dataServiceUUIDs[0];
+
+        assert serviceUUID != null : "DataService UUID is null? : pmd="+pmd;
+        
         final IDataService dataService;
 
         try {
 
-            dataService = fed.getClient().getDataService(serviceID);
+            dataService = fed.getClient().getDataService(serviceUUID);
 
         } catch (Exception ex) {
 

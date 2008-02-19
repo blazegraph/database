@@ -36,18 +36,23 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
 
-
 /**
+ * Base class for {@link IResourceMetadata} implementations.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 abstract public class AbstractResourceMetadata implements IResourceMetadata, Externalizable {
 
+    static final protected Logger log = Logger
+            .getLogger(AbstractResourceMetadata.class);
+    
     /**
      * The name of the resource file.
      */
@@ -75,7 +80,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
      * a {@link Journal}, the commit time is the commit time associated with
      * the {@link BTree} revision of interest.
      */
-    private long commitTime;
+    private long createTime;
     
     /**
      * De-serialization constructor.
@@ -85,7 +90,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     }
 
     protected AbstractResourceMetadata(String filename, long nbytes,
-            ResourceState state, UUID uuid, long commitTime) {
+            ResourceState state, UUID uuid, long createTime) {
 
         if (filename == null || state == null || uuid == null)
             throw new IllegalArgumentException();
@@ -94,9 +99,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
             throw new IllegalArgumentException(
                     "Store file size is non-positive");
 
-        if (commitTime == 0L)
-            throw new IllegalArgumentException("Commit time is zero?");
-        
         this.filename = filename;
         
         this.nbytes = nbytes;
@@ -105,8 +107,16 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
         this.uuid = uuid;
 
-        this.commitTime = commitTime;
+        this.createTime = createTime;
         
+        if (createTime == 0L) {
+          
+            throw new IllegalArgumentException("Create time is zero? : " + this);
+          
+//          log.warn("Commit time is zero: "+this);
+          
+      }
+      
     }
 
     final public int hashCode() {
@@ -137,7 +147,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
 
         if (uuid.equals(o.getUUID()) && filename.equals(o.getFile())
                 && nbytes == o.size() && state == o.state()
-                && commitTime == o.getCommitTime()) {
+                && createTime == o.getCreateTime()) {
 
             return true;
             
@@ -171,9 +181,9 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
     }
 
-    final public long getCommitTime() {
+    final public long getCreateTime() {
         
-        return commitTime;
+        return createTime;
         
     }
     
@@ -192,7 +202,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
         uuid = new UUID(in.readLong(),in.readLong());
         
-        commitTime = in.readLong();
+        createTime = in.readLong();
         
         filename = in.readUTF();
         
@@ -210,7 +220,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
 
         out.writeLong(uuid.getLeastSignificantBits());
 
-        out.writeLong(commitTime);
+        out.writeLong(createTime);
         
         out.writeUTF(filename);
         
@@ -226,7 +236,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         ", state="+state()+
         ", filename="+getFile()+
         ", uuid="+getUUID()+
-        ", commitTime="+getCommitTime()+
+        ", createTime="+getCreateTime()+
         "}";
         
     }

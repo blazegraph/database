@@ -599,7 +599,7 @@ public class IsolatedFusedView extends FusedView {
          * objects and see both deleted and undeleted entries.
          */
         final IEntryIterator itr = writeSet.rangeIterator(null, null,
-                0/* capacity */, KEYS | VALS/* flags */, null);
+                0/* capacity */, ALL/* flags */, null);
 
         while (itr.hasNext()) {
 

@@ -91,7 +91,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
 
         super(getFileString(journal), journal.getBufferStrategy().getExtent(),
                 state, journal.getRootBlockView().getUUID(), journal
-                        .getRootBlockView().getFirstCommitTime());
+                        .getRootBlockView().getCreateTime());
 
     }
 
