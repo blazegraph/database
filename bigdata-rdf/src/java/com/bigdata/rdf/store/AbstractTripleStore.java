@@ -74,7 +74,7 @@ import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.journal.ConcurrentJournal;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.IJustificationIterator;
@@ -409,8 +409,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * an unisolated index while a thread is writing on that index. Stores based
      * on the {@link IBigdataFederation} or an {@link EmbeddedDataService}
      * automatically inherent the appropriate concurrency controls as would a
-     * store whose index access was intermediated by the executor service of the
-     * {@link ConcurrentJournal}.
+     * store whose index access was intermediated by the executor service of an
+     * {@link IConcurrencyManager}.
      */
     abstract public boolean isConcurrent();
     

@@ -34,31 +34,26 @@ import java.util.UUID;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPSerializer;
-import com.bigdata.btree.IDataSerializer.WrappedValueSerializer;
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.ReadCommittedIndex;
 import com.bigdata.rdf.model.OptimizedValueFactory._Statement;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.DataService;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @todo remove overflow() support - this will become part of the journal API.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class LocalTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
-    protected final /*Master*/Journal store;
+    protected final Journal store;
     
     /**
      * @todo this property is not useful for the {@link LocalTripleStore} since
@@ -474,20 +469,20 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
     }
     
-    /**
-     * @deprecated overflow handling is being moved into the journal.
-     */
-    protected void didOverflow(Object state) {
-        
-        // clear hard references to named indices.
-        ndx_termId = null;
-        ndx_idTerm = null;
-        ndx_freeText = null;
-        ndx_spo = null;
-        ndx_pos = null;
-        ndx_osp = null;
-        
-    }
+//    /**
+//     * @deprecated overflow handling is being moved into the journal.
+//     */
+//    protected void didOverflow(Object state) {
+//        
+//        // clear hard references to named indices.
+//        ndx_termId = null;
+//        ndx_idTerm = null;
+//        ndx_freeText = null;
+//        ndx_spo = null;
+//        ndx_pos = null;
+//        ndx_osp = null;
+//        
+//    }
 
     public String usage(){
         
@@ -646,95 +641,107 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
         }
 
-        private IIndex ndx_termId;
-        private IIndex ndx_idTerm;
-        private IIndex ndx_freeText;
-        private IIndex ndx_spo;
-        private IIndex ndx_pos;
-        private IIndex ndx_osp;
-        private IIndex ndx_just;
+//        private IIndex ndx_termId;
+//        private IIndex ndx_idTerm;
+//        private IIndex ndx_freeText;
+//        private IIndex ndx_spo;
+//        private IIndex ndx_pos;
+//        private IIndex ndx_osp;
+//        private IIndex ndx_just;
 
         public IIndex getTermIdIndex() {
             
-            if(ndx_termId==null) {
-                
-                ndx_termId= new ReadCommittedIndex(db.store,name_termId);
-                
-            }
+//            if (ndx_termId == null) {
+
+            return db.store.getIndex(name_termId, ITx.READ_COMMITTED);
+
+//            }
             
-            return ndx_termId;
+//            return ndx_termId;
             
         }
 
         public IIndex getIdTermIndex() {
         
-            if(ndx_idTerm==null) {
-                
-                ndx_idTerm = new ReadCommittedIndex(db.store,name_idTerm);
-                
-            }
-            
-            return ndx_idTerm;
+            return db.store.getIndex(name_idTerm, ITx.READ_COMMITTED);
+
+//            if(ndx_idTerm==null) {
+//                
+//                ndx_idTerm = new ReadCommittedIndex(db.store,name_idTerm);
+//                
+//            }
+//            
+//            return ndx_idTerm;
 
         }
 
         public IIndex getFullTextIndex() {
-            
-            if(ndx_freeText==null && textIndex) {
-                
-                ndx_freeText= new ReadCommittedIndex(db.store,name_freeText);
-                
-            }
-            
-            return ndx_freeText;
+
+            return db.store.getIndex(name_freeText, ITx.READ_COMMITTED);
+
+//            if(ndx_freeText==null && textIndex) {
+//                
+//                ndx_freeText= new ReadCommittedIndex(db.store,name_freeText);
+//                
+//            }
+//            
+//            return ndx_freeText;
             
         }
 
         public IIndex getSPOIndex() {
 
-            if(ndx_spo ==null) {
-                
-                ndx_spo = new ReadCommittedIndex(db.store,name_spo);
-                
-            }
-            
-            return ndx_spo;
+            return db.store.getIndex(name_spo, ITx.READ_COMMITTED);
+
+//            if(ndx_spo ==null) {
+//                
+//                ndx_spo = new ReadCommittedIndex(db.store,name_spo);
+//                
+//            }
+//            
+//            return ndx_spo;
 
         }
         
         public IIndex getPOSIndex() {
 
-            if(ndx_pos ==null) {
-                
-                ndx_pos = new ReadCommittedIndex(db.store,name_pos);
-                
-            }
-            
-            return ndx_pos;
+            return db.store.getIndex(name_pos, ITx.READ_COMMITTED);
+//
+//            if(ndx_pos ==null) {
+//                
+//                ndx_pos = new ReadCommittedIndex(db.store,name_pos);
+//                
+//            }
+//            
+//            return ndx_pos;
 
         }
 
         public IIndex getOSPIndex() {
 
-            if(ndx_osp ==null) {
-                
-                ndx_osp = new ReadCommittedIndex(db.store,name_osp);
-                
-            }
-            
-            return ndx_osp;
+            return db.store.getIndex(name_osp, ITx.READ_COMMITTED);
+
+//            if(ndx_osp ==null) {
+//                
+//                ndx_osp = new ReadCommittedIndex(db.store,name_osp);
+//                
+//            }
+//            
+//            return ndx_osp;
 
         }
 
         public IIndex getJustificationIndex() {
 
-            if(ndx_just ==null) {
-                
-                ndx_just = new ReadCommittedIndex(db.store,name_just);
-                
-            }
-            
-            return ndx_just;
+            return db.store.getIndex(name_just, ITx.READ_COMMITTED);
+
+//            if(ndx_just ==null) {
+//                
+//                ndx_just = new ReadCommittedIndex(db.store,name_just);
+//                
+//            }
+//            
+//            return ndx_just;
 
         }
 
