@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -371,4 +372,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    /**
+     * @throws UnsupportedOperationException
+     *             since {@link #overflow()} is not supported.
+     */
+    public File getIndexSegmentFile(IndexMetadata indexMetadata) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

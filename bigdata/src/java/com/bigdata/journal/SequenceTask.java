@@ -103,7 +103,7 @@ public class SequenceTask extends AbstractTask {
         
         final IConcurrencyManager concurrencyManager = tasks[0].concurrencyManager;
         
-        final IResourceManager resourceManager = tasks[0].resourceManager;
+        final IResourceManager resourceManager = tasks[0].getResourceManager();
         
         final long startTime = tasks[0].startTime; 
         
@@ -123,7 +123,7 @@ public class SequenceTask extends AbstractTask {
             if (task.concurrencyManager != concurrencyManager)
                 throw new IllegalArgumentException();
 
-            if (task.resourceManager != resourceManager)
+            if (task.getResourceManager() != resourceManager)
                 throw new IllegalArgumentException();
 
             if (task.startTime != startTime)

@@ -106,6 +106,16 @@ public abstract class AbstractTask implements Callable<Object> {
     protected final IResourceManager resourceManager;
     
     /**
+     * The object used to manage access to the resources from which views of the
+     * indices are created.
+     */
+    public final IResourceManager getResourceManager() {
+        
+        return resourceManager;
+        
+    }
+    
+    /**
      * The journal against which the operation will be carried out.
      * <p>
      * If the task is running against an unisolated index, then this will be the

@@ -33,6 +33,7 @@ import java.io.File;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 
@@ -181,4 +182,15 @@ public interface IResourceManager {
      */
     public void delete(long timestamp);
     
+    /**
+     * Return the file on which a new {@link IndexSegment} should be written.
+     * The file will exist but will have zero length.
+     * 
+     * @param indexMetadata
+     *            The index metadata.
+     * 
+     * @return The file.
+     */
+    public File getIndexSegmentFile(IndexMetadata indexMetadata);
+
 }
