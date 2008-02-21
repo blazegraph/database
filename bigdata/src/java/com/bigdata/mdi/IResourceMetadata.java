@@ -35,7 +35,7 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IResourceMetadata {
+public interface IResourceMetadata extends Cloneable {
 
     /**
      * True iff this resource is an {@link IndexSegment}. Each

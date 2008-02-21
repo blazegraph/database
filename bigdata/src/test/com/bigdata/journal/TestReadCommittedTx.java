@@ -27,14 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.util.UUID;
-
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 
 /**
  * Test suite for read-committed transactions.
+ * 
+ * @todo re-write to use {@link ITx#READ_COMMITTED} but not
+ *       {@link ReadCommittedTx}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -157,15 +156,18 @@ public class TestReadCommittedTx extends ProxyTestCase {
 
         final byte[] v1 = new byte[]{1};
 
-        // create a new read-committed transaction.
-        final long ts0 = journal.newTx(IsolationEnum.ReadCommitted);
-
+//        // create a new read-committed transaction.
+//        final long ts0 = journal.newTx(IsolationEnum.ReadCommitted);
+        final long ts0 = ITx.READ_COMMITTED;
+        
         {
             /*
-             * verify that the index is not accessible since it has not been
+             * verify that the index does not exist since it has not been
              * registered.
              */
-            assertNull(journal.getIndex(name,ts0));
+            IIndex ndx = journal.getIndex(name,ts0);
+            
+            assertNull(ndx);
             
         }
         
@@ -221,7 +223,7 @@ public class TestReadCommittedTx extends ProxyTestCase {
         {
             /*
              * commit the journal and verify that the write is now visible to
-             * the read-committed transaction.
+             * the read-committed scope.
              */
 
             journal.commit();
@@ -234,27 +236,32 @@ public class TestReadCommittedTx extends ProxyTestCase {
             
         }
         
-        {
-            /*
-             * verify that the write is also visible in a new read-committed
-             * transaction.
-             */
-            
-            long ts1 = journal.newTx(IsolationEnum.ReadCommitted);
-
-            IIndex ts1_ndx = journal.getIndex(name, ts1);
-
-            assertTrue(ts1_ndx.contains(k1));
-            assertEquals(v1,(byte[])ts1_ndx.lookup(k1));
-            assertEquals(1,ts1_ndx.rangeCount(null, null));
-
-            // should be a nop.
-            assertEquals(0,journal.commit(ts1));
-
-        }
+//        {
+//            /*
+//             * verify that the write is also visible in a new read-committed
+//             * transaction.
+//             */
+//            
+//            long ts1 = journal.newTx(IsolationEnum.ReadCommitted);
+//
+//            IIndex ts1_ndx = journal.getIndex(name, ts1);
+//
+//            assertTrue(ts1_ndx.contains(k1));
+//            assertEquals(v1,(byte[])ts1_ndx.lookup(k1));
+//            assertEquals(1,ts1_ndx.rangeCount(null, null));
+//
+//            // should be a nop.
+//            assertEquals(0,journal.commit(ts1));
+//
+//        }
         
-        // should be a nop.
-        journal.abort(ts0);
+        // should be illegal since this is not a full transaction.
+        try {
+            journal.abort(ts0);
+            fail("Expecting: "+IllegalStateException.class);
+        } catch(IllegalStateException ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
 
         // close and delete the database.
         journal.closeAndDelete();

@@ -1426,10 +1426,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
             }
 
-            if( forceOnCommit != ForceEnum.No ) {
+            if (forceOnCommit != ForceEnum.No) {
 
-                force(forceOnCommit==ForceEnum.ForceMetadata);
-            
+                force(forceOnCommit == ForceEnum.ForceMetadata);
+
             }
 
         }
@@ -1440,6 +1440,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
+        log.debug("wrote root block: "+rootBlock);
+        
         counters.nwriteRootBlock++;
         
     }

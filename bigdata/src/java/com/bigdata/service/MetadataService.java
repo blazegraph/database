@@ -38,8 +38,10 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrentJournal;
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
@@ -159,10 +161,13 @@ abstract public class MetadataService extends DataService implements
             // Note: We need this in order to assert a lock on this resource!
             final String metadataIndexName = MetadataService
                     .getMetadataIndexName(scaleOutIndexName);
+     
+            final AbstractTask task = new RegisterScaleOutIndexTask(
+                    concurrencyManager, resourceManager, metadataIndexName,
+                    metadata, separatorKeys, dataServices);
             
-            final UUID managedIndexUUID = (UUID) journal.submit(
-                    new RegisterScaleOutIndexTask(journal, metadataIndexName,
-                            metadata, separatorKeys, dataServices)).get();
+            final UUID managedIndexUUID = (UUID) concurrencyManager
+                    .submit(task).get();
 
             return managedIndexUUID;
             
@@ -181,9 +186,10 @@ abstract public class MetadataService extends DataService implements
         
         try {
 
-            journal.submit(
-                    new DropScaleOutIndexTask(journal,
-                            getMetadataIndexName(name))).get();
+            final AbstractTask task = new DropScaleOutIndexTask(
+                    concurrencyManager, getMetadataIndexName(name));
+            
+            concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -246,12 +252,12 @@ abstract public class MetadataService extends DataService implements
          *            the index paritions will be auto-assigned to data
          *            services.
          */
-        public RegisterScaleOutIndexTask(ConcurrentJournal journal,
-                String metadataIndexName, final IndexMetadata metadata,
-                byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
+        public RegisterScaleOutIndexTask(ConcurrencyManager concurrencyManager,
+                IResourceManager resourceManager, String metadataIndexName,
+                final IndexMetadata metadata, byte[][] separatorKeys,
+                UUID[] dataServiceUUIDs) {
 
-            super(journal, ITx.UNISOLATED, false/* readOnly */,
-                    metadataIndexName);
+            super(concurrencyManager, ITx.UNISOLATED, metadataIndexName);
 
             if(metadata==null)
                 throw new IllegalArgumentException();
@@ -406,6 +412,8 @@ abstract public class MetadataService extends DataService implements
              * Create the metadata index.
              */
             
+            AbstractJournal journal = getJournal();
+            
             MetadataIndex mdi = MetadataIndex.create(journal,
                     metadataIndexUUID, metadata);
 
@@ -462,9 +470,11 @@ abstract public class MetadataService extends DataService implements
              * Record each partition in the metadata index.
              */
 
-            for(int i=0; i<npartitions; i++) {
+            for (int i = 0; i < npartitions; i++) {
 
-                mdi.put(separatorKeys[i], partitions[i]);
+//                mdi.put(separatorKeys[i], partitions[i]);
+                
+                mdi.insert(separatorKeys[i], SerializerUtil.serialize(partitions[i]));
             
             }
 
@@ -499,10 +509,10 @@ abstract public class MetadataService extends DataService implements
          * @param name
          *            The name of the metadata index for some scale-out index.
          */
-        protected DropScaleOutIndexTask(ConcurrentJournal journal,
+        protected DropScaleOutIndexTask(ConcurrencyManager concurrencyManager,
                 String name) {
             
-            super(journal, ITx.UNISOLATED, false/*readOnly*/, name);
+            super(concurrencyManager, ITx.UNISOLATED, name);
 
         }
 
@@ -541,9 +551,10 @@ abstract public class MetadataService extends DataService implements
                 
                 ITuple tuple = itr.next();
 
+                // @TODO use getValueStream() variant once I resolve problem with stream.
                 IPartitionMetadata pmd = (IPartitionMetadata) SerializerUtil
-//                .deserialize(tuple.getValue());
-                .deserialize(tuple.getValueStream());
+                .deserialize(tuple.getValue());
+//                .deserialize(tuple.getValueStream());
 
                 /*
                  * Drop the index partition.
@@ -572,7 +583,7 @@ abstract public class MetadataService extends DataService implements
             log.info("Dropped "+ndropped+" index partitions for "+name);
 
             // drop the metadata index as well.
-            journal.dropIndex(getOnlyResource());
+            getJournal().dropIndex(getOnlyResource());
             
             return ndropped;
             

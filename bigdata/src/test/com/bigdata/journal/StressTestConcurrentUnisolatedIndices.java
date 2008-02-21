@@ -45,9 +45,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
@@ -227,7 +226,8 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
             String[] resource = tmp.toArray(new String[nlocks]);
             
-            tasks.add(new WriteTask(journal, resource, keyLen, nops, failureRate, btrees));
+            tasks.add(new WriteTask(journal, resource, keyLen, nops,
+                    failureRate, btrees));
 
         }
 
@@ -329,10 +329,10 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("bytesWrittenPerSec", ""+bytesWrittenPerSecond);
         ret.put("tasks/sec", ""+(ncommitted * 1000 / elapsed));
-        ret.put("maxRunning", ""+journal.writeService.getMaxRunning());
-        ret.put("maxPoolSize", ""+journal.writeService.getMaxPoolSize());
-        ret.put("maxLatencyUntilCommit", ""+journal.writeService.getMaxLatencyUntilCommit());
-        ret.put("maxCommitLatency", ""+journal.writeService.getMaxCommitLatency());
+        ret.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
+        ret.put("maxPoolSize", ""+journal.getConcurrencyManager().writeService.getMaxPoolSize());
+        ret.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxLatencyUntilCommit());
+        ret.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitLatency());
 
         System.err.println(ret.toString(true/*newline*/));
         
@@ -352,11 +352,11 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         final Random r = new Random();
         
-        public WriteTask(ConcurrentJournal journal, String[] resource,
-                int keyLen, int nops, double failureRate,
+        public WriteTask(IConcurrencyManager concurrencyManager,
+                String[] resource, int keyLen, int nops, double failureRate,
                 ConcurrentHashMap<IIndex, Thread> btrees) {
 
-            super(journal, ITx.UNISOLATED, false/* readOnly */, resource);
+            super(concurrencyManager, ITx.UNISOLATED, resource);
 
             this.keyLen = keyLen;
             
@@ -382,7 +382,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
             
             for (int i = 0; i < resource.length; i++) {
 
-                indices[i] = getLiveJournal().getIndex(resource[i]);
+                indices[i] = getJournal().getIndex(resource[i]);
 
                 if (btrees.put(indices[i], Thread.currentThread()) != null) {
 
@@ -544,7 +544,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
     /**
      * Additional properties understood by this test.
      */
-    public static interface TestOptions extends Options {
+    public static interface TestOptions extends ConcurrencyManager.Options {
 
         /**
          * The timeout for the test (seconds).

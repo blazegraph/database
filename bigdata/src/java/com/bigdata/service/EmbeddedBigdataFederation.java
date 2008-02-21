@@ -38,10 +38,12 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
@@ -74,7 +76,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
     /**
      * The directory in which the data files will reside.
      */
-    final File dataDir;
+    private final File dataDir;
     
     /**
      * The (in process) {@link MetadataService}.
@@ -158,16 +160,29 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         public static String DEFAULT_NDATA_SERVICES = "2";
         
         /**
-         * <code>data.dir</code> - The property whose value is the name of the
-         * directory under which the data services will store their state (their
-         * service ID, journals, and index segments).
+         * <code>data.dir</code> - The name of the required property whose
+         * value is the name of the directory under which each metadata and data
+         * service will store their state (their journals and index segments).
+         * <p>
+         * Note: A set of subdirectories will be created under the specified
+         * data directory. Those subdirectories will be named by the UUID of the
+         * corresponding metadata or data service. In addition, the subdirectory
+         * corresponding to the metadata service will have a file named ".mds"
+         * to differentiate it from the data service directories. The presence
+         * of that ".mds" file is used to re-start the service as a metadata
+         * service rather than a data service.
+         * <p>
+         * Since a set of subdirectories will be created for the embedded
+         * federation, it is important to give each embedded federation its own
+         * data directory. Otherwise a new federation starting up with another
+         * federation's data directory will attempt to re-start that federation.
          */
         public static final String DATA_DIR = "data.dir";
 
-        /**
-         * The default is the current working directory.
-         */
-        public static final String DEFAULT_DATA_DIR = ".";
+//        /**
+//         * The default is the current working directory.
+//         */
+//        public static final String DEFAULT_DATA_DIR = ".";
         
     }
     
@@ -225,7 +240,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             /*
              * Always do first time startup since there is no persistent state.
              */
-            ndataServices = createFederation(properties);
+            ndataServices = createFederation(properties, isTransient);
 
         } else {
 
@@ -238,7 +253,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 try {
 
                     // create temp file.
-                    dataDir = File.createTempFile("bigdata", "fed", tmpDir);
+                    dataDir = File.createTempFile("bigdata", ".fed", tmpDir);
                     
                     // delete temp file.
                     dataDir.delete();
@@ -257,9 +272,20 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 
             } else {
 
-                dataDir = new File(properties.getProperty(Options.DATA_DIR,
-                        Options.DEFAULT_DATA_DIR));
+//                dataDir = new File(properties.getProperty(Options.DATA_DIR,
+//                        Options.DEFAULT_DATA_DIR));
+                
+                String val = properties.getProperty(Options.DATA_DIR);
+                
+                if (val == null) {
 
+                    throw new RuntimeException("Required property: "
+                            + Options.DATA_DIR);
+                    
+                }
+                
+                dataDir = new File(val);
+                
             }
 
             log.info(Options.DATA_DIR + "=" + dataDir);
@@ -334,7 +360,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 /*
                  * First time startup.
                  */
-                ndataServices = createFederation(properties);
+                ndataServices = createFederation(properties,isTransient);
 
             } else {
                 
@@ -353,8 +379,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
                     final Properties p = new Properties(properties);
 
-                    p.setProperty(Options.FILE, new File(serviceDir, "journal"
-                            + Options.JNL).toString());
+                    p.setProperty(Options.DATA_DIR, serviceDir.toString());
 
                     if(new File(serviceDir,".mds").exists()) {
                         
@@ -413,8 +438,14 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * @param properties
      * 
      * @return The #of created data services.
+     * 
+     * FIXME The embedded federation setup is not correct when transient buffers
+     * are requested. We wind up creating the resource manager files in the
+     * current working directory when we really want the resource manager to
+     * startup with transient journals (and disallow overflow since you can not
+     * re-open a store or even write an index segement).
      */
-    private int createFederation(Properties properties) {
+    private int createFederation(Properties properties, boolean isTransient) {
         
         final int ndataServices;
         
@@ -446,28 +477,32 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
             final UUID serviceUUID = UUID.randomUUID();
 
-            final File serviceDir = new File(dataDir, serviceUUID.toString());
+            if (!isTransient) {
 
-            serviceDir.mkdirs();
+                final File serviceDir = new File(dataDir, serviceUUID
+                        .toString());
 
-            /*
-             * Create ".mds" file to mark this as the metadata service
-             * directory.
-             */
-            try {
+                serviceDir.mkdirs();
 
-                new RandomAccessFile(new File(serviceDir, ".mds"), "rw")
-                        .close();
+                /*
+                 * Create ".mds" file to mark this as the metadata service
+                 * directory.
+                 */
+                try {
 
-            } catch (IOException e) {
+                    new RandomAccessFile(new File(serviceDir, ".mds"), "rw")
+                            .close();
 
-                throw new RuntimeException(e);
+                } catch (IOException e) {
+
+                    throw new RuntimeException(e);
+
+                }
+
+                p.setProperty(Options.DATA_DIR, serviceDir.toString());
 
             }
-
-            p.setProperty(Options.FILE, new File(serviceDir, "journal"
-                    + Options.JNL).toString());
-                   
+            
             metadataService = new EmbeddedMetadataService(this, serviceUUID, p);
             
         }
@@ -485,13 +520,16 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
                 final UUID serviceUUID = UUID.randomUUID();
 
-                final File serviceDir = new File(dataDir, serviceUUID
-                        .toString());
+                if (!isTransient) {
 
-                serviceDir.mkdirs();
+                    final File serviceDir = new File(dataDir, serviceUUID
+                            .toString());
 
-                p.setProperty(Options.FILE, new File(serviceDir, "journal"
-                        + Options.JNL).toString());
+                    serviceDir.mkdirs();
+
+                    p.setProperty(Options.DATA_DIR, serviceDir.toString());
+                    
+                }
 
                 dataService[i] = new EmbeddedDataService(serviceUUID, p);
 
@@ -505,7 +543,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
     
-    public MetadataIndex getMetadataIndex(String name) {
+    public IMetadataIndex getMetadataIndex(String name) {
 
         assertOpen();
 
@@ -514,13 +552,25 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         // The metadata service.
         final MetadataService metadataService = (MetadataService) getMetadataService();
+        
+        // The timestamp for the last commit on the journal.
+        final long timestamp = metadataService.getResourceManager()
+                .getLiveJournal().getRootBlockView().getLastCommitTime();
+        
+        // A historical view of the metadata index as of that timestamp.
+        final AbstractBTree[] sources = metadataService.getResourceManager()
+                .getIndexSources(metadataName, timestamp);
+        
+        if (sources.length != 1) {
+            
+            throw new UnsupportedOperationException(
+                    "Metadata index must not be a view: name=" + name
+                            + ", #sources=" + sources);
+            
+        }
 
-        /*
-         * @todo this is the live metadata index -- it should be a read-only
-         * view according to our method declaration. This must be resolved in
-         * order to support dynamic partitioning.
-         */
-        return (MetadataIndex) metadataService.journal.getIndex(metadataName);
+        // Read only view.
+        return new ReadOnlyMetadataIndexView( sources[0] );
 
     }
     

@@ -79,27 +79,27 @@ public interface IJournal extends IMRMW, IAtomicStore, IIndexManager {
      */
     public IIndex getIndex(String name);
 
-    /**
-     * Return the named index (isolated). Writes will be allowed iff the
-     * transaction is {@link IsolationEnum#ReadWrite}. Writes on the returned
-     * index will be made restart-safe iff the transaction
-     * {@link ITx#commit() commits}.
-     * 
-     * @param name
-     *            The index name.
-     * @param startTime
-     *            The transaction start time, which serves as the unique
-     *            identifier for the transaction.
-     * 
-     * @return The isolated index or <code>null</code> iff there is no index
-     *         registered with that name.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> is <code>null</code>
-     * 
-     * @exception IllegalStateException
-     *                if there is no active transaction with that timestamp.
-     */
-    public IIndex getIndex(String name, long startTime);
-
+//    /**
+//     * Return the named index (isolated). Writes will be allowed iff the
+//     * transaction is {@link IsolationEnum#ReadWrite}. Writes on the returned
+//     * index will be made restart-safe iff the transaction
+//     * {@link ITx#commit() commits}.
+//     * 
+//     * @param name
+//     *            The index name.
+//     * @param startTime
+//     *            The transaction start time, which serves as the unique
+//     *            identifier for the transaction.
+//     * 
+//     * @return The isolated index or <code>null</code> iff there is no index
+//     *         registered with that name.
+//     * 
+//     * @exception IllegalArgumentException
+//     *                if <i>name</i> is <code>null</code>
+//     * 
+//     * @exception IllegalStateException
+//     *                if there is no active transaction with that timestamp.
+//     */
+//    public IIndex getIndex(String name, long startTime);
+//
 }

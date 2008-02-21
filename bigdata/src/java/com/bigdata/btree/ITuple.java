@@ -30,8 +30,9 @@ package com.bigdata.btree;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.rawstore.IBlockStore;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * Interface exposes more direct access to keys and values visited by an
@@ -165,12 +166,21 @@ public interface ITuple {
      *             if the value is <code>null</code>.
      * @throws UnsupportedOperationException
      *             if the index entry is <code>deleted</code>.
+     * 
+     * FIXME There is a problem, presumably with {@link DataOutputBuffer} or
+     * perhaps {@link DataInputBuffer}, that causes reading from this stream to
+     * occasionally throw either an EOF or a UTF exception. I added a
+     * "readLimit" to the {@link DataOutputBuffer} and some more unit tests but
+     * the problem still shows up from time to time, especially when running the
+     * scale-out architecture as it does all of that (de-)serialization for RMI.
+     * Once this issue is fixed callers SHOULD prefer {@link #getValueStream()}
+     * to {@link #getValue()}.
      */
     public DataInputBuffer getValueStream();
     
     /**
-     * Return an object that may be used to perform a streaming read on a large
-     * record from the {@link IBlockStore} that provided this tuple.
+     * Return an object that may be used to perform a streaming read of a large
+     * record from the {@link IRawStore} that provided this tuple.
      * 
      * @param addr
      *            The address of the record.

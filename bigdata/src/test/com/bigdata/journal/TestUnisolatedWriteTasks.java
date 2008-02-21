@@ -115,7 +115,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                                 resource[0],//
                                 new IndexMetadata(resource[0], indexUUID)),
                 
-                new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
+                new AbstractTask(journal,ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
                         
@@ -148,8 +148,8 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
          * Submit task to validate the committed unisolated write on the named
          * index.
          */
-        journal.submit(new AbstractTask(journal, ITx.UNISOLATED,
-                true/* readOnly */, resource) {
+        journal.submit(new AbstractTask(journal, ITx.READ_COMMITTED,
+                resource) {
 
                     protected Object doTask() throws Exception {
 
@@ -258,7 +258,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                         new RegisterIndexTask(journal, resource[1], //
                                 new IndexMetadata(resource[1], indexUUID2)),
                 
-                new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
+                new AbstractTask(journal, ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
 
@@ -318,8 +318,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
          * Submit task to validate the committed unisolated write on the named
          * index.
          */
-        journal.submit(new AbstractTask(journal, ITx.UNISOLATED,
-                true/* readOnly */, resource) {
+        journal.submit(new AbstractTask(journal, ITx.READ_COMMITTED, resource) {
 
                     protected Object doTask() throws Exception {
 
@@ -503,16 +502,16 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         journal.submit(SequenceTask.newSequence(new AbstractTask[]{
                 
                 // register all indices.
-                new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
+                new AbstractTask(journal, ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
                         
                         for(int i=0; i<nindices; i++) {
                             
-                            getLiveJournal().registerIndex(//
+                            getJournal().registerIndex(//
                                     indices[i].name,//
                                     BTree.create(//
-                                            getLiveJournal(),//
+                                            getJournal(),//
                                             new IndexMetadata(indices[i].name,indices[i].indexUUID)
                                     ));
                             
@@ -525,7 +524,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                 },
 
                 // write on all indices.
-                new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,resource) {
+                new AbstractTask(journal, ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
 
@@ -570,8 +569,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
          * index.
          */
         journal.submit(
-                new AbstractTask(journal, ITx.UNISOLATED, true/* readOnly */,
-                        resource) {
+                new AbstractTask(journal, ITx.READ_COMMITTED, resource) {
 
                     // verify the writes on each index.
                     protected Object doTask() throws Exception {

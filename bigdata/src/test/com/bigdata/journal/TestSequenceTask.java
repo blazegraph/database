@@ -92,15 +92,15 @@ public class TestSequenceTask extends ProxyTestCase {
                 
                 new AbstractTask[] {
 
-                new RegisterIndexTask(journal, resource[0], new IndexMetadata(
+                new RegisterIndexTask(journal,resource[0], new IndexMetadata(
                         resource[0], indexUUID)),
                                 
-                new AbstractTask(journal, ITx.UNISOLATED, false/* readOnly */,
-                        resource) {
+                new AbstractTask(journal, ITx.UNISOLATED, resource) {
 
                     /**
-                     * The task just sets a boolean value and returns the name of the
-                     * sole resource. It does not actually read or write on anything.
+                     * The task just sets a boolean value and returns the name
+                     * of the sole resource. It does not actually read or write
+                     * on anything.
                      */
                     protected Object doTask() throws Exception {
 
@@ -173,8 +173,7 @@ public class TestSequenceTask extends ProxyTestCase {
                         resource[0], indexUUID)),
 
 
-                new AbstractTask(journal, ITx.UNISOLATED, false/* readOnly */,
-                        resource) {
+                new AbstractTask(journal, ITx.UNISOLATED, resource) {
 
                     /**
                      * Write on the index that we just created.
@@ -192,8 +191,7 @@ public class TestSequenceTask extends ProxyTestCase {
                 
                 },
                                                 
-                new AbstractTask(journal,
-                        ITx.UNISOLATED, false/*readOnly*/, resource) {
+                new AbstractTask(journal, ITx.UNISOLATED, resource) {
 
                     /**
                      * The task just sets a boolean value and returns the name of the

@@ -631,7 +631,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     final public IResourceMetadata[] getResourceMetadata() {
         
-        return new IResourceMetadata[]{
+        return new IResourceMetadata[] {
           
                 store.getResourceMetadata()
                 
@@ -730,6 +730,16 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     /**
      * The #of entries (aka values) in the {@link AbstractBTree}. This is zero
      * (0) for a new btree.
+     * 
+     * @todo this could be re-defined as the exact entry count if we tracked the
+     *       #of deleted index entries and subtracted that from the total #of
+     *       index entries before returning the result. The #of deleted index
+     *       entries would be stored in the index {@link Checkpoint} record.
+     *       <p>
+     *       Since {@link #getEntryCount()} is also used to give the total #of
+     *       index enties (and we need that feature) so we need to either add
+     *       another method with the appropriate semantics, add a boolean flag,
+     *       or add a method returning the #of deleted entries, etc.
      */
     abstract public int getEntryCount();
 

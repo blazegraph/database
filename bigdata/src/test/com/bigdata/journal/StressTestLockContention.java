@@ -95,8 +95,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         for (int i = 0; i < ntasks; i++) {
 
-            tasks.add(new AbstractTask(journal, ITx.UNISOLATED,
-                    false/* readOnly */, resource) {
+            tasks.add(new AbstractTask(journal, ITx.UNISOLATED,resource) {
 
                 protected Object doTask() throws Exception {
 

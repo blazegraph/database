@@ -43,7 +43,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
@@ -213,10 +212,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       create/update/delete of the same file? a distributed lease-based lock
  *       system derived from jini or built ourselves? Can this be supported with
  *       the historical and not yet purged timestamped metadata for the file?
- * 
- * @todo use {@link IBlockStore} and {@link IBlock} for streamed writes? Make
- *       the read API more stream-based as well? This will only matter if the
- *       underlying {@link IBlockStore} API gets implemented and used.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -2802,7 +2797,7 @@ public class BigdataRepository implements ContentRepository {
      * point. </li>
      * 
      * <li> It is possible to issue transactional read requests, but you must
-     * first open a transaction with an {@link ITransactionManager}. In general
+     * first open a transaction with an {@link ITransactionManagerService}. In general
      * the use of full transactions is discouraged as the
      * {@link BigdataRepository} is designed for high throughput and high
      * concurrency with weaker isolation levels suitable for scale-out

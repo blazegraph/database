@@ -24,15 +24,17 @@
   <!-- compatibility reasons, no leading/trailing newlines and -->
   <!-- 72 character length limit.                              -->
 
-  <shortDescription>bigdata(R)</shortDescription>
+  <shortDescription>bigdata(TM)</shortDescription>
 
   <description>
+
+  <!-- 169 is copyright; 174 is registered mark. -->
 
 <![CDATA[
 
   <p>
 
-	  bigdata&#174; is a scale-out data and computing fabric designed for commodity hardware. 
+	  bigdata&#169; is a scale-out data and computing fabric designed for commodity hardware. 
 
   </p>
   <p>
@@ -250,8 +252,8 @@
   
   <p>
   
-  	  SYSTAP, LLC will offer commercial licenses for customers who either want the
-  	  value add (warrenty, technical support, additional regression testing), who
+  	  SYSTAP, LLC offers commercial licenses for customers who either want the
+  	  value add (warranty, technical support, additional regression testing), who
   	  want to redistribute bigdata with their own commercial products, or who are
   	  not "comfortable" with the GPL license.  For inquiries or further information,
   	  please write <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.

@@ -29,8 +29,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 
-import org.apache.log4j.lf5.util.Resource;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
@@ -379,7 +377,7 @@ public interface Options {
      * The default for the {@link #FORCE_ON_COMMIT} option (file data and
      * metadata are forced).
      */
-    public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.Force;
+    public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.ForceMetadata;
     
     /**
      * The default for the {@link #DOUBLE_SYNC} option (application data is NOT

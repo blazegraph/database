@@ -35,10 +35,9 @@ com.bigdata.Journal}.
 </p>
 
 <p>
-A "reference" for a node of the object index is always an int64 value
+A "reference" for a child node is always an int64 value
 encoding an address in a {@link com.bigdata.rawstore.IRawStore}.
-Those slots are read and written as ByteBuffers.  The {@link
-NodeSerializer} knows how to access and interpret the contents of a
+Those slots are read and written as ByteBuffers.  The {@link com.bigdata.btree.NodeSerializer} knows how to access and interpret the contents of a
 ByteBuffer as an index node with a given branching factor and provides
 for extensible serialization semantics for leaves and values.
 </p>

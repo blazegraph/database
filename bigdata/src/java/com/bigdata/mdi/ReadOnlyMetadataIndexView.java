@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,31 +20,48 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 */
 /*
- * Created on Feb 16, 2007
+ * Created on Feb 20, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.mdi;
 
 import java.util.Iterator;
 
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.DelegateIndex;
+import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IEntryFilter;
+import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.ReadOnlyCounter;
+import com.bigdata.btree.ReadOnlyEntryIterator;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
-import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.Split;
 
 /**
- * A fly-weight wrapper that does not permit write operations and reads
- * through onto an underlying {@link IIndex}.
+ * Implementation disallows writes on the index.
+ * <p>
+ * Note: This is used by the {@link EmbeddedBigdataFederation} to return a
+ * read-only view.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyIndex extends DelegateIndex {
-    
-    public ReadOnlyIndex(IIndex src) {
-        
-        super(src);
+public class ReadOnlyMetadataIndexView extends MetadataIndexView {
+
+    /**
+     * @param delegate
+     */
+    public ReadOnlyMetadataIndexView(AbstractBTree delegate) {
+
+        super(delegate);
         
     }
 

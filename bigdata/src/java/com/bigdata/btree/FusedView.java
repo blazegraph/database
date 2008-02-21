@@ -51,6 +51,15 @@ import com.bigdata.service.Split;
  * still have a binding.
  * </p>
  * 
+ * @todo There is no efficient way to implement the {@link ILinearList} API for
+ *       a fused view. Unlike a range-partitioned view, the keys in a fused view
+ *       may be in any of the source indices. The only way to find the
+ *       {@link ILinearList#keyAt(int)} an index is to use an iterator over the
+ *       fused view and scan until the #of tuples traversed is equal to the
+ *       given index. Likewise, the only way to find the
+ *       {@link ILinearList#indexOf(byte[])} a key is to use an iterator over
+ *       the fused view and scan until the key is matched.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -111,12 +120,12 @@ public class FusedView implements IIndex {
     
     final public AbstractBTree[] getSources() {
 
-        // @todo clone the array to prevent modification?
-        return srcs;
+        // Note: clone the array to prevent modification.
+        return srcs.clone();
         
     }
 
-    final public IResourceMetadata[] getResourceMetadata() {
+    public IResourceMetadata[] getResourceMetadata() {
         
         IResourceMetadata[] resources = new IResourceMetadata[srcs.length];
 
@@ -224,7 +233,7 @@ public class FusedView implements IIndex {
         
     }
 
-    final public IndexMetadata getIndexMetadata() {
+    public IndexMetadata getIndexMetadata() {
         
         return srcs[0].getIndexMetadata();
         
@@ -482,5 +491,5 @@ public class FusedView implements IIndex {
         aggregator.aggregate(result, new Split(null,0,n));
         
     }
-    
+
 }

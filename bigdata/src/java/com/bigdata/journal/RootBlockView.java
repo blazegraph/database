@@ -620,34 +620,34 @@ public class RootBlockView implements IRootBlockView {
         // the value stored in the root block.
         final int storedChecksum = buf.getInt(OFFSET_CHECKSUM);
 
-        if(checker==null) {
+        if (checker == null) {
             
             log.warn("Checksum not validated");
-            
+
             return storedChecksum;
-            
+
         }
 
         // compute the checksum of the root block.
         final int actualChecksum = calcChecksum(checker);
-        
-        if(storedChecksum!=0) {
-            
-            if( storedChecksum != actualChecksum ) {
-                
+
+        if (storedChecksum != 0) {
+
+            if (storedChecksum != actualChecksum) {
+
                 throw new RootBlockException("Checksum error");
-                
+
             }
-            
+
         }
-        
+
         return storedChecksum;
-        
+
     }
 
     /**
-     * Compute the checksum of the root block (excluding only the field including
-     * the checksum value itself).
+     * Compute the checksum of the root block (excluding only the field
+     * including the checksum value itself).
      */
     public int calcChecksum(ChecksumUtility checker) {
         
@@ -677,6 +677,8 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", uuid="+getUUID());
         sb.append(", offsetBits="+getOffsetBits());
         sb.append(", checksum="+getChecksum(null));
+        sb.append(", createTime="+getCreateTime());
+        sb.append(", closeTime="+getCloseTime());
         
         sb.append("}");
         

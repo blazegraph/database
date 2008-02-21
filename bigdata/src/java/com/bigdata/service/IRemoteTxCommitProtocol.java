@@ -32,7 +32,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ITxCommitProtocol;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ValidationError;
 
 /**
@@ -41,7 +41,7 @@ import com.bigdata.journal.ValidationError;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo reconcile API with {@link ITxCommitProtocol} which is declared by
+ * @todo reconcile API with {@link ITransactionManager} which is declared by
  *       {@link AbstractJournal}. I do not want to have IOException on all of
  *       the bigdata interfaces, but you need either that or
  *       {@link RemoteException} for an interface that will be exposed by a jini

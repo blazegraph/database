@@ -38,20 +38,19 @@ package com.bigdata.journal;
  */
 public class DropIndexTask extends AbstractTask {
 
-    public DropIndexTask(ConcurrentJournal journal,String name) {
+    public DropIndexTask(IConcurrencyManager concurrencyManager, String name) {
 
-        super(journal,ITx.UNISOLATED,false/*readOnly*/,name);
+        super(concurrencyManager, ITx.UNISOLATED, name);
 
     }
 
     /**
      * Drop the named index.
-     *  
-     * @return A {@link Boolean} value that is <code>true</code> iff the
-     *         index was pre-existing at the time that this task executed
-     *         and therefore was dropped. <code>false</code> is returned
-     *         iff the index did not exist at the time that this task was
-     *         executed.
+     * 
+     * @return A {@link Boolean} value that is <code>true</code> iff the index
+     *         was pre-existing at the time that this task executed and
+     *         therefore was dropped. <code>false</code> is returned iff the
+     *         index did not exist at the time that this task was executed.
      */
     public Object doTask() throws Exception {
 
@@ -59,7 +58,7 @@ public class DropIndexTask extends AbstractTask {
 
         try {
 
-            getLiveJournal().dropIndex(name);
+            getJournal().dropIndex(name);
 
         } catch (NoSuchIndexException ex) {
 

@@ -31,16 +31,16 @@ import java.util.concurrent.Executors;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.sparse.SparseRowStore;
@@ -128,7 +128,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
 //        }
 //        
 
-        File parent = getLiveJournal().getFile().getParentFile();
+        File parent = getJournal().getFile().getParentFile();
         
         try {
 
@@ -210,7 +210,8 @@ abstract public class AbstractPartitionTask extends AbstractTask {
      * @param name
      *            The index name.
      */
-    public AbstractPartitionTask(Journal journal, String name) {
+    public AbstractPartitionTask(IConcurrencyManager concurrencyManager,
+            String name) {
 
         /*
          * @todo does not have to be unisolated - we can run against a
@@ -218,7 +219,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          * appropriately.
          */
 
-        super(journal, ITx.UNISOLATED, false/* readOnly */, name);
+        super(concurrencyManager, ITx.UNISOLATED, name);
         
     }
     
@@ -557,11 +558,11 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          * @param branchingFactor
          *            The branching factor for the new {@link IndexSegment}.
          */
-        public MergeTask(Journal journal, String name, int partId,
-                int branchingFactor) {
+        public MergeTask(IConcurrencyManager concurrencyManager, String name,
+                int partId, int branchingFactor) {
 
-            this(journal, name, partId, branchingFactor, null/* fromKey */,
-                    null/* toKey */);
+            this(concurrencyManager, name, partId, branchingFactor,
+                    null/* fromKey */, null/* toKey */);
 
         }
 
@@ -590,10 +591,10 @@ abstract public class AbstractPartitionTask extends AbstractTask {
          *            partition and <code>null</code> iff there is no right
          *            sibling).
          */
-        public MergeTask(Journal journal, String name, int partId,
-                int branchingFactor, byte[] fromKey, byte[] toKey) {
+        public MergeTask(IConcurrencyManager concurrencyManager, String name,
+                int partId, int branchingFactor, byte[] fromKey, byte[] toKey) {
 
-            super(journal, name);
+            super(concurrencyManager, name);
 
             this.name = name;
             this.partId = partId;
@@ -650,7 +651,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             // Build index segment.
             final IndexSegmentBuilder builder = new IndexSegmentBuilder(//
                     outFile, //
-                    getLiveJournal().tmpDir, //
+                    getJournal().tmpDir, //
                     nentries,//
                     itr, //
                     branchingFactor,//

@@ -32,16 +32,25 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IAddressSerializer;
+import com.bigdata.btree.NodeSerializer;
+
 /**
  * An interface that encapsulates behaviors for (de-)serialization of objects on
  * an {@link IRawStore}.
  * <p>
  * Note that the methods declared on this interface MUST construct
- * {@link ObjectOutputStream}s that implement {@link IStoreObjectOutputStream} and
- * {@link ObjectInputStream}s that implement {@link IStoreObjectInputStream} thereby
- * make the {@link IRawStore} reference available during (de-)serialization.
- * This constraint makes it possible to utilize the {@link IAddressManager} for
- * the store during (de-)serialization.
+ * {@link ObjectOutputStream}s that implement {@link IStoreObjectOutputStream}
+ * and {@link ObjectInputStream}s that implement
+ * {@link IStoreObjectInputStream} thereby make the {@link IRawStore} reference
+ * available during (de-)serialization. This constraint makes it possible to
+ * utilize the {@link IAddressManager} for the store during (de-)serialization.
+ * 
+ * @todo this is not being used much (or perhaps at all) at this time and needs
+ *       to be looked into again. The main use case is the child addresses for
+ *       the nodes of a {@link BTree}. See {@link NodeSerializer} and
+ *       {@link IAddressSerializer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

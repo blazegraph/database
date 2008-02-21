@@ -60,10 +60,14 @@ abstract public class AbstractTx implements ITx {
     protected ReentrantLock lock = new ReentrantLock();
     
     /**
-     * The transaction uses the {@link Journal} for some handshaking in the
-     * commit protocol and to locate the named indices that it isolates.
+     * Used for some handshaking in the commit protocol.
      */
-    final protected AbstractJournal journal;
+    final protected ILocalTransactionManager transactionManager;
+    
+    /**
+     * Used to locate the named indices that the transaction isolates.
+     */
+    final protected IResourceManager resourceManager;
     
     /**
      * The start startTime assigned to this transaction.
@@ -99,14 +103,21 @@ abstract public class AbstractTx implements ITx {
     
     private RunState runState;
 
-    protected AbstractTx(AbstractJournal journal, long startTime, IsolationEnum level ) {
+    protected AbstractTx(ILocalTransactionManager transactionManager,
+            IResourceManager resourceManager, long startTime,
+            IsolationEnum level) {
         
-        if (journal == null)
+        if (transactionManager == null)
+            throw new IllegalArgumentException();
+        
+        if (resourceManager == null)
             throw new IllegalArgumentException();
         
         assert startTime != 0L;
         
-        this.journal = journal;
+        this.transactionManager = transactionManager;
+        
+        this.resourceManager = resourceManager;
         
         this.startTime = startTime;
 
@@ -117,7 +128,7 @@ abstract public class AbstractTx implements ITx {
         // pre-compute the hash code for the transaction.
         this.hashCode = Long.valueOf(startTime).hashCode();
         
-        journal.activateTx(this);
+        transactionManager.activateTx(this);
 
         this.runState = RunState.Active;
 
@@ -242,7 +253,7 @@ abstract public class AbstractTx implements ITx {
 
                 runState = RunState.Aborted;
 
-                journal.completedTx(this);
+                transactionManager.completedTx(this);
 
                 ResourceManager.closeTx(startTime, commitTime, true);
 
@@ -324,7 +335,7 @@ abstract public class AbstractTx implements ITx {
 
             }
 
-            journal.prepared(this);
+            transactionManager.prepared(this);
 
             runState = RunState.Prepared;
 
@@ -363,7 +374,7 @@ abstract public class AbstractTx implements ITx {
 
             try {
 
-                if (!readOnly) {
+                if (!readOnly && !isEmptyWriteSet()) {
 
                     /*
                      * Merge each isolated index into the global scope. This
@@ -391,7 +402,7 @@ abstract public class AbstractTx implements ITx {
 
                 runState = RunState.Committed;
 
-                journal.completedTx(this);
+                transactionManager.completedTx(this);
 
                 ResourceManager.closeTx(startTime, commitTime, false);
 

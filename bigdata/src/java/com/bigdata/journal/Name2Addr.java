@@ -83,7 +83,7 @@ public class Name2Addr extends BTree {
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link #commitList}.
      */
-    private final WeakValueCache<String, IIndex> indexCache;
+    private final WeakValueCache<String, BTree> indexCache;
 
     /**
      * The capacity of the inner {@link LRUCache} for the {@link WeakValueCache}.
@@ -240,7 +240,7 @@ public class Name2Addr extends BTree {
 
         super(store, checkpoint, metadata);
         
-        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
+        indexCache = new WeakValueCache<String, BTree>(new LRUCache<String, BTree>(LRU_CAPACITY));
 
     }
 
@@ -340,12 +340,12 @@ public class Name2Addr extends BTree {
      * @exception IllegalArgumentException
      *                if <i>name</i> is <code>null</code>.
      */
-    public IIndex get(String name) {
+    public BTree get(String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
         
-        IIndex btree = indexCache.get(name);
+        BTree btree = indexCache.get(name);
         
         if (btree != null)
             return btree;
@@ -458,7 +458,7 @@ public class Name2Addr extends BTree {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-    public void registerIndex(String name,IIndex btree) {
+    public void registerIndex(String name,BTree btree) {
         
         if (name == null)
             throw new IllegalArgumentException();

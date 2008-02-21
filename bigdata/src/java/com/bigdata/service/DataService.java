@@ -44,29 +44,33 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrentJournal;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
+import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.ILocalTransactionManager;
+import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
+import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.journal.ProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
+import com.bigdata.journal.ResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.ResourceState;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
- * started using the {@link DataServer} class. Operations are submitted using
- * {@link ConcurrentJournal#submit(AbstractTask)} and will run with the
+ * started using the {@link DataServer} class. Operations are submitted using an
+ * {@link IConcurrentManager#submit(AbstractTask)} and will run with the
  * appropriate concurrency controls as imposed by that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -78,10 +82,11 @@ import com.bigdata.rawstore.IBlock;
  *       moved (shed) while a client has a lease.
  * 
  * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
- *       with an {@link ITransactionManager} service. The data service needs to
- *       notify the {@link ITransactionManager} each time an isolated writer
- *       touches a named index so that the transaction manager can build up the
- *       set of resources that must be locked during the validate/commit phrase.
+ *       with an {@link ITransactionManagerService} service. The data service
+ *       needs to notify the {@link ITransactionManagerService} each time an
+ *       isolated writer touches a named index so that the transaction manager
+ *       can build up the set of resources that must be locked during the
+ *       validate/commit phrase.
  * 
  * @todo Write benchmark test to measure interhost transfer rates. Should be
  *       100Mbits/sec (~12M/sec) on a 100BaseT switched network. With full
@@ -100,7 +105,7 @@ import com.bigdata.rawstore.IBlock;
  *       this way it exactly matches the RPC semantics supported by JERI. The
  *       underlying reason is that the RPC calls are all translated into
  *       {@link Future}s when the are submitted via
- *       {@link ConcurrentJournal#submit(AbstractTask)}. The
+ *       {@link ConcurrencyManager#submit(AbstractTask)}. The
  *       {@link DataService} itself then invokes {@link Future#get()} in order
  *       to await the completion of the request and return the response (object
  *       or thrown exception).
@@ -125,7 +130,7 @@ import com.bigdata.rawstore.IBlock;
  *       have to handle that. In contrast, if the queue never blocks and never
  *       imposes latency on clients then it is possible to flood the data
  *       service with requests, even through they will be processed by no more
- *       than {@link ConcurrentJournal.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
+ *       than {@link ConcurrentManager.Options#WRITE_SERVICE_MAXIMUM_POOL_SIZE}
  *       threads.
  * 
  * @todo Review JERI options to support secure RMI protocols. For example, using
@@ -135,8 +140,6 @@ import com.bigdata.rawstore.IBlock;
  */
 abstract public class DataService implements IDataService,
         IWritePipeline, IResourceTransfer, IServiceShutdown {
-
-    protected Journal journal;
 
     public static final Logger log = Logger.getLogger(DataService.class);
 
@@ -151,33 +154,113 @@ abstract public class DataService implements IDataService,
     }
     
     /**
+     * FIXME Discover the {@link ITransactionManager} service and use it as the
+     * source of timestamps!
+     * 
+     * FIXME Make sure that the {@link IBigdataClient} and
+     * {@link IBigdataFederation} implementations likewise discover the
+     * {@link ITransactionManager} service and use it rather than directly
+     * issuing {@link ITransactionManager} requests to a {@link DataService}!
+     */
+    private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+    
+    final protected ResourceManager resourceManager;
+    final protected ConcurrencyManager concurrencyManager;
+    final protected AbstractLocalTransactionManager localTransactionManager;
+
+    /**
+     * The object used to manage the local resources.
+     */
+    public IResourceManager getResourceManager() {
+        
+        return resourceManager;
+        
+    }
+
+    /**
+     * The object used to control access to the local resources.
+     */
+    public IConcurrencyManager getConcurrencyManager() {
+        
+        return concurrencyManager;
+        
+    }
+
+    /**
+     * The object used to coordinate transactions executing against local
+     * resources.
+     */
+    public ILocalTransactionManager getLocalTransactionManager() {
+        
+        return localTransactionManager; 
+        
+    }
+    
+    /**
      * 
      * @param properties
      */
     public DataService(Properties properties) {
         
-        journal = new DataServiceJournal(properties);
+        resourceManager = new ResourceManager(properties, new ITimestampService() {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+                
+            }
+
+        });
+        
+        localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+                
+            }
+            
+        };
+        
+        concurrencyManager = new ConcurrencyManager(properties,
+                localTransactionManager, resourceManager);
+
+        localTransactionManager.setConcurrencyManager(concurrencyManager);
 
     }
 
     /**
-     * Polite shutdown does not accept new requests and will shutdown once
-     * the existing requests have been processed.
+     * Polite shutdown does not accept new requests and will shutdown once the
+     * existing requests have been processed.
+     * <p>
+     * Note: The {@link IConcurrencyManager} is shutdown first, then the
+     * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
     public void shutdown() {
         
-        journal.shutdown();
+        concurrencyManager.shutdown();
+        
+        localTransactionManager.shutdown();
+
+        resourceManager.shutdown();
         
     }
     
     /**
-     * Shutdown attempts to abort in-progress requests and shutdown as soon
-     * as possible.
+     * Shutdown attempts to abort in-progress requests and shutdown as soon as
+     * possible.
+     * <p>
+     * Note: The {@link IConcurrencyManager} is shutdown first, then the
+     * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
     public void shutdownNow() {
+  
+        concurrencyManager.shutdownNow();
 
-        journal.shutdownNow();
-        
+        localTransactionManager.shutdownNow();
+
+        resourceManager.shutdownNow();
+
     }
 
     /**
@@ -198,7 +281,7 @@ abstract public class DataService implements IDataService,
         try {
         
             // will place task on writeService and block iff necessary.
-            return journal.commit(tx);
+            return localTransactionManager.commit(tx);
         
         } finally {
             
@@ -215,7 +298,7 @@ abstract public class DataService implements IDataService,
         try {
 
             // will place task on writeService iff read-write tx.
-            journal.abort(tx);
+            localTransactionManager.abort(tx);
             
         } finally {
             
@@ -263,34 +346,6 @@ abstract public class DataService implements IDataService,
     }
     
     /**
-     * Return true iff the value identifies a read-only transaction known to
-     * this data service.
-     * 
-     * @param startTime
-     *            The transaction identifier.
-     * 
-     * @return True iff that is a read-only transaction.
-     * 
-     * @exception IllegalStateException
-     *                if the transaction identifier is not active.
-     */
-    private boolean isReadOnly(long startTime) {
-        
-        assert startTime != 0l;
-        
-        ITx tx = journal.getTx(startTime);
-        
-        if (tx == null) {
-
-            throw new IllegalStateException("Unknown: tx=" + startTime);
-            
-        }
-        
-        return tx.isReadOnly();
-        
-    }
-
-    /**
      * @todo if the journal overflows then the returned metadata can become
      *       stale (the journal in question will no longer be absorbing writes
      *       but it will continue to be used to absorb reads until the asyn
@@ -301,7 +356,8 @@ abstract public class DataService implements IDataService,
      */
     public JournalMetadata getJournalMetadata() throws IOException {
         
-        return new JournalMetadata(journal,ResourceState.Live);
+        return new JournalMetadata(resourceManager.getLiveJournal(),
+                ResourceState.Live);
         
     }
 
@@ -313,7 +369,8 @@ abstract public class DataService implements IDataService,
 
         sb.append("\n");
 
-        sb.append(journal.getStatistics());
+        // @todo report at the resource manager level instead.
+        sb.append(resourceManager.getLiveJournal().getStatistics());
         
         return sb.toString();
         
@@ -378,8 +435,10 @@ abstract public class DataService implements IDataService,
             if (metadata == null)
                 throw new IllegalArgumentException();
 
-            journal.submit(new RegisterIndexTask(journal, name, metadata))
-                    .get();
+            final AbstractTask task = new RegisterIndexTask(concurrencyManager,
+                    name, metadata);
+            
+            concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -396,7 +455,10 @@ abstract public class DataService implements IDataService,
         
         try {
         
-            journal.submit(new DropIndexTask(journal, name)).get();
+            final AbstractTask task = new DropIndexTask(concurrencyManager,
+                    name);
+            
+            concurrencyManager.submit(task).get();
 
         } finally {
             
@@ -412,7 +474,8 @@ abstract public class DataService implements IDataService,
         
         try {
 
-            final IIndex ndx = journal.getIndex(name);
+            // Note: as defined on the current "live" journal.
+            final BTree ndx = resourceManager.getLiveJournal().getIndex(name);
             
             if(ndx == null) {
                 
@@ -420,7 +483,7 @@ abstract public class DataService implements IDataService,
                 
             }
             
-            return ((BTree)ndx).getIndexMetadata();
+            return ndx.getIndexMetadata();
             
         } finally {
             
@@ -436,7 +499,8 @@ abstract public class DataService implements IDataService,
         
         try {
 
-            final IIndex ndx = journal.getIndex(name);
+            // @todo define at the resource manager level so it reports on all components of the index.
+            final IIndex ndx = resourceManager.getLiveJournal().getIndex(name);
             
             if(ndx == null) {
                 
@@ -461,12 +525,13 @@ abstract public class DataService implements IDataService,
 
         try {
     
-            final boolean readOnly = proc instanceof IReadOnlyOperation;
-    
             // submit the procedure and await its completion.
-    
-            return journal.submit(
-                    new ProcedureTask(journal, tx, readOnly, name, proc)).get();
+
+            final AbstractTask task = new IndexProcedureTask(
+                    concurrencyManager, tx,
+                    name, proc);
+            
+            return concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -484,13 +549,15 @@ abstract public class DataService implements IDataService,
         
         try {
 
-            if( name == null ) throw new IllegalArgumentException();
+            if (name == null)
+                throw new IllegalArgumentException();
             
-            final RangeIteratorTask task = new RangeIteratorTask(journal, tx,
-                    name, fromKey, toKey, capacity, flags, filter);
+            final RangeIteratorTask task = new RangeIteratorTask(
+                    concurrencyManager, tx, name, fromKey, toKey, capacity,
+                    flags, filter);
     
             // submit the task and wait for it to complete.
-            return (ResultSet) journal.submit(task).get();
+            return (ResultSet) concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -500,6 +567,67 @@ abstract public class DataService implements IDataService,
             
     }
 
+    /**
+     * @todo this operation should be able to abort an
+     *       {@link IBlock#inputStream() read} that takes too long or if there
+     *       is a need to delete the resource.
+     */
+    public IBlock readBlock(IResourceMetadata resource, final long addr) {
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+
+        if (addr == 0L)
+            throw new IllegalArgumentException();
+
+        setupLoggingContext();
+
+        try {
+            
+            final IRawStore store = resourceManager.openStore(resource.getUUID());
+    
+            if (store == null) {
+    
+                log.warn("Resource not available: " + resource);
+    
+                throw new IllegalStateException("Resource not available");
+    
+            }
+    
+            // @todo efficient (stream-based) read from the journal (IBlockStore
+            // API).
+    
+            return new IBlock() {
+    
+                public long getAddress() {
+                    return addr;
+                }
+    
+                // @todo reuse buffers
+                public InputStream inputStream() {
+    
+                    ByteBuffer buf = store.read(addr);
+    
+                    return new ByteBufferInputStream(buf);
+    
+                }
+    
+                public int length() {
+    
+                    return store.getByteCount(addr);
+    
+                }
+    
+            };
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }
+                 
+    }
+    
     /**
      * Task for running a rangeIterator operation.
      * 
@@ -514,12 +642,11 @@ abstract public class DataService implements IDataService,
         private final int flags;
         private final IEntryFilter filter;
         
-        public RangeIteratorTask(ConcurrentJournal journal, long startTime,
-                String name, byte[] fromKey, byte[] toKey, int capacity,
-                int flags, IEntryFilter filter) {
+        public RangeIteratorTask(ConcurrencyManager concurrencyManager,
+                long startTime, String name, byte[] fromKey, byte[] toKey,
+                int capacity, int flags, IEntryFilter filter) {
 
-            super(journal, startTime,
-                    (flags & IRangeQuery.REMOVEALL) == 0/* readOnly */, name);
+            super(concurrencyManager, startTime, name);
 
             this.fromKey = fromKey;
             this.toKey = toKey;
@@ -539,58 +666,6 @@ abstract public class DataService implements IDataService,
     }
 
     /**
-     * @todo this operation should be able to abort an
-     *       {@link IBlock#inputStream() read} that takes too long or if there
-     *       is a need to delete the resource.
-     */
-    public IBlock readBlock(IResourceMetadata resource, final long addr) {
-    
-        if(resource.isJournal()) {
-            
-            // @todo support multiple journals (overflow).
-            
-            // @todo efficient (stream-based) read from the journal (IBlockStore API).
-            
-            return new IBlock() {
-
-                public long getAddress() {
-                    return addr;
-                }
-
-                // @todo reuse buffers
-                public InputStream inputStream() {
-
-                    ByteBuffer buf = journal.read(addr);
-                    
-                    return new ByteBufferInputStream(buf);
-                    
-                }
-
-                public int length() {
-                    
-                    return journal.getByteCount(addr);
-                    
-                }
-                
-            };
-            
-        } else {
-            
-            /*
-             * @todo read from index segments. make sure that we do not
-             * double-open index segments. in fact, all we need to do for this
-             * is obtain the index segment file store and we can read the block
-             * directly from that (the index segment itself does not need to be
-             * open).
-             */
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-    }
-    
-    /**
      * @todo IResourceTransfer is not implemented.
      */
     public void sendResource(String filename, InetSocketAddress sink) {
@@ -598,27 +673,5 @@ abstract public class DataService implements IDataService,
         throw new UnsupportedOperationException();
         
     }
-    
-    /**
-     * 
-     * FIXME Either this class or its outer class MUST discover the
-     * {@link ITransactionManager} and delegate the methods on that interface to
-     * that service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class DataServiceJournal extends Journal {
-
-        /**
-         * @param properties
-         */
-        public DataServiceJournal(Properties properties) {
-            
-            super(properties);
-            
-        }
-                
-    }
-    
+        
 }

@@ -210,6 +210,7 @@ public class Node extends AbstractNode implements INodeData {
      *            allow room for the insert key that places the node temporarily
      *            over capacity during a split.
      */
+    @SuppressWarnings("unchecked")
     protected Node(AbstractBTree btree, long addr, int branchingFactor,
             int nentries, IKeyBuffer keys, long[] childAddr,
             int[] childEntryCounts
@@ -247,6 +248,7 @@ public class Node extends AbstractNode implements INodeData {
     /**
      * Used to create a new node when a node is split.
      */
+    @SuppressWarnings("unchecked")
     protected Node(BTree btree) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );
@@ -278,6 +280,7 @@ public class Node extends AbstractNode implements INodeData {
      *            The #of entries spanned by the oldRoot <em>before</em> the
      *            split.
      */
+    @SuppressWarnings("unchecked")
     protected Node(BTree btree, AbstractNode oldRoot, int nentries) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );

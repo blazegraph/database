@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.ConcurrencyManager.Options;
 
 /**
  * Test suite for {@link RegisterIndexTask} and {@link DropIndexTask}.
@@ -59,11 +59,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
     }
 
     /**
-     * Test ability to create a {@link ConcurrentJournal}, submit an unisolated
-     * write task that creates a named index shutdown the journal. The journal
-     * is then re-opened and we verify that the registered index is restart
-     * safe.  Finally we drop the index, close the journal and then re-open it
-     * again to verify that the drop index operation was restart safe.
+     * Test ability to submit an unisolated write task that creates a named
+     * index and then shutdown the journal. The journal is then re-opened and we
+     * verify that the registered index is restart safe. Finally we drop the
+     * index, close the journal and then re-open it again to verify that the
+     * drop index operation was restart safe.
      */
     public void test_addDropIndex() {
 
@@ -83,8 +83,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new RegisterIndexTask(
-                    journal, name, new IndexMetadata(name, indexUUID)));
+            Future<Object> future = journal.submit(new RegisterIndexTask( journal,
+                    name, new IndexMetadata(name, indexUUID)));
 
             try {
 
@@ -123,8 +123,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
             journal.shutdown();
 
-            properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-            properties.setProperty(Options.FILE,journal.getFile().toString());
+            properties.setProperty(ConcurrencyManager.Options.CREATE_TEMP_FILE,"false");
+            properties.setProperty(ConcurrencyManager.Options.FILE,journal.getFile().toString());
 
             journal = new Journal(properties);
             
@@ -138,8 +138,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             final long commitCounterBefore = journal.getRootBlockView()
                     .getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractTask(
-                    journal, ITx.UNISOLATED, true/* readOnly */, name) {
+            Future<Object> future = journal.submit(new AbstractTask( journal,
+                    ITx.READ_COMMITTED, name) {
 
                 protected Object doTask() throws Exception {
 
@@ -240,8 +240,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             
             final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-            Future<Object> future = journal.submit(new AbstractTask(
-                    journal, ITx.UNISOLATED, true/* readOnly */, name) {
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    ITx.READ_COMMITTED, name) {
 
                 protected Object doTask() throws Exception {
 
@@ -451,7 +451,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         
         final String name = "abc";
 
-        Future<Object> future = journal.submit(new AbstractTask(journal,ITx.UNISOLATED,true/*readOnly*/,name){
+        Future<Object> future = journal.submit(new AbstractTask(journal,
+                ITx.READ_COMMITTED, name) {
 
             protected Object doTask() throws Exception {
                 

@@ -32,14 +32,13 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.FusedView;
+import com.bigdata.btree.ILinearList;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.ICommitter;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.Tx;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.MetadataService;
 
@@ -49,6 +48,22 @@ import com.bigdata.service.MetadataService;
  * the first key that would be directed into the corresponding index segment,
  * e.g., a <em>separator key</em> (this is just the standard btree semantics).
  * The values are serialized {@link PartitionMetadata} objects.
+ * <p>
+ * Note: At this time the recommended scale-out approach for the metadata index
+ * is to place the metadata indices on a {@link MetadataService} (the same
+ * {@link MetadataService} may be used for an arbitrary #of scale-out indices)
+ * and to <em>replicate</em> the state for the {@link MetadataService} onto
+ * failover {@link MetadataService}s. Since the {@link MetadataIndex} may grow
+ * without bound, you simply need to have enough disk on hand for it (the size
+ * requirements are quite modest). Further, the {@link MetadataService} MUST NOT
+ * be used to hold the data for the scale-out indices themselves since the
+ * {@link MetadataIndex} can not undergo {@link IResourceManager#overflow()}.
+ * <p>
+ * One advantage of this approach is that the {@link MetadataIndex} is
+ * guarenteed to hold all historical states of the partition definitions for
+ * each index - effectively it is an immortal store for the partition metadata.
+ * On the other hand it is not possible to compact the metadata index without
+ * taking the database offline.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,24 +75,72 @@ import com.bigdata.service.MetadataService;
  *       successor, but it is handy for clients to get it along with the rest of
  *       the partition metadata.
  * 
- * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
- *       to support the {@link IsolatedFusedView}s in use by a {@link Tx}.
- *       Deletes of old journals and index segments MUST be deferred until no
- *       transaction remains which can read those data. This metadata must be
- *       restart-safe so that resources are eventually deleted.
- * 
- * @todo the {@link MetadataIndex} does not support overflow or splits. There
- *       are several issues to be solved
+ * @todo The {@link MetadataIndex} does NOT support either overflow (it may NOT
+ *       be a {@link FusedView}) NOR key-range splits. There are several issues
+ *       involved:
  *       <p>
  *       (a) How to track the next partition identifier to be assigned to an
  *       index partition for the managed index. Currently this value is written
- *       in the {@link MetadataIndexCheckpoint} record. Care MUST be applied to
- *       ensure that this value is not lost during overflow or split. Further,
- *       if the metadata index is split into partitions then additional care
- *       MUST be taken to use only the value of that field on the 'meta-meta'
- *       index.
+ *       in the {@link MetadataIndexCheckpoint} record and is propagated to the
+ *       new backing store on overflow. However, if the metadata index is split
+ *       into partitions then additional care MUST be taken to use only the
+ *       value of that field on the 'meta-meta' index.
  *       <p>
  *       (b) how to locate the partitions of the metadata index itself.
+ *       <p>
+ *       (c) The {@link IMetadataIndex} defines some operations which depend on
+ *       the {@link ILinearList} API. However, per {@link FusedView}, it is NOT
+ *       possible to efficiently implementat that API for a fused view.
+ * 
+ * @todo Here are some options for scale-out on the metadata index.
+ *       <p>
+ *       In fact, while delete markers in the index partition views facilitate
+ *       overflow processing they make it impossible to use the
+ *       {@link ILinearList} API which we need for the metadata index. However,
+ *       it is in fact possible to write the {@link ILinearList} API for a
+ *       key-range partitioned index without delete markers in the index
+ *       partitions (WRITE THIS CODE AND TEST IT BEFORE GOING FURTHER TO PROVE
+ *       THE POINT). So, that is how to handle scale-out for the metadata index.
+ *       <p>
+ *       Getting this working will require somewhat different handling of
+ *       scale-out indices when delete markers are not allowed. For one thing,
+ *       overflow of an index without delete markers requires immediate copying
+ *       of the index (partition) onto the new journal. if the index has too
+ *       many entries then it must be split during that overflow processing. You
+ *       can't use index segments since they imply deletion markers in the index
+ *       views.
+ *       <p>
+ *       A split can be processed during overflow, and the new index partitions
+ *       will wind up on the new journal. Likewise, an index partition can be
+ *       sent to a different metadata service, but this will require a custom
+ *       operation to send along everything from some historical commit point
+ *       for the index partition and either deny writes on the index partition
+ *       until we cut over to its new location (by far the easiest) or journal
+ *       writes so that the index can be made current on the new location before
+ *       we cut over (frought with potential problems).
+ *       <p>
+ *       A meta-metadata index might be necessary to locate the key-range
+ *       partitions of a metadata index.
+ *       <p>
+ *       Overall it seems that the choice of delete markers provides more
+ *       flexibility in overflow operations while working without delete markers
+ *       allows the use of the {@link ILinearList} API. Probably both should be
+ *       supported throughout so that the {@link MetadataIndex} is not a special
+ *       case, but just an application that requires the {@link ILinearList} and
+ *       hence does not use delete markers and pays some different costs for
+ *       overflow and split operations and may have to handle replication
+ *       differently.
+ *       <p>
+ *       Since there are no deletion markers, we can't use transactional
+ *       isolation on the metadata index either. Probably we will have to make
+ *       use of a mechanism to broadcast the read-behind time to clients for the
+ *       metadata index and clients will have to update their cache when the
+ *       index moves into its next consistent state.
+ * 
+ * @todo A metadata index can be recovered by a distributed process running over
+ *       the data services. Each data service reports all index partitions. The
+ *       reports are collected and the index is rebuilt from the reports. Much
+ *       like a map/reduce job.
  */
 public class MetadataIndex extends BTree implements IMetadataIndex {
 
@@ -216,12 +279,27 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          * 
          * @param metadata
          */
-        public MetadataIndexCheckpoint(IndexMetadata metadata, Long counter) {
+        public MetadataIndexCheckpoint(IndexMetadata metadata) {
 
-            super(metadata, counter);
+            super(metadata);
 
             // The first partitionId is zero(0).
             nextPartitionId = 0;
+            
+        }
+        
+        /**
+         * Create the initial checkpoint record when the metadata index
+         * overflows onto a new backing store.
+         * 
+         * @param metadata
+         */
+        public MetadataIndexCheckpoint(IndexMetadata metadata, Checkpoint oldCheckpoint) {
+
+            super(metadata, oldCheckpoint);
+
+            // propagate the value of this field onto the new backing store.
+            nextPartitionId = ((MetadataIndexCheckpoint)oldCheckpoint).nextPartitionId;
             
         }
         
@@ -340,162 +418,29 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     }
 
-    /**
-     * Find the index of the partition spanning the given key.
-     * 
-     * @return The index of the partition spanning the given key or
-     *         <code>-1</code> iff there are no partitions defined.
-     * 
-     * @exception IllegalStateException
-     *                if there are partitions defined but no partition spans the
-     *                key. In this case the {@link MetadataIndex} lacks an entry
-     *                for the key <code>new byte[]{}</code>.
-     */
-    public int findIndexOf(byte[] key) {
-        
-        int pos = super.indexOf(key);
-        
-        if (pos < 0) {
-
-            /*
-             * the key lies between the partition separators and represents the
-             * insert position.  we convert it to an index and subtract one to
-             * get the index of the partition that spans this key.
-             */
-            
-            pos = -(pos+1);
-
-            if(pos == 0) {
-
-                if(nentries != 0) {
-                
-                    throw new IllegalStateException(
-                            "Partition not defined for empty key.");
-                    
-                }
-                
-                return -1;
-                
-            }
-                
-            pos--;
-
-            return pos;
-            
-        } else {
-            
-            /*
-             * exact hit on a partition separator, so we choose the entry with
-             * that key.
-             */
-            
-            return pos;
-            
-        }
-
-    }
-    
-    /**
-     * Find and return the partition spanning the given key.
-     * 
-     * @return The partition spanning the given key or <code>null</code> if
-     *         there are no partitions defined.
-     */
-    public PartitionMetadata find(byte[] key) {
-        
-        final int index = findIndexOf(key);
-        
-        if(index == -1) return null;
-        
-        byte[] val = (byte[]) valueAt(index);
-        
-        return (PartitionMetadata) SerializerUtil.deserialize(val);
-        
-    }
-    
-    /**
-     * The partition with that separator key or <code>null</code> (exact
-     * match on the separator key).
-     * 
-     * @param key
-     *            The separator key (the first key that would go into that
-     *            partition).
-     * 
-     * @return The partition with that separator key or <code>null</code>.
-     */
     public PartitionMetadata get(byte[] key) {
         
-        byte[] val = (byte[]) lookup(key);
-        
-        if(val==null) return null;
-        
-        return (PartitionMetadata) SerializerUtil.deserialize(val);
+        return (PartitionMetadata)SerializerUtil.deserialize(lookup(key));
         
     }
-    
-    /**
-     * Create or update a partition (exact match on the separator key).
-     * 
-     * @param key
-     *            The separator key (the first key that would go into that
-     *            partition).
-     * @param val
-     *            The parition metadata.
-     * 
-     * @return The previous partition metadata for that separator key or
-     *         <code>null</code> if there was no partition for that separator
-     *         key.
-     * 
-     * @exception IllegalArgumentException
-     *                if the key identifies an existing partition but the
-     *                partition identifers do not agree.
-     */
-    public PartitionMetadata put(byte[] key,PartitionMetadata val) {
+
+    public PartitionMetadata find(byte[] key) {
+
+        // @todo could retain the view reference.
+        return new MetadataIndexView(this).find(key);
         
-        if (val == null) {
-
-            throw new IllegalArgumentException();
-
-        }
-        
-        byte[] newval = SerializerUtil.serialize(val);
-        
-        byte[] oldval2 = (byte[])insert(key, newval);
-
-        PartitionMetadata oldval = oldval2 == null ? null
-                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
-        
-        if (oldval != null && oldval.getPartitionId() != val.getPartitionId()) {
-
-            throw new IllegalArgumentException("Expecting: partId="
-                    + oldval.getPartitionId() + ", but have partId="
-                    + val.getPartitionId());
-
-        }
-
-        return oldval;
-    
     }
 
-//    /**
-//     * Remove a partition (exact match on the separator key).
-//     * 
-//     * @param key
-//     *            The separator key (the first key that would go into that
-//     *            partition).
-//     * 
-//     * @return The existing partition for that separator key or
-//     *         <code>null</code> if there was no entry for that separator key.
-//     */
-//    public PartitionMetadata remove(byte[] key) {
-//        
-//        byte[] oldval2 = (byte[])super.remove(key);
-//
-//        PartitionMetadata oldval = oldval2 == null ? null
-//                : (PartitionMetadata) SerializerUtil.deserialize(oldval2);
-//
-//        return oldval;
-//        
-//    }
+    public int findIndexOf(byte[] key) {
+
+        return new MetadataIndexView(this).findIndexOf(key);
+        
+    }
+
+    public int[] findIndices(byte[] fromKey, byte[] toKey) {
+
+        return new MetadataIndexView(this).findIndices(fromKey, toKey);
+
+    }
 
 }

@@ -33,7 +33,7 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 
 /**
@@ -182,25 +182,18 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
         this.flags = flags;
         this.filter = filter;
 
-        final MetadataIndex mdi = ndx.getMetadataIndex();
+        final IMetadataIndex mdi = ndx.getMetadataIndex();
 
-        // index of the first partition to check.
-        final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
-
-        // index of the last partition to check.
-        final int toIndex = (toKey == null ? mdi.getEntryCount() - 1 : mdi
-                .findIndexOf(toKey));
-
-        // keys are out of order.
-        if (fromIndex > toIndex) {
-
-            throw new IllegalArgumentException("fromKey > toKey");
-
+        {
+            
+            int a[] = mdi.findIndices(fromKey, toKey);
+            
+            fromIndex = a[0];
+            
+            toIndex = a[1];
+            
         }
-
-        this.fromIndex = fromIndex;
-        this.toIndex = toIndex;
-
+        
         // starting index is the lower bound.
         index = fromIndex;
         

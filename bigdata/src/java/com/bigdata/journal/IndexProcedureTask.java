@@ -22,40 +22,39 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Feb 9, 2007
+ * Created on Jan 10, 2008
  */
+package com.bigdata.journal;
 
-package com.bigdata.scaleup;
-
-import com.bigdata.btree.BTreeMetadata;
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.btree.IIndexProcedure;
 
 /**
- * Extension of {@link Name2Addr} for locating the {@link MetadataIndex}
- * associated with a named {@link PartitionedIndexView}.
+ * Class provides an adaptor allowing a {@link IIndexProcedure} to be executed
+ * on an {@link IConcurrencyManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Name2MetadataAddr extends Name2Addr {
+public class IndexProcedureTask extends AbstractTask {
 
-    public Name2MetadataAddr(IRawStore store) {
+    protected final IIndexProcedure proc;
 
-        super(store);
-        
+    public IndexProcedureTask(ConcurrencyManager concurrencyManager,
+            long startTime, String name, IIndexProcedure proc) {
+
+        super(concurrencyManager, startTime, name);
+
+        if (proc == null)
+            throw new IllegalArgumentException();
+
+        this.proc = proc;
+
     }
-    
-    /**
-     * Deserialization constructor.
-     * @param store
-     * @param metadata
-     */
-    public Name2MetadataAddr(IRawStore store, BTreeMetadata metadata) {
 
-        super(store,metadata);
-        
+    final public Object doTask() throws Exception {
+
+        return proc.apply(getIndex(getOnlyResource()));
+
     }
 
 }
