@@ -51,7 +51,6 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -72,7 +71,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * {@link IDataService}s on which the index partitions are located and
  * directing read and write operations appropriately.  See {@link ClientIndexView}.
  * <p>
- * A client may discover and use an {@link ITransactionManager} if needs to use
+ * A client may discover and use an {@link ITransactionManagerService} if needs to use
  * transactions as opposed to unisolated reads and writes. When the client
  * requests a transaction, the transaction manager responds with a long integer
  * containing the transaction identifier - this is simply the unique start time

@@ -37,6 +37,7 @@ import java.util.concurrent.Callable;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
@@ -328,13 +329,13 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
     public boolean isStable() {
 
-        return dataService.getJournal().isStable();
+        return dataService.getLiveJournal().isStable();
         
     }
 
     public boolean isReadOnly() {
 
-        return dataService.getJournal().isReadOnly();
+        return dataService.getLiveJournal().isReadOnly();
         
     }
 
@@ -354,7 +355,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
     final public void close() {
         
-        log.info("\n"+dataService.getJournal().getStatistics());
+        log.info("\n"+dataService.getLiveJournal().getStatistics());
         
         super.close();
         
@@ -364,22 +365,23 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     
     final public void closeAndDelete() {
 
-        log.info("\n"+dataService.getJournal().getStatistics());
+        log.info("\n"+dataService.getLiveJournal().getStatistics());
 
         super.closeAndDelete();
         
         dataService.shutdown();
         
-        dataService.getJournal().delete();
+        dataService.getLiveJournal().delete();
         
     }
     
     /**
-     * Return the backing file.
+     * Note: There is no single file that backs the database. This returns only
+     * the file for the "live" {@link Journal}.
      */
     public File getFile() {
         
-        return dataService.getJournal().getFile();
+        return dataService.getLiveJournal().getFile();
         
     }
     

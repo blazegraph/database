@@ -41,9 +41,6 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
-import com.bigdata.journal.IJournal;
-import com.bigdata.journal.Journal;
-
 /**
  * The bigdata data server.
  * <p>
@@ -137,32 +134,19 @@ public class DataServer extends AbstractServer {
         
         super.destroy();
         
-        try {
-
-            IJournal journal = service.journal;
-            
-            log.info("Deleting: "+journal.getFile());
-            
-            journal.delete();
-
-            log.info("Journal deleted.");
-
-        } catch (Throwable t) {
-
-            log.warn("Could not delete journal: " + t, t);
-
-        }
+        // destroy all resources.
+        service.getResourceManager().delete();
 
     }
     
-    /**
-     * The backing {@link Journal}.
-     */
-    protected Journal getJournal() {
-        
-        return ((DataService)impl).journal;
-        
-    }
+//    /**
+//     * The backing {@link Journal}.
+//     */
+//    protected Journal getJournal() {
+//        
+//        return ((DataService)impl).journal;
+//        
+//    }
     
     /**
      * Adds jini administration interfaces to the basic {@link DataService}.

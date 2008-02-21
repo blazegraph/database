@@ -31,8 +31,8 @@ import net.jini.core.lookup.ServiceID;
 
 /**
  * Test of client-server communications. The test starts a {@link DataServer}
- * and then that we can discover that {@link DataServer}. The server is stopped
- * when the test is torn down.
+ * and then verifies that basic operations can be carried out against that
+ * server. The server is stopped when the test is torn down.
  * <p>
  * Note: This test uses the <code>DataServer0.config</code> file from the
  * src/resources/config/standalone package.

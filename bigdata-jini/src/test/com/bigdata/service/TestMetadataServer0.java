@@ -32,6 +32,9 @@ import net.jini.core.lookup.ServiceID;
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}
  * 
+ * @todo add tests of all methods on the {@link IMetadataService} api, e.g.,
+ *       {@link IMetadataService#getPartition(String, byte[]) and friends.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

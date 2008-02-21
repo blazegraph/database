@@ -142,20 +142,7 @@ public class BigdataFederation implements IBigdataFederation {
         
     }
     
-    /**
-     * Return a read-only view of the index partitions for the named scale-out
-     * index.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * 
-     * @return The partitions for that index (keys are byte[] partition
-     *         separator keys, values are serialized {@link PartitionMetadata}
-     *         objects).
-     * 
-     * @throws NoSuchIndexException
-     */
-    public MetadataIndex getMetadataIndex(String name) {
+    synchronized public MetadataIndex getMetadataIndex(String name) {
 
         assertOpen();
 
@@ -163,17 +150,17 @@ public class BigdataFederation implements IBigdataFederation {
 
         if (tmp == null) {
 
-            try {
-
-                tmp = cacheMetadataIndex(name);
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(
-                        "Could not cache partition metadata", ex);
-
+            tmp = cacheMetadataIndex(name);
+            
+            if (tmp == null) {
+                
+                // No such scale-out index.
+                
+                return null;
+                
             }
 
+            // save reference to cached mdi.
             partitions.put(name, tmp);
 
         }
@@ -305,11 +292,10 @@ public class BigdataFederation implements IBigdataFederation {
      * @param name
      *            The name of the scale-out index.
      * 
-     * @return The cached partition metadata.
-     * 
-     * @throws NoSuchIndexException
+     * @return The cached partition metadata -or- <code>null</code> iff there
+     *         is no such scale-out index.
      */
-    private MetadataIndex cacheMetadataIndex(String name) throws IOException {
+    private MetadataIndex cacheMetadataIndex(String name) {
 
         assertOpen();
 
@@ -320,11 +306,22 @@ public class BigdataFederation implements IBigdataFederation {
         final IMetadataService metadataService = getMetadataService();
 
         // The metadata for the metadata index itself.
-        final MetadataIndexMetadata mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName);
+        final MetadataIndexMetadata mdmd;
+        try {
+
+            mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName);
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
         if (mdmd == null) {
 
-            throw new NoSuchIndexException(name);
+            // No such index.
+            
+            return null;
 
         }
 

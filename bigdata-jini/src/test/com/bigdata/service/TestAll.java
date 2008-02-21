@@ -65,7 +65,7 @@ public class TestAll extends TestCase {
         /*
          * Test of a single client talking to a bigdata federation.
          */
-        suite.addTestSuite( TestBigdataClient.class );
+        suite.addTestSuite( TestEmbeddedBigdataClient.class );
         
         /*
          * @todo test correctness when services fail at various points in
