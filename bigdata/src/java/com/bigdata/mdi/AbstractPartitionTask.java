@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.mdi;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.concurrent.Executors;
@@ -40,8 +39,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -78,131 +77,20 @@ import com.bigdata.sparse.SparseRowStore;
  */
 abstract public class AbstractPartitionTask extends AbstractTask {
 
-//    protected final MasterJournal journal;
-    
     /**
      * Branching factor used for temporary file(s).
      */
     protected final int tmpFileBranchingFactor = Bytes.kilobyte32*4;
 
-//    /**
-//     * When true, pre-record checksum are generated for the output
-//     * {@link IndexSegment}.
-//     */
-//    protected final boolean useChecksum = false;
-    
-//    /**
-//     * When non-null, a {@link RecordCompressor} will be applied to the
-//     * output {@link IndexSegment}.
-//     */
-//    protected final RecordCompressor recordCompressor = null;
-        
     /**
-     * Return the desired filename for a segment in a partition of a named
-     * index.
-     * 
-     * @param name
-     *            The name of the index.
-     * @param partId
-     *            The unique within index partition identifier - see
-     *            {@link PartitionMetadata#partId}.
-     * 
-     * @todo munge the index name so that we can support unicode index names in
-     *       the filesystem.
-     * 
-     * @todo use leading zero number format for the partitionId and the
-     *       segmentId in the filenames.
+     * @see IResourceManager#getIndexSegmentFile(IndexMetadata)
      */
-    protected File getSegmentFile(String name,int partId) {
-
-//        File parent = getPartitionDirectory(name,partId);
+    protected File getSegmentFile(IndexMetadata indexMetadata) {
         
-//        return new File(journal.getFile().getParent(), //
-//                "index-" + name + "-" + partId + Options.SEG//
-//                );
-        
-// if(!parent.exists() && !parent.mkdirs()) {
-//            
-//            throw new RuntimeException("Could not create directory: "+parent);
-//            
-//        }
-//        
-
-        File parent = getJournal().getFile().getParentFile();
-        
-        try {
-
-            String basename = "index_" + name + "_" + partId + Options.SEG;
-            
-            return File.createTempFile(basename, Options.SEG, parent);
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
+        return getResourceManager().getIndexSegmentFile(indexMetadata);
         
     }
     
-//    /**
-//     * The directory in which files for the parition should be located.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * @param partId
-//     *            The partition identifier.
-//     *            
-//     * @return The directory in which files for the partition should be placed.
-//     */
-//    protected File getPartitionDirectory(String name,int partId) {
-//        
-//        return new File(getIndexDirectory(name),
-//                "part" + partId
-//                );
-//
-//    }
-//
-//    /**
-//     * The name of the directory in which the partitions for the named index
-//     * should be located.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * @return
-//     */
-//    protected File getIndexDirectory(String name) {
-//        
-//        return new File(segmentDir, name);
-//        
-//    }
-//    
-//    /**
-//     * Return a unique name for a new slave journal file.
-//     */
-//    protected File getNextJournalFile() {
-//        
-//        final File file;
-//        
-//        try {
-//
-//            file = File.createTempFile(basename,Options.JNL, journalDir);
-//            
-//            if (!file.delete()) {
-//
-//                throw new AssertionError("Unable to delete new slave file");
-//
-//            }
-//            
-//            return file;
-//            
-//        } catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//    }
-
     /**
      * 
      * @param journal
@@ -629,7 +517,7 @@ abstract public class AbstractPartitionTask extends AbstractTask {
             final long commitTime = startTime;
             
             // the file to be generated.
-            final File outFile = getSegmentFile(name, partId);
+            final File outFile = getSegmentFile(metadata);
 
             // Note: truncates nentries to int.
             final int nentries = (int) src.rangeCount(fromKey, toKey);

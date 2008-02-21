@@ -53,6 +53,7 @@ import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
+import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
@@ -661,10 +662,6 @@ public class ResourceManager implements IResourceManager {
 
     /**
      * {@link ResourceManager} options.
-     * <p>
-     * Note: If you specify {@link com.bigdata.journal.Options#BUFFER_MODE} as
-     * {@link BufferMode#Transient} then journals will be NOT stored in the file
-     * system and {@link ResourceManager#overflow()} will be disabled.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -673,15 +670,20 @@ public class ResourceManager implements IResourceManager {
 
         /**
          * <code>data.dir</code> - The property whose value is the name of the
-         * directory in which the store files will be created (default is the
-         * current working directory).
+         * directory in which the store files will be created (no default). This
+         * property is required unless the instance is transient. If you specify
+         * {@link com.bigdata.journal.Options#BUFFER_MODE} as
+         * {@link BufferMode#Transient} then journals will be NOT stored in the
+         * file system and {@link ResourceManager#overflow()} will be disabled.
          * <p>
          * The files are created within subdirectories as follows: The
          * "journals" subdirectory contains the journal files. The "segments"
-         * subdirectory contains the index segment files. The "segments"
-         * directory is contains subdirectories corresponding to the index name
-         * (munged as necessary to conform to the file system), then the index
-         * UUID (always unique), and finally the index partition identifier.
+         * directory contains subdirectories corresponding to the index UUID for
+         * each scale-out index. Within those index-specific directories, the
+         * index segment files are assigned to files using the temporary file
+         * mechanisms using the munged index name as the file prefix and
+         * {@link Options#SEG} as the file suffix.  If the index is partitioned
+         * then the partition identifier appears as part of the file prefix.
          * <p>
          * Note: While files are stored per the scheme described above, the
          * entire {@link #DATA_DIR} will be scanned recursively to identify all
@@ -692,10 +694,6 @@ public class ResourceManager implements IResourceManager {
          * <p>
          * Note: Each {@link DataService} or {@link MetadataService} MUST have
          * its own {@link #DATA_DIR}.
-         * 
-         * @todo Make sure that the tasks that handle {@link IndexSegment}
-         *       generation place the {@link IndexSegment} files according to
-         *       the scheme described here.
          * 
          * @todo When copying a resource from a remote {@link DataService} make
          *       sure that it gets placed according to the scheme defined here.
@@ -710,11 +708,6 @@ public class ResourceManager implements IResourceManager {
          *       metadata.
          */
         public static final String DATA_DIR = "data.dir";
-
-        /**
-         * The default is the current working directory.
-         */
-        public static final String DEFAULT_DATA_DIR = ".";
 
     }
     
@@ -786,9 +779,15 @@ public class ResourceManager implements IResourceManager {
             final File dataDir;
             try {
 
-                dataDir = new File(properties.getProperty(
-                    Options.DATA_DIR, Options.DEFAULT_DATA_DIR))
-                    .getCanonicalFile();
+                final String val = properties.getProperty(Options.DATA_DIR);
+                
+                if (val == null) {
+                    
+                    throw new RuntimeException("Required property: "+Options.DATA_DIR);
+                    
+                }
+                
+                dataDir = new File(val).getCanonicalFile();
 
                 log.info(Options.DATA_DIR + "=" + dataDir);
 
@@ -2030,6 +2029,14 @@ public class ResourceManager implements IResourceManager {
                 
             }
             
+            log.warn("Removing: "+f);
+            
+            if(!f.delete()) {
+                
+                log.error("Could not remove: "+f);
+                
+            }
+            
         }
 
         // @todo could be a filter on listFiles.
@@ -2058,4 +2065,44 @@ public class ResourceManager implements IResourceManager {
         
     }
     
+    /**
+     * @todo munge the index name so that we can support unicode index names in
+     *       the filesystem.
+     * 
+     * @todo use leading zero number format for the partitionId in the
+     *       filenames.
+     */
+    public File getIndexSegmentFile(IndexMetadata indexMetadata) {
+
+        // munge index name to fit the file system.
+        final String mungedName = indexMetadata.getName();
+
+        // subdirectory using the scale-out indices unique index UUID.
+        final File indexDir = new File(segmentsDir, indexMetadata
+                .getIndexUUID().toString());
+
+        final IPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
+        
+        final String partitionStr = (pmd == null ? "" : "#"
+                + pmd.getPartitionId());
+
+        final String prefix = mungedName + "" + partitionStr;
+
+        final File file;
+        try {
+
+            file = File.createTempFile(prefix, Options.SEG, indexDir);
+
+        } catch (IOException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+        log.warn("Created file: " + file);
+
+        return file;
+
+    }
+
 }

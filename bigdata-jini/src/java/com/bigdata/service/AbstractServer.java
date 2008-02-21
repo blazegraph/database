@@ -374,6 +374,17 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
                 log.info("New service instance - ServiceID will be assigned");
                 
+                // Make sure that the parent directory exists.
+                File parentDir = serviceIdFile.getParentFile();
+                
+                if(!parentDir.exists()) {
+                    
+                    log.warn("Creating: " + parentDir);
+
+                    parentDir.mkdirs();
+                    
+                }
+                
             }
 
             // The properties file used to configure the service.
