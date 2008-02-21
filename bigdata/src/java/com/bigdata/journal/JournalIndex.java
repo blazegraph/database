@@ -150,23 +150,28 @@ public class JournalIndex extends BTree {
 //    }
 
     /**
-     * Return the {@link ICommitRecord} having the largest timestamp that is
-     * less than or equal to the given timestamp. This is used primarily to
-     * locate the commit record that will serve as the ground state for a
-     * transaction having <i>timestamp</i> as its start time. In this context
-     * the LTE search identifies the most recent commit state that not later
-     * than the start time of the transaction.
+     * Return the {@link IResourceMetadata} identifying the journal having the
+     * largest createTime that is less than or equal to the given timestamp.
+     * This is used primarily to locate the commit record that will serve as the
+     * ground state for a transaction having <i>timestamp</i> as its start
+     * time. In this context the LTE search identifies the most recent commit
+     * state that not later than the start time of the transaction.
      * 
      * @param timestamp
      *            The given timestamp.
      * 
-     * @return The commit record -or- <code>null</code> iff there are no
-     *         {@link ICommitRecord}s in the index that satisify the probe.
+     * @return The description of the relevant journal resource -or-
+     *         <code>null</code> iff there are no journals in the index that
+     *         satisify the probe.
      * 
-     * @see #get(long)
+     * @throws IllegalArgumentException
+     *             if <i>timestamp</i> is less than or equal to ZERO (0L).
      */
     synchronized public IResourceMetadata find(long timestamp) {
 
+        if (timestamp <= 0L)
+            throw new IllegalArgumentException();
+        
         // find (first less than or equal to).
         final int index = findIndexOf(timestamp);
         

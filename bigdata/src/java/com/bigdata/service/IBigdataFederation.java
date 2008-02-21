@@ -29,13 +29,13 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
 
 /**
  * The client-facing interface to a bigdata federation.
@@ -55,19 +55,16 @@ public interface IBigdataFederation {
     public IMetadataService getMetadataService();
     
     /**
-     * Return a read-only view of the index partitions for the named
-     * scale-out index.
+     * Return a read-only view of the index partitions for the named scale-out
+     * index.
      * 
      * @param name
      *            The name of the scale-out index.
      * 
-     * @return The partitions for that index (keys are byte[] partition
-     *         separator keys, values are serialized
-     *         {@link PartitionMetadata} objects).
-     * 
-     * @throws NoSuchIndexException
+     * @return The {@link IMetadataIndex} for the named scale-out index -or-
+     *         <code>null</code> iff there is no such scale-out index.
      */
-    public MetadataIndex getMetadataIndex(String name);
+    public IMetadataIndex getMetadataIndex(String name);
     
     /**
      * Register a scale-out index.

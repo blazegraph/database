@@ -48,7 +48,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrentJournal} to
+ * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrencyManager} to
  * execute concurrent unisolated write tasks and perform group commits. Tasks
  * extend {@link AbstractTask}. The caller receives a {@link Future} when they
  * submit a task to the write service. That {@link Future} is NOT available
@@ -132,35 +132,50 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    private ConcurrentJournal journal;
+//    private final ConcurrencyManager concurrencyManager;
+    
+    private final IResourceManager resourceManager;
+    
+//    private ConcurrentJournal journal;
 
-    protected ConcurrentJournal getJournal() {
+//    protected ConcurrentJournal getJournal() {
+//
+//        return journal;
+//
+//    }
 
-        return journal;
-
-    }
-
-    public WriteExecutorService(ConcurrentJournal journal, int corePoolSize,
-            int maximumPoolSize, BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
+    public WriteExecutorService(IResourceManager resourceManager, int corePoolSize,
+            int maximumPoolSize, BlockingQueue<Runnable> queue,
+            ThreadFactory threadFactory) {
 
         super( corePoolSize, maximumPoolSize, Integer.MAX_VALUE,
                 TimeUnit.NANOSECONDS,
                 queue, threadFactory);
 
-        setJournal(journal);
+//        if (concurrencyManager == null)
+//            throw new IllegalArgumentException();
+
+        if (resourceManager == null)
+            throw new IllegalArgumentException();
+        
+//        setJournal(journal);
+        
+//        this.concurrencyManager = concurrencyManager;
+
+        this.resourceManager = resourceManager;
         
     }
 
-    private void setJournal(ConcurrentJournal journal) {
-
-        if (journal == null)
-            throw new NullPointerException();
-
-        this.journal = journal;
-
-        //            lastCommitTime.set( journal.getRootBlockView().getLastCommitTime() );
-
-    }
+//    private void setJournal(ConcurrentJournal journal) {
+//
+//        if (journal == null)
+//            throw new NullPointerException();
+//
+//        this.journal = journal;
+//
+//        //            lastCommitTime.set( journal.getRootBlockView().getLastCommitTime() );
+//
+//    }
 
     /*
      * Support for pausing and resuming execution of new worker tasks.
@@ -478,10 +493,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * causing the entire group to be discarded.
                      */
                     
+                    AbstractJournal journal = resourceManager.getLiveJournal();
+                    
                     if(journal.isOpen()) {
+
                         throw new RetryException();
+                        
                     } else {
+                        
                         throw new IllegalStateException("Journal is closed");
+                        
                     }
                     
                 }
@@ -997,6 +1018,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * attempt to abort the write set.
              */
 
+            AbstractJournal journal = resourceManager.getLiveJournal();
+
             if(!journal.isOpen()) {
 
                 return false;
@@ -1151,6 +1174,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * abort().
              */
 
+            AbstractJournal journal = resourceManager.getLiveJournal();
+
             if(journal.isOpen()) {
 
                 // Abandon the write sets.
@@ -1163,6 +1188,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch(Throwable t) {
             
+            AbstractJournal journal = resourceManager.getLiveJournal();
+
             if(journal.isOpen()) {
 
                 log.error("Problem with abort?", t);

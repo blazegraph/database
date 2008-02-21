@@ -72,12 +72,13 @@ public class SequenceTask extends AbstractTask {
      * @param readOnly
      * @param resource
      */
-    protected SequenceTask(ConcurrentJournal journal, long startTime,
-            boolean readOnly, String[] resource, AbstractTask[] tasks) {
+    protected SequenceTask(IConcurrencyManager concurrencyManager,
+            long startTime, String[] resource, AbstractTask[] tasks) {
 
-        super(journal, startTime, readOnly, resource);
+        super(concurrencyManager, startTime, resource);
 
-        if(tasks==null) throw new IllegalArgumentException();
+        if (tasks == null)
+            throw new IllegalArgumentException();
         
         this.tasks = tasks;
         
@@ -100,7 +101,9 @@ public class SequenceTask extends AbstractTask {
         
         if(tasks[0]==null) throw new NullPointerException();
         
-        final AbstractJournal journal = tasks[0].getLiveJournal();
+        final IConcurrencyManager concurrencyManager = tasks[0].concurrencyManager;
+        
+        final IResourceManager resourceManager = tasks[0].resourceManager;
         
         final long startTime = tasks[0].startTime; 
         
@@ -117,7 +120,10 @@ public class SequenceTask extends AbstractTask {
             if (task == null)
                 throw new NullPointerException();
 
-            if (task.getLiveJournal() != journal)
+            if (task.concurrencyManager != concurrencyManager)
+                throw new IllegalArgumentException();
+
+            if (task.resourceManager != resourceManager)
                 throw new IllegalArgumentException();
 
             if (task.startTime != startTime)
@@ -130,9 +136,8 @@ public class SequenceTask extends AbstractTask {
             
         }
         
-        return new SequenceTask((ConcurrentJournal) journal, startTime,
-                readOnly, resources.toArray(new String[resources.size()]),
-                tasks);
+        return new SequenceTask(concurrencyManager, startTime, resources
+                .toArray(new String[resources.size()]), tasks);
         
     }
     

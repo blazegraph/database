@@ -38,6 +38,7 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.Tuple;
 import com.bigdata.journal.ITx;
 
@@ -329,16 +330,16 @@ public class IsolatedFusedView extends FusedView {
      * the global scope.
      * </p>
      * 
-     * @param currentGroundState
-     *            This MUST be the current view of the ground state as of when
-     *            the transaction is validated (NOT when it was created). This
-     *            view WILL NOT the same as the groundState specified to the
-     *            constructor if intervening transactions have committed on the
-     *            index.
+     * @param groundStateSources
+     *            The ordered view of the unisolated index. This MUST be the
+     *            current view of the ground state as of when the transaction is
+     *            validated (NOT when it was created). This view WILL NOT the
+     *            same as the groundState specified to the constructor if
+     *            intervening transactions have committed on the index.
      * 
      * @return True iff validation succeeds.
      */
-    public boolean validate(IIndex currentGroundState) {
+    public boolean validate(AbstractBTree[] groundStateSources) {
 
         if (isEmptyWriteSet()) {
 
@@ -405,6 +406,21 @@ public class IsolatedFusedView extends FusedView {
         BTree tmp = null;
 
         /*
+         * A view onto the consistent state of the current global scope for that
+         * index. We use this ONLY for reading (clearly).
+         */
+        final IIndex groundState = (groundStateSources.length == 1 ? groundStateSources[0]
+                : new FusedView(groundStateSources));
+        
+//        /*
+//         * The btree that is absorbing writes for the index. We need this as a
+//         * BTree and not a FusedView or IIndex in order to handle all of the
+//         * cases as cleanly as possible - what matters is having access to the
+//         * core lookup() method on AbstractBTree.
+//         */
+//        final BTree groundStateWriteSet = (BTree) groundStateSources[0];
+        
+        /*
          * Scan the write set of the transaction.
          * 
          * Note: Both indices have the same total ordering so we are essentially
@@ -428,16 +444,16 @@ public class IsolatedFusedView extends FusedView {
             final byte[] key = txEntry.getKey();
 
             // Lookup the entry in the global scope.
-            final ITuple baseEntry;
+            final ITuple baseEntry; //= groundState.lookup(key, groundStateTuple);
             
-            if(currentGroundState instanceof AbstractBTree) {
+            if(groundState instanceof AbstractBTree) {
                 
-                 baseEntry = ((AbstractBTree) currentGroundState).lookup(key,
+                 baseEntry = ((AbstractBTree) groundState).lookup(key,
                         groundStateTuple);
                  
             } else {
 
-                baseEntry = ((FusedView) currentGroundState).lookup(key,
+                baseEntry = ((FusedView) groundState).lookup(key,
                         groundStateTuple);
 
             }
@@ -588,12 +604,36 @@ public class IsolatedFusedView extends FusedView {
      * @param commitTime
      *            The commit time assigned to the transaction.
      * 
-     * @param globalScope
-     *            The unisolated {@link BTree} absorbing writes for the index
-     *            (or index partition).
+     * @param groundStateSources
+     *            The ordered view of the unisolated index. This MUST be the
+     *            current view of the ground state as of when the transaction is
+     *            validated (NOT when it was created). This view WILL NOT the
+     *            same as the groundState specified to the constructor if
+     *            intervening transactions have committed on the index.
      */
-    public void mergeDown(final long commitTime, BTree globalScope) {
+    public void mergeDown(final long commitTime,
+            AbstractBTree[] groundStateSources) {
 
+        /*
+         * A read-only view onto the consistent state of the current global
+         * scope for that index. We use this ONLY for reading (clearly).
+         */
+//        final IIndex groundStateScope = new ReadOnlyFusedView(groundStateSources);
+        /*
+         * A view onto the consistent state of the current global scope for that
+         * index. We use this ONLY for reading (clearly).
+         */
+        final IIndex groundState = (groundStateSources.length == 1 ? groundStateSources[0]
+                : new FusedView(groundStateSources));
+        
+        /*
+         * The btree that is absorbing writes for the index. We need this as a
+         * BTree and not a FusedView or IIndex in order to handle all of the
+         * cases as cleanly as possible - what matters is having access to the
+         * core insert method on AbstractBTree.
+         */
+        final BTree groundStateWriteSet = (BTree) groundStateSources[0];
+        
         /*
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
@@ -617,10 +657,10 @@ public class IsolatedFusedView extends FusedView {
                  * have a "delete marker" for this key.
                  */
 
-                if (globalScope.contains(key)) {
+                if (groundState.contains(key)) {
 
 //                    globalScope.remove(key);
-                    globalScope.insert(key, null/* val */, true/* delete */,
+                    groundStateWriteSet.insert(key, null/* val */, true/* delete */,
                             commitTime, null/*tuple*/);
 
                 } else {
@@ -641,8 +681,8 @@ public class IsolatedFusedView extends FusedView {
                  * unisolated index entry.
                  */
 
-                globalScope.insert(key, entry.getValue(), false/* delete */,
-                        commitTime, null/* tuple */);
+                groundStateWriteSet.insert(key, entry.getValue(),
+                        false/* delete */, commitTime, null/* tuple */);
 
             }
 

@@ -59,10 +59,10 @@ public class RegisterIndexTask extends AbstractTask {
      * 
      * to register a new index that supports isolation.
      */
-    public RegisterIndexTask(ConcurrentJournal journal, String name,
-            IndexMetadata metadata) {
+    public RegisterIndexTask(IConcurrencyManager concurrencyManager,
+            String name, IndexMetadata metadata) {
 
-        super(journal, ITx.UNISOLATED, false/* readOnly */, name);
+        super(concurrencyManager, ITx.UNISOLATED, name);
 
         if (metadata == null)
             throw new NullPointerException();
@@ -80,7 +80,7 @@ public class RegisterIndexTask extends AbstractTask {
 
         String name = getOnlyResource();
 
-        IIndex ndx = getLiveJournal().getIndex(name);
+        IIndex ndx = getJournal().getIndex(name);
             
         if (ndx != null) {
 
@@ -93,10 +93,10 @@ public class RegisterIndexTask extends AbstractTask {
         }
 
         // create index instance.
-        final BTree btree = BTree.create(getLiveJournal(), metadata);
+        final BTree btree = BTree.create(getJournal(), metadata);
 
         // register the index.
-        getLiveJournal().registerIndex(name, btree);
+        getJournal().registerIndex(name, btree);
 
         final UUID indexUUID = btree.getIndexMetadata().getIndexUUID();
 

@@ -41,24 +41,23 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 
 /**
- * Abstract base class for tasks that may be submitted to the
- * {@link ConcurrentJournal}. Tasks may be isolated (by a transaction) or
+ * Abstract base class for tasks that may be submitted to an
+ * {@link IConcurrencyManager}. Tasks may be isolated (by a transaction) or
  * unisolated. Tasks access named resources (aka indices), which they
  * pre-declare in their constructors.
  * <p>
  * Isolated tasks are part of a larger transaction. Transactions are started and
- * committed using an {@link ITransactionManager}. Several kinds of isolation
- * are supported - see {@link IsolationEnum}. Transactional tasks run with full
- * concurrency using an MVCC (Multi-Version Concurrency Control) strategy. When
- * a transaction is committed (by the {@link ITransactionManager}) it must wait
- * for lock(s) on the unisolated named indices on which it has written before it
- * may validate and commit.
+ * committed using an {@link ITransactionManagerService}. Several kinds of
+ * isolation are supported - see {@link IsolationEnum}. Transactional tasks run
+ * with full concurrency using an MVCC (Multi-Version Concurrency Control)
+ * strategy. When a transaction is committed (by the
+ * {@link ITransactionManagerService}) it must wait for lock(s) on the
+ * unisolated named indices on which it has written before it may validate and
+ * commit.
  * <p>
  * Unisolated tasks are further divided into read only and read/write. A
  * read-only task reads against the last committed state of a named index.
@@ -73,7 +72,10 @@ import com.bigdata.concurrent.LockManagerTask;
  * Pre-declaration of locks allows us to avoid deadlocks in the lock system.
  * <p>
  * Note: Use a distinct instance of this task each time you
- * {@link ConcurrentJournal#submit(AbstractTask)} it!
+ * {@link ConcurrencyManager#submit(AbstractTask)} it!
+ * 
+ * @todo review javadoc here and on {@link AbstractJournal} and the
+ *       {@link IConcurrencyManager} interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -86,14 +88,30 @@ public abstract class AbstractTask implements Callable<Object> {
      * Used to protect against re-submission of the same task object.
      */
     private final AtomicBoolean submitted = new AtomicBoolean(false);
+
+    /**
+     * The object used to manage exclusive access to the unisolated indices.
+     */
+    protected final IConcurrencyManager concurrencyManager;
     
     /**
-     * The live journal.
+     * The object used to manage local transactions.
      */
-    private final ConcurrentJournal journal;
+    protected final ILocalTransactionManager transactionManager;
+    
+    /**
+     * The object used to manage access to the resources from which views of the
+     * indices are created.
+     */
+    protected final IResourceManager resourceManager;
     
     /**
      * The journal against which the operation will be carried out.
+     * <p>
+     * If the task is running against an unisolated index, then this will be the
+     * {@link IResourceManager#getLiveJournal()}. Otherwise it will be whatever
+     * journal is appropriate to the historical commit point against which the
+     * task is being run.
      * <p>
      * Note: This exposes unconstrained access to the journal that could be used
      * to violate the concurrency control mechanisms, therefore you SHOULD NOT
@@ -102,25 +120,98 @@ public abstract class AbstractTask implements Callable<Object> {
      * {@link #getIndex(String)} and operations on the returned index. Using
      * {@link SequenceTask} you can combine application specific unisolated
      * write tasks with tasks that add or drop indices into atomic operations.
+     * 
+     * @return The corresponding journal for that timestamp -or-
+     *         <code>null</code> if no journal has data for that timestamp,
+     *         including when a historical journal with data for that timestamp
+     *         has been deleted.
+     *         
+     * @see IResourceManager#getJournal(long)
      */
-    protected final AbstractJournal getLiveJournal() {
+    protected final AbstractJournal getJournal() {
+        
+        final AbstractJournal journal = resourceManager.getJournal(Math
+                .abs(startTime));
+        
+        log.warn("No such journal: timestamp=" + startTime);
         
         return journal;
         
     }
+    
+//    /**
+//     * Find and cache the appropriate commit record for this task.
+//     * 
+//     * @return The commit record -or- <code>null</code> iff there is no commit
+//     *         record corresponding to the {@link #startTime} for this task.
+//     */
+//    protected final ICommitRecord getCommitRecord() {
+//        
+//        if (commitRecord == null) {
+//            
+//            final AbstractJournal journal = getJournal();
+//
+//            if (journal == null) return null;
+//            
+//            if (startTime < ITx.UNISOLATED) {
+//
+//                /*
+//                 * Historical read task.
+//                 */
+//                
+//                commitRecord = journal.getCommitRecord(-startTime);
+//
+//                if (commitRecord == null) {
+//
+//                    log.warn("No commit point less than startTime="
+//                            + (-startTime));
+//
+//                    return null;
+//                    
+//                }
+//
+//                log.info("Found historical committed state"+
+//                        ": startTime=" + startTime +
+//                        ", commitCounter=" + commitRecord.getCommitCounter() +
+//                        ", timestamp="+ commitRecord.getTimestamp()
+//                        );
+//
+//            } else {
+//
+//                /*
+//                 * Read only task. We note the most recent commit record so that
+//                 * we can base all read-only views off of the same consistent
+//                 * historical state (and so that we do not conflict with
+//                 * unisolated writers on the live versions of the indices).
+//                 */
+//
+//                commitRecord = journal.getCommitRecord();
+//
+//                log.info("Found most recent committed state"+
+//                        ": commitCounter="+ commitRecord.getCommitCounter()+
+//                        ", timestamp="+ commitRecord.getTimestamp()
+//                        );
+//
+//            }
+//
+//        }
+//
+//        return commitRecord;
+//        
+//    }
 
     /**
      * The transaction identifier -or- {@link ITx#UNISOLATED} IFF the operation
-     * is NOT isolated by a transaction -or- <code> - tx </code> to read from
-     * the most recent commit point not later than the absolute value of <i>tx</i>
-     * (a fully isolated read-only transaction using a historical start time).
+     * is NOT isolated by a transaction -or- <code> - startTime </code> to read
+     * from the most recent commit point not later than the absolute value of
+     * <i>startTime</i>.
      */
     protected final long startTime;
 
     /**
      * True iff the operation is isolated by a transaction.
      */
-    protected final boolean fullyIsolated;
+    protected final boolean isTransaction;
 
     /**
      * True iff the operation is not permitted to write.
@@ -146,14 +237,14 @@ public abstract class AbstractTask implements Callable<Object> {
      */
     protected final ITx tx;
 
-    /**
-     * We note and save a reference to the most recent commit record when we
-     * begin a task that is an <strong>unisolated reader</strong>. This allows
-     * us to ensure that all index views requested by that reader are (a) from
-     * the same committed state of the store; and (b) do NOT conflict with
-     * unisolated writers (which are NOT thread-safe).
-     */
-    private ICommitRecord commitRecord = null;
+//    /**
+//     * We note and save a reference to the most recent commit record when we
+//     * begin a task that is an <strong>unisolated reader</strong>. This allows
+//     * us to ensure that all index views requested by that reader are (a) from
+//     * the same committed state of the store; and (b) do NOT conflict with
+//     * unisolated writers (which are NOT thread-safe).
+//     */
+//    private ICommitRecord commitRecord = null;
     
     /**
      * Cache of resolved named indices.
@@ -171,41 +262,37 @@ public abstract class AbstractTask implements Callable<Object> {
     /**
      * Convenience constructor variant for one named resource.
      * 
-     * @param journal
-     *            The journal on which the task will be executed.
+     * @param concurrencyControl
+     *            The object used to control access to the local resources.
      * @param startTime
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
      *            <code> - tx </code> to read from the most recent commit point
      *            not later than the absolute value of <i>tx</i> (a fully
      *            isolated read-only transaction using a historical start time).
-     * @param readOnly
-     *            True iff the task is read-only.
      * @param resource
      *            The resource on which the task will operate. E.g., the names
      *            of the index. When the task is an unisolated write task an
      *            exclusive lock will be requested on the named resource and the
      *            task will NOT run until it has obtained that lock.
      */
-    protected AbstractTask(ConcurrentJournal journal, long startTime,
-            boolean readOnly, String resource) {
-        
-        this(journal, startTime, readOnly, new String[] { resource });
+    protected AbstractTask(IConcurrencyManager concurrencyManager,
+            long startTime, String resource) {
+
+        this(concurrencyManager, startTime, new String[] { resource });
         
     }
     
     /**
      * 
-     * @param journal
-     *            The journal on which the task will be executed.
+     * @param concurrencyControl
+     *            The object used to control access to the local resources.
      * @param startTime
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
      *            <code> - tx </code> to read from the most recent commit point
      *            not later than the absolute value of <i>tx</i> (a fully
      *            isolated read-only transaction using a historical start time).
-     * @param readOnly
-     *            True iff the task is read-only.
      * @param resource
      *            The resource(s) on which the task will operate. E.g., the
      *            names of the index(s). When the task is an unisolated write
@@ -213,41 +300,62 @@ public abstract class AbstractTask implements Callable<Object> {
      *            resource and the task will NOT run until it has obtained those
      *            lock(s).
      */
-    protected AbstractTask(ConcurrentJournal journal, long startTime,
-            boolean readOnly, String[] resource) {
+    protected AbstractTask(IConcurrencyManager concurrencyManager,
+            long startTime, String[] resource) {
+        
+        if (concurrencyManager == null) {
 
-        if (journal == null)
             throw new NullPointerException();
 
-//        if (startTime < 0L) {
-//            throw new IllegalArgumentException("startTime is negative: "
-//                    + startTime);
-//        }
+        }
 
-        if (startTime < 0L && !readOnly) {
-            
-            throw new IllegalArgumentException("historical reads must be flagged as read-only");
+//        if (startTime < ITx.UNISOLATED && !readOnly) {
+//
+//            throw new IllegalArgumentException(
+//                    "Historical reads must be flagged as read-only");
+//
+//        }
+//
+//        if (startTime == ITx.UNISOLATED && readOnly) {
+//
+//            /*
+//             * Note: For this you generally want to use ITx.READ_COMMITTED
+//             * instead.
+//             */
+//            
+//            throw new IllegalArgumentException(
+//                    "Unisolated operations may not be flagged as read-only.");
+//            
+//        }
+        
+        if (resource == null) {
+
+            throw new NullPointerException();
             
         }
-        
-        if (resource == null)
-            throw new NullPointerException();
 
         for(int i=0; i<resource.length; i++) {
             
-            if (resource[i] == null)
+            if (resource[i] == null) {
+
                 throw new NullPointerException();
+                
+            }
             
         }
         
-        this.journal = journal;
+        this.concurrencyManager = concurrencyManager;
 
+        this.transactionManager = concurrencyManager.getTransactionManager();
+
+        this.resourceManager = concurrencyManager.getResourceManager();
+        
         this.startTime = startTime;
 
-        this.fullyIsolated = startTime > ITx.UNISOLATED;
+        this.isTransaction = startTime > ITx.UNISOLATED;
 
-        this.readOnly = readOnly; // @todo override as true if startTime<0L?
-
+//        this.readOnly = readOnly;
+        
         this.resource = resource;
 
         this.indexCache = new HashMap<String,IIndex>(resource.length);
@@ -255,10 +363,26 @@ public abstract class AbstractTask implements Callable<Object> {
         if (startTime > ITx.UNISOLATED) {
 
             /*
-             * Isolated read.
+             * A transaction.
+             * 
+             * Transactions are always identified by a positive timestamp giving
+             * the startTime of the transaction and from which we can determine
+             * the commit record from which that transaction will read.
+             * 
+             * The transaction startTime is generated by the transaction
+             * manager. When the desired startTime is historical, the
+             * transaction manager will (a) verify that it can assert read locks
+             * for the historical commit point; and (b) return a startTime not
+             * in use by any other transaction which will be used to identify
+             * the new transaction - if necessary the request for the new
+             * transaction may be delayed until a suitable startTime is
+             * available.
+             * 
+             * If the transaction is read-write then it will write on a fully
+             * isolated write set.
              */
 
-            tx = journal.getTx(startTime);
+            tx = transactionManager.getTx(startTime);
 
             if (tx == null) {
 
@@ -272,29 +396,41 @@ public abstract class AbstractTask implements Callable<Object> {
 
             }
 
-            if (tx.isReadOnly() != readOnly) {
+            readOnly = tx.isReadOnly();
+            
+//            if (tx.isReadOnly() != readOnly) {
+//
+//                throw new IllegalArgumentException("Tx readOnly="
+//                        + tx.isReadOnly() + ", but task readOnly="
+//                        + readOnly);
+//                
+//            }
 
-                throw new IllegalArgumentException("Tx readOnly="
-                        + tx.isReadOnly() + ", but task readOnly="
-                        + readOnly);
-                
-            }
-            
-        } else if(startTime<ITx.UNISOLATED) {
-          
+        } else if (startTime < ITx.UNISOLATED) {
+
             /*
-             * Historical read.
+             * A lightweight historical read.
+             * 
+             * Note: A lightweight historical reads does not assert read locks
+             * and is not coordinated with the transaction manager.
+             * 
+             * Note: Read-committed isolation is handled as a special case of
+             * lightweight historical read.
              */
-            
+
             tx = null;
+            
+            readOnly = true;
             
         } else {
 
             /*
-             * Unisolated read.
+             * Unisolated operation.
              */
 
             tx = null;
+            
+            readOnly = false;
 
         }
 
@@ -431,7 +567,7 @@ public abstract class AbstractTask implements Callable<Object> {
         
         try {
             
-            if (fullyIsolated) {
+            if (isTransaction) {
 
                 log.info("Running isolated operation: tx="+startTime);
                 
@@ -484,7 +620,9 @@ public abstract class AbstractTask implements Callable<Object> {
                  * the lock manager for the unisolated indices.
                  */
 
-                return doReadWriteTask();
+                assert startTime == ITx.UNISOLATED;
+                
+                return doUnisolatedReadWriteTask();
                 
             }
 
@@ -499,16 +637,15 @@ public abstract class AbstractTask implements Callable<Object> {
     /**
      * Call {@link #doTask()} for an unisolated write task.
      * <p>
-     * Note: This uses a delegate that coordinates with
-     * {@link ConcurrentJournal#lockManager} to force a schedule on tasks that
-     * write on unisolated indices.
+     * Note: This coordinates with {@link IConcurrencyManager#getLockManager()}
+     * to force a schedule on tasks that write on unisolated indices.
      * 
      * @throws Exception
      */
-    private Object doReadWriteTask() throws Exception {
+    private Object doUnisolatedReadWriteTask() throws Exception {
         
         // lock manager.
-        LockManager<String> lockManager = ((ConcurrentJournal) journal).lockManager;
+        final LockManager<String> lockManager = concurrencyManager.getLockManager();
 
         // resource(s) to lock (exclusive locks are used).
 
@@ -522,7 +659,7 @@ public abstract class AbstractTask implements Callable<Object> {
         Callable<Object> delegate = new LockManagerTask<String>(
                 lockManager, resource, new InnerWriteServiceCallable());
         
-        WriteExecutorService writeService = ((ConcurrentJournal) journal).writeService;
+        final WriteExecutorService writeService = concurrencyManager.getWriteService();
 
         writeService.beforeTask(Thread.currentThread(), this);
 
@@ -778,18 +915,14 @@ public abstract class AbstractTask implements Callable<Object> {
      *                operation is executed.
      * 
      * @exception IllegalStateException
-     *                if the named index was not declared to the constructor.
+     *                if the named index is not one of the resources declared to
+     *                the constructor.
      * 
-     * FIXME When the named {@link BTree} is an index partition (its metadata
-     * record has a non-null partition metadata field) then this method MUST
-     * return fused view that reads the resources for the index partition. The
-     * necessary resources are described in that partition metadata (except that
-     * it also needs a commitTime field).
-     * <p>
-     * Make sure that the {@link IndexSegment}s are not re-opened all the time
-     * and that we never have a given {@link IndexSegment} "double open". This
-     * MIGHT require coordindation by the data service, which should introduce
-     * additional tasks for overflow and compacting merges.
+     * @todo Make sure that we have tests for historical reads (including
+     *       readOnly with timestamp == 0L), unisolated read-write tasks, and
+     *       various kinds of transactions (timestamp > 0L). Also verify when
+     *       the indices are views with more than one resource (e.g., there are
+     *       one or more index segments that are part of the view).
      */
     final public IIndex getIndex(String name) {
 
@@ -830,159 +963,103 @@ public abstract class AbstractTask implements Callable<Object> {
         // validate that this is a declared index.
         assertResource(name);
         
-        final IIndex tmp;
+        final IIndex tmp = transactionManager.getIndex(name, startTime);
+        
+        if (tmp == null) {
 
-        if (fullyIsolated) {
-
-            /*
-             * Isolated operation.
-             * 
-             * Note: The backing index is always a historical state of the named
-             * index.
-             */
-
-            final IIndex isolatedIndex = (IIndex) tx.getIndex(name);
-
-            if (isolatedIndex == null) {
-
-                throw new NoSuchIndexException(name);
-
-            }
-
-            tmp = (IIndex) isolatedIndex;
-
-        } else {
-
-            /*
-             * historical read -or- unisolated read operation.
-             */
-
-            if (readOnly) {
-
-                if (commitRecord == null) {
-                    
-                    /*
-                     * Find the appropriate commit record for this task.
-                     * 
-                     * Note: We will save it so that all index views for the
-                     * task are based on the same commit record.
-                     */
-                    
-                    if (startTime < ITx.UNISOLATED) {
-
-                        /*
-                         * Historical read task.
-                         */
-                        
-                        commitRecord = journal.getCommitRecord(-startTime);
-
-                        if (commitRecord == null) {
-
-                            throw new NoSuchIndexException(name
-                                    + " : No commit point less than startTime="
-                                    + (-startTime));
-
-                        }
-
-                        log
-                                .info("Running historical reader against committed state: commitCounter="
-                                        + commitRecord.getCommitCounter()
-                                        + ", timestamp="
-                                        + commitRecord.getTimestamp());
-
-                    } else {
-
-                        /*
-                         * Read only task. We note the most recent commit record
-                         * so that we can base all read-only views off of the
-                         * same consistent historical state (and so that we do
-                         * not conflict with unisolated writers on the live
-                         * versions of the indices).
-                         */
-
-                        commitRecord = journal.getCommitRecord();
-
-                        /*
-                         * The read-only unisolated index is based on the last
-                         * committed state of the store.
-                         * 
-                         * Note: We use this version of the index rather than
-                         * the "live" index so that read operations on
-                         * unisolated indices DO NOT conflict with write
-                         * operations on unisolated indices.
-                         */
-
-                        if (commitRecord.getCommitCounter() == 0) {
-
-                            /*
-                             * This catches the edge case where nothing has been
-                             * committed onto the journal. In this case it is
-                             * not possible to create a read-only unisolated
-                             * view based on the last committed state since
-                             * NOTHING has been committed.
-                             */
-
-                            throw new NoSuchIndexException(name);
-
-                        }
-
-                        log
-                                .info("Running unisolated reader against committed state: commitCounter="
-                                        + commitRecord.getCommitCounter()
-                                        + ", timestamp="
-                                        + commitRecord.getTimestamp());
-
-                    }
-
-                }
-                
-                /*
-                 * This is a historical state for the named index.
-                 */
-                
-                IIndex foo = journal.getIndex(name,commitRecord);
-                
-                if (foo == null) {
-                    
-                    throw new NoSuchIndexException(name);
-
-                }
-                
-                /*
-                 * Wrap the index such that attempts to write on it will cause
-                 * an UnsupportedOperationException to be thrown.
-                 */
-
-                tmp = new ReadOnlyIndex(foo);
-            
-            } else {
-                
-                /*
-                 * Writable unisolated index.
-                 * 
-                 * Note: This is the "live" mutable index. This index is NOT
-                 * thread-safe. A lock system is used to ensure that at most one
-                 * task has access to this index at a time.
-                 */
-                
-                tmp = (BTree) journal.getIndex(name);
-
-                if (tmp == null) {
-
-                    throw new NoSuchIndexException(name);
-
-                }
-
-            }
+            throw new NoSuchIndexException(name + " @ " + startTime);
 
         }
+        
+// final IIndex tmp;
+//
+//        if (isTransaction) {
+//
+//            /*
+//             * Isolated operation.
+//             * 
+//             * Note: The backing index is always a historical state of the named
+//             * index.
+//             */
+//
+//            final IIndex isolatedIndex = tx.getIndex(name);
+//
+//            if (isolatedIndex == null) {
+//
+//                throw new NoSuchIndexException(name);
+//
+//            }
+//
+//            tmp = isolatedIndex;
+//
+//        } else {
+//            
+//            /*
+//             * historical read -or- unisolated read operation.
+//             */
+//
+//            if (readOnly) {
+//
+//                final AbstractBTree[] sources = resourceManager
+//                        .getIndexSources(name, startTime);
+//
+//                if (sources == null) {
+//
+//                    throw new NoSuchIndexException(name);
+//
+//                }
+//
+//                if (sources.length == 1) {
+//
+//                    tmp = new ReadOnlyIndex( sources[0] );
+//
+//                } else {
+//
+//                    tmp = new ReadOnlyFusedView(sources);
+//
+//                }
+//                            
+//            } else {
+//                
+//                /*
+//                 * Writable unisolated index.
+//                 * 
+//                 * Note: This is the "live" mutable index. This index is NOT
+//                 * thread-safe. A lock manager is used to ensure that at most
+//                 * one task has access to this index at a time.
+//                 */
+//
+//                assert startTime == ITx.UNISOLATED;
+//                
+//                final AbstractBTree[] sources = resourceManager
+//                        .getIndexSources(name, ITx.UNISOLATED);
+//                
+//                if (sources == null) {
+//
+//                    throw new NoSuchIndexException(name);
+//
+//                }
+//
+//                if (sources.length == 1) {
+//
+//                    tmp = sources[0];
+//                    
+//                } else {
+//                    
+//                    tmp = new FusedView( sources );
+//                    
+//                }
+//
+//            }
+//
+//        }
 
         /*
          * Put the index into a hard reference cache under its name so that we
          * can hold onto it for the duration of the operation.
          */
 
-        indexCache.put(name,tmp);
+        indexCache.put(name, tmp);
 
         return tmp;
 

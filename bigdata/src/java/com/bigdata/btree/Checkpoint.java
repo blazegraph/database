@@ -151,12 +151,8 @@ public class Checkpoint implements Externalizable {
      * 
      * @param metadata
      *            The index metadata record.
-     * @param counter
-     *            The initial value of the counter (0L the first time an index
-     *            is created and whatever the old value of the counter was when
-     *            an index overflows onto a new backing store).
      */
-    public Checkpoint(IndexMetadata metadata, Long counter ) {
+    public Checkpoint(IndexMetadata metadata ) {
 
         this( //
                 metadata.getMetadataAddr(), //
@@ -165,7 +161,32 @@ public class Checkpoint implements Externalizable {
                 0, // nnodes
                 0, // nleaves
                 0, // nentries
-                counter.longValue()
+                0L // counter
+        );
+        
+    }
+
+    /**
+     * Create the first checkpoint record for an existing {@link BTree} when it
+     * is propagated on overflow onto a new backing {@link IRawStore}.
+     * 
+     * @param metadata
+     *            The index metadata record.
+     * @param oldCheckpoint
+     *            The last {@link Checkpoint} for the index on the old backing
+     *            store.  The {@link Checkpoint#counter} is propagated to the
+     *            new {@link Checkpoint} record.
+     */
+    public Checkpoint(IndexMetadata metadata, Checkpoint oldCheckpoint ) {
+
+        this( //
+                metadata.getMetadataAddr(), //
+                0L,// No root yet.
+                0, // height 
+                0, // nnodes
+                0, // nleaves
+                0, // nentries
+                oldCheckpoint.counter
         );
         
     }

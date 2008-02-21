@@ -48,24 +48,24 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
-import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceRangeIterator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * Test suite for the {@link ConcurrentJournal}.
+ * Test suite for the {@link IConcurrencyManager} interface on the
+ * {@link Journal}.
  * 
  * @todo write test cases that submit various kinds of operations and verify the
  *       correctness of those individual operations. refactor the services
  *       package to do this, including things such as the
- *       {@link DataServiceRangeIterator}. this will help to isolate the correctness
- *       of the data service "api", including concurrency of operations, from
- *       the {@link DataService}.
+ *       {@link DataServiceRangeIterator}. this will help to isolate the
+ *       correctness of the data service "api", including concurrency of
+ *       operations, from the {@link DataService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -81,7 +81,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
     }
 
     /**
-     * Test ability to create a {@link ConcurrentJournal} and then shut it down.
+     * Test ability to create a {@link Journal} and then shut it down (in
+     * particular this is testing shutdown of the thread pool on the
+     * {@link ConcurrencyManager}).
      */
     public void test_shutdown() {
 
@@ -126,7 +128,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         final AtomicBoolean ran = new AtomicBoolean(false);
         
         Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, true/*readOnly*/, resource) {
+                ITx.READ_COMMITTED, resource) {
 
             /**
              * The task just sets a boolean value and returns the name of the
@@ -183,7 +185,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         final AtomicBoolean ran = new AtomicBoolean(false);
         
         Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/*readOnly*/, resource) {
+                ITx.UNISOLATED, resource) {
 
             /**
              * The task just sets a boolean value and returns the name of the
@@ -244,7 +246,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         assertNotSame(ITx.UNISOLATED,tx);
         
         Future<Object> future = journal.submit(new AbstractTask(journal,
-                tx, true/*readOnly*/, resource) {
+                tx, resource) {
 
             /**
              * The task just sets a boolean value and returns the name of the
@@ -305,12 +307,12 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        final long tx = journal.newTx(IsolationEnum.ReadCommitted);
-
-        assertNotSame(ITx.UNISOLATED,tx);
+        final long tx = ITx.READ_COMMITTED;
+//        final long tx = journal.newTx(IsolationEnum.ReadCommitted);
+//      assertNotSame(ITx.UNISOLATED, tx);
         
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                tx, true/*readOnly*/, resource) {
+        Future<Object> future = journal.submit(new AbstractTask(journal, tx,
+                resource) {
 
             /**
              * The task just sets a boolean value and returns the name of the
@@ -341,9 +343,16 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 commitCounterBefore, journal.getRootBlockView()
                         .getCommitCounter());
 
-        // commit of a readCommitted tx returns commitTime of ZERO(0L).
-        assertEquals(0L,journal.commit(tx));
-        
+//        // commit of a readCommitted tx returns commitTime of ZERO(0L).
+//        assertEquals(0L,journal.commit(tx));
+        // should be illegal since this is not a full transaction.
+        try {
+            journal.abort(tx);
+            fail("Expecting: "+IllegalStateException.class);
+        } catch(IllegalStateException ex) {
+            log.info("Ignoring expected exception: "+ex);
+        }
+
         journal.shutdown();
 
         journal.delete();
@@ -375,7 +384,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         assertNotSame(ITx.UNISOLATED,tx);
         
         Future<Object> future = journal.submit(new AbstractTask(journal,
-                tx, false/*readOnly*/, resource) {
+                tx, resource) {
 
             /**
              * The task just sets a boolean value and returns the name of the
@@ -442,7 +451,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         final AtomicBoolean ran = new AtomicBoolean(false);
         
         Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, resource) {
+                ITx.UNISOLATED, resource) {
 
             /**
              * The task just sets a boolean value and then sleeps.
@@ -562,8 +571,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final AtomicBoolean ran = new AtomicBoolean(false);
         
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, resource) {
+        Future<Object> future = journal.submit(new AbstractTask(journal, 
+                ITx.UNISOLATED, resource) {
 
             /**
              * The task just sets a boolean value and then runs an infinite
@@ -677,7 +686,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         }
         
         Future<Object> f1 = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, resource) {
+                ITx.UNISOLATED, resource) {
 
             /**
              */
@@ -686,7 +695,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 runState.compareAndSet(0, 1);
 
                 // low-level write so there is some data to be committed.
-                getLiveJournal().write(getRandomData());
+                getJournal().write(getRandomData());
 
                 // wait more before exiting.
                 {
@@ -717,15 +726,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         // force async abort of the commit group.
         
-        Future<Object> f2 = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, new String[] { }) {
+        Future<Object> f2 = journal.submit(new AbstractTask(journal, 
+                ITx.UNISOLATED, new String[] { }) {
 
             protected Object doTask() throws Exception {
 
                 log.warn("Running task that will force abort of the commit group.");
                 
                 // low-level write.
-                getLiveJournal().write(getRandomData());
+                getJournal().write(getRandomData());
 
                 throw new PrivateException("Forcing abort of the commit group.");
                 
@@ -749,7 +758,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             try {
                 if(runState.get()<4) {
                     // No abort yet.
-                    assertEquals("Not expecting abort",0,journal.writeService.getAbortCount());
+                    assertEquals("Not expecting abort",0,journal.getConcurrencyManager().writeService.getAbortCount());
                 }
             } finally {
                 lock.unlock();
@@ -764,7 +773,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             log.warn("Waiting for the abort.");
             final long begin = System.currentTimeMillis();
             while ((begin - System.currentTimeMillis()) < 1000) {
-                if (journal.writeService.getAbortCount() > 0) {
+                if (journal.getConcurrencyManager().writeService.getAbortCount() > 0) {
                     log.warn("Noticed abort");
                     break;
                 } else {
@@ -777,7 +786,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
         }
 
         // verify did abort.
-        assertEquals("Expecting abort",1,journal.writeService.getAbortCount());
+        assertEquals("Expecting abort", 1,
+                journal.getConcurrencyManager().writeService.getAbortCount());
 
         /*
          * Verify that both futures are complete and that both throw exceptions
@@ -827,8 +837,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
         /*
          * Note: this task is stateless
          */
-        final AbstractTask task = new AbstractTask(journal,
-                ITx.UNISOLATED, false/* readOnly */, resource) {
+        final AbstractTask task = new AbstractTask(journal, 
+                ITx.UNISOLATED, resource) {
 
             protected Object doTask() throws Exception {
 
@@ -1086,16 +1096,25 @@ public class TestConcurrentJournal extends ProxyTestCase {
              */
             class ReadTask extends AbstractTask {
 
-                protected ReadTask(ConcurrentJournal journal, String resource) {
-                    super(journal, ITx.UNISOLATED, true/* readOnly */,
-                            resource);
+                protected ReadTask(IConcurrencyManager concurrencyManager,
+                        String resource) {
+
+                    super(concurrencyManager, ITx.READ_COMMITTED, resource);
+
                 }
 
                 protected Object doTask() throws Exception {
 
                     IIndex ndx = getIndex(getOnlyResource());
-                    
-                    assertTrue(ndx instanceof ReadOnlyIndex);
+
+                    // verify writes not allowed.
+                    try {
+                        ndx.insert(new byte[]{}, new byte[]{});
+                        fail("Expecting: "+UnsupportedOperationException.class);
+                    }catch(UnsupportedOperationException ex) {
+                        log.info("Ingoring expected exception: "+ex);
+                    }
+//                    assertTrue(ndx instanceof ReadOnlyIndex);
                     
                     IEntryIterator itr = ndx.rangeIterator(null, null);
 
@@ -1135,8 +1154,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 writerService.submit(new Callable<Object>() {
                     public Object call() throws Exception {
                         journal.submit(new InterruptMyselfTask(journal,
-                                ITx.UNISOLATED, false/* readOnly */,
-                                theResource));
+                                ITx.UNISOLATED, theResource));
                         // pause between submits
                         Thread.sleep(20);
                         return null;
@@ -1152,8 +1170,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
             {
                 Collection<AbstractTask> tasks = new LinkedList<AbstractTask>();
                 for (int i = 0; i < NRESOURCES * 10; i++) {
+                    
                     tasks.add(new ReadTask(journal, resource[i
                             % resource.length]));
+                    
                 }
                 // await futures.
                 List<Future<Object>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);

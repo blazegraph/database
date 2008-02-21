@@ -29,13 +29,12 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.mdi.IResourceMetadata;
@@ -48,7 +47,7 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * The data service interface provides remote access to named indices, provides
  * for both unisolated and isolated operations on those indices, and exposes the
- * {@link IRemoteTxCommitProtocol} interface to the {@link ITransactionManager}
+ * {@link IRemoteTxCommitProtocol} interface to the {@link ITransactionManagerService}
  * service for the coordination of distributed transactions. Clients normally
  * write to the {@link IIndex} interface. The {@link ClientIndexView} provides
  * an implementation of that interface supporting range partitioned scale-out
@@ -128,7 +127,7 @@ import com.bigdata.sparse.SparseRowStore;
  * <dt>Distributed transactions</dt>
  * 
  * <dd>Distributed transactions are coordinated using an
- * {@link ITransactionManager} service and incur more overhead than both
+ * {@link ITransactionManagerService} service and incur more overhead than both
  * unisolated and historical read operations. Transactions are assigned a
  * timestamp (the transaction identifier) and an {@link IsolationEnum} when they
  * begin and must be explicitly closed by either an abort or a commit. Both the
@@ -406,9 +405,19 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *            The description of the resource containing that block.
      * @param addr
      *            The address of the block in that resource.
-     *            
+     * 
      * @return An object that may be used to read the block from the data
      *         service.
+     * 
+     * @throws IllegalArgumentException
+     *             if the resource is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the addr is <code>0L</code>
+     * @throws IllegalStateException
+     *             if the resource is not available.
+     * @throws IllegalArgumentException
+     *             if the record identified by addr can not be read from the
+     *             resource.
      */
     public IBlock readBlock(IResourceMetadata resource, long addr)
             throws IOException;

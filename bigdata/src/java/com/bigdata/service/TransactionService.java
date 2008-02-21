@@ -39,11 +39,15 @@ import java.util.concurrent.Executors;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.RunState;
+import com.bigdata.journal.Tx;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.util.MillisecondTimestampFactory;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -51,16 +55,23 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 /**
  * Centalized transaction manager service. In response to a client request, the
  * transaction manager will distribute prepare/commit or abort operations to all
- * data services on which writes were made by a transaction.  A transaction manager
- * is required iff transactions will be used.  If only unisolated operations will
- * be performed on the bigdata federation, then each {@link DataService} MAY use
- * its own local timestamp service to generate commit times.
+ * data services on which writes were made by a transaction. A transaction
+ * manager is required iff transactions will be used. If only unisolated
+ * operations will be performed on the bigdata federation, then each
+ * {@link DataService} MAY use its own local timestamp service to generate
+ * commit times.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @see OldTransactionServer, which has lots of code and notes that bear on this
  *      implementation.
+ * 
+ * @todo Track which {@link IndexSegment}s and {@link Journal}s are required
+ *       to support the {@link IsolatedFusedView}s in use by a {@link Tx}.
+ *       Deletes of old journals and index segments MUST be deferred until no
+ *       transaction remains which can read those data. This metadata must be
+ *       restart-safe so that resources are eventually deleted.
  * 
  * @todo support a shutdown protocol. The transaction manager is notified that
  *       the federation will shutdown. At that point the transaction manager
@@ -99,6 +110,17 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       represent a protocol error. we could maintain an LRU cache of completed
  *       transactions for this purpose.
  * 
+ * @todo In order to release the resources associated with a commit point
+ *       (historical journals and index segments) we need a protocol by which a
+ *       delegate index view is explicitly closed (or collected using a weak
+ *       value cache) once it is no longer in use for an operation. The index
+ *       views need to be accumulated on a commit point (aka commit record).
+ *       When no index views for a given commit record are active, the commit
+ *       point is no longer accessible to the read-committed transaction and
+ *       should be released. Resources (journals and index segments) required to
+ *       present views on that commit point MAY be released once there are no
+ *       longer any fully isolated transactions whose start time would select
+ *       that commit point as their ground state.
  * @todo does the api need to be synchronized?
  * 
  * @todo track ground states so that we known when we can release old journals
@@ -158,6 +180,12 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
     public void shutdownNow() {
 
         commitService.shutdownNow();
+        
+    }
+    
+    public String getStatistics() {
+        
+        throw new UnsupportedOperationException();
         
     }
 
@@ -241,7 +269,7 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
 
             } else {
 
-                // wait for the commit.
+                // wait for the commit
                 commitService.submit(new SimpleCommitTask(tx)).get();
                 
             }

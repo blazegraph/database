@@ -50,9 +50,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
@@ -107,17 +105,12 @@ import com.bigdata.service.MetadataService;
  * <li>transactions per second</li>
  * </ol>
  * 
- * FIXME Move the executor services out of the {@link ConcurrentJournal}. This
- * is fine if there is only a single journal, but with multiple journals the
- * executor services need to be decoupled from the journal.
- * <p>
- * Make sure that {@link AbstractTask#getIndex(String)} returns a {@link BTree},
- * {@link FusedView}, {@link IsolatedFusedView}, {@link ReadOnlyFusedView},
- * or even a {@link KeyRangePartitionedView} as necessary for index partitions
- * (the KeyRangePartitionedView is a trial balloon for transparently promoting
- * an index to scale-out, but maybe that operation should be explicit - not
- * transparent - since it radically changes how the index is accessed from a
- * services perspective).
+ * @todo update javadoc.
+ * 
+ * @todo maintain "read locks" for resources and a latency queue. use this to
+ *       close down resources and to delete old resources according to a
+ *       resource release policy (configurable). coordinate read locks with the
+ *       transaction manager and the concurrency manager.
  * 
  * @todo The choice of the #of offset bits governs both the maximum #of records
  *       (indirectly through the maximum byte offset) and the maximum record
@@ -215,7 +208,7 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceManager {
+public class ResourceManager implements IResourceManager {
 
     /**
      * Logger.
@@ -574,6 +567,13 @@ public class ResourceManager {
     private final Properties properties;
 
     /**
+     * Used to assign timestamps.
+     * 
+     * @see #nextTimestamp()
+     */
+    private final ITimestampService timestampService;
+    
+    /**
      * The directory in which the data files reside.
      * <p>
      * Note: It is a hard requirement that each resource is located by the
@@ -614,6 +614,27 @@ public class ResourceManager {
     final private JournalIndex journalIndex;
 
     /**
+     * <code>true</code> until the {@link ResourceManager} is shutdown.
+     */
+    private boolean open = true;
+
+    /**
+     * <code>true</code> iff {@link BufferMode#Transient} was indicated.
+     */
+    private final boolean isTransient;
+    
+    /**
+     * @throws IllegalStateException
+     *             unless open.
+     */
+    protected void assertOpen() {
+        
+        if (!open)
+            throw new IllegalStateException();
+        
+    }
+    
+    /**
      * A map from the resource UUID to the absolute {@link File} for that
      * resource.
      * <p>
@@ -640,6 +661,10 @@ public class ResourceManager {
 
     /**
      * {@link ResourceManager} options.
+     * <p>
+     * Note: If you specify {@link com.bigdata.journal.Options#BUFFER_MODE} as
+     * {@link BufferMode#Transient} then journals will be NOT stored in the file
+     * system and {@link ResourceManager#overflow()} will be disabled.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -692,6 +717,12 @@ public class ResourceManager {
         public static final String DEFAULT_DATA_DIR = ".";
 
     }
+    
+    protected long nextTimestamp() {
+        
+        return timestampService.nextTimestamp();
+        
+    }
 
     /**
      * (Re-)open the {@link ResourceManager}.
@@ -699,15 +730,24 @@ public class ResourceManager {
      * @param properties
      *            See {@link Options}.
      * 
-     * @throws IOException
+     * @param timestampService
+     *            Used to assign timestamps to resources. This MUST be the same
+     *            {@link ITimestampService} that is used by the
+     *            {@link ITransactionManager} since resource timestamps and
+     *            transaction timestamps MUST be consistent.
      */
-    public ResourceManager(Properties properties) throws IOException {
+    public ResourceManager(Properties properties, ITimestampService timestampService) {
 
         if (properties == null)
             throw new IllegalArgumentException();
 
+        if(timestampService==null)
+            throw new IllegalArgumentException();
+        
         this.properties = properties;
 
+        this.timestampService = timestampService;
+        
         /*
          * Create the _transient_ index in which we will store the mapping from
          * the commit times of the journals to their resource descriptions.
@@ -717,25 +757,54 @@ public class ResourceManager {
         log.info("Current working directory: "
                 + new File(".").getAbsolutePath());
 
+        // true iff transient journals is requested.
+        isTransient = BufferMode.valueOf(properties.getProperty(
+                Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE.toString())) == BufferMode.Transient;
+        
         /*
          * data directory.
          */
-        {
+        if (isTransient) {
 
+            /*
+             * Transient.
+             */
+            
+            dataDir = null;
+            
+            journalsDir = null;
+            
+            segmentsDir = null;
+            
+        } else {
+
+            /*
+             * Persistent.
+             */
+            
             // Note: dataDir is _canonical_
-            final File dataDir = new File(properties.getProperty(
+            final File dataDir;
+            try {
+
+                dataDir = new File(properties.getProperty(
                     Options.DATA_DIR, Options.DEFAULT_DATA_DIR))
                     .getCanonicalFile();
 
-            log.info(Options.DATA_DIR + "=" + dataDir);
+                log.info(Options.DATA_DIR + "=" + dataDir);
 
-            journalsDir = new File(dataDir, "journals").getCanonicalFile();
+                journalsDir = new File(dataDir, "journals").getCanonicalFile();
 
-            segmentsDir = new File(dataDir, "segments").getCanonicalFile();
+                segmentsDir = new File(dataDir, "segments").getCanonicalFile();
+
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
 
             if (!dataDir.exists()) {
 
-                log.warn("Creating data directory: " + dataDir);
+                log.warn("Creating: " + dataDir);
 
                 if (!dataDir.mkdirs()) {
 
@@ -744,6 +813,12 @@ public class ResourceManager {
 
                 }
 
+            }
+
+            if (!journalsDir.exists()) {
+
+                log.warn("Creating: "+journalsDir);
+
                 if (!journalsDir.mkdir()) {
 
                     throw new RuntimeException("Could not create directory: "
@@ -751,6 +826,12 @@ public class ResourceManager {
 
                 }
 
+            }
+
+            if (!segmentsDir.exists()) {
+
+                log.warn("Creating: "+segmentsDir);
+                
                 if (!segmentsDir.mkdir()) {
 
                     throw new RuntimeException("Could not create directory: "
@@ -759,7 +840,9 @@ public class ResourceManager {
                 }
 
             }
-
+            
+            // verify all are directories vs regular files.
+            
             if (!dataDir.isDirectory()) {
 
                 throw new RuntimeException("Not a directory: "
@@ -789,10 +872,19 @@ public class ResourceManager {
         {
 
             // Note: tmpDir is _canonical_
-            final File tmpDir = new File(properties.getProperty(
+            final File tmpDir;
+            try {
+                
+                tmpDir = new File(properties.getProperty(
                     Options.TMP_DIR, System.getProperty("java.io.tmpdir")))
                     .getCanonicalFile();
-
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
             log.info(Options.TMP_DIR + "=" + tmpDir);
 
             if (!tmpDir.exists()) {
@@ -822,7 +914,7 @@ public class ResourceManager {
         /*
          * Look for pre-existing data files.
          */
-        {
+        if(!isTransient) {
 
             log.info("Starting scan of data directory: " + dataDir);
 
@@ -869,21 +961,34 @@ public class ResourceManager {
                 log.warn("Creating initial journal");
 
                 // unique file name for new journal.
-                file = File.createTempFile("journal", // prefix
-                        Options.JNL,// suffix
-                        journalsDir // directory
-                        ).getCanonicalFile();
+                if (isTransient) {
 
-                // delete temp file.
-                file.delete();
+                    file = null;
+                    
+                } else {
+                    
+                    try {
+
+                        file = File.createTempFile("journal", // prefix
+                                Options.JNL,// suffix
+                                journalsDir // directory
+                                ).getCanonicalFile();
+
+                    } catch (IOException e) {
+
+                        throw new RuntimeException(e);
+
+                    }
+
+                    // delete temp file.
+                    file.delete();
+                    
+                }
 
                 /*
                  * Set the createTime on the new journal resource.
-                 * 
-                 * FIXME Use the same timesource as the tx manager!
                  */
-                p.setProperty(Options.CREATE_TIME, ""
-                        + System.currentTimeMillis());
+                p.setProperty(Options.CREATE_TIME, "" + nextTimestamp());
                 
                 newJournal = true;
 
@@ -917,9 +1022,13 @@ public class ResourceManager {
 
             }
 
-            assert file.isAbsolute() : "Path must be absolute: " + file;
+            if(!isTransient) {
 
-            p.setProperty(Options.FILE, file.toString());
+                assert file.isAbsolute() : "Path must be absolute: " + file;
+
+                p.setProperty(Options.FILE, file.toString());
+                
+            }
 
             // Create/open journal.
             liveJournal = new Journal(p);
@@ -1089,24 +1198,37 @@ public class ResourceManager {
         return new Properties(this.properties);
 
     }
+    
+    public File getTmpDir() {
+        
+        return tmpDir;
+        
+    }
+    
+    public File getDataDir() {
+        
+        return dataDir;
+        
+    }
 
     /**
      * @todo update the shutdown methods if we add a thread pool for anything.
      * 
-     * @todo note that the resource manager is closed when we start the shutdown
-     *       and check for !open on various methods.
-     * 
-     * FIXME There needs to be a shutdown protocol that coordinates with the
-     * shutdown of the concurrency control (services for reading or writing on
-     * index resourcesa).
+     * @todo check for !open on various methods.
      */
     public void shutdown() {
 
+        assertOpen();
+        
         shutdownNow();
-
+        
     }
 
     public void shutdownNow() {
+
+        assertOpen();
+        
+        open = false;
 
         Iterator<IRawStore> itr = openStores.values().iterator();
 
@@ -1140,17 +1262,6 @@ public class ResourceManager {
 
     }
 
-    /**
-     * Return the reference to the journal which has the most current data for
-     * the given timestamp. If necessary, the journal will be opened.
-     * 
-     * @param timestamp
-     *            The startTime of an active transaction, <code>0L</code> for
-     *            the current unisolated index view, or <code>-timestamp</code>
-     *            for a historical view no later than the specified timestamp.
-     * 
-     * @return The corresponding journal for that timestamp.
-     */
     public AbstractJournal getJournal(long timestamp) {
 
         if (timestamp == 0L) {
@@ -1176,8 +1287,16 @@ public class ResourceManager {
 
         synchronized (journalIndex) {
 
-            resource = journalIndex.find(timestamp);
+            resource = journalIndex.find(Math.abs(timestamp));
 
+        }
+
+        if (resource == null) {
+
+            log.info("No such journal: timestamp="+timestamp);
+            
+            return null;
+            
         }
         
         return (AbstractJournal) openStore(resource.getUUID());
@@ -1315,8 +1434,12 @@ public class ResourceManager {
 
                 final AbstractJournal journal = new Journal(properties);
 
+                final long closeTime = journal.getRootBlockView().getCloseTime();
+                
                 // verify journal was closed for writes.
-                assert journal.getRootBlockView().getCloseTime() != 0;
+                assert closeTime != 0 : "Journal not closed for writes? "
+                        + " : file=" + file + ", uuid=" + uuid + ", closeTime="
+                        + closeTime;
                 
                 assert journal.isReadOnly();
                 
@@ -1384,65 +1507,96 @@ public class ResourceManager {
      *            The store from which the index will be loaded.
      * 
      * @return A reference to the index -or- <code>null</code> if the index
-     *         was not registered on the resource as of the timestamp.
-     * 
-     * @throws RuntimeException
-     *             if the resource could not be located.
-     * @throws RuntimeException
-     *             if the resource does not have data for the specified
-     *             timestamp.
-     * 
-     * @todo work through {@link Tx#getIndex(String)} and verify that it will
-     *       return the isolated index (or index partition view).
+     *         was not registered on the resource as of the timestamp or if the
+     *         store has no data for that timestamp.
      */
-    public AbstractBTree openIndex(String name, long timestamp, IRawStore store) {
+    public AbstractBTree getIndexOnStore(String name, long timestamp, IRawStore store) {
 
-        // use absolute value in case timestamp is negative.
-        final long ts = Math.abs(timestamp);
+        if (name == null)
+            throw new IllegalArgumentException();
 
+        if (store == null)
+            throw new IllegalArgumentException();
+        
         final AbstractBTree btree;
 
         if (store instanceof IJournal) {
 
-            AbstractJournal journal = (AbstractJournal) store;
+            // the given journal.
+            final AbstractJournal journal = (AbstractJournal) store;
 
-            if (timestamp == 0L) {
+            if (timestamp == ITx.UNISOLATED) {
 
-                // unisolated view.
+                /*
+                 * Unisolated index.
+                 */
 
+                // MAY be null.
                 btree = (BTree) journal.getIndex(name);
 
+            } else if( timestamp == ITx.READ_COMMITTED ) {
+
+                /*
+                 * Read committed operation against the most recent commit point.
+                 * 
+                 * Note: This commit record is always defined, but that does not
+                 * mean that any indices have been registered.
+                 */
+
+                final ICommitRecord commitRecord = journal.getCommitRecord();
+
+                final long ts = commitRecord.getTimestamp();
+
+                if (ts == 0L) {
+
+                    log.warn("Nothing committed: read-committed operation.");
+
+                    return null;
+
+                }
+
+                // MAY be null.
+                btree = journal.getIndex(name, commitRecord);
+                
             } else {
 
                 /*
-                 * A historical view.
+                 * A specified historical index commit point.
                  */
 
-                // the corresponding commit record on that journal.
+                // use absolute value in case timestamp is negative.
+                final long ts = Math.abs(timestamp);
+
+                // the corresponding commit record on the journal.
                 final ICommitRecord commitRecord = journal.getCommitRecord(ts);
 
                 if (commitRecord == null) {
 
-                    throw new RuntimeException(
-                            "Resource has no data for timestamp: timestamp="
-                                    + ts + ", store=" + store);
+                    log.warn("Resource has no data for timestamp: timestamp="
+                            + ts + ", store=" + store);
 
+                    return null;
+                    
                 }
 
-                // open index on that journal.
+                // open index on that journal (MAY be null).
                 btree = (BTree) journal.getIndex(name, commitRecord);
 
             }
 
         } else {
 
+            // use absolute value in case timestamp is negative.
+            final long ts = Math.abs(timestamp);
+
             final IndexSegmentFileStore segStore = ((IndexSegmentFileStore) store);
 
             if (segStore.getCheckpoint().commitTime < ts) {
 
-                throw new RuntimeException(
-                        "Resource has no data for timestamp: timestamp=" + ts
-                                + ", store=" + store);
+                log.warn("Resource has no data for timestamp: timestamp=" + ts
+                        + ", store=" + store);
+                
+                return null;
 
             }
 
@@ -1451,8 +1605,8 @@ public class ResourceManager {
 
         }
 
-        log.info("name=" + name + ", timestamp=" + ts + ", store=" + store
-                + " : " + btree);
+        log.info("name=" + name + ", timestamp=" + timestamp + ", store="
+                + store + " : " + btree);
 
         return btree;
 
@@ -1471,12 +1625,12 @@ public class ResourceManager {
      *            the current unisolated index view, or <code>-timestamp</code>
      *            for a historical view no later than the specified timestamp.
      * 
-     * @return The sources for the index view or <code>null</code> if the
+     * @return The sources for the index view -or- <code>null</code> if the
      *         index was not defined as of the timestamp.
      * 
      * @see FusedView
      */
-    public AbstractBTree[] openIndexPartition(String name, long timestamp) {
+    public AbstractBTree[] getIndexSources(String name, long timestamp) {
 
         log.info("name=" + name + ", timestamp=" + timestamp);
 
@@ -1489,9 +1643,18 @@ public class ResourceManager {
             // the corresponding journal (can be the live journal).
             final AbstractJournal journal = getJournal(timestamp);
 
-            btree = openIndex(name, timestamp, journal);
+            btree = getIndexOnStore(name, timestamp, journal);
 
-            log.info("View base on " + journal.getResourceMetadata());
+            if (btree == null) {
+
+                log.warn("No such index: name=" + name + ", timestamp="
+                        + timestamp);
+
+                return null;
+
+            }
+
+            log.info("View based on " + journal.getResourceMetadata());
 
         }
 
@@ -1542,7 +1705,7 @@ public class ResourceManager {
 
                 final IRawStore store = openStore(resource.getUUID());
 
-                final AbstractBTree ndx = openIndex(name, timestamp, store);
+                final AbstractBTree ndx = getIndexOnStore(name, timestamp, store);
 
                 if (ndx == null) {
 
@@ -1567,7 +1730,7 @@ public class ResourceManager {
         return sources;
 
     }
-
+    
     /**
      * Creates a new journal and re-defines the views for all named indices to
      * include the pre-overflow view with reads being absorbed by a new btree on
@@ -1584,15 +1747,31 @@ public class ResourceManager {
      * <p>
      * Note: The decision to simply re-define views rather than export the data
      * on the named indices on the old journal
+     * 
+     * @todo write unit test for an overflow edge case in which we attempt to
+     *       perform an read-committed task on a pre-existing index immediately
+     *       after an {@link #overflow()} and verify that a commit record exists
+     *       on the new journal and that the read-committed task can read from
+     *       the fused view of the new (empty) index on the new journal and the
+     *       old index on the old journal.
      */
-    public void overflow() {
+    public boolean overflow() {
 
         log.info("begin");
 
-        /*
-         * FIXME Use the same timesource as the tx manager.
-         */
-        final long createTime = System.currentTimeMillis();
+        if(isTransient) {
+
+            /*
+             * Note: This is disabled in part because we can not close out and
+             * then re-open a transient journal.
+             */
+            
+            throw new UnsupportedOperationException(
+                    "Overflow not supported for transient journals");
+            
+        }
+        
+        final long createTime = nextTimestamp();
         final long closeTime = createTime;
         
         /*
@@ -1725,7 +1904,7 @@ public class ResourceManager {
 
                     // Create checkpoint for the new B+Tree.
                     final Checkpoint overflowCheckpoint = indexMetadata
-                            .overflowCheckpoint(oldCounter);
+                            .overflowCheckpoint(oldBTree.getCheckpoint());
 
                     /*
                      * Write the checkpoint record on the store. The address of
@@ -1775,7 +1954,7 @@ public class ResourceManager {
             oldJournal.close(closeTime);
             
             // remove from list of open journals.
-            if(this.openStores.remove(oldJournal.getRootBlockView().getUUID())==null) {
+            if (this.openStores.remove(oldJournal.getRootBlockView().getUUID()) != oldJournal) {
                 
                 throw new AssertionError();
                 
@@ -1813,7 +1992,70 @@ public class ResourceManager {
         }
 
         log.info("end");
+        
+        return true;
 
     }
 
+    public void delete() {
+        
+        if (open)
+            throw new IllegalStateException();
+
+        // NOP if transient.
+        if(isTransient) return; 
+        
+        log.warn("Deleting all resources: " + dataDir);
+        
+        recursiveDelete(dataDir);
+        
+    }
+    
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(File f) {
+        
+        if(f.isDirectory()) {
+            
+            File[] children = f.listFiles();
+            
+            for(int i=0; i<children.length; i++) {
+                
+                recursiveDelete( children[i] );
+                
+            }
+            
+        }
+
+        // @todo could be a filter on listFiles.
+        // @todo will be unable to delete the embedded federation's metadata service directory with the .mds file.
+        // @todo could define the filter for files of interest for delete as a parameter or method available for
+        // override.
+        // FIXME Definately to not permit willy-nilli delete of a recursive directory!
+        if(f.getName().endsWith(Options.JNL)||f.getName().endsWith(Options.SEG)) {
+            
+            log.warn("Removing: " + f);
+
+            if (!f.delete()) {
+
+                log.error("Could not remove: " + f);
+                
+            }
+
+        }
+        
+    }
+
+    public void delete(long timestamp) {
+        // TODO Auto-generated method stub
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

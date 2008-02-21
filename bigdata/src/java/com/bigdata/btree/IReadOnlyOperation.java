@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.journal.AbstractTask;
+
 /**
- * An index operation that asserts that it will not attempt mutation operations.
- * The presence of this marker interface is used to impose runtime restrictions
- * on mutation, e.g., by wrapping the index within a read-only view.
+ * An index operation that asserts that the operation does not perform writes.
+ * <p>
+ * Note: The timestamp associated with the {@link AbstractTask} governs whether
+ * the index is read-only, isolated, read-committed, or unisolated NOT the
+ * presence of this interface.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

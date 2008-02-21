@@ -121,8 +121,14 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             journal.commit();
 
             // verify counters.
-            assertEquals("abortCount",0,journal.writeService.getAbortCount());
-            assertEquals("commitCount",0,journal.writeService.getCommitCount());
+
+            assertEquals("abortCount", 0,
+                    journal.getConcurrencyManager().writeService
+                            .getAbortCount());
+            
+            assertEquals("commitCount", 0,
+                    journal.getConcurrencyManager().writeService
+                            .getCommitCount());
 
             /*
              * Submit a task that waits for 10 seconds or until interrupted. It
@@ -135,7 +141,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
              * "get()" this task since that will block and the 'interrupt' task
              * will not run.
              */
-            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,false/*readOnly*/,new String[]{}){
+            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,new String[]{}){
 
                 protected Object doTask() throws Exception {
                     
@@ -155,7 +161,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
                 
                 journal.submit(
                         new InterruptMyselfTask(journal, ITx.UNISOLATED,
-                                false/* readOnly */, resource[0])).get();
+                                resource[0])).get();
                 
                 fail("Not expecting success");
                 
@@ -172,18 +178,22 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             log.warn("Waiting for the write service to commit or abort");
             
-            while (journal.writeService.getAbortCount() == 0
-                    && journal.writeService.getCommitCount() == 0) {
+            while (journal.getConcurrencyManager().writeService.getAbortCount() == 0
+                    && journal.getConcurrencyManager().writeService
+                            .getCommitCount() == 0) {
                 
                 Thread.sleep(10);
                 
             }
             
             // did abort.
-            assertEquals("abortCount",1,journal.writeService.getAbortCount());
-            
+            assertEquals("abortCount", 1,
+                    journal.getConcurrencyManager().writeService
+                            .getAbortCount());
+
             // did not commit.
-            assertEquals("commitCount",0,journal.writeService.getCommitCount());
+            assertEquals("commitCount", 0,
+                    journal.getConcurrencyManager().writeService.getCommitCount());
             
             /*
              * write on the store and flush the store to disk in order to provoke an
@@ -210,8 +220,11 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      */
     static class InterruptMyselfTask extends AbstractTask {
 
-        protected InterruptMyselfTask(ConcurrentJournal journal, long startTime, boolean readOnly, String resource) {
-            super(journal, startTime, readOnly, resource);
+        protected InterruptMyselfTask(IConcurrencyManager concurrencyManager,
+                long startTime, String resource) {
+
+            super(concurrencyManager, startTime, resource);
+            
         }
 
         protected Object doTask() throws Exception {
@@ -235,7 +248,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             ndx.write();
             
             // force flush of store to disk.
-            getLiveJournal().force(true);
+            getJournal().force(true);
 
             } catch(Exception ex) {
 

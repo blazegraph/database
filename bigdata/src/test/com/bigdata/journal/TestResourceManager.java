@@ -48,9 +48,14 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Test suite for the {@link ResourceManager}.
+ * 
+ * FIXME add tests for access to read-committed and fully isolated indices.
+ * 
+ * @todo add tests for coordination of read locks with a transaction manager.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -164,7 +169,7 @@ public class TestResourceManager extends TestCase2 {
                 com.bigdata.journal.ResourceManager.Options.DATA_DIR, dataDir
                         .toString());
         
-        ResourceManager rmgr = new ResourceManager(properties);
+        ResourceManager rmgr = new MyResourceManager(properties);
 
         assertTrue(dataDir.exists());
         assertTrue(dataDir.isDirectory());
@@ -213,16 +218,17 @@ public class TestResourceManager extends TestCase2 {
             properties.setProperty(Options.FILE, file.toString());
          
             Journal journal = new Journal(properties);
-            
-//            // commit the journal to assign [firstCommitTime].
-//            journal.commit();
 
             // wait for at least one distinct timestamp to go by.
             journal.nextTimestamp();
 
             journalMetadata1 = journal.getResourceMetadata();
+
+            // required to set the initial commitRecord before we can close out the journal for further writes.
+            journal.commit();
             
-            journal.shutdownNow();
+            // close out for further writes.
+            journal.close(journal.nextTimestamp());
             
             assertTrue(journalMetadata1.getCreateTime() > 0L);
             
@@ -269,7 +275,7 @@ public class TestResourceManager extends TestCase2 {
                     com.bigdata.journal.ResourceManager.Options.DATA_DIR,
                     dataDir.toString());
             
-            rmgr = new ResourceManager(properties);
+            rmgr = new MyResourceManager(properties);
             
         }
         
@@ -392,7 +398,7 @@ public class TestResourceManager extends TestCase2 {
                     com.bigdata.journal.ResourceManager.Options.DATA_DIR,
                     dataDir.toString());
             
-            rmgr = new ResourceManager(properties);
+            rmgr = new MyResourceManager(properties);
             
         }
         
@@ -589,7 +595,7 @@ public class TestResourceManager extends TestCase2 {
                     com.bigdata.journal.ResourceManager.Options.DATA_DIR,
                     dataDir.toString());
             
-            rmgr = new ResourceManager(properties);
+            rmgr = new MyResourceManager(properties);
             
         }
         
@@ -603,7 +609,7 @@ public class TestResourceManager extends TestCase2 {
         assertNotNull(journal.getIndex(indexName));
 
         // verify resource manager returns the same index object.
-        assertEquals(journal.getIndex(indexName), rmgr.openIndex(indexName,
+        assertEquals(journal.getIndex(indexName), rmgr.getIndexOnStore(indexName,
                 0L/* timestamp */, journal));
 
         // verify index segment discovered.
@@ -623,7 +629,7 @@ public class TestResourceManager extends TestCase2 {
         {
           
             AbstractBTree[] sources = rmgr
-                    .openIndexPartition(indexName, 0L/* timestamp */);
+                    .getIndexSources(indexName, 0L/* timestamp */);
 
             assertNotNull("sources", sources);
 
@@ -664,7 +670,7 @@ public class TestResourceManager extends TestCase2 {
                 com.bigdata.journal.ResourceManager.Options.DATA_DIR, dataDir
                         .toString());
         
-        ResourceManager rmgr = new ResourceManager(properties);
+        ResourceManager rmgr = new MyResourceManager(properties);
 
         /*
          * Define, register, and populate the initial partition of a named
@@ -744,7 +750,7 @@ public class TestResourceManager extends TestCase2 {
         {
             
             AbstractBTree[] sources = rmgr
-                    .openIndexPartition(indexName, 0L/* timestamp */); 
+                    .getIndexSources(indexName, 0L/* timestamp */); 
             
             assertNotNull("sources",sources);
             
@@ -768,4 +774,30 @@ public class TestResourceManager extends TestCase2 {
         
     }
 
+    static class MyResourceManager extends ResourceManager {
+
+        private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+
+        /**
+         * @param properties
+         * @param timestampService
+         */
+        public MyResourceManager(Properties properties) {
+            
+            super(properties, new ITimestampService(){
+
+                public long nextTimestamp() {
+
+                    return timestampFactory.nextMillis();
+                    
+                }}
+            
+            );
+            
+        }
+        
+        
+        
+    }
+    
 }

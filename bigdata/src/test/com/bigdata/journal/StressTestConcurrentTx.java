@@ -47,7 +47,7 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
-import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
@@ -153,7 +153,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      * those transactions, and finally choose to either commit or abort the
      * transactions. The concurrency with which the {@link AbstractTask}s
      * submitted by the "clients" may run is governed by the
-     * {@link ConcurrentJournal.Options}. However, the concurrency is capped by
+     * {@link ConcurrencyManager.Options}. However, the concurrency is capped by
      * the #of clients since each client manages a single transaction at a time.
      * 
      * @param journal
@@ -391,8 +391,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
              * complete.
              */
             
-            journal.submit(new AbstractTask(journal, tx, false/* readOnly */,
-                    name) {
+            journal.submit(new AbstractTask(journal, tx, name) {
                 
                 protected Object doTask() {
                     // Random operations on the named index(s).
@@ -534,7 +533,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     /**
      * Additional properties understood by this test.
      */
-    public static interface TestOptions extends Options {
+    public static interface TestOptions extends ConcurrencyManager.Options {
 
         /**
          * The timeout for the test.

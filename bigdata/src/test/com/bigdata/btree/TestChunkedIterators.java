@@ -30,7 +30,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.rawstore.IBlockStore;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -41,7 +41,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * class so they have a dependency on this test suite to get it right for the
  * base class.
  * 
- * @todo Test {@link IBlockStore} read through semantics.
+ * @todo Test {@link IBlock} read through semantics.
  * 
  * @todo Test when version timestamps are supported.
  * 
@@ -55,8 +55,8 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @todo Test delete behind semantics more throughly.
  * 
  * @todo write tests when some entries are deleted (when deletion markers are
- *       and are not supported and when DELETED are and are not requested).
- *       make sure that the concept of delete marker vs version timestamp is
+ *       and are not supported and when DELETED are and are not requested). make
+ *       sure that the concept of delete marker vs version timestamp is
  *       differentiated in the {@link ITuple} interface and the
  *       {@link IEntryIterator} implementations.
  * 

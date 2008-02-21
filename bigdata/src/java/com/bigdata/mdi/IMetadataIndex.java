@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.mdi;
 
+import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.service.IMetadataService;
@@ -46,10 +47,14 @@ import com.bigdata.service.IMetadataService;
  *       moved onto {@link IMetadataIndex}, especially since we tend to cache
  *       things.
  * 
+ * @todo If these methods are to be invoked remotely then we will need to
+ *       returning the byte[] rather than the de-serialized
+ *       {@link PartitionMetadata}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMetadataIndex extends IIndex {
+public interface IMetadataIndex extends IIndex, ILinearList {
 
     /**
      * The metadata template for the scale-out index managed by this metadata
@@ -57,37 +62,61 @@ public interface IMetadataIndex extends IIndex {
      */
     public IndexMetadata getScaleOutIndexMetadata();
     
-//    /**
-//     * Find the index of the partition spanning the given key.
-//     * 
-//     * @return The index of the partition spanning the given key or
-//     *         <code>-1</code> iff there are no partitions defined.
-//     * 
-//     * @exception IllegalStateException
-//     *                if there are partitions defined but no partition spans the
-//     *                key. In this case the {@link MetadataIndex} lacks an entry
-//     *                for the key <code>new byte[]{}</code>.
-//     */
-//    public int findIndexOf(byte[] key);
-//    
-//    /**
-//     * Find and return the partition spanning the given key.
-//     * 
-//     * @return The partition spanning the given key or <code>null</code> if
-//     *         there are no partitions defined.
-//     */
-//    public PartitionMetadata find(byte[] key);
-//    
-//    /**
-//     * The partition with that separator key or <code>null</code> (exact
-//     * match on the separator key).
-//     * 
-//     * @param key
-//     *            The separator key (the first key that would go into that
-//     *            partition).
-//     * 
-//     * @return The partition with that separator key or <code>null</code>.
-//     */
-//    public PartitionMetadata get(byte[] key);
+    /**
+     * The partition with that separator key or <code>null</code> (exact match
+     * on the separator key).
+     * 
+     * @param key
+     *            The separator key (the first key that would go into that
+     *            partition).
+     * 
+     * @return The partition with that separator key or <code>null</code>.
+     */
+    public PartitionMetadata get(byte[] key);
+
+    /**
+     * Find the index of the partition spanning the given key.
+     * 
+     * @return The index of the partition spanning the given key or
+     *         <code>-1</code> iff there are no partitions defined.
+     * 
+     * @exception IllegalStateException
+     *                if there are partitions defined but no partition spans the
+     *                key. In this case the {@link MetadataIndex} lacks an entry
+     *                for the key <code>new byte[]{}</code>.
+     */
+    public int findIndexOf(byte[] key);
+    
+    /**
+     * Find and return the partition spanning the given key.
+     * 
+     * @return The partition spanning the given key or <code>null</code> if
+     *         there are no partitions defined.
+     */
+    public PartitionMetadata find(byte[] key);
+
+    /**
+     * Return the index of the partitions corresponding to the fromKey and the
+     * toKey. These are the partitions against which an operation over that
+     * key-range must be mapped. Note that the indices will have the same value
+     * if both keys lie within the same index partition.
+     * 
+     * @param fromKey
+     *            The lowest key that will be counted (inclusive). When
+     *            <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first key that will not be counted (exclusive). When
+     *            <code>null</code> there is no upper bound.
+     * 
+     * @return An array of two elements. a[0] is the fromIndex. a[1] is the
+     *         toIndex.
+     * 
+     * @throws IllegalArgumentException
+     *             if the keys are out of order.
+     * 
+     * @todo change return type to <code>long</code> and pack into high/low
+     *       word if this method will be executed remotely.
+     */
+    public int[] findIndices(byte[] fromKey,byte[] toKey);
     
 }

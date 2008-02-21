@@ -42,7 +42,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BatchContains;
 import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
@@ -53,10 +52,12 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.ResultSet;
@@ -65,6 +66,7 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -133,6 +135,11 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  *       indexName, key } to obtain a {@link ServiceID} for a
  *       {@link DataService} and then needs to translate the {@link ServiceID}
  *       to a data service using the {@link #dataServiceMap}.
+ * 
+ * @todo test the {@link ILinearList} API against a key-range partitioned index.
+ * 
+ * @todo test the {@link ILinearList} API against an index partition formed from
+ *       more than one index resources.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -229,7 +236,7 @@ public class ClientIndexView implements IIndex {
      *       this approach is forward looking to when the metadata index is only
      *       partly materialized on the client.
      */
-    final protected MetadataIndex getMetadataIndex() {
+    final protected IMetadataIndex getMetadataIndex() {
         
         return fed.getMetadataIndex(name);
         
@@ -320,7 +327,7 @@ public class ClientIndexView implements IIndex {
          */
         {
             
-            final MetadataIndex mdi = getMetadataIndex();
+            final IMetadataIndex mdi = getMetadataIndex();
             
             final IEntryIterator itr = mdi.rangeIterator(null, null);
             
@@ -548,20 +555,15 @@ public class ClientIndexView implements IIndex {
         if (proc == null)
             throw new IllegalArgumentException();
         
-        final MetadataIndex mdi = getMetadataIndex();
+        final int fromIndex, toIndex;
+        {
 
-        // index of the first partition to check.
-        final int fromIndex = (fromKey == null ? 0 : mdi.findIndexOf(fromKey));
+            int a[] = getMetadataIndex().findIndices(fromKey, toKey);
 
-        // index of the last partition to check.
-        final int toIndex = (toKey == null ? mdi.getEntryCount() - 1 : mdi
-                .findIndexOf(toKey));
+            fromIndex = a[0];
 
-        // keys are out of order.
-        if (fromIndex > toIndex) {
-
-            throw new IllegalArgumentException("fromKey > toKey");
-
+            toIndex = a[1];
+            
         }
 
         // #of index partitions on which the procedure will be run.
@@ -1007,70 +1009,62 @@ public class ClientIndexView implements IIndex {
      */
     public PartitionMetadataWithSeparatorKeys getPartition(byte[] key) {
 
-        MetadataIndex mdi = fed.getMetadataIndex(name);
+        final IMetadataIndex mdi = fed.getMetadataIndex(name);
 
-        IPartitionMetadata pmd;
-
-        //            final byte[][] data;
-
-        try {
-
-            final int index = mdi.findIndexOf(key);
-
-            /*
-             * The code from this point on is shared with getPartitionAtIndex() and
-             * also by some of the index partition tasks (CreatePartition for one).
-             */
-
-            if (index == -1)
-                return null;
-
-            /*
-             * The serialized index partition metadata record for the partition that
-             * spans the given key.
-             */
-            byte[] val = (byte[]) mdi.valueAt(index);
-
-            /*
-             * The separator key that defines the left edge of that index partition
-             * (always defined).
-             */
-            byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
-
-            /*
-             * The separator key that defines the right edge of that index partition
-             * or [null] iff the index partition does not have a right sibling (a
-             * null has the semantics of no upper bound).
-             */
-            byte[] rightSeparatorKey;
-
-            try {
-
-                rightSeparatorKey = (byte[]) mdi.keyAt(index + 1);
-
-            } catch (IndexOutOfBoundsException ex) {
-
-                rightSeparatorKey = null;
-
-            }
-
-            //                return new byte[][] { leftSeparatorKey, val, rightSeparatorKey };
-            //
-            //                data = getMetadataService().getPartition(name, key);
-            //                
-            //                if (data == null)
-            //                    return null;
-
-            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
-
-            return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
-                    pmd, rightSeparatorKey);
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+        final int index = mdi.findIndexOf(key);
+        
+        return getPartitionAtIndex(index);
+        
+//        final IPartitionMetadata pmd;
+//        try {
+//
+//            /*
+//             * The code from this point on is shared with getPartitionAtIndex() and
+//             * also by some of the index partition tasks (CreatePartition for one).
+//             */
+//
+//            if (index == -1)
+//                return null;
+//
+//            /*
+//             * The serialized index partition metadata record for the partition that
+//             * spans the given key.
+//             */
+//            final byte[] val = mdi.valueAt(index);
+//
+//            /*
+//             * The separator key that defines the left edge of that index partition
+//             * (always defined).
+//             */
+//            final byte[] leftSeparatorKey = mdi.keyAt(index);
+//
+//            /*
+//             * The separator key that defines the right edge of that index partition
+//             * or [null] iff the index partition does not have a right sibling (a
+//             * null has the semantics of no upper bound).
+//             */
+//            final byte[] rightSeparatorKey;
+//
+//            try {
+//
+//                rightSeparatorKey = mdi.keyAt(index + 1);
+//
+//            } catch (IndexOutOfBoundsException ex) {
+//
+//                rightSeparatorKey = null;
+//
+//            }
+//            
+//            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
+//
+//            return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
+//                    pmd, rightSeparatorKey);
+//
+//        } catch (Exception ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
 
     }
 
@@ -1085,8 +1079,6 @@ public class ClientIndexView implements IIndex {
      */
     public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(int index) {
 
-        MetadataIndex mdi = fed.getMetadataIndex(name);
-
         /*
          * The code from this point on is shared with getPartition()
          */
@@ -1094,17 +1086,19 @@ public class ClientIndexView implements IIndex {
         if (index == -1)
             return null;
 
+        final IMetadataIndex mdi = fed.getMetadataIndex(name);
+
         /*
          * The serialized index partition metadata record for the partition that
          * spans the given key.
          */
-        byte[] val = (byte[]) mdi.valueAt(index);
+        final byte[] val = mdi.valueAt(index);
 
         /*
          * The separator key that defines the left edge of that index partition
          * (always defined).
          */
-        byte[] leftSeparatorKey = (byte[]) mdi.keyAt(index);
+        final byte[] leftSeparatorKey = mdi.keyAt(index);
 
         /*
          * The separator key that defines the right edge of that index partition
@@ -1115,7 +1109,7 @@ public class ClientIndexView implements IIndex {
 
         try {
 
-            rightSeparatorKey = (byte[]) mdi.keyAt(index + 1);
+            rightSeparatorKey = mdi.keyAt(index + 1);
 
         } catch (IndexOutOfBoundsException ex) {
 
@@ -1170,5 +1164,5 @@ public class ClientIndexView implements IIndex {
         throw new UnsupportedOperationException();
         
     }
-    
+
 }

@@ -34,8 +34,8 @@ import java.util.Map;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.Bytes;
@@ -103,12 +103,12 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class Tx extends AbstractTx implements IIndexStore, ITx {
 
-    /**
-     * The historical {@link ICommitRecord} choosen as the ground state for this
-     * transaction. All indices isolated by this transaction are isolated as of
-     * the discoverable root address based on this commit record.
-     */
-    final protected ICommitRecord commitRecord;
+//    /**
+//     * The historical {@link ICommitRecord} choosen as the ground state for this
+//     * transaction. All indices isolated by this transaction are isolated as of
+//     * the discoverable root address based on this commit record.
+//     */
+//    final protected ICommitRecord commitRecord;
 
     /**
      * A temporary store used to hold write sets for read-write transactions. It
@@ -123,7 +123,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      * @todo this must be thread-safe to support concurrent operations on the
      *       same tx.
      */
-    private Map<String, IIndex> btrees = new HashMap<String, IIndex>();
+    private Map<String, IIndex> indices = new HashMap<String, IIndex>();
 
     /**
      * Create a transaction reading from the most recent committed state not
@@ -144,17 +144,18 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
      *            When true the transaction will reject writes and
      *            {@link #prepare()} and {@link #commit()} will be NOPs.
      */
-    public Tx(AbstractJournal journal, long startTime, boolean readOnly) {
+    public Tx(ILocalTransactionManager transactionManager,
+            IResourceManager resourceManager, long startTime, boolean readOnly) {
 
-        super(journal, startTime, readOnly ? IsolationEnum.ReadOnly
-                : IsolationEnum.ReadWrite);
+        super(transactionManager, resourceManager, startTime,
+                readOnly ? IsolationEnum.ReadOnly : IsolationEnum.ReadWrite);
 
-        /*
-         * The commit record serving as the ground state for the indices
-         * isolated by this transaction (MAY be null, in which case the
-         * transaction will be unable to isolate any indices).
-         */
-        this.commitRecord = journal.getCommitRecord(startTime);
+//        /*
+//         * The commit record serving as the ground state for the indices
+//         * isolated by this transaction (MAY be null, in which case the
+//         * transaction will be unable to isolate any indices).
+//         */
+//        this.commitRecord = journal.getCommitRecord(startTime);
 
     }
 
@@ -172,7 +173,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
          * transaction so that the JVM may reclaim the space allocated to them
          * on the heap.
          */
-        btrees.clear();
+        indices.clear();
 
         /*
          * Close and delete the TemporaryRawStore.
@@ -191,10 +192,12 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
 
         if (tmpStore == null) {
 
-            tmpStore = readOnly ? null : new TemporaryRawStore(journal
-                    .getOffsetBits(), Bytes.megabyte * 1, // initial
-                    // in-memory
-                    // size.
+            final int offsetBits = resourceManager.getLiveJournal()
+                    .getOffsetBits();
+            
+            tmpStore = readOnly ? null : new TemporaryRawStore(//
+                    offsetBits, //
+                    Bytes.megabyte * 1, // initial in-memory size
                     Bytes.megabyte * 10, // maximum in-memory size.
                     false // do NOT use direct buffers.
                     );
@@ -231,7 +234,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
          * for all isolated btrees, if(!validate()) return false;
          */
 
-        Iterator<Map.Entry<String, IIndex>> itr = btrees.entrySet()
+        Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
@@ -243,14 +246,23 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             IsolatedFusedView isolated = (IsolatedFusedView) entry.getValue();
 
             /*
-             * Note: this is the _current_ state for the named index. We need to
-             * validate against the current state, not against some historical
-             * state.
+             * Note: this is the live version of the named index. We need to
+             * validate against the live version of the index, not some
+             * historical state.
              */
 
-            IIndex groundState = journal.getIndex(name);
+            final AbstractBTree[] sources = resourceManager.getIndexSources(
+                    name, UNISOLATED);
 
-            if (!isolated.validate(groundState)) {
+            if (sources == null) {
+
+                log.warn("Index does not exist: " + name);
+
+                return false;
+                
+            }
+            
+            if (!isolated.validate( sources )) {
 
                 // Validation failed.
 
@@ -266,13 +278,53 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
 
     }
 
+//    /**
+//     * Return a read-only view of the current (unisolated) named index.
+//     * 
+//     * @param name
+//     *            The index name.
+//     *            
+//     * @return The view -or- <code>null</code> iff the index is not registered
+//     *         at this time.A
+//     */
+//    private IIndex getCurrentGroundState(String name) {
+//
+//        final AbstractBTree[] sources = resourceManager.getIndexSources(name,
+//                UNISOLATED);
+//
+//        if (sources == null) {
+//
+//            // Index does not exist.
+//            
+//            return null;
+//            
+//        }
+//        
+//        assert sources.length > 0;
+//
+//        if (sources.length == 1) {
+//
+//            assert sources[0] != null;
+//
+//            return new ReadOnlyIndex(sources[0]);
+//
+//        } else {
+//
+//            return new ReadOnlyFusedView(sources);
+//
+//        }
+//
+//        // IIndex groundState = journal.getIndex(name);
+//
+//    }
+    
     protected void mergeOntoGlobalState(final long commitTime) {
 
         assert !readOnly;
 
         super.mergeOntoGlobalState(commitTime);
 
-        final Iterator<Map.Entry<String, IIndex>> itr = btrees.entrySet()
+        final Iterator<Map.Entry<String, IIndex>> itr = indices.entrySet()
                 .iterator();
 
         while (itr.hasNext()) {
@@ -289,7 +341,19 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
              * historical state.
              */
 
-            final BTree groundState = (BTree) journal.getIndex(name);
+            final AbstractBTree[] sources = resourceManager.getIndexSources(
+                    name, UNISOLATED);
+
+            if (sources == null) {
+
+                /*
+                 * Note: This should not happen since we just validated the
+                 * index.
+                 */
+
+                throw new AssertionError();
+
+            }
 
             /*
              * Copy the validated write set for this index down onto the
@@ -297,7 +361,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
              * markers, and values as necessary in the unisolated index.
              */
 
-            isolated.mergeDown(commitTime, groundState);
+            isolated.mergeDown(commitTime, sources );
 
         }
 
@@ -333,100 +397,101 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             }
 
             /*
-             * Store the btrees in hash map so that we can recover the same
+             * Test the cache - this is used so that we can recover the same
              * instance on each call within the same transaction.
              */
             
-            IIndex index = btrees.get(name);
+            if (indices.containsKey(name)) {
 
-            if (commitRecord == null) {
+                // Already defined.
+                
+                return indices.get(name);
+
+            }
+
+            // if (commitRecord == null) {
+            //
+            // /*
+            // * This occurs when there are either no commit records or no
+            // * commit records before the start time for the transaction.
+            // */
+            //
+            // return null;
+            //
+            // }
+
+            final IIndex index;
+
+            /*
+             * See if the index was registered as of the ground state used by
+             * this transaction to isolated indices.
+             */
+
+            final AbstractBTree[] sources = resourceManager.getIndexSources(
+                    name, startTime);
+
+            if (sources == null) {
 
                 /*
-                 * This occurs when there are either no commit records or no
-                 * commit records before the start time for the transaction.
+                 * The named index was not registered as of the transaction
+                 * ground state.
                  */
+
+                log.info("No such index: " + name + ", startTime=" + startTime);
 
                 return null;
 
             }
 
-            if (index == null) {
+            if (!sources[0].getIndexMetadata().isIsolatable()) {
 
-                /*
-                 * See if the index was registered as of the ground state used
-                 * by this transaction to isolated indices.
-                 */
-                
-                IIndex src = journal.getIndex(name, commitRecord);
+                throw new RuntimeException("Not isolatable: " + name);
 
-                if (!src.getIndexMetadata().isIsolatable()) {
+            }
 
-                    throw new RuntimeException("Not isolatable: " + name);
-                    
-                }
-                
-                if (name == null) {
+            // IIndex src = journal.getIndex(name, commitRecord);
 
-                    /*
-                     * The named index was not registered as of the transaction
-                     * ground state.
-                     */
+            /*
+             * Isolate the named btree.
+             */
 
-                    return null;
+            if (readOnly) {
 
-                }
+                if (sources.length == 1) {
 
-                /*
-                 * Isolate the named btree.
-                 */
-
-                if (readOnly) {
-
-                    index = new ReadOnlyIndex(src);
+                    index = new ReadOnlyIndex(sources[0]);
 
                 } else {
 
-                    // create the write set on a temporary store.
-                    final BTree writeSet = BTree.create(getTemporaryStore(),
-                            src.getIndexMetadata().clone());
-                    
-                    /*
-                     * Setup the view. The write set is always the first element
-                     * in the view.
-                     */
-                    
-                    final AbstractBTree[] sources;
-                    
-                    if(src instanceof AbstractBTree) {
-                        
-                        sources = new AbstractBTree[] { 
-                                writeSet,
-                                (AbstractBTree) src
-                                };
-                        
-                    } else {
-
-                        AbstractBTree[] a = ((FusedView) src).getSources();
-
-                        sources = new AbstractBTree[a.length+1];
-                        
-                        sources[0] = writeSet;
-                        
-                        System.arraycopy(a, 0, sources, 1, a.length);
-                        
-                    }
-                    
-                    // create view with isolated write set.
-                    index = new IsolatedFusedView(startTime, sources);
-
-                    // report event.
-                    ResourceManager.isolateIndex(startTime, name);
+                    index = new ReadOnlyFusedView(sources);
 
                 }
 
-                btrees.put(name, index);
+            } else {
+
+                /*
+                 * Setup the view. The write set is always the first element in
+                 * the view.
+                 */
+
+                // the view definition.
+                final AbstractBTree[] b = new AbstractBTree[sources.length + 1];
+
+                // create the write set on a temporary store.
+                b[0] = BTree.create(getTemporaryStore(), sources[0]
+                        .getIndexMetadata().clone());
+
+                System.arraycopy(sources, 0, b, 1, sources.length);
+
+                // create view with isolated write set.
+                index = new IsolatedFusedView(startTime, b);
+
+                // report event.
+                ResourceManager.isolateIndex(startTime, name);
 
             }
+
+            indices.put(name, index);
 
             return index;
 
@@ -451,7 +516,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
 
             }
 
-            Iterator<IIndex> itr = btrees.values().iterator();
+            Iterator<IIndex> itr = indices.values().iterator();
 
             while (itr.hasNext()) {
 
@@ -489,7 +554,7 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         
         try {
         
-            return btrees.keySet().toArray(new String[btrees.size()]);
+            return indices.keySet().toArray(new String[indices.size()]);
             
         } finally {
             

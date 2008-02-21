@@ -788,30 +788,69 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * public constructor with the following method signature
      * 
      * <pre>
-     *  ...( IndexMetadata metadata, long counter )
+     *  ...( IndexMetadata metadata )
      * </pre>
-     * 
-     * @param 
      * 
      * @return The {@link Checkpoint}.
      */
     final public Checkpoint firstCheckpoint() {
 
-        return overflowCheckpoint(0L/* counter */);
+        try {
+            
+            Class cl = Class.forName(getCheckpointClassName());
+            
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor.
+             */
+            
+            Constructor ctor = cl.getConstructor(new Class[] {
+                    IndexMetadata.class//
+                    });
+
+            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
+                    this //
+                    });
+            
+            return checkpoint;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
 
     }
     
     /**
      * Variant used when an index overflows onto a new backing store.
+     * <p>
+     * The caller is responsible for writing the {@link Checkpoint} record onto
+     * the store.
+     * <p>
+     * The class identified by {@link #getCheckpointClassName()} MUST declare a
+     * public constructor with the following method signature
      * 
-     * @param counter
-     *            The value of the {@link ICounter} to be propagated to the new
-     *            index instance.
-     *            
+     * <pre>
+     *  ...( IndexMetadata metadata, Checkpoint oldCheckpoint )
+     * </pre>
+     * 
+     * @param oldCheckpoint
+     *            The last checkpoint for the index of the old backing store.
+     * 
      * @return The first {@link Checkpoint} for the index on the new backing
      *         store.
+     * 
+     * @throws IllegalArgumentException
+     *             if the oldCheckpoint is <code>null</code>.
      */
-    final public Checkpoint overflowCheckpoint(long counter) {
+    final public Checkpoint overflowCheckpoint(Checkpoint oldCheckpoint) {
+       
+        if (oldCheckpoint == null) {
+         
+            throw new IllegalArgumentException();
+            
+        }
         
         try {
             
@@ -824,15 +863,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
             
             Constructor ctor = cl.getConstructor(new Class[] {
                     IndexMetadata.class, //
-                    Long.class//
+                    Checkpoint.class//
                     });
 
             Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
                     this, //
-                    Long.valueOf(counter)//
+                    oldCheckpoint//
                     });
             
-            assert checkpoint.getCounter() == counter;
+            // sanity check makes sure the counter is propagated to the new store.
+            assert checkpoint.getCounter() == oldCheckpoint.getCounter();
             
             return checkpoint;
             

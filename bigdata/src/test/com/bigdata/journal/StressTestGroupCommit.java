@@ -47,7 +47,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.journal.ConcurrentJournal.Options;
+import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
@@ -335,7 +335,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface TestOptions extends Options {
+    public static interface TestOptions extends ConcurrencyManager.Options {
         
         /**
          * The timeout for the test (seconds).
@@ -390,8 +390,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                     new RegisterIndexTask(journal, resource, 
                             new IndexMetadata(resource, indexUUID)),
 
-                    new AbstractTask(journal, ITx.UNISOLATED,
-                            false/* readOnly */, resource) {
+                    new AbstractTask(journal, ITx.UNISOLATED, resource) {
                         
                         protected Object doTask() throws Exception {
 
@@ -493,10 +492,10 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         result.put("tasks/sec", ""+tasksPerSecond);
         result.put("commits/sec", ""+commitsPerSecond);
         result.put("tasks/commit", ""+tasksPerCommit);
-        result.put("maxRunning", ""+journal.writeService.getMaxRunning());
-        result.put("maxLatencyUntilCommit", ""+journal.writeService.getMaxLatencyUntilCommit());
-        result.put("maxCommitLatency", ""+journal.writeService.getMaxCommitLatency());
-        result.put("poolSize",""+journal.writeService.getPoolSize());
+        result.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
+        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxLatencyUntilCommit());
+        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitLatency());
+        result.put("poolSize",""+journal.getConcurrencyManager().writeService.getPoolSize());
         
         System.err.println(result.toString(true/*newline*/));
 

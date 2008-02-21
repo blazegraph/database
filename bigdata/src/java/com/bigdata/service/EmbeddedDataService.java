@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.journal.Journal;
+import com.bigdata.journal.AbstractJournal;
 
 /**
  * A local (in process) data service.
@@ -35,9 +35,15 @@ public class EmbeddedDataService extends DataService {
         
     }
  
-    public Journal getJournal() {
+    /**
+     * This returns only the live journal. In general there may be many
+     * resources associated with the data service.
+     * 
+     * @deprecated by {@link #getResourceManager()}
+     */
+    public AbstractJournal getLiveJournal() {
         
-        return journal;
+        return resourceManager.getLiveJournal();
         
     }
     

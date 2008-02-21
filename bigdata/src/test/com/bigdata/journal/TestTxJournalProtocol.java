@@ -62,12 +62,12 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         final long startTime = journal.nextTimestamp();
 
-        Tx tx0 = new Tx(journal, startTime, false);
+        Tx tx0 = new Tx(journal, journal, startTime, false);
 
         try {
 
             // Try to create another transaction with the same identifier.
-            new Tx(journal, startTime, false);
+            new Tx(journal, journal, startTime, false);
 
             fail("Expecting: " + IllegalStateException.class);
 
@@ -105,14 +105,14 @@ public class TestTxJournalProtocol extends ProxyTestCase {
 
         final long startTime = journal.nextTimestamp();
 
-        ITx tx0 = new Tx(journal, startTime, false/*readOnly*/);
+        ITx tx0 = new Tx(journal, journal, startTime, false/*readOnly*/);
         
         tx0.prepare(0L/*journal.nextTimestamp()*/);
 
         try {
 
             // Try to create another transaction with the same start time.
-            new Tx(journal, startTime, false);
+            new Tx(journal, journal, startTime, false);
 
             fail("Expecting: " + IllegalStateException.class);
 

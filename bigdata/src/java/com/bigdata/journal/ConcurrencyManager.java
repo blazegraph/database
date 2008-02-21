@@ -1,26 +1,3 @@
-/**
-
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
-
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
 package com.bigdata.journal;
 
 import java.util.Collection;
@@ -41,6 +18,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -49,13 +27,13 @@ import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * A journal that supports concurrent of operations on unisolated named indices.
- * The journal uses a {@link LockManager} to administer exclusive locks on
- * unisolated named indices and thereby identify a schedule of operations such
- * that access to an unisolated named index is always single threaded while
- * access to distinct unisolated named indices MAY be concurrent.
+ * Supports concurrent operations against named indices. The
+ * {@link ConcurrencyManager} a {@link LockManager} to administer exclusive
+ * locks on unisolated named indices and thereby identify a schedule of
+ * operations such that access to an unisolated named index is always single
+ * threaded while access to distinct unisolated named indices MAY be concurrent.
  * <p>
- * The journal have several thread pools that facilitate concurrency. They are:
+ * There are several thread pools that facilitate concurrency. They are:
  * <dl>
  * 
  * <dt>{@link #txWriteService}</dt>
@@ -66,7 +44,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * run with arbitrary concurrency. However, concurrent tasks for the same
  * transaction must obtain an exclusive lock on the isolated index that is used
  * to buffer their writes. A transaction that requests a commit using the
- * {@link ITransactionManager} results in a task being submitted to the
+ * {@link ITransactionManagerService} results in a task being submitted to the
  * {@link #writeService}. Transactions are selected to commit once they have
  * acquired a lock on the corresponding unisolated indices, thereby enforcing
  * serialization of their write sets both among other transactions and among
@@ -96,10 +74,24 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ConcurrentJournal extends AbstractJournal {
+public class ConcurrencyManager implements IConcurrencyManager {
+
+    protected static final Logger log = Logger.getLogger(ConcurrencyManager.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
 
     /**
-     * Options for the {@link ConcurrentJournal}.
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+    
+    /**
+     * Options for the {@link ConcurrentManager}.
      * <p>
      * Note: The main factors that influence the throughput of group commit are
      * {@link #WRITE_SERVICE_CORE_POOL_SIZE} and
@@ -123,7 +115,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * @version $Id$
      */
     public static interface Options extends com.bigdata.journal.Options {
-
+    
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool
          * handling concurrent transactions.
@@ -131,12 +123,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_TX_SERVICE_CORE_POOL_SIZE
          */
         public static final String TX_SERVICE_CORE_POOL_SIZE = "txServiceCorePoolSize";
-
+    
         /**
          * The default #of threads in the transaction service thread pool.
          */
         public final static String DEFAULT_TX_SERVICE_CORE_POOL_SIZE = "50";
-
+    
         /**
          * <code>readServicePoolSize</code> - The #of threads in the pool
          * handling concurrent unisolated read requests on named indices.
@@ -144,14 +136,14 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_READ_SERVICE_CORE_POOL_SIZE
          */
         public static final String READ_SERVICE_CORE_POOL_SIZE = "readServiceCorePoolSize";
-
+    
         /**
          * The default #of threads in the read service thread pool.
          * 
          * @see #READ_SERVICE_CORE_POOL_SIZE
          */
         public final static String DEFAULT_READ_SERVICE_CORE_POOL_SIZE = "50";
-
+    
         /**
          * The target for the #of threads in the pool handling concurrent
          * unisolated write on named indices.
@@ -159,7 +151,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE
          */
         public final static String WRITE_SERVICE_CORE_POOL_SIZE = "writeServiceCorePoolSize";
-
+    
         /**
          * The default #of threads in the write service thread pool (200).
          * 
@@ -186,7 +178,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE
          */
         public final static String WRITE_SERVICE_MAXIMUM_POOL_SIZE = "writeServiceMaximumPoolSize";
-
+    
         /**
          * The default for the maximum #of threads in the write service thread
          * pool.
@@ -200,12 +192,12 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
          */
         public final static String WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "writeServicePrestartAllCoreThreads";
-
+    
         /**
          * The default for {@link #WRITE_SERVICE_PRESTART_ALL_CORE_THREADS}.
          */
         public final static String DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS = "false";
-
+    
         /**
          * The maximum depth of the write service queue before newly submitted
          * tasks will block the caller -or- ZERO (0) to use a queue with an
@@ -215,7 +207,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * @see #DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY
          */
         public static final String WRITE_SERVICE_QUEUE_CAPACITY = "writeServiceQueueCapacity";
-
+    
         /**
          * The default maximum depth of the write service queue (1000).
          */
@@ -232,10 +224,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * The default {@link #STATUS_DELAY}.
          */
         public final static String DEFAULT_STATUS_DELAY = "10000";
-
+    
         /**
          * The maximum time in milliseconds that
-         * {@link ConcurrentJournal#shutdown()} will wait termination of the
+         * {@link ConcurrencyManager#shutdown()} will wait termination of the
          * various services -or- ZERO (0) to wait forever (default is to wait
          * forever).
          * <p>
@@ -243,7 +235,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          * once shutdown begins so this primarily effects whether or not tasks
          * that are already executing will be allowed to run until completion.
          * <p>
-         * Note: You can use {@link ConcurrentJournal#shutdownNow()} to
+         * Note: You can use {@link ConcurrencyManager#shutdownNow()} to
          * terminate the journal immediately.
          * <p>
          * Note: Abrupt shutdown of the journal is always safe, but changes that
@@ -254,12 +246,32 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         public final static String SHUTDOWN_TIMEOUT = "shutdownTimeout";
 
         /**
-         * The default timeout for {@link ConcurrentJournal#shutdown()}.
+         * The default timeout for {@link IConcurrencyManager#shutdown()}.
          */
         public final static String DEFAULT_SHUTDOWN_TIMEOUT = "0";
         
     }
 
+    /**
+     * The properties specified to the ctor.
+     */
+    final private Properties properties;
+
+    /**
+     * The object managing local transactions. 
+     */
+    final private ILocalTransactionManager transactionManager;
+    
+    /**
+     * The object managing the resources on which the indices are stored.
+     */
+    final private IResourceManager resourceManager;
+    
+    /**
+     * <code>true</code> until the service is shutdown.
+     */
+    private boolean open = true;
+    
     /**
      * Pool of threads for handling concurrent read/write transactions on named
      * indices. Distinct transactions are not inherently limited in their
@@ -329,6 +341,54 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     final protected LockManager<String> lockManager;
 
     /**
+     * An object wrapping the properties specified to the ctor.
+     */
+    public Properties getProperties() {
+        
+        return new Properties(properties);
+        
+    }
+    
+    protected void assertOpen() {
+        
+        if (!open)
+            throw new IllegalStateException();
+        
+    }
+    
+    public WriteExecutorService getWriteService() {
+        
+        assertOpen();
+        
+        return writeService;
+        
+    }
+    
+    public LockManager<String> getLockManager() {
+        
+        assertOpen();
+        
+        return lockManager;
+        
+    }
+    
+    public ILocalTransactionManager getTransactionManager() {
+        
+        assertOpen();
+        
+        return transactionManager;
+        
+    }
+    
+    public IResourceManager getResourceManager() {
+        
+        assertOpen();
+        
+        return resourceManager;
+        
+    }
+    
+    /**
      * Shutdown the journal (running tasks will run to completion, but no new
      * tasks will start).
      * <p>
@@ -340,6 +400,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     public void shutdown() {
 
         assertOpen();
+
+        open = false;
         
         log.info("");
 
@@ -423,9 +485,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         // final status message.
         statusTask.run();
         System.err.println(statusTask.status());
-        
-        super.shutdown();
-
+    
     }
 
     /**
@@ -437,6 +497,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     public void shutdownNow() {
 
         assertOpen();
+
+        open = false;
         
         log.info("");
         
@@ -452,26 +514,38 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         statusTask.run();
 //        System.err.println(statusTask.status());
 
-        super.shutdownNow();
-
     }
 
-//    public String getStatistics() {
-//        
-//        return super.getStatistics() + "\n" + statusTask.status();
-//        
-//    }
-    
     /**
      * (Re-)open a journal supporting concurrent operations.
      * 
      * @param properties
-     *            See {@link Options}.
+     *            See {@link ConcurrencyManager.Options}.
+     * @param transactionManager
+     *            The object managing the local transactions.
+     * @param resourceManager
+     *            The object managing the resources on which the indices are
+     *            stored.
      */
-    public ConcurrentJournal(Properties properties) {
+    public ConcurrencyManager(Properties properties,
+            ILocalTransactionManager transactionManager,
+            IResourceManager resourceManager) {
 
-        super(properties);
+        if (properties == null)
+            throw new IllegalArgumentException();
 
+        if (transactionManager == null)
+            throw new IllegalArgumentException();
+
+        if (resourceManager == null)
+            throw new IllegalArgumentException();
+
+        this.properties = properties;
+        
+        this.transactionManager = transactionManager; 
+         
+        this.resourceManager = resourceManager;
+        
         String val;
 
         final int txServicePoolSize;
@@ -480,41 +554,41 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         // txServicePoolSize
         {
 
-            val = properties.getProperty(Options.TX_SERVICE_CORE_POOL_SIZE,
-                    Options.DEFAULT_TX_SERVICE_CORE_POOL_SIZE);
+            val = properties.getProperty(ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE,
+                    ConcurrencyManager.Options.DEFAULT_TX_SERVICE_CORE_POOL_SIZE);
 
             txServicePoolSize = Integer.parseInt(val);
 
             if (txServicePoolSize < 1) {
 
                 throw new RuntimeException("The '"
-                        + Options.TX_SERVICE_CORE_POOL_SIZE
+                        + ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE
                         + "' must be at least one.");
 
             }
 
-            log.info(Options.TX_SERVICE_CORE_POOL_SIZE + "=" + txServicePoolSize);
+            log.info(ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE + "=" + txServicePoolSize);
 
         }
 
         // readServicePoolSize
         {
 
-            val = properties.getProperty(Options.READ_SERVICE_CORE_POOL_SIZE,
-                    Options.DEFAULT_READ_SERVICE_CORE_POOL_SIZE);
+            val = properties.getProperty(ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE,
+                    ConcurrencyManager.Options.DEFAULT_READ_SERVICE_CORE_POOL_SIZE);
 
             readServicePoolSize = Integer.parseInt(val);
 
             if (readServicePoolSize < 1) {
 
                 throw new RuntimeException("The '"
-                        + Options.READ_SERVICE_CORE_POOL_SIZE
+                        + ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE
                         + "' must be at least one.");
 
             }
 
             log
-                    .info(Options.READ_SERVICE_CORE_POOL_SIZE + "="
+                    .info(ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE + "="
                             + readServicePoolSize);
 
         }
@@ -522,19 +596,19 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         // shutdownTimeout
         {
 
-            val = properties.getProperty(Options.SHUTDOWN_TIMEOUT,
-                    Options.DEFAULT_SHUTDOWN_TIMEOUT);
+            val = properties.getProperty(ConcurrencyManager.Options.SHUTDOWN_TIMEOUT,
+                    ConcurrencyManager.Options.DEFAULT_SHUTDOWN_TIMEOUT);
 
             shutdownTimeout = Long.parseLong(val);
 
             if (shutdownTimeout < 0) {
 
-                throw new RuntimeException("The '" + Options.SHUTDOWN_TIMEOUT
+                throw new RuntimeException("The '" + ConcurrencyManager.Options.SHUTDOWN_TIMEOUT
                         + "' must be non-negative.");
 
             }
 
-            log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
+            log.info(ConcurrencyManager.Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
 
         }
 
@@ -558,18 +632,18 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             {
 
                 writeServiceCorePoolSize = Integer.parseInt(properties.getProperty(
-                        Options.WRITE_SERVICE_CORE_POOL_SIZE,
-                        Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE));
+                        ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE,
+                        ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE));
 
                 if (writeServiceCorePoolSize < 1) {
 
                     throw new RuntimeException("The '"
-                            + Options.WRITE_SERVICE_CORE_POOL_SIZE
+                            + ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE
                             + "' must be at least one.");
 
                 }
 
-                log.info(Options.WRITE_SERVICE_CORE_POOL_SIZE + "="
+                log.info(ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE + "="
                         + writeServiceCorePoolSize);
 
             }
@@ -578,18 +652,18 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             {
 
                 writeServiceMaximumPoolSize = Integer.parseInt(properties.getProperty(
-                        Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
-                        Options.DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE));
+                        ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE,
+                        ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_MAXIMUM_POOL_SIZE));
 
                 if (writeServiceMaximumPoolSize < writeServiceCorePoolSize) {
 
                     throw new RuntimeException("The '"
-                            + Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE
+                            + ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE
                             + "' must be greater than the core pool size.");
 
                 }
 
-                log.info(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE + "="
+                log.info(ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE + "="
                         + writeServiceMaximumPoolSize);
 
             }
@@ -598,13 +672,13 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             {
 
                 writeServiceQueueCapacity = Integer.parseInt(properties.getProperty(
-                        Options.WRITE_SERVICE_QUEUE_CAPACITY,
-                        Options.DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY));
+                        ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY,
+                        ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY));
 
                 if (writeServiceQueueCapacity < 0) {
 
                     throw new RuntimeException("The '"
-                            + Options.WRITE_SERVICE_QUEUE_CAPACITY
+                            + ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY
                             + "' must be non-negative.");
 
                 }
@@ -612,13 +686,13 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                 if (writeServiceQueueCapacity<writeServiceCorePoolSize) {
 
                     throw new RuntimeException("The '"
-                            + Options.WRITE_SERVICE_QUEUE_CAPACITY
+                            + ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY
                             + "' must be greater than the "
-                            + Options.WRITE_SERVICE_CORE_POOL_SIZE);
+                            + ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE);
 
                 }
 
-                log.info(Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
+                log.info(ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
                         + writeServiceQueueCapacity);
 
             }
@@ -627,10 +701,10 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             {
                 
                 writeServicePrestart = Boolean.parseBoolean(properties.getProperty(
-                        Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS,
-                        Options.DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS));
+                        ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS,
+                        ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS));
                 
-                log.info(Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS + "="
+                log.info(ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS + "="
                         + writeServicePrestart);
 
             }
@@ -641,9 +715,9 @@ abstract public class ConcurrentJournal extends AbstractJournal {
                         : new ArrayBlockingQueue<Runnable>(writeServiceQueueCapacity)
                         );
             
-            writeService = new WriteExecutorService(this, writeServiceCorePoolSize,
-                    writeServiceMaximumPoolSize, queue, DaemonThreadFactory
-                            .defaultThreadFactory());
+            writeService = new WriteExecutorService(resourceManager,
+                    writeServiceCorePoolSize, writeServiceMaximumPoolSize,
+                    queue, DaemonThreadFactory.defaultThreadFactory());
 
             if (writeServicePrestart) {
 
@@ -681,9 +755,9 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             final long initialDelay = 100;
             
             final long delay = Long.parseLong(properties.getProperty(
-                    Options.STATUS_DELAY, Options.DEFAULT_STATUS_DELAY));
+                    ConcurrencyManager.Options.STATUS_DELAY, ConcurrencyManager.Options.DEFAULT_STATUS_DELAY));
 
-            log.info(Options.STATUS_DELAY+"="+delay);
+            log.info(ConcurrencyManager.Options.STATUS_DELAY+"="+delay);
             
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
@@ -705,6 +779,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      */
     protected StatusTask newStatusTask() {
 
+        assertOpen();
+        
         return new StatusTask();
 
     }
@@ -754,20 +830,20 @@ abstract public class ConcurrentJournal extends AbstractJournal {
          */
         public String status() {
 
-            /*
-             * The #of commits on the _store_ (vs the #of commits since the
-             * write service was started).
-             * 
-             * Note: if the journal is already closed then this information is
-             * not available.
-             */
-            long commitCounter = -1;
-            try {
-                commitCounter = getCommitRecord().getCommitCounter();
-            } catch (Throwable t) {
-                log.warn("Commit record not available: "+t);
-                /* ignore */
-            }
+//            /*
+//             * The #of commits on the _store_ (vs the #of commits since the
+//             * write service was started).
+//             * 
+//             * Note: if the journal is already closed then this information is
+//             * not available.
+//             */
+//            long commitCounter = -1;
+//            try {
+//                commitCounter = getCommitRecord().getCommitCounter();
+//            } catch (Throwable t) {
+//                log.warn("Commit record not available: "+t);
+//                /* ignore */
+//            }
             
             final long elapsed = System.currentTimeMillis() - begin;
             
@@ -819,8 +895,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
             // commitCounter and related stats.
             sb.append(
-                      "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
-                    + ", ncommits="+ writeService.getCommitCount()
+//                      "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
+                        "ncommits="+ writeService.getCommitCount()
                     + ", naborts=" + writeService.getAbortCount()
                     + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
                     + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
@@ -852,7 +928,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      * the store by only syncing the data to disk periodically rather than after
      * every write. Group commits are scheduled by the {@link #commitService}.
      * The trigger conditions for group commits may be configured using
-     * {@link Options}. If you are using the store in a single threaded context
+     * {@link ConcurrencyManager.Options}. If you are using the store in a single threaded context
      * then you may set {@link Options#WRITE_SERVICE_CORE_POOL_SIZE} to ONE (1)
      * which has the effect of triggering commit immediately after each
      * unisolated write. However, note that you can not sync a disk more than ~
@@ -929,7 +1005,7 @@ abstract public class ConcurrentJournal extends AbstractJournal {
             
         } else {
 
-            if (task.fullyIsolated) {
+            if (task.isTransaction) {
 
                 /*
                  * A task that reads from historical data and writes on isolated
@@ -1034,6 +1110,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
     public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks)
             throws InterruptedException {
 
+        assertOpen();
+        
         List<Future<Object>> futures = new LinkedList<Future<Object>>();
 
         boolean done = false;
@@ -1127,6 +1205,8 @@ abstract public class ConcurrentJournal extends AbstractJournal {
      */
     public List<Future<Object>> invokeAll(Collection<AbstractTask> tasks,
             long timeout, TimeUnit unit) throws InterruptedException {
+
+        assertOpen();
         
         List<Future<Object>> futures = new LinkedList<Future<Object>>();
 
@@ -1227,182 +1307,5 @@ abstract public class ConcurrentJournal extends AbstractJournal {
         }
         
     }
-    
-    /*
-     * transaction support.
-     */
-    
-    /**
-     * Abort a transaction (synchronous, low latency for read-only transactions
-     * but aborts for read-write transactions are serialized since there may be
-     * latency in communications with the transaction server or deletion of the
-     * temporary backing store for the transaction).
-     * 
-     * @param ts
-     *            The transaction identifier (aka start time).
-     */
-    public void abort(long ts) {
 
-        ITx tx = getTx(ts);
-        
-        if (tx == null)
-            throw new IllegalArgumentException("No such tx: " + ts);
-        
-        // abort is synchronous.
-        tx.abort();
-        
-        /*
-         * Note: We do not need to abort the pending group commit since nothing
-         * is written by the transaction on the unisolated indices until it has
-         * validated - and the validate/merge task is an unisolated write
-         * operation.
-         */
-        
-    }
-
-    /**
-     * Commit a transaction (synchronous).
-     * <p>
-     * Read-only transactions and transactions without write sets are processed
-     * immediately and will have a commit time of ZERO (0L).
-     * <p>
-     * Transactions with non-empty write sets are placed onto the
-     * {@link #writeService} and the caller will block until the transaction
-     * either commits or aborts. For this reason, this method MUST be invoked
-     * from within a worker thread for the transaction so that concurrent
-     * transactions may continue to execute.
-     * 
-     * @param ts
-     *            The transaction identifier (aka start time).
-     * 
-     * @return The transaction commit time -or- ZERO (0L) if the transaction was
-     *         read-only or had empty write sets.
-     * 
-     * @exception ValidationError
-     *                If the transaction could not be validated. A transaction
-     *                that can not be validated is automatically aborted. The
-     *                caller MAY re-execute the transaction.
-     */
-    public long commit(long ts) throws ValidationError {
-
-        ITx tx = getTx(ts);
-        
-        if (tx == null) {
-
-            throw new IllegalArgumentException("No such tx: " + ts);
-            
-        }
-
-        /*
-         * A read-only transaction can commit immediately since validation and
-         * commit are basically NOPs.
-         */
-
-        if(tx.isReadOnly()) {
-        
-            // read-only transactions do not get a commit time.
-            tx.prepare(0L);
-
-            return tx.commit();
-            
-        }
-        
-        /*
-         * A transaction with an empty write set can commit immediately since
-         * validation and commit are basically NOPs (this is the same as the
-         * read-only case.)
-         */
-
-        if(tx.isEmptyWriteSet()) {
-
-            tx.prepare(0L);
-
-            return tx.commit();
-
-        }
-        
-        try {
-
-            Long commitTime = (Long) writeService.submit(
-                    new TxCommitTask(this, tx)).get();
-            
-            if(DEBUG) {
-                
-                log.debug("committed: startTime="+tx.getStartTimestamp()+", commitTime="+commitTime);
-                
-            }
-            
-            return commitTime;
-            
-        } catch(InterruptedException ex) {
-            
-            // interrupted, perhaps during shutdown.
-            throw new RuntimeException(ex);
-            
-        } catch(ExecutionException ex) {
-            
-            Throwable cause = ex.getCause();
-            
-            if(cause instanceof ValidationError) {
-                
-                throw (ValidationError) cause;
-                
-            }
-
-            // this is an unexpected error.
-            throw new RuntimeException(ex);
-            
-        }
-        
-    }
-    
-    /**
-     * This task is an UNISOLATED operation that validates and commits a
-     * transaction known to have non-empty write sets.
-     * 
-     * @todo write a task design to support 2/3-phase commit of transactions
-     *       (for a transaction whose write sets are distributed across multiple
-     *       journals).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class TxCommitTask extends AbstractTask {
-        
-        /**
-         * The transaction that is being committed.
-         */
-        private final ITx tx;
-        
-        public TxCommitTask(ConcurrentJournal journal,ITx tx) {
-            
-            super(journal,ITx.UNISOLATED,false/*readOnly*/,tx.getDirtyResource());
-            
-            this.tx = tx;
-            
-        }
-
-        /**
-         * 
-         * @return The commit time assgiedn to the transaction.
-         */
-        public Object doTask() throws Exception {
-            
-            /*
-             * The commit time is assigned when we prepare the transaction.
-             * 
-             * @todo This will be an RPC when using a distributed database. Try
-             * to refactor so that we do make RPCs during the write task!
-             */
-
-            final long commitTime = nextTimestamp();
-            
-            tx.prepare(commitTime);
-            
-            return Long.valueOf( tx.commit() );
-            
-        }
-        
-    }
-    
 }

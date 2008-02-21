@@ -69,6 +69,12 @@ public interface ICommitRecord {
      * The commit counter associated with the commit record. This is used by
      * transactions in order to determine whether or not intervening commits
      * have occurred since the transaction start time.
+     * 
+     * @todo The {@link IResourceManager} introduced overflow of journals. The
+     *       commitCounter always starts out at zero on a new journal, so the tx
+     *       should probably examine the {@link IRootBlockView} to figure out if
+     *       this is the same journal on which it started and then the
+     *       commitCounter to see if there has been an intervening commit.
      */
     public long getCommitCounter();
     

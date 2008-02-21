@@ -451,6 +451,96 @@ public class TestFusedView extends AbstractBTreeTestCase {
         assertFalse(view.contains(k7));
 
     }
+
+//    /**
+//     * Unit tests for the {@link ILinearList} API when the index is a view
+//     * composed of more than one index resource.
+//     */
+//    public void test_linearList() {
+//        
+//        byte[] k3 = i2k(3);
+//        byte[] k5 = i2k(5);
+//        byte[] k7 = i2k(7);
+//
+//        byte[] v3a = new byte[]{3};
+//        byte[] v5a = new byte[]{5};
+//        byte[] v7a = new byte[]{7};
+//        
+//        byte[] v3b = new byte[]{3,1};
+//        byte[] v5b = new byte[]{5,1};
+//        byte[] v7b = new byte[]{7,1};
+//        
+//        IRawStore store = new SimpleMemoryRawStore();
+//        
+//        // two btrees with the same index UUID.
+//        final BTree btree1, btree2;
+//        {
+//            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+//            
+//            md.setBranchingFactor(3);
+//            
+//            md.setDeleteMarkers(true);
+//
+//            btree1 = BTree.create(store, md);
+//            
+//            btree2 = BTree.create(store, md.clone());
+//            
+//        }
+//        
+//        /*
+//         * Create an ordered view onto {btree1, btree2}. Keys found in btree1
+//         * will cause the search to halt. If the key is not in btree1 then
+//         * btree2 will also be searched. A miss is reported if the key is not
+//         * found in either btree.
+//         * 
+//         * Note: Since delete markers are enabled keys will be recognized when
+//         * the index entry has been marked as deleted.
+//         */
+//        final FusedView view = new FusedView(new AbstractBTree[] { btree1,
+//                btree2 });
+//        
+//        /* 
+//         * Some tests when the view is empty.
+//         */
+//
+//        // probe with null is disallowed.
+//        try {
+//            view.indexOf(null);
+//            fail("Expecting: " + IllegalArgumentException.class);
+//        } catch (IllegalArgumentException ex) {
+//            log.info("Ignoring expected exception: " + ex);
+//        }
+//        
+//        // not found.
+//        assertEquals(-1,view.indexOf(new byte[]{}));
+//        assertEquals(-1,view.indexOf(k3));
+//        assertEquals(-1,view.indexOf(new byte[]{9,9,9}));
+//            
+//        /*
+//         * Write some data on btree2 and test the linear list API. This lets us
+//         * examine the case where the first btree is empty and all data is in
+//         * the 2nd part of the view.
+//         */
+//        btree2.insert(k3,v3a);
+//        btree2.insert(k5,v5a);
+//        btree2.insert(k7,v7a);
+//        
+//        // not found.
+//        assertEquals(-1,view.indexOf(new byte[]{}));
+//        assertEquals(-3,view.indexOf(new byte[]{9,9,9}));
+//
+//        // found
+//        assertEquals(0,view.indexOf(k3));
+//        assertEquals(1,view.indexOf(k5));
+//        assertEquals(2,view.indexOf(k7));
+//
+//        btree1.insert(k3,v3b);
+////      btree1.insert(k5,v5a);
+////      btree1.insert(k7,v7b);
+//      btree1.remove(k7);
+//      
+//
+//    }
     
 //        btree1.insert(k5, v5a);
 //        assertEquals(2,btree1.rangeCount(null, null));

@@ -34,10 +34,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -51,6 +49,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.ReadOnlyFusedView;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
@@ -81,8 +80,8 @@ import com.bigdata.util.ChecksumUtility;
  * use this method to access the mutable {@link BTree} then YOU are responsible
  * for avoiding concurrent writes on the returned object.
  * <p>
- * See {@link ConcurrentJournal#submit(AbstractTask)} for a thread-safe API that
- * provides suitable concurrency control for both isolated and unisolated
+ * See {@link IConcurrentManager#submit(AbstractTask)} for a thread-safe API
+ * that provides suitable concurrency control for both isolated and unisolated
  * operations on named indices. Note that the use of the thread-safe API does
  * NOT protect against applications that directly access the mutable
  * {@link BTree} using {@link #getIndex(String)}.
@@ -108,10 +107,11 @@ import com.bigdata.util.ChecksumUtility;
  * each transaction is written on a distinct {@link TemporaryStore}. However,
  * without additional concurrency controls, each transaction is NOT thread-safe
  * and MUST NOT be executed by more than one concurrent thread. Again, see
- * {@link ConcurrentJournal#submit(AbstractTask)} for a high-concurrency API for
- * both isolated operations (transactions) and unisolated operations. Note that
- * the {@link TemporaryStore} backing a transaction will spill automatically
- * from memory onto disk if the write set of the transaction grows too large.
+ * {@link IConcurrentManager#submit(AbstractTask)} for a high-concurrency API
+ * for both isolated operations (transactions) and unisolated operations. Note
+ * that the {@link TemporaryStore} backing a transaction will spill
+ * automatically from memory onto disk if the write set of the transaction grows
+ * too large.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -123,22 +123,6 @@ import com.bigdata.util.ChecksumUtility;
  * segments and journals based on LRU policy and timeout; in a distributed
  * solution resources would be migrated to other hosts to reduce the total
  * sustained resource load).</li>
- * <li> Concurrent load for RDFS w/o rollback. There should also be an
- * unisolated read mode that does "read-behind", i.e., reading from the last
- * committed state on the store. The purpose of this is to permit fully
- * concurrent readers with the writer in an unisolated mode. If concurrent
- * readers actually read from the same btree instance as the writer then
- * exceptions would arise from concurrent modification. This problem is
- * trivially avoided by maintaining a distinction between a concurrent read-only
- * btree emerging from the last committed state and a single non-concurrent
- * access btree for the writer. In this manner readers may read from the
- * unisolated state of the database with concurrent modification -- to another
- * instance of the btree. Once the writer commits, any new readers will read
- * from its committed state and the older btree objects will be flushed from
- * cache soon after their readers terminate -- thereby providing a consistent
- * view to a reader (or the reader could always switch to read from the then
- * current btree after a commit - just like the distinction between an isolated
- * reader and a read-committed reader).</li>
  * <li> Minimize (de-)serialization costs for B+Trees since we are not IO bound.</li>
  * <li> Reduce heap churn through the use allocation pools for ByteBuffers and
  * byte[]s. There are several places where we can do this, including:
@@ -148,15 +132,12 @@ import com.bigdata.util.ChecksumUtility;
  * become a memory sink. Profile using the BEA tool to look for sources of
  * memory allocation and leakage. </li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
- * <li> GOM integration, including: support for primary key (clustered) indices;
- * using queues from GOM to journal/database segment server supporting both
- * embedded and remote scenarios; and using state-based conflict resolution to
- * obtain high concurrency for generic objects, link set metadata, indices, and
- * distributed split cache and hot cache support.</li>
+ * <li> GOM integration features, including: support for primary key (clustered)
+ * indices; supporting both embedded and remote scenarios; and using state-based
+ * conflict resolution to obtain high concurrency for generic objects, link set
+ * metadata, indices, and distributed split cache and hot cache support.</li>
  * <li> Scale-out database, including:
  * <ul>
- * <li> Data server (mixture of journal server and read-optimized database
- * server). Implemented, but needs optimized network IO.</li>
  * <li> Media replication for data service failover </li>
  * <li> Automatic management of partitioned indices. Note that the split point
  * must be choosen with some awareness of the application keys in order to
@@ -167,8 +148,6 @@ import com.bigdata.util.ChecksumUtility;
  * <li> Metadata index services (one per named index with failover).
  * Implemented, but uses static partitioning.</li>
  * <li> Resource reclaimation. </li>
- * <li> Job scheduler to map functional programs across the data (possible
- * Hadoop integration point).</li>
  * </ul>
  * </ol>
  * 
@@ -185,11 +164,6 @@ import com.bigdata.util.ChecksumUtility;
  * @todo Define distributed protocol for robust startup, operation, and
  *       failover.
  * 
- * @todo I need to revisit the assumptions for very large objects. I expect that
- *       using an index with a key formed as [URI][chuck#] would work just fine.
- *       Chunks would then be limited to 32k or so. Writes on such indices
- *       should probably be directed to a journal using a disk-only mode.
- * 
  * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
  *       or other persistence capable data structure basis. It is nice to be
  *       able to choose for which indices and when ( {@link Journal} vs
@@ -203,24 +177,26 @@ import com.bigdata.util.ChecksumUtility;
  *       exceptions to be thrown out of concurrent threads. It would be nice if
  *       we could throw a single exception that indicated that the journal had
  *       been asynchronously closed.
+ * 
+ * @todo Run unit tests at some non-default #of offset bits.
  */
-public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
+public abstract class AbstractJournal implements IJournal, ITransactionManager {
 
     /**
      * Logger.
      */
-    public static final Logger log = Logger.getLogger(IJournal.class);
+    protected static final Logger log = Logger.getLogger(IJournal.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
     /**
@@ -500,27 +476,27 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         log.info(Options.OFFSET_BITS + "=" + offsetBits);
 
-        if (offsetBits != WormAddressManager.DEFAULT_OFFSET_BITS) {
-
-            /*
-             * FIXME The problem is that the CommitRecordIndex and the Name2Addr
-             * class both define IValueSerializer objects that need to know how
-             * to pack and unpack addresses. Those objects are serialized into
-             * the BTreeMetadata records using Java default serialization. When
-             * when they are de-serialized they no longer have a reference to
-             * the store and therefore do not know the #of offset bits to use
-             * when encoding and decoding addresses. This has been patched by
-             * requiring the use of the default #of offset bits. A proper
-             * solution would take an approach similar to the extSer package
-             * which provides a marker interface used to identify objects who
-             * need to have the store reference set during de-serialization.
-             */
-
-            throw new RuntimeException("Only "
-                    + WormAddressManager.DEFAULT_OFFSET_BITS
-                    + " is supported at this time");
-
-        }
+//        if (offsetBits != WormAddressManager.DEFAULT_OFFSET_BITS) {
+//
+//            /*
+//             * FIXME The problem is that the CommitRecordIndex and the Name2Addr
+//             * class both define IValueSerializer objects that need to know how
+//             * to pack and unpack addresses. Those objects are serialized into
+//             * the BTreeMetadata records using Java default serialization. When
+//             * when they are de-serialized they no longer have a reference to
+//             * the store and therefore do not know the #of offset bits to use
+//             * when encoding and decoding addresses. This has been patched by
+//             * requiring the use of the default #of offset bits. A proper
+//             * solution would take an approach similar to the extSer package
+//             * which provides a marker interface used to identify objects who
+//             * need to have the store reference set during de-serialization.
+//             */
+//
+//            throw new RuntimeException("Only "
+//                    + WormAddressManager.DEFAULT_OFFSET_BITS
+//                    + " is supported at this time");
+//
+//        }
         
         /*
          * "createTempFile"
@@ -712,12 +688,18 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
         }
 
         /*
+         * Note: The caller SHOULD specify an explicit [createTime] when its
+         * value is critical. The default assigned here does NOT attempt to use
+         * a clock that is consistent with the commit protocol or even a clock
+         * that assigns unique timestamps.
+         */
+        final long createTime = Long.parseLong(properties.getProperty(
+                Options.CREATE_TIME, "" + System.currentTimeMillis()));
+        
+        /*
          * Create the appropriate IBufferStrategy object.
          */
 
-        final long createTime = Long.parseLong(properties.getProperty(
-                Options.CREATE_TIME, "" + nextTimestamp()));
-        
         switch (bufferMode) {
 
         case Transient: {
@@ -1033,6 +1015,8 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     public void delete() {
 
+        if(isOpen()) throw new IllegalStateException();
+
         log.info("");
         
         _bufferStrategy.delete();
@@ -1056,19 +1040,46 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      */
     public void close(long closeTime) {
         
+        log.info("Closing journal for further writes: closeTime="+closeTime);
+        
         IRootBlockView old = _rootBlock;
         
-        // Create the final root block.
+        /*
+         * Create the final root block.
+         * 
+         * Note: We MUST bump the commitCounter in order to have the new root
+         * block be selected over the old one!
+         * 
+         * Note: This will throw an error if nothing has ever been committed on
+         * the journal. The problem is that the root block does not permit a
+         * non-zero commitCounter unless the commitRecordAddr and perhaps some
+         * other stuff are non-zero as well.
+         */
         IRootBlockView newRootBlock = new RootBlockView(!old.isRootBlock0(),
                 old.getOffsetBits(), old.getNextOffset(), old
                         .getFirstCommitTime(), old.getLastCommitTime(), old
-                        .getCommitCounter(), old.getCommitRecordAddr(), old
+                        .getCommitCounter()+1, old.getCommitRecordAddr(), old
                         .getCommitRecordIndexAddr(), old.getUUID(), old
                         .getCreateTime(), closeTime, checker);
 
-        // write it on the store.
-        _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+        /*
+         * Write it on the store.
+         * 
+         * Note: We request that the write is forced to disk since close() will
+         * not force buffered writes. This is necessary in order to make sure
+         * that the updated root block (and anything left in the write cache for
+         * the disk buffer) get forced through onto the disk. We do not need to
+         * specify ForceMetadata here since the file size is unchanged by this
+         * operation.
+         */
+        _bufferStrategy.writeRootBlock(newRootBlock, ForceEnum.Force);
+        
+        // replace the root block reference.
+        _rootBlock = newRootBlock;
 
+        // discard current commit record - can be re-read from the store.
+        _commitRecord = null;
+        
         // close down the journal.
         close();
         
@@ -1389,7 +1400,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     /**
      * Note: This method can not be implemented by the {@link AbstractJournal}
      * since it lacks a commit timestamp factory, which is properly part of the
-     * {@link ITransactionManager}.
+     * {@link ITransactionManagerService}.
      * 
      * @see Journal#commit()
      */
@@ -1656,31 +1667,33 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
     }
 
     /**
-     * Returns a read-only view of the root addresses. The caller may modify the
-     * returned array without changing the effective state of those addresses as
-     * used by the store.
+     * Returns a read-only view of the {@link ICommitRecord} containing the root
+     * addresses.
+     * <p>
+     * Note: Synchronization was added to this method since the
+     * {@link StatusThread} and {@link AbstractTask}s may all invoke this
+     * concurrently. The synchronization could be removed if we made sure that
+     * this was never null outside of initialization or commit.
      * 
-     * @return The root addresses.
-     * 
-     * @todo Synchronization was added to this method since the
-     *       {@link StatusThread} and {@link AbstractTask}s may all invoke
-     *       this concurrently. The synchronization could be removed if we made
-     *       sure that this was never null outside of initialization or commit.
+     * @return The current {@link ICommitRecord} and never <code>null</code>.
      */
     synchronized public ICommitRecord getCommitRecord() {
 
         assertOpen();
-        
+
         if (_commitRecord == null) {
 
-            long commitRecordAddr = _rootBlock.getCommitRecordAddr();
+            // the address of the current commit record from the root block.
+            final long commitRecordAddr = _rootBlock.getCommitRecordAddr();
 
             if (commitRecordAddr == 0L) {
 
+                // No commit record on the store yet.
                 _commitRecord = new CommitRecord();
 
             } else {
 
+                // Read the commit record from the store.
                 _commitRecord = CommitRecordSerializer.INSTANCE
                         .deserialize(_bufferStrategy.read(commitRecordAddr));
 
@@ -1836,12 +1849,12 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * visible to other users of the same read-only index. This is typically
      * accomplished by wrapping the returned object in class that will throw an
      * exception for writes such as {@link ReadOnlyIndex} or
-     * {@link ReadCommittedIndex}.
+     * {@link ReadOnlyFusedView}.
      * 
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
      */
-    protected IIndex getIndex(String name, ICommitRecord commitRecord) {
+    protected BTree getIndex(String name, ICommitRecord commitRecord) {
 
         assertOpen();
 
@@ -1954,11 +1967,11 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      *            
      * @return The index object.
      */
-    final protected IIndex getIndex(long addr) {
+    final protected BTree getIndex(long addr) {
         
         synchronized (objectCache) {
 
-            IIndex obj = (IIndex) objectCache.get(addr);
+            BTree obj = (BTree) objectCache.get(addr);
 
             if (obj == null) {
                 
@@ -2004,7 +2017,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * 
      * @see Options#BRANCHING_FACTOR
      */
-    public IIndex registerIndex(String name) {
+    public BTree registerIndex(String name) {
 
         IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
 
@@ -2032,7 +2045,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
-    public IIndex registerIndex(String name, BTree ndx) {
+    public BTree registerIndex(String name, BTree ndx) {
 
         assertOpen();
 
@@ -2116,7 +2129,7 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
      *       longer required by any open index. This will require a distinct
      *       referenceCount on the {@link Journal}.
      */
-    public IIndex getIndex(String name) {
+    public BTree getIndex(String name) {
 
         assertOpen();
 
@@ -2136,160 +2149,6 @@ public abstract class AbstractJournal implements IJournal, ITxCommitProtocol {
 
         }
 
-    }
-
-    /*
-     * transaction support (@todo moving to ResourceManager)
-     */
-    
-    /**
-     * Note: This is declared here since the transaction commit protocol
-     * requires access to a timestamp service.
-     */
-    abstract public long nextTimestamp();
-
-    /**
-     * A hash map containing all active transactions. A transaction that is
-     * preparing will remain in this collection until it has either successfully
-     * prepared or aborted.
-     */
-    final Map<Long, ITx> activeTx = new ConcurrentHashMap<Long, ITx>();
-
-    /**
-     * A hash map containing all transactions that have prepared but not yet
-     * either committed or aborted.
-     * 
-     * @todo A transaction will be in this map only while it is actively
-     *       committing, so this is always a "map" of one and could be replaced
-     *       by a scalar reference (except that we may allow concurrent prepare
-     *       and commit of read-only transactions).
-     */
-    final Map<Long, ITx> preparedTx = new ConcurrentHashMap<Long, ITx>();
-
-    /**
-     * Notify the journal that a new transaction is being activated (starting on
-     * the journal).
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @throws IllegalStateException
-     * 
-     * @todo test for transactions that have already been completed? that would
-     *       represent a protocol error in the transaction manager service.
-     */
-    protected void activateTx(ITx tx) throws IllegalStateException {
-
-        Long timestamp = tx.getStartTimestamp();
-
-        if (activeTx.containsKey(timestamp))
-            throw new IllegalStateException("Already active: tx=" + tx);
-
-        if (preparedTx.containsKey(timestamp))
-            throw new IllegalStateException("Already prepared: tx=" + tx);
-
-        activeTx.put(timestamp, tx);
-
-    }
-
-    /**
-     * Notify the journal that a transaction has prepared (and hence is no
-     * longer active).
-     * 
-     * @param tx
-     *            The transaction
-     * 
-     * @throws IllegalStateException
-     */
-    protected void prepared(ITx tx) throws IllegalStateException {
-
-        Long id = tx.getStartTimestamp();
-
-        ITx tx2 = activeTx.remove(id);
-
-        if (tx2 == null)
-            throw new IllegalStateException("Not active: tx=" + tx);
-
-        assert tx == tx2;
-
-        if (preparedTx.containsKey(id))
-            throw new IllegalStateException("Already preparing: tx=" + tx);
-
-        preparedTx.put(id, tx);
-
-    }
-
-    /**
-     * Notify the journal that a transaction is completed (either aborted or
-     * committed).
-     * 
-     * @param tx
-     *            The transaction.
-     * 
-     * @throws IllegalStateException
-     */
-    protected void completedTx(ITx tx) throws IllegalStateException {
-
-        assert tx != null;
-        assert tx.isComplete();
-
-        Long id = tx.getStartTimestamp();
-
-        ITx txActive = activeTx.remove(id);
-
-        ITx txPrepared = preparedTx.remove(id);
-
-        if (txActive == null && txPrepared == null) {
-
-            throw new IllegalStateException(
-                    "Neither active nor being prepared: tx=" + tx);
-
-        }
-
-    }
-
-    /**
-     * Lookup an active or prepared transaction (exact match).
-     * 
-     * @param startTime
-     *            The start timestamp for the transaction.
-     * 
-     * @return The transaction with that start time or <code>null</code> if
-     *         the start time is not mapped to either an active or prepared
-     *         transaction.
-     */
-    public ITx getTx(long startTime) {
-
-        ITx tx = activeTx.get(startTime);
-
-        if (tx == null) {
-
-            tx = preparedTx.get(startTime);
-
-        }
-
-        return tx;
-
-    }
-
-    public IIndex getIndex(String name, long ts) {
-        
-        if (name == null) {
-
-            throw new IllegalArgumentException();
-            
-        }
-        
-        ITx tx = activeTx.get(ts);
-        
-        if (tx == null) {
-
-            throw new IllegalStateException();
-            
-        }
-        
-        return tx.getIndex(name);
-        
     }
 
     /*

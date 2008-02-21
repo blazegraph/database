@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.util.Date;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -50,9 +52,25 @@ public class TestTx extends ProxyTestCase {
     }
 
     public TestTx(String name) {
+        
         super(name);
+        
     }
 
+    /**
+     * Writes some interesting constants on {@link System#err}.
+     */
+    public void test_constants() {
+        
+        System.err.println("min : "+new Date(Long.MIN_VALUE));
+        System.err.println("min1: "+new Date(Long.MIN_VALUE+1));
+        System.err.println("-1L : "+new Date(-1));
+        System.err.println(" 0L : "+new Date(0L));
+        System.err.println("max1: "+new Date(Long.MAX_VALUE-1));
+        System.err.println("max : "+new Date(Long.MAX_VALUE));
+        
+    }
+    
     /**
      * Test verifies that a transaction may start when there are (a) no commits
      * on the journal; and (b) no indices have been registered.
@@ -775,7 +793,7 @@ public class TestTx extends ProxyTestCase {
         assertTrue(tx2<tx3);
         assertTrue(tx3>tx1CommitTime);
         System.err.println("tx3: startTime="+tx3);
-        System.err.println("tx3: ground state: "+((Tx)journal.getTx(tx3)).commitRecord);
+//        System.err.println("tx3: ground state: "+((Tx)journal.getTx(tx3)).commitRecord);
         
         // data version still not visible in tx0.
         assertNull(journal.getIndex(name,tx0).lookup(id1));

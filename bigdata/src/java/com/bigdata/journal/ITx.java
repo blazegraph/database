@@ -23,23 +23,54 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.util.Date;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedFusedView;
 
 /**
+ * <p>
  * Interface for transactional reading and writing of persistent data.
- *
+ * </p>
+ * 
+ * @see ITransactionManager
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface ITx extends IIndexStore {
 
     /**
-     * A constant that may be used as the transaction identifier when the
-     * operation is <em>unisolated</em> (non-transactional).  The value of
-     * this constant is ZERO (0L).
+     * The constant that SHOULD used as the timestamp for an <em>unisolated</em>
+     * read-write operation. The value of this constant is ZERO (0L) -- this
+     * value corresponds to <code>Wed Dec 31 19:00:00 EST 1969</code> when
+     * interpreted as a {@link Date}.
      */
     public static final long UNISOLATED = 0L;
+    
+    /**
+     * A constant that SHOULD used as the timestamp for a
+     * <em>read-committed</em> (non-transactional) read-only operation. The
+     * value of this constant is ZERO (-1L) -- this value corresponds to
+     * <code>Wed Dec 31 18:59:59 EST 1969</code> when interpreted as a
+     * {@link Date}.
+     * <p>
+     * {@link AbstractTask}s that run with read-committed isolation provide a
+     * read-only view onto the most recently committed state of the indices on
+     * which they read. However, when a process runs a series of
+     * {@link AbstractTask}s with read-committed isolation the view of the
+     * index in each distinct task will change if concurrenct processes commit
+     * writes on the index. Further, an index itself can appear or disappear if
+     * concurrent processes drop or register that index.
+     * <p>
+     * A read-committed transaction imposes fewer constraints on when old
+     * resources (historical journals and index segments) may be released. For
+     * this reason, a read-committed transaction is a good choice when a
+     * very-long running read must be performed on the database. Since a
+     * read-committed transaction does not allow writes, the commit and abort
+     * protocols are identical.
+     */
+    public static final long READ_COMMITTED = -1L;
     
     /**
      * The start time for the transaction as assigned by a centralized

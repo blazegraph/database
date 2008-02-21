@@ -35,14 +35,6 @@ package com.bigdata.journal;
 public enum IsolationEnum {
 
     /**
-     * A read-only transaction that will read any data successfully
-     * committed on the database (the view provided by the transaction does
-     * not remain valid as of the transaction start time but evolves as
-     * concurrent transactions commit) (level 0).
-     */
-    ReadCommitted(0),
-
-    /**
      * A fully isolated read-only transaction (level 1).
      */
     ReadOnly(1),
@@ -80,8 +72,6 @@ public enum IsolationEnum {
     public IsolationEnum get(int level) {
 
         switch (level) {
-        case 0:
-            return ReadCommitted;
         case 1:
             return ReadOnly;
         case 2:
