@@ -43,6 +43,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.Journal;
 import com.bigdata.repo.BigdataRepository;
@@ -565,7 +566,7 @@ public class SparseRowStore {
          */
         protected IKeyBuilder getKeyBuilder(IIndex ndx) {
 
-            return ((Journal) ((AbstractBTree) ndx).getStore()).getKeyBuilder();
+            return ((AbstractJournal) ((AbstractBTree) ndx).getStore()).getKeyBuilder();
 
         }
                 
@@ -860,7 +861,7 @@ public class SparseRowStore {
                 
             } else if (timestamp == AUTO_TIMESTAMP_UNIQUE) {
 
-                timestamp = ((Journal)((AbstractBTree)ndx).getStore()).nextTimestamp();
+                timestamp = ((AbstractJournal)((AbstractBTree)ndx).getStore()).nextTimestamp();
                 
             }
             

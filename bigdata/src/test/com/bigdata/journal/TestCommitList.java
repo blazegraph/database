@@ -158,7 +158,7 @@ public class TestCommitList extends ProxyTestCase {
         BTree ndx = (BTree)journal.registerIndex(name);
         
         // verify index was flushed to the backing store.
-        assertFalse(ndx.needsWrite());
+        assertFalse(ndx.needsCheckpoint());
         
         // verify a new index is on the commit list.
         assertTrue(journal.name2Addr.willCommit(name));

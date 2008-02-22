@@ -48,6 +48,22 @@ public interface IPartitionMetadata {
     /**
      * The ordered list of data services on which data for this partition will
      * be written and from which data for this partition may be read.
+     * 
+     * @todo data services should be placed into zones that handle replication.
+     *       There should be a distinct zone for the metadata services since
+     *       their data should not be co-mingled with the regular data services.
+     *       The clients should get failover information from the zone not this
+     *       method. Either replace this with the zone identifier and do lookup
+     *       of the data service on the zone or keep this as the primary in the
+     *       zone but have the zone know about failover services for the
+     *       primary. This will make it much easier to move an index partition
+     *       and handle failover since we will not be duplicating the data
+     *       throughout the metadata index. perhaps assign a partition UUID and
+     *       do lookup of the data service within the zone using that so that we
+     *       do not have to update the partition description at all when we move
+     *       an index partition. Alternative, retire the old partition
+     *       identifier and issue a new one each time the data service chain is
+     *       modified or the index partition is moved.
      */
     public UUID[] getDataServices();
     
@@ -65,6 +81,13 @@ public interface IPartitionMetadata {
      * restart-safe deletion.
      * 
      * @see ResourceState
+     * 
+     * @todo Perhaps this information should only be kept locally in the index
+     *       partitions themselves on the data service. The client certainly
+     *       does not need this information in order to direct its request to
+     *       the appropriate data service. This also relieves us of the chore of
+     *       updating the {@link MetadataIndex} each time we overflow the
+     *       journal.
      */
     public IResourceMetadata[] getResources();
 

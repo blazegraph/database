@@ -135,7 +135,7 @@ public class DataServer extends AbstractServer {
         super.destroy();
         
         // destroy all resources.
-        service.getResourceManager().delete();
+        service.getResourceManager().destroyAllResources();
 
     }
     

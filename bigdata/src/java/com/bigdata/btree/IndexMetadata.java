@@ -203,7 +203,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * Address that can be used to read this metadata record from the store.
      * <p>
      * Note: This is not a persistent property. However the value is set when
-     * the metadata record is read from, or written on, the store.
+     * the metadata record is read from, or written on, the store. It is zero
+     * when you {@link #clone()} a metadata record until it's been written onto
+     * the store.
      */
     final public long getMetadataAddr() {
         

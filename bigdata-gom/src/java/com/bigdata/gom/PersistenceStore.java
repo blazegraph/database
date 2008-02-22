@@ -1495,7 +1495,7 @@ public class PersistenceStore implements IPersistentStore
 //                    UUID.randomUUID(), valueSerializer);
             
             // force the btree to the store so that we can get its checkpoint record.
-            btree.write();
+            btree.checkpoint();
 
 //            m_journal.registerIndex(name, btree);
             

@@ -1019,7 +1019,7 @@ public class BigdataRepository implements ContentRepository {
      * operation is NOT atomic it is possible that conflicts can arise when more
      * than one client attempts to update a file concurrently.
      * 
-     * @param metadata
+     * @param doc
      *            The file metadata.
      */
     public int update(Document doc) {
@@ -2894,11 +2894,11 @@ public class BigdataRepository implements ContentRepository {
         } else {
 
             /*
-             * @todo Obtain the index view for that historical timestamp or isolated
+             * Obtain the index view for that historical timestamp or isolated
              * by the specified transaction.
              */
 
-            throw new UnsupportedOperationException();
+            dataIndex = fed.getIndex(tx, DATA_NAME);
             
         }
 

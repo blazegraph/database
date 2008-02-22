@@ -131,7 +131,7 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
         unisolatedIndex.insert(k7, null, true/* deleted */, t2, null/* tuple */);
 
         // checkpoint the unisolated index.
-        final long addrCheckpoint1 = unisolatedIndex.write();
+        final long addrCheckpoint1 = unisolatedIndex.checkpoint();
 
         // load the ground state from that checkpoint.
         final BTree groundState = BTree.load(journal, addrCheckpoint1);

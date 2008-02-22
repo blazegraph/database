@@ -254,6 +254,19 @@ public class BigdataFederation implements IBigdataFederation {
 
     public IIndex getIndex(long tx, String name) {
 
+        if (tx != ITx.UNISOLATED) {
+         
+            /*
+             * FIXME drive through support for all kinds of ops and verify that the
+             * client is smart enough to choose READ_COMMITTED isolation for a
+             * read-only procedure so that we don't drag down the write service!
+             */
+
+            throw new UnsupportedOperationException(
+                    "Only unisolated operations are supported");
+            
+        }
+        
         assertOpen();
 
         /*

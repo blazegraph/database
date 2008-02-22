@@ -370,7 +370,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         this.indexCache = new HashMap<String,IIndex>(resource.length);
         
-        if (startTime > ITx.UNISOLATED) {
+        if (isTransaction) {
 
             /*
              * A transaction.

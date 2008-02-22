@@ -299,10 +299,6 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    /**
-     * @todo run on the {@link #getThreadPool()} in order to limit client
-     *       parallelism to the size of the thread pool.
-     */
     public Object submit(byte[] key, IIndexProcedure proc) {
 
         try {

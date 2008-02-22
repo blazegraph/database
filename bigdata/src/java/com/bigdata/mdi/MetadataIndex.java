@@ -137,6 +137,13 @@ import com.bigdata.service.MetadataService;
  *       metadata index and clients will have to update their cache when the
  *       index moves into its next consistent state.
  * 
+ * @todo the metadata index can be hash partitioned and range queries can be
+ *       flooded to all partitions so that we do not need a meta-metadata index
+ *       to locate metadata index partitions. the #of metadata can be changed by
+ *       a suitable broadcast event in which clients have to change to the new
+ *       hash basis.  this feature can be generalized to provide hash partitioned
+ *       indices as well as key-range partitioned indices.
+ * 
  * @todo A metadata index can be recovered by a distributed process running over
  *       the data services. Each data service reports all index partitions. The
  *       reports are collected and the index is rebuilt from the reports. Much
@@ -146,7 +153,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     public IndexMetadata getScaleOutIndexMetadata() {
         
-        return ((MetadataIndexMetadata) metadata).scaleOutIndexMetadata;
+        return ((MetadataIndexMetadata) getIndexMetadata()).scaleOutIndexMetadata;
         
     }
     

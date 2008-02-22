@@ -59,11 +59,15 @@ public interface IResourceMetadata extends Cloneable {
     
     /**
      * The #of bytes in the store file.
+     * 
+     * @todo is this useful for any decision making?
      */
     public long size();
 
     /**
      * The life cycle state of that store file.
+     * 
+     * @deprecated 
      */
     public ResourceState state();
 

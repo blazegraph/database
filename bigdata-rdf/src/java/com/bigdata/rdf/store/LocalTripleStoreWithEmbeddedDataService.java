@@ -371,7 +371,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
         dataService.shutdown();
         
-        dataService.getLiveJournal().delete();
+        dataService.getLiveJournal().destroyAllResources();
         
     }
     

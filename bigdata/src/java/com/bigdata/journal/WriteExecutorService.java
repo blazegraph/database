@@ -97,6 +97,25 @@ import com.bigdata.rawstore.IRawStore;
  * the channel. (The same problem can arise if you are using NIO for sockets or
  * anything else that uses the {@link Channel} abstraction.)
  * 
+ * <h2>Overflow handling</h2>
+ * 
+ * <p>
+ * The {@link WriteExecutorService} invokes {@link #overflow()} each time it
+ * does a group commit. Normally the {@link WriteExecutorService} does not
+ * quiese before doing a group commit, and when it is not quiesent the
+ * {@link ResourceManager} can NOT {@link #overflow()} the journal since
+ * concurrent tasks are still writing on the current journal. Therefore the
+ * {@link ResourceManager} monitors the {@link IBufferStrategy#getExtent()} of
+ * the live journal. When it decides that the live journal is large enough it
+ * {@link WriteExecutorService#pause()}s {@link WriteExecutorService} and waits
+ * until {@link #overflow()} is called with a quiesent
+ * {@link WriteExecutorService}. This effectively grants the
+ * {@link ResourceManager} exclusive access to the journal. It can then run
+ * {@link #overflow()} to setup a new journal and tell the
+ * {@link WriteExecutorService} to {@link WriteExecutorService#resume()}
+ * processing.
+ * </p>
+ * 
  * @todo The thread pool is essentially used as a queue to force tasks which
  *       have completed to await the commit. Consider placing a limit on the #of
  *       running threads when the thread pool is very large in case (a) a large
@@ -136,46 +155,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     
     private final IResourceManager resourceManager;
     
-//    private ConcurrentJournal journal;
+    public WriteExecutorService(IResourceManager resourceManager,
+            int corePoolSize, int maximumPoolSize,
+            BlockingQueue<Runnable> queue, ThreadFactory threadFactory) {
 
-//    protected ConcurrentJournal getJournal() {
-//
-//        return journal;
-//
-//    }
-
-    public WriteExecutorService(IResourceManager resourceManager, int corePoolSize,
-            int maximumPoolSize, BlockingQueue<Runnable> queue,
-            ThreadFactory threadFactory) {
-
-        super( corePoolSize, maximumPoolSize, Integer.MAX_VALUE,
-                TimeUnit.NANOSECONDS,
-                queue, threadFactory);
-
-//        if (concurrencyManager == null)
-//            throw new IllegalArgumentException();
+        super(corePoolSize, maximumPoolSize, Integer.MAX_VALUE,
+                TimeUnit.NANOSECONDS, queue, threadFactory);
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
         
-//        setJournal(journal);
-        
-//        this.concurrencyManager = concurrencyManager;
-
         this.resourceManager = resourceManager;
         
     }
-
-//    private void setJournal(ConcurrentJournal journal) {
-//
-//        if (journal == null)
-//            throw new NullPointerException();
-//
-//        this.journal = journal;
-//
-//        //            lastCommitTime.set( journal.getRootBlockView().getLastCommitTime() );
-//
-//    }
 
     /*
      * Support for pausing and resuming execution of new worker tasks.
@@ -290,6 +282,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public long getAbortCount() {
         
         return naborts;
+        
+    }
+    
+    /**
+     * <code>true</code> iff the pause flag is set such that the write service
+     * will queue up new tasks without allowing them to execute.
+     * 
+     * @see #pause()
+     * @see #resume()
+     */
+    public boolean isPaused() {
+        
+        return isPaused;
         
     }
     
@@ -950,6 +955,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             }
             
             log.info("Commit Ok");
+
+            // allow overflow processing.
+            resourceManager.overflow(true/* exclusiveLock */, this);
             
             return true;
             
@@ -1002,6 +1010,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * <ul>
      * <li>nrunning, nwrites, active...</li>
      * </ul>
+     * 
+     * @return <code>true</code> iff the commit was successful.
      */
     private boolean commit() {
 

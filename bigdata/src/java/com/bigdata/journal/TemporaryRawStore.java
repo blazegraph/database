@@ -212,10 +212,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
 
     /**
      * Note: This operation is a NOP since {@link #close()} always deletes the
-     * backing file and {@link #delete()} requires that the store is closed as a
+     * backing file and {@link #destroyAllResources()} requires that the store is closed as a
      * pre-condition.
      */
-    public void delete() {
+    public void destroyAllResources() {
         
         if(open) throw new IllegalStateException();
         

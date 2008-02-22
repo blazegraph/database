@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
@@ -56,7 +57,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /**
      * @todo do not need local tx manager for read-only journals.
-     * @param properties See {@link com.bigdata.journal.Options}.
+     * 
+     * @param properties
+     *            See {@link com.bigdata.journal.Options}.
      */
     public Journal(Properties properties) {
         
@@ -362,11 +365,30 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    /*
+     * IResourceManager
+     */
+    
+    /**
+     * Note: This implementation does not handle overflow of the journal and
+     * always returns <code>false</code>. As a consequence the journal
+     * capacity will simply be extended by {@link #write(ByteBuffer)} until the
+     * available disk space is exhausted.
+     * 
+     * @return This implementation returns <code>false</code> since it does
+     *         NOT open a new journal.
+     */
+    public boolean overflow(boolean exclusiveLock,WriteExecutorService writeService) {
+        
+        return false;
+        
+    }
+
     /**
      * This request is always ignored for a {@link Journal} since it does not
      * have any resources to manage.
      */
-    public void delete(long timestamp) {
+    public void releaseOldResources(long timestamp) {
 
         log.info("Request ignored for Journal: timestamp="+timestamp);
         

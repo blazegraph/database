@@ -28,6 +28,7 @@
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.HashMap;
@@ -35,6 +36,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -65,6 +69,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * The {@link ResourceManager} is responsible for locating, opening, closing
@@ -107,6 +112,12 @@ import com.bigdata.service.MetadataService;
  * </ol>
  * 
  * @todo update javadoc.
+ * 
+ * @todo track the disk space used by the {@link #getDataDir()} and the free
+ *       space remaining on the mount point that hosts the data directory. if we
+ *       approach the limit on the space in use then we need to shed index
+ *       partitions to other data services or potentially become more aggressive
+ *       in releasing old resources.
  * 
  * @todo maintain "read locks" for resources and a latency queue. use this to
  *       close down resources and to delete old resources according to a
@@ -235,6 +246,12 @@ public class ResourceManager implements IResourceManager {
     static NumberFormat cf;
 
     static NumberFormat fpf;
+    
+    /**
+     * Leading zeros without commas used to format the partition identifiers
+     * into index segment file names.
+     */
+    static NumberFormat leadingZeros;
 
     static {
 
@@ -248,6 +265,12 @@ public class ResourceManager implements IResourceManager {
 
         fpf.setMaximumFractionDigits(2);
 
+        leadingZeros = NumberFormat.getIntegerInstance();
+        
+        leadingZeros.setMinimumIntegerDigits(5);
+        
+        leadingZeros.setGroupingUsed(false);
+        
     }
 
     // /*
@@ -363,9 +386,9 @@ public class ResourceManager implements IResourceManager {
      * @param nbytes
      *            The #of bytes in the {@link IndexSegment}.
      * 
-     * @todo the event is reported from {@link IndexSegmentBuilder} and does not
-     *       report the index name and does not account for resources
-     *       (time/space) required by the merge aspect of a bulk build.
+     * @todo the event is reported from {@link IndexSegmentBuilder} does not
+     *       account for resources (time/space) required by the merge aspect of
+     *       a bulk build.
      */
     static public void buildIndexSegment(String name, String filename,
             int nentries, long elapsed, long nbytes) {
@@ -566,13 +589,6 @@ public class ResourceManager implements IResourceManager {
      * The properties given to the ctor.
      */
     private final Properties properties;
-
-    /**
-     * Used to assign timestamps.
-     * 
-     * @see #nextTimestamp()
-     */
-    private final ITimestampService timestampService;
     
     /**
      * The directory in which the data files reside.
@@ -615,9 +631,10 @@ public class ResourceManager implements IResourceManager {
     final private JournalIndex journalIndex;
 
     /**
-     * <code>true</code> until the {@link ResourceManager} is shutdown.
+     * Set <code>true</code> by {@link #start()} and remains <code>true</code>
+     * until the {@link ResourceManager} is shutdown.
      */
-    private boolean open = true;
+    private boolean open;
 
     /**
      * <code>true</code> iff {@link BufferMode#Transient} was indicated.
@@ -659,6 +676,21 @@ public class ResourceManager implements IResourceManager {
      * A map from the resource description to the open resource.
      */
     private Map<UUID, IRawStore> openStores = new HashMap<UUID, IRawStore>();
+
+    /**
+     * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
+     * 
+     * @todo config param.
+     */
+    final private long shutdownTimeout = 5*1000;
+
+    /**
+     * The service that runs asynchronous resource management tasks, primarily
+     * handling index segment builds and enrolling the index segments into use.
+     * 
+     * @todo and possibly index partition splits and joins.
+     */
+    private ExecutorService service;
 
     /**
      * {@link ResourceManager} options.
@@ -711,36 +743,68 @@ public class ResourceManager implements IResourceManager {
 
     }
     
+    private IConcurrencyManager concurrencyManager;
+    
+    /**
+     * The object used to control access to the index resources.
+     * 
+     * @throws IllegalStateException
+     *             if the object has not been set yet using
+     *             {@link #setConcurrencyManager(IConcurrencyManager)}.
+     */
+    public IConcurrencyManager getConcurrencyManager() {
+        
+        if(concurrencyManager==null) {
+            
+            // Not assigned!
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        return concurrencyManager;
+        
+    }
+
+    public void setConcurrencyManager(IConcurrencyManager concurrencyManager) {
+
+        if (concurrencyManager == null)
+            throw new IllegalArgumentException();
+
+        if (this.concurrencyManager != null)
+            throw new IllegalStateException();
+
+        this.concurrencyManager = concurrencyManager;
+        
+    }
+
     protected long nextTimestamp() {
         
-        return timestampService.nextTimestamp();
+        return getConcurrencyManager().getTransactionManager().nextTimestamp();
         
     }
 
     /**
      * (Re-)open the {@link ResourceManager}.
+     * <p>
+     * Note: You MUST use {@link #setConcurrencyManager(IConcurrencyManager)}
+     * after calling this constructor (the parameter can not be passed in since
+     * there is a circular dependency between the {@link IConcurrencyManager}
+     * and {@link #commit(long)} on this class, which requires access to the
+     * {@link IConcurrencyManager} to submit a task).
      * 
      * @param properties
      *            See {@link Options}.
      * 
-     * @param timestampService
-     *            Used to assign timestamps to resources. This MUST be the same
-     *            {@link ITimestampService} that is used by the
-     *            {@link ITransactionManager} since resource timestamps and
-     *            transaction timestamps MUST be consistent.
+     * @see #start()
      */
-    public ResourceManager(Properties properties, ITimestampService timestampService) {
+    public ResourceManager(Properties properties) {
 
         if (properties == null)
             throw new IllegalArgumentException();
 
-        if(timestampService==null)
-            throw new IllegalArgumentException();
-        
         this.properties = properties;
 
-        this.timestampService = timestampService;
-        
         /*
          * Create the _transient_ index in which we will store the mapping from
          * the commit times of the journals to their resource descriptions.
@@ -787,6 +851,7 @@ public class ResourceManager implements IResourceManager {
                     
                 }
                 
+                // Note: stored in canonical form.
                 dataDir = new File(val).getCanonicalFile();
 
                 log.info(Options.DATA_DIR + "=" + dataDir);
@@ -909,7 +974,36 @@ public class ResourceManager implements IResourceManager {
             this.tmpDir = tmpDir;
 
         }
+        
+    }
 
+    /**
+     * Starts up the {@link ResourceManager}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link IConcurrencyManager} has not been set.
+     * 
+     * @throws IllegalStateException
+     *             if the the {@link ResourceManager} is already running.
+     * 
+     * FIXME startup a thread that will handle async merge, build, split, and
+     *       join tasks for the index partitions registered on the journal. Make
+     *       it easier to visit those indices using {@link Name2Addr} by declaring
+     *       a typed iterator visiting the {@link Entry} objects.  The thread can
+     *       also monitor the disk usage.  (I will want some way to disable that
+     *       thread so that I can write unit tests for those tasks without them
+     *       happening automatically.)
+     */
+    synchronized public void start() {
+    
+        getConcurrencyManager();
+        
+        if (open) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
         /*
          * Look for pre-existing data files.
          */
@@ -1030,7 +1124,7 @@ public class ResourceManager implements IResourceManager {
             }
 
             // Create/open journal.
-            liveJournal = new Journal(p);
+            liveJournal = new ManagedJournal(p);
 
             if (newJournal) {
 
@@ -1056,6 +1150,10 @@ public class ResourceManager implements IResourceManager {
             }
 
         }
+
+        service = Executors.newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+        
+        open = true;
 
     }
 
@@ -1099,7 +1197,7 @@ public class ResourceManager implements IResourceManager {
         if (!dir.isDirectory())
             throw new IllegalArgumentException();
 
-        final File[] files = dir.listFiles();
+        final File[] files = dir.listFiles(newFileFilter());
 
         for (final File file : files) {
 
@@ -1131,7 +1229,7 @@ public class ResourceManager implements IResourceManager {
 
             properties.setProperty(Options.READ_ONLY, "true");
 
-            Journal tmp = new Journal(properties);
+            AbstractJournal tmp = new ManagedJournal(properties);
 
             resource = tmp.getResourceMetadata();
 
@@ -1163,7 +1261,7 @@ public class ResourceManager implements IResourceManager {
              * This file is not relevant to the resource manager.
              */
 
-            log.warn("Ignoring unknown file: " + file);
+            log.warn("Ignoring file: " + file);
 
             return;
 
@@ -1204,28 +1302,66 @@ public class ResourceManager implements IResourceManager {
         
     }
     
+    /**
+     * Note: The returned {@link File} is in canonical form.
+     */
     public File getDataDir() {
         
         return dataDir;
         
     }
 
-    /**
-     * @todo update the shutdown methods if we add a thread pool for anything.
-     * 
-     * @todo check for !open on various methods.
-     */
     public void shutdown() {
 
         assertOpen();
         
-        shutdownNow();
+        /*
+         * Note: when the timeout is zero we approximate "forever" using
+         * Long.MAX_VALUE.
+         */
+
+        final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
+                : this.shutdownTimeout;
+        
+        final TimeUnit unit = TimeUnit.MILLISECONDS;
+        
+        final long begin = System.currentTimeMillis();
+        
+        service.shutdown();
+
+        try {
+
+            log.info("Awaiting service termination");
+            
+            long elapsed = System.currentTimeMillis() - begin;
+            
+            if(!service.awaitTermination(shutdownTimeout-elapsed, unit)) {
+                
+                log.warn("Service termination: timeout");
+                
+            }
+
+        } catch(InterruptedException ex) {
+            
+            log.warn("Interrupted awaiting service termination.", ex);
+            
+        }
+
+        closeStores();
         
     }
 
     public void shutdownNow() {
 
         assertOpen();
+
+        service.shutdownNow();
+
+        closeStores();
+        
+    }
+
+    private void closeStores() {
         
         open = false;
 
@@ -1242,7 +1378,7 @@ public class ResourceManager implements IResourceManager {
         }
 
     }
-
+    
     /**
      * The #of journals on hand.
      */
@@ -1261,9 +1397,15 @@ public class ResourceManager implements IResourceManager {
 
     }
 
+    /*
+     * @todo write tests for unisolated and read-committed. make sure that there
+     * is no fencepost for read committed immediately after an overflow (there
+     * should not be since we do a commit when we register the indices on the
+     * new store).
+     */
     public AbstractJournal getJournal(long timestamp) {
 
-        if (timestamp == 0L) {
+        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
 
             /*
              * This is a request for the live journal.
@@ -1431,7 +1573,7 @@ public class ResourceManager implements IResourceManager {
                 // All historical journals are read-only!
                 properties.setProperty(Options.READ_ONLY, "true");
 
-                final AbstractJournal journal = new Journal(properties);
+                final AbstractJournal journal = new ManagedJournal(properties);
 
                 final long closeTime = journal.getRootBlockView().getCloseTime();
                 
@@ -1642,6 +1784,14 @@ public class ResourceManager implements IResourceManager {
             // the corresponding journal (can be the live journal).
             final AbstractJournal journal = getJournal(timestamp);
 
+            if(journal == null) {
+                
+                log.warn("No journal with data for timestamp: name="+name+", timestamp="+timestamp);
+                
+                return null;
+                
+            }
+            
             btree = getIndexOnStore(name, timestamp, journal);
 
             if (btree == null) {
@@ -1731,21 +1881,24 @@ public class ResourceManager implements IResourceManager {
     }
     
     /**
-     * Creates a new journal and re-defines the views for all named indices to
-     * include the pre-overflow view with reads being absorbed by a new btree on
-     * the new journal.
+     * An overflow condition is recognized when the journal is within some
+     * declared percentage of {@link com.bigdata.journal.Options#MAXIMUM_EXTENT}.
      * <p>
-     * Note: This method MUST NOT be invoked unless you have exclusive access to
-     * the journal. Typically, the only time you can guarentee this is during
-     * commit processing. Therefore overflow is generally performed by a
-     * post-commit event handler.
+     * Once an overflow condition is recognized the {@link ResourceManager} will
+     * {@link WriteExecutorService#pause()} the {@link WriteExecutorService}
+     * unless it already has an <i>exclusiveLock</i>. Eventually the
+     * {@link WriteExecutorService} will quiese, at which point there will be
+     * another group commit and this method will be invoked again, this time
+     * with an <i>exclusiveLock</i> on the {@link WriteExecutorService}.
      * <p>
-     * Note: Journal references MUST NOT be presumed to survive this method. In
-     * particular, the old journal will be closed out by this method and marked
-     * as read-only henceforth.
-     * <p>
-     * Note: The decision to simply re-define views rather than export the data
-     * on the named indices on the old journal
+     * Once this method is invoked with an <i>exclusiveLock</i> and when an
+     * overflow condition is recognized it will create a new journal and
+     * re-define the views for all named indices to include the pre-overflow
+     * view with reads being absorbed by a new btree on the new journal.
+     * 
+     * FIXME The metadata index needs to be updated as well (unless we do NOT
+     * store the {@link IResourceManager}[] in the metadata index). There will
+     * have to be a read-behind point for the metadata index.
      * 
      * @todo write unit test for an overflow edge case in which we attempt to
      *       perform an read-committed task on a pre-existing index immediately
@@ -1754,22 +1907,115 @@ public class ResourceManager implements IResourceManager {
      *       the fused view of the new (empty) index on the new journal and the
      *       old index on the old journal.
      */
-    public boolean overflow() {
+    public boolean overflow(boolean exclusiveLock,
+            WriteExecutorService writeService) {
 
-        log.info("begin");
-
-        if(isTransient) {
+        if (isTransient) {
 
             /*
              * Note: This is disabled in part because we can not close out and
              * then re-open a transient journal.
              */
-            
-            throw new UnsupportedOperationException(
-                    "Overflow not supported for transient journals");
-            
+
+            return false;
+
         }
         
+        /*
+         * Look for overflow condition on the "live" journal.
+         */
+        final boolean overflow;
+        // total file extent.
+        final long extent;
+        // #of bytes written on the journal.
+        final long nextOffset;
+        // the file backing the journal.
+        final File file;
+        {
+
+            /*
+             * Choose maximum of the target maximum extent and the current user
+             * data extent so that we do not re-trigger overflow immediately if
+             * the buffer has been extended beyond the target maximum extent.
+             * Among other things this lets you run the buffer up to a
+             * relatively large extent (if you use a disk-only mode since you
+             * will run out of memory if you use a fully buffered mode).
+             */
+            
+            final AbstractJournal journal = getLiveJournal();
+            
+            final long limit = Math.max(journal.maximumExtent, journal
+                    .getBufferStrategy().getUserExtent());
+            
+            nextOffset = journal.getRootBlockView().getNextOffset();
+            
+            if (nextOffset > .9 * limit) {
+
+                overflow = true;
+
+            } else {
+                
+                overflow = false;
+                
+            }
+
+            file = journal.getFile();
+            
+        }
+
+        if(!overflow) return false;
+        
+        if(!exclusiveLock) {
+
+            if(!writeService.isPaused()) {
+
+                log.info("Pausing write service");
+                
+                writeService.pause();
+                
+            }
+            
+            return false;
+
+        }
+
+        /*
+         * We have an exclusive lock and the overflow conditions are satisifed.
+         */
+        
+        try {
+
+            // Do overflow processing.
+            doOverflow();
+            
+        } finally {
+            
+            // Allow the write service to resume executing tasks on the new journal.
+            writeService.resume();
+
+            log.info("Resumed write service.");
+
+        }
+
+        // log the size of the journal when it actually overflowed.
+        ResourceManager.overflowJournal(file.toString(), nextOffset);
+
+        return true;
+
+    }
+
+    /**
+     * Performs the actual overflow handling once all pre-conditions have been
+     * satisified.
+     */
+    protected void doOverflow() {
+        
+        log.info("begin");
+        
+        /*
+         * Note: We assign the same timestamp to the createTime of the new
+         * journal and the closeTime of the old journal.
+         */
         final long createTime = nextTimestamp();
         final long closeTime = createTime;
         
@@ -1807,7 +2053,7 @@ public class ResourceManager implements IResourceManager {
              */
             p.setProperty(Options.CREATE_TIME, ""+createTime);
             
-            newJournal = new Journal(p);
+            newJournal = new ManagedJournal(p);
             
             assert createTime == newJournal.getRootBlockView().getCreateTime();
 
@@ -1845,18 +2091,19 @@ public class ResourceManager implements IResourceManager {
                 if (oldpmd == null) {
 
                     /*
-                     * @todo this is a bit brittle when using an embedded
-                     * journal since there are no checks to ensure that all
-                     * indices are scale-out. However, when using a federation
-                     * all indices are scale-out indices (...except the metadata
-                     * indices themselves so you can't overflow on the metadata
-                     * service right now...).
+                     * A unpartitioned named index.
+                     * 
+                     * @todo probably overflow the entire index, but it is a
+                     * problem to have an unpartitioned index if you are
+                     * expecting to do overflows. in the scale-out system all
+                     * named indices are registered as partitioned indices so
+                     * this is never a problem.
                      */
 
-                    throw new RuntimeException(
-                            "Can not overflow unpartitioned index: "
-                                    + entry.name);
-
+                    throw new RuntimeException("Not a partitioned index: "
+                            + entry.name);
+                     
+                    
                 }
 
                 IResourceMetadata[] oldResources = oldpmd.getResources();
@@ -1989,14 +2236,12 @@ public class ResourceManager implements IResourceManager {
             log.info("Changed over to a new live journal");
 
         }
-
-        log.info("end");
         
-        return true;
+        log.info("end");
 
     }
-
-    public void delete() {
+    
+    public void destroyAllResources() {
         
         if (open)
             throw new IllegalStateException();
@@ -2021,7 +2266,7 @@ public class ResourceManager implements IResourceManager {
         
         if(f.isDirectory()) {
             
-            File[] children = f.listFiles();
+            File[] children = f.listFiles(newFileFilter());
             
             for(int i=0; i<children.length; i++) {
                 
@@ -2038,27 +2283,152 @@ public class ResourceManager implements IResourceManager {
             }
             
         }
-
-        // @todo could be a filter on listFiles.
-        // @todo will be unable to delete the embedded federation's metadata service directory with the .mds file.
-        // @todo could define the filter for files of interest for delete as a parameter or method available for
-        // override.
-        // FIXME Definately to not permit willy-nilli delete of a recursive directory!
-        if(f.getName().endsWith(Options.JNL)||f.getName().endsWith(Options.SEG)) {
             
-            log.warn("Removing: " + f);
+        log.warn("Removing: " + f);
 
-            if (!f.delete()) {
+        if (!f.delete()) {
 
-                log.error("Could not remove: " + f);
-                
-            }
+            log.error("Could not remove: " + f);
 
         }
         
     }
 
-    public void delete(long timestamp) {
+    /**
+     * Returns a filter that is used to recognize files that are managed by this
+     * class. The {@link ResourceManager} will log warnings if it sees an
+     * unexpected file and will NOT {@link #destroyAllResources()} files that it does not
+     * recognize.
+     * 
+     * @see ResourceFileFilter
+     * 
+     * @todo perhaps define setFileFilter and getFileFilter instead since
+     *       subclassing this method is a bit difficult. The
+     *       {@link ResourceFileFilter} would have to be a static class and we
+     *       would have to pass in the {@link IResourceManager} so that it could
+     *       get the {@link #dataDir}.
+     */
+    protected ResourceFileFilter newFileFilter() {
+
+        return new ResourceFileFilter();
+        
+    }
+    
+    /**
+     * The default implementation accepts directories under the configured
+     * {@link IResourceManager#getDataDir()} and files with either
+     * {@link com.bigdata.journal.Options#JNL} or
+     * {@link com.bigdata.journal.Options#SEG} file extensions.
+     * <p> *
+     * <P>
+     * If you define additional files that are stored within the
+     * {@link ResourceManager#getDataDir()} then you SHOULD subclass
+     * {@link ResourceFileFilter} to recognize those files and override
+     * {@link ResourceManager#newFileFilter()} method to return your
+     * {@link ResourceFileFilter} subclass.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class ResourceFileFilter implements FileFilter {
+
+        /**
+         * Override this method to extend the filter.
+         * 
+         * @param f
+         *            A file passed to {@link #accept(File)}
+         *            
+         * @return <code>true</code> iff the file should be accepted by the
+         *         filter.
+         */
+        protected boolean accept2(File f) {
+            
+            return false;
+            
+        }
+        
+        final public boolean accept(File f) {
+
+            if (f.isDirectory()) {
+
+//                // Either f iff it is a directory or the directory containing f.
+//                final File dir = f.isDirectory() ? f : f.getParentFile();
+                
+                final File dir = f;
+
+                // get the canonical form of the directory.
+                final String fc;
+                try {
+
+                    fc = dir.getCanonicalPath();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                if (!fc.startsWith(getDataDir().getPath())) {
+
+                    throw new RuntimeException("File not in data directory: file="
+                            + f + ", dataDir=" + dataDir);
+
+                }
+
+                // directory inside of the data directory.
+                return true;
+
+            }
+            
+            if (f.getName().endsWith(Options.JNL)) {
+
+                // journal file.
+                return true;
+                
+            }
+
+            if (f.getName().endsWith(Options.SEG)) {
+
+                // index segment file.
+                return true;
+                
+            }
+
+            if (accept2(f)) {
+                
+                // accepted by subclass.
+                return true;
+                
+            }
+            
+            log.warn("Unknown file: " + f);
+
+            return false;
+
+        }
+
+    }
+    
+    /**
+     * @todo release point is min(earliestTx, minReleaseAge, createTime of the
+     *       oldest journal still required by an index view).
+     *       <p>
+     *       The earlestTx is effectivetly how we do "read locks" for
+     *       transactions. The transaction manager periodically notifies the
+     *       resource manager of the earliest running tx. That timestamp will
+     *       naturally grow as transactions complete, thereby releasing their
+     *       "read locks" on resources.
+     *       <p>
+     *       The minReleaseAge is just how long you want to hold onto an
+     *       immortal database view. E.g., 3 days of full history. There should
+     *       be a setting, e.g., zero (0L), for a true immortal database.
+     *       <p>
+     *       The last value is the createTime on the journal whose indices are
+     *       still being merged onto index segments asynchronously. That time
+     *       gets updated every time we finish processing the indices for a
+     *       given historical journal.
+     */
+    public void releaseOldResources(long timestamp) {
         // TODO Auto-generated method stub
 
         throw new UnsupportedOperationException();
@@ -2069,8 +2439,7 @@ public class ResourceManager implements IResourceManager {
      * @todo munge the index name so that we can support unicode index names in
      *       the filesystem.
      * 
-     * @todo use leading zero number format for the partitionId in the
-     *       filenames.
+     * @todo should the filename be relative or absolute?
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata) {
 
@@ -2081,12 +2450,15 @@ public class ResourceManager implements IResourceManager {
         final File indexDir = new File(segmentsDir, indexMetadata
                 .getIndexUUID().toString());
 
+        // make sure that directory exists.
+        indexDir.mkdirs();
+        
         final IPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
         
-        final String partitionStr = (pmd == null ? "" : "#"
-                + pmd.getPartitionId());
+        final String partitionStr = (pmd == null ? "" : "_part"
+                + leadingZeros.format(pmd.getPartitionId()));
 
-        final String prefix = mungedName + "" + partitionStr;
+        final String prefix = mungedName + "" + partitionStr + "_";
 
         final File file;
         try {
@@ -2105,4 +2477,46 @@ public class ResourceManager implements IResourceManager {
 
     }
 
+    // @todo make sure not pre-existing and file in dataDir.
+    public void addResource(UUID uuid, File file) {
+
+        if (resourceFiles.put(uuid, file) != null) {
+
+            // should not already there.
+            
+            throw new AssertionError();
+            
+        }
+        
+    }
+    
+    /**
+     * Implementation designed to use a shared {@link ConcurrencyManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class ManagedJournal extends AbstractJournal {
+
+        public ManagedJournal(Properties properties) {
+            
+            super(properties);
+            
+        }
+
+        public long nextTimestamp() {
+            
+            return ResourceManager.this.nextTimestamp();
+            
+        }
+        
+        @Override
+        public long commit() {
+
+            return commitNow(nextTimestamp());
+            
+        }
+                
+    }
+    
 }

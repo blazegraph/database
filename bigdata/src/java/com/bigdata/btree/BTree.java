@@ -299,9 +299,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * Note: When the {@link BTree} is part of a scale-out index then the
      * counter will assign values within a namespace defined by the partition
      * identifier.
-     * 
-     * FIXME verify correct handling of the counter during overflow!  It must
-     * be propagated to the checkpoint record for the new {@link BTree}.
      */
     public ICounter getCounter() {
 
@@ -325,7 +322,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * empty {@link Checkpoint} record containing the address of the
      * {@link IndexMetadata} for the index. Thereafter this reference is
      * maintained as the {@link Checkpoint} record last written by
-     * {@link #write()} or read by {@link #load(IRawStore, long)}.
+     * {@link #checkpoint()} or read by {@link #load(IRawStore, long)}.
      */
     protected Checkpoint checkpoint = null;
     
@@ -368,6 +365,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     protected AtomicLong counter;
   
     /**
+     * The last address from which the {@link IndexMetadata} record was read or
+     * on which it was written.
+     */
+    private long lastMetadataAddr;
+    
+    /**
      * Load a {@link BTree} from the store using a {@link Checkpoint} record.
      * 
      * @param store
@@ -407,6 +410,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         this.nleaves = checkpoint.getLeafCount();
         this.nentries = checkpoint.getEntryCount();
         this.counter = new AtomicLong( checkpoint.getCounter() );
+        
+        // save the address from which the index metadata record was read.
+        this.lastMetadataAddr = metadata.getMetadataAddr();
         
         /*
          * Note: the mutable BTree has a limit here so that split() will always
@@ -567,10 +573,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * The parent nodes are guarenteed to be dirty if there is a dirty child so
      * the commit never triggers copy-on-write.
      * <p>
-     * Note: This is NOT an atomic commit. The commit protocol is at the store
-     * level and involves the use of alternating root blocks and (for
-     * transactions) validating and merging down onto the corresponding global
-     * index.
+     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
+     * is at the store level and uses checkpoints to ensure that the state of
+     * the btree is current on the store.
      * 
      * @return The address at which the {@link Checkpoint} record for the
      *         {@link BTree} was written onto the store. The {@link BTree} can
@@ -582,7 +587,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      *       I have not yet seen a situation where that was more interesting
      *       than the address of the written {@link Checkpoint} record.
      */
-    public long write() {
+    public long checkpoint() {
         
         assert root != null; // i.e., isOpen().
 
@@ -592,6 +597,21 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             
         }
 
+        if (metadata.getMetadataAddr() == 0L) {
+            
+            /*
+             * The index metadata has been modified so we write out a new
+             * metadata record on the store.
+             */
+            
+            // write the metadata record.
+            metadata.write(store);
+            
+            // note the address of the new metadata record.
+            lastMetadataAddr = metadata.getMetadataAddr();
+            
+        }
+        
         // create new checkpoint record.
         checkpoint = metadata.newCheckpoint(this);
         
@@ -634,19 +654,18 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     public boolean modifiedSince(long checkpointAddr) {
         
-        return needsWrite() || checkpoint.getMetadataAddr() != checkpointAddr;
+        return needsCheckpoint() || checkpoint.getMetadataAddr() != checkpointAddr;
         
     }
 
     /**
      * Return true iff changes would be lost unless the B+Tree is flushed to the
-     * backing store using {@link #write()}.
+     * backing store using {@link #checkpoint()}.
      * <p>
-     * Note: In order to avoid needless writes this method will return
+     * Note: In order to avoid needless checkpoints this method will return
      * <code>false</code> if:
      * <ul>
-     * <li> the metadata record is defined (it is not defined when a btree is
-     * first created) -AND-
+     * <li> the metadata record address has not changed -AND-
      * <ul>
      * <li> EITHER the root is <code>null</code>, indicating that the index
      * is closed (flushing the index to disk and updating the metadata record is
@@ -661,11 +680,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * </ul>
      * 
      * @return <code>true</code> true iff changes would be lost unless the
-     *         B+Tree was flushed to the backing store using {@link #write()}.
+     *         B+Tree was flushed to the backing store using {@link #checkpoint()}.
      */
-    public boolean needsWrite() {
+    public boolean needsCheckpoint() {
 
-        if (metadata != null && //
+        if (metadata.getMetadataAddr() == lastMetadataAddr && //
                 (root == null || //
                         ( !root.dirty //
                         && checkpoint.getRootAddr() == root.identity //
@@ -682,19 +701,47 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
-     * Handle request for a commit by {@link #write()}ing dirty nodes and
+     * Method updates the index metadata associated with this {@link BTree}.
+     * The new metadata record will be written out as part of the next index
+     * {@link #checkpoint()}.
+     * <p>
+     * Note: this method should be used with caution.
+     * 
+     * @param indexMetadata
+     *            The new metadata description for the {@link BTree}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the new value is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the new metadata record has already been written on the
+     *             store - see {@link IndexMetadata#getMetadataAddr()}
+     */
+    public void setIndexMetadata(IndexMetadata indexMetadata) {
+
+        if (indexMetadata == null)
+            throw new IllegalArgumentException();
+
+        if (indexMetadata.getMetadataAddr() != 0)
+            throw new IllegalArgumentException();
+
+        this.metadata = indexMetadata;
+        
+    }
+    
+    /**
+     * Handle request for a commit by {@link #checkpoint()}ing dirty nodes and
      * leaves onto the store, writing a new metadata record, and returning the
      * address of that metadata record.
      * <p>
      * Note: In order to avoid needless writes the existing metadata record is
-     * always returned if {@link #needsWrite()} is <code>false</code>.
+     * always returned if {@link #needsCheckpoint()} is <code>false</code>.
      * 
      * @return The address of a {@link Checkpoint} record from which the btree
      *         may be reloaded.
      */
     public long handleCommit() {
 
-        if (needsWrite()) {
+        if (needsCheckpoint()) {
 
             /*
              * Flush the btree, write its metadata record, and return the
@@ -702,7 +749,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
              * updated.
              */
 
-            return write();
+            return checkpoint();
 
         }
 

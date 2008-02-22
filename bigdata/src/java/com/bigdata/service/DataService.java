@@ -44,6 +44,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.io.ByteBufferInputStream;
@@ -54,12 +55,13 @@ import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.ResourceManager;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.ResourceState;
@@ -202,15 +204,7 @@ abstract public class DataService implements IDataService,
      */
     public DataService(Properties properties) {
         
-        resourceManager = new ResourceManager(properties, new ITimestampService() {
-
-            public long nextTimestamp() {
-
-                return timestampFactory.nextMillis();
-                
-            }
-
-        });
+        resourceManager = new ResourceManager(properties);
         
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
 
@@ -227,6 +221,10 @@ abstract public class DataService implements IDataService,
 
         localTransactionManager.setConcurrencyManager(concurrencyManager);
 
+        resourceManager.setConcurrencyManager(concurrencyManager);
+
+        resourceManager.start();
+        
     }
 
     /**
@@ -518,6 +516,13 @@ abstract public class DataService implements IDataService,
         
     }
     
+    /**
+     * Note: This chooses {@link ITx#READ_COMMITTED} if the the index has
+     * {@link ITx#UNISOLATED} isolation and the {@link IIndexProcedure} is an
+     * {@link IReadOnlyOperation} operation. This provides better concurrency on
+     * the {@link DataService} by moving read-only operations off of the
+     * {@link WriteExecutorService}.
+     */
     public Object submit(long tx, String name, IIndexProcedure proc)
             throws InterruptedException, ExecutionException {
 
@@ -525,12 +530,16 @@ abstract public class DataService implements IDataService,
 
         try {
     
-            // submit the procedure and await its completion.
+            // Choose READ_COMMITTED iff proc is read-only and UNISOLATED was requested.
+            final long startTime = (tx == ITx.UNISOLATED
+                        && proc instanceof IReadOnlyOperation ? ITx.READ_COMMITTED
+                        : tx);
 
+            // submit the procedure.
             final AbstractTask task = new IndexProcedureTask(
-                    concurrencyManager, tx,
-                    name, proc);
+                    concurrencyManager, startTime, name, proc);
             
+            // await its completion.
             return concurrencyManager.submit(task).get();
         
         } finally {

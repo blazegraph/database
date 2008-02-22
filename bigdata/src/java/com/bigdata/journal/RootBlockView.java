@@ -95,9 +95,11 @@ public class RootBlockView implements IRootBlockView {
     final int MAGIC = 0x65fe21bc;
 
     /**
-     * This is the only version defined so far.
+     * Original version.
      */
     final int VERSION0 = 0x0;
+    
+    final int currentVersion = VERSION0;
     
     /**
      * The buffer holding the backing data.
@@ -367,7 +369,7 @@ public class RootBlockView implements IRootBlockView {
         
         buf.putLong(challisField);
         buf.putInt(MAGIC);
-        buf.putInt(VERSION0);
+        buf.putInt(currentVersion);
         buf.put((byte)offsetBits);
         buf.putLong(nextOffset);
         buf.putLong(localTime);
@@ -558,7 +560,7 @@ public class RootBlockView implements IRootBlockView {
         
         if( magic != MAGIC ) {
 
-            throw new RuntimeException("MAGIC: expected="+MAGIC+", actual="+magic);
+            throw new RootBlockException("MAGIC: expected="+MAGIC+", actual="+magic);
             
         }
 
@@ -566,7 +568,7 @@ public class RootBlockView implements IRootBlockView {
         
         if( version != VERSION0 ) {
             
-            throw new RuntimeException("Unknown version: "+version);
+            throw new RootBlockException("Unknown version: "+version);
             
         }
         
@@ -576,6 +578,12 @@ public class RootBlockView implements IRootBlockView {
         // test that the "Challis" fields agree.
         getChallisField();
         
+        if(getCreateTime() == 0L) {
+
+            throw new RootBlockException("Create time should not be zero.");
+            
+        }
+
     }
 
     public UUID getUUID() {

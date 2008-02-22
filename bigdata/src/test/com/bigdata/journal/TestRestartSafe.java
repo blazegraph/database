@@ -192,7 +192,7 @@ public class TestRestartSafe extends ProxyTestCase {
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                     btree.entryIterator());
     
-            addr1 = btree.write();
+            addr1 = btree.checkpoint();
             
             journal.commit();
             
@@ -223,7 +223,7 @@ public class TestRestartSafe extends ProxyTestCase {
 
                 assertSameIterator(new Object[] {}, btree.entryIterator());
 
-                addr2 = btree.write();
+                addr2 = btree.checkpoint();
 
                 journal.commit();
             }
@@ -275,7 +275,7 @@ public class TestRestartSafe extends ProxyTestCase {
             assertEquals(1,btree.getCounter().incrementAndGet());
             assertEquals(1,btree.getCounter().get());
             
-            addr1 = btree.write();
+            addr1 = btree.checkpoint();
             
             journal.commit();
             
@@ -363,7 +363,7 @@ public class TestRestartSafe extends ProxyTestCase {
             assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
                     btree.entryIterator());
 
-            addr1 = btree.write();
+            addr1 = btree.checkpoint();
 
             journal.commit();
 

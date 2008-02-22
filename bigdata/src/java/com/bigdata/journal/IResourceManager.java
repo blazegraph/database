@@ -128,29 +128,29 @@ public interface IResourceManager {
     public AbstractBTree[] getIndexSources(String name, long timestamp);
 
     /**
-     * Creates a new journal and re-defines the views for all named indices to
-     * include the pre-overflow view with reads being absorbed by a new btree on
-     * the new journal.
+     * Creates a new journal migrate the named indices to the new journal.
+     * Typically this involves updating the view of the named indices such that
+     * they read from a fused view of an empty index on the new journal and the
+     * last committed state of the index on the old journal.
      * <p>
-     * Note: This method MUST NOT be invoked unless you have exclusive access to
-     * the journal. Typically, the only time you can guarentee this is during
-     * commit processing. Therefore overflow is generally performed by a
-     * post-commit event handler.
-     * <p>
-     * Note: Journal references MUST NOT be presumed to survive this method. In
-     * particular, the old journal will be closed out by this method and marked
-     * as read-only henceforth.
-     * <p>
-     * Note: The decision to simply re-define views rather than export the data
-     * on the named indices on the old journal
+     * Note: When this method returns <code>true</code> journal references
+     * MUST NOT be presumed to survive this method. In particular, the old
+     * journal MAY be closed out by this method and marked as read-only
+     * henceforth.
      * 
-     * @todo change the return type to void and clean up
-     *       {@link AbstractJournal#overflow()} and the various things that were
-     *       designed to trigger that method. Overflow should only be invoked by
-     *       the {@link IResourceManager} in a "post-commit" operation where it
-     *       notices that the overflow criteria have been satisified.
+     * @param exclusiveLock
+     *            <code>true</code> iff the current thread has an exclusive
+     *            lock on the journal.
+     * 
+     * @param writeService
+     *            The service on which {@link ITx#UNISOLATED} tasks are executed
+     *            and which is responsible for handling commits.
+     * 
+     * @return true iff the journal was replaced by a new journal.
+     * 
+     * @see #getLiveJournal()
      */
-    public boolean overflow();
+    public boolean overflow(boolean exclusiveLock,WriteExecutorService writeService);
     
     /**
      * Deletes all resources.
@@ -158,7 +158,7 @@ public interface IResourceManager {
      * @exception IllegalStateException
      *                if the {@link IResourceManager} is open.
      */
-    public void delete();
+    public void destroyAllResources();
 
     /**
      * Deletes all resources having no data for the specified timestamp. This
@@ -170,6 +170,17 @@ public interface IResourceManager {
      * policy. Ignoring some requests generally has little impact since the
      * transaction manager can be relied on to notify the resource manager of a
      * new "delete" point as more transactions commit.
+     * <p>
+     * Note: The ability to read from a historical commit point requires the
+     * existence of the journals back until the one covering that historical
+     * commit point. This is because the distinct historical commit points for
+     * the indices are ONLY defined on the journals. The index segments carry
+     * forward the commit state of a specific index as of the commitTime of the
+     * index from which the segment was built. This means that you can
+     * substitute the index segment for the historical index state on older
+     * journals, but the index segment carries forward only a single commit
+     * state for the index so it can not be used to read from arbitrary
+     * historical commit points.
      * 
      * @param timestamp
      *            The timestamp.
@@ -180,7 +191,7 @@ public interface IResourceManager {
      *       issues is how to impose a resource release policy when distributed
      *       transactions are not in use.
      */
-    public void delete(long timestamp);
+    public void releaseOldResources(long timestamp);
     
     /**
      * Return the file on which a new {@link IndexSegment} should be written.

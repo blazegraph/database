@@ -240,7 +240,7 @@ public class FileMetadata {
             long initialExtent, long maximumExtent, boolean create,
             boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
             ForceEnum forceWrites, int offsetBits, boolean validateChecksum,
-            long createTime, ChecksumUtility checker) throws RuntimeException {
+            final long createTime, ChecksumUtility checker) throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -424,7 +424,7 @@ public class FileMetadata {
                 this.nextOffset = rootBlock.getNextOffset();
                 
                 this.createTime = rootBlock.getCreateTime();
-
+                
                 this.closeTime = rootBlock.getCloseTime();
                 
                 if (closeTime != 0L && !readOnly) {

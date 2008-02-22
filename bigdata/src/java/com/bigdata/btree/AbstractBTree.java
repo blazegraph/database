@@ -693,7 +693,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * The metadata record for the index. This data does not change during the
      * life of the {@link BTree} object.
      */
-    protected final IndexMetadata metadata;
+    protected IndexMetadata metadata;
     
     /**
      * The branching factor for the btree.
@@ -750,22 +750,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     final public NodeSerializer getNodeSerializer() {
 
         return nodeSer;
-
-    }
-
-    /**
-     * The unique identifier for the index whose data is stored in this B+Tree
-     * data structure. When using a scale-out index the same <i>indexUUID</i>
-     * MUST be assigned to each mutable and immutable B+Tree having data for any
-     * partition of that scale-out index. This makes it possible to work
-     * backwards from the B+Tree data structures and identify the index to which
-     * they belong.
-     * 
-     * @deprecated by {@link #getIndexMetadata()}
-     */
-    final public UUID getIndexUUID() {
-
-        return metadata.getIndexUUID();
 
     }
 
