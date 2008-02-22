@@ -336,7 +336,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
 
     }
     
-    public void delete() {
+    public void destroyAllResources() {
 
         if (open)
             throw new IllegalStateException();
@@ -354,7 +354,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
         
         close();
 
-        delete();
+        destroyAllResources();
         
     }
 

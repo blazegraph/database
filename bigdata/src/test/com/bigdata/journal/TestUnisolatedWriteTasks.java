@@ -199,7 +199,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
         
-        journal.delete();
+        journal.destroyAllResources();
         
     }
     
@@ -419,7 +419,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
         
-        journal.delete();
+        journal.destroyAllResources();
         
     }
    
@@ -615,7 +615,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 

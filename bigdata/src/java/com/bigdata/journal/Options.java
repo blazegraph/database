@@ -130,11 +130,8 @@ public interface Options {
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * The journal will {@link Journal#overflow()} once it approaches this limit
-     * during a {@link Journal#commit()}. The default implementation ignores
-     * overflow events. A scale up or scale out implementation uses this event
-     * as a trigger to evict data from btrees that absorb writes on the journal
-     * into partitioned {@link IndexSegment}s.
+     * The journal will {@link IResourceManager#overflow()} once it approaches
+     * this limit.
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */
@@ -159,6 +156,8 @@ public interface Options {
      * opened. This property may be set to false if you are engaged in a
      * desparate attempt to use a bad root block or to patch a bad root block
      * using a hex editor.
+     * 
+     * @see #DEFAULT_VALIDATE_CHECKSUM
      */
     public static final String VALIDATE_CHECKSUM = "validateChecksum";
     

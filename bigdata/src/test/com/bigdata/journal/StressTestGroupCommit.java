@@ -135,7 +135,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             final BTree ndx = BTree.create(journal, new IndexMetadata(resource,
                     indexUUID));
             
-            ndx.write();
+            ndx.checkpoint();
             
             journal.registerIndex(resource, ndx);
 
@@ -158,7 +158,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.delete();
+        journal.destroyAllResources();
         
     }
 
@@ -282,7 +282,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.delete();
+        journal.destroyAllResources();
 
     }
     
@@ -506,7 +506,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.delete();
+        journal.destroyAllResources();
         
         return result;
         

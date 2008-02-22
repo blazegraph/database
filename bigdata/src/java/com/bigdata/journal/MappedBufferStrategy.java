@@ -118,7 +118,7 @@ public class MappedBufferStrategy extends DiskBackedBufferStrategy {
      * Instead, we mark the file for "deleteOnExit" and let the VM attempt to
      * clean it up when it exits.
      */
-    public void delete() {
+    public void destroyAllResources() {
         
         if( isOpen() ) {
             

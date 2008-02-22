@@ -180,7 +180,7 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @todo Run unit tests at some non-default #of offset bits.
  */
-public abstract class AbstractJournal implements IJournal, ITransactionManager {
+public abstract class AbstractJournal implements IJournal {
 
     /**
      * Logger.
@@ -696,6 +696,8 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
         final long createTime = Long.parseLong(properties.getProperty(
                 Options.CREATE_TIME, "" + System.currentTimeMillis()));
         
+        assert createTime != 0L;
+        
         /*
          * Create the appropriate IBufferStrategy object.
          */
@@ -863,7 +865,7 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
      * The delegate that implements the {@link BufferMode}.
      * <p>
      * Note: this method MUST NOT check to see whether the journal is open since
-     * we need to use it if we want to invoke {@link IBufferStrategy#delete()}
+     * we need to use it if we want to invoke {@link IBufferStrategy#destroyAllResources()}
      * and we can only invoke that method once the journal is closed.
      */
     final public IBufferStrategy getBufferStrategy() {
@@ -998,7 +1000,7 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
              * live data.
              */
 
-            delete();
+            destroyAllResources();
             
         }
 
@@ -1013,13 +1015,13 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
      * @exception IllegalStateException
      *                if the journal is open.
      */
-    public void delete() {
+    public void destroyAllResources() {
 
         if(isOpen()) throw new IllegalStateException();
 
         log.info("");
         
-        _bufferStrategy.delete();
+        _bufferStrategy.destroyAllResources();
 
         ResourceManager.deleteJournal(getFile() == null ? null : getFile()
                 .toString());
@@ -1109,7 +1111,7 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
              * was already deleted by _close().
              */
             
-            delete();
+            destroyAllResources();
             
         }
         
@@ -1490,7 +1492,7 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
          * address, and add the entry to the CommitRecordIndex before we can
          * flush the CommitRecordIndex to the store.
          */
-        final long commitRecordIndexAddr = _commitRecordIndex.write();
+        final long commitRecordIndexAddr = _commitRecordIndex.checkpoint();
 
         /*
          * Force application data to stable storage _before_ we update the root
@@ -1567,57 +1569,10 @@ public abstract class AbstractJournal implements IJournal, ITransactionManager {
 
         }
 
-        /*
-         * Look for overflow condition.
-         */
-        {
-
-            /*
-             * Choose maximum of the target maximum extent and the current user
-             * data extent so that we do not re-trigger overflow immediately if
-             * the buffer has been extended beyond the target maximum extent.
-             * Among other things this lets you run the buffer up to a
-             * relatively large extent (if you use a disk-only mode since you
-             * will run out of memory if you use a fully buffered mode).
-             */
-            final long limit = Math.max(maximumExtent, _bufferStrategy
-                    .getUserExtent());
-            
-            if (nextOffset > .9 * limit) {
-
-                if( overflow() ) {
-                    
-                    /*
-                     * Someone handled the overflow event by opening a new
-                     * journal to absorb further writes.
-                     */
-                    ResourceManager.overflowJournal(getFile() == null ? null
-                            : getFile().toString(), size());
-                    
-                }
-
-            }
-
-        }
-
         log.info("Done: nextOffset="+nextOffset);
         
         return commitTime;
 
-    }
-
-    /**
-     * Note: This implementation does not handle overflow of the journal. The
-     * journal capacity will simply be extended by {@link #write(ByteBuffer)}
-     * until the available resources are exhausted.
-     * 
-     * @return This implementation returns <code>false</code> since it does
-     *         NOT open a new journal.
-     */
-    public boolean overflow() {
-
-        return false;
-        
     }
 
     public void force(boolean metadata) {

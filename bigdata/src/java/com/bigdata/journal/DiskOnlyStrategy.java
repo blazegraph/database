@@ -914,7 +914,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
-    public void delete() {
+    public void destroyAllResources() {
         
         if (isOpen()) {
 

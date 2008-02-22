@@ -262,6 +262,9 @@ abstract public class AbstractLocalTransactionManager implements
 
     }
 
+    /**
+     * @todo move this to the {@link IResourceManager}?
+     */
     public IIndex getIndex(String name, long timestamp) {
         
         if (name == null) {
@@ -273,7 +276,7 @@ abstract public class AbstractLocalTransactionManager implements
         final boolean isTransaction = timestamp > ITx.UNISOLATED;
         
         final ITx tx; 
-        {
+        if(isTransaction) {
 
             ITx tmp = activeTx.get(timestamp);
         
@@ -293,6 +296,10 @@ abstract public class AbstractLocalTransactionManager implements
             
             tx = tmp;
         
+        } else {
+            
+            tx = null;
+            
         }
         
         if( isTransaction && tx == null ) {

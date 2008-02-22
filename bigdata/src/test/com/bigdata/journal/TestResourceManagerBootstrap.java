@@ -33,8 +33,6 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import junit.framework.TestCase2;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
@@ -51,61 +49,24 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
- * Test suite for the {@link ResourceManager}.
- * 
- * FIXME add tests for access to read-committed and fully isolated indices.
- * 
- * @todo add tests for coordination of read locks with a transaction manager.
+ * Bootstrap test suite for the {@link ResourceManager}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestResourceManager extends TestCase2 {
+public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstrapTestCase {
 
     /**
      * 
      */
-    public TestResourceManager() {
+    public TestResourceManagerBootstrap() {
     }
 
     /**
      * @param name
      */
-    public TestResourceManager(String name) {
+    public TestResourceManagerBootstrap(String name) {
         super(name);
-    }
-
-    /** The data directory. */
-    File dataDir;
-    /** The subdirectory containing the journal resources. */
-    File journalsDir;
-    /** The subdirectory spanning the index segment resources. */
-    File segmentsDir;
-    /** The temp directory. */
-    File tmpDir = new File(System.getProperty("java.io.tmpdir"));
-
-    /**
-     * Sets up the per-test data directory.
-     */
-    public void setUp() throws Exception {
-
-        super.setUp();
-        
-        /*
-         * Create a normal temporary file whose path is the path of the data
-         * directory and then delete the temporary file.
-         */
-
-        dataDir = File.createTempFile(getName(), "", tmpDir).getCanonicalFile();
-        
-        assertTrue(dataDir.delete()); 
-
-        assertFalse(dataDir.exists());
-
-        journalsDir = new File(dataDir,"journals");
-
-        segmentsDir = new File(dataDir,"segments");
-        
     }
 
     /**
@@ -154,6 +115,8 @@ public class TestResourceManager extends TestCase2 {
 
     }
     
+    final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
+
     /**
      * Test creation of a new {@link ResourceManager}. This verifies the
      * correct creation of the data directory, the various subdirectories, and
@@ -162,22 +125,46 @@ public class TestResourceManager extends TestCase2 {
      * @throws IOException
      */
     public void test_create() throws IOException {
-        
-        Properties properties = new Properties();
 
-        properties.setProperty(
-                com.bigdata.journal.ResourceManager.Options.DATA_DIR, dataDir
-                        .toString());
+        /*
+         * Setup the resource manager.
+         */
         
-        ResourceManager rmgr = new MyResourceManager(properties);
+        final Properties properties = getProperties();
 
+        ResourceManager resourceManager = new ResourceManager(properties);
+
+        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
+                resourceManager) {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+
+            }
+
+        };
+
+        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+                properties, localTransactionManager, resourceManager);
+
+        localTransactionManager.setConcurrencyManager(concurrencyManager);
+
+        resourceManager.setConcurrencyManager(concurrencyManager);
+        
+        resourceManager.start();
+        
+        /*
+         * Do tests.
+         */
+        
         assertTrue(dataDir.exists());
         assertTrue(dataDir.isDirectory());
         assertTrue(journalsDir.isDirectory());
         assertTrue(segmentsDir.isDirectory());
 
         // fetch the live journal.
-        AbstractJournal journal = rmgr.getLiveJournal();
+        AbstractJournal journal = resourceManager.getLiveJournal();
         
         assertNotNull(journal);
         
@@ -185,7 +172,9 @@ public class TestResourceManager extends TestCase2 {
         assertTrue(new File(journalsDir,journal.getFile().getName()).exists());
 
         // shutdown
-        rmgr.shutdownNow();
+        concurrencyManager.shutdownNow();
+        localTransactionManager.shutdownNow();
+        resourceManager.shutdownNow();
         
     }
 
@@ -264,41 +253,59 @@ public class TestResourceManager extends TestCase2 {
         }
 
         /*
-         * Open the resource manager.
+         * Setup the resource manager.
          */
-        final ResourceManager rmgr;
-        {
-            
-            Properties properties = new Properties();
-            
-            properties.setProperty(
-                    com.bigdata.journal.ResourceManager.Options.DATA_DIR,
-                    dataDir.toString());
-            
-            rmgr = new MyResourceManager(properties);
-            
-        }
+        
+        final Properties properties = getProperties();
+
+        ResourceManager resourceManager = new ResourceManager(properties);
+
+        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
+                resourceManager) {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+
+            }
+
+        };
+
+        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+                properties, localTransactionManager, resourceManager);
+
+        localTransactionManager.setConcurrencyManager(concurrencyManager);
+
+        resourceManager.setConcurrencyManager(concurrencyManager);
+        
+        resourceManager.start();
+        
+        /*
+         * Do tests.
+         */
         
         // verify live journal was opened.
-        assertNotNull(rmgr.getLiveJournal());
+        assertNotNull(resourceManager.getLiveJournal());
         
         // verify same reference each time we request the live journal. 
-        assertTrue(rmgr.getLiveJournal()==rmgr.getLiveJournal());
+        assertTrue(resourceManager.getLiveJournal()==resourceManager.getLiveJournal());
         
         // verify #of journals discovered.
-        assertEquals(2,rmgr.getJournalCount());
+        assertEquals(2,resourceManager.getJournalCount());
         
         // open one journal.
-        assertNotNull(rmgr.openStore(journalMetadata1.getUUID()));
+        assertNotNull(resourceManager.openStore(journalMetadata1.getUUID()));
 
         // open the other journal.
-        assertNotNull(rmgr.openStore(journalMetadata2.getUUID()));
+        assertNotNull(resourceManager.openStore(journalMetadata2.getUUID()));
         
         // verify correct journal has same reference as the live journal.
-        assertTrue(rmgr.getLiveJournal()==rmgr.openStore(journalMetadata2.getUUID()));
+        assertTrue(resourceManager.getLiveJournal()==resourceManager.openStore(journalMetadata2.getUUID()));
         
-        // shutdown.
-        rmgr.shutdownNow();
+        // shutdown
+        concurrencyManager.shutdownNow();
+        localTransactionManager.shutdownNow();
+        resourceManager.shutdownNow();
         
     }
     
@@ -387,40 +394,58 @@ public class TestResourceManager extends TestCase2 {
         }
 
         /*
-         * Open the resource manager.
+         * Setup the resource manager.
          */
-        final ResourceManager rmgr;
-        {
-            
-            Properties properties = new Properties();
-            
-            properties.setProperty(
-                    com.bigdata.journal.ResourceManager.Options.DATA_DIR,
-                    dataDir.toString());
-            
-            rmgr = new MyResourceManager(properties);
-            
-        }
+        
+        final Properties properties = getProperties();
+
+        ResourceManager resourceManager = new ResourceManager(properties);
+
+        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
+                resourceManager) {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+
+            }
+
+        };
+
+        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+                properties, localTransactionManager, resourceManager);
+
+        localTransactionManager.setConcurrencyManager(concurrencyManager);
+
+        resourceManager.setConcurrencyManager(concurrencyManager);
+        
+        resourceManager.start();
+
+        /*
+         * Do tests.
+         */
         
         // verify #of journals discovered.
-        assertEquals(1, rmgr.getJournalCount());
+        assertEquals(1, resourceManager.getJournalCount());
 
         // verify index segments discovered.
         for(int i=0; i<nsegments; i++) {
             
-            IndexSegmentFileStore segStore = (IndexSegmentFileStore) rmgr
+            IndexSegmentFileStore segStore = (IndexSegmentFileStore) resourceManager
                     .openStore(segmentUUIDs[i]);
 
             // verify opened.
             assertNotNull(segStore);
             
             // verify same reference.
-            assertTrue(segStore == rmgr.openStore(segmentUUIDs[i]));
+            assertTrue(segStore == resourceManager.openStore(segmentUUIDs[i]));
             
         }
         
-        // shutdown.
-        rmgr.shutdownNow();
+        // shutdown
+        concurrencyManager.shutdownNow();
+        localTransactionManager.shutdownNow();
+        resourceManager.shutdownNow();
         
     }
     
@@ -584,43 +609,59 @@ public class TestResourceManager extends TestCase2 {
         }
 
         /*
-         * Open the resource manager.
+         * Setup the resource manager.
          */
-        final ResourceManager rmgr;
-        {
-            
-            Properties properties = new Properties();
-            
-            properties.setProperty(
-                    com.bigdata.journal.ResourceManager.Options.DATA_DIR,
-                    dataDir.toString());
-            
-            rmgr = new MyResourceManager(properties);
-            
-        }
+        
+        final Properties properties = getProperties();
+
+        ResourceManager resourceManager = new ResourceManager(properties);
+
+        AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
+                resourceManager) {
+
+            public long nextTimestamp() {
+
+                return timestampFactory.nextMillis();
+
+            }
+
+        };
+
+        ConcurrencyManager concurrencyManager = new ConcurrencyManager(
+                properties, localTransactionManager, resourceManager);
+
+        localTransactionManager.setConcurrencyManager(concurrencyManager);
+
+        resourceManager.setConcurrencyManager(concurrencyManager);
+        
+        resourceManager.start();
+
+        /*
+         * Do tests.
+         */
         
         // verify journal discovered.
-        assertEquals(1, rmgr.getJournalCount());
+        assertEquals(1, resourceManager.getJournalCount());
         
         // open the journal.
-        IJournal journal = rmgr.getLiveJournal();
+        IJournal journal = resourceManager.getLiveJournal();
 
         // verify index exists on that journal.
         assertNotNull(journal.getIndex(indexName));
 
         // verify resource manager returns the same index object.
-        assertEquals(journal.getIndex(indexName), rmgr.getIndexOnStore(indexName,
+        assertEquals(journal.getIndex(indexName), resourceManager.getIndexOnStore(indexName,
                 0L/* timestamp */, journal));
 
         // verify index segment discovered.
-        IndexSegmentFileStore segStore = (IndexSegmentFileStore) rmgr
+        IndexSegmentFileStore segStore = (IndexSegmentFileStore) resourceManager
                 .openStore(segmentUUID);
 
         // verify opened.
         assertNotNull(segStore);
 
         // verify same reference.
-        assertTrue(segStore == rmgr.openStore(segmentUUID));
+        assertTrue(segStore == resourceManager.openStore(segmentUUID));
         
         /*
          * @todo verify does not double-open an index segement from its store
@@ -628,7 +669,7 @@ public class TestResourceManager extends TestCase2 {
          */
         {
           
-            AbstractBTree[] sources = rmgr
+            AbstractBTree[] sources = resourceManager
                     .getIndexSources(indexName, 0L/* timestamp */);
 
             assertNotNull("sources", sources);
@@ -645,159 +686,11 @@ public class TestResourceManager extends TestCase2 {
 
         }
 
-        // shutdown.
-        rmgr.shutdownNow();
+        // shutdown
+        concurrencyManager.shutdownNow();
+        localTransactionManager.shutdownNow();
+        resourceManager.shutdownNow();
 
     }
 
-    /**
-     * A test for overflow of the {@link ResourceManager}. We begin with a
-     * blank slate, so the {@link ResourceManager} creates an initial
-     * {@link Journal} for us and put its into play. The test then registers an
-     * initial partition of scale-out index on that journal and some data is
-     * written on that index. An overflow operation is executed, which causes a
-     * new {@link Journal} to be created and brought into play. The index is
-     * re-defined on the new journal such that its view includes the data on the
-     * old journal as well.
-     * 
-     * @throws IOException 
-     */
-    public void test_overflow() throws IOException {
-
-        Properties properties = new Properties();
-
-        properties.setProperty(
-                com.bigdata.journal.ResourceManager.Options.DATA_DIR, dataDir
-                        .toString());
-        
-        ResourceManager rmgr = new MyResourceManager(properties);
-
-        /*
-         * Define, register, and populate the initial partition of a named
-         * scale-out index.
-         */
-        final String indexName = "testIndex";
-        final int nentries = 100;
-        {
-
-            AbstractJournal journal = rmgr.getLiveJournal();
-
-            IndexMetadata indexMetadata = new IndexMetadata(indexName, UUID
-                    .randomUUID());
-
-            // required for scale-out indices.
-            indexMetadata.setDeleteMarkers(true);
-
-            indexMetadata.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(//
-                    0, // partitionId
-                    new UUID[]{UUID.randomUUID()},// dataService UUIDs.
-                    new IResourceMetadata[]{
-                            journal.getResourceMetadata()
-                    },
-                    new byte[]{}, // leftSeparator.
-                    null // rightSeparator.
-                    ));
-            
-            // create index and register on the journal.
-            IIndex ndx = journal.registerIndex(indexName, BTree.create(journal,
-                    indexMetadata));
-
-            DataOutputBuffer buf = new DataOutputBuffer(Bytes.SIZEOF_INT);
-
-            // populate with some data.
-            for (int j = 0; j < nentries; j++) {
-
-                // format the value.
-                buf.reset().putInt(j);
-
-                // insert values.
-                ndx.insert(KeyBuilder.asSortKey(j), buf.toByteArray());
-
-                // bump the counter. 
-                ndx.getCounter().incrementAndGet();
-                
-            }
-
-            // commit data on the journal
-            journal.commit();
-
-        }
-
-        /*
-         * Do overflow operation. This should create a new journal and migrate
-         * the index definition to the new journal while re-defining the view to
-         * include the data on the old journal.
-         */
-        {
-
-            IJournal oldJ = rmgr.getLiveJournal();
-            
-            assertEquals(1, rmgr.getJournalCount());
-
-            // do overflow.
-            rmgr.overflow();
-
-            assertEquals(2, rmgr.getJournalCount());
-
-            // verify live journal is a different instance.
-            assertTrue(oldJ != rmgr.getLiveJournal());
-
-        }
-
-        /*
-         * Verify new view on the index partition.
-         */
-        {
-            
-            AbstractBTree[] sources = rmgr
-                    .getIndexSources(indexName, 0L/* timestamp */); 
-            
-            assertNotNull("sources",sources);
-            
-            assertEquals("#sources",2,sources.length);
-
-            assertTrue(sources[0] != sources[1]);
-            
-            // entries are still on the old index.
-            assertEquals(nentries,sources[1].getEntryCount());
-
-            // verify counter on the old index is unchanged.
-            assertEquals(nentries,sources[1].getCounter().get());
-
-            // verify no entries yet on the new index.
-            assertEquals(0,sources[0].getEntryCount());
-
-            // verify counter was carried forward to the new index(!)
-            assertEquals(nentries,sources[0].getCounter().get());
-            
-        }
-        
-    }
-
-    static class MyResourceManager extends ResourceManager {
-
-        private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-
-        /**
-         * @param properties
-         * @param timestampService
-         */
-        public MyResourceManager(Properties properties) {
-            
-            super(properties, new ITimestampService(){
-
-                public long nextTimestamp() {
-
-                    return timestampFactory.nextMillis();
-                    
-                }}
-            
-            );
-            
-        }
-        
-        
-        
-    }
-    
 }

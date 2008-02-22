@@ -245,7 +245,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             try {
             
             // force flush of index to store
-            ndx.write();
+            ndx.checkpoint();
             
             // force flush of store to disk.
             getJournal().force(true);

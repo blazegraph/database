@@ -42,6 +42,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -654,6 +655,19 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      *       between isolated and unisolated views.
      */
     public IIndex getIndex(long tx, String name) {
+
+        if (tx != ITx.UNISOLATED) {
+         
+            /*
+             * FIXME drive through support. The only change is that we need to
+             * have the metadata index for that timestamp, but I need to make
+             * sure that we can get that.
+             */
+
+            throw new UnsupportedOperationException(
+                    "Only unisolated operations are supported");
+            
+        }
 
         assertOpen();
 

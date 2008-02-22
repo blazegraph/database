@@ -140,7 +140,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
-    public void delete() {
+    public void destroyAllResources() {
 
         if(isOpen()) throw new IllegalStateException();
         

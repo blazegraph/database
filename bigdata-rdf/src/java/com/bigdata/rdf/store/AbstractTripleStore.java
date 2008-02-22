@@ -116,6 +116,11 @@ import cutthecrap.utils.striterators.Striterator;
  * Abstract base class that implements logic for the {@link ITripleStore}
  * interface that is invariant across the choice of the backing store.
  * 
+ * @todo store persistent metadata about the rdf database in a named object in
+ *       the federation and use that to locate the indices. This will give us
+ *       more than one rdf store per federation and will also let us persist
+ *       other metadata about the rdf store.
+ * 
  * @todo performance improvements:
  *       <p>
  *       Tune btree record structure using the same mechanisms (reduce disk
@@ -184,7 +189,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo examine role for semi joins (join indices) - these can be declared for
  *       various predicate combinations and then maintained, effectively by
  *       rules using the existing TM mechanisms.
- *       
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

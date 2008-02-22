@@ -521,7 +521,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
         
         journal.shutdown();
         
-        journal.delete();
+        journal.destroyAllResources();
         
     }
 

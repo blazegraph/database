@@ -510,10 +510,6 @@ public class ClientIndexView implements IIndex {
         
     }
 
-    /**
-     * @todo run on the {@link #getThreadPool()} in order to limit client
-     *       parallelism to the size of the thread pool.
-     */
     public Object submit(byte[] key, IIndexProcedure proc) {
 
         // The index partition for that key.
@@ -534,10 +530,23 @@ public class ClientIndexView implements IIndex {
                 
             }
 
-            final String name = DataService.getIndexPartitionName(this.name,
-                    pmd.getPartitionId());
+//            final String name = DataService.getIndexPartitionName(this.name,
+//                    pmd.getPartitionId());
 
-            Object result = dataService.submit(tx, name, proc);
+            // required to get the result back from the procedure.
+            final IResultHandler resultHandler = new IdentityHandler();
+            
+            // setup proc to run on the thread pool in order to limit client parallelism
+            final DataServiceProcedureTask task = new DataServiceProcedureTask(
+                    new Split(pmd,0,0), dataService, proc, resultHandler );
+            
+            // submit procedure and await completion.
+            getThreadPool().submit(task).get();
+            
+            // the singleton result.
+            Object result = resultHandler.getResult();
+            
+//            Object result = dataService.submit(tx, name, proc);
 
             return result;
 
@@ -547,6 +556,46 @@ public class ClientIndexView implements IIndex {
 
         }
 
+    }
+    
+    /**
+     * Hands back the object visited for a single index partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    @SuppressWarnings("unused")
+    private static class IdentityHandler implements IResultHandler<Object, Object> {
+
+        int nvisited = 0;
+        private Object ret;
+        
+        public void aggregate(Object result, Split split) {
+
+            if (nvisited != 0) {
+            
+                /*
+                 * You can not use this handler if the procedure is mapped over
+                 * more than one split.
+                 */
+                
+                throw new UnsupportedOperationException();
+
+            }
+            
+            this.ret = result;
+            
+            nvisited++;
+            
+            
+        }
+
+        public Object getResult() {
+
+            return ret;
+            
+        }
+        
     }
     
     public void submit(byte[] fromKey, byte[] toKey,
@@ -796,7 +845,7 @@ public class ClientIndexView implements IIndex {
 
         @SuppressWarnings("unchecked")
         public Void call() throws Exception {
-
+            
             Object result = dataService.submit(tx, name, proc);
 
             if (resultHandler != null) {

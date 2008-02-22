@@ -31,6 +31,8 @@ import com.bigdata.btree.IndexSegment;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated
  */
 public enum ResourceState {
 

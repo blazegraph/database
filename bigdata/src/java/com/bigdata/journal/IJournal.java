@@ -38,7 +38,7 @@ import com.bigdata.rawstore.IMRMW;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMRMW, IAtomicStore, IIndexManager {
+public interface IJournal extends IMRMW, IAtomicStore, IIndexManager, ITimestampService {
 
     /**
      * A copy of the properties used to initialize this journal.
@@ -46,23 +46,16 @@ public interface IJournal extends IMRMW, IAtomicStore, IIndexManager {
     public Properties getProperties();
     
     /**
-     * An overflow condition arises when the journal is within some declared
-     * percentage of its maximum capacity during a {@link #commit()}. If this
-     * event is not handled then the journal will automatically extent itself
-     * until it either runs out of address space (int32) or other resources.
-     * 
-     * @return true iff the overflow event was handled (e.g., if a new journal
-     *         was created to absorb subsequent writes). if a new journal is NOT
-     *         opened then this method should return false.
-     */
-    public boolean overflow();
-    
-    /**
      * Shutdown the journal politely. Scheduled operations will run to
      * completion, but no new operations will be scheduled.
      */
     public void shutdown();
 
+    /**
+     * Immediate shutdown.
+     */
+    public void shutdownNow();
+    
     /**
      * Return the named index (unisolated). Writes on the returned index will be
      * made restart-safe with the next {@link #commit()} unless discarded by

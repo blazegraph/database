@@ -784,12 +784,12 @@ public class IndexSegmentBuilder {
                     + elapsed_setup + "ms) + build(" + elapsed_build
                     + "ms) +  write(" + elapsed_write + "ms); nentries="
                     + plan.nentries + ", branchingFactor=" + plan.m + ", nnodes="
-                    + nnodesWritten + ", nleaves=" + nleavesWritten+
+                    + nnodesWritten + ", nleaves=" + nleavesWritten+", length="+
                     fpf.format(((double) checkpoint.length / Bytes.megabyte32))
                     + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
 
             // report event
-            ResourceManager.buildIndexSegment(null/* name */,
+            ResourceManager.buildIndexSegment(metadata.getName(),
                     outFile.toString(), plan.nentries, elapsed, checkpoint.length);
 
         } catch (Throwable ex) {

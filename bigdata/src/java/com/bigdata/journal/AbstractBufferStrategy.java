@@ -232,7 +232,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         close();
 
-        delete();
+        destroyAllResources();
         
     }
 

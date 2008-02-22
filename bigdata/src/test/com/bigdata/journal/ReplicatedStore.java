@@ -535,8 +535,8 @@ public class ReplicatedStore implements IRawStore {
         
     }
 
-    public void delete() {
-        localStore.delete();
+    public void destroyAllResources() {
+        localStore.destroyAllResources();
     }
 
     public Object deserialize(byte[] b, int off, int len) {

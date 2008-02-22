@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -110,11 +111,33 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
-        // tests of the resource manager
-        suite.addTestSuite( TestResourceManager.class );
+        /*
+         * Test management of local resources.
+         * 
+         * @todo convert to a proxy test suite per the examples above so that we
+         * can run any interesting conditions and gather the resource manager
+         * unit tests together into that proxy test suite and its bootstrap
+         * tests.
+         * 
+         * @todo add tests for access to read-committed and fully isolated
+         * indices.
+         * 
+         * @todo add tests for coordination of read locks with a transaction
+         * manager.
+         */
+        // bootstrap tests of the resource manager
+        suite.addTestSuite(TestResourceManagerBootstrap.class);
+        // test basics.
+        suite.addTestSuite(TestResourceManagerBasics.class);
+        // test overflow handling.
+        suite.addTestSuite(TestOverflow.class);
+        // test of index segment build and full compacting merge tasks.
+        suite.addTestSuite(TestMergeTasks.class);
+        // test merge/split of index partitions.
+        suite.addTestSuite(TestSplitJoinTasks.class);
 
         return suite;
-        
+
     }
-    
+
 }

@@ -93,7 +93,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
         
-        journal.delete();
+        journal.destroyAllResources();
         
     }
 
@@ -105,7 +105,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdownNow();
         
-        journal.delete();
+        journal.destroyAllResources();
 
     }
     
@@ -161,7 +161,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -218,7 +218,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -282,7 +282,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
     
@@ -355,7 +355,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -421,7 +421,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -526,7 +526,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -633,7 +633,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -813,7 +813,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -881,7 +881,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         journal.shutdown();
         
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 

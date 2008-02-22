@@ -1606,7 +1606,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The btree that is being validated.
      */
-    static public void assertSameBTree(AbstractBTree expected, AbstractBTree actual) {
+    static public void assertSameBTree(AbstractBTree expected, IIndex actual) {
 
         assert expected != null;
         
@@ -1618,10 +1618,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         // The #of entries must agree.
         assertEquals("entryCount", expected.getEntryCount(), actual
-                .getEntryCount());
+                .rangeCount(null,null));
         
         // verify the entry iterator.
-        doEntryIteratorTest(actual,expected);
+//        doEntryIteratorTest(actual,expected);
+        doEntryIteratorTest(expected,actual);
         
         /*
          * Extract the ground truth mapping from the input btree.
@@ -1646,7 +1647,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * If the are wrong then this test will fail in various interesting
          * ways.
          */
-        doRandomIndexOfTest("actual", actual, keys, vals);
+        if(actual instanceof AbstractBTree) {
+
+            doRandomIndexOfTest("actual", ((AbstractBTree)actual), keys, vals);
+            
+        }
 
         /*
          * Examine the btree for inconsistencies (we also examine the ground
@@ -1656,8 +1661,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         System.err.println("Examining expected tree for inconsistencies");
         assert expected.dump(System.err);
 
-        System.err.println("Examining actual tree for inconsistencies");
-        assert actual.dump(System.err);
+        if(actual instanceof AbstractBTree) {
+            System.err.println("Examining actual tree for inconsistencies");
+            assert ((AbstractBTree)actual).dump(System.err);
+        }
 
     }
     
@@ -1816,9 +1823,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param vals
      *            the values in key order.
      */
-    static public void doRandomLookupTest(String label, AbstractBTree btree, byte[][] keys, byte[][] vals) {
+    static public void doRandomLookupTest(String label, IIndex btree, byte[][] keys, byte[][] vals) {
         
-        int nentries = btree.getEntryCount();
+        int nentries = (int)btree.rangeCount(null,null);
         
         System.err.println("\ncondition: "+label+", nentries="+nentries);
         
@@ -1855,7 +1862,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         System.err.println(label + " : tested " + nentries
                 + " keys order in " + elapsed + "ms");
         
-        System.err.println(label + " : " + btree.counters);
+        System.err.println(label + " : " + btree.getStatistics());
          
     }
 

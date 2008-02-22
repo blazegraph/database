@@ -137,7 +137,7 @@ public class TestSequenceTask extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
@@ -233,7 +233,7 @@ public class TestSequenceTask extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.delete();
+        journal.destroyAllResources();
 
     }
 
