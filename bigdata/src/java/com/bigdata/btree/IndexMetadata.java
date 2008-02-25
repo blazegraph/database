@@ -36,7 +36,9 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.journal.ResourceManager.DefaultSplitHandler;
 import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -222,6 +224,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private UUID indexUUID;
     private String name;
     private int branchingFactor;
+    private int indexSegmentBranchingFactor;
     private PartitionMetadataWithSeparatorKeys pmd;
     private String className;
     private String checkpointClassName;
@@ -236,12 +239,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private double errorRate;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
-//    private Object splitHandler;
 //    private Object historyPolicy;
-//    private Class writeRetentionQueueClass;
-//    private Class writeRetentionQueueListenerClass;
-//    private int writeRetentionQueueCapacity;
-//    private int writeRetentionQueueScan;
 
     /**
      * The unique identifier for the index whose data is stored in this B+Tree
@@ -256,10 +254,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     /**
      * The name associated with the index -or- <code>null</code> iff the index
      * is is not named (internal indices are generally not named while
-     * application indices are always named). When the index is a scale-out
-     * index, this is the name of the scale-out index NOT the name of an index
-     * partition. When the index is a metadata index, then this is the name of
-     * the metadata index NOT the name of the managed index.
+     * application indices are always named).
+     * <p>
+     * Note: When the index is a scale-out index, this is the name of the
+     * scale-out index NOT the name under which an index partition is
+     * registered.
+     * <p>
+     * Note: When the index is a metadata index, then this is the name of the
+     * metadata index NOT the name of the managed index.
      */
     public final String getName() {return name;}
     
@@ -274,6 +276,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * generally much larger in order to reduce the number of disk seeks.
      */
     public final int getBranchingFactor() {return branchingFactor;}
+    
+    /**
+     * The branching factor used when building an {@link IndexSegment} (default
+     * is 4096). Index segments are read-only B+Tree resources. The are built
+     * using a bulk index build procedure and typically have a much higher
+     * branching factor than the corresponding mutable index on the journal.
+     * <p>
+     * Note: the value of this property will determine the branching factor of
+     * the {@link IndexSegment}. When the {@link IndexSegment} is built, it
+     * will be given a {@link #clone()} of this {@link IndexMetadata} and the
+     * actual branching factor for the {@link IndexSegment} be set on the
+     * {@link #getBranchingFactor()} at that time.
+     */
+    public final int getIndexSegmentBranchingFactor() {return indexSegmentBranchingFactor;}
     
     /**
      * When non-<code>null</code>, this is the description of the view of
@@ -414,6 +430,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.branchingFactor = branchingFactor;
     }
 
+    public void setIndexSegmentBranchingFactor(int branchingFactor) {
+        if(branchingFactor < BTree.MIN_BRANCHING_FACTOR) {
+            throw new IllegalArgumentException();
+        }
+        this.indexSegmentBranchingFactor = branchingFactor;
+    }
+
     public void setClassName(String className) {
         this.className = className;
     }
@@ -459,12 +482,26 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.overflowHandler = overflowHandler;
     }
 
+    /**
+     * Object which decides whether and where to split an index partition into 2
+     * or more index partitions. The default is a {@link DefaultSplitHandler}
+     * using some reasonable values for its properties. You can override this
+     * property in order to tune or constrain the manner in which index split
+     * points are choosen.
+     * 
+     * @return The {@link ISplitHandler}. If <code>null</code> then index
+     *         splits will be disabled.
+     */
     public ISplitHandler getSplitHandler() {
+
         return splitHandler;
+        
     }
     
     public void setSplitHandler(ISplitHandler splitHandler) {
+        
         this.splitHandler = splitHandler;
+        
     }
     
     /**
@@ -519,7 +556,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.indexUUID = indexUUID;
         
         this.branchingFactor = BTree.DEFAULT_BRANCHING_FACTOR;
-        
+
+        this.indexSegmentBranchingFactor = 4096;
+
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
@@ -545,7 +584,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
   
         this.overflowHandler = null;
         
-        this.splitHandler = null;
+        this.splitHandler = new DefaultSplitHandler(
+                5 * Bytes.megabyte32, // entryCountPerSplit
+                20, // sampleRate
+                1.5, // overCapacityMultiplier
+                .75  // underCapacityMultiplier
+                );
         
     }
 
@@ -624,6 +668,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         sb.append(", name=" + (name == null ? "N/A" : name));
         sb.append(", indexUUID=" + indexUUID);
         sb.append(", branchingFactor=" + branchingFactor);
+        sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + className);
         sb.append(", checkpointClass=" + checkpointClassName);
@@ -679,6 +724,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         indexUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
         branchingFactor = (int)LongPacker.unpackLong(in);
+
+        indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
         
         pmd = (PartitionMetadataWithSeparatorKeys)in.readObject();
         
@@ -729,6 +776,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         out.writeLong(indexUUID.getLeastSignificantBits());
         
         LongPacker.packLong(out, branchingFactor);
+
+        LongPacker.packLong(out, indexSegmentBranchingFactor);
 
         out.writeObject(pmd);
         

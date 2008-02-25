@@ -33,6 +33,7 @@ import java.io.File;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
@@ -126,6 +127,32 @@ public interface IResourceManager {
      * @see FusedView
      */
     public AbstractBTree[] getIndexSources(String name, long timestamp);
+
+    /**
+     * Return the named index as of the specified timestamp.
+     * 
+     * @param name
+     *            The index name.
+     * @param timestamp
+     *            Either the startTime of an active transaction,
+     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+     *            <code>-timestamp</code> for a historical view no later than
+     *            the specified timestamp.
+     * 
+     * @return The isolated index or <code>null</code> iff there is no index
+     *         registered with that name for that <i>timestamp</i>, including
+     *         if the timestamp is a transaction identifier and the transaction
+     *         is unknown or not active.
+     * 
+     * @exception IllegalArgumentException
+     *                if <i>name</i> is <code>null</code>
+     */
+//    * 
+//    * @exception IllegalStateException
+//    *                if <i>timestamp</i> is positive but there is no active
+//    *                transaction with that timestamp.
+    public IIndex getIndex(String name, long startTime);
 
     /**
      * Creates a new journal migrate the named indices to the new journal.

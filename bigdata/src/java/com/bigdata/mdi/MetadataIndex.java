@@ -143,7 +143,7 @@ import com.bigdata.service.MetadataService;
  *       a suitable broadcast event in which clients have to change to the new
  *       hash basis.  this feature can be generalized to provide hash partitioned
  *       indices as well as key-range partitioned indices.
- * 
+ *       
  * @todo A metadata index can be recovered by a distributed process running over
  *       the data services. Each data service reports all index partitions. The
  *       reports are collected and the index is rebuilt from the reports. Much

@@ -1570,6 +1570,90 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 //        
 //    }
 
+    /**
+     * Copy all data, including deleted index entry markers and timestamps iff
+     * supported by the source and target. The goal is an exact copy of the data
+     * in the source btree.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the <i>src</i> and <i>this</i> do not have the same
+     *             setting for {@link IndexMetadata#getDeleteMarkers()}
+     * 
+     * @throws UnsupportedOperationException
+     *             if the <i>src</i> and <i>this</i> do not have the same
+     *             setting for {@link IndexMetadata#getVersionTimestamps()}
+     * 
+     * @return The #of index entries that were copied.
+     * 
+     * @todo write tests for all variations (delete markers, timestamps, etc).
+     */
+    public long rangeCopy(IIndex src, byte[] fromKey, byte[] toKey) {
+
+        final IEntryIterator itr = src.rangeIterator(fromKey, toKey,
+                0/* capacity */, IRangeQuery.ALL, null/* filter */);
+
+        final boolean deleteMarkers = getIndexMetadata().getDeleteMarkers();
+
+        final boolean versionTimestamps = getIndexMetadata().getVersionTimestamps();
+
+        if (src.getIndexMetadata().getDeleteMarkers() != deleteMarkers) {
+
+            throw new UnsupportedOperationException(
+                    "Support for delete markers not consistent");
+
+        }
+
+        if (src.getIndexMetadata().getVersionTimestamps() != versionTimestamps) {
+
+            throw new UnsupportedOperationException(
+                    "Support for version timestamps not consistent");
+
+        }
+
+        ITuple tuple = null;
+        
+        while (itr.hasNext()) {
+
+            tuple = itr.next();
+
+            final byte[] key = tuple.getKey();
+
+            if (versionTimestamps) {
+
+                final long timestamp = tuple.getVersionTimestamp();
+
+                if (deleteMarkers && tuple.isDeletedVersion()) {
+
+                    insert(key, null/* value */, true/* delete */,
+                            timestamp, null/* tuple */);
+
+                } else {
+
+                    insert(key, tuple.getValue(), false/* delete */,
+                            timestamp, null/* tuple */);
+
+                }
+
+            } else {
+
+                if (deleteMarkers && tuple.isDeletedVersion()) {
+
+                    remove(key);
+
+                } else {
+
+                    insert(key, tuple.getValue());
+
+                }
+
+            }
+
+        }
+        
+        return tuple == null ? 0L : tuple.getVisitCount();
+
+    }
+    
     public Object submit(byte[] key, IIndexProcedure proc) {
         
         return proc.apply(this);
