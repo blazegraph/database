@@ -1042,9 +1042,10 @@ public abstract class AbstractJournal implements IJournal {
      */
     public void close(long closeTime) {
         
-        log.info("Closing journal for further writes: closeTime="+closeTime);
+        log.info("Closing journal for further writes: closeTime=" + closeTime
+                + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
         
-        IRootBlockView old = _rootBlock;
+        final IRootBlockView old = _rootBlock;
         
         /*
          * Create the final root block.
@@ -1432,7 +1433,7 @@ public abstract class AbstractJournal implements IJournal {
 
         assertOpen();
 
-        log.info("");
+        log.info("commitTime="+commitTime);
         
         /*
          * First, run each of the committers accumulating the updated root
@@ -1569,7 +1570,7 @@ public abstract class AbstractJournal implements IJournal {
 
         }
 
-        log.info("Done: nextOffset="+nextOffset);
+        log.info("Done: commitTime="+commitTime+", nextOffset="+nextOffset);
         
         return commitTime;
 

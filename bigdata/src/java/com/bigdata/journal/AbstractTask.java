@@ -139,11 +139,15 @@ public abstract class AbstractTask implements Callable<Object> {
      * @see IResourceManager#getJournal(long)
      */
     protected final AbstractJournal getJournal() {
-        
+
         final AbstractJournal journal = resourceManager.getJournal(Math
                 .abs(startTime));
-        
-        log.warn("No such journal: timestamp=" + startTime);
+
+        if (journal == null) {
+
+            log.warn("No such journal: timestamp=" + startTime);
+            
+        }
         
         return journal;
         
@@ -973,7 +977,7 @@ public abstract class AbstractTask implements Callable<Object> {
         // validate that this is a declared index.
         assertResource(name);
         
-        final IIndex tmp = transactionManager.getIndex(name, startTime);
+        final IIndex tmp = resourceManager.getIndex(name, startTime);
         
         if (tmp == null) {
 

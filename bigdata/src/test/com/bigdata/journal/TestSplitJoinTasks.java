@@ -40,6 +40,8 @@ import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
+ * FIXME work through a split.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

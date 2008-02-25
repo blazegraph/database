@@ -44,9 +44,10 @@ public interface IRangeQuery {
      * the half-open range exactly using {@link AbstractNode#indexOf(Object)}.
      * The cost is equal to the cost of lookup of the both keys.
      * <p>
-     * Note: If the index supports transactional isolation then the range count
-     * will be the upper bound and will include any deleted index entries that
-     * have not been purged through a compacting merge.
+     * Note: If the index supports deletion markers then the range count will be
+     * the upper bound and will double count index entries that exist on an
+     * {@link IndexSegment} but which have been since overwritten, including the
+     * special case where the overwrite is a delete.
      * 
      * @param fromKey
      *            The lowest key that will be counted (inclusive). When

@@ -94,35 +94,4 @@ public interface ILocalTransactionManager extends ITransactionManager {
      */
     public ITx getTx(long startTime);
     
-    /**
-     * Return the named index as of the specified timestamp.
-     * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            Either the startTime of an active transaction,
-     *            {@link ITx#UNISOLATED} for the current unisolated index view,
-     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
-     *            <code>-timestamp</code> for a historical view no later than
-     *            the specified timestamp.
-     * 
-     * @return The isolated index or <code>null</code> iff there is no index
-     *         registered with that name.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> is <code>null</code>
-     * 
-     * @exception IllegalStateException
-     *                if there is no active transaction with that timestamp.
-     * 
-     * FIXME This method was historically used to return the index isolated by
-     * the transaction with the specified startTime. That needs to be
-     * re-examined in the more recent developments of the
-     * {@link IResourceManager} and the need to introduce views into
-     * {@link AbstractTask}.
-     * 
-     * @todo javadoc on {@link ILocalTransactionManager} interface.
-     */
-    public IIndex getIndex(String name, long startTime);
-
 }

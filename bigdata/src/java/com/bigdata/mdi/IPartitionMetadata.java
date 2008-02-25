@@ -42,6 +42,27 @@ public interface IPartitionMetadata {
 
     /**
      * The unique partition identifier.
+     * 
+     * @todo the index name and left and right separator keys are a complete
+     *       description of an index partition. The index partition name could
+     *       be formed from those three fields rather than the index name and
+     *       the partitionId. This would releave us of centralized assignment of
+     *       partition identifiers.
+     *       <p>
+     *       If the client knows the left,right separators and the data service
+     *       then they can directly talk to the data service.
+     *       <p>
+     *       If the client knows a key or key range of interest then they can
+     *       obtain the partition descriptions and a data service locator either
+     *       either by flooding the query to the data servers or from a metadata
+     *       index.
+     *       <p>
+     *       Another alternative is to use a UUID here. Like the separator keys,
+     *       but unlike the partitionId, UUIDs may be assigned either top-down
+     *       or bottom up. Their advantage over the separator keys is that they
+     *       are more terse. However, the separator keys are not that much data
+     *       when compared to the typical request/response for an RMI by a
+     *       client to a data service.
      */
     public int getPartitionId();
 

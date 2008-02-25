@@ -383,6 +383,7 @@ public class IndexSegmentBuilder {
         assert tmpDir != null;
         assert entryCount > 0;
         assert entryIterator != null;
+        assert commitTime > 0L;
 
         // the UUID assigned to this index segment file.
         this.segmentUUID = UUID.randomUUID();

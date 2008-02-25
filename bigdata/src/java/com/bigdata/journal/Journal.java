@@ -33,8 +33,11 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.ReadOnlyFusedView;
+import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -243,8 +246,153 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         localTransactionManager.completedTx(tx);
     }
 
-    public IIndex getIndex(String name, long ts) {
-        return localTransactionManager.getIndex(name, ts);
+    /**
+     * Note: logic copied from {@link ResourceManager#getIndex(String, long)}.
+     */
+    public IIndex getIndex(String name, long timestamp) {
+        
+        if (name == null) {
+
+            throw new IllegalArgumentException();
+
+        }
+
+        final boolean isTransaction = timestamp > ITx.UNISOLATED;
+        
+        final ITx tx = (isTransaction ? getConcurrencyManager()
+                .getTransactionManager().getTx(timestamp) : null); 
+        
+        if(isTransaction) {
+
+            if(tx == null) {
+                
+                log.warn("Unknown transaction: name="+name+", tx="+timestamp);
+                
+                return null;
+                    
+            }
+            
+            if(!tx.isActive()) {
+                
+                // typically this means that the transaction has already prepared.
+                log.warn("Transaction not active: name=" + name + ", tx="
+                        + timestamp + ", prepared=" + tx.isPrepared()
+                        + ", complete=" + tx.isComplete() + ", aborted="
+                        + tx.isAborted());
+
+                return null;
+                
+            }
+                                
+        }
+        
+        if( isTransaction && tx == null ) {
+        
+            /*
+             * Note: This will happen both if you attempt to use a transaction
+             * identified that has not been registered or if you attempt to use
+             * a transaction manager after the transaction has been either
+             * committed or aborted.
+             */
+            
+            log.warn("No such transaction: name=" + name + ", tx=" + tx);
+
+            return null;
+            
+        }
+        
+        final boolean readOnly = (timestamp < ITx.UNISOLATED)
+                || (isTransaction && tx.isReadOnly());
+
+        final IIndex tmp;
+
+        if (isTransaction) {
+
+            /*
+             * Isolated operation.
+             * 
+             * Note: The backing index is always a historical state of the named
+             * index.
+             */
+
+            final IIndex isolatedIndex = tx.getIndex(name);
+
+            if (isolatedIndex == null) {
+
+                log.warn("No such index: name="+name+", tx="+timestamp);
+                
+                return null;
+
+            }
+
+            tmp = isolatedIndex;
+
+        } else {
+            
+            /*
+             * historical read -or- unisolated read operation.
+             */
+
+            if (readOnly) {
+
+                final AbstractBTree[] sources = getIndexSources(name, timestamp);
+
+                if (sources == null) {
+
+                    log.warn("No such index: name="+name+", timestamp="+timestamp);
+                    
+                    return null;
+
+                }
+
+                if (sources.length == 1) {
+
+                    tmp = new ReadOnlyIndex(sources[0]);
+
+                } else {
+
+                    tmp = new ReadOnlyFusedView(sources);
+
+                }
+                            
+            } else {
+                
+                /*
+                 * Writable unisolated index.
+                 * 
+                 * Note: This is the "live" mutable index. This index is NOT
+                 * thread-safe. A lock manager is used to ensure that at most
+                 * one task has access to this index at a time.
+                 */
+
+                assert timestamp == ITx.UNISOLATED;
+                
+                final AbstractBTree[] sources = getIndexSources(name, ITx.UNISOLATED);
+                
+                if (sources == null) {
+
+                    log.warn("No such index: name="+name+", timestamp="+timestamp);
+                    
+                    return null;
+                    
+                }
+
+                if (sources.length == 1) {
+
+                    tmp = sources[0];
+                    
+                } else {
+                    
+                    tmp = new FusedView( sources );
+                    
+                }
+
+            }
+
+        }
+        
+        return tmp;
+
     }
 
     public ITx getTx(long startTime) {

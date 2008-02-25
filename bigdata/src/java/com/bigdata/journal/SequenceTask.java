@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Vector;
 
 /**
  * A task comprised of a sequence of operations. All operations MUST run on
@@ -67,6 +68,11 @@ public class SequenceTask extends AbstractTask {
     private final AbstractTask[] tasks;
     
     /**
+     * The result of each task is appended to this vector.
+     */
+    final protected Vector<Object> results;
+
+    /**
      * @param journal
      * @param startTime
      * @param readOnly
@@ -81,6 +87,8 @@ public class SequenceTask extends AbstractTask {
             throw new IllegalArgumentException();
         
         this.tasks = tasks;
+     
+        results = new Vector<Object>(tasks.length);
         
     }
 
@@ -94,15 +102,18 @@ public class SequenceTask extends AbstractTask {
      * @return The {@link SequenceTask}.
      */
     public static SequenceTask newSequence(AbstractTask[] tasks) {
-        
-        if(tasks==null) throw new NullPointerException();
-        
-        if(tasks.length==0) throw new IllegalArgumentException();
-        
-        if(tasks[0]==null) throw new NullPointerException();
-        
+
+        if (tasks == null)
+            throw new NullPointerException();
+
+        if (tasks.length == 0)
+            throw new IllegalArgumentException();
+
+        if (tasks[0] == null)
+            throw new NullPointerException();
+
         final IConcurrencyManager concurrencyManager = tasks[0].concurrencyManager;
-        
+
         final IResourceManager resourceManager = tasks[0].getResourceManager();
         
         final long startTime = tasks[0].startTime; 
@@ -146,13 +157,11 @@ public class SequenceTask extends AbstractTask {
      */
     protected Object doTask() throws Exception {
 
-        Object[] ret = new Object[tasks.length];
-        
         for(int i=0; i<tasks.length; i++) {
             
             AbstractTask task = tasks[i];
             
-            ret[i] = task.doTask();
+            results.add( task.doTask() );
  
             if(Thread.interrupted()) {
                 
@@ -162,7 +171,7 @@ public class SequenceTask extends AbstractTask {
             
         }
         
-        return ret;
+        return results.toArray();
         
     }
     
