@@ -29,6 +29,7 @@
 package com.bigdata.journal;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -37,6 +38,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
 
 /**
  * Interface manging the resources on which indices are stored. The resources
@@ -107,6 +111,19 @@ public interface IResourceManager {
     public AbstractJournal getJournal(long timestamp);
     
     /**
+     * Opens an {@link IRawStore}.
+     * 
+     * @param uuid
+     *            The UUID identifying that store file.
+     * 
+     * @return The open {@link IRawStore}.
+     * 
+     * @throws RuntimeException
+     *             if something goes wrong.
+     */
+    public IRawStore openStore(UUID uuid);
+    
+    /**
      * Return the ordered {@link AbstractBTree} sources for an index or a view
      * of an index partition. The {@link AbstractBTree}s are ordered from the
      * most recent to the oldest and together comprise a coherent view of an
@@ -140,10 +157,10 @@ public interface IResourceManager {
      *            <code>-timestamp</code> for a historical view no later than
      *            the specified timestamp.
      * 
-     * @return The isolated index or <code>null</code> iff there is no index
-     *         registered with that name for that <i>timestamp</i>, including
-     *         if the timestamp is a transaction identifier and the transaction
-     *         is unknown or not active.
+     * @return The index or <code>null</code> iff there is no index registered
+     *         with that name for that <i>timestamp</i>, including if the
+     *         timestamp is a transaction identifier and the transaction is
+     *         unknown or not active.
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> is <code>null</code>
@@ -152,8 +169,35 @@ public interface IResourceManager {
 //    * @exception IllegalStateException
 //    *                if <i>timestamp</i> is positive but there is no active
 //    *                transaction with that timestamp.
-    public IIndex getIndex(String name, long startTime);
+    public IIndex getIndex(String name, long timestamp);
 
+    /**
+     * Return statistics about the named index. This method will report on all
+     * resources supporting the view of the index as of the specified timestamp.
+     * 
+     * @param name
+     *            The index name.
+     * @param timestamp
+     *            Either the startTime of an active transaction,
+     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+     *            <code>-timestamp</code> for a historical view no later than
+     *            the specified timestamp.
+     * 
+     * @return Statistics about that index -or- <code>null</code> if the index
+     *         is not defined as of that timestamp.
+     * 
+     * @todo report as XML or Object.
+     */
+    public String getStatistics(String name, long timestamp);
+    
+    /**
+     * Statistics about the {@link IResourceManager}.
+     * 
+     * @todo report as XML or Object.
+     */
+    public String getStatistics();
+    
     /**
      * Creates a new journal migrate the named indices to the new journal.
      * Typically this involves updating the view of the named indices such that
@@ -230,5 +274,24 @@ public interface IResourceManager {
      * @return The file.
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata);
+
+    /**
+     * Return the {@link IMetadataService} that will be used to assign partition
+     * identifiers and which will be notified when index partitions are splits,
+     * moved, etc.
+     */
+    public IMetadataService getMetadataService();
+    
+    /**
+     * Return the {@link UUID} of the {@link IDataService} whose resources are
+     * being managed.
+     */
+    public UUID getDataServiceUUID();
+
+    /**
+     * Return the {@link UUID}[] of the {@link IDataService} failover chain for
+     * the {@link IDataService} resources are being managed.
+     */
+    public UUID[] getDataServiceUUIDs();
 
 }

@@ -66,21 +66,7 @@ public class IndexSegment extends AbstractBTree {
      */
     protected it.unimi.dsi.mg4j.util.BloomFilter bloomFilter;
 
-    /**
-     * Text of a message used in exceptions for mutation operations on the index
-     * segment.
-     */
-    final protected transient static String MSG_READ_ONLY = "Read-only index";
-
-    public int getBranchingFactor() {
-
-        reopen();
-
-        return fileStore.getMetadata().getBranchingFactor();
-
-    }
-
-    public int getHeight() {
+    final public int getHeight() {
 
         reopen();
 
@@ -88,7 +74,7 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    public int getLeafCount() {
+    final public int getLeafCount() {
 
         reopen();
 
@@ -96,7 +82,7 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    public int getNodeCount() {
+    final public int getNodeCount() {
 
         reopen();
 
@@ -104,7 +90,7 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
-    public int getEntryCount() {
+    final public int getEntryCount() {
 
         reopen();
 
@@ -232,6 +218,21 @@ public class IndexSegment extends AbstractBTree {
 
     }
 
+    final public boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
+    /**
+     * The value of the {@link IndexSegmentCheckpoint#commitTime} field.
+     */
+    final public long getLastCommitTime() {
+        
+        return fileStore.getCheckpoint().commitTime;
+        
+    }
+    
     /*
      * bloom filter support.
      */
@@ -242,10 +243,10 @@ public class IndexSegment extends AbstractBTree {
      * @param key
      *            The key.
      * 
-     * @return True if the bloom filter believes that the key is present in the
-     *         index. When true, you MUST still test the key to verify that it
-     *         is, in fact, present in the index. When false, you SHOULD NOT
-     *         test the index.
+     * @return <code>true</code> if the bloom filter believes that the key is
+     *         present in the index. When true, you MUST still test the key to
+     *         verify that it is, in fact, present in the index. When false, you
+     *         SHOULD NOT test the index.
      * 
      * @todo examine the #of weights in use by the bloom filter and its impact
      *       on false positives for character data.
@@ -269,29 +270,29 @@ public class IndexSegment extends AbstractBTree {
      * Operation is disallowed - the counter is always stored in the mutable
      * btree.
      */
-    public ICounter getCounter() {
+    final public ICounter getCounter() {
         
         throw new UnsupportedOperationException(MSG_READ_ONLY);
         
     }
     
-    /**
-     * Operation is disallowed.
-     */
-    public Tuple insert(byte[] key, byte[] value, boolean delete, long timestamp, Tuple tuple) {
+//    /**
+//     * Operation is disallowed.
+//     */
+//    public Tuple insert(byte[] key, byte[] value, boolean delete, long timestamp, Tuple tuple) {
+//
+//        throw new UnsupportedOperationException(MSG_READ_ONLY);
+//
+//    }
 
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
-
-    }
-
-    /**
-     * Operation is disallowed.
-     */
-    public Tuple remove(byte[] key, Tuple tuple) {
-
-        throw new UnsupportedOperationException(MSG_READ_ONLY);
-
-    }
+//    /**
+//     * Operation is disallowed.
+//     */
+//    public Tuple remove(byte[] key, Tuple tuple) {
+//
+//        throw new UnsupportedOperationException(MSG_READ_ONLY);
+//
+//    }
 
     /**
      * Applies the optional bloom filter if it exists. If the bloom filter

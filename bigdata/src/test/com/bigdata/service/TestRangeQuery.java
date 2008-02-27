@@ -40,7 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
-import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadata;
 
 /**
  * Test suite for the {@link IRangeQuery} API.
@@ -92,8 +92,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
         /*
          * Request a view of that partitioned index.
          */
-        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                ITx.UNISOLATED, name);
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,ITx.UNISOLATED);
 
         /*
          * Range count the view to verify that it is empty.
@@ -104,8 +103,8 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
          * Get metadata for the index partitions that we will need to verify
          * the splits.
          */
-        final PartitionMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
-        final PartitionMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        final PartitionLocatorMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionLocatorMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
         assertNotNull("partition#0",pmd0);
         assertNotNull("partition#1",pmd1);
 
@@ -159,7 +158,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         PartitionedRangeQueryIterator itr = null;
         
@@ -211,7 +210,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -266,7 +265,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -321,7 +320,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -390,8 +389,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                ITx.UNISOLATED, name);
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,ITx.UNISOLATED);
 
         PartitionedRangeQueryIterator itr = null;
 
@@ -459,7 +457,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
         
         final int nentries = 10;
         
@@ -583,7 +581,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         final int capacity = 5;
         final int nentries = 10;

@@ -34,7 +34,7 @@ import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
 
 /**
  * Class supports range query across one or more index partitions.
@@ -62,9 +62,9 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     private final ClientIndexView ndx;
     
     /**
-     * The transaction identifier -or- zero iff the request is unisolated.
+     * The timestamp from the {@link ClientIndexView}.
      */
-    private final long tx;
+    private final long timestamp;
 
     /**
      * The first key to visit -or- null iff no lower bound.
@@ -114,7 +114,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     /**
      * The metadata for the current index partition.
      */
-    private PartitionMetadataWithSeparatorKeys pmd = null;
+    private PartitionLocatorMetadataWithSeparatorKeys pmd = null;
 
     /**
      * The data service for the current index partition (this should
@@ -158,9 +158,8 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
         
     }
     
-    public PartitionedRangeQueryIterator(ClientIndexView ndx, long tx,
-            byte[] fromKey, byte[] toKey, int capacity, int flags,
-            IEntryFilter filter) {
+    public PartitionedRangeQueryIterator(ClientIndexView ndx, byte[] fromKey,
+            byte[] toKey, int capacity, int flags, IEntryFilter filter) {
 
         if (ndx == null) {
 
@@ -175,7 +174,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
         }
 
         this.ndx = ndx;
-        this.tx = tx;
+        this.timestamp = ndx.getTimestamp();
         this.fromKey = fromKey;
         this.toKey = toKey;
         this.capacity = capacity;
@@ -244,14 +243,14 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
             final int partitionId = pmd.getPartitionId();
             
-            log.info("name=" + ndx.getName() + ", tx=" + tx + ", partition="
+            log.info("name=" + ndx.getName() + ", tx=" + timestamp + ", partition="
                     + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
             
-            src = new DataServiceRangeIterator(dataService, name, tx, _fromKey, _toKey,
+            src = new DataServiceRangeIterator(dataService, name, timestamp, _fromKey, _toKey,
                     capacity, flags, filter);
 
             // increment the #of partitions visited.

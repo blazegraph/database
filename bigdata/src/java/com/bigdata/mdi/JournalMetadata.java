@@ -82,23 +82,17 @@ public class JournalMetadata extends AbstractResourceMetadata {
         
     }
 
-    /**
-     * Note: this assigns a size of zero (0L) since we can not accurately
-     * estimate the #of bytes on the journal dedicated to a given partition of a
-     * named index.
-     */
-    public JournalMetadata(AbstractJournal journal, ResourceState state) {
+    public JournalMetadata(AbstractJournal journal) {
 
         super(getFileString(journal), journal.getBufferStrategy().getExtent(),
-                state, journal.getRootBlockView().getUUID(), journal
+                journal.getRootBlockView().getUUID(), journal
                         .getRootBlockView().getCreateTime());
 
     }
 
-    public JournalMetadata(String file, long nbytes, ResourceState state,
-            UUID uuid, long commitTime) {
+    public JournalMetadata(String file, long nbytes, UUID uuid, long commitTime) {
 
-        super(file, nbytes, state, uuid, commitTime);
+        super(file, nbytes, uuid, commitTime);
 
     }
 

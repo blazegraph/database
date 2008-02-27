@@ -303,7 +303,7 @@ public class StressTestConcurrent extends
                 );
 
         // request index view.
-        IIndex ndx = federation.getIndex(ITx.UNISOLATED, name);
+        IIndex ndx = federation.getIndex(name,ITx.UNISOLATED);
         
         assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
                 .getIndexUUID());

@@ -33,9 +33,10 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.repo.BigdataRepository.Options;
 
 /**
@@ -64,6 +65,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
 
     protected IBigdataClient client;
     protected IBigdataFederation fed;
+    protected IMetadataService metadataService;
     protected IDataService dataService0;
     protected IDataService dataService1;
 
@@ -82,6 +84,8 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         return properties;
         
     }
+
+    private File dataDir;
     
     /**
      * Data files are placed into a directory named by the test. If the
@@ -89,7 +93,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
      */
     public void setUp() throws Exception {
       
-        File dataDir = new File( getName() );
+        dataDir = new File( getName() );
         
         if(dataDir.exists() && dataDir.isDirectory()) {
 
@@ -101,15 +105,31 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         
         fed = client.connect();
 
+        metadataService = ((EmbeddedBigdataFederation)fed).getMetadataService();
+        System.err.println("metadataService: "+metadataService.getServiceUUID());
+
         dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
+        System.err.println("dataService0   : "+dataService0.getServiceUUID());
 
         dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
+        System.err.println("dataService1   : "+dataService1.getServiceUUID());
         
     }
     
     public void tearDown() throws Exception {
         
         client.terminate();
+
+        /*
+         * Optional cleanup after the test runs, but sometimes its helpful to be
+         * able to see what was created in the file system.
+         */
+        
+        if(false && dataDir.exists() && dataDir.isDirectory()) {
+
+            recursiveDelete( dataDir );
+            
+        }
         
     }
     
@@ -170,7 +190,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
     final protected void assertIndexRegistered(IDataService dataService, String name,
             UUID indexUUID) throws IOException {
 
-        IndexMetadata metadata = dataService.getIndexMetadata(name);
+        IndexMetadata metadata = dataService.getIndexMetadata(name,ITx.UNISOLATED);
         
         assertNotNull("metadata",metadata);
         

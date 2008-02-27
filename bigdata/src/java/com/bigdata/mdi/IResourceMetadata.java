@@ -26,7 +26,7 @@ package com.bigdata.mdi;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentCheckpoint;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
 
 /**
@@ -65,15 +65,12 @@ public interface IResourceMetadata extends Cloneable {
     public long size();
 
     /**
-     * The life cycle state of that store file.
+     * The unique identifier for the resource.
      * 
-     * @deprecated 
-     */
-    public ResourceState state();
-
-    /**
-     * The unique identifier for the resource (the UUID found in either the
-     * journal root block or the {@link IndexSegmentCheckpoint}).
+     * @see IRootBlockView#getUUID(), the UUID for an {@link AbstractJournal}.
+     * 
+     * @see IndexSegmentCheckpoint#segmentUUID, the UUID for an
+     *      {@link IndexSegment}.
      */
     public UUID getUUID();
     
@@ -87,20 +84,6 @@ public interface IResourceMetadata extends Cloneable {
      * assign commit timestamps.
      */
     public long getCreateTime();
-    
-//    * The use of commit times for index revisions on the {@link Journal} is
-//    * required in order to identify the specific {@link BTree} revision of
-//    * interest for some view when it is other than the most recent revision of
-//    * that {@link BTree}. This facilites certain kinds of overflow operations.
-//    /**
-//     * The commit time for the index view. This is always the same as the
-//     * {@link #getCreateTime()} for an {@link IndexSegment}. However, a
-//     * {@link Journal} may have many versions of a {@link BTree} and this field
-//     * identifies which version is in use by the view.
-//     * 
-//     * @return
-//     */
-//    public long getCommitTime();
     
     /**
      * The hash code of the {@link #getUUID() resource UUID}.

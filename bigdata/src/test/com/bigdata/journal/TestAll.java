@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 
+import com.bigdata.service.IMetadataService;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -124,6 +126,10 @@ public class TestAll extends TestCase {
          * 
          * @todo add tests for coordination of read locks with a transaction
          * manager.
+         * 
+         * Note: More extensive tests are performed in the services package
+         * where we have access to the IMetadataService as well so that we can
+         * validate the results of an index split, etc.
          */
         // bootstrap tests of the resource manager
         suite.addTestSuite(TestResourceManagerBootstrap.class);
@@ -132,9 +138,9 @@ public class TestAll extends TestCase {
         // test overflow handling.
         suite.addTestSuite(TestOverflow.class);
         // test of index segment build and full compacting merge tasks.
-        suite.addTestSuite(TestMergeTasks.class);
+        suite.addTestSuite(TestBuildTask.class);
         // test merge/split of index partitions.
-        suite.addTestSuite(TestSplitJoinTasks.class);
+        suite.addTestSuite(TestSplitTask.class);
 
         return suite;
 

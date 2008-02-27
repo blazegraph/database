@@ -35,6 +35,9 @@ package com.bigdata.service;
  * 
  * @todo reconcile with Jini - does Jini provide for both polite and immediate
  *       shutdown or only a single kind (destroyService).
+ * 
+ * @todo declare on the various "Manager" interfaces, all of which use these
+ *       method signatures.  Perhaps rename as "IShutdown".
  */
 public interface IServiceShutdown {
 

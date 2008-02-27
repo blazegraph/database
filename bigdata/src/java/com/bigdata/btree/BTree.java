@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -63,6 +63,9 @@ import com.bigdata.rawstore.IRawStore;
  * incoherent traversal whether or not they result in addition or removal of
  * nodes in the tree.
  * </p>
+ * 
+ * @todo write tests to verify that {@link #setReadOnly(boolean)} in fact
+ *       disables all means to write on or modify the state of the {@link BTree}.
  * 
  * @todo consider also tracking the #of deleted entries in a key range (parallel
  *       to how we track the #of entries in a key range) so that we can report
@@ -302,18 +305,23 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     public ICounter getCounter() {
 
-        final PartitionMetadataWithSeparatorKeys pmd = metadata.getPartitionMetadata();
+        ICounter counter = new Counter(this);
+        
+        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
 
-        if (pmd == null) {
+        if (pmd != null) {
 
-            return new Counter(this);
-
-        } else {
-
-            return new PartitionedCounter(pmd.getPartitionId(), new Counter(
-                    this));
+            counter = new PartitionedCounter(pmd.getPartitionId(), counter);
 
         }
+
+        if (isReadOnly()) {
+
+            return new ReadOnlyCounter(counter);
+
+        }
+
+        return counter;
 
     }
     
@@ -448,7 +456,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * <p>
      * Note: The {@link #getCounter()} is NOT changed by this method.
      */
-    private void newRootLeaf() {
+    final private void newRootLeaf() {
 
         height = 0;
 
@@ -522,12 +530,73 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
     }
 
+    final public boolean isReadOnly() {
+     
+        return readOnly;
+        
+    }
+    
     /**
-     * Return the listener.
+     * Mark the B+Tree as read-only. Once the B+Tree is marked as read-only,
+     * that instance will remain read-only.
      * 
-     * @return
+     * @param readOnly
+     *            <code>true</code> if you want to mark the B+Tree as
+     *            read-only.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the B+Tree is already read-only and you pass
+     *             <code>false</code>.
      */
-    public IDirtyListener getListener() {
+    final public void setReadOnly(boolean readOnly) {
+
+        if (this.readOnly && !readOnly) {
+
+            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            
+        }
+        
+        this.readOnly = readOnly;
+        
+    }
+    transient private boolean readOnly = false;
+    
+    final public long getLastCommitTime() {
+        
+        return lastCommitTime;
+        
+    }
+    
+    /**
+     * Sets the lastCommitTime
+     * 
+     * @param lastCommitTime
+     *            The timestamp of the last committed state of this index.
+     */
+    final public void setLastCommitTime(long lastCommitTime) {
+        
+//        if (this.lastCommitTime != 0L) {
+//            
+//            throw new IllegalStateException();
+//            
+//        }
+        
+        if(this.lastCommitTime!=0L && this.lastCommitTime != lastCommitTime) {
+        
+            log.warn("Updated lastCommitTime: old=" + this.lastCommitTime
+                    + ", new=" + lastCommitTime);
+            
+        }
+        
+        this.lastCommitTime = lastCommitTime;
+        
+    }
+    private long lastCommitTime = 0L; // ITx.UNISOLATED
+    
+    /**
+     * Return the {@link IDirtyListener}.
+     */
+    final public IDirtyListener getListener() {
         
         return listener;
         
@@ -538,7 +607,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * 
      * @param listener The listener.
      */
-    public void setDirtyListener(IDirtyListener listener) {
+    final public void setDirtyListener(IDirtyListener listener) {
 
         this.listener = listener;
         
@@ -549,7 +618,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     /**
      * Fire an event to the listener (iff set).
      */
-    void fireDirtyEvent() {
+    final protected void fireDirtyEvent() {
         
         IDirtyListener l = this.listener;
         
@@ -587,7 +656,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      *       I have not yet seen a situation where that was more interesting
      *       than the address of the written {@link Checkpoint} record.
      */
-    public long checkpoint() {
+    final public long checkpoint() {
+        
+        assertNotReadOnly();
         
         assert root != null; // i.e., isOpen().
 
@@ -715,14 +786,18 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * @throws IllegalArgumentException
      *             if the new metadata record has already been written on the
      *             store - see {@link IndexMetadata#getMetadataAddr()}
+     * @throws UnsupportedOperationException
+     *             if the index is read-only.
      */
-    public void setIndexMetadata(IndexMetadata indexMetadata) {
-
+    final public void setIndexMetadata(IndexMetadata indexMetadata) {
+        
         if (indexMetadata == null)
             throw new IllegalArgumentException();
 
         if (indexMetadata.getMetadataAddr() != 0)
             throw new IllegalArgumentException();
+
+        assertNotReadOnly();
 
         this.metadata = indexMetadata;
         
@@ -779,7 +854,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * and dropping indices vs removing the entries in an individual
      * {@link BTree}.
      */
-    public void removeAll() {
+    final public void removeAll() {
 
         if (getIndexMetadata().getDeleteMarkers()) {
             

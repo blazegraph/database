@@ -62,11 +62,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
      * The size of that file in bytes.
      */
     private long nbytes;
-    
-    /**
-     * The life-cycle state for that resource.
-     */
-    private ResourceState state;
 
     /**
      * The unique identifier for the resource.
@@ -90,9 +85,9 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     }
 
     protected AbstractResourceMetadata(String filename, long nbytes,
-            ResourceState state, UUID uuid, long createTime) {
+            UUID uuid, long createTime) {
 
-        if (filename == null || state == null || uuid == null)
+        if (filename == null || uuid == null)
             throw new IllegalArgumentException();
 
         if (nbytes <= 0)
@@ -103,8 +98,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
         this.nbytes = nbytes;
         
-        this.state = state;
-        
         this.uuid = uuid;
 
         this.createTime = createTime;
@@ -113,9 +106,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
           
             throw new IllegalArgumentException("Create time is zero? : " + this);
           
-//          log.warn("Commit time is zero: "+this);
-          
-      }
+        }
       
     }
 
@@ -146,7 +137,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         // Note: compares UUIDs first.
 
         if (uuid.equals(o.getUUID()) && filename.equals(o.getFile())
-                && nbytes == o.size() && state == o.state()
+                && nbytes == o.size() 
                 && createTime == o.getCreateTime()) {
 
             return true;
@@ -166,12 +157,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
     public final long size() {
         
         return nbytes;
-        
-    }
-
-    final public ResourceState state() {
-        
-        return state;
         
     }
 
@@ -198,8 +183,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
 
         nbytes = LongPacker.unpackLong(in);
         
-        state = ResourceState.valueOf(ShortPacker.unpackShort(in));
-        
         uuid = new UUID(in.readLong(),in.readLong());
         
         createTime = in.readLong();
@@ -213,8 +196,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         ShortPacker.packShort(out, VERSION0);
         
         LongPacker.packLong(out, nbytes);
-        
-        ShortPacker.packShort(out, state.valueOf());
         
         out.writeLong(uuid.getMostSignificantBits());
 
@@ -233,7 +214,6 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata, Ext
         
         return getClass().getSimpleName()+
         "{ size="+size()+
-        ", state="+state()+
         ", filename="+getFile()+
         ", uuid="+getUUID()+
         ", createTime="+getCreateTime()+

@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutorService;
 
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.ResourceState;
 
 /**
  * A purely transient append-only implementation useful when data need to be
@@ -182,13 +181,6 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
                 
             }
 
-            public ResourceState state() {
-
-                // presumed live.
-                return ResourceState.Live;
-                
-            }
-            
         };
         
     }

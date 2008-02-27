@@ -28,12 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ChunkedLocalRangeIterator;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -41,15 +43,15 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.mdi.IPartitionMetadata;
-import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -57,32 +59,7 @@ import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Support transparent dynamic partitioning of scale-out indices. Handle
- *       the load-balancing later.
- * 
- * @todo Support transactionally isolated views onto the metadata index by
- *       passing in the tx identifier and using the appropriate historical view
- *       of the metadata index?
- * 
- * @todo Provide a means to reconstruct the metadata index from the journal and
- *       index segment data files. We tag each journal and index segment with a
- *       UUID. Each index is also tagged with a UUID, and that UUID is written
- *       into the metadata record for the index on each journal and index
- *       segment. Based on those UUIDs we are able to work backwards from the
- *       data on disk and identify the indices to which they belong. That
- *       information in combination with the timestamps in the metadata records
- *       and the first/last keys in the index partition is sufficient to
- *       regenerate the metadata indices.
- * 
- * @todo A temporal/immortable database can be realized if we never delete old
- *       journals since they contain the historical committed states of the
- *       database. The use of index segments would still provide fast read
- *       performance on recent data, while a suitable twist on the metadata
- *       index would allow access to those historical states. (E.g., you have to
- *       be able to access the historical state of the metadata index that
- *       corresponds to the commit time of interest for the database.)
- * 
- * @todo support two-tier metadata index.
+ * FIXME Load-balancing (moving index partitions around).
  * 
  * @todo the client (or the data services?) should send as async message every N
  *       seconds providing a histogram of the partitions they have touched (this
@@ -122,6 +99,26 @@ abstract public class MetadataService extends DataService implements
     public static interface Options extends DataService.Options {
         
     }
+
+//    /**
+//     * Overriden to use a {@link Journal} rather than a {@link ResourceManager}.
+//     * <p>
+//     * Note: There is a cyclic dependency of the {@link ResourceManager} on an
+//     * {@link IMetadataService} (for partition updates) and the
+//     * {@link MetadataService} on an {@link IResourceManager} (for managing its
+//     * files). This dependency grounds out because the {@link MetadataService}
+//     * establishes itself as the reference returned by
+//     * {@link #getMetadataService()}. However, since the {@link MetadataIndex}
+//     * does not support overflow this method has been overriden to use a
+//     * {@link Journal} rather than a {@link ResourceManager} as the
+//     * {@link IResourceManager} as the {@link IResourceManager} implementation
+//     * object.
+//     */
+//    protected IResourceManager newResourceManager(Properties properties) {
+//
+//        return new Journal(properties);
+//        
+//    }
     
     /**
      * @param properties
@@ -132,6 +129,53 @@ abstract public class MetadataService extends DataService implements
 
     }
 
+    public int nextPartitionId(String name) throws IOException, InterruptedException, ExecutionException {
+       
+        setupLoggingContext();
+        
+        try {
+
+            final AbstractTask task = new NextPartitionIdTask(
+                    concurrencyManager, getMetadataIndexName(name));
+            
+            final Integer partitionId = (Integer) concurrencyManager.submit(
+                    task).get();
+        
+            log.info("Assigned partitionId="+partitionId+", name="+name);
+            
+            return partitionId.intValue();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }        
+        
+    }
+    
+    public void splitIndexPartition(String name, int partitionId,
+            byte[] leftSeparator,
+            PartitionLocatorMetadataWithSeparatorKeys newLocators[])
+            throws IOException, InterruptedException, ExecutionException {
+
+        setupLoggingContext();
+
+        try {
+
+            final AbstractTask task = new SplitIndexPartitionTask(
+                    concurrencyManager, getMetadataIndexName(name),
+                    partitionId, leftSeparator, newLocators);
+            
+            concurrencyManager.submit(task).get();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }        
+        
+    }
+    
     /**
      * @todo if if exits already? (and has consistent/inconsistent metadata)?
      */
@@ -202,6 +246,182 @@ abstract public class MetadataService extends DataService implements
     /*
      * Tasks.
      */
+    
+    /**
+     * Task assigns the next partition identifier for a registered scale-out
+     * index in a restart-safe manner.
+     */
+    protected class NextPartitionIdTask extends AbstractTask {
+
+        /**
+         * @param concurrencyManager
+         * @param resource
+         */
+        protected NextPartitionIdTask(IConcurrencyManager concurrencyManager, String resource) {
+
+            super(concurrencyManager, ITx.UNISOLATED, resource);
+            
+        }
+
+        /**
+         * @return The next partition identifier as an {@link Integer}.
+         */
+        @Override
+        protected Object doTask() throws Exception {
+
+            final IIndex ndx = getIndex(getOnlyResource());
+            
+            final int counter = (int) ndx.getCounter().incrementAndGet();
+            
+            return counter;
+            
+        }
+        
+    }
+    
+    /**
+     * Atomic operation removes the pre-existing entry for specified index
+     * partition and replaces it with N new entries giving the locators for the
+     * N new index partitions created when that index partition was split.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class SplitIndexPartitionTask extends AbstractTask {
+
+        protected final int partitionId;
+        protected final byte[] leftSeparator;
+        protected final PartitionLocatorMetadataWithSeparatorKeys locators[];
+        
+        /**
+         * @param concurrencyManager
+         * @param resource
+         * @param partitionId
+         * @param leftSeparator
+         * @param locators
+         */
+        protected SplitIndexPartitionTask(
+                IConcurrencyManager concurrencyManager, String resource,
+                int partitionId,
+                byte[] leftSeparator,
+                PartitionLocatorMetadataWithSeparatorKeys locators[]) {
+
+            super(concurrencyManager, ITx.UNISOLATED, resource);
+
+            if (leftSeparator == null)
+                throw new IllegalArgumentException();
+            
+            if (locators == null)
+                throw new IllegalArgumentException();
+            
+            this.partitionId = partitionId;
+            
+            this.leftSeparator = leftSeparator;
+            
+            this.locators = locators;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            log.info("name=" + getOnlyResource() + ", partitionId="
+                    + partitionId + ", locators=" + Arrays.toString(locators));
+            
+            MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
+            
+            PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil
+                    .deserialize(mdi.remove(leftSeparator));
+            
+            /*
+             * Sanity check the partitionId under that key.
+             */
+            if (pmd.getPartitionId() != partitionId) {
+
+                throw new RuntimeException("Found " + pmd.getPartitionId()
+                        + ", but expected partitionId=" + partitionId);
+                
+            }
+            
+            /*
+             * Sanity check the first locator. It's leftSeparator MUST be the
+             * leftSeparator of the index partition that was split.
+             */
+            if(!BytesUtil.bytesEqual(leftSeparator,locators[0].getLeftSeparatorKey())) {
+                
+                throw new RuntimeException("locators[0].leftSeparator does not agree.");
+                
+            }
+
+            /*
+             * Sanity check the last locator. It's rightSeparator MUST be the
+             * rightSeparator of the index partition that was split.  For the
+             * last index partition, the right separator is always null.
+             */
+            {
+                
+                final int indexOf = mdi.indexOf(leftSeparator);
+                byte[] rightSeparator;
+                try {
+
+                    // The key for the next index partition.
+
+                    rightSeparator = mdi.keyAt(indexOf + 1);
+
+                } catch (IndexOutOfBoundsException ex) {
+
+                    // The rightSeparator for the last index partition is null.
+
+                    rightSeparator = null;
+
+                }
+
+                final PartitionLocatorMetadataWithSeparatorKeys locator = locators[locators.length - 1];
+                
+                if (rightSeparator == null) {
+
+                    if (locator.getRightSeparatorKey() != null) {
+
+                        throw new RuntimeException("locators["
+                                + locators.length
+                                + "].rightSeparator should be null.");
+
+                    }
+
+                } else {
+
+                    if (!BytesUtil.bytesEqual(rightSeparator, locator
+                            .getRightSeparatorKey())) {
+
+                        throw new RuntimeException("locators["
+                                + locators.length
+                                + "].rightSeparator does not agree.");
+
+                    }
+
+                }
+                
+            }
+
+            for(int i=0; i<locators.length; i++) {
+                
+                PartitionLocatorMetadataWithSeparatorKeys locator = locators[i];
+                
+                PartitionLocatorMetadata tmp = new PartitionLocatorMetadata(
+                        locator.getPartitionId(),
+                        locator.getDataServices()
+                );
+
+                mdi.insert(locator.getLeftSeparatorKey(), SerializerUtil
+                        .serialize(tmp));
+                
+            }
+            
+            return null;
+            
+        }
+
+    }
     
     /**
      * Registers a metadata index for a named scale-out index and statically
@@ -427,17 +647,15 @@ abstract public class MetadataService extends DataService implements
              * Map the partitions onto the data services.
              */
             
-            PartitionMetadata[] partitions = new PartitionMetadata[npartitions];
+            PartitionLocatorMetadata[] partitions = new PartitionLocatorMetadata[npartitions];
             
             for(int i=0; i<npartitions; i++) {
                 
-                PartitionMetadata pmd = new PartitionMetadata(//
+                PartitionLocatorMetadata pmd = new PartitionLocatorMetadata(//
                         mdi.nextPartitionId(),//
                         new UUID[] { //
                             dataServiceUUIDs[i]
-                        },
-                        new IResourceMetadata[] { //
-                            dataServices[i].getJournalMetadata() }
+                        }
                         );
                 
                 log.info("name=" + scaleOutIndexName + ", partitionId="
@@ -453,11 +671,21 @@ abstract public class MetadataService extends DataService implements
                 IndexMetadata md = metadata.clone();
                 
                 // override the partition metadata.
-                md.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
+                md.setPartitionMetadata(new LocalPartitionMetadata(
+                        pmd.getPartitionId(),//
                         separatorKeys[i],// leftSeparator
-                        pmd,//
-                        i + 1 < npartitions ? separatorKeys[i + 1] : null) // rightSeparator
-                    );
+                        i + 1 < npartitions ? separatorKeys[i + 1] : null, // rightSeparator
+                        /*
+                         * Note: The resourceMetadata[] is set on the data
+                         * service when the index is actually registered since
+                         * that is the only time when we can guarentee that we
+                         * have access to the live journal. Otherwise the
+                         * journal MAY have overflowed and a different journal
+                         * COULD be the live journal by the time this request is
+                         * processed.
+                         */
+                         null // resourceMetadata[]
+                    ));
                 
                 dataServices[i].registerIndex(DataService
                         .getIndexPartitionName(scaleOutIndexName, pmd.getPartitionId()), md);
@@ -552,8 +780,8 @@ abstract public class MetadataService extends DataService implements
                 ITuple tuple = itr.next();
 
                 // @TODO use getValueStream() variant once I resolve problem with stream.
-                IPartitionMetadata pmd = (IPartitionMetadata) SerializerUtil
-                .deserialize(tuple.getValue());
+                PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil
+                        .deserialize(tuple.getValue());
 //                .deserialize(tuple.getValueStream());
 
                 /*

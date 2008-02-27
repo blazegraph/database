@@ -52,7 +52,6 @@ import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
@@ -65,18 +64,59 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * A client-side view of an index.
  * <p>
+ * 
+ * FIXME When the client requests an operation on index partition from a data
+ * service for which it has a {@link PartitionLocatorMetadata} record and the
+ * data service response indicates that the index is not defined then the client
+ * has stale data cached in the metadata index. The client SHOULD simply
+ * re-cache the entry(s) for the key range of the old index partition and then
+ * re-issue its request to those index partitions - this needs to happen both in
+ * this class and in the {@link PartitionedRangeQueryIterator}. This will cover
+ * split, merge, and move index partition scenarios.
+ * <p>
+ * If the index was dropped then that should cause the operation to abort (only
+ * possible for read committed operations).
+ * <p>
+ * Likewise, if a transaction is aborted, then then index should refuse further
+ * operations.
+ * 
+ * @todo Use a weak-ref cache with an LRU (or hard reference cache) to evict
+ *       cached {@link PartitionLocatorMetadata}. The client needs access by {
+ *       indexName, timestamp, key }. We need to eventually evict the cached
+ *       locators to prevent the client from building up too much state locally.
+ *       Also the cached locators can not be shared across different timestamps,
+ *       so clients will build up a locator cache when working on a transaction
+ *       but then never go back to that cache once the transaction completes.
+ *       <p>
+ *       While it may be possible to share cached locators between historical
+ *       reads and transactions for the same point in history, we do not have
+ *       enough information on hand to make those decisions. What we would need
+ *       to know is the historical commit time corresponding to an assigned
+ *       transaction startTime. This is not one-to-one since the start times for
+ *       transactions must be unique (among those in play). See
+ *       {@link ITransactionManager#newTx(com.bigdata.journal.IsolationEnum)}
+ *       for more on this.
+ * 
+ * @todo detect data service failure and coordinate cutover to the failover data
+ *       services. ideally you can read on a failover data service at any time
+ *       but it should not accept write operations unless it is the primary data
+ *       service in the failover chain.
+ *       <p>
+ *       Offer policies for handling index partitions that are unavailable at
+ *       the time of the request (continued operation during partial failure).
  * 
  * @todo We should be able to transparently use either a hash mod N approach to
  *       distributed index partitions or a dynamic approach based on overflow.
@@ -84,27 +124,12 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  *       approaches would be hidden by appropriate implementations of this
  *       class.
  * 
- * @todo the client does not attempt to obtain a new data service proxy for a
- *       partition if the current proxy fails (no failover).
- * 
- * @todo the client does not notice deleted index partitions (which can arise
- *       from index partition joins). this case needs to be handled in any code
- *       that visits partitions using the entryIndex in the metadata index since
- *       some entries may be "deleted".
- * 
  * @todo It is a design goal (not yet obtained) that the client should interact
  *       with an interface rather than directly with {@link MetadataIndex} so
  *       that this code can look identical regardless of whether the metadata
  *       index is local (embedded) or remote. (We do in fact use the same code
  *       for both scenarios, but only because, at this time, the metadata index
  *       is fully cached in the remote case).
- * 
- * @todo note that it is possible (though uncommon) for an index partition split
- *       or join to occur during operations. Figure out how I want to handle
- *       that, and how I want to handle that with transactional isolation
- *       (presumably a read-only historical view of the metadata index would be
- *       used - in which case we need to pass the tx into the getPartition()
- *       method).
  * 
  * @todo cache leased information about index partitions of interest to the
  *       client. The cache will be a little tricky since we need to know when
@@ -121,25 +146,10 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
  *       definitions (aka the lower bounds for known partitions where the left
  *       sibling partition is not known to the client).
  * 
- * @todo develop and offer policies for handling index partitions that are
- *       unavailable at the time of the request (continued operation during
- *       partial failure).
- * 
  * @todo support isolated views, share cached data service information between
  *       isolated and unisolated views.
  * 
  * @todo support failover metadata service discovery.
- * 
- * @todo Use a weak-ref cache with an LRU (or hard reference cache) to retain
- *       cached {@link IPartitionMetadata}. The client needs access by {
- *       indexName, key } to obtain a {@link ServiceID} for a
- *       {@link DataService} and then needs to translate the {@link ServiceID}
- *       to a data service using the {@link #dataServiceMap}.
- * 
- * @todo test the {@link ILinearList} API against a key-range partitioned index.
- * 
- * @todo test the {@link ILinearList} API against an index partition formed from
- *       more than one index resources.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -177,29 +187,27 @@ public class ClientIndexView implements IIndex {
 
     /**
      * This may be used to disable the non-batch API, which is quite convenient
-     * for location code that needs to be re-written to use
+     * for locating code that needs to be re-written to use
      * {@link IIndexProcedure}s.
-     * 
-     * @todo make this a config option and also support this option on the
-     *       bigdata clients.
      */
-    private final boolean batchOnly = false;
+    private final boolean batchOnly;
 
     /**
      * The default capacity for the {@link #rangeIterator(byte[], byte[])}
      */
-    final int capacity = 50000;
+    final int capacity;
 
-    private final long tx;
+    private final long timestamp;
 
     /**
-     * The transaction identifier -or- {@link ITx#UNISOLATED} iff the index view
-     * is unisolated -or- <code>- timestamp</code> for a historical read of
-     * the most recent committed state not later than <i>timestamp</i>.
+     * Either the startTime of an active transaction, {@link ITx#UNISOLATED} for
+     * the current unisolated index view, {@link ITx#READ_COMMITTED} for a
+     * read-committed view, or <code>-timestamp</code> for a historical view
+     * no later than the specified timestamp.
      */
-    public long getTx() {
+    public long getTimestamp() {
         
-        return tx;
+        return timestamp;
         
     }
     
@@ -215,9 +223,9 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
-     * The metadata for the {@link MetadataIndex} that manages the scale-out
-     * index. The metadata template for the managed scale-out index is available
-     * as a field on this object.
+     * The {@link IndexMetadata} for the {@link MetadataIndex} that manages the
+     * scale-out index. The metadata template for the managed scale-out index is
+     * available as a field on this object.
      */
     private final MetadataIndexMetadata metadataIndexMetadata;
     
@@ -231,14 +239,9 @@ public class ClientIndexView implements IIndex {
         
     }
     
-    /**
-     * @todo define an interface and use a read-only view of the metadata index.
-     *       this approach is forward looking to when the metadata index is only
-     *       partly materialized on the client.
-     */
     final protected IMetadataIndex getMetadataIndex() {
         
-        return fed.getMetadataIndex(name);
+        return fed.getMetadataIndex(name,timestamp);
         
     }
     
@@ -247,15 +250,19 @@ public class ClientIndexView implements IIndex {
      * 
      * @param fed
      *            The federation containing the index.
-     * @param tx
-     *            The transaction identifier -or- {@link ITx#UNISOLATED} iff the
-     *            index view is unisolated -or- <code>- timestamp</code> for a
-     *            historical read of the most recent committed state not later
-     *            than <i>timestamp</i>.
      * @param name
      *            The index name.
+     * @param timestamp
+     *            Either the startTime of an active transaction,
+     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+     *            <code>-timestamp</code> for a historical view no later than
+     *            the specified timestamp.
+     * @param metadataIndexMetadata
+     *            The metadata for the {@link MetadataIndex} as of that
+     *            timestamp.
      */
-    public ClientIndexView(IBigdataFederation fed, long tx, String name,
+    public ClientIndexView(IBigdataFederation fed, String name, long timestamp,
             MetadataIndexMetadata metadataIndexMetadata) {
 
         if (fed == null)
@@ -264,13 +271,20 @@ public class ClientIndexView implements IIndex {
         if (name == null)
             throw new IllegalArgumentException();
         
+        if (metadataIndexMetadata == null)
+            throw new IllegalArgumentException();
+        
         this.fed = fed;
 
-        this.tx = tx;
-        
         this.name = name;
+
+        this.timestamp = timestamp;
         
         this.metadataIndexMetadata = metadataIndexMetadata;
+        
+        this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
+        
+        this.batchOnly = fed.getClient().getBatchApiOnly();
         
     }
 
@@ -313,7 +327,7 @@ public class ClientIndexView implements IIndex {
             String _name = MetadataService.getMetadataIndexName(name);
             
             sb.append("\n" + _name + " : "
-                    + getMetadataService().getStatistics(_name));
+                    + getMetadataService().getStatistics(_name,timestamp));
 
         } catch (IOException ex) {
 
@@ -335,17 +349,16 @@ public class ClientIndexView implements IIndex {
                 
                 final ITuple tuple = itr.next();
                 
-                final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil.deserialize(tuple.getValueStream());
+                final PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil.deserialize(tuple.getValueStream());
                 
                 final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
                 
                 sb.append("\npartition: " + _name);
-                sb.append("\nresources: " + Arrays.toString(pmd.getResources()));
                 sb.append("\ndataServices: " + Arrays.toString(pmd.getDataServices()));
                 
                 String _stats;
                 try {
-                    _stats = getDataService(pmd).getStatistics( _name );
+                    _stats = getDataService(pmd).getStatistics( _name, timestamp );
                 } catch (IOException e) {
                     _stats = "Could not obtain index partition statistics: "+e.toString();
                 }
@@ -505,7 +518,7 @@ public class ClientIndexView implements IIndex {
 
         }
         
-        return new PartitionedRangeQueryIterator(this, tx, fromKey, toKey,
+        return new PartitionedRangeQueryIterator(this, fromKey, toKey,
                 capacity, flags, filter);
         
     }
@@ -513,7 +526,7 @@ public class ClientIndexView implements IIndex {
     public Object submit(byte[] key, IIndexProcedure proc) {
 
         // The index partition for that key.
-        final PartitionMetadata pmd = getPartition(key);
+        final PartitionLocatorMetadata pmd = getPartition(key);
 
         // The data service for that index partition.
         final IDataService dataService = getDataService(pmd);
@@ -633,7 +646,7 @@ public class ClientIndexView implements IIndex {
         
         for (int index = fromIndex; index <= toIndex; index++) {
 
-            final IPartitionMetadata pmd = getPartitionAtIndex(index);
+            final PartitionLocatorMetadataWithSeparatorKeys pmd = getPartitionAtIndex(index);
 
             assert pmd != null : "No partition metadata? name=" + name
                     + " @ index=" + index;
@@ -846,7 +859,7 @@ public class ClientIndexView implements IIndex {
         @SuppressWarnings("unchecked")
         public Void call() throws Exception {
             
-            Object result = dataService.submit(tx, name, proc);
+            Object result = dataService.submit(timestamp, name, proc);
 
             if (resultHandler != null) {
 
@@ -910,7 +923,7 @@ public class ClientIndexView implements IIndex {
 
                 final Split split = itr.next();
 
-                final IDataService dataService = getDataService(split.pmd);
+                final IDataService dataService = getDataService((PartitionLocatorMetadata)split.pmd);
 
                 final IIndexProcedure proc = ctor.newInstance(split.ntuples,
                         split.fromIndex, keys, vals);
@@ -1002,7 +1015,7 @@ public class ClientIndexView implements IIndex {
         while(fromIndex<ntuples) {
         
             // partition spanning that key.
-            final PartitionMetadataWithSeparatorKeys pmd = getPartition(keys[fromIndex]);
+            final PartitionLocatorMetadataWithSeparatorKeys pmd = getPartition(keys[fromIndex]);
 
             final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
 
@@ -1056,65 +1069,14 @@ public class ClientIndexView implements IIndex {
      *            
      * @return The index partition metadata.
      */
-    public PartitionMetadataWithSeparatorKeys getPartition(byte[] key) {
+    public PartitionLocatorMetadataWithSeparatorKeys getPartition(byte[] key) {
 
-        final IMetadataIndex mdi = fed.getMetadataIndex(name);
+        final IMetadataIndex mdi = fed.getMetadataIndex(name,timestamp);
 
         final int index = mdi.findIndexOf(key);
         
         return getPartitionAtIndex(index);
         
-//        final IPartitionMetadata pmd;
-//        try {
-//
-//            /*
-//             * The code from this point on is shared with getPartitionAtIndex() and
-//             * also by some of the index partition tasks (CreatePartition for one).
-//             */
-//
-//            if (index == -1)
-//                return null;
-//
-//            /*
-//             * The serialized index partition metadata record for the partition that
-//             * spans the given key.
-//             */
-//            final byte[] val = mdi.valueAt(index);
-//
-//            /*
-//             * The separator key that defines the left edge of that index partition
-//             * (always defined).
-//             */
-//            final byte[] leftSeparatorKey = mdi.keyAt(index);
-//
-//            /*
-//             * The separator key that defines the right edge of that index partition
-//             * or [null] iff the index partition does not have a right sibling (a
-//             * null has the semantics of no upper bound).
-//             */
-//            final byte[] rightSeparatorKey;
-//
-//            try {
-//
-//                rightSeparatorKey = mdi.keyAt(index + 1);
-//
-//            } catch (IndexOutOfBoundsException ex) {
-//
-//                rightSeparatorKey = null;
-//
-//            }
-//            
-//            pmd = (IPartitionMetadata) SerializerUtil.deserialize(val);
-//
-//            return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey,
-//                    pmd, rightSeparatorKey);
-//
-//        } catch (Exception ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-
     }
 
     /**
@@ -1126,7 +1088,7 @@ public class ClientIndexView implements IIndex {
      *       range count and range iterator requests and to some extent batch
      *       operations that span multiple index partitions).
      */
-    public PartitionMetadataWithSeparatorKeys getPartitionAtIndex(int index) {
+    public PartitionLocatorMetadataWithSeparatorKeys getPartitionAtIndex(int index) {
 
         /*
          * The code from this point on is shared with getPartition()
@@ -1135,7 +1097,7 @@ public class ClientIndexView implements IIndex {
         if (index == -1)
             return null;
 
-        final IMetadataIndex mdi = fed.getMetadataIndex(name);
+        final IMetadataIndex mdi = fed.getMetadataIndex(name,timestamp);
 
         /*
          * The serialized index partition metadata record for the partition that
@@ -1166,10 +1128,11 @@ public class ClientIndexView implements IIndex {
 
         }
 
-        final PartitionMetadata pmd = (PartitionMetadata) SerializerUtil
+        final PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil
                 .deserialize(val);
 
-        return new PartitionMetadataWithSeparatorKeys(leftSeparatorKey, pmd,
+        return new PartitionLocatorMetadataWithSeparatorKeys(pmd
+                .getPartitionId(), pmd.getDataServices(), leftSeparatorKey,
                 rightSeparatorKey);
 
     }
@@ -1177,7 +1140,7 @@ public class ClientIndexView implements IIndex {
     /**
      * Resolve the data service to which the index partition is mapped.
      */
-    public IDataService getDataService(IPartitionMetadata pmd) {
+    public IDataService getDataService(PartitionLocatorMetadata pmd) {
 
         final UUID [] dataServiceUUIDs = pmd.getDataServices();
 

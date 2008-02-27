@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,6 +22,10 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
+/*
+ * Created on Feb 26, 2008
+ */
+
 package com.bigdata.mdi;
 
 import java.io.IOException;
@@ -34,64 +38,46 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.journal.Journal;
-
+import com.bigdata.service.ClientIndexView;
 
 /**
- * An immutable object whose state describes an index partition together with
- * the left and right separator keys surrounding the index partition.
+ * Instances of this class are created by the {@link ClientIndexView} in order
+ * to pair the separator keys from the {@link MetadataIndex} with the
+ * {@link PartitionLocatorMetadata}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
+public class PartitionLocatorMetadataWithSeparatorKeys extends
+        PartitionLocatorMetadata {
 
     /**
      * 
      */
-    private static final long serialVersionUID = -1511361004851335936L;
+    private static final long serialVersionUID = -102510213471770566L;
     
     private byte[] leftSeparatorKey;
     private byte[] rightSeparatorKey;
-
-    /**
-     * De-serialization constructor.
-     */
-    public PartitionMetadataWithSeparatorKeys() {
-        
-    }
     
     /**
-     * 
-     * @param partId
-     *            The unique partition identifier assigned by the
-     *            {@link MetadataIndex}.
-     * @param dataServices
-     *            The ordered array of data service identifiers on which data
-     *            for this partition will be written and from which data for
-     *            this partition may be read.
-     * @param resources
-     *            A description of each {@link Journal} or {@link IndexSegment}
-     *            resource associated with that partition. The entries in the
-     *            array reflect the creation time of the resources. The earliest
-     *            resource is listed first. The most recently created resource
-     *            is listed last.
-     * @param leftSeparatorKey
-     *            The first key that can enter this index partition. The left
-     *            separator key for the first index partition is always
-     *            <code>new byte[]{}</code>. The left separator key MAY NOT
-     *            be <code>null</code>.
-     * @param rightSeparatorKey
-     *            The first key that is excluded from this index partition or
-     *            <code>null</code> iff there is no upper bound.
+     * De-serialization ctor.
      */
-    public PartitionMetadataWithSeparatorKeys(int partitionId,
-            UUID[] dataServices, IResourceMetadata[] resources,
-            byte[] leftSeparatorKey, byte[] rightSeparatorKey) {
+    public PartitionLocatorMetadataWithSeparatorKeys() {
+        super();
+    }
 
-        super(partitionId, dataServices, resources);
-
+    /**
+     * @param partitionId
+     * @param dataServices
+     * @param leftSeparatorKey
+     * @param rightSeparatorKey
+     */
+    public PartitionLocatorMetadataWithSeparatorKeys(int partitionId,
+            UUID[] dataServices, byte[] leftSeparatorKey,
+            byte[] rightSeparatorKey) {
+        
+        super(partitionId, dataServices);
+        
         if (leftSeparatorKey == null)
             throw new IllegalArgumentException("leftSeparatorKey");
         
@@ -110,21 +96,13 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
             }
             
         }
-        
+     
         this.leftSeparatorKey = leftSeparatorKey;
         
         this.rightSeparatorKey = rightSeparatorKey;
-        
+
     }
 
-    public PartitionMetadataWithSeparatorKeys(byte[] leftSeparatorKey,
-            IPartitionMetadata src, byte[] rightSeparatorKey) {
-
-        this(src.getPartitionId(), src.getDataServices(), src
-                .getResources(), leftSeparatorKey, rightSeparatorKey);
-        
-    }
-    
     /**
      * The separator key that defines the left edge of that index partition
      * (always defined) - this is the first key that can enter the index
@@ -132,7 +110,7 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
      * always an empty byte[] since that is the smallest key that may be
      * defined.
      */
-    public byte[] getLeftSeparatorKey() {
+    final public byte[] getLeftSeparatorKey() {
 
         return leftSeparatorKey;
         
@@ -143,25 +121,12 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
      * or [null] iff the index partition does not have a right sibling (a
      * null has the semantics of no upper bound).
      */
-    public byte[] getRightSeparatorKey() {
+    final public byte[] getRightSeparatorKey() {
         
         return rightSeparatorKey;
         
     }
-    
-    public String toString() {
 
-        return 
-        "{ partitionId="+getPartitionId()+
-        ", dataServices="+Arrays.toString(getDataServices())+
-        ", resourceMetadata="+Arrays.toString(getResources())+
-        ", leftSeparator="+Arrays.toString(getLeftSeparatorKey())+
-        ", rightSeparator="+(getRightSeparatorKey()==null?"null":Arrays.toString(getRightSeparatorKey()))+
-        "}"
-        ;
-
-    }
-    
     private static final transient short VERSION0 = 0x0;
     
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
@@ -170,7 +135,7 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
         
         final short version = ShortPacker.unpackShort(in);
         
-        if(version!=VERSION0) {
+        if (version != VERSION0) {
             
             throw new IOException("Unknown version: "+version);
             
@@ -195,13 +160,13 @@ public class PartitionMetadataWithSeparatorKeys extends PartitionMetadata {
             rightSeparatorKey = null;
 
         }
-
+                
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
-
+        
         ShortPacker.packShort(out, VERSION0);
 
         LongPacker.packLong(out, leftSeparatorKey.length);

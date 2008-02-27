@@ -74,7 +74,7 @@ public class TestBasicIndexStuff extends
 
         UUID indexUUID = fed.registerIndex(metadata);
 
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED, name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
                 .getIndexUUID());
@@ -153,7 +153,7 @@ public class TestBasicIndexStuff extends
                 dataService1.getServiceUUID()
         });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         // the index is empty.
         assertFalse(ndx.contains(new byte[]{1}));

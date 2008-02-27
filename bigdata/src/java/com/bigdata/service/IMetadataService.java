@@ -33,6 +33,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
 
 /**
  * A metadata service for a named index.
@@ -45,13 +47,6 @@ import com.bigdata.btree.IndexMetadata;
  * Note: methods on this interface MUST throw {@link IOException} in order to be
  * compatible with RMI.
  * 
- * @todo consider adding the timestamp of commit record for the data that was
- *       read such that a client can effect consistent read-only view simply by
- *       providing that timestamp to the next method call. This is especially
- *       relevant for the {@link IMetadataService} interface since clients need
- *       to make multiple requests for rangeCount and rangeIterator and the use
- *       of the same read-timestamp will make those requests consistent.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -60,10 +55,6 @@ public interface IMetadataService extends IDataService, Remote {
     /*
      * methods that require access to the metadata server for their
      * implementations.
-     * 
-     * @todo the tx identifier will have to be pass in for clients that want to
-     * use transactional isolation to achieve a consistent and stable view of
-     * the metadata index as of the start time of their transaction.
      */
     
     /**
@@ -84,6 +75,45 @@ public interface IMetadataService extends IDataService, Remote {
      */
     public IDataService getDataServiceByUUID(UUID serviceUUID)
             throws IOException;
+
+    /**
+     * Return the next unique partition identifier to be assigned to the named
+     * scale-out index.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * 
+     * @return The next partition identifier.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     */
+    public int nextPartitionId(String name) throws IOException,
+            InterruptedException, ExecutionException;
+
+    /**
+     * Updates the {@link MetadataIndex} for the named scale-out index to
+     * reflect the split of an index partition into N new index partitions. The
+     * old index partition is removed from the {@link MetadataIndex} and the new
+     * index partitions are inserted in a single atomic operation.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param partitionId
+     *            The partition identifier.
+     * @param leftSeparator
+     *            The left separator key for the old index partition.
+     * @param locators
+     *            The locator information for the new index partitions that were
+     *            created by the split of the old index partition.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void splitIndexPartition(String name, int partitionId, byte[] leftSeparator,
+            PartitionLocatorMetadataWithSeparatorKeys[] locators)
+            throws IOException, InterruptedException, ExecutionException;
 
     /**
      * Register and statically partition a scale-out index.

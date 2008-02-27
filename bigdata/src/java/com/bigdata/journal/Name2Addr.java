@@ -481,7 +481,7 @@ public class Name2Addr extends BTree {
             
         }
         
-        // flush btree to the store to get the metadata record address.
+        // flush btree to the store to get the checkpoint record address.
         final long addr = ((ICommitter)btree).handleCommit();
         
         // add a serialized entry to the persistent index.

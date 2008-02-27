@@ -40,7 +40,6 @@ import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
@@ -49,8 +48,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -58,9 +55,7 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.mdi.ResourceState;
 import com.bigdata.rawstore.AbstractRawWormStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
@@ -412,38 +407,50 @@ public abstract class AbstractJournal implements IJournal {
         log.info(Options.USE_DIRECT_BUFFERS+"="+useDirectBuffers);
 
         /*
-         * "writeCache"
-         */
-
-        final int writeCacheCapacity = Integer.parseInt(properties.getProperty(
-                Options.WRITE_CACHE_CAPACITY, ""
-                        + Options.DEFAULT_WRITE_CACHE_CAPACITY));
-
-        if (writeCacheCapacity > 0 && writeCacheCapacity < Bytes.megabyte) {
-
-            throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
-                    + " must be ZERO (0) or at least 1M (" + Bytes.megabyte
-                    + ")");
-
-        }
-
-        log.info(Options.WRITE_CACHE_CAPACITY + "=" + writeCacheCapacity);
-
-        /*
          * "initialExtent"
          */
 
         final long initialExtent = Long.parseLong(properties.getProperty(
                 Options.INITIAL_EXTENT, "" + Options.DEFAULT_INITIAL_EXTENT));
 
-        if (initialExtent < Bytes.megabyte) {
+        if (initialExtent < Options.minimumInitialExtent) {
 
             throw new RuntimeException("The '" + Options.INITIAL_EXTENT
-                    + "' must be at least one megabyte(" + Bytes.megabyte + ")");
+                    + "' must be at least " + Options.minimumInitialExtent
+                    + " bytes");
 
         }
 
         log.info(Options.INITIAL_EXTENT + "=" + initialExtent);           
+
+        /*
+         * "writeCache"
+         */
+
+        final int writeCacheCapacity;
+        {
+            
+            int tmp = Integer.parseInt(properties.getProperty(
+                Options.WRITE_CACHE_CAPACITY, ""
+                        + Options.DEFAULT_WRITE_CACHE_CAPACITY));
+
+            final int minWriteCacheCapacity = (int) Math.min(
+                    Options.minimumInitialExtent,
+                    Options.minimumWriteCacheCapacity);
+            
+            if (tmp > 0 && tmp < minWriteCacheCapacity) {
+
+                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
+                        + " must be ZERO (0) or at least "
+                        + minWriteCacheCapacity + " bytes");
+
+            }
+
+            writeCacheCapacity = tmp;
+            
+        }
+
+        log.info(Options.WRITE_CACHE_CAPACITY + "=" + writeCacheCapacity);
 
         /*
          * "maximumExtent" @todo refactor this a bit so that it is more
@@ -1142,9 +1149,7 @@ public abstract class AbstractJournal implements IJournal {
 
     public IResourceMetadata getResourceMetadata() {
         
-        // @todo assumes the journal is live - handle overflow.
-        
-        return new JournalMetadata(this,ResourceState.Live);
+        return new JournalMetadata(this);
         
     }
     
@@ -1803,9 +1808,7 @@ public abstract class AbstractJournal implements IJournal {
      * <p>
      * Note: The caller MUST take care not to permit writes since they could be
      * visible to other users of the same read-only index. This is typically
-     * accomplished by wrapping the returned object in class that will throw an
-     * exception for writes such as {@link ReadOnlyIndex} or
-     * {@link ReadOnlyFusedView}.
+     * accomplished using {@link BTree#setReadOnly(boolean)}.
      * 
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
@@ -2058,32 +2061,12 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * Return the mutable view of the named index (aka the "live" index). This
      * object is NOT thread-safe. You MUST NOT write on this index unless you
-     * KNOW that you are the only writer. Other consumers SHOULD wrap this as a
-     * {@link ReadOnlyIndex} to avoid the possibility of mishap.
+     * KNOW that you are the only writer. See {@link ConcurrencyManager}, which
+     * handles exclusive locks for unisolated indices. Other consumers SHOULD
+     * use {@link BTree#setReadOnly(boolean)} to avoid the possibility of
+     * mishap.
      * 
      * @return The mutable view of the index.
-     * 
-     * @todo add hard reference queue for {@link AbstractBTree} to the journal
-     *       and track the #of instances of each {@link AbstractBTree} on the
-     *       queue using #referenceCount and "touch()", perhaps in Name2Addr;
-     *       write tests. consider one queue for mutable btrees and another for
-     *       index segments, partitioned indices, metadata indices, etc.
-     *       consider the meaning of "queue length" here and how to force close
-     *       based on timeout. improve reporting of index segments by name and
-     *       partition.<br>
-     *       Mutable indices are low-cost to close/open. Closing them once they
-     *       are no longer receiving writes can release some large buffers and
-     *       reduce the latency of commits since dirty nodes will already have
-     *       been flushed to disk. The largest cost on re-open is de-serializing
-     *       nodes and leaves for subsequent operations. Those nodes will be
-     *       read from a fully buffered store, so the latency will be small even
-     *       though deserialization is CPU intensive. <br>
-     *       Close operations on unisolated indices need to be queued in the
-     *       {@link #writeService} so that they are executed in the same thread
-     *       as other operations on the unisolated index.<br>
-     *       Make sure that we close out old {@link Journal}s that are no
-     *       longer required by any open index. This will require a distinct
-     *       referenceCount on the {@link Journal}.
      */
     public BTree getIndex(String name) {
 

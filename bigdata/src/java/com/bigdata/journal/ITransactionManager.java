@@ -117,11 +117,6 @@ public interface ITransactionManager extends ITimestampService {
      *            The isolation level. The following isolation levels are
      *            supported:
      *            <dl>
-     *            <dt>{@link IsolationEnum#ReadCommitted}</dt>
-     *            <dd>A read-only transaction in which data become visible
-     *            within the transaction as concurrent transactions commit. This
-     *            is suitable for very long read processes that do not require a
-     *            fully consistent view of the data.</dd>
      *            <dt>{@link IsolationEnum#ReadOnly}</dt>
      *            <dd>A fully isolated read-only transaction with "read locks"
      *            on the resources required for that historical state of the

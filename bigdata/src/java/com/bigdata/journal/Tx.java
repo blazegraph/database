@@ -34,9 +34,8 @@ import java.util.Map;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -425,6 +424,11 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
             /*
              * See if the index was registered as of the ground state used by
              * this transaction to isolated indices.
+             * 
+             * Note: IResourceManager#getIndex(String name,long timestamp) calls
+             * us when the timestamp identifies an active transaction so we MUST
+             * NOT call that method ourselves! Hence there is some replication
+             * of logic between that method and this one.
              */
 
             final AbstractBTree[] sources = resourceManager.getIndexSources(
@@ -457,15 +461,27 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
 
             if (readOnly) {
 
+                assert sources[0].isReadOnly();
+
                 if (sources.length == 1) {
 
-                    index = new ReadOnlyIndex(sources[0]);
+                    index = sources[0];
 
                 } else {
 
-                    index = new ReadOnlyFusedView(sources);
+                    index = new FusedView(sources);
 
                 }
+
+//                if (sources.length == 1) {
+//
+//                    index = new ReadOnlyIndex(sources[0]);
+//
+//                } else {
+//
+//                    index = new ReadOnlyFusedView(sources);
+//
+//                }
 
             } else {
 

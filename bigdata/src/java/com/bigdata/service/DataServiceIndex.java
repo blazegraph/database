@@ -49,7 +49,7 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
 
 /**
  * A view onto an unpartitioned index living inside an embedded
@@ -77,7 +77,7 @@ public class DataServiceIndex implements IIndex {
     protected static final Logger log = Logger.getLogger(DataServiceIndex.class);
     
     private final String name;
-    private final long tx;
+    private final long timestamp;
     private final EmbeddedDataService dataService;
 
     /**
@@ -89,7 +89,7 @@ public class DataServiceIndex implements IIndex {
      */
     public long getTx() {
         
-        return tx;
+        return timestamp;
         
     }
     
@@ -113,9 +113,6 @@ public class DataServiceIndex implements IIndex {
      * This may be used to disable the non-batch API, which is quite convenient
      * for location code that needs to be re-written to use
      * {@link IIndexProcedure}s.
-     * 
-     * @todo make this a config option and also support this option on the
-     *       bigdata clients.
      */
     private final boolean batchOnly = false;
     
@@ -125,7 +122,7 @@ public class DataServiceIndex implements IIndex {
      * 
      * @param name
      *            The index name.
-     * @param tx
+     * @param timestamp
      *            The transaction identifier -or- {@link ITx#UNISOLATED} iff the
      *            index view is unisolated -or- <code>- timestamp</code> for a
      *            historical read of the most recent committed state not later
@@ -133,11 +130,11 @@ public class DataServiceIndex implements IIndex {
      * @param dataService
      *            The data service.
      */
-    public DataServiceIndex(String name, long tx, EmbeddedDataService dataService) {
+    public DataServiceIndex(String name, long timestamp, EmbeddedDataService dataService) {
 
         this.name = name;
         
-        this.tx = tx;
+        this.timestamp = timestamp;
         
         this.dataService = dataService;
         
@@ -147,7 +144,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            return dataService.getIndexMetadata(name);
+            return dataService.getIndexMetadata(name,timestamp);
 
         } catch (IOException ex) {
 
@@ -161,7 +158,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            return dataService.getStatistics(name);
+            return dataService.getStatistics(name,timestamp);
 
         } catch (IOException ex) {
 
@@ -273,7 +270,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            rangeCount = (Long) dataService.submit(tx, name, proc);
+            rangeCount = (Long) dataService.submit(timestamp, name, proc);
 
         } catch (Exception ex) {
 
@@ -294,7 +291,7 @@ public class DataServiceIndex implements IIndex {
 
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
 
-        return new DataServiceRangeIterator(dataService, name, tx, fromKey, toKey,
+        return new DataServiceRangeIterator(dataService, name, timestamp, fromKey, toKey,
                 capacity, flags, filter);
 
     }
@@ -303,7 +300,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            return dataService.submit(tx, name, proc);
+            return dataService.submit(timestamp, name, proc);
 
         } catch (Exception ex) {
 
@@ -322,7 +319,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
             
-            Object result = dataService.submit(tx, name, proc);
+            Object result = dataService.submit(timestamp, name, proc);
 
             if(handler!=null) {
                 
@@ -344,7 +341,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            Object result = dataService.submit(tx, name, ctor.newInstance(
+            Object result = dataService.submit(timestamp, name, ctor.newInstance(
                     n, 0/* offset */, keys, vals));
             
             aggregator.aggregate(result, new Split(null,0,n));
@@ -358,14 +355,14 @@ public class DataServiceIndex implements IIndex {
     }
 
     /**
-     * The 'live' resources associated with the cached {@link IndexMetadata}.
+     * The resources associated with the cached {@link IndexMetadata}.
      */
     public IResourceMetadata[] getResourceMetadata() {
 
-        PartitionMetadataWithSeparatorKeys pmd = getIndexMetadata()
+        LocalPartitionMetadata pmd = getIndexMetadata()
                 .getPartitionMetadata();
 
-        return pmd.getLiveResources();
+        return pmd.getResources();
 
     }
 

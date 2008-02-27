@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -36,9 +37,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
@@ -59,8 +60,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
     /**
-     * @todo do not need local tx manager for read-only journals.
-     * 
      * @param properties
      *            See {@link com.bigdata.journal.Options}.
      */
@@ -125,6 +124,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
 
     /**
+     * Note: This will only succeed if the <i>uuid</i> identifies <i>this</i>
+     * journal.
+     */
+    public IRawStore openStore(UUID uuid) {
+    
+        if(uuid == getRootBlockView().getUUID()) {
+            
+            return this;
+            
+        }
+
+        throw new UnsupportedOperationException();
+        
+    }
+        
+    /**
      * Always returns an array containing a single {@link BTree} which is the
      * {@link BTree} loaded from the commit record whose commit timestamp is
      * less than or equal to <i>timestamp</i> -or- <code>null</code> if there
@@ -168,6 +183,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // MAY be null.
             btree = getIndex(name, commitRecord);
 
+            if (btree != null) {
+
+                /*
+                 * Mark the B+Tree as read-only and set the lastCommitTime
+                 * timestamp from the commitRecord.
+                 */
+                
+                btree.setReadOnly(true);
+                
+                btree.setLastCommitTime(ts);
+                
+            }
+            
         } else {
 
             /*
@@ -189,9 +217,25 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // MAY be null
             btree = getIndex(name, commitRecord);
         
+            if (btree != null) {
+
+                /*
+                 * Mark the B+Tree as read-only and set the lastCommitTime
+                 * timestamp from the commitRecord.
+                 */
+                
+                btree.setReadOnly(true);
+                
+                btree.setLastCommitTime(ts);
+                
+            }
+
         }
         
-        // no such index as of that timestamp.
+        /* 
+         * No such index as of that timestamp.
+         */
+
         if (btree == null) {
 
             log.warn("No such index: timestamp="+timestamp);
@@ -345,15 +389,29 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
                 }
 
+                assert sources.length > 0;
+                
+                assert sources[0].isReadOnly();
+
                 if (sources.length == 1) {
-
-                    tmp = new ReadOnlyIndex(sources[0]);
-
+                    
+                    tmp = sources[0];
+                    
                 } else {
-
-                    tmp = new ReadOnlyFusedView(sources);
-
+                    
+                    tmp = new FusedView(sources);
+                    
                 }
+                
+//                if (sources.length == 1) {
+//
+//                    tmp = new ReadOnlyIndex(sources[0]);
+//
+//                } else {
+//
+//                    tmp = new ReadOnlyFusedView(sources);
+//
+//                }
                             
             } else {
                 
@@ -526,10 +584,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @return This implementation returns <code>false</code> since it does
      *         NOT open a new journal.
      */
-    public boolean overflow(boolean exclusiveLock,WriteExecutorService writeService) {
-        
+    public boolean overflow(boolean exclusiveLock,
+            WriteExecutorService writeService) {
+
         return false;
-        
+
     }
 
     /**
@@ -551,5 +610,45 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         throw new UnsupportedOperationException();
         
     }
+
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public IMetadataService getMetadataService() {
+
+        throw new UnsupportedOperationException();
+        
+    }
     
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public UUID getDataServiceUUID() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public UUID[] getDataServiceUUIDs() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public String getStatistics(String name, long timestamp) {
+
+        IIndex ndx = getIndex(name, timestamp);
+        
+        if(ndx==null) return null;
+        
+        return ndx.getStatistics();
+        
+    }
+
 }

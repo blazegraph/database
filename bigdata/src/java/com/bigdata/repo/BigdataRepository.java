@@ -468,7 +468,7 @@ public class BigdataRepository implements ContentRepository {
 
         if (metadataIndex == null) {
 
-            IIndex ndx = fed.getIndex(ITx.UNISOLATED, METADATA_NAME);
+            IIndex ndx = fed.getIndex(METADATA_NAME,ITx.UNISOLATED);
 
             metadataIndex = new SparseRowStore(ndx);
             
@@ -480,12 +480,14 @@ public class BigdataRepository implements ContentRepository {
 
     /**
      * The index in which the file data is stored (the index must exist).
+     * 
+     * @todo pass in the timestamp?
      */
     public IIndex getDataIndex() {
 
         if (dataIndex == null) {
 
-            dataIndex = fed.getIndex(ITx.UNISOLATED, DATA_NAME);
+            dataIndex = fed.getIndex(DATA_NAME,ITx.UNISOLATED);
 
         }
 
@@ -524,7 +526,7 @@ public class BigdataRepository implements ContentRepository {
 
             fed.registerIndex(md);
 
-            IIndex ndx = fed.getIndex(ITx.UNISOLATED, METADATA_NAME);
+            IIndex ndx = fed.getIndex(METADATA_NAME,ITx.UNISOLATED);
 
             metadataIndex = new SparseRowStore(ndx);
 
@@ -553,7 +555,7 @@ public class BigdataRepository implements ContentRepository {
             // register the index.
             fed.registerIndex(md);
 
-            dataIndex = fed.getIndex(ITx.UNISOLATED, DATA_NAME);
+            dataIndex = fed.getIndex(DATA_NAME,ITx.UNISOLATED);
 
         }
 
@@ -2898,7 +2900,7 @@ public class BigdataRepository implements ContentRepository {
              * by the specified transaction.
              */
 
-            dataIndex = fed.getIndex(tx, DATA_NAME);
+            dataIndex = fed.getIndex(DATA_NAME,tx);
             
         }
 

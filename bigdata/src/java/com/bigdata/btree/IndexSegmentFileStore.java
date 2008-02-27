@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.ResourceState;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.Bytes;
@@ -164,10 +163,8 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
         
         if(!open) reopen();
 
-        // @todo presumes the index segment is live.
         return new SegmentMetadata(file.toString(), checkpoint.length,
-                ResourceState.Live, checkpoint.segmentUUID,
-                checkpoint.commitTime);
+                checkpoint.segmentUUID, checkpoint.commitTime);
         
     }
     

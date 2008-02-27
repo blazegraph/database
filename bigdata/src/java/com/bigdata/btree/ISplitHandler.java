@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -78,6 +79,6 @@ public interface ISplitHandler extends Serializable {
      *         examination reveals that the index SHOULD NOT be split at this
      *         time.
      */
-    public Split[] getSplits(IIndex ndx);
+    public Split[] getSplits(IResourceManager resourceManager, IIndex ndx);
     
 }

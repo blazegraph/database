@@ -34,6 +34,8 @@ import com.bigdata.mdi.IResourceMetadata;
  * A read-only fused view.
  * </p>
  * 
+ * @deprecated by {@link BTree#setReadOnly(boolean)}
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

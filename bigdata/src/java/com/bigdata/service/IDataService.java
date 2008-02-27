@@ -38,7 +38,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
@@ -164,13 +164,6 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public UUID getServiceUUID() throws IOException;
     
     /**
-     * A description of the journal currently backing the data service.
-     * 
-     * @throws IOException
-     */
-    public JournalMetadata getJournalMetadata() throws IOException;
-
-    /**
      * Statistics describing the data service, including IO, indices, etc.
      * 
      * @throws IOException
@@ -190,7 +183,12 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * 
      * @param metadata
      *            The metadata describing the index.
-     *            
+     *            <p>
+     *            The {@link LocalPartitionMetadata#getResources()} property on
+     *            the {@link IndexMetadata#getPartitionMetadata()} SHOULD NOT be
+     *            set. The correct {@link IResourceMetadata}[] will be assigned
+     *            when the index is registered on the {@link IDataService}.
+     * 
      * @return <code>true</code> iff the index was created. <code>false</code>
      *         means that the index was pre-existing, but the metadata specifics
      *         for the index MAY differ from those specified.
@@ -207,15 +205,19 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * 
      * @param name
      *            The index name.
+     * @param timestamp
+     *            Either the startTime of an active transaction,
+     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+     *            <code>-timestamp</code> for a historical view no later than
+     *            the specified timestamp.
      * 
      * @return The metadata for the named index -or- <code>null</code> if the
      *         named index is not register on this {@link IDataService}.
      *         
      * @throws IOException
-     * 
-     * @todo should pass tx to this method in case the metadata is updated.
      */
-    public IndexMetadata getIndexMetadata(String name) throws IOException;
+    public IndexMetadata getIndexMetadata(String name, long timestamp) throws IOException;
     
     /**
      * Return various statistics about the named index.
@@ -227,7 +229,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * 
      * @throws IOException
      */
-    public String getStatistics(String name) throws IOException;
+    public String getStatistics(String name,long timestamp) throws IOException;
         
     /**
      * Drops the named index.

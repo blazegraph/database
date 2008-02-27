@@ -37,6 +37,8 @@ import com.bigdata.service.Split;
  * A fly-weight wrapper that does not permit write operations and reads
  * through onto an underlying {@link IIndex}.
  * 
+ * @deprecated by {@link BTree#setReadOnly(boolean)}
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

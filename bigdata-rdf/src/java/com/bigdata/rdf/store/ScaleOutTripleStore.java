@@ -379,8 +379,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (terms == null) {
 
-            terms = (ClientIndexView) fed.getIndex(
-                    ITx.UNISOLATED, name_termId);
+            terms = (ClientIndexView) fed.getIndex(name_termId, ITx.UNISOLATED);
 
         }
 
@@ -392,8 +391,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (ids == null) {
 
-            ids = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
-                    name_idTerm);
+            ids = (ClientIndexView) fed.getIndex(name_idTerm, ITx.UNISOLATED);
 
         }
 
@@ -405,8 +403,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (spo == null) {
 
-            spo = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
-                    name_spo);
+            spo = (ClientIndexView) fed.getIndex(name_spo, ITx.UNISOLATED);
 
         }
 
@@ -418,8 +415,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (pos == null) {
 
-            pos = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
-                    name_pos);
+            pos = (ClientIndexView) fed.getIndex(name_pos, ITx.UNISOLATED);
 
         }
 
@@ -431,8 +427,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (osp == null) {
 
-            osp = (ClientIndexView) fed.getIndex(ITx.UNISOLATED,
-                    name_osp);
+            osp = (ClientIndexView) fed.getIndex(name_osp, ITx.UNISOLATED);
 
         }
 
@@ -444,8 +439,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         if (just == null) {
 
-            just = (ClientIndexView) fed.getIndex(
-                    ITx.UNISOLATED, name_just);
+            just = (ClientIndexView) fed.getIndex(name_just,ITx.UNISOLATED);
 
         }
 

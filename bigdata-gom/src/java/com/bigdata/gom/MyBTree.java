@@ -591,7 +591,7 @@ final public class MyBTree extends AbstractBTree {
      * written on the store since they will not not otherwise participate in the
      * commit protocol. This method invokes {@link BTree#handleCommit()} to
      * flush the {@link BTree} state to the store and obtain the address of the
-     * new metadata record from which the btree's state may be reloaded.
+     * new checkpoint record from which the btree's state may be reloaded.
      */
     protected void saveBTree() {
 
