@@ -49,7 +49,16 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     protected final Properties properties;
 
+    /*
+     * IBigdataClient state.
+     */
     private final ExecutorService threadPool;
+    private final int defaultRangeQueryCapacity;
+    private final boolean batchApiOnly;
+
+    /*
+     * IBigdataClient API.
+     */
 
     public ExecutorService getThreadPool() {
         
@@ -59,6 +68,18 @@ public class EmbeddedBigdataClient implements IBigdataClient {
         
     }
 
+    public int getDefaultRangeQueryCapacity() {
+        
+        return defaultRangeQueryCapacity;
+        
+    }
+    
+    public boolean getBatchApiOnly() {
+        
+        return batchApiOnly;
+        
+    }
+    
     protected void assertConnected() {
         
         if (fed == null)
@@ -77,12 +98,20 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
         this.properties = properties;
         
-        // @todo configure nthreads.
-        final int nthreads = 10;
-        //properties.getProperty(Options.CLIENT_THREAD_POOL_SIZE,Options.DEFAULT_CLIENT_THREAD_POOL_SIZE);
+        final int nthreads = Integer.parseInt(properties.getProperty(
+                Options.CLIENT_THREAD_POOL_SIZE,
+                Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
         
         threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
                 .defaultThreadFactory());
+
+        defaultRangeQueryCapacity = Integer.parseInt(properties.getProperty(
+                Options.CLIENT_RANGE_QUERY_CAPACITY,
+                Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
+        
+        batchApiOnly = Boolean.valueOf(properties.getProperty(
+                Options.CLIENT_BATCH_API_ONLY,
+                Options.DEFAULT_CLIENT_BATCH_API_ONLY));
 
     }
     

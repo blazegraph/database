@@ -1707,10 +1707,6 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             ITuple actualTuple = actualItr.next();
             
-            byte[] expectedVal = expectedTuple.getValue();
-            
-            byte[] actualVal = actualTuple.getValue();
-
             byte[] expectedKey = expectedTuple.getKey();
             
             byte[] actualKey = actualTuple.getKey();
@@ -1732,26 +1728,45 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 
             }
 
-            try {
 
-                assertSameValue(expectedVal, actualVal);
-                
-            } catch (AssertionFailedError ex) {
-                /*
-                 * Lazily generate message.
-                 */
-                fail("Values differ: index="
-                        + index
-                        + ", key="
-                        + BytesUtil.toString(expectedKey)
-                        + ", expected="
-                        + (expectedVal instanceof byte[] ? BytesUtil
-                                .toString((byte[]) expectedVal) : expectedVal)
-                        + ", actual="
-                        + (actualVal instanceof byte[] ? BytesUtil
-                                .toString((byte[]) actualVal) : actualVal), ex);
-                
+            if (expectedTuple.isDeletedVersion()) {
+
+                assert actualTuple.isDeletedVersion();
+
+            } else {
+
+                byte[] expectedVal = expectedTuple.getValue();
+
+                byte[] actualVal = actualTuple.getValue();
+
+                try {
+
+                    assertSameValue(expectedVal, actualVal);
+
+                } catch (AssertionFailedError ex) {
+                    /*
+                     * Lazily generate message.
+                     */
+                    fail("Values differ: index="
+                            + index
+                            + ", key="
+                            + BytesUtil.toString(expectedKey)
+                            + ", expected="
+                            + (expectedVal instanceof byte[] ? BytesUtil
+                                    .toString((byte[]) expectedVal)
+                                    : expectedVal)
+                            + ", actual="
+                            + (actualVal instanceof byte[] ? BytesUtil
+                                    .toString((byte[]) actualVal) : actualVal),
+                            ex);
+
+                }
+
             }
+            
+            assertEquals("timestamps differ: index=" + index + ", key="
+                    + BytesUtil.toString(expectedKey), expectedTuple
+                    .getVersionTimestamp(), actualTuple.getVersionTimestamp());
             
             index++;
             

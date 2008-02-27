@@ -30,6 +30,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 
@@ -208,10 +209,16 @@ public class IndexSegmentCheckpoint {
     
     /**
      * The commit time associated with the view from which the
-     * {@link IndexSegment} was generated. This field is written at the head and
-     * tail of the {@link IndexSegmentCheckpoint} record. If the timestamps on
-     * that record do not agree then the build operation probably failed while
-     * writing the checkpoint record.
+     * {@link IndexSegment} was generated. The {@link IndexSegment} state is
+     * equivilent to the state of the view as of that timestamp. However, the
+     * {@link IndexSegment} provides a view of only a single commit point in
+     * contrast to the many commit points that are typically available on a
+     * {@link Journal}.
+     * <p>
+     * Note: This field is written at the head and tail of the
+     * {@link IndexSegmentCheckpoint} record. If the timestamps on that record
+     * do not agree then the build operation probably failed while writing the
+     * checkpoint record.
      */
     final public long commitTime;
 

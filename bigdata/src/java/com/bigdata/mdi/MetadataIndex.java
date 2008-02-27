@@ -47,7 +47,7 @@ import com.bigdata.service.MetadataService;
  * metadata index for each distributed index. The keys of the metadata index are
  * the first key that would be directed into the corresponding index segment,
  * e.g., a <em>separator key</em> (this is just the standard btree semantics).
- * The values are serialized {@link PartitionMetadata} objects.
+ * The values are serialized {@link PartitionLocatorMetadata} objects.
  * <p>
  * Note: At this time the recommended scale-out approach for the metadata index
  * is to place the metadata indices on a {@link MetadataService} (the same
@@ -69,7 +69,7 @@ import com.bigdata.service.MetadataService;
  * @version $Id$
  * 
  * @todo consider changing the values to
- *       {@link PartitionMetadataWithSeparatorKeys} objects. the metadata index
+ *       {@link LocalPartitionMetadata} objects. the metadata index
  *       does not to store either separator key since they are redundent with
  *       the key for an index partition's metadata and the key for its
  *       successor, but it is handy for clients to get it along with the rest of
@@ -425,13 +425,13 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     }
 
-    public PartitionMetadata get(byte[] key) {
+    public PartitionLocatorMetadata get(byte[] key) {
         
-        return (PartitionMetadata)SerializerUtil.deserialize(lookup(key));
+        return (PartitionLocatorMetadata)SerializerUtil.deserialize(lookup(key));
         
     }
 
-    public PartitionMetadata find(byte[] key) {
+    public PartitionLocatorMetadata find(byte[] key) {
 
         // @todo could retain the view reference.
         return new MetadataIndexView(this).find(key);

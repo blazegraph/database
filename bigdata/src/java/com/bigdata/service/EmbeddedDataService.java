@@ -12,7 +12,7 @@ import com.bigdata.journal.AbstractJournal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedDataService extends DataService {
+abstract public class EmbeddedDataService extends DataService {
     
     final private UUID serviceUUID;
     

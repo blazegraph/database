@@ -28,17 +28,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
-import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 
@@ -47,29 +44,6 @@ import com.bigdata.rawstore.IRawStore;
  * bigdata federation - it is in effect a proxy object for the distributed set
  * of services that comprise the federation.
  * 
- * @todo in order to for a {@link IPartitionMetadata} cache to remain valid we
- *       need to either not store the left and right separator keys or we need
- *       to update the right separator key of an existing partition when a new
- *       partition is created by either this client or any other client. If the
- *       data service validates that the key(s) lie within its mapped
- *       partitions, then it can issue an appropriate redirect when the client
- *       has stale information. Failure to handle this issue will result in
- *       reads or writes against the wrong data services, which will result in
- *       lost data from the perspective of the clients. (in fact, I think that I
- *       will simply change the partition identifier when the key range of a
- *       partition is changed, which will take care of the problem).
- * 
- * @todo This implementation does not handle a partitioned metadata index.
- * 
- * @todo only statically partitioned indices are supported at this time.
- * 
- * @todo refactor to make use of this cache in the various operations of this
- *       client, reading through to the metadata service iff there is a cache
- *       miss.
- * 
- * @todo Rather than synchronizing all requests, this should queue requests for
- *       a specific metadata index iff there is a cache miss for that index.
- *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -88,6 +62,8 @@ public class BigdataFederation implements IBigdataFederation {
 
     /**
      * A per-index partition metadata cache.
+     * 
+     * @todo close out unused cache entries.
      */
     private final Map<String, MetadataIndex> partitions = new ConcurrentHashMap<String, MetadataIndex>();
     
@@ -141,23 +117,35 @@ public class BigdataFederation implements IBigdataFederation {
         return client;
         
     }
-    
-    synchronized public MetadataIndex getMetadataIndex(String name) {
+
+    /**
+     * 
+     * @todo Rather than synchronizing all requests, this should queue requests
+     *       for a specific metadata index iff there is a cache miss for that
+     *       index.
+     * 
+     */
+    synchronized public MetadataIndex getMetadataIndex(String name,
+            long timestamp) {
 
         assertOpen();
+
+        // FIXME Cache per isolation time.
+        if (timestamp != ITx.UNISOLATED)
+            throw new UnsupportedOperationException();
 
         MetadataIndex tmp = partitions.get(name);
 
         if (tmp == null) {
 
-            tmp = cacheMetadataIndex(name);
-            
+            tmp = cacheMetadataIndex(name, timestamp);
+
             if (tmp == null) {
-                
+
                 // No such scale-out index.
-                
+
                 return null;
-                
+
             }
 
             // save reference to cached mdi.
@@ -252,21 +240,8 @@ public class BigdataFederation implements IBigdataFederation {
 
     }
 
-    public IIndex getIndex(long tx, String name) {
+    public IIndex getIndex(String name,long timestamp) {
 
-        if (tx != ITx.UNISOLATED) {
-         
-            /*
-             * FIXME drive through support for all kinds of ops and verify that the
-             * client is smart enough to choose READ_COMMITTED isolation for a
-             * read-only procedure so that we don't drag down the write service!
-             */
-
-            throw new UnsupportedOperationException(
-                    "Only unisolated operations are supported");
-            
-        }
-        
         assertOpen();
 
         /*
@@ -276,8 +251,11 @@ public class BigdataFederation implements IBigdataFederation {
         final MetadataIndexMetadata mdmd;
         try {
 
+            // @todo test cache for this object as of that timestamp?
             mdmd = (MetadataIndexMetadata) getMetadataService()
-                    .getIndexMetadata(MetadataService.getMetadataIndexName(name));
+                    .getIndexMetadata(
+                            MetadataService.getMetadataIndexName(name),
+                            timestamp);
             
             if (mdmd == null) {
 
@@ -295,7 +273,7 @@ public class BigdataFederation implements IBigdataFederation {
         
         // Index exists.
         
-        return new ClientIndexView(this, tx, name, mdmd );
+        return new ClientIndexView(this, name, timestamp, mdmd);
 
     }
 
@@ -307,8 +285,10 @@ public class BigdataFederation implements IBigdataFederation {
      * 
      * @return The cached partition metadata -or- <code>null</code> iff there
      *         is no such scale-out index.
+     * 
+     * FIXME Just create cache view when MDI is large and then cache on demand.
      */
-    private MetadataIndex cacheMetadataIndex(String name) {
+    private MetadataIndex cacheMetadataIndex(String name,long timestamp) {
 
         assertOpen();
 
@@ -322,7 +302,7 @@ public class BigdataFederation implements IBigdataFederation {
         final MetadataIndexMetadata mdmd;
         try {
 
-            mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName);
+            mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName,timestamp);
             
         } catch(IOException ex) {
             
@@ -354,14 +334,15 @@ public class BigdataFederation implements IBigdataFederation {
          * Bulk copy the partition definitions for the scale-out index into the
          * client.
          * 
-         * Note: This assumes that the metadata index is NOT partitioned.
+         * Note: This assumes that the metadata index is NOT partitioned and
+         * DOES NOT support delete markers.
          */
         {
         
-            final IEntryIterator itr = new DataServiceRangeIterator(metadataService,
-                    metadataName, ITx.UNISOLATED, null/* fromKey */,
-                    null/* toKey */, 0/* capacity */, IRangeQuery.KEYS
-                            | IRangeQuery.VALS, null/*filter*/);
+            final IEntryIterator itr = new DataServiceRangeIterator(
+                    metadataService, metadataName, timestamp,
+                    null/* fromKey */, null/* toKey */, 0/* capacity */,
+                    IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
         
             while(itr.hasNext()) {
              

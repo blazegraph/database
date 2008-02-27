@@ -35,7 +35,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadata;
 
 /**
  * Test suite for the {@link EmbeddedBigdataClient}.
@@ -66,13 +66,13 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         final long tx = ITx.UNISOLATED;
         
         // verify index does not exist.
-        assertNull(fed.getIndex(tx, name));
+        assertNull(fed.getIndex(name,tx));
         
         // register.
         UUID indexUUID = fed.registerIndex(metadata);
         
         // obtain view.
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,tx);
 
         // verify view is non-null
         assertNotNull(ndx);
@@ -124,7 +124,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         {
 
             IndexMetadata actual = dataService0.getIndexMetadata(DataService
-                    .getIndexPartitionName(name, partitionId0));
+                    .getIndexPartitionName(name, partitionId0), ITx.UNISOLATED);
 
             // verify index partition exists on that data service.
             assertNotNull(actual);
@@ -133,10 +133,6 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             assertEquals("partitionId", partitionId0, actual
                     .getPartitionMetadata().getPartitionId());
 
-            assertEquals("serviceUUID", new UUID[] { dataService0
-                    .getServiceUUID() }, actual.getPartitionMetadata()
-                    .getDataServices());
-            
             assertEquals("leftSeparator", new byte[] {}, actual
                     .getPartitionMetadata().getLeftSeparatorKey());
             
@@ -154,7 +150,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         {
 
             IndexMetadata actual = dataService1.getIndexMetadata(DataService
-                    .getIndexPartitionName(name, partitionId1));
+                    .getIndexPartitionName(name, partitionId1), ITx.UNISOLATED);
 
             // verify index partition exists on that data service.
             assertNotNull(actual);
@@ -163,10 +159,6 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             assertEquals("partitionId", partitionId1, actual
                     .getPartitionMetadata().getPartitionId());
 
-            assertEquals("serviceUUID", new UUID[] { dataService1
-                    .getServiceUUID() }, actual.getPartitionMetadata()
-                    .getDataServices());
-            
             assertEquals("leftSeparator", new byte[] {5}, actual
                     .getPartitionMetadata().getLeftSeparatorKey());
             
@@ -209,8 +201,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         /*
          * Request a view of that index.
          */
-        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                ITx.UNISOLATED, name);
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,ITx.UNISOLATED);
 
         /*
          * Range count the index to verify that it is empty.
@@ -221,8 +212,8 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
          * Get metadata for the index partitions that we will need to verify
          * the splits.
          */
-        final PartitionMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
-        final PartitionMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        final PartitionLocatorMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionLocatorMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
         assertNotNull("partition#0",pmd0);
         assertNotNull("partition#1",pmd1);
         
@@ -309,8 +300,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         });
 
         // view of that index.
-        ClientIndexView ndx = (ClientIndexView) fed.getIndex(
-                ITx.UNISOLATED, name);
+        ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,ITx.UNISOLATED);
         
         assertNotNull("Expecting index to be registered", ndx);
 
@@ -324,7 +314,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         fed.dropIndex(name);
 
         // request view of index.
-        assertNull("Not expecting index to exist", fed.getIndex(ITx.UNISOLATED, name));
+        assertNull("Not expecting index to exist", fed.getIndex(name,ITx.UNISOLATED));
         
     }
     

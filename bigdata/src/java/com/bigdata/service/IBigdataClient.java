@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 
 /**
@@ -111,4 +112,61 @@ public interface IBigdataClient {
      */
     public ExecutorService getThreadPool();
 
+    /**
+     * The default capacity when a client issues a range query request.
+     * 
+     * @see Options#CLIENT_RANGE_QUERY_CAPACITY
+     */
+    public int getDefaultRangeQueryCapacity();
+    
+    /**
+     * When <code>true</code> requests for non-batch API operations will throw
+     * exceptions.
+     * 
+     * @see Options#CLIENT_BATCH_API_ONLY
+     */
+    public boolean getBatchApiOnly();
+    
+    /**
+     * Configuration options for {@link IBigdataClient}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface Options {
+    
+        /**
+         * The #of threads in the client thread pool (default is <code>20</code>).
+         * This thread pool is used to parallelize all requests issued by the
+         * client and also to limit the maximum parallelism of the client with
+         * respect to requests made of the federation.
+         * 
+         * @todo review this default.
+         */
+        public static final String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
+        
+        public static final String DEFAULT_CLIENT_THREAD_POOL_SIZE = "20";
+
+        /**
+         * The default capacity used when a client issues a range query request (50000).
+         * 
+         * @todo allow override on a per index basis as part of the index metadata?
+         */
+        public static final String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
+
+        public static final String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "50000";
+
+        /**
+         * A boolean property which controls whether or not the non-batch API
+         * will be disabled (default is <code>false</code>). This may be used
+         * to disable the non-batch API, which is quite convenient for locating
+         * code that needs to be re-written to use {@link IIndexProcedure}s in
+         * order to obtain high performance.
+         */
+        public static final String CLIENT_BATCH_API_ONLY = "client.batchOnly";
+
+        public static final String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
+        
+    };
+    
 }

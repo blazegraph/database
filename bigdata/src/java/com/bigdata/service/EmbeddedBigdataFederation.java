@@ -42,7 +42,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -380,7 +379,12 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
                     final Properties p = new Properties(properties);
 
+                    /*
+                     * Note: Use DATA_DIR if the metadata service is using a
+                     * ResourceManager and FILE if it is using a simple Journal.
+                     */
                     p.setProperty(Options.DATA_DIR, serviceDir.toString());
+//                    p.setProperty(Options.FILE, new File(serviceDir,"journal"+Options.JNL).toString());
 
                     if(new File(serviceDir,".mds").exists()) {
                         
@@ -500,7 +504,12 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
                 }
 
+                /*
+                 * Note: Use DATA_DIR if the metadata service is using a
+                 * ResourceManager and FILE if it is using a simple Journal.
+                 */
                 p.setProperty(Options.DATA_DIR, serviceDir.toString());
+//                p.setProperty(Options.FILE, new File(serviceDir,"journal"+Options.JNL).toString());
 
             }
             
@@ -532,7 +541,15 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                     
                 }
 
-                dataService[i] = new EmbeddedDataService(serviceUUID, p);
+                dataService[i] = new EmbeddedDataService(serviceUUID, p) {
+                  
+                    protected IMetadataService getMetadataService() {
+                        
+                        return metadataService;
+                        
+                    }
+                    
+                };
 
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
 
@@ -544,7 +561,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
     
-    public IMetadataIndex getMetadataIndex(String name) {
+    public IMetadataIndex getMetadataIndex(String name,long timestamp) {
 
         assertOpen();
 
@@ -554,11 +571,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         // The metadata service.
         final MetadataService metadataService = (MetadataService) getMetadataService();
         
-        // The timestamp for the last commit on the journal.
-        final long timestamp = metadataService.getResourceManager()
-                .getLiveJournal().getRootBlockView().getLastCommitTime();
-        
-        // A historical view of the metadata index as of that timestamp.
+        // The sources for the view as of that timestamp.
         final AbstractBTree[] sources = metadataService.getResourceManager()
                 .getIndexSources(metadataName, timestamp);
         
@@ -650,24 +663,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
 
-    /**
-     * @todo support isolated views, share cached data service information
-     *       between isolated and unisolated views.
-     */
-    public IIndex getIndex(long tx, String name) {
-
-        if (tx != ITx.UNISOLATED) {
-         
-            /*
-             * FIXME drive through support. The only change is that we need to
-             * have the metadata index for that timestamp, but I need to make
-             * sure that we can get that.
-             */
-
-            throw new UnsupportedOperationException(
-                    "Only unisolated operations are supported");
-            
-        }
+    public IIndex getIndex(String name,long timestamp) {
 
         assertOpen();
 
@@ -675,7 +671,9 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         try {
 
             mdmd = (MetadataIndexMetadata) getMetadataService()
-                    .getIndexMetadata(MetadataService.getMetadataIndexName(name));
+                    .getIndexMetadata(
+                            MetadataService.getMetadataIndexName(name),
+                            timestamp);
             
             if (mdmd == null) {
 
@@ -691,7 +689,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
         }
 
-        return new ClientIndexView(this, tx, name, mdmd);
+        return new ClientIndexView(this, name, timestamp, mdmd);
 
     }
 
@@ -718,7 +716,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class EmbeddedMetadataService extends MetadataService {
+    public static class EmbeddedMetadataService extends MetadataService {
 
         final private UUID serviceUUID;
         private int nextDataService;
@@ -768,6 +766,13 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         public IDataService getDataServiceByUUID(UUID dataService) throws IOException {
 
             return federation.getDataService(dataService);
+            
+        }
+
+        @Override
+        protected IMetadataService getMetadataService() {
+
+            return this;
             
         }
         

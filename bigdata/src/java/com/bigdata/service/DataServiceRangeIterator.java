@@ -37,6 +37,7 @@ import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 
@@ -67,7 +68,11 @@ public class DataServiceRangeIterator extends AbstractChunkedRangeIterator {
     /**
      * The data service for the index.
      * 
-     * @todo this should failover.
+     * FIXME This should automatically redirect when an index partition has
+     * moved or been split. for that we need access to the metadata service or a
+     * cache aware {@link IMetadataIndex} object.
+     * 
+     * @todo this should failover if a data service dies.
      */
     protected final IDataService dataService;
     

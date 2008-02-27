@@ -24,11 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.service.IDataService;
 
 /**
  * Register a named index (unisolated write operation).
@@ -56,8 +60,11 @@ public class RegisterIndexTask extends AbstractTask {
      *            The name under which to register the index.
      * @param metadata
      *            The index metadata.
-     * 
-     * to register a new index that supports isolation.
+     *            <p>
+     *            The {@link LocalPartitionMetadata#getResources()} property on
+     *            the {@link IndexMetadata#getPartitionMetadata()} SHOULD NOT be
+     *            set. The correct {@link IResourceMetadata}[] will be assigned
+     *            when the index is registered on the {@link IDataService}.
      */
     public RegisterIndexTask(IConcurrencyManager concurrencyManager,
             String name, IndexMetadata metadata) {
@@ -92,6 +99,34 @@ public class RegisterIndexTask extends AbstractTask {
 
         }
 
+        /*
+         * Note: If this is an index partition then we set the resource metadata
+         * for the index partition based on the current live journal so that it
+         * will be correct. The caller SHOULD NOT have set this field, so we log
+         * a warning if it was set.
+         */
+        LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
+
+        if (pmd != null) {
+
+            if (pmd.getResources() != null) {
+
+                log.warn("Ignoring resource metadata: name=" + name
+                        + ", resources=" + Arrays.toString(pmd.getResources()));
+
+            }
+
+            pmd = new LocalPartitionMetadata(pmd.getPartitionId(),//
+                    pmd.getLeftSeparatorKey(),//
+                    pmd.getRightSeparatorKey(),//
+                    new IResourceMetadata[] {//
+                    getJournal().getResourceMetadata() //
+                    });
+
+            metadata.setPartitionMetadata(pmd);
+            
+        }
+        
         // create index instance.
         final BTree btree = BTree.create(getJournal(), metadata);
 

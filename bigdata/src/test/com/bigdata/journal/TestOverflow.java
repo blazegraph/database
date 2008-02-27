@@ -38,11 +38,12 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * FIXME test for automatic overflow triggering - move overflow tests into their own test suite.
+ * Basic tests for
+ * {@link ResourceManager#overflow(boolean, WriteExecutorService)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -62,7 +63,6 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
     public TestOverflow(String arg0) {
         super(arg0);
     }
-
 
     /**
      * A test for overflow of the {@link ResourceManager}. We begin with a
@@ -94,15 +94,13 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             // required for scale-out indices.
             indexMetadata.setDeleteMarkers(true);
 
-            indexMetadata.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(//
+            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                     0, // partitionId
-                    new UUID[]{UUID.randomUUID()},// dataService UUIDs.
+                    new byte[]{}, // leftSeparator.
+                    null, // rightSeparator.
                     new IResourceMetadata[]{
                             journal.getResourceMetadata()
-                    },
-                    new byte[]{}, // leftSeparator.
-                    null // rightSeparator.
-                    ));
+                    }));
             
             // create index and register on the journal.
             IIndex ndx = journal.registerIndex(indexName, BTree.create(journal,

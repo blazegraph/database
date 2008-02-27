@@ -981,93 +981,10 @@ public abstract class AbstractTask implements Callable<Object> {
         
         if (tmp == null) {
 
-            throw new NoSuchIndexException(name + " @ " + startTime);
+            throw new NoSuchIndexException(name + ", timestamp=" + startTime);
 
         }
         
-// final IIndex tmp;
-//
-//        if (isTransaction) {
-//
-//            /*
-//             * Isolated operation.
-//             * 
-//             * Note: The backing index is always a historical state of the named
-//             * index.
-//             */
-//
-//            final IIndex isolatedIndex = tx.getIndex(name);
-//
-//            if (isolatedIndex == null) {
-//
-//                throw new NoSuchIndexException(name);
-//
-//            }
-//
-//            tmp = isolatedIndex;
-//
-//        } else {
-//            
-//            /*
-//             * historical read -or- unisolated read operation.
-//             */
-//
-//            if (readOnly) {
-//
-//                final AbstractBTree[] sources = resourceManager
-//                        .getIndexSources(name, startTime);
-//
-//                if (sources == null) {
-//
-//                    throw new NoSuchIndexException(name);
-//
-//                }
-//
-//                if (sources.length == 1) {
-//
-//                    tmp = new ReadOnlyIndex( sources[0] );
-//
-//                } else {
-//
-//                    tmp = new ReadOnlyFusedView(sources);
-//
-//                }
-//                            
-//            } else {
-//                
-//                /*
-//                 * Writable unisolated index.
-//                 * 
-//                 * Note: This is the "live" mutable index. This index is NOT
-//                 * thread-safe. A lock manager is used to ensure that at most
-//                 * one task has access to this index at a time.
-//                 */
-//
-//                assert startTime == ITx.UNISOLATED;
-//                
-//                final AbstractBTree[] sources = resourceManager
-//                        .getIndexSources(name, ITx.UNISOLATED);
-//                
-//                if (sources == null) {
-//
-//                    throw new NoSuchIndexException(name);
-//
-//                }
-//
-//                if (sources.length == 1) {
-//
-//                    tmp = sources[0];
-//                    
-//                } else {
-//                    
-//                    tmp = new FusedView( sources );
-//                    
-//                }
-//
-//            }
-//
-//        }
-
         /*
          * Put the index into a hard reference cache under its name so that we
          * can hold onto it for the duration of the operation.

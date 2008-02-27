@@ -128,10 +128,15 @@ public interface Options {
      */
     public static final String INITIAL_EXTENT = "initialExtent";
     
+    public static final long minimumInitialExtent = Bytes.megabyte;
+    
+    public static final int minimumWriteCacheCapacity = Bytes.megabyte32;
+    
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * The journal will {@link IResourceManager#overflow()} once it approaches
-     * this limit.
+     * The journal will
+     * {@link IResourceManager#overflow(boolean, WriteExecutorService)} once it
+     * approaches this limit.
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */

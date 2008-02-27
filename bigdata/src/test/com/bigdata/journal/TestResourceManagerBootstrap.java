@@ -44,8 +44,9 @@ import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
@@ -132,7 +133,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new ResourceManager(properties);
+        ResourceManager resourceManager = new MyResourceManager(properties);
 
         AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
                 resourceManager) {
@@ -258,7 +259,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new ResourceManager(properties);
+        ResourceManager resourceManager = new MyResourceManager(properties);
 
         AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
                 resourceManager) {
@@ -399,7 +400,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new ResourceManager(properties);
+        ResourceManager resourceManager = new MyResourceManager(properties);
 
         AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
                 resourceManager) {
@@ -559,11 +560,10 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 indexMetadata = indexMetadata.clone();
                 
                 // describe the index partition.
-                indexMetadata.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
+                indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
                         partId,//
-                        new UUID[]{//dataService UUIDs
-                                UUID.randomUUID() // 
-                        },//
+                        new byte[]{}, // left separator (first valid key)
+                        null,         // right separator (no upper bound)
                         /*
                          * Note: The journal gets listed first since it can
                          * continue to receive writes and therefore logically
@@ -575,10 +575,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                         new IResourceMetadata[]{// resource metadata[].
                                 journal.getResourceMetadata(),//
                                 segmentMetadata //
-                        },//
-                        new byte[]{}, // left separator (first valid key)
-                        null // right separator (no upper bound)
-                        ));
+                        }));
 
                 /*
                  * Drop the index that we used to build up the data for the
@@ -614,8 +611,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         final Properties properties = getProperties();
 
-        ResourceManager resourceManager = new ResourceManager(properties);
-
+        ResourceManager resourceManager = new MyResourceManager(properties);
+        
         AbstractLocalTransactionManager localTransactionManager = new AbstractLocalTransactionManager(
                 resourceManager) {
 
@@ -690,6 +687,34 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         concurrencyManager.shutdownNow();
         localTransactionManager.shutdownNow();
         resourceManager.shutdownNow();
+
+    }
+
+    protected static class MyResourceManager extends ResourceManager {
+
+        public MyResourceManager(Properties properties) {
+
+            super(properties);
+
+        }
+
+        public IMetadataService getMetadataService() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public UUID getDataServiceUUID() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public UUID[] getDataServiceUUIDs() {
+
+            throw new UnsupportedOperationException();
+            
+        }
 
     }
 

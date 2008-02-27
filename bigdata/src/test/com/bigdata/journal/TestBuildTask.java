@@ -44,39 +44,24 @@ import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ResourceManager.BuildResult;
-import com.bigdata.journal.ResourceManager.DefaultSplitHandler;
-import com.bigdata.journal.ResourceManager.PostProcessOldJournalTask;
-import com.bigdata.journal.ResourceManager.SplitIndexPartitionTask;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
- * FIXME Work through build, compacting merge, merge+split at the
- * {@link ResourceManager}, get the {@link MetadataIndex} to update and
- * clients to notice those updates, and then try out on the RDF database. I can
- * set the split initially in terms of the #of index entries in an index
- * partition, e.g., 10 or 100M. I can also simplify by only implementing the
- * compacting merges and splits, leaving joins for later. I will need some means
- * to choose the host onto which to put an index partition, but that can be
- * (partitionId MOD nhosts) at first. Likewise I can defer failover support. I
- * will need to move index partitions around, at least when new partitions are
- * first created, or they will just jamb up on the first machine(s). The initial
- * indices can be distributed onto one host each, so that is 5-12 hosts
- * depending on whether justifications, full text search, or a quad store is
- * being used.
+ * Basic test of building an index segment from an index partition on overflow.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMergeTasks extends AbstractResourceManagerTestCase {
+public class TestBuildTask extends AbstractResourceManagerTestCase {
 
     /**
      * 
      */
-    public TestMergeTasks() {
+    public TestBuildTask() {
         super();
 
     }
@@ -84,7 +69,7 @@ public class TestMergeTasks extends AbstractResourceManagerTestCase {
     /**
      * @param arg0
      */
-    public TestMergeTasks(String arg0) {
+    public TestBuildTask(String arg0) {
         super(arg0);
     }
     
@@ -102,36 +87,28 @@ public class TestMergeTasks extends AbstractResourceManagerTestCase {
      * @throws IOException 
      * @throws ExecutionException 
      * @throws InterruptedException 
-     * 
-     * @todo test variant supporting split where a constained key-range and the
-     *       target partition identifier are specified. in this use case we
-     *       split the source view into two output views from which we will then
-     *       assemble the new index partitions and finally register the split
-     *       with the metadata index.  Call this variant a MergeSplitTask since
-     *       it needs different inputs to the ctor       
      */
-    public void test_compactingMerge() throws IOException, InterruptedException, ExecutionException {
+    public void test_buildIndexSegment() throws IOException, InterruptedException, ExecutionException {
         
         /*
          * Register the index.
          */
         final String name = "testIndex";
         final UUID indexUUID = UUID.randomUUID();
+        final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
         {
-        
-            IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
             
             // must support delete markers
             indexMetadata.setDeleteMarkers(true);
             
             // must be an index partition.
-            indexMetadata.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
+            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
                     0, // partitionId (arbitrary since no metadata index).
-                    new UUID[]{UUID.randomUUID()},// data services (arbitrary since not scale-out)
-                    new IResourceMetadata[]{resourceManager.getLiveJournal().getResourceMetadata()},
                     new byte[]{}, //leftSeparator
-                    null // rightSeparator
-                    ));
+                    null, // rightSeparator
+                    new IResourceMetadata[]{//
+                            resourceManager.getLiveJournal().getResourceMetadata()//
+                    }));
             
             // submit task to register the index and wait for it to complete.
             concurrencyManager.submit(new RegisterIndexTask(concurrencyManager,name,indexMetadata)).get();
@@ -205,9 +182,11 @@ public class TestMergeTasks extends AbstractResourceManagerTestCase {
              */ 
             final long startTime = -oldJournal.getRootBlockView().getLastCommitTime();
         
+            final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
+            
             // task to run.
             final AbstractTask task = resourceManager.new BuildIndexSegmentTask(
-                    concurrencyManager, startTime, name);
+                    concurrencyManager, startTime, name, outFile);
             
             // submit task and await result (metadata describing the new index segment).
             final BuildResult result = (BuildResult) concurrencyManager.submit(task).get();
@@ -280,125 +259,6 @@ public class TestMergeTasks extends AbstractResourceManagerTestCase {
 
         fail("write tests");
 
-    }
-    
-    /**
-     * Test generation of N index splits based on an index partition that has
-     * been pre-populated with index entries and a specified target #of index
-     * entries per index partition.
-     * 
-     * @throws Exception 
-     */
-    public void test_splitTask() throws Exception {
-        
-        /*
-         * Register the index.
-         */
-        final String name = "testIndex";
-        final UUID indexUUID = UUID.randomUUID();
-        {
-        
-            final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
-
-            // The target #of index entries per partition.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setEntryCountPerSplit(400);
-            
-            // must support delete markers
-            indexMetadata.setDeleteMarkers(true);
-            
-            // must be an index partition.
-            indexMetadata.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
-                    0, // partitionId (arbitrary since no metadata index).
-                    new UUID[]{UUID.randomUUID()},// data services (arbitrary since not scale-out)
-                    new IResourceMetadata[]{resourceManager.getLiveJournal().getResourceMetadata()},
-                    new byte[]{}, //leftSeparator
-                    null // rightSeparator
-                    ));
-            
-            // submit task to register the index and wait for it to complete.
-            concurrencyManager.submit(new RegisterIndexTask(concurrencyManager,name,indexMetadata)).get();
-        
-        }
-        
-        /*
-         * Populate the index with some data.
-         */
-        final BTree groundTruth = BTree.create(new SimpleMemoryRawStore(),new IndexMetadata(indexUUID));
-        {
-            
-            final int nentries = 1000;
-            
-            final byte[][] keys = new byte[nentries][];
-            final byte[][] vals = new byte[nentries][];
-
-            Random r = new Random();
-
-            for (int i = 0; i < nentries; i++) {
-
-                keys[i] = KeyBuilder.asSortKey(i);
-
-                vals[i] = new byte[4];
-
-                r.nextBytes(vals[i]);
-
-                groundTruth.insert(keys[i],vals[i]);
-                                
-            }
-
-            IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
-                    .newInstance(nentries, 0/* offset */, keys, vals);
-
-            // submit the task and wait for it to complete.
-            concurrencyManager.submit(
-                    new IndexProcedureTask(concurrencyManager, ITx.UNISOLATED,
-                            name, proc)).get();
-            
-        }
-
-        /*
-         * Overflow the journal.
-         */
-        
-        // createTime of the old journal.
-        final long createTime0 = resourceManager.getLiveJournal().getRootBlockView().getCreateTime();
-        // uuid of the old journal.
-        final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView().getUUID();
-        
-        // force overflow onto a new journal.
-        resourceManager.doOverflow();
-        
-        // lookup the old journal again using its createTime.
-        final AbstractJournal oldJournal = resourceManager.getJournal(createTime0);
-        assertEquals("uuid",uuid0,oldJournal.getRootBlockView().getUUID());
-        assertNotSame("closeTime",0L,oldJournal.getRootBlockView().getCloseTime());
-        
-        /*
-         * Run task that will post-process the old journal.
-         */
-
-        // lastCreateTime on the old journal.
-        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
-
-        // run post-processing task.
-        resourceManager.new PostProcessOldJournalTask(lastCommitTime).call();
-        
-        // verify that the old index partition is no longer registered.
-        assertNull(resourceManager
-        .getIndex(name, ITx.UNISOLATED));
-        
-        /*
-         * Compare the index against ground truth after the post-processing is
-         * done.
-         * 
-         * @todo verify the new index partitions are registered. 
-         * 
-         * FIXME This comparison can only be carried out piece meal or using a
-         * metadata index so that we have a view of the now partitioned index.
-         */
-//        AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
-        
-        fail("write test");
-        
     }
     
 }

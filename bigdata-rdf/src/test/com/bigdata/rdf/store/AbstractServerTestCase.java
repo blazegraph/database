@@ -43,9 +43,9 @@ import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadata;
 import com.bigdata.service.AbstractServer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -441,18 +441,40 @@ public abstract class AbstractServerTestCase extends TestCase2 {
     }
 
     /**
-     * Compares two representations of the metadata for an index partition
+     * Compares two representations of the {@link PartitionLocatorMetadata}
      * without the left- and right-separator keys that bound the index
      * partition.
      * 
      * @param expected
      * @param actual
      */
-    protected void assertEquals(IPartitionMetadata expected, IPartitionMetadata actual) {
+    protected void assertEquals(PartitionLocatorMetadata expected, PartitionLocatorMetadata actual) {
         
         assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
         
         assertEquals("dataServices",expected.getDataServices(),actual.getDataServices());
+
+    }
+    
+    /**
+     * Compares two representations of the {@link LocalPartitionMetadata} for an
+     * index partition including the optional resource descriptions.
+     * 
+     * @param expected
+     * @param actual
+     */
+    protected void assertEquals(LocalPartitionMetadata expected,
+            LocalPartitionMetadata actual) {
+
+        assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
+
+        assertEquals("leftSeparatorKey", expected.getLeftSeparatorKey(),
+                ((LocalPartitionMetadata) actual)
+                        .getLeftSeparatorKey());
+
+        assertEquals("rightSeparatorKey", expected.getRightSeparatorKey(),
+                ((LocalPartitionMetadata) actual)
+                        .getRightSeparatorKey());
 
         final IResourceMetadata[] expectedResources = expected.getResources();
 
@@ -473,40 +495,11 @@ public abstract class AbstractServerTestCase extends TestCase2 {
             assertEquals("UUID[" + i + "]", expectedResources[i].getUUID(),
                     actualResources[i].getUUID());
 
-            assertEquals("state[" + i + "]", expectedResources[i].state(),
-                    actualResources[i].state());
-            
             // verify by equals.
             assertTrue("resourceMetadata",expectedResources[i].equals(actualResources[i]));
             
         }
         
-    }
-
-    /**
-     * Compares two representations of the metadata for an index partition
-     * including the left- and right-separator keys that bound the index
-     * partition.
-     * 
-     * @param expected
-     * @param actual
-     */
-    protected void assertEquals(PartitionMetadataWithSeparatorKeys expected,
-            IPartitionMetadata actual) {
-
-        assertEquals((IPartitionMetadata) expected, actual);
-
-        assertTrue("Class",
-                actual instanceof PartitionMetadataWithSeparatorKeys);
-
-        assertEquals("leftSeparatorKey", expected.getLeftSeparatorKey(),
-                ((PartitionMetadataWithSeparatorKeys) actual)
-                        .getLeftSeparatorKey());
-
-        assertEquals("rightSeparatorKey", expected.getRightSeparatorKey(),
-                ((PartitionMetadataWithSeparatorKeys) actual)
-                        .getRightSeparatorKey());
-
     }
     
 }

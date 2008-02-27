@@ -254,7 +254,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         UUID indexUUID = fed.registerIndex(metadata);
 
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED, name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
         assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
                 .getIndexUUID());
@@ -291,16 +291,16 @@ public class TestBigdataClient extends AbstractServerTestCase {
                     dataService1.getServiceUUID() //
                 });
         
-        IIndex ndx = fed.getIndex(ITx.UNISOLATED,name);
+        IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
         
         assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
                 .getIndexUUID());
 
         // verify partition 0 on dataService0
-        assertNotNull(dataService0.getIndexMetadata(DataService.getIndexPartitionName(name, 0)));
+        assertNotNull(dataService0.getIndexMetadata(DataService.getIndexPartitionName(name, 0),ITx.UNISOLATED));
 
         // verify partition 1 on dataService1
-        assertNotNull(dataService1.getIndexMetadata(DataService.getIndexPartitionName(name, 1)));
+        assertNotNull(dataService1.getIndexMetadata(DataService.getIndexPartitionName(name, 1),ITx.UNISOLATED));
 
         doBasicIndexTests(ndx);
 

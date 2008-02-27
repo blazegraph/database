@@ -45,10 +45,9 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -177,9 +176,17 @@ public class IndexSegmentBuilder {
     final public UUID segmentUUID;
 
     /**
-     * A copy of the metadata object provided to the ctor.
+     * A copy of the metadata object provided to the ctor. This object is
+     * further modified before being written on the
+     * {@link IndexSegmentFileStore}.
      */
     final public IndexMetadata metadata;
+    
+    /**
+     * The {@link IndexSegmentCheckpoint} record written on the
+     * {@link IndexSegmentFileStore}.
+     */
+    final public IndexSegmentCheckpoint checkpoint;
     
     /**
      * Used to serialize the nodes and leaves of the output tree.
@@ -284,30 +291,30 @@ public class IndexSegmentBuilder {
     /**
      * The process runtime in milliseconds.
      */
-    final long elapsed;
+    public final long elapsed;
     
     /**
      * The time to setup the index build, including the generation of the index
      * plan and the initialization of some helper objects.
      */
-    final long elapsed_setup;
+    public final long elapsed_setup;
     
     /**
      * The time to write the nodes and leaves into their respective buffers, not
      * including the time to transfer those buffered onto the output file.
      */
-    final long elapsed_build;
+    public final long elapsed_build;
     
     /**
      * The time to write the nodes and leaves from their respective buffers
      * onto the output file and synch and close that output file.
      */
-    final long elapsed_write;
+    public final long elapsed_write;
     
     /**
      * The data throughput rate in megabytes per second.
      */
-    final float mbPerSec;
+    public final float mbPerSec;
         
     /**
      * <p>
@@ -388,8 +395,38 @@ public class IndexSegmentBuilder {
         // the UUID assigned to this index segment file.
         this.segmentUUID = UUID.randomUUID();
 
-        // make a copy of the caller's metadata.
-        this.metadata = metadata.clone();
+        /*
+         * Make a copy of the caller's metadata.
+         * 
+         * Note: The callers's reference is replaced by a reference to the clone
+         * in order to avoid accidental modifications to the caller's metadata
+         * object.
+         */
+        this.metadata = metadata = metadata.clone();
+        {
+            
+            LocalPartitionMetadata pmd = this.metadata.getPartitionMetadata();
+            
+            if (pmd != null) {
+        
+                /*
+                 * Copy the local partition metadata, but do not include the
+                 * resource metadata identifying the resources that comprise the
+                 * index partition view. that information is only stored on the
+                 * BTree, not on the IndexSegment.
+                 */
+
+                this.metadata.setPartitionMetadata(//
+                        new LocalPartitionMetadata(//
+                                pmd.getPartitionId(),//
+                                pmd.getLeftSeparatorKey(),//
+                                pmd.getRightSeparatorKey(),//
+                                null // No resource metadata.
+                        ));
+                
+            }
+            
+        }
         
         /*
          * Override the branching factor on the index segment.
@@ -747,8 +784,7 @@ public class IndexSegmentBuilder {
             final long begin_write = System.currentTimeMillis();
             
             // write everything out on the outFile.
-            final IndexSegmentCheckpoint checkpoint = writeIndexSegment(
-                    outChannel, commitTime);
+            checkpoint = writeIndexSegment(outChannel, commitTime);
             
             /*
              * Flush this channel to disk and close the channel. This also
@@ -788,10 +824,6 @@ public class IndexSegmentBuilder {
                     + nnodesWritten + ", nleaves=" + nleavesWritten+", length="+
                     fpf.format(((double) checkpoint.length / Bytes.megabyte32))
                     + "MB"+", rate="+fpf.format(mbPerSec)+"MB/sec");
-
-            // report event
-            ResourceManager.buildIndexSegment(metadata.getName(),
-                    outFile.toString(), plan.nentries, elapsed, checkpoint.length);
 
         } catch (Throwable ex) {
 
@@ -1496,7 +1528,7 @@ public class IndexSegmentBuilder {
 
             // save the index segment resource description for the caller.
             this.segmentMetadata = new SegmentMetadata(outFile.toString(), out
-                    .length(), ResourceState.Live, segmentUUID, commitTime);
+                    .length(), segmentUUID, commitTime);
             
             return md;
             
@@ -1512,7 +1544,11 @@ public class IndexSegmentBuilder {
      */
     public IResourceMetadata getSegmentMetadata() {
         
-        if(segmentMetadata==null) throw new IllegalStateException();
+        if (segmentMetadata == null) {
+
+            throw new IllegalStateException();
+            
+        }
         
         return segmentMetadata;
         

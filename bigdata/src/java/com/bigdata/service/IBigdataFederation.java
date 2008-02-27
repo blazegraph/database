@@ -33,9 +33,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.MetadataIndex;
 
 /**
  * The client-facing interface to a bigdata federation.
@@ -64,7 +63,7 @@ public interface IBigdataFederation {
      * @return The {@link IMetadataIndex} for the named scale-out index -or-
      *         <code>null</code> iff there is no such scale-out index.
      */
-    public IMetadataIndex getMetadataIndex(String name);
+    public IMetadataIndex getMetadataIndex(String name,long timestamp);
     
     /**
      * Register a scale-out index.
@@ -132,17 +131,19 @@ public interface IBigdataFederation {
     /**
      * Obtain a view on a partitioned index.
      * 
-     * @param tx
-     *            The transaction identifier or zero(0L) iff the index will
-     *            be unisolated.
-     * 
      * @param name
      *            The index name.
+     * @param timestamp
+     *            Either the startTime of an active transaction,
+     *            {@link ITx#UNISOLATED} for the current unisolated index view,
+     *            {@link ITx#READ_COMMITTED} for a read-committed view, or
+     *            <code>-timestamp</code> for a historical view no later than
+     *            the specified timestamp.
      * 
      * @return The index or <code>null</code> if the index is not
      *         registered with the {@link MetadataService}.
      */
-    public IIndex getIndex(long tx, String name);
+    public IIndex getIndex(String name,long timestamp);
     
     /**
      * Return the client object that was used to connect to the federation.

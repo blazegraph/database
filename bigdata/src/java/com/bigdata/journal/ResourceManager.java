@@ -32,7 +32,6 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -48,8 +47,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -69,8 +66,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -78,18 +73,18 @@ import com.bigdata.mdi.AbstractPartitionTask;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
-import com.bigdata.mdi.ResourceState;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
@@ -137,6 +132,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo update javadoc.
  * 
+ * FIXME A separate process must examine the #of index partitions per data
+ * service and move those partitions to under utilized data services in the same
+ * zone in order to load balance the zone. Without this we can't move index
+ * partitions off of their original data service.
+ * 
  * @todo The resource manager needs to track the invalidated (aka deleted when
  *       an index partition was split or merged) and moved index partitions on
  *       an LRU and refuse attempts to access that index with a special
@@ -146,7 +146,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       entries will drop off of the LRU and clients will get an index not
  *       found error rather than an index partition invalidated error or an
  *       index partition moved error.
- *      
+ * 
  * @todo track the disk space used by the {@link #getDataDir()} and the free
  *       space remaining on the mount point that hosts the data directory. if we
  *       approach the limit on the space in use then we need to shed index
@@ -274,7 +274,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResourceManager implements IResourceManager {
+abstract public class ResourceManager implements IResourceManager {
 
     /**
      * Logger.
@@ -428,33 +428,26 @@ public class ResourceManager implements IResourceManager {
     /**
      * Report on a bulk merge/build of an {@link IndexSegment}.
      * 
-     * @param name
-     *            The index name or null if this is not a named index.
-     * @param filename
-     *            The name of the file on which the index segment was written.
-     * @param nentries
-     *            The #of entries in the {@link IndexSegment}.
-     * @param elapsed
-     *            The elapsed time of the operation that built the index segment
-     *            (merge + build).
-     * @param nbytes
-     *            The #of bytes in the {@link IndexSegment}.
-     * 
-     * @todo the event is reported from {@link IndexSegmentBuilder} does not
-     *       account for resources (time/space) required by the merge aspect of
-     *       a bulk build.
+     * @param builder
+     *            The object responsible for building the {@link IndexSegment}.
      */
-    static public void buildIndexSegment(String name, String filename,
-            int nentries, long elapsed, long nbytes) {
+    public void notifyIndexSegmentBuildEvent(IndexSegmentBuilder builder) {
 
         if (INFO) {
 
+            String name = builder.metadata.getName();
+            String filename = builder.outFile.toString();
+            int nentries = builder.plan.nentries;
+            long elapsed = builder.elapsed;
+            long commitTime = builder.checkpoint.commitTime;
+            long nbytes = builder.checkpoint.length;
+            
             // data rate in MB/sec.
-            float mbPerSec = (elapsed == 0 ? 0 : nbytes / Bytes.megabyte32
-                    / (elapsed / 1000f));
+            float mbPerSec = builder.mbPerSec;
 
             log.info("name=" + name + ", filename=" + filename + ", nentries="
-                    + nentries + ", elapsed=" + elapsed + ", "
+                    + nentries + ", commitTime=" + commitTime + ", elapsed="
+                    + elapsed + ", "
                     + fpf.format(((double) nbytes / Bytes.megabyte32)) + "MB"
                     + ", rate=" + fpf.format(mbPerSec) + "MB/sec");
         }
@@ -602,11 +595,17 @@ public class ResourceManager implements IResourceManager {
      * @param nbytes
      *            The total #of bytes written on the journal.
      */
-    static public void overflowJournal(String filename, long nbytes) {
+    public void notifyJournalOverflowEvent(AbstractJournal journal) {
 
-        if (INFO)
-            log.info("filename=" + filename + ", #bytes=" + nbytes);
+        if (INFO) {
 
+            log.info("filename=" + journal.getFile() + ", nextOffset="
+                    + journal.getBufferStrategy().getNextOffset() + ", extent="
+                    + journal.getBufferStrategy().getExtent() + ", maxExtent="
+                    + journal.maximumExtent);
+
+        }
+        
     }
 
     /**
@@ -696,6 +695,11 @@ public class ResourceManager implements IResourceManager {
     private final boolean isTransient;
     
     /**
+     * Set based on {@link Options#INDEX_SEGMENT_BUILD_THRESHOLD}.
+     */
+    private final int indexSegmentBuildThreshold;
+    
+    /**
      * @throws IllegalStateException
      *             unless open.
      */
@@ -741,18 +745,44 @@ public class ResourceManager implements IResourceManager {
     /**
      * The service that runs asynchronous resource management tasks, primarily
      * handling index segment builds and enrolling the index segments into use.
-     * 
-     * @todo and possibly index partition joins, but those need to be directed
-     *       top-down since the index partitions need to be co-located on a data
-     *       service before we can join them.
+     * <p>
+     * Note: index partition joins need to be directed top-down since the index
+     * partitions need to be co-located on a data service before we can join
+     * them.
      */
     private ExecutorService service;
 
     /**
      * A flag used to disable overflow of the live journal until asynchronous
      * post-processing of the old journal has been completed.
+     * 
+     * @see PostProcessOldJournalTask
      */
-    private final AtomicBoolean overflowAllowed = new AtomicBoolean(false);
+    private final AtomicBoolean overflowAllowed = new AtomicBoolean(true);
+
+    /**
+     * <code>true</code> unless an overflow event is currently being
+     * processed.
+     */
+    public boolean isOverflowAllowed() {
+        
+        return overflowAllowed.get();
+        
+    }
+    
+//    /**
+//     * A non-restart safe cache of recently invalidated index partitions. In
+//     * some cases the index partition has simply been moved to another data
+//     * service. In other cases the index partition has been split and requests
+//     * for the old index partition must be replaced by requests for one or all
+//     * of the new index partitions arising from that split.
+//     */
+//    private LRUCache<byte[]/* key */, PartitionLocatorMetadata/* val */> invalidatedPartitionCache = new LRUCache<byte[], PartitionLocatorMetadata>(
+//            100);
+//
+//    protected void invalidateIndexPartition(String name, int partitionId, Object response) {
+//        
+//    }
     
     /**
      * {@link ResourceManager} options.
@@ -795,14 +825,20 @@ public class ResourceManager implements IResourceManager {
          * @todo Perhaps there is no need for the "file" in the
          *       {@link IResourceMetadata} since it appears that we need to
          *       maintain a map from UUID to local file system files in anycase.
-         *       <p>
-         *       Likewise, if the {@link MetadataIndex} maintains historical
-         *       entries using historical reads then we probably do not need to
-         *       store anything except the "live" entries in the index partition
-         *       metadata.
          */
         public static final String DATA_DIR = "data.dir";
 
+        /**
+         * The minimum #of index entries before an {@link IndexSegment} will be
+         * built from an index during overflow processing (default is
+         * <code>5000</code>).
+         * 
+         * @see #DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD
+         */
+        public static final String INDEX_SEGMENT_BUILD_THRESHOLD = "indexSegment.buildThreshold";
+
+        public static final String DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD = "5000";
+        
     }
     
     private IConcurrencyManager concurrencyManager;
@@ -867,6 +903,25 @@ public class ResourceManager implements IResourceManager {
 
         this.properties = properties;
 
+        {
+
+            indexSegmentBuildThreshold = Integer.parseInt(properties
+                    .getProperty(Options.INDEX_SEGMENT_BUILD_THRESHOLD,
+                            Options.DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD));
+
+            log.info(Options.INDEX_SEGMENT_BUILD_THRESHOLD + "="
+                    + indexSegmentBuildThreshold);
+
+            if (indexSegmentBuildThreshold < 1) {
+
+                throw new RuntimeException(
+                        Options.INDEX_SEGMENT_BUILD_THRESHOLD
+                                + " must be positive");
+
+            }
+            
+        }
+        
         /*
          * Create the _transient_ index in which we will store the mapping from
          * the commit times of the journals to their resource descriptions.
@@ -1689,8 +1744,21 @@ public class ResourceManager implements IResourceManager {
      * Return a reference to the named index as of the specified timestamp on
      * the identified resource.
      * <p>
-     * Note: The returned index is NOT isolated and is NOT protected against
-     * writes (unless it is on an {@link IndexSegmentFileStore}).
+     * Note: The returned index is NOT isolated.
+     * <p>
+     * Note: When the index is a {@link BTree} associated with a historical
+     * commit point (vs the live unisolated index) it will be marked as
+     * {@link AbstractBTree#isReadOnly()} and
+     * {@link AbstractBTree#getLastCommitTime()} will reflect the commitTime of
+     * the {@link ICommitRecord} from which that {@link BTree} was loaded. Note
+     * further that the commitTime MAY NOT be the same as the specified
+     * <i>timestamp</i> for a number of reasons. First, <i>timestamp</i> MAY
+     * be negative to indicate a historical read vs a transactional read.
+     * Second, the {@link ICommitRecord} will be the record having the greatest
+     * commitTime LTE the specified <i>timestamp</i>.
+     * <p>
+     * Note: An {@link IndexSegment} is always read-only and always reports the
+     * commitTime associated with the view from which it was constructed.
      * 
      * @param name
      *            The index name.
@@ -1704,6 +1772,28 @@ public class ResourceManager implements IResourceManager {
      * @return A reference to the index -or- <code>null</code> if the index
      *         was not registered on the resource as of the timestamp or if the
      *         store has no data for that timestamp.
+     * 
+     * @todo add hard reference queue for {@link AbstractBTree} to the journal
+     *       and track the #of instances of each {@link AbstractBTree} on the
+     *       queue using #referenceCount and "touch()", perhaps in Name2Addr;
+     *       write tests. consider one queue for mutable btrees and another for
+     *       index segments, partitioned indices, metadata indices, etc.
+     *       consider the meaning of "queue length" here and how to force close
+     *       based on timeout. improve reporting of index segments by name and
+     *       partition.<br>
+     *       Mutable indices are low-cost to close/open. Closing them once they
+     *       are no longer receiving writes can release some large buffers and
+     *       reduce the latency of commits since dirty nodes will already have
+     *       been flushed to disk. The largest cost on re-open is de-serializing
+     *       nodes and leaves for subsequent operations. Those nodes will be
+     *       read from a fully buffered store, so the latency will be small even
+     *       though deserialization is CPU intensive. <br>
+     *       Close operations on unisolated indices need to be queued in the
+     *       {@link #writeService} so that they are executed in the same thread
+     *       as other operations on the unisolated index.<br>
+     *       Make sure that we close out old {@link Journal}s that are no
+     *       longer required by any open index. This will require a distinct
+     *       referenceCount on the {@link Journal}.
      */
     public AbstractBTree getIndexOnStore(String name, long timestamp, IRawStore store) {
 
@@ -1753,6 +1843,19 @@ public class ResourceManager implements IResourceManager {
                 // MAY be null.
                 btree = journal.getIndex(name, commitRecord);
                 
+                if (btree != null) {
+
+                    /*
+                     * Mark the B+Tree as read-only and set the lastCommitTime
+                     * timestamp from the commitRecord.
+                     */
+                    
+                    ((BTree)btree).setReadOnly(true);
+                    
+                    ((BTree)btree).setLastCommitTime(ts);
+                    
+                }
+
             } else {
 
                 /*
@@ -1776,6 +1879,19 @@ public class ResourceManager implements IResourceManager {
 
                 // open index on that journal (MAY be null).
                 btree = (BTree) journal.getIndex(name, commitRecord);
+
+                if (btree != null) {
+
+                    /*
+                     * Mark the B+Tree as read-only and set the lastCommitTime
+                     * timestamp from the commitRecord.
+                     */
+                    
+                    ((BTree)btree).setReadOnly(true);
+                    
+                    ((BTree)btree).setLastCommitTime(ts);
+                    
+                }
 
             }
 
@@ -1875,7 +1991,7 @@ public class ResourceManager implements IResourceManager {
          * resources named in that index partition. Otherwise the index is
          * unpartitioned.
          */
-        final PartitionMetadataWithSeparatorKeys pmd = btree.getIndexMetadata()
+        final LocalPartitionMetadata pmd = btree.getIndexMetadata()
                 .getPartitionMetadata();
 
         if (pmd == null) {
@@ -1895,7 +2011,7 @@ public class ResourceManager implements IResourceManager {
         {
 
             // live resources for that index partition.
-            final IResourceMetadata[] a = pmd.getLiveResources();
+            final IResourceMetadata[] a = pmd.getResources();
 
             sources = new AbstractBTree[a.length];
 
@@ -1932,6 +2048,30 @@ public class ResourceManager implements IResourceManager {
 
         return sources;
 
+    }
+    
+    public String getStatistics(String name, long timestamp) {
+        
+        AbstractBTree[] sources = getIndexSources(name, timestamp);
+        
+        if(sources==null) {
+            
+            return null;
+            
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("name="+name+", timestamp="+timestamp);
+        
+        for(int i=0; i<sources.length; i++) {
+         
+            sb.append("\n"+sources[i].getStatistics());
+            
+        }
+        
+        return sb.toString();
+        
     }
     
     /**
@@ -2033,16 +2173,20 @@ public class ResourceManager implements IResourceManager {
 
                 }
 
+                assert sources.length > 0;
+
+                assert sources[0].isReadOnly();
+
                 if (sources.length == 1) {
 
-                    tmp = new ReadOnlyIndex(sources[0]);
+                    tmp = sources[0];
 
                 } else {
 
-                    tmp = new ReadOnlyFusedView(sources);
-
+                    tmp = new FusedView(sources);
+                    
                 }
-                            
+                
             } else {
                 
                 /*
@@ -2065,6 +2209,8 @@ public class ResourceManager implements IResourceManager {
                     
                 }
 
+                assert ! sources[0].isReadOnly();
+                
                 if (sources.length == 1) {
 
                     tmp = sources[0];
@@ -2099,16 +2245,16 @@ public class ResourceManager implements IResourceManager {
      * re-define the views for all named indices to include the pre-overflow
      * view with reads being absorbed by a new btree on the new journal.
      * 
-     * FIXME The metadata index needs to be updated as well (unless we do NOT
-     * store the {@link IResourceManager}[] in the metadata index). There will
-     * have to be a read-behind point for the metadata index.
-     * 
      * @todo write unit test for an overflow edge case in which we attempt to
      *       perform an read-committed task on a pre-existing index immediately
      *       after an {@link #overflow()} and verify that a commit record exists
      *       on the new journal and that the read-committed task can read from
      *       the fused view of the new (empty) index on the new journal and the
      *       old index on the old journal.
+     * 
+     * @todo we can reach the {@link WriteExecutorService} from
+     *       {@link #getConcurrencyManager()} so drop it from the method
+     *       signature.
      */
     public boolean overflow(boolean exclusiveLock,
             WriteExecutorService writeService) {
@@ -2142,13 +2288,11 @@ public class ResourceManager implements IResourceManager {
         /*
          * Look for overflow condition on the "live" journal.
          */
-        final boolean overflow;
-        // total file extent.
-        final long extent;
+        final AbstractJournal journal = getLiveJournal();
+        // true iff the journal meets the pre-conditions for overflow.
+        final boolean shouldOverflow;
         // #of bytes written on the journal.
         final long nextOffset;
-        // the file backing the journal.
-        final File file;
         {
 
             /*
@@ -2160,28 +2304,31 @@ public class ResourceManager implements IResourceManager {
              * will run out of memory if you use a fully buffered mode).
              */
             
-            final AbstractJournal journal = getLiveJournal();
-            
-            final long limit = Math.max(journal.maximumExtent, journal
-                    .getBufferStrategy().getUserExtent());
+//            final long limit = Math.max(journal.maximumExtent, journal
+//                    .getBufferStrategy().getUserExtent());
             
             nextOffset = journal.getRootBlockView().getNextOffset();
-            
-            if (nextOffset > .9 * limit) {
+            assert nextOffset == journal.getBufferStrategy().getNextOffset();
 
-                overflow = true;
+            if (nextOffset > .9 * journal.maximumExtent) {
+
+                shouldOverflow = true;
 
             } else {
                 
-                overflow = false;
+                shouldOverflow = false;
                 
             }
 
-            file = journal.getFile();
-            
+            System.err.println("testing overflow: exclusiveLock="
+                    + exclusiveLock + ", nextOffset=" + nextOffset
+                    + ", maximumExtent=" + journal.maximumExtent
+                    + ", willOverflow=" + shouldOverflow + ", dataServiceUUID="
+                    + getDataServiceUUID());
+               
         }
 
-        if(!overflow) return false;
+        if(!shouldOverflow) return false;
         
         if(!exclusiveLock) {
 
@@ -2217,14 +2364,14 @@ public class ResourceManager implements IResourceManager {
 
         }
         
-        // log the size of the journal when it actually overflowed.
-        ResourceManager.overflowJournal(file.toString(), nextOffset);
+        // report event.
+        notifyJournalOverflowEvent(journal);
 
         /*
          * Start the asynchronous processing of the named indices on the old
          * journal.
          */
-        if(!overflowAllowed.compareAndSet(false, true)) {
+        if(!overflowAllowed.compareAndSet(true, false)) {
 
             throw new AssertionError();
             
@@ -2246,12 +2393,22 @@ public class ResourceManager implements IResourceManager {
      * satisified.
      * <p>
      * Note: This method does NOT start a {@link PostProcessOldJournalTask}.
+     * <P>
+     * Note: You MUST have an exclusive lock on the {@link WriteExecutorService}
+     * before you invoke this method!
      * 
      * @return The lastCommitTime of the old journal.
      * 
      * @todo closing out and re-opening the old journal as read-only is going to
      *       discard some buffering that we might prefer to keep on hand during
      *       the {@link PostProcessOldJournalTask}.
+     * 
+     * @todo If a very large #of index partitions are hosted on the same journal
+     *       then they should be re-distributed regardless of their size.
+     * 
+     * @todo Work out high-level alerting for resource exhaustion and failure to
+     *       maintain QOS on individual machines, indices, and across the
+     *       federation.  Consider resource limits on indices.
      */
     protected long doOverflow() {
         
@@ -2322,27 +2479,33 @@ public class ResourceManager implements IResourceManager {
                 final Entry entry = EntrySerializer.INSTANCE
                         .deserialize(new DataInputBuffer(tuple.getValue()));
 
-                // old index
+                // old index (just the mutable btree on the old journal, not the full view of that index).
                 final BTree oldBTree = (BTree) oldJournal.getIndex(entry.addr);
 
+                // #of index entries on the old index.
+                final int entryCount = oldBTree.getEntryCount();
+                
                 // clone index metadata.
                 final IndexMetadata indexMetadata = oldBTree.getIndexMetadata()
                         .clone();
 
                 // old partition metadata.
-                final PartitionMetadataWithSeparatorKeys oldpmd = indexMetadata
+                final LocalPartitionMetadata oldpmd = indexMetadata
                         .getPartitionMetadata();
 
                 if (oldpmd == null) {
 
                     /*
-                     * A unpartitioned named index.
+                     * A named index that is not an index partition.
+                     * 
+                     * Note: In the scale-out system all named indices are
+                     * registered as partitioned indices so this condition
+                     * SHOULD NOT arise.
                      * 
                      * @todo probably overflow the entire index, but it is a
                      * problem to have an unpartitioned index if you are
-                     * expecting to do overflows. in the scale-out system all
-                     * named indices are registered as partitioned indices so
-                     * this is never a problem.
+                     * expecting to do overflows since the index can never be
+                     * broken down and can't be moved around.
                      */
 
                     throw new RuntimeException("Not a partitioned index: "
@@ -2350,26 +2513,76 @@ public class ResourceManager implements IResourceManager {
                      
                     
                 }
+                
+                /*
+                 * When true, a new index segment will be build from the view
+                 * defined by the old index on the old journal during
+                 * post-overflow processing.  Otherwise we will copy the data
+                 * from the old index into the new index
+                 */
+                final boolean willBuildIndexSegment = entryCount >= indexSegmentBuildThreshold;
 
-                IResourceMetadata[] oldResources = oldpmd.getResources();
+                /*
+                 * We will only create a new empty index, taking care to
+                 * propagate the index local counter.
+                 * 
+                 * Update the partition metadata so that the new index reflects
+                 * its location on the new journal.
+                 * 
+                 * Note: The old index on the old journal is retained as part of
+                 * the view.
+                 */
+                if(willBuildIndexSegment) {
+                    
+                    final IResourceMetadata[] oldResources = oldpmd
+                            .getResources();
 
-                IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length + 1];
+                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length + 1];
 
-                System.arraycopy(oldResources, 0, newResources, 1,
-                        oldResources.length);
+                    System.arraycopy(oldResources, 0, newResources, 1,
+                            oldResources.length);
 
-                // new resource is listed first (reverse chronological order)
-                newResources[0] = newJournal.getResourceMetadata();
+                    // new resource is listed first (reverse chronological
+                    // order)
+                    newResources[0] = newJournal.getResourceMetadata();
 
-                // describe the index partition.
-                indexMetadata
-                        .setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
-                                oldpmd.getPartitionId(),//
-                                oldpmd.getDataServices(),//
-                                newResources,//
-                                oldpmd.getLeftSeparatorKey(),//
-                                oldpmd.getRightSeparatorKey()//
-                        ));
+                    // describe the index partition.
+                    indexMetadata
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    oldpmd.getPartitionId(),//
+                                    oldpmd.getLeftSeparatorKey(),//
+                                    oldpmd.getRightSeparatorKey(),//
+                                    newResources //
+                            ));
+                    
+                } else {
+                    
+                    /*
+                     * When false we will copy the index data from the B+Tree
+                     * old journal (but not from the full index view) onto the
+                     * new journal. In this case the index will use a view that
+                     * DOES NOT include the old index on the old journal.
+                     */
+
+                    final IResourceMetadata[] oldResources = oldpmd.getResources();
+
+                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length];
+
+                    System.arraycopy(oldResources, 0, newResources, 0, oldResources.length);
+
+                    // new resource is listed first (reverse chronological order)
+                    newResources[0] = newJournal.getResourceMetadata();
+
+                    // describe the index partition.
+                    indexMetadata
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    oldpmd.getPartitionId(),//
+                                    oldpmd.getLeftSeparatorKey(),//
+                                    oldpmd.getRightSeparatorKey(),//
+                                    newResources //
+                            ));
+
+                }
 
                 /*
                  * Create and register the index with the new view on the new
@@ -2412,7 +2625,22 @@ public class ResourceManager implements IResourceManager {
                             overflowCheckpoint.getCheckpointAddr());
 
                     assert newBTree.getCounter().get() == oldCounter;
-
+                    
+                    if(!willBuildIndexSegment) {
+                        
+                        /*
+                         * Copy the data from the B+Tree on the old journal into
+                         * the B+Tree on the new journal.
+                         */
+                        
+                        log.warn("Copying data to new journal: name=" + entry.name
+                                + ", entryCount=" + entryCount + ", threshold="
+                                + indexSegmentBuildThreshold);
+                        
+                        newBTree.rangeCopy(oldBTree, null, null);
+                     
+                    }
+                    
                     /*
                      * Register the new B+Tree on the new journal.
                      */
@@ -2790,13 +3018,6 @@ public class ResourceManager implements IResourceManager {
      *       historical reads after this task has been completed so we can only
      *       reduce a reference counter, not close it out alltogether.
      * 
-     * FIXME handle invalidation of old index partitions.
-     * 
-     * FIXME After this task executes a separate process must examine the #of
-     * index partitions per data service and move those partitions to under
-     * utilized data services in the same zone in order to load balance the
-     * zone.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
@@ -2843,6 +3064,7 @@ public class ResourceManager implements IResourceManager {
             log.info("begin: lastCommitTime="+lastCommitTime);
             
             int ndone = 0;
+            int nskip = 0;
             
             // the old journal.
             final AbstractJournal oldJournal = getJournal(lastCommitTime);
@@ -2864,6 +3086,35 @@ public class ResourceManager implements IResourceManager {
                 // the name of an index to consider.
                 final String name = entry.name;
 
+                /*
+                 * Check the index segment build threshold. If this threshold is
+                 * not met then we presume that the data was already copied onto
+                 * the live journal and we DO NOT build an index segment from
+                 * the old view.
+                 */
+                {
+                    
+                    // get the B+Tree on the old journal.
+                    final BTree oldBTree = oldJournal.getIndex(entry.addr);
+                    
+                    final int entryCount = oldBTree.getEntryCount();
+                    
+                    final boolean willBuildIndexSegment = entryCount >= indexSegmentBuildThreshold;
+                    
+                    if (!willBuildIndexSegment) {
+
+                        log.warn("Will not build index segment: name=" + name
+                                + ", entryCount=" + entryCount + ", threshold="
+                                + indexSegmentBuildThreshold);
+                        
+                        nskip++;
+                        
+                        continue;
+                        
+                    }
+                    
+                }
+                
                 // historical view of that index at that time.
                 final IIndex view = getIndexOnStore(name, lastCommitTime, oldJournal );
 
@@ -2898,9 +3149,13 @@ public class ResourceManager implements IResourceManager {
                     /*
                      * Just do an index build task.
                      */
+                    
+                    
+                    // the file to be generated.
+                    final File outFile = getIndexSegmentFile(indexMetadata);
 
                     task = new BuildIndexSegmentTask(getConcurrencyManager(),
-                            lastCommitTime, name);
+                            lastCommitTime, name, outFile);
 
                 }
 
@@ -2913,7 +3168,7 @@ public class ResourceManager implements IResourceManager {
 
             log.info("Will process "+ndone+" indices");
             
-            assert ndone == nindices;
+            assert ndone+nskip == nindices : "ndone="+ndone+", nskip="+nskip+", nindices="+nindices;
 
             // submit all tasks, awaiting their completion.
             final List<Future<Object>> futures = getConcurrencyManager()
@@ -2945,11 +3200,9 @@ public class ResourceManager implements IResourceManager {
          * another task which will cause the live index partition definition to
          * be either updated (for a build task) or replaced (for an index split
          * task).
-         * 
-         * FIXME The metadata index is updated as a post-condition to reflect
-         * the new index partitions. This requires specialization of the task
-         * when the resource manager is executing on a data service to give it
-         * access to the metadata service for the index.
+         * <p>
+         * The {@link IMetadataService} is updated as a post-condition to
+         * reflect the index partition split.
          * 
          * @throws Exception
          */
@@ -3065,6 +3318,7 @@ public class ResourceManager implements IResourceManager {
                  * overflow until we have handle the old journal, all new writes
                  * are on the live index.
                  */
+                
                 return null;
 
             } finally {
@@ -3093,24 +3347,31 @@ public class ResourceManager implements IResourceManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-     public class BuildIndexSegmentTask extends AbstractPartitionTask {
+    public class BuildIndexSegmentTask extends AbstractPartitionTask {
 
-         final protected byte[] fromKey;
-         final protected byte[] toKey;
-         
-         /**
-          * 
-          * @param concurrencyManager
-          * @param timestamp
-          *            The lastCommitTime of the journal whose view of the index
-          *            you wish to capture in the generated {@link IndexSegment}.
-          * @param name
-          *            The name of the index.
-          */
+        final protected File outFile;
+
+        final protected byte[] fromKey;
+
+        final protected byte[] toKey;
+
+        /**
+         * 
+         * @param concurrencyManager
+         * @param timestamp
+         *            The lastCommitTime of the journal whose view of the index
+         *            you wish to capture in the generated {@link IndexSegment}.
+         * @param name
+         *            The name of the index.
+         * @param outFile
+         *            The file on which the {@link IndexSegment} will be
+         *            written.
+         */
         public BuildIndexSegmentTask(IConcurrencyManager concurrencyManager,
-                long timestamp, String name) {
+                long timestamp, String name, File outFile) {
 
-            this(concurrencyManager, timestamp, name, null/* fromKey */, null/* toKey */);
+            this(concurrencyManager, timestamp, name, outFile,
+                    null/* fromKey */, null/* toKey */);
 
         }
 
@@ -3122,6 +3383,9 @@ public class ResourceManager implements IResourceManager {
          *            you wish to capture in the generated {@link IndexSegment}.
          * @param name
          *            The name of the index.
+         * @param outFile
+         *            The file on which the {@link IndexSegment} will be
+         *            written.
          * @param fromKey
          *            The lowest key that will be counted (inclusive). When
          *            <code>null</code> there is no lower bound.
@@ -3130,10 +3394,14 @@ public class ResourceManager implements IResourceManager {
          *            <code>null</code> there is no upper bound.
          */
         public BuildIndexSegmentTask(IConcurrencyManager concurrencyManager,
-                long timestamp, String name, byte[] fromKey, byte[] toKey) {
+                long timestamp, String name, File outFile, byte[] fromKey, byte[] toKey) {
 
             super(concurrencyManager, timestamp, name);
 
+            if(outFile==null) throw new IllegalArgumentException();
+            
+            this.outFile = outFile;
+            
             this.fromKey = fromKey;
              
             this.toKey = toKey;
@@ -3164,7 +3432,8 @@ public class ResourceManager implements IResourceManager {
             /*
              * Build the index segment.
              */
-            return buildIndexSegment(name, src, commitTime, fromKey, toKey);
+            
+            return buildIndexSegment(name, src, outFile, commitTime, fromKey, toKey);
 
         }
 
@@ -3178,6 +3447,8 @@ public class ResourceManager implements IResourceManager {
      *            index).
      * @param src
      *            A view of the index partition as of the <i>createTime</i>.
+     * @parma outFile The file on which the {@link IndexSegment} will be
+     *        written.
      * @param createTime
      *            The timestamp of the view. This is typically the
      *            lastCommitTime of the old journal after an
@@ -3194,7 +3465,7 @@ public class ResourceManager implements IResourceManager {
      * 
      * @throws IOException
      */
-    public BuildResult buildIndexSegment(String name, IIndex src,
+    public BuildResult buildIndexSegment(String name, IIndex src, File outFile,
             long createTime, byte[] fromKey, byte[] toKey) throws IOException {
 
         assert createTime > 0L;
@@ -3205,9 +3476,6 @@ public class ResourceManager implements IResourceManager {
         // the branching factor for the generated index segment.
         final int branchingFactor = indexMetadata
                 .getIndexSegmentBranchingFactor();
-         
-         // the file to be generated.
-         final File outFile = getIndexSegmentFile(indexMetadata);
 
          // Note: truncates nentries to int.
         final int nentries = (int) Math.min(src.rangeCount(fromKey, toKey),
@@ -3232,6 +3500,9 @@ public class ResourceManager implements IResourceManager {
                  createTime//
          );
 
+         // report event
+         notifyIndexSegmentBuildEvent(builder);
+
          /*
           * notify the resource manager so that it can find this file.
           * 
@@ -3247,7 +3518,6 @@ public class ResourceManager implements IResourceManager {
          SegmentMetadata segmentMetadata = new SegmentMetadata(//
                  "" + outFile, //
                  outFile.length(),//
-                 ResourceState.Live,//
                  builder.segmentUUID,//
                  createTime//
                  );
@@ -3392,7 +3662,7 @@ public class ResourceManager implements IResourceManager {
 
                 assert splits[i].pmd != null;
 
-                assert splits[i].pmd instanceof PartitionMetadataWithSeparatorKeys;
+                assert splits[i].pmd instanceof LocalPartitionMetadata;
 
                 assert buildResults[i] != null;
                 
@@ -3498,7 +3768,7 @@ public class ResourceManager implements IResourceManager {
              /*
               * This is the old index partition definition.
               */
-             final PartitionMetadataWithSeparatorKeys oldpmd = indexMetadata
+             final LocalPartitionMetadata oldpmd = indexMetadata
                      .getPartitionMetadata();
 
              // Check pre-conditions.
@@ -3548,12 +3818,11 @@ public class ResourceManager implements IResourceManager {
 
              // describe the index partition.
              indexMetadata
-                     .setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(
+                     .setPartitionMetadata(new LocalPartitionMetadata(
                              oldpmd.getPartitionId(),//
-                             oldpmd.getDataServices(),//
-                             newResources,//
                              oldpmd.getLeftSeparatorKey(),//
-                             oldpmd.getRightSeparatorKey()//
+                             oldpmd.getRightSeparatorKey(),//
+                             newResources //
                      ));
              
              // update the metadata associated with the btree.
@@ -3648,9 +3917,9 @@ public class ResourceManager implements IResourceManager {
 
                 assert split.pmd != null;
 
-                assert split.pmd instanceof PartitionMetadataWithSeparatorKeys;
+                assert split.pmd instanceof LocalPartitionMetadata;
 
-                PartitionMetadataWithSeparatorKeys pmd = (PartitionMetadataWithSeparatorKeys) split.pmd;
+                LocalPartitionMetadata pmd = (LocalPartitionMetadata) split.pmd;
 
                 // check the leftSeparator key.
                 assert pmd.getLeftSeparatorKey() != null;
@@ -3704,7 +3973,7 @@ public class ResourceManager implements IResourceManager {
              * separator key of the source (this condition is also checked
              * above).
              */
-            assert ((PartitionMetadataWithSeparatorKeys) splits[0].pmd)
+            assert ((LocalPartitionMetadata) splits[0].pmd)
                     .getLeftSeparatorKey().equals(
                             indexMetadata.getPartitionMetadata()
                                     .getLeftSeparatorKey());
@@ -3716,7 +3985,7 @@ public class ResourceManager implements IResourceManager {
             {
                 
                 // right separator for the last split.
-                final byte[] rightSeparator = ((PartitionMetadataWithSeparatorKeys) splits[splits.length - 1].pmd)
+                final byte[] rightSeparator = ((LocalPartitionMetadata) splits[splits.length - 1].pmd)
                         .getRightSeparatorKey();
                 
                 if(rightSeparator == null ) {
@@ -3770,7 +4039,7 @@ public class ResourceManager implements IResourceManager {
              * the source index partitions key range. There MUST NOT be any
              * overlap in the key ranges for the splits.
              */
-            final Split[] splits = splitHandler.getSplits(src);
+            final Split[] splits = splitHandler.getSplits(ResourceManager.this,src);
             
             if (splits == null) {
                 
@@ -3778,8 +4047,11 @@ public class ResourceManager implements IResourceManager {
                  * No splits were choosen so the index will not be split at this
                  * time.  Instead we do a normal index segment build task.
                  */
-                
-                return buildIndexSegment(name, src, createTime,
+                                
+                // the file to be generated.
+                final File outFile = getIndexSegmentFile(indexMetadata);
+
+                return buildIndexSegment(name, src, outFile, createTime,
                         null/* fromKey */, null/*toKey*/);
                 
             }
@@ -3804,10 +4076,13 @@ public class ResourceManager implements IResourceManager {
                 
                 final Split split = splits[i];
 
-                PartitionMetadataWithSeparatorKeys pmd = (PartitionMetadataWithSeparatorKeys)split.pmd;
+                final LocalPartitionMetadata pmd = (LocalPartitionMetadata)split.pmd;
+                
+                final File outFile = getIndexSegmentFile(indexMetadata);
                 
                 AbstractTask task = new BuildIndexSegmentTask(
                         getConcurrencyManager(), -createTime, name, //
+                        outFile,//
                         pmd.getLeftSeparatorKey(), //
                         pmd.getRightSeparatorKey());
 
@@ -3872,7 +4147,7 @@ public class ResourceManager implements IResourceManager {
 
                 assert splits[i].pmd != null;
 
-                assert splits[i].pmd instanceof PartitionMetadataWithSeparatorKeys;
+                assert splits[i].pmd instanceof LocalPartitionMetadata;
                 
                 assert buildResults[i] != null;
                 
@@ -3901,37 +4176,55 @@ public class ResourceManager implements IResourceManager {
              */
             final BTree src = (BTree) getIndexOnStore(name, ITx.UNISOLATED, journal); 
             
+            /*
+             * Locators for the new index partitions.
+             */
+
+            final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src.getIndexMetadata().getPartitionMetadata();
+
+            final PartitionLocatorMetadataWithSeparatorKeys[] locators = new PartitionLocatorMetadataWithSeparatorKeys[splits.length];
+            
             for(int i=0; i<splits.length; i++) {
 
                 // new metadata record (cloned).
                 final IndexMetadata md = src.getIndexMetadata().clone();
                 
-                final PartitionMetadataWithSeparatorKeys pmd = (PartitionMetadataWithSeparatorKeys)splits[i].pmd;
+                final LocalPartitionMetadata pmd = (LocalPartitionMetadata)splits[i].pmd;
+                
+                assert pmd.getResources() == null : "Not expecting resources for index segment: "+pmd;
+
+                /*
+                 * form locator for the new index partition for this split..
+                 */
+                final PartitionLocatorMetadataWithSeparatorKeys locator = new PartitionLocatorMetadataWithSeparatorKeys(
+                        oldpmd.getPartitionId(),//
+                        /*
+                         * This is the set of failover services for this index
+                         * partition. The first element of the array is always
+                         * the data service on which this resource manager is
+                         * running. The remainder of elements in the array are
+                         * the failover services.
+                         * 
+                         * @todo The index partition data will be replicated at
+                         * the byte image level for the live journal.
+                         * 
+                         * @todo New index segment resources will be replicated
+                         * as well.
+                         * 
+                         * @todo Once the index partition data is fully
+                         * replicated we update the metadata index.
+                         */
+                        getDataServiceUUIDs(),//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey()//
+                        );
+                
+                locators[i] = locator;
                 
                 /*
                  * Update the view definition.
-                 * 
-                 * Note: We have to override several fields in the new index
-                 * segments's partition metadata description that are filled
-                 * with junk.
-                 * 
-                 * FIXME It would be much better not to have such junk since it
-                 * is persistent in the IndexSegmentFileStore! This will mean
-                 * converting the partitionId to a UUID, having access to the
-                 * DataServiceUUIDs (or replacing them with a named ZONE) and
-                 * having the task that defines the splits also define the
-                 * filename on which the index segment will be written.
                  */
-                md.setPartitionMetadata(new PartitionMetadataWithSeparatorKeys(//
-                        pmd.getPartitionId(),// new partitionId.
-                        src.getIndexMetadata().getPartitionMetadata().getDataServices(),// from src
-                        new IResourceMetadata[]{// 
-                            journal.getResourceMetadata(), // the live journal.
-                            buildResults[i].segmentMetadata // the new index segment.
-                        },//
-                        pmd.getLeftSeparatorKey(), //
-                        pmd.getRightSeparatorKey() //
-                        ));
+                md.setPartitionMetadata(pmd);
                 
                 // create new btree.
                 final BTree btree = BTree.create(journal, md);
@@ -3963,540 +4256,29 @@ public class ResourceManager implements IResourceManager {
             // drop the source index (the old index partition).
             journal.dropIndex(name);
 
+            /*
+             * Notify the metadata service that the index partition has been split.
+             */
+            getMetadataService().splitIndexPartition(
+                    src.getIndexMetadata().getName(),//
+                    oldpmd.getPartitionId(),//
+                    oldpmd.getLeftSeparatorKey(),//
+                    locators);
+            
             return null;
             
         }
         
     }
-    
-    /**
-     * A configurable default policy for deciding when and where to split an
-     * index partition into 2 or more index partitions.
-     * <p>
-     * Note: There is probably no single value for
-     * {@link #getEntryCountPerSplit()} that is going to be "right" across
-     * applications. The space requirements for keys is very difficult to
-     * estimate since leading key compression will often provide a good win.
-     * Likewise, indices are free to use compression on their values as well so
-     * the size of the byte[] values is not a good estimate of their size in the
-     * index.
-     * <p>
-     * Note: The #of index entries is a good proxy for the space requirements of
-     * most indices. The {@link BigdataRepository} is one case where the space
-     * requirements could be quite different since 64M blocks may be stored
-     * along with the index entries, however in that case you can also test for
-     * the size of the index segment that is part of the view and decide that
-     * it's time to split the view.
-     * 
-     * @todo Perhaps I could do something to estimate the size of the nodes and
-     *       the leaves in the index.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class DefaultSplitHandler implements ISplitHandler {
 
-        private int entryCountPerSplit;
-        private int sampleRate;
-        private double overCapacityMultiplier;
-        private double underCapacityMultiplier;
-
-        /**
-         * De-serialization ctor.
-         */
-        public DefaultSplitHandler() {
-            
-        }
-
-        public DefaultSplitHandler(int entryCountPerSplit, int sampleRate,
-                double overCapacityMultiplier, double underCapacityMultiplier) {
-
-            setEntryCountPerSplit(entryCountPerSplit);
-
-            setSampleRate(sampleRate);
-
-            setOverCapacityMultiplier(overCapacityMultiplier);
-            
-            setUnderCapacityMultiplier(underCapacityMultiplier);
-            
-        }
+    public String getStatistics() {
         
-        /**
-         * The target maximum #of index entries in an index partition.
-         */
-        public int getEntryCountPerSplit() {
-         
-            return entryCountPerSplit;
-            
-        }
-
-        public void setEntryCountPerSplit(int entryCountPerSplit) {
-            
-            if(entryCountPerSplit<=BTree.MIN_BRANCHING_FACTOR) {
-                
-                throw new IllegalArgumentException();
-                
-            }
-           
-            this.entryCountPerSplit = entryCountPerSplit;
-            
-        }
-
-        /**
-         * The #of samples per estimated #of splits.
-         */
-        public int getSampleRate() {
-            
-            return sampleRate;
-            
-        }
-
-        public void setSampleRate(int sampleRate) {
-            
-            this.sampleRate = sampleRate;
-            
-        }
-
-        /**
-         * The threshold for splitting an index is the
-         * {@link #getOverCapacityMultiplier()} times
-         * {@link #getEntryCountPerSplit()}. If there are fewer than this many
-         * entries in the index then it will not be split.
-         */
-        public double getOverCapacityMultiplier() {
-            
-            return overCapacityMultiplier;
-            
-        }
-
-        /**
-         * 
-         * @param overCapacityMultiplier
-         *            A value in [1.0:2.0].
-         */
-        public void setOverCapacityMultiplier(double overCapacityMultiplier) {
-
-            final double min = 1.0;
-            final double max = 2.0;
-
-            if (overCapacityMultiplier < min || overCapacityMultiplier > max ) {
-                
-                throw new IllegalArgumentException("Must be in [" + min + ":"
-                        + max + "], but was " + overCapacityMultiplier);
-                
-            }
-            
-            this.overCapacityMultiplier = overCapacityMultiplier;
-            
-        }
-
-        /**
-         * This is the target under capacity rate for a new index partition. For
-         * example, if the {@link #getEntryCountPerSplit()} is 5M and this
-         * property is <code>.75</code> then an attempt will be made to divide
-         * the index partition into N splits such that each split is at 75% of
-         * the {@link #getEntryCountPerSplit()} capacity.
-         */
-        public double getUnderCapacityMultiplier() {
-
-            return underCapacityMultiplier;
-            
-        }
-
-        /**
-         * 
-         * @param underCapacityMultiplier
-         *            A value in [0.5,1.0).
-         */
-        public void setUnderCapacityMultiplier(double underCapacityMultiplier) {
-
-            final double min = 0.5;
-            final double max = 1.0;
-
-            if (underCapacityMultiplier < min || underCapacityMultiplier >= max) {
-
-                throw new IllegalArgumentException("Must be in [" + min + ":"
-                        + max + "), but was " + underCapacityMultiplier);
-
-            }
-            
-            this.underCapacityMultiplier = underCapacityMultiplier;
-            
-        }
-
-        public boolean shouldSplit(IIndex view) {
-            
-            /*
-             * Range count the index. Will overestimate if deleted entries
-             * or overwritten entries exist.
-             */
-            final long rangeCount = view.rangeCount(null, null);
-
-            /*
-             * Recommend split if the range count exceeds the overcapacity
-             * multiplier.
-             */
-
-            if ((getOverCapacityMultiplier() * rangeCount) >= entryCountPerSplit) {
-                
-                log.info("Recommending split: rangeCount=" + rangeCount);
-                
-                return true;
-                
-            }
-            
-            return false;
-            
-        }
-
-        /**
-         * A sample collected from a key-range scan.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        protected class Sample {
-           
-            /**
-             * A key from the index.
-             */
-            final byte[] key;
-            
-            /**
-             * The origin zero (0) offset at which that key was found
-             * (interpretation is that the key was visited by the Nth
-             * {@link ITuple}).
-             */
-            final int offset;
-            
-            public Sample(byte[] key, int offset) {
-                
-                assert key != null;
-                
-                assert offset >= 0;
-                
-                this.key = key;
-                
-                this.offset = offset;
-                
-            }
-            
-            public String toString() {
-                
-                return super.toString()+"{offset="+offset+", key="+Arrays.toString(key)+"}";
-                
-            }
-            
-        }
-
-        /**
-         * Sample index using a range scan choosing ({@link #getSampleRate()} x
-         * N) {@link Sample}s. The key range scan will filter out both
-         * duplicates and deleted index entries. The scan will halt if the index
-         * entry offsets would exceed an int32 value.
-         * 
-         * @return An ordered array of {@link Sample}s as an aid to choosen the
-         *         split points for the view.
-         */
-        public Sample[] sampleIndex(IIndex ndx, AtomicLong nvisited) {
-         
-            final int sampleRate = getSampleRate();
-
-            final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
-                    Integer.MAX_VALUE);
-
-            final IEntryIterator itr = ndx.rangeIterator(null, null,
-                    0/* capacity */, IRangeQuery.KEYS, null/* filter */);
-
-            ITuple tuple = null;
-            
-            final List<Sample> samples = new ArrayList<Sample>(rangeCount
-                    / sampleRate);
-            
-            while(itr.hasNext()) {
-                
-                tuple = itr.next();
-                
-                final long offset = tuple.getVisitCount() - 1;
-                
-                if(offset == Integer.MAX_VALUE) {
-                    
-                    /*
-                     * This covers an extreme condition. If the split offsets
-                     * would exceed an int32 value then we do not continue. Such
-                     * views can be broken down by multiple passes, e.g., on
-                     * subsequent overflows of a journal.
-                     */
-                    
-                    log.warn("Aborting sample - offsets would exceed int32.");
-                    
-                    break;
-                    
-                }
-                
-                if((offset % sampleRate)==0) {
-                    
-                    // take a sample.
-                    
-                    final Sample sample = new Sample(tuple.getKey(), (int) offset);
-                     
-                    log.info("samples["+samples.size()+"] = "+sample);
-
-                    samples.add( sample );
-                    
-                }
-                
-            }
-            
-            assert samples.size() > 0;
-            
-            assert samples.get(0).offset == 0 : "Expecting offset := 0 for 1st sample, not "
-                    + samples.get(0).offset;
-            
-            // the actual #of index entries in the view.
-            nvisited.set( tuple == null ? 0L : tuple.getVisitCount()); 
-            
-            log.info("Collected "+samples.size()+" samples from "+nvisited+" index entries");
-            
-            return samples.toArray(new Sample[samples.size()]);
-            
-        }
-
-        /**
-         * Note: There are configuation parameters so that you can choose to let
-         * the index partition grow until it reaches e.g., 150-200% of its
-         * maximum entry count and then split it into N index partitions each of
-         * which is e.g., 50-75% full.
-         * <p>
-         * Note: If the index partition has more than int32 index entries then
-         * the last split will have a zero (0) toIndex since we don't know how
-         * many index entries will go into that split.
-         * 
-         * @param ndx
-         *            The source index partition.
-         * 
-         * @return A {@link Split}[] array contains everything that we need to
-         *         define the new index partitions <em>except</em> the
-         *         partition identifiers.
-         * 
-         * @see #getSplits(IIndex, int,
-         *      com.bigdata.journal.ResourceManager.DefaultSplitHandler.Sample[])
-         */
-        public Split[] getSplits(IIndex ndx) {
-            
-            final AtomicLong nvisited = new AtomicLong();
-            
-            final Sample[] samples = sampleIndex(ndx, nvisited);
-            
-            if(nvisited.get() < overCapacityMultiplier * getEntryCountPerSplit()) {
-                
-                log.info("Will not split : nvisited=" + nvisited
-                        + " is less than " + overCapacityMultiplier
-                        + " * entryCountPerSplit(" + entryCountPerSplit + ")");
-                
-                return null;
-                
-            }
-            
-            /*
-             * 5. Compute the actual #of splits
-             */
-            final int nsplits = (int) Math
-                    .floor((nvisited.get() / getUnderCapacityMultiplier())
-                            / getEntryCountPerSplit());
-
-            if (nsplits < 2) {
-
-                /*
-                 * Split rejected based on insufficient capacity in the result
-                 * splits for the configured undercapacity multiplier.
-                 */
-                
-                log.info("Will not split : nsplits(" + nsplits
-                                + ") := floor(nvisited(" + nvisited
-                                + ") / underCapacityMultiplier("
-                                + getUnderCapacityMultiplier()
-                                + ") / entryCountPerSplit("
-                                + +entryCountPerSplit + ")");
-
-                return null;
-                
-            }
-
-            return getSplits(ndx, nsplits, samples, nvisited.get());
-            
-        }
-
-        /**
-         * Examine the {@link Sample}s choosing {@link Split}s that best
-         * capture the target #of splits to be made.
-         * <p>
-         * Note: If you are trying to write a custom split rule then consider
-         * subclassing this method and adjust the split points to as to obey any
-         * application constraint such as not splitting a primary key across
-         * index partitions. In general, the split rule can scan forward or
-         * backward until it finds a suitable adjusted split point.
-         * <p>
-         * Note: The caller MUST disregard the {@link IResourceMetadata}[]
-         * attached to {@link Split#pmd} since we do not have that information
-         * on hand here. The correct {@link IResourceMetadata}[] is available
-         * locally to {@link UpdateSplitIndexPartition}.
-         * 
-         * @param ndx
-         *            The source index partition.
-         * @param nsplits
-         *            The target #of splits. If necessary or desired, the #of
-         *            splits MAY be changed simply by returning an array with a
-         *            different #of splits -or- <code>null</code> iff you
-         *            decide that you do not want the index partition to be
-         *            split at this time.
-         * @param samples
-         *            An ordered array of samples from the index partition. See
-         *            {@link #sampleIndex(IIndex, AtomicLong)()}.
-         * @param nvisited
-         *            The #of index entries that were visited when generating
-         *            those samples. This is capped at {@link Integer#MAX_VALUE}
-         *            by {@link #sampleIndex(IIndex, AtomicLong)}.
-         * 
-         * @return A {@link Split}[] array contains everything that we need to
-         *         define the new index partitions <em>except</em> the
-         *         partition identifiers -or- <code>null</code> if a more
-         *         detailed examination reveals that the index SHOULD NOT be
-         *         split at this time.
-         * 
-         * @see #getEntryCountPerSplit()
-         * @see #getUnderCapacityMultiplier()
-         * 
-         * @todo there are a lot of edge conditions in this -- write tests!
-         */
-        protected Split[] getSplits(IIndex ndx, int nsplits, Sample[] samples, long nvisited) {
-
-            // the name of the scale-out index vs the name under which the index partition is registered.
-            final String scaleOutIndexName = ndx.getIndexMetadata().getName();
-            
-            // The target #of index entries per split.
-            final int targetCapacity = (int) (getEntryCountPerSplit() * getUnderCapacityMultiplier());
-            
-            final Split[] splits = new Split[nsplits];
-
-            // index into the samples[].
-            int j = 0;
-            // #of index entries assigned into splits so far.
-            int nused = 0;
-            // begin at index zero into the source index partition.
-            int fromIndex = 0;
-            // begin with the leftSeparator for the source index partition.
-            byte[] fromKey = ndx.getIndexMetadata().getPartitionMetadata().getLeftSeparatorKey();
-            
-            for (int i = 0; i < nsplits; i++) {
-
-                Sample sample = null;
-
-                // consider remaining samples.
-                for (; j < samples.length; j++) {
-
-                    sample = samples[j];
-
-                    int count = sample.offset - nused;
-
-                    if (count >= targetCapacity) {
-
-                        log.info("Filled split[" + i + "] with " + count
-                                + " entries: targetCapacity=" + targetCapacity
-                                + ", samples[j]=" + sample);
-
-                        j++; // consumed.
-
-                        nused += count;
-                        
-                        break;
-                        
-                    }
-                    
-                }
-
-                final int toIndex;
-                if (sample == null) {
-
-                    assert j == samples.length;
-
-                    toIndex = 0;
-
-                } else {
-
-                    toIndex = sample.offset;
-
-                }
-
-                final byte[] toKey;
-                if (i == nsplits - 1) {
-
-                    // Note: always assign the rightSeparator to the last split.
-
-                    toKey = ndx.getIndexMetadata().getPartitionMetadata()
-                            .getRightSeparatorKey();
-
-                } else {
-
-                    assert sample != null;
-                    
-                    toKey = sample.key;
-                    
-                }
-                
-                PartitionMetadataWithSeparatorKeys pmd = nextPartition(scaleOutIndexName, fromKey,
-                        toKey);
-                
-                splits[i] = new Split(pmd,fromIndex,toIndex);
-                
-                fromKey = toKey;
-                
-                fromIndex = toIndex;
-                
-            }
-            
-            return splits;
-            
-        }
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("ResourceManager: dataService="+getDataServiceUUID()+", dataDir="+dataDir);
+        
+        return sb.toString();
         
     }
-    
-    /**
-     * FIXME This MUST be coordinated with the {@link MetadataIndex}. Perhaps
-     * the right thing is to change the partitionId into a UUID so that we can
-     * define them in a bottom up manner.
-     * 
-     * @param name The name of the scale-out index.
-     * 
-     * @return
-     */
-    static PartitionMetadataWithSeparatorKeys nextPartition(String name, byte[] leftSeparator, byte[] rightSeparator) {
-        
-        // @todo this is not restart safe and MUST be coordinated with the MDI.
-        final int partitionId = _partitionId.incrementAndGet();
-        
-        // @todo this is random junk - must be same as this dataService.
-        final UUID[] dataServiceUUIDs = new UUID[] {UUID.randomUUID()};
-        
-        /*
-         * @todo this is random junk - must be overriden once the index segment
-         * has been created and we are ready to update the view.
-         */
-        final IResourceMetadata[] resourceMetadata = new IResourceMetadata[] {
-                new JournalMetadata("junk",FileMetadata.headerSize0,ResourceState.Live,UUID.randomUUID(),System.currentTimeMillis())
-        };
-        
-        return new PartitionMetadataWithSeparatorKeys(
-                partitionId,      //
-                dataServiceUUIDs, //
-                resourceMetadata, //
-                leftSeparator,    //
-                rightSeparator    //
-                );
-        
-        
-    }
- 
-    static private AtomicInteger _partitionId = new AtomicInteger(0);
     
 }

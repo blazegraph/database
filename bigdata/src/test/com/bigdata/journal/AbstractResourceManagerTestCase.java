@@ -28,9 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.btree.IEntryFilter;
+import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.ResultSet;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.rawstore.IBlock;
 import com.bigdata.repo.BigdataRepository.Options;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
@@ -73,20 +87,88 @@ public class AbstractResourceManagerTestCase extends
         
     }
     
+    protected IMetadataService metadataService;
     protected ResourceManager resourceManager;
     protected ConcurrencyManager concurrencyManager;
     protected AbstractLocalTransactionManager localTransactionManager;
     protected static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
+    /**
+     * Setup test fixtures.
+     */
     public void setUp() throws Exception {
         
         super.setUp();
 
-        Properties properties = getProperties();
-        
-        resourceManager = new ResourceManager(properties);
-        
-        localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
+        metadataService = new MockMetadataService();
+//        {
+//        
+//            /*
+//             * Note: The metadata service uses a ResourceManager internally.
+//             * Therefore we setup a distinct DATA_DIR to avoid conflicts with
+//             * the ResourceManager instance whose behavior we are trying to
+//             * test.
+//             */
+//            Properties properties = new Properties(getProperties());
+//
+//            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//            
+//            metadataService = new MetadataService(properties) {
+//
+//                private final UUID uuid = UUID.randomUUID();
+//
+//                @Override
+//                protected IMetadataService getMetadataService() {
+//                    return this;
+//                }
+//
+//                @Override
+//                public UUID getServiceUUID() throws IOException {
+//                    return uuid;
+//                }
+//
+//                public UUID getUnderUtilizedDataService() throws IOException {
+//                    throw new UnsupportedOperationException();
+//                }
+//
+//                public IDataService getDataServiceByUUID(UUID serviceUUID)
+//                        throws IOException {
+//                    throw new UnsupportedOperationException();
+//                }
+//
+//            };
+//
+//        }
+
+        final Properties properties = getProperties();
+
+        resourceManager = new ResourceManager(properties) {
+
+            final private UUID dataServiceUUID = UUID.randomUUID();
+            
+            public IMetadataService getMetadataService() {
+
+                return metadataService;
+
+            }
+
+            public UUID getDataServiceUUID() {
+                
+                return dataServiceUUID;
+                
+            }
+
+            /** Note: no failover services. */
+            public UUID[] getDataServiceUUIDs() {
+                
+                return new UUID[] { dataServiceUUID };
+                
+            }
+
+        };
+
+        localTransactionManager = new AbstractLocalTransactionManager(
+                resourceManager) {
 
             public long nextTimestamp() {
 
@@ -131,6 +213,8 @@ public class AbstractResourceManagerTestCase extends
 
         resourceManager.shutdown();
 
+//        metadataService.shutdown();
+        
     }
 
     /**
@@ -151,6 +235,100 @@ public class AbstractResourceManagerTestCase extends
         if (resourceManager != null)
             resourceManager.shutdownNow();
 
+//        if (metadataService!= null)
+//            metadataService.shutdownNow();
+
     }
 
+    /**
+     * A minimal implementation of {@link IMetadataService} - only those methods
+     * actually used by the {@link ResourceManager} are implemented.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class MockMetadataService implements IMetadataService {
+
+        private AtomicInteger partitionId = new AtomicInteger(0);
+        
+        public UUID getUnderUtilizedDataService() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public IDataService getDataServiceByUUID(UUID serviceUUID) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public int nextPartitionId(String name) throws IOException, InterruptedException, ExecutionException {
+            return partitionId.incrementAndGet();
+        }
+
+        public UUID registerScaleOutIndex(IndexMetadata metadata, byte[][] separatorKeys, UUID[] dataServices) throws IOException, InterruptedException, ExecutionException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void dropScaleOutIndex(String name) throws IOException, InterruptedException, ExecutionException {
+            throw new UnsupportedOperationException();
+        }
+
+        public UUID getServiceUUID() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public JournalMetadata getJournalMetadata() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public String getStatistics() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void registerIndex(String name, IndexMetadata metadata) throws IOException, InterruptedException, ExecutionException {
+            throw new UnsupportedOperationException();
+        }
+
+        public IndexMetadata getIndexMetadata(String name,long timestamp) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public String getStatistics(String name) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void dropIndex(String name) throws IOException, InterruptedException, ExecutionException {
+            throw new UnsupportedOperationException();
+        }
+
+        public ResultSet rangeIterator(long tx, String name, byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) throws InterruptedException, ExecutionException, IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public Object submit(long tx, String name, IIndexProcedure proc) throws InterruptedException, ExecutionException, IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public IBlock readBlock(IResourceMetadata resource, long addr) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public long commit(long tx) throws ValidationError, IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void abort(long tx) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void splitIndexPartition(String name, int partitionId, byte[] leftSeparator, PartitionLocatorMetadataWithSeparatorKeys[] locators) throws IOException, InterruptedException, ExecutionException {
+
+            log.info("Split index partition: name="+name+", partitionId="+partitionId+" into "+locators.length+" partitions");
+            
+        }
+
+        public String getStatistics(String name, long timestamp) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+        
+    }
+    
 }

@@ -27,13 +27,51 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.mdi;
 
-import java.util.UUID;
-
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.journal.Journal;
+import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
 
 /**
  * A description of the metadata state for a partition of a scale-out index.
+ * <p>
+ * Each index partition has a distinct partitionId. This partitionId is assigned
+ * by a centralized service - the {@link IMetadataService} for the scale-out
+ * index for that index partition. A centralized service is required in order to
+ * obtain distinct int32 partition identifiers because those partition
+ * identifiers are used in turn to support scale-out partition local
+ * {@link ICounter}s - the partitionId forms the upper word of the int64
+ * counter value.
+ * <p>
+ * The scale-out index name and the left and right separator keys are a complete
+ * identifier for an index partition - any two index partitions which share
+ * those three properties MUST be the same index partition. However, access to
+ * index partitions is generally in terms of the name of the scale-out index and
+ * the partitionId.  See {@link DataService#getIndexPartitionName(String, int)}
+ * which returns the name under which an index partition will be registered and
+ * the name that must be used when requesting operations on that index partition
+ * using an {@link IDataService}.
+ * <p>
+ * An index partition has additional state, including:
+ * <ul>
+ * <li>the {@link IDataService} on which it resides.</li>
+ * <li>the {@link IResourceMetadata}[] describing the resources required to
+ * materialize a view of the index partition.</li>
+ * <li>those resources themselves, which contain the index partition data.</li>
+ * </ul>
+ * <p>
+ * The left and right separator keys define the half-open key range of the index
+ * partition. The separator keys are available directly as the <i>keys</i> of
+ * the {@link MetadataIndex}, therefore they are not stored in the index
+ * partition records within the metadata index. However, the separator keys are
+ * stored in the index partition description within the {@link IndexMetadata}
+ * records so that they are available locally with the index partition data.
+ * <p>
+ * If the client knows a key or key range of interest for a scale-out index then
+ * they can obtain the relevant index partition descriptions and a data service
+ * locator either either by flooding the query to the {@link IDataService}s or
+ * from the {@link MetadataIndex}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -42,74 +80,12 @@ public interface IPartitionMetadata {
 
     /**
      * The unique partition identifier.
-     * 
-     * @todo the index name and left and right separator keys are a complete
-     *       description of an index partition. The index partition name could
-     *       be formed from those three fields rather than the index name and
-     *       the partitionId. This would releave us of centralized assignment of
-     *       partition identifiers.
-     *       <p>
-     *       If the client knows the left,right separators and the data service
-     *       then they can directly talk to the data service.
-     *       <p>
-     *       If the client knows a key or key range of interest then they can
-     *       obtain the partition descriptions and a data service locator either
-     *       either by flooding the query to the data servers or from a metadata
-     *       index.
-     *       <p>
-     *       Another alternative is to use a UUID here. Like the separator keys,
-     *       but unlike the partitionId, UUIDs may be assigned either top-down
-     *       or bottom up. Their advantage over the separator keys is that they
-     *       are more terse. However, the separator keys are not that much data
-     *       when compared to the typical request/response for an RMI by a
-     *       client to a data service.
      */
     public int getPartitionId();
 
     /**
-     * The ordered list of data services on which data for this partition will
-     * be written and from which data for this partition may be read.
-     * 
-     * @todo data services should be placed into zones that handle replication.
-     *       There should be a distinct zone for the metadata services since
-     *       their data should not be co-mingled with the regular data services.
-     *       The clients should get failover information from the zone not this
-     *       method. Either replace this with the zone identifier and do lookup
-     *       of the data service on the zone or keep this as the primary in the
-     *       zone but have the zone know about failover services for the
-     *       primary. This will make it much easier to move an index partition
-     *       and handle failover since we will not be duplicating the data
-     *       throughout the metadata index. perhaps assign a partition UUID and
-     *       do lookup of the data service within the zone using that so that we
-     *       do not have to update the partition description at all when we move
-     *       an index partition. Alternative, retire the old partition
-     *       identifier and issue a new one each time the data service chain is
-     *       modified or the index partition is moved.
+     * Return {@link #getPartitionId()}
      */
-    public UUID[] getDataServices();
+    public int hashCode();
     
-    /**
-     * Zero or more files containing {@link Journal}s or {@link IndexSegment}s
-     * holding data for this index partition. The order of the resources
-     * corresponds to the order in which a fused view of the index partition
-     * will be read. Reads begin with the most "recent" data for the index
-     * partition and stop as soon as there is a "hit" on one of the resources
-     * (including a hit on a deleted index entry).
-     * <p>
-     * Note: Only the {@link ResourceState#Live} resources should be read in
-     * order to provide a consistent view of the data for the index partition.
-     * {@link ResourceState#Dead} resources will eventually be scheduled for
-     * restart-safe deletion.
-     * 
-     * @see ResourceState
-     * 
-     * @todo Perhaps this information should only be kept locally in the index
-     *       partitions themselves on the data service. The client certainly
-     *       does not need this information in order to direct its request to
-     *       the appropriate data service. This also relieves us of the chore of
-     *       updating the {@link MetadataIndex} each time we overflow the
-     *       journal.
-     */
-    public IResourceMetadata[] getResources();
-
 }

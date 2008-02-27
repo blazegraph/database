@@ -331,6 +331,12 @@ public class MetadataServer extends DataServer {
             }.start();
 
         }
+
+        protected IMetadataService getMetadataService() {
+
+            return this;
+            
+        }
         
     }
 

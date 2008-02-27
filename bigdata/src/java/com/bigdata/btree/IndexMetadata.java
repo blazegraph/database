@@ -36,8 +36,8 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.journal.ResourceManager.DefaultSplitHandler;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.journal.DefaultSplitHandler;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.sparse.SparseRowStore;
@@ -225,7 +225,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private String name;
     private int branchingFactor;
     private int indexSegmentBranchingFactor;
-    private PartitionMetadataWithSeparatorKeys pmd;
+    private LocalPartitionMetadata pmd;
     private String className;
     private String checkpointClassName;
     private IKeySerializer keySer;
@@ -297,7 +297,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * {@link BTree} is not part of a scale-out index. This is updated when the
      * view composition for the index partition is changed.
      */
-    public final PartitionMetadataWithSeparatorKeys getPartitionMetadata() {return pmd;}
+    public final LocalPartitionMetadata getPartitionMetadata() {return pmd;}
     
     /**
      * The name of a class derived from {@link BTree} that will be used to
@@ -415,7 +415,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.keySer = keySer;
     }
 
-    public void setPartitionMetadata(PartitionMetadataWithSeparatorKeys pmd) {
+    public void setPartitionMetadata(LocalPartitionMetadata pmd) {
         this.pmd = pmd;
     }
 
@@ -727,7 +727,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
         
-        pmd = (PartitionMetadataWithSeparatorKeys)in.readObject();
+        pmd = (LocalPartitionMetadata)in.readObject();
         
         className = in.readUTF();
         

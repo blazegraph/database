@@ -35,7 +35,6 @@ import java.util.UUID;
 
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.ResourceState;
 
 
 /**
@@ -172,13 +171,6 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
                 
             }
 
-            public ResourceState state() {
-
-                // presumed live.
-                return ResourceState.Live;
-                
-            }
-            
         };
         
     }

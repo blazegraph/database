@@ -63,11 +63,13 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
         super(arg0);
     }
 
+    /**
+     * Overriden to specify the {@link BufferMode#Disk} mode.
+     */
     public Properties getProperties() {
         
         Properties properties = new Properties( super.getProperties() );
         
-        // Note: test requires data on disk.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
         
@@ -147,7 +149,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          */
         {
 
-            IIndex ndx = fed.getIndex(ITx.UNISOLATED, name);
+            IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
             ndx.submit(nentries, keys, vals,
                     BatchInsertConstructor.RETURN_NO_VALUES, null/*handler*/);
@@ -159,7 +161,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          */
         {
 
-            IIndex ndx = fed.getIndex(ITx.UNISOLATED, name);
+            IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
             assertEquals(nentries, ndx.rangeCount(null, null));
 
@@ -258,9 +260,9 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * Verify the scale-out index is registered.
          */
         
-        assertNotNull(fed.getIndex(ITx.UNISOLATED, name));
+        assertNotNull(fed.getIndex(name,ITx.UNISOLATED));
 
-        assertEquals(indexUUID, fed.getIndex(ITx.UNISOLATED, name)
+        assertEquals(indexUUID, fed.getIndex(name,ITx.UNISOLATED)
                 .getIndexMetadata().getIndexUUID());
         
         /*
@@ -268,7 +270,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          */
         {
 
-            IIndex ndx = fed.getIndex(ITx.UNISOLATED, name);
+            IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
             assertEquals(nentries, ndx.rangeCount(null, null));
 

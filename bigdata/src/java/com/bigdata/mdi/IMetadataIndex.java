@@ -49,7 +49,7 @@ import com.bigdata.service.IMetadataService;
  * 
  * @todo If these methods are to be invoked remotely then we will need to
  *       returning the byte[] rather than the de-serialized
- *       {@link PartitionMetadata}.
+ *       {@link PartitionLocatorMetadata}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -72,7 +72,7 @@ public interface IMetadataIndex extends IIndex, ILinearList {
      * 
      * @return The partition with that separator key or <code>null</code>.
      */
-    public PartitionMetadata get(byte[] key);
+    public PartitionLocatorMetadata get(byte[] key);
 
     /**
      * Find the index of the partition spanning the given key.
@@ -93,7 +93,7 @@ public interface IMetadataIndex extends IIndex, ILinearList {
      * @return The partition spanning the given key or <code>null</code> if
      *         there are no partitions defined.
      */
-    public PartitionMetadata find(byte[] key);
+    public PartitionLocatorMetadata find(byte[] key);
 
     /**
      * Return the index of the partitions corresponding to the fromKey and the

@@ -56,13 +56,13 @@ public class SegmentMetadata extends AbstractResourceMetadata {
      * De-serialization constructor.
      */
     public SegmentMetadata() {
-        
+
     }
 
-    public SegmentMetadata(String filename, long nbytes, ResourceState state,
-            UUID uuid, long commitTime) {
+    public SegmentMetadata(String filename, long nbytes, UUID uuid,
+            long commitTime) {
 
-        super(filename, nbytes, state, uuid, commitTime);
+        super(filename, nbytes, uuid, commitTime);
 
     }
 

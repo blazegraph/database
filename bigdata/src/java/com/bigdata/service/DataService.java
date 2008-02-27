@@ -40,7 +40,6 @@ import java.util.concurrent.RejectedExecutionException;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
@@ -63,8 +62,6 @@ import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.mdi.ResourceState;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.MillisecondTimestampFactory;
@@ -79,9 +76,6 @@ import com.bigdata.util.MillisecondTimestampFactory;
  * @version $Id$
  * 
  * @see DataServer, which is used to start this service.
- * 
- * @todo The data service should redirect clients if an index partition has been
- *       moved (shed) while a client has a lease.
  * 
  * @todo Participate in 1-phase (local) and 2-/3- phrase (distributed) commits
  *       with an {@link ITransactionManagerService} service. The data service
@@ -157,16 +151,14 @@ abstract public class DataService implements IDataService,
     
     /**
      * FIXME Discover the {@link ITransactionManager} service and use it as the
-     * source of timestamps!
-     * 
-     * FIXME Make sure that the {@link IBigdataClient} and
+     * source of timestamps! Make sure that the {@link IBigdataClient} and
      * {@link IBigdataFederation} implementations likewise discover the
      * {@link ITransactionManager} service and use it rather than directly
      * issuing {@link ITransactionManager} requests to a {@link DataService}!
      */
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
     
-    final protected ResourceManager resourceManager;
+    final protected IResourceManager resourceManager;
     final protected ConcurrencyManager concurrencyManager;
     final protected AbstractLocalTransactionManager localTransactionManager;
 
@@ -199,12 +191,65 @@ abstract public class DataService implements IDataService,
     }
     
     /**
+     * The {@link MetadataService}.
+     */
+    abstract protected IMetadataService getMetadataService();
+    
+    /**
+     * Returns the {@link IResourceManager}.
+     * 
+     * @param properties Properties to configure that object.
+     * 
+     * @return The {@link IResourceManager}.
+     */
+    protected IResourceManager newResourceManager(Properties properties) {
+
+        return new ResourceManager(properties) {
+            
+            public IMetadataService getMetadataService() {
+                
+                return DataService.this.getMetadataService();
+                                
+            }
+            
+            public UUID getDataServiceUUID() {
+
+                try {
+                    
+                    return DataService.this.getServiceUUID();
+                
+                } catch (IOException e) {
+                    
+                    throw new RuntimeException(e);
+                    
+                }
+                
+            }
+            
+            /**
+             * @todo this must report the entire service failover chain.
+             */
+            public UUID[] getDataServiceUUIDs() {
+
+                return new UUID[] {
+                        
+                        getDataServiceUUID()
+                        
+                };
+                
+            }
+            
+        };
+
+    }
+    
+    /**
      * 
      * @param properties
      */
     public DataService(Properties properties) {
         
-        resourceManager = new ResourceManager(properties);
+        resourceManager = newResourceManager(properties);
         
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
 
@@ -221,9 +266,17 @@ abstract public class DataService implements IDataService,
 
         localTransactionManager.setConcurrencyManager(concurrencyManager);
 
-        resourceManager.setConcurrencyManager(concurrencyManager);
+        if(resourceManager instanceof ResourceManager) {
 
-        resourceManager.start();
+            /*
+             * Startup the resource manager.
+             */
+            
+            ((ResourceManager)resourceManager).setConcurrencyManager(concurrencyManager);
+
+            ((ResourceManager)resourceManager).start();
+            
+        }
         
     }
 
@@ -343,22 +396,6 @@ abstract public class DataService implements IDataService,
 
     }
     
-    /**
-     * @todo if the journal overflows then the returned metadata can become
-     *       stale (the journal in question will no longer be absorbing writes
-     *       but it will continue to be used to absorb reads until the asyn
-     *       overflow operation is complete, at which point the journal can be
-     *       closed. the journal does not become "Dead" until it is no longer
-     *       possible that a live transaction will want to read from a
-     *       historical state found on that journal).
-     */
-    public JournalMetadata getJournalMetadata() throws IOException {
-        
-        return new JournalMetadata(resourceManager.getLiveJournal(),
-                ResourceState.Live);
-        
-    }
-
     public String getStatistics() throws IOException {
         
         StringBuilder sb = new StringBuilder();
@@ -367,8 +404,7 @@ abstract public class DataService implements IDataService,
 
         sb.append("\n");
 
-        // @todo report at the resource manager level instead.
-        sb.append(resourceManager.getLiveJournal().getStatistics());
+        sb.append(resourceManager.getStatistics());
         
         return sb.toString();
         
@@ -466,14 +502,17 @@ abstract public class DataService implements IDataService,
 
     }
    
-    public IndexMetadata getIndexMetadata(String name) throws IOException {
+    public IndexMetadata getIndexMetadata(String name,long timestamp) throws IOException {
 
         setupLoggingContext();
         
         try {
 
-            // Note: as defined on the current "live" journal.
-            final BTree ndx = resourceManager.getLiveJournal().getIndex(name);
+            /*
+             * Note: This does not use concurrency controls but we are 
+             * performing a purely read-only operation.
+             */
+            final IIndex ndx = resourceManager.getIndex(name,timestamp);
             
             if(ndx == null) {
                 
@@ -481,7 +520,7 @@ abstract public class DataService implements IDataService,
                 
             }
             
-            return ndx.getIndexMetadata();
+            return ndx.getIndexMetadata()/*.clone()?*/;
             
         } finally {
             
@@ -491,22 +530,25 @@ abstract public class DataService implements IDataService,
         
     }
 
-    public String getStatistics(String name) throws IOException {
+    public String getStatistics(String name, long timestamp) throws IOException {
 
         setupLoggingContext();
         
         try {
 
-            // @todo define at the resource manager level so it reports on all components of the index.
-            final IIndex ndx = resourceManager.getLiveJournal().getIndex(name);
+            /*
+             * Note: This does not use concurrency controls but we are 
+             * performing a purely read-only operation.
+             */
+            String statistics = resourceManager.getStatistics(name, timestamp);
             
-            if(ndx == null) {
+            if(statistics == null) {
                 
                 throw new NoSuchIndexException(name);
                 
             }
             
-            return ((BTree)ndx).getStatistics();
+            return statistics;
             
         } finally {
             
@@ -604,7 +646,7 @@ abstract public class DataService implements IDataService,
             }
     
             // @todo efficient (stream-based) read from the journal (IBlockStore
-            // API).
+            // API).  This is a fully buffered read and will cause heap churn.
     
             return new IBlock() {
     
@@ -675,7 +717,11 @@ abstract public class DataService implements IDataService,
     }
 
     /**
-     * @todo IResourceTransfer is not implemented.
+     * @todo IResourceTransfer is not implemented. delegate this to the
+     *       {@link IResourceManager}. share code with
+     *       {@link #readBlock(IResourceMetadata, long)} and with media
+     *       replication system, all of which needs efficient socket-level
+     *       streaming IO.
      */
     public void sendResource(String filename, InetSocketAddress sink) {
     

@@ -27,9 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.rmi.RemoteException;
 import java.util.Arrays;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,17 +74,19 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * communications from the application. The {@link IIndex} objects provided by
  * the factory are responsible for transparently discovering the
  * {@link IDataService}s on which the index partitions are located and
- * directing read and write operations appropriately.  See {@link ClientIndexView}.
+ * directing read and write operations appropriately. See
+ * {@link ClientIndexView}.
  * <p>
- * A client may discover and use an {@link ITransactionManagerService} if needs to use
- * transactions as opposed to unisolated reads and writes. When the client
- * requests a transaction, the transaction manager responds with a long integer
- * containing the transaction identifier - this is simply the unique start time
- * assigned to that transaction by the transaction manager. The client then
- * provides that transaction identifier for operations that are isolated within
- * the transaction. When the client is done with the transaction, it must use
- * the transaction manager to either abort or commit the transaction.
- * (Transactions that fail to progress may be eventually aborted.)
+ * A client may discover and use an {@link ITransactionManagerService} if needs
+ * to use transactions as opposed to unisolated reads and writes. When the
+ * client requests a transaction, the transaction manager responds with a long
+ * integer containing the transaction identifier - this is simply the unique
+ * start time assigned to that transaction by the transaction manager. The
+ * client then provides that transaction identifier for operations that are
+ * isolated within the transaction. When the client is done with the
+ * transaction, it must use the transaction manager to either abort or commit
+ * the transaction. (Transactions that fail to progress may be eventually
+ * aborted.)
  * <p>
  * When using unisolated operations, the client does not need to resolve or use
  * the transaction manager and it simply specifies <code>0L</code> as the
@@ -88,6 +95,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo document client configuration, the relationship between jini groups and
  *       a bigdata federation, and whether and how a single client could connect
  *       to more than one bigdata federation.
+ * 
+ * @todo refactor the concept of the jini bigdata client from the concept of a
+ *       bigdata client that discovers and talks to remote services.
  * 
  * @see ClientIndexView
  * 
@@ -148,7 +158,16 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         
     }
     
+    /*
+     * IBigdataClient state.
+     */
     private final ExecutorService threadPool;
+    private final int defaultRangeQueryCapacity;
+    private final boolean batchApiOnly;
+
+    /*
+     * IBigdataClient API.
+     */
 
     public ExecutorService getThreadPool() {
         
@@ -158,6 +177,18 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         
     }
 
+    public int getDefaultRangeQueryCapacity() {
+        
+        return defaultRangeQueryCapacity;
+        
+    }
+    
+    public boolean getBatchApiOnly() {
+        
+        return batchApiOnly;
+        
+    }
+    
     protected void assertConnected() {
         
         if (fed == null)
@@ -492,13 +523,49 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         }
 
-        // @todo configure nthreads.
-        final int nthreads = 10;
-        //properties.getProperty(Options.CLIENT_THREAD_POOL_SIZE,Options.DEFAULT_CLIENT_THREAD_POOL_SIZE);
+        /*
+         * Read the properties file used to configure the client.
+         */
+        final Properties properties = new Properties();
+        try {
+
+            File propertyFile = (File) config.getEntry(CLIENT_LABEL,
+                    "propertyFile", File.class);
+
+            InputStream is = new BufferedInputStream(new FileInputStream(
+                    propertyFile));
+
+            properties.load(is);
+
+            is.close();
+
+        } catch (Exception ex) {
+
+            terminate();
+            
+            throw new RuntimeException("Configuration error: "+ex, ex);
+            
+        }
+
+        /*
+         * Client configuration.
+         */
+        
+        final int nthreads = Integer.parseInt(properties.getProperty(
+                Options.CLIENT_THREAD_POOL_SIZE,
+                Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
         
         threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
                 .defaultThreadFactory());
 
+        defaultRangeQueryCapacity = Integer.parseInt(properties.getProperty(
+                Options.CLIENT_RANGE_QUERY_CAPACITY,
+                Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
+        
+        batchApiOnly = Boolean.valueOf(properties.getProperty(
+                Options.CLIENT_BATCH_API_ONLY,
+                Options.DEFAULT_CLIENT_BATCH_API_ONLY));
+        
     }
 
     public void terminate() {

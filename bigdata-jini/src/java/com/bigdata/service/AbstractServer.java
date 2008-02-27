@@ -387,15 +387,15 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
             }
 
-            // The properties file used to configure the service.
-
-            File propertyFile = (File) config.getEntry(SERVICE_LABEL,
-                    "propertyFile", File.class);
-
-            Properties properties = new Properties();
-            
+            /*
+             * Read the properties file used to configure the service.
+             */
+            final Properties properties = new Properties();
             try {
-            
+
+                File propertyFile = (File) config.getEntry(SERVICE_LABEL,
+                        "propertyFile", File.class);
+
                 InputStream is = new BufferedInputStream(new FileInputStream(
                         propertyFile));
                 

@@ -33,7 +33,6 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -42,7 +41,7 @@ import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.PartitionMetadataWithSeparatorKeys;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Split;
 
@@ -125,72 +124,12 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      */
     final protected boolean debug = DEBUG;
 
-//    /**
-//     * Flags that may be specified when create an index.
-//     * 
-//     * @todo refactor into use.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static interface IIndexFlags {
-//
-//        /**
-//         * When specified the {@link IIndex} will support deletion markers.
-//         * <p>
-//         * Note: this option MUST be enabled for scale-out (aka partitioned)
-//         * indices. The presence of delete markers is required when reading from
-//         * a fused view for an index partition. Without the delete markers
-//         * entries that had been deleted would magically "re-appear" if they
-//         * were on an {@link IndexSegment} for the view since the read would
-//         * "miss" on the mutable {@link BTree} but "hit" on the
-//         * {@link IndexSegment}.
-//         * <p>
-//         * When <code>true</code> deleting an index index entry causes the
-//         * value under the key to be removed and the "delete" flag set for the
-//         * index entry. Unless an immortal store is desired, deleted index
-//         * entries are periodically flushed by compacting merges.
-//         * <p>
-//         * When <code>false</code> deleting an index entry causes the entry to
-//         * be removed from the {@link BTree}. This option makes sense when you
-//         * do not need partitioned indices.
-//         */
-//        public final int DELETE_MARKERS = 1<<0;
-//        
-//        /**
-//         * When specified the {@link IIndex} will permit timestamps to be
-//         * associated with index entries. Timestamps are required to support
-//         * transactional isolation. See {@link IsolatedFusedView} for a
-//         * description of how timestamps are used to detect write-write
-//         * conflicts.
-//         */
-//        public final int VERSION_TIMESTAMPS = 1<<1;
-//        
-////        /**
-////         * 
-////         */
-////        public final int ISOLATABLE = (DELETE_MARKERS|VERSION_TIMESTAMPS);
-//
-//        /**
-//         * When specified the {@link IIndex} will use write checksums on records
-//         * written on the backing {@link IRawStore} and will validate those
-//         * checksums when the records are deserialized.
-//         * 
-//         * @todo consider separate bit flags for the mutable btrees vs the index
-//         *       segments.
-//         * 
-//         * @todo expose the choice of checksum behavior to the application as a
-//         *       configuration option. checksums are relatively expensive to
-//         *       compute and make the most sense for long-term read-only data
-//         *       (the index segments) and the least sense for fully buffered
-//         *       journals (since the data are fully buffered, reads occur
-//         *       against memory and disk checksum errors would not be detected
-//         *       in any case).
-//         */
-//        public final int USE_CHECKSUMS = 1<<2;
-//        
-//    };
-    
+    /**
+     * Text of a message used in exceptions for mutation operations on the index
+     * segment.
+     */
+    final protected transient static String MSG_READ_ONLY = "Read-only index";
+
     /**
      * Counters tracking various aspects of the btree.
      */
@@ -200,16 +139,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * The persistence store.
      */
     final protected IRawStore store;
-
-//    /**
-//     * The unique identifier for the index whose data is stored in this B+Tree
-//     * data structure. When using a scale-out index the same <i>indexUUID</i>
-//     * MUST be assigned to each mutable and immutable B+Tree having data for any
-//     * partition of that scale-out index. This makes it possible to work
-//     * backwards from the B+Tree data structures and identify the index to which
-//     * they belong.
-//     */
-//    final private UUID indexUUID;
 
     /**
      * The branching factor for the btree.
@@ -446,7 +375,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         assert metadata != null;
 
-
         // save a reference to the immutable metadata record.
         this.metadata = metadata;
         
@@ -454,20 +382,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         assert branchingFactor >= MIN_BRANCHING_FACTOR;
         
-//        assert hardReferenceQueue != null;
-
-//        assert keySer != null;
-//        
-//        assert valueSer != null;
-
         assert nodeFactory != null;
 
-//        if (indexUUID == null)
-//            throw new IllegalArgumentException("indexUUID");
-
         this.store = store;
-
-//        this.branchingFactor = branchingFactor;
 
         this.writeRetentionQueue = newWriteRetentionQueue();
 
@@ -492,10 +409,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                 metadata.getRecordCompressor(),//
                 useChecksum//metadata.getUseChecksum()//
                 );
-
-//        this.indexUUID = metadata.getIndexUUID();
-        
-//        this.isolatable = metadata.isIsolatable();
 
     }
 
@@ -621,6 +534,33 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
 
     /**
+     * Return <code>true</code> iff this B+Tree is read-only.
+     */
+    abstract public boolean isReadOnly();
+    
+    /**
+     * 
+     * @throws UnsupportedOperationException
+     *             if the B+Tree is read-only.
+     * 
+     * @see #isReadOnly()
+     */
+    final protected void assertNotReadOnly() {
+        
+        if(isReadOnly()) {
+            
+            throw new UnsupportedOperationException(MSG_READ_ONLY);
+            
+        }
+        
+    }
+    
+    /**
+     * The timestamp of the last committed state of this index.
+     */
+    abstract public long getLastCommitTime();
+    
+    /**
      * The backing store.
      */
     final public IRawStore getStore() {
@@ -641,17 +581,54 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     
     /**
      * Returns the metadata record for this btree.
+     * <p>
+     * Note: If the B+Tree is read-only then the metadata object will be cloned
+     * to avoid potential modification. However, only a single cloned copy of
+     * the metadata record will be shared between all callers for a given
+     * instance of this class.
+     * 
+     * @todo the clone once policy is a compromise between driving the read only
+     *       semantics into the {@link IndexMetadata} object, cloning each time,
+     *       and leaving it to the caller to clone as required. Either the
+     *       former or the latter might be a better choice.
      * 
      * @return The metadata record for this btree and never <code>null</code>.
      */
-    public IndexMetadata getIndexMetadata() {
+    final public IndexMetadata getIndexMetadata() {
 
+        if(isReadOnly()) {
+            
+            synchronized (this) {
+
+                if (metadata2 == null) {
+
+                    metadata2 = metadata.clone();
+
+                }
+
+            }
+
+            return metadata2;
+            
+        }
+        
         return metadata;
         
     }
+    private IndexMetadata metadata2;
+   
+    /**
+     * The metadata record for the index. This data does not change during the
+     * life of the {@link BTree} object.
+     */
+    protected IndexMetadata metadata;
     
     /**
-     * Verify that the key lies within the partition.
+     * Iff the B+Tree is an index partition then verify that the key lies within
+     * the key range of an index partition.
+     * <p>
+     * Note: An index partition is identified by
+     * {@link IndexMetadata#getPartitionMetadata()} returning non-<code>null</code>.
      * 
      * @param key
      *            The key.
@@ -664,11 +641,18 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      */
     public void rangeCheck(byte[] key) {
 
-        if(key==null) throw new IllegalArgumentException();
+        if (key == null)
+            throw new IllegalArgumentException();
 
-        final PartitionMetadataWithSeparatorKeys pmd = metadata.getPartitionMetadata();
+        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
         
-        if(pmd==null) return; // nothing to check.
+        if (pmd == null) {
+
+            // nothing to check.
+            
+            return;
+            
+        }
         
         final byte[] leftSeparatorKey = pmd.getLeftSeparatorKey();
 
@@ -688,17 +672,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         }
             
     }
-        
-    /**
-     * The metadata record for the index. This data does not change during the
-     * life of the {@link BTree} object.
-     */
-    protected IndexMetadata metadata;
-    
+     
     /**
      * The branching factor for the btree.
      */
-    public int getBranchingFactor() {
+    final public int getBranchingFactor() {
 
         return branchingFactor;
 
@@ -970,8 +948,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * @return <i>tuple</i> -or- <code>null</code> if there was no entry
      *         under that key. See {@link ITuple#isDeletedVersion()} to
      *         determine whether or not the entry is marked as deleted.
+     *         
+     * @throws UnsupportedOperationException
+     *             if the index is read-only.
      */
-    public Tuple insert(byte[] key, byte[] value, boolean delete,
+    final public Tuple insert(byte[] key, byte[] value, boolean delete,
             long timestamp, Tuple tuple) {
 
         assert delete == false || getIndexMetadata().getDeleteMarkers();
@@ -984,6 +965,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
+        assertNotReadOnly();
+        
         counters.ninserts++;
 
         return getRootOrFinger(key)
@@ -1042,8 +1025,10 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * 
      * @throws UnsupportedOperationException
      *             if delete markers are being maintained.
+     * @throws UnsupportedOperationException
+     *             if the index is read-only.
      */
-    public Tuple remove(byte[] key, Tuple tuple) {
+    final public Tuple remove(byte[] key, Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1053,6 +1038,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             throw new UnsupportedOperationException();
             
         }
+        
+        assertNotReadOnly();
         
         counters.nremoves++;
 
@@ -1188,7 +1175,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    public byte[] valueAt(int index,Tuple tuple) {
+    final public byte[] valueAt(int index,Tuple tuple) {
 
         if (index < 0)
             throw new IndexOutOfBoundsException("less than zero");
@@ -1211,7 +1198,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * IRangeQuery
      */
     
-    public long rangeCount(byte[] fromKey, byte[] toKey) {
+    final public long rangeCount(byte[] fromKey, byte[] toKey) {
 
         if (fromKey == null && toKey == null) {
 
@@ -1252,10 +1239,10 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
 
     final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
-        
+
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 KEYS | VALS/* flags */, null/* filter */);
-        
+
     }
 
     /**
@@ -1265,311 +1252,61 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IEntryFilter filter) {
 
-        if((flags & REMOVEALL) == 0) {
+        if ((flags & REMOVEALL) != 0) {
+
+            assertNotReadOnly();
+
+        }
+
+        final IEntryIterator src;
+
+        if ((flags & REMOVEALL) == 0) {
 
             /*
              * Simple case since we will not be writing on the btree.
              */
-            
-            return getRoot().rangeIterator(fromKey, toKey, flags, filter);
+
+            src = getRoot().rangeIterator(fromKey, toKey, flags, filter);
+
+        } else {
+
+            /*
+             * The iterator will populate its buffers up to the capacity and
+             * then delete behind once the buffer is full or as soon as the
+             * iterator is exhausted.
+             * 
+             * Note: This would cause a stack overflow if the caller is already
+             * using a chunked range iterator. The problem is that the ResultSet
+             * is populated using IIndex#rangeIterator(...). This situation is
+             * handled by explicitly turning off the REMOVEALL flag when forming
+             * the iterator for the ResultSet. See ChunkedRangeIterator.
+             */
+
+            src = new ChunkedLocalRangeIterator(this, fromKey, toKey, capacity,
+                    KEYS | flags, filter);
 
         }
-        
-        /*
-         * The iterator will populate its buffers up to the capacity and then
-         * delete behind once the buffer is full or as soon as the iterator is
-         * exhausted.
-         * 
-         * Note: This would cause a stack overflow if the caller is already
-         * using a chunked range iterator. The problem is that the ResultSet is
-         * populated using IIndex#rangeIterator(...). This situation is handled
-         * by explicitly turning off the REMOVEALL flag when forming the
-         * iterator for the ResultSet.  See ChunkedRangeIterator.
-         */
-        return new ChunkedLocalRangeIterator(this, fromKey, toKey, capacity, KEYS
-                | flags, filter);
-        
-//        /*
-//         * The iterator will write on the btree (it will in effect "delete
-//         * behind"). Since the btree does not (yet) support concurrent
-//         * modification from the iterator directly we wrap up the iterator with
-//         * a buffer.
-//         * 
-//         * @todo modify the EntryIterator to accept [capacity], e.g., a limit on
-//         * the #of entries that it will visit. This is important with the REMOVE
-//         * flag since we may only want to delete the head of something.
-//         * 
-//         * @todo write unit tests for the REMOVE flag.
-//         * 
-//         * @todo modify the EntryIterator to support remove so that we do not
-//         * have to buffer the results here.
-//         */
-//        
-//        // places a limit on the #of entries to be deleted.
-//        final int rangeCount = capacity == 0 ? (int) rangeCount(fromKey, toKey)
-//                : capacity;
-//        
-//        IEntryIterator src = getRoot().rangeIterator(fromKey, toKey,
-//                flags | KEYS// Note: we need the keys for the delete operation
-//                , filter);
-//        
-//        BufferedEntryIterator buf = new BufferedEntryIterator(rangeCount,
-//                flags, src);
-//
-//        for (int i = 0; i < buf.n; i++) {
-//
-//            // delete behind.
-//            
-//            remove(buf.keys[i]);
-//
-//        }
-//        
-//        // return iterator.
-//        
-//        return buf;
-//        
-//    }
-//
-//    /**
-//     * Helper class provides a delete behind capability by fully buffering the
-//     * iterator result.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     * 
-//     * @deprecated This will go away once {@link EntryIterator#remove()} is
-//     *             supported.
-//     */
-//    private static class BufferedEntryIterator implements IEntryIterator {
-//
-//        /** #of tuples. */
-//        final int n;
-//        
-//        /** from the ctor. */
-//        final int flags;
-//        
-//        /** iff values were copied. */
-//        final boolean needVals;
-//        
-//        /** iff version metadata was copied. */
-//        final boolean needMetadata;
-//
-//        /** the keys (always copied). */
-//        final byte[][] keys;
-//
-//        /** the values (iff copied). */
-//        final byte[][] vals;
-//        
-//        final long[] versionTimestamps;
-//        final boolean[] deleteMarkers;
-//        
-//        /**
-//         * the current tuple index into {@link #keys}[] and {@link #vals}[].
-//         */
-//        private int i = 0;
-//
-//        private final ByteArrayBuffer kbuf = new ByteArrayBuffer();
-//        private final ByteArrayBuffer vbuf;
-//
-//        private class Tuple implements ITuple {
-//
-//            public byte[] getKey() {
-//
-//                if (i == 0)
-//                    throw new IllegalStateException();
-//
-//                if (keys == null)
-//                    throw new UnsupportedOperationException();
-//                
-//                return keys[i - 1];
-//                
-//            }
-//
-//            public ByteArrayBuffer getKeyBuffer() {
-//                
-//                kbuf.reset().put(getKey());
-//                
-//                return kbuf;
-//                
-//            }
-//
-//            public boolean getKeysRequested() {
-//
-//                return (flags & KEYS) != 0;
-//
-//            }
-//
-//            public boolean getValuesRequested() {
-//
-//                return (flags & VALS) != 0;
-//                
-//            }
-//
-//            public boolean getMetadataRequested() {
-//
-//                return (flags & METADATA) != 0;
-//                
-//            }
-//
-//            public long getVisitCount() {
-//                
-//                return i;
-//                
-//            }
-//
-//            public byte[] getValue() {
-//             
-//                if (i == 0)
-//                    throw new IllegalStateException();
-//
-//                if (!needVals)
-//                    throw new UnsupportedOperationException();
-//
-//                return vals[i-1];
-//                
-//            }
-//
-//            public ByteArrayBuffer getValueBuffer() {
-//
-//                if (!needVals)
-//                    throw new UnsupportedOperationException();
-//
-//                vbuf.reset().put(getValue());
-//                
-//                return vbuf;
-//                
-//            }
-//
-//            public long getVersionTimestamp() {
-//                
-//                if (i == 0)
-//                    throw new IllegalStateException();
-//
-//                if (!needMetadata)
-//                    throw new UnsupportedOperationException();
-//
-//                return versionTimestamps[i-1];
-//                
-//            }
-//
-//            public boolean isDeletedVersion() {
-//
-//                if (i == 0)
-//                    throw new IllegalStateException();
-//
-//                if (!needMetadata)
-//                    throw new UnsupportedOperationException();
-//
-//                return deleteMarkers[i-1];
-//                
-//            }
-//
-//        }
-//        
-//        final Tuple tuple = new Tuple();
-//        
-//        public BufferedEntryIterator(int limit, int flags, IEntryIterator src) {
-//
-//            this.flags = flags;
-//            
-//            int n = 0;
-//
-//            needVals = (flags & VALS) == 0;
-//            
-//            needMetadata = (flags & METADATA) == 0;
-//
-//            keys = new byte[limit][];
-//
-//            vals = needVals ? new byte[limit][] : null;
-//
-//            vbuf = needVals ? new ByteArrayBuffer() : null;
-//            
-//            versionTimestamps = needMetadata ? new long[limit] : null;
-//
-//            deleteMarkers = needMetadata ? new boolean[limit] : null;
-//            
-//            while (src.hasNext() && n < limit) {
-//        
-//                ITuple tmp = src.next();
-//
-//                keys[n] = tmp.getKey();
-//                
-//                if(needVals) {
-//                    
-//                    vals[n] = tmp.getValue();
-//                    
-//                }
-//                
-//                if(needMetadata) {
-//                    
-//                    versionTimestamps[n] = tmp.getVersionTimestamp();
-//                    
-//                    deleteMarkers[n] = tmp.isDeletedVersion();
-//                    
-//                }
-//                
-//                n++;
-//                
-//            }
-//            
-//            this.n = n;
-//            
-//        }
-//        
-//        public boolean hasNext() {
-//
-//            return i < n;
-//            
-//        }
-//
-//        public ITuple next() {
-//
-//            if (!hasNext())
-//                throw new NoSuchElementException();
-//            
-//            i++;
-//            
-//            return tuple;
-//            
-//        }
-//
-//        public void remove() {
-//            
-//            throw new UnsupportedOperationException();
-//            
-//        }
-        
+
+        if (isReadOnly()) {
+
+            /*
+             * Must explicitly disable Iterator#remove().
+             */
+
+            return new ReadOnlyEntryIterator(src);
+
+        } else {
+
+            /*
+             * Iterator#remove() MAY be supported.
+             */
+
+            return src;
+
+        }
+
     }
-
-//    public long removeAll(byte[] fromKey, byte[] toKey, long _limit) {
-//        
-//        if (_limit < 0)
-//            throw new IllegalArgumentException();
-//        
-//        // Note: entry count is integer for a single B+Tree instance.
-//        final int limit = (int)_limit;
-//        
-//        // iterator will buffer remove() requests.
-//        final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
-//                this, fromKey, toKey, limit, KEYS/* flags */, null/* filter */);
-//
-//        int nremoved = 0;
-//
-//        while (itr.hasNext() && nremoved < limit) {
-//
-//            itr.next();
-//
-//            itr.remove();
-//
-//        }
-//
-//        // flush buffered remove() requests.
-//        itr.flush();
-//        
-//        return nremoved;
-//        
-//    }
-
+    
     /**
      * Copy all data, including deleted index entry markers and timestamps iff
      * supported by the source and target. The goal is an exact copy of the data
@@ -2015,8 +1752,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * the node has a parent, then the parent is notified of the persistent
      * identity assigned to the node by the store. This method is NOT recursive
      * and dirty children of a node will NOT be visited.
-     * <p>
-     * Note: This will throw an exception if the backing store is read-only.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the B+Tree (or the backing store) is read-only.
      * 
      * @return The persistent identity assigned by the store.
      */
@@ -2028,6 +1766,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         assert node.dirty;
         assert !node.deleted;
         assert !node.isPersistent();
+        assertNotReadOnly();
 
         /*
          * Note we have to permit the reference counter to be positive and not

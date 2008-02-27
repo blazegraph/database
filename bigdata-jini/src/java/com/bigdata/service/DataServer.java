@@ -138,16 +138,7 @@ public class DataServer extends AbstractServer {
         service.getResourceManager().destroyAllResources();
 
     }
-    
-//    /**
-//     * The backing {@link Journal}.
-//     */
-//    protected Journal getJournal() {
-//        
-//        return ((DataService)impl).journal;
-//        
-//    }
-    
+
     /**
      * Adds jini administration interfaces to the basic {@link DataService}.
      * 
@@ -275,6 +266,12 @@ public class DataServer extends AbstractServer {
 
             return serviceUUID;
             
+        }
+
+        @Override
+        protected IMetadataService getMetadataService() {
+            // TODO Auto-generated method stub
+            return null;
         }
 
 // /*
