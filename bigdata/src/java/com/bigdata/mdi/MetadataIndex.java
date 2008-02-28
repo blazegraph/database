@@ -68,13 +68,6 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo consider changing the values to
- *       {@link LocalPartitionMetadata} objects. the metadata index
- *       does not to store either separator key since they are redundent with
- *       the key for an index partition's metadata and the key for its
- *       successor, but it is handy for clients to get it along with the rest of
- *       the partition metadata.
- * 
  * @todo The {@link MetadataIndex} does NOT support either overflow (it may NOT
  *       be a {@link FusedView}) NOR key-range splits. There are several issues
  *       involved:
@@ -139,11 +132,12 @@ import com.bigdata.service.MetadataService;
  * 
  * @todo the metadata index can be hash partitioned and range queries can be
  *       flooded to all partitions so that we do not need a meta-metadata index
- *       to locate metadata index partitions. the #of metadata can be changed by
- *       a suitable broadcast event in which clients have to change to the new
- *       hash basis.  this feature can be generalized to provide hash partitioned
- *       indices as well as key-range partitioned indices.
- *       
+ *       to locate metadata index partitions. the #of metadata service nodes can
+ *       be changed by a suitable broadcast event in which clients have to
+ *       change to the new hash basis. this feature can be generalized to
+ *       provide hash partitioned indices as well as key-range partitioned
+ *       indices.
+ * 
  * @todo A metadata index can be recovered by a distributed process running over
  *       the data services. Each data service reports all index partitions. The
  *       reports are collected and the index is rebuilt from the reports. Much
@@ -436,18 +430,6 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
         // @todo could retain the view reference.
         return new MetadataIndexView(this).find(key);
         
-    }
-
-    public int findIndexOf(byte[] key) {
-
-        return new MetadataIndexView(this).findIndexOf(key);
-        
-    }
-
-    public int[] findIndices(byte[] fromKey, byte[] toKey) {
-
-        return new MetadataIndexView(this).findIndices(fromKey, toKey);
-
     }
 
 }

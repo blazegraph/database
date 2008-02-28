@@ -205,6 +205,12 @@ public class ClientIndexView implements IIndex {
     protected static final String NON_BATCH_API = "Non-batch API";
 
     /**
+     * The maximum #of tasks that may be submitted in parallel for a single user
+     * request.
+     */
+    private final int MAX_PARALLEL_TASKS = 100;
+    
+    /**
      * This may be used to disable the non-batch API, which is quite convenient
      * for locating code that needs to be re-written to use
      * {@link IIndexProcedure}s.
@@ -562,7 +568,7 @@ public class ClientIndexView implements IIndex {
     public Object submit(byte[] key, IIndexProcedure proc) {
 
         // Find the index partition spanning that key.
-        final PartitionLocator pmd = findPartition(key);
+        final PartitionLocator pmd = getMetadataIndex().find(key);
 
         /*
          * Submit procedure to that data service.
@@ -600,17 +606,94 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
-     * Maps a method across a key range.
+     * Returns an iterator that will visit the {@link PartitionLocator}s for
+     * the specified scale-out index key range.
      * <p>
      * The method fetches a chunk of locators at a time from the metadata index.
      * Unless the #of index partitions spanned is very large, this will be an
      * atomic read of locators from the metadata index. When the #of index
      * partitions spanned is very large, then this will allow a chunked
-     * approach. Note that the actual client parallelism is limited by
-     * {@link Options#CLIENT_THREAD_POOL_SIZE}, which is typically smaller than
-     * the capacity of the chunked iterator used to read on the metadata index.
-     * In order to avoid growing the task execution queue without bound, the
-     * method will introduce latency or block if the task queue gets too large.
+     * approach.
+     * <p>
+     * The actual client parallelism is limited by
+     * {@link Options#CLIENT_THREAD_POOL_SIZE}. This value is typically smaller
+     * than the capacity of the chunked iterator used to read on the metadata
+     * index.
+     * 
+     * @param fromKey
+     *            The scale-out index first key that will be visited
+     *            (inclusive). When <code>null</code> there is no lower bound.
+     * @param toKey
+     *            The first scale-out index key that will NOT be visited
+     *            (exclusive). When <code>null</code> there is no upper bound.
+     * 
+     * @return The iterator. The value returned by {@link ITuple#getValue()}
+     *         will be a serialized {@link PartitionLocator} object.
+     */
+//    * @param parallel
+//    *            <code>true</code> iff a parallelizable procedure will be
+//    *            mapped over the index partitions (this effects the #of cached
+//    *            locators).
+    public ITupleIterator locatorScan(final byte[] fromKey, final byte[] toKey ) {
+//            final boolean parallel) {
+        
+//        /*
+//         * When the view is either unisolated or read committed we restrict the
+//         * scan on the metadata index to buffer no more locators than can be
+//         * processed in parallel (if the task is not parallelizable then we only
+//         * read a few locators at a time). This keeps us from buffering locators
+//         * that may be made stale not by index partition splits, joins, or moves
+//         * but simply by concurrent writes of index entries since those writes
+//         * will be visible immediate with either unisolated or read committed
+//         * isolation.
+//         */
+//        final int capacity = (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED)//
+//            ? (parallel ? MAX_PARALLEL_TASKS : 5) // unisolated or read-committed.
+//            : 0 // historical read or fully isolated (default capacity)
+//            ;
+        
+        log.info("Querying metadata index: name=" + name + ", fromKey="
+                + BytesUtil.toString(fromKey) + ", toKey="
+                + BytesUtil.toString(toKey) + ", capacity=" + capacity);
+        
+        final ITupleIterator itr;
+        {
+         
+            /*
+             * Note: The scan on the metadata index needs to start at the index
+             * partition in which the fromKey would be located. Therefore when
+             * the fromKey is specified we replace it with the leftSeparator of
+             * the index partition which would contain that fromKey.
+             */
+
+            final byte[] _fromKey = fromKey == null //
+                ? null //
+                : getMetadataIndex().find(fromKey).getLeftSeparatorKey()//
+                ;
+
+            itr = getMetadataIndex().rangeIterator(_fromKey,//
+                    toKey, //
+                    0, // capacity, //
+                    IRangeQuery.VALS,// the values are the locators.
+                    null // filter
+                    );
+
+        }
+
+        return itr;
+        
+    }
+    
+    /**
+     * Maps an {@link IIndexProcedure} across a key range by breaking it down
+     * into one task per index partition spanned by that key range.
+     * <p>
+     * Note: In order to avoid growing the task execution queue without bound,
+     * an upper bound of {@link #MAX_PARALLEL_TASKS} tasks will be placed onto
+     * the queue at a time. More tasks will be submitted once those tasks finish
+     * until all tasks have been executed. When the task is not parallelizable
+     * the tasks will be submitted to the corresponding index partitions at a
+     * time and in key order.
      */
     public void submit(byte[] fromKey, byte[] toKey,
             final IIndexProcedure proc, final IResultHandler resultHandler) {
@@ -627,49 +710,11 @@ public class ClientIndexView implements IIndex {
 
         // max #of tasks to queue at once.
         final int maxTasks = Math.min(((ThreadPoolExecutor) getThreadPool())
-                .getCorePoolSize(), 100);
-        
-        /*
-         * When the view is either unisolated or read committed we restrict the
-         * scan on the metadata index to buffer no more locators than can be
-         * processed in parallel (if the task is not parallelizable then we only
-         * read a few locators at a time). This keeps us from buffering locators
-         * that may be made stale not by index partition splits, joins, or moves
-         * but simply by concurrent writes of index entries since those writes
-         * will be visible immediate with either unisolated or read committed
-         * isolation.
-         */
-        final int capacity = (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED)//
-            ? (parallel ? maxTasks : 5) // unisolated or read-committed.
-            : 0 // historical read or fully isolated (default capacity)
-            ;
-        
-        log.info("Querying metadata index: name=" + name + ", fromKey="
-                + BytesUtil.toString(fromKey) + ", toKey="
-                + BytesUtil.toString(toKey) + ", capacity=" + capacity);
-        
-        final ITupleIterator itr;
-        {
-         
-            /*
-             * Note: The scan on the metadata index needs to start at the index
-             * partition in which the fromKey would be located. Therefore when
-             * the fromKey is specified we replace it with the leftSeparator of
-             * the index partition which would contain that fromKey.
-             */
-            
-            final byte[] _fromKey = fromKey == null ? null : findPartition(
-                    fromKey).getLeftSeparatorKey();
+                .getCorePoolSize(), MAX_PARALLEL_TASKS);
 
-            itr = getMetadataIndex().rangeIterator(_fromKey,//
-                    toKey, //
-                    capacity, //
-                    IRangeQuery.VALS,// the values are the locators.
-                    null // filter
-                    );
-
-        }
-
+        // scan spanned index partition locators in key order.
+        final ITupleIterator itr = locatorScan(fromKey, toKey);
+        
         long nparts = 0;
         
         while (itr.hasNext()) {
@@ -961,18 +1006,19 @@ public class ClientIndexView implements IIndex {
         /**
          * 
          * @param split
+         * @param proc
+         * @param resultHandler
          * @param ctor
          *            The object used to create the <i>proc</i> instance IFF
          *            the <i>proc</i> is an {@link IKeyArrayIndexProcedure}.
          *            This is used to re-split the data if necessary in response
          *            to stale locator information.
-         * @param proc
-         * @param resultHandler
          */
         public DataServiceProcedureTask(Split split,
-//                IIndexProcedureConstructor ctor, FIXME re-split support.
                 IIndexProcedure proc,
-                IResultHandler resultHandler) {
+                IResultHandler resultHandler
+//              IIndexProcedureConstructor ctor, FIXME re-split support.
+        ) {
 
             if (split.pmd == null)
                 throw new IllegalArgumentException();
@@ -1068,7 +1114,7 @@ public class ClientIndexView implements IIndex {
          * @throws Exception
          */
         protected void retry() throws Exception {
-
+            
             // FIXME Handle NoSuchIndexException
             throw new UnsupportedOperationException();
             
@@ -1126,7 +1172,7 @@ public class ClientIndexView implements IIndex {
         while (fromIndex < ntuples) {
         
             // partition spanning that key.
-            final PartitionLocator pmd = findPartition(keys[fromIndex]);
+            final PartitionLocator pmd = getMetadataIndex().find(keys[fromIndex]);
 
             final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
 
@@ -1169,114 +1215,6 @@ public class ClientIndexView implements IIndex {
         }
 
         return splits;
-
-    }
-
-    /**
-     * Return the metadata for the index partition which spans the given key.
-     * 
-     * @param key
-     *            The key.
-     *            
-     * @return The index partition metadata.
-     */
-    protected PartitionLocator findPartition(byte[] key) {
-
-        return getMetadataIndex().find(key);
-        
-//        final int index = mdi.findIndexOf(key);
-//        
-//        if (index == -1)
-//            return null;
-//
-//        /*
-//         * The serialized index partition metadata record for the partition that
-//         * spans the given key.
-//         */
-//        final byte[] val = mdi.valueAt(index);
-//
-//        /*
-//         * The separator key that defines the left edge of that index partition
-//         * (always defined).
-//         */
-//        final byte[] leftSeparatorKey = mdi.keyAt(index);
-//
-//        /*
-//         * The separator key that defines the right edge of that index partition
-//         * or [null] iff the index partition does not have a right sibling (a
-//         * null has the semantics of no upper bound).
-//         */
-//        byte[] rightSeparatorKey;
-//
-//        try {
-//
-//            rightSeparatorKey = mdi.keyAt(index + 1);
-//
-//        } catch (IndexOutOfBoundsException ex) {
-//
-//            rightSeparatorKey = null;
-//
-//        }
-//
-//        final PartitionLocator pmd = (PartitionLocator) SerializerUtil
-//                .deserialize(val);
-//
-//        return new PartitionLocatorWithSeparatorKeys(pmd
-//                .getPartitionId(), pmd.getDataServices(), leftSeparatorKey,
-//                rightSeparatorKey);
-        
-    }
-
-    /**
-     * @todo can this be encapsulated in a manner that will minimize RMI
-     *       overhead?
-     * 
-     * @deprecated use a range scan of the metadata index to replace the use of
-     *             this method in the {@link PartitionedRangeQueryIterator}. It
-     *             is not needed by anyone else.
-     */
-    public PartitionLocator getPartitionAtIndex(int index) {
-
-        if (index == -1)
-            return null;
-
-        final IMetadataIndex mdi = fed.getMetadataIndex(name,timestamp);
-
-        /*
-         * The serialized index partition metadata record for the partition that
-         * spans the given key.
-         */
-        final byte[] val = mdi.valueAt(index);
-
-        /*
-         * The separator key that defines the left edge of that index partition
-         * (always defined).
-         */
-        final byte[] leftSeparatorKey = mdi.keyAt(index);
-
-        /*
-         * The separator key that defines the right edge of that index partition
-         * or [null] iff the index partition does not have a right sibling (a
-         * null has the semantics of no upper bound).
-         */
-        byte[] rightSeparatorKey;
-
-        try {
-
-            rightSeparatorKey = mdi.keyAt(index + 1);
-
-        } catch (IndexOutOfBoundsException ex) {
-
-            rightSeparatorKey = null;
-
-        }
-
-        final PartitionLocator pmd = (PartitionLocator) SerializerUtil
-                .deserialize(val);
-
-        return new PartitionLocator(pmd
-                .getPartitionId(), pmd.getDataServices(), leftSeparatorKey,
-                rightSeparatorKey);
 
     }
 
