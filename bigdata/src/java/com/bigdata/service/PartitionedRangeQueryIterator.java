@@ -33,9 +33,8 @@ import com.bigdata.btree.DelegateTuple;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.ResultSet;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.util.InnerCause;
 
@@ -62,17 +61,24 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private final ClientIndexView ndx;
     
     /**
+     * Iterator traversing the index partition locators spanned by the query.
+     */
+    private ITupleIterator locatorItr;
+    
+    /**
      * The timestamp from the {@link ClientIndexView}.
      */
     private final long timestamp;
 
     /**
-     * The first key to visit -or- null iff no lower bound.
+     * The first key to visit -or- <code>null</code> iff no lower bound (from
+     * the ctor).
      */
     private final byte[] fromKey;
     
     /**
-     * The first key to NOT visit -or- null iff no upper bound.
+     * The first key to NOT visit -or- <code>null</code> iff no upper bound
+     * (from the ctor).
      */
     private final byte[] toKey;
 
@@ -91,37 +97,29 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private final ITupleFilter filter;
     
     /**
-     * Index of the first partition to be queried.
+     * The last key that was visited on the {@link #src} iterator. This is used
+     * in case we trap a {@link NoSuchIndexException}. It provides the
+     * exclusive lower bound for the query against the new index partitions
+     * identified when we refresh our {@link PartitionLocator}s. This is
+     * <code>null</code> initially and is set to the non-<code>null</code>
+     * value of each key that we visit by {@link #next()}.
      */
-    private final int fromIndex;
-    
-    /**
-     * Index of the last partition to be queried.
-     */
-    private final int toIndex;
+    private byte[] lastKeyVisited = null;
 
     /**
-     * Index of the partition that is currently being queried.
+     * The metadata for the current index partition.
      */
-    private int index;
+    private PartitionLocator locator = null;
 
     /**
      * The #of partitions that have been queried so far. There will be one
      * {@link DataServiceRangeIterator} query issued per partition.
+     * 
+     * @deprecated The #of partitions is a bit tricky since splits and introduce
+     *             new partitions.
      */
     private int nparts = 0;
     
-    /**
-     * The metadata for the current index partition.
-     */
-    private PartitionLocator pmd = null;
-
-    /**
-     * The data service for the current index partition (this should
-     * failover).
-     */
-    private IDataService dataService = null;
-
     /**
      * The #of enties visited so far.
      */
@@ -141,6 +139,9 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
 
     /**
      * The #of index partitions queried so far.
+     * 
+     * @deprecated The #of partitions is a bit tricky since splits and introduce
+     *             new partitions.
      */
     public int getPartitionCount() {
         
@@ -181,43 +182,143 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         this.flags = flags;
         this.filter = filter;
 
-        final IMetadataIndex mdi = ndx.getMetadataIndex();
+        // scan spanned index partition locators in key order.
+        this.locatorItr = ndx.locatorScan(fromKey, toKey);
 
-        {
+    }
+
+    public boolean hasNext() {
+
+        if (exhausted) {
+
+            return false;
             
-            /*
-             * FIXME The indices into the metadata index are not stable for
-             * read-committed or unisolated queries. Either we have to cache the
-             * actual partition locators up front, or we have to convert the
-             * query for partition locators into a historical read as of a
-             * recent commit time, or we have to re-compute the partition
-             * locators each time before moving on to the next partition.
-             */
-            int a[] = mdi.findIndices(fromKey, toKey);
+        }
+
+        if (locator == null) {
+
+            // Setup query for the first partition.
             
-            fromIndex = a[0];
+            if (!nextPartition()) {
+                
+                return false;
+                
+            }
+
+        }
+        
+        assert src != null;
+
+        try {
+
+            if(src.hasNext()) {
             
-            toIndex = a[1];
+                // More from the current source iterator.
+                
+                return true;
+                
+            }
+            
+        } catch(RuntimeException ex) {
+            
+            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+                
+                /*
+                 * Handle NoSuchIndexException. This exception indicates that we
+                 * have a stale index partition locator. This can happen when
+                 * index partitions are split, joined, or moved.
+                 */
+
+                // clear since invalid.
+                locator = null;
+                
+                // Re-start the locator scan.
+                locatorItr = ndx.locatorScan(currentFromKey(), toKey);
+                
+                // Recursive query.
+                return hasNext();
+                
+            }
             
         }
         
-        // starting index is the lower bound.
-        index = fromIndex;
+        /*
+         * The current index partition is empty, but there are other index
+         * partitions left to query.
+         * 
+         * Each source iterator reads from one index partition. (The source
+         * iterator is itself a chunked iterator so it may issue multiple remote
+         * requests to consume the data available on a given index partition).
+         */
+        
+        if(nextPartition()) {
+        
+            /*
+             * Recursive query since the index partition might be empty.
+             */
+            
+            return hasNext();
+            
+        }
+        
+        /*
+         * Exausted.
+         */
+        
+        exhausted = true;
+        
+        return false;
         
     }
 
     /**
-     * Issues a new range query against the current partition (the one
-     * identified by {@link #index}. 
+     * The next [fromKey] that we are supposed to visit. If we have not visited
+     * anything, then we are still on the original {@link #fromKey}. Otherwise
+     * we take the successor of the {@link #lastKeyVisited}.
+     */
+    private byte[] currentFromKey() {
+
+        final byte[] currentFromKey = lastKeyVisited == null //
+            ? this.fromKey//
+            : BytesUtil.successor(lastKeyVisited)//
+            ;
+
+        return currentFromKey;
+        
+    }
+    
+    /**
+     * Issues a new range query against the next index partititon.
+     */
+    private boolean nextPartition() {
+
+        assert ! exhausted;
+        
+        if(!locatorItr.hasNext()) return false;
+        
+        ITuple tuple = locatorItr.next();
+        
+        locator = (PartitionLocator)SerializerUtil.deserialize(tuple.getValue());
+        
+        // submit query to the next partition.
+        
+        rangeQuery();
+
+        assert src != null;
+
+        return true;
+
+    }
+    
+    /**
+     * Issues a range query against the current {@link #locator}.
      */
     private void rangeQuery() {
 
         assert ! exhausted;
-
-        pmd = ndx.getPartitionAtIndex(index);
-
-        dataService = ndx.getDataService(pmd);
         
+        assert locator != null;
+
         try {
 
             /*
@@ -234,21 +335,24 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
              * be greater than was originally anticipated.
              */
 
-            final byte[] _fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey, pmd);
+            final byte[] _fromKey = AbstractKeyRangeIndexProcedure
+                    .constrainFromKey(currentFromKey(), locator);
 
-            final byte[] _toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
+            final byte[] _toKey = AbstractKeyRangeIndexProcedure
+                    .constrainToKey(toKey, locator);
             
-//            final byte[] _fromKey = (index == fromIndex ? fromKey : pmd
-//                    .getLeftSeparatorKey());
-//
-//            final byte[] _toKey = (index == toIndex ? toKey : pmd
-//                    .getRightSeparatorKey());
-
-            final int partitionId = pmd.getPartitionId();
+            final int partitionId = locator.getPartitionId();
             
             log.info("name=" + ndx.getName() + ", tx=" + timestamp + ", partition="
                     + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
+            
+            /*
+             * The data service for the current index partition.
+             * 
+             * @todo this should failover.
+             */
+            final IDataService dataService = ndx.getDataService(locator);
             
             /*
              * Iterator will visit all data on that index partition.
@@ -273,125 +377,6 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
 
     }
 
-    /**
-     * Issues a new range query against the next index partititon.
-     */
-    private void nextPartition() {
-
-        assert ! exhausted;
-        assert src != null;
-        
-        // update the partition index.
-        
-        index++;
-
-        // submit query to the next partition.
-        
-        rangeQuery();
-
-    }
-    
-    /**
-     * There are three levels at which we need to test in order to determine
-     * if the total iterator is exhausted. First, we need to test to see if
-     * there are more entries remaining in the current {@link ResultSet}.
-     * If not and the {@link ResultSet} is NOT
-     * {@link ResultSet#isExhausted() exhausted}, then we issue a
-     * {@link #continuationQuery()} against the same index partition. If the
-     * {@link ResultSet} is {@link ResultSet#isExhausted() exhausted}, then
-     * we test to see whether or not we have visited all index partitions.
-     * If so, then the iterator is exhausted. Otherwise we issue a range
-     * query against the {@link #nextPartition()}.
-     * 
-     * @return True iff the iterator is not exhausted.
-     */
-    public boolean hasNext() {
-
-        if (nparts == 0) {
-
-            // Obtain the first result set.
-
-            rangeQuery();
-
-        }
-        
-        assert src != null;
-        
-        if (exhausted) {
-
-            return false;
-            
-        }
-
-        try {
-
-            if(src.hasNext()) {
-            
-                // More from the current source iterator.
-                
-                return true;
-                
-            }
-            
-        } catch(RuntimeException ex) {
-            
-            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
-                
-                /*
-                 * FIXME Handle NoSuchIndexException.
-                 * 
-                 * 1. advance the fromKey to the next key that we are supposed
-                 * to visit
-                 * 
-                 * 1. refresh locator(s) spanning the key range for the index
-                 * partition for which we got this exception
-                 */
-                throw new UnsupportedOperationException(ex);
-                
-            }
-            
-        }
-        
-        /*
-         * The source iterator is exhausted so we will issue a continuation
-         * query. Each source iterator reads from one index partition. (The
-         * source iterator is itself a chunked iterator so it may issue multiple
-         * remote requests to consume the data available on a given index
-         * partition).
-         */
-        
-        if(index < toIndex) {
-        
-            /*
-             * The current index partition is empty, but there are other
-             * index partitions left to query.
-             */
-            
-            nextPartition();
-            
-            /*
-             * Recursive query since the index partition might be empty.
-             */
-            
-            return hasNext();
-            
-        }
-        
-        /*
-         * Exausted.
-         */
-        
-        exhausted = true;
-        
-        return false;
-        
-    }
-
-    /**
-     * The byte[] containing the serialized value for the next matching
-     * entry in the index -or- <code>null</code> iff the iterator was
-     * provisioned to NOT visit values.
-     */
     public ITuple next() {
 
         if (!hasNext()) {
@@ -404,7 +389,13 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
 
         final long nvisited = this.nvisited;
         
-        return new DelegateTuple( src.next() ) {
+        final ITuple sourceTuple = src.next();
+
+        this.lastKeyVisited = sourceTuple.getKey();
+
+        assert lastKeyVisited != null;
+        
+        return new DelegateTuple( sourceTuple ) {
             
             public long getVisitCount() {
                 

@@ -150,4 +150,35 @@ public interface IMetadataService extends IDataService, Remote {
     public void dropScaleOutIndex(String name) throws IOException,
             InterruptedException, ExecutionException;
     
+    /**
+     * The partition with that separator key or <code>null</code> (exact match
+     * on the separator key).
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param timestamp
+     * @param key
+     *            The separator key (the first key that would go into that
+     *            partition).
+     * 
+     * @return The partition with that separator key or <code>null</code>.
+     */
+    public PartitionLocator get(String name, long timestamp, byte[] key)
+            throws InterruptedException, ExecutionException, IOException;
+
+    /**
+     * Find and return the partition spanning the given key.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param timestamp
+     * @param key
+     *            A key of interest for the scale-out index.
+     * 
+     * @return The partition spanning the given key or <code>null</code> if
+     *         there are no partitions defined.
+     */
+    public PartitionLocator find(String name, long timestamp, byte[] key)
+            throws InterruptedException, ExecutionException, IOException;
+
 }

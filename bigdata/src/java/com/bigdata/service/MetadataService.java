@@ -58,7 +58,31 @@ import com.bigdata.mdi.PartitionLocator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Load-balancing (moving index partitions around).
+ * FIXME Moving index partitions around:
+ * <p>
+ * Consider failover vs moving index partitions around vs load-balancing.
+ * <p>
+ * In failover, we have a chain of data services that are replicating some index
+ * partitions at the media level - using binary images of the journals and the
+ * index segments. The failover chain can also support load-balancing of queries
+ * by reading from any data service in the failover chain, not just the primary
+ * data service. When a data service fails (assuming a hard failure of the
+ * machine) we automatically failover the primary to the first secondary data
+ * service and recruit another data service to re-populate the failover chain in
+ * order to maintain the desired replication count.
+ * <P>
+ * When we move index partitions around we are distributing them in order to
+ * make the use of CPU, RAM and DISK resources more even across the federation.
+ * This is most important when a scale-out index is relatively new as we need to
+ * distribute the index in order to realize performance benefits and smooth out
+ * the index performance. This is also important when some index partitions are
+ * so hot that they need to be wired into RAM. Finally, this is important when a
+ * host is overloaded, especially when it is approaching resource exhaustion.
+ * However, the fastest way to obtain more disk space on a host is to be more
+ * aggressive in releasing old resources. Moving the current state of an index
+ * partition does not release ANY DISK space on the host since only the current
+ * state of the index partition is moved, not its historical states (which are
+ * on a mixture of journals and index segments).
  * 
  * @todo the client (or the data services?) should send as async message every N
  *       seconds providing a histogram of the partitions they have touched (this
@@ -152,6 +176,69 @@ abstract public class MetadataService extends DataService implements
         
     }
     
+    public PartitionLocator get(String name, long timestamp, final byte[] key)
+            throws InterruptedException, ExecutionException, IOException {
+    
+        setupLoggingContext();
+
+        try {
+
+            final AbstractTask task = new AbstractTask(
+                    concurrencyManager, timestamp, getMetadataIndexName(name)
+                    ) {
+
+                        @Override
+                        protected Object doTask() throws Exception {
+                            
+                            MetadataIndex ndx = (MetadataIndex)getIndex(getOnlyResource());
+                            
+                            return ndx.get(key);
+                            
+                        }
+                
+            };
+            
+            return (PartitionLocator) concurrencyManager.submit(task).get();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }        
+
+    }
+
+    public PartitionLocator find(String name, long timestamp, final byte[] key)
+            throws InterruptedException, ExecutionException, IOException {
+
+        setupLoggingContext();
+
+        try {
+
+            final AbstractTask task = new AbstractTask(concurrencyManager,
+                    timestamp, getMetadataIndexName(name)) {
+
+                @Override
+                protected Object doTask() throws Exception {
+
+                    MetadataIndex ndx = (MetadataIndex) getIndex(getOnlyResource());
+
+                    return ndx.find(key);
+
+                }
+
+            };
+
+            return (PartitionLocator) concurrencyManager.submit(task).get();
+
+        } finally {
+
+            clearLoggingContext();
+
+        }
+
+    }
+
     public void splitIndexPartition(String name, PartitionLocator oldLocator,
             PartitionLocator newLocators[]) throws IOException,
             InterruptedException, ExecutionException {

@@ -332,6 +332,16 @@ public class AbstractResourceManagerTestCase extends
         public String getStatistics(String name, long timestamp) throws IOException {
             throw new UnsupportedOperationException();
         }
+
+        public PartitionLocator get(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public PartitionLocator find(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
         
     }
     

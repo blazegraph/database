@@ -147,8 +147,6 @@ import cutthecrap.utils.striterators.Striterator;
  * machines). Look at job completion rate, scaling, bytes read/written per
  * second, etc.
  * 
- * FIXME get group commit working.
- * 
  * FIXME get working with a distributed federation as well.
  * 
  * @todo offer option to buffer map outputs across map tasks within the service

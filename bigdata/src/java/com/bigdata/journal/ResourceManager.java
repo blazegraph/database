@@ -69,7 +69,6 @@ import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
-import com.bigdata.mdi.AbstractPartitionTask;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -3347,7 +3346,7 @@ abstract public class ResourceManager implements IResourceManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class BuildIndexSegmentTask extends AbstractPartitionTask {
+    public class BuildIndexSegmentTask extends AbstractTask {
 
         final protected File outFile;
 

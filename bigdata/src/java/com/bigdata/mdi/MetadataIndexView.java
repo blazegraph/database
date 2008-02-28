@@ -30,6 +30,7 @@ package com.bigdata.mdi;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
+import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -53,9 +54,54 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
         
     }
     
-    public int findIndexOf(byte[] key) {
+    public IndexMetadata getScaleOutIndexMetadata() {
+
+        return ((MetadataIndexMetadata)getIndexMetadata()).getManagedIndexMetadata();
         
-        int pos = indexOf(key);
+    }
+
+    public PartitionLocator get(byte[] key) {
+
+        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
+
+    }
+
+    /**
+     * Note: It is this method which introduces the requirement for the
+     * {@link ILinearList} API for the {@link MetadataIndex}. The method is
+     * used to discover the locator for the index partition within which the
+     * <i>key</i> would be found.
+     */
+    public PartitionLocator find(byte[] key) {
+        
+        final int index = findIndexOf(key);
+        
+        if(index == -1) {
+            
+            return null;
+            
+        }
+        
+        final byte[] val = delegate.valueAt(index);
+        
+        return (PartitionLocator) SerializerUtil.deserialize(val);
+        
+    }
+    
+    /**
+     * Find the index of the partition spanning the given key.
+     * 
+     * @return The index of the partition spanning the given key or
+     *         <code>-1</code> iff there are no partitions defined.
+     * 
+     * @exception IllegalStateException
+     *                if there are partitions defined but no partition spans the
+     *                key. In this case the {@link MetadataIndex} lacks an entry
+     *                for the key <code>new byte[]{}</code>.
+     */
+    private int findIndexOf(byte[] key) {
+        
+        int pos = delegate.indexOf(key);
         
         if (pos < 0) {
 
@@ -97,127 +143,4 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
 
     }
     
-    public PartitionLocator find(byte[] key) {
-        
-        final int index = findIndexOf(key);
-        
-        if(index == -1) {
-            
-            return null;
-            
-        }
-        
-        final byte[] val = valueAt(index);
-        
-        return (PartitionLocator) SerializerUtil.deserialize(val);
-        
-    }
-    
-    public PartitionLocator get(byte[] key) {
-
-        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
-
-//        final byte[] val = lookup(key);
-//
-//        if (val == null) {
-//
-//            return null;
-//            
-//        }
-//
-//        return (PartitionMetadata) SerializerUtil.deserialize(val);
-        
-    }
-    
-    /**
-     * Create or update a partition (exact match on the separator key).
-     * 
-     * @param key
-     *            The separator key (the first key that would go into that
-     *            partition).
-     * @param val
-     *            The parition metadata.
-     * 
-     * @return The previous partition metadata for that separator key or
-     *         <code>null</code> if there was no partition for that separator
-     *         key.
-     * 
-     * @exception IllegalArgumentException
-     *                if the key identifies an existing partition but the
-     *                partition identifers do not agree.
-     */
-    public PartitionLocator put(byte[] key, PartitionLocator val) {
-
-        if (val == null) {
-
-            throw new IllegalArgumentException();
-
-        }
-        
-        final byte[] newval = SerializerUtil.serialize(val);
-        
-        final byte[] oldval2 = insert(key, newval);
-
-        PartitionLocator oldval = oldval2 == null ? null
-                : (PartitionLocator) SerializerUtil.deserialize(oldval2);
-        
-        if (oldval != null && oldval.getPartitionId() != val.getPartitionId()) {
-
-            throw new IllegalArgumentException("Expecting: partId="
-                    + oldval.getPartitionId() + ", but have partId="
-                    + val.getPartitionId());
-
-        }
-
-        return oldval;
-    
-    }
-
-    public IndexMetadata getScaleOutIndexMetadata() {
-
-        return ((MetadataIndexMetadata)getIndexMetadata()).getManagedIndexMetadata();
-        
-    }
-
-    public int[] findIndices(byte[] fromKey, byte[] toKey) {
-
-        // index of the first partition to check.
-        final int fromIndex = (fromKey == null ? 0 : findIndexOf(fromKey));
-
-        // index of the last partition to check.
-        final int toIndex = (toKey == null ? delegate.getEntryCount() - 1 : 
-            findIndexOf(toKey));
-
-        // keys are out of order.
-        if (fromIndex > toIndex) {
-
-            throw new IllegalArgumentException("fromKey > toKey");
-
-        }
-
-        return new int[] { fromIndex, toIndex };
-        
-    }
-
-
-    public int indexOf(byte[] key) {
-
-        return delegate.indexOf(key);
-        
-    }
-
-
-    public byte[] keyAt(int index) {
-        
-        return delegate.keyAt(index);
-        
-    }
-
-
-    public byte[] valueAt(int index) {
-
-        return delegate.valueAt(index);
-        
-    }
-
 }

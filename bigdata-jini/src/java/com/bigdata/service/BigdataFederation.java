@@ -27,15 +27,22 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 
@@ -116,45 +123,6 @@ public class BigdataFederation implements IBigdataFederation {
         
         return client;
         
-    }
-
-    /**
-     * 
-     * @todo Rather than synchronizing all requests, this should queue requests
-     *       for a specific metadata index iff there is a cache miss for that
-     *       index.
-     * 
-     */
-    synchronized public MetadataIndex getMetadataIndex(String name,
-            long timestamp) {
-
-        assertOpen();
-
-        // FIXME Cache per isolation time.
-        if (timestamp != ITx.UNISOLATED)
-            throw new UnsupportedOperationException();
-
-        MetadataIndex tmp = partitions.get(name);
-
-        if (tmp == null) {
-
-            tmp = cacheMetadataIndex(name, timestamp);
-
-            if (tmp == null) {
-
-                // No such scale-out index.
-
-                return null;
-
-            }
-
-            // save reference to cached mdi.
-            partitions.put(name, tmp);
-
-        }
-
-        return tmp;
-
     }
 
     public IMetadataService getMetadataService() {
@@ -244,10 +212,111 @@ public class BigdataFederation implements IBigdataFederation {
 
         assertOpen();
 
-        /*
-         * Verify index exists.
-         */
+        final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name, timestamp);
         
+        // No such index.
+        if (mdmd == null)
+            return null;
+
+        // Index exists.
+        return new ClientIndexView(this, name, timestamp, mdmd);
+
+    }
+
+    /**
+     * 
+     * @todo Rather than synchronizing all requests, this should queue requests
+     *       for a specific metadata index iff there is a cache miss for that
+     *       index.
+     * 
+     * FIXME This should be a read-through view onto the metadata index.
+     * <p>
+     * The easiest way to have the view be correct is for the operations to all
+     * run against the remote metadata index (no caching).
+     * <p>
+     * There are three kinds of queries that we do against the metadata index:
+     * (1) get(key); (2) find(key); and (3) locatorScan(fromKey,toKey). The
+     * first is only used by the unit tests. The second is used when we start a
+     * locator scan, when we split a batch operation against the index
+     * partitions, and when we map an index procedure over a key range or use a
+     * key range iterator. This is the most costly of the queries, but it is
+     * also the one that is the least easy to cache. The locator scan itself is
+     * heavily buffered - a cache would only help for frequently scanned and
+     * relatively small key ranges. For this purpose, it may be better to cache
+     * the iterator result itself locally to the client (for historical reads or
+     * transactional reads).
+     * <p>
+     * The difficulty with caching find(key) is that we need to use the
+     * {@link ILinearList} API to locate the appropriate index partition.
+     * However, since it is a cache, there can be cache misses. These would show
+     * up as a "gap" in the (leftSeparator,rightSeparator) coverage.
+     * <p>
+     * If we do not cache access to the remote metadata index then we will
+     * impose additional latency on clients, traffic on the network, and demands
+     * on the metadata service. However, with high client concurrency mitigates
+     * the increase in access latency to the metadata index.
+     */
+    synchronized public IMetadataIndex getMetadataIndex(String name,
+            long timestamp) {
+
+        assertOpen();
+
+        final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name, timestamp);
+        
+        // No such index.
+        if (mdmd == null) return null;
+                
+        if (true) {
+
+            // FIXME test with this and with caching and see what works better.
+            return new NoCacheMetadataIndexView(name, timestamp, mdmd);
+            
+        } else {
+
+            // FIXME Cache per isolation time.
+            if (timestamp != ITx.UNISOLATED)
+                throw new UnsupportedOperationException();
+
+            MetadataIndex tmp = partitions.get(name);
+
+            if (tmp == null) {
+
+                tmp = cacheMetadataIndex(name, timestamp,mdmd);
+
+                if (tmp == null) {
+
+                    // No such scale-out index.
+
+                    return null;
+
+                }
+
+                // save reference to cached mdi.
+                partitions.put(name, tmp);
+
+            }
+
+            return tmp;
+
+        }
+        
+    }
+
+    /**
+     * Return the metadata for the metadata index itself.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * 
+     * @param timestamp
+     * 
+     * @return The metadata for the metadata index or <code>null</code> iff no
+     *         scale-out index is registered by that name at that timestamp.
+     */
+    private MetadataIndexMetadata getMetadataIndexMetadata(String name, long timestamp) {
+
+        assertOpen();
+
         final MetadataIndexMetadata mdmd;
         try {
 
@@ -269,12 +338,18 @@ public class BigdataFederation implements IBigdataFederation {
 
         }
         
-        // Index exists.
+        if (mdmd == null) {
+
+            // No such index.
+            
+            return null;
+
+        }
         
-        return new ClientIndexView(this, name, timestamp, mdmd);
+        return mdmd;
 
     }
-
+    
     /**
      * Cache the index partition metadata in the client.
      * 
@@ -286,35 +361,10 @@ public class BigdataFederation implements IBigdataFederation {
      * 
      * FIXME Just create cache view when MDI is large and then cache on demand.
      */
-    private MetadataIndex cacheMetadataIndex(String name,long timestamp) {
+    private MetadataIndex cacheMetadataIndex(String name, long timestamp,
+            MetadataIndexMetadata mdmd) {
 
         assertOpen();
-
-        // The name of the metadata index.
-        final String metadataName = MetadataService.getMetadataIndexName(name);
-
-        // The metadata service - we will use a range query on it.
-        final IMetadataService metadataService = getMetadataService();
-
-        // The metadata for the metadata index itself.
-        final MetadataIndexMetadata mdmd;
-        try {
-
-            mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName,timestamp);
-            
-        } catch(Exception ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-        
-        if (mdmd == null) {
-
-            // No such index.
-            
-            return null;
-
-        }
 
         // The UUID of the metadata index.
         final UUID metadataIndexUUID = mdmd.getIndexUUID();
@@ -345,9 +395,15 @@ public class BigdataFederation implements IBigdataFederation {
         {
         
             final ITupleIterator itr = new RawDataServiceRangeIterator(
-                    metadataService, metadataName, timestamp,
-                    null/* fromKey */, null/* toKey */, 0/* capacity */,
-                    IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
+                    getMetadataService(),//
+                    MetadataService.getMetadataIndexName(name), //
+                    timestamp,//
+                    null, // fromKey
+                    null, // toKey
+                    0, // capacity
+                    IRangeQuery.KEYS | IRangeQuery.VALS, //
+                    null // filter
+                    );
         
             while(itr.hasNext()) {
              
@@ -364,6 +420,129 @@ public class BigdataFederation implements IBigdataFederation {
         }
 
         return mdi;
+
+    }
+
+    /**
+     * An implementation that performs NO caching. All methods read through to
+     * the remote metadata index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    class NoCacheMetadataIndexView implements IMetadataIndex {
+
+        final String name;
+        final long timestamp;
+        final MetadataIndexMetadata mdmd;
+        
+        /**
+         * 
+         * @param name The name of the scale-out index.
+         * @param timestamp
+         */
+        public NoCacheMetadataIndexView(String name,long timestamp,MetadataIndexMetadata mdmd) {
+        
+            assert name != null;
+            assert mdmd != null;
+            
+            this.name = name;
+
+            this.timestamp = timestamp;
+
+            this.mdmd = mdmd;
+            
+        }
+        
+        // @todo re-fetch if READ_COMMITTED or UNISOLATED? it's very unlikely to change.
+        public IndexMetadata getScaleOutIndexMetadata() {
+
+            return mdmd;
+            
+        }
+
+        // this could be cached easily, but its only used by the unit tests.
+        public PartitionLocator get(byte[] key) {
+
+            try {
+
+                return getMetadataService().get(name, timestamp, key);
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+
+        // harder to cache - must look for "gaps"
+        public PartitionLocator find(byte[] key) {
+
+            try {
+
+                return getMetadataService().find(name, timestamp, key);
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+
+        // only used by unit tests.
+        public long rangeCount(byte[] fromKey, byte[] toKey) {
+
+            final IIndexProcedure proc = new RangeCountProcedure(fromKey, toKey);
+
+            final Long rangeCount;
+            try {
+
+                rangeCount = (Long) getMetadataService().submit(timestamp,
+                        MetadataService.getMetadataIndexName(name), proc);
+
+            } catch (Exception e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+            return rangeCount.longValue();
+
+        }
+
+        public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+
+            return rangeIterator(fromKey, toKey, 0/* capacity */,
+                    IRangeQuery.DEFAULT, null/* filter */);
+
+        }
+
+        /**
+         * Note: Since this view is read-only this method forces the use of
+         * {@link ITx#READ_COMMITTED} IFF the timestamp for the view is
+         * {@link ITx#UNISOLATED}. This produces the same results on read and
+         * reduces contention for the {@link WriteExecutorService}. This is
+         * already done automatically for anything that gets run as an index
+         * procedure, so we only have to do this explicitly for the range
+         * iterator method.
+         */
+        // not so interesting to cache, but could cache the iterator results on the scale-out index.
+        public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+                int capacity, int flags, ITupleFilter filter) {
+
+            return new RawDataServiceRangeIterator(getMetadataService(),//
+                    MetadataService.getMetadataIndexName(name), //
+                    (timestamp==ITx.UNISOLATED?ITx.READ_COMMITTED:timestamp),//
+                    null, // fromKey
+                    null, // toKey
+                    0, // capacity
+                    IRangeQuery.KEYS | IRangeQuery.VALS, //
+                    null // filter
+            );
+
+        }
 
     }
 
