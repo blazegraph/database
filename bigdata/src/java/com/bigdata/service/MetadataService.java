@@ -50,8 +50,7 @@ import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadata;
-import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocator;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -153,10 +152,9 @@ abstract public class MetadataService extends DataService implements
         
     }
     
-    public void splitIndexPartition(String name, int partitionId,
-            byte[] leftSeparator,
-            PartitionLocatorMetadataWithSeparatorKeys newLocators[])
-            throws IOException, InterruptedException, ExecutionException {
+    public void splitIndexPartition(String name, PartitionLocator oldLocator,
+            PartitionLocator newLocators[]) throws IOException,
+            InterruptedException, ExecutionException {
 
         setupLoggingContext();
 
@@ -164,7 +162,7 @@ abstract public class MetadataService extends DataService implements
 
             final AbstractTask task = new SplitIndexPartitionTask(
                     concurrencyManager, getMetadataIndexName(name),
-                    partitionId, leftSeparator, newLocators);
+                    oldLocator, newLocators);
             
             concurrencyManager.submit(task).get();
             
@@ -289,65 +287,67 @@ abstract public class MetadataService extends DataService implements
      */
     protected class SplitIndexPartitionTask extends AbstractTask {
 
-        protected final int partitionId;
-        protected final byte[] leftSeparator;
-        protected final PartitionLocatorMetadataWithSeparatorKeys locators[];
+        protected final PartitionLocator oldLocator;
+        protected final PartitionLocator newLocators[];
         
         /**
          * @param concurrencyManager
          * @param resource
-         * @param partitionId
-         * @param leftSeparator
-         * @param locators
+         * @param oldLocator
+         * @param newLocators
          */
         protected SplitIndexPartitionTask(
                 IConcurrencyManager concurrencyManager, String resource,
-                int partitionId,
-                byte[] leftSeparator,
-                PartitionLocatorMetadataWithSeparatorKeys locators[]) {
+                PartitionLocator oldLocator,
+                PartitionLocator newLocators[]) {
 
             super(concurrencyManager, ITx.UNISOLATED, resource);
 
-            if (leftSeparator == null)
+            if (oldLocator == null)
                 throw new IllegalArgumentException();
-            
-            if (locators == null)
+
+            if (newLocators == null)
                 throw new IllegalArgumentException();
+
+            this.oldLocator = oldLocator;
             
-            this.partitionId = partitionId;
-            
-            this.leftSeparator = leftSeparator;
-            
-            this.locators = locators;
+            this.newLocators = newLocators;
             
         }
 
         @Override
         protected Object doTask() throws Exception {
 
-            log.info("name=" + getOnlyResource() + ", partitionId="
-                    + partitionId + ", locators=" + Arrays.toString(locators));
+            log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
+                    + ", locators=" + Arrays.toString(newLocators));
             
             MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
             
-            PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil
-                    .deserialize(mdi.remove(leftSeparator));
+            PartitionLocator pmd = (PartitionLocator) SerializerUtil
+                    .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
             
-            /*
-             * Sanity check the partitionId under that key.
-             */
-            if (pmd.getPartitionId() != partitionId) {
+            if(oldLocator.equals(pmd)) {
 
-                throw new RuntimeException("Found " + pmd.getPartitionId()
-                        + ", but expected partitionId=" + partitionId);
+                /*
+                 * Sanity check failed - old locator not equal to the locator
+                 * found under that key in the metadata index.
+                 * 
+                 * @todo differences in just the data service failover chain
+                 * are probably not important and might be ignored.
+                 */
+
+                throw new RuntimeException("Expected oldLocator=" + oldLocator
+                        + ", but actual=" + pmd);
                 
             }
+
+            final byte[] leftSeparator = oldLocator.getLeftSeparatorKey();
             
             /*
              * Sanity check the first locator. It's leftSeparator MUST be the
              * leftSeparator of the index partition that was split.
              */
-            if(!BytesUtil.bytesEqual(leftSeparator,locators[0].getLeftSeparatorKey())) {
+            if(!BytesUtil.bytesEqual(leftSeparator,newLocators[0].getLeftSeparatorKey())) {
                 
                 throw new RuntimeException("locators[0].leftSeparator does not agree.");
                 
@@ -376,14 +376,14 @@ abstract public class MetadataService extends DataService implements
 
                 }
 
-                final PartitionLocatorMetadataWithSeparatorKeys locator = locators[locators.length - 1];
+                final PartitionLocator locator = newLocators[newLocators.length - 1];
                 
                 if (rightSeparator == null) {
 
                     if (locator.getRightSeparatorKey() != null) {
 
                         throw new RuntimeException("locators["
-                                + locators.length
+                                + newLocators.length
                                 + "].rightSeparator should be null.");
 
                     }
@@ -394,7 +394,7 @@ abstract public class MetadataService extends DataService implements
                             .getRightSeparatorKey())) {
 
                         throw new RuntimeException("locators["
-                                + locators.length
+                                + newLocators.length
                                 + "].rightSeparator does not agree.");
 
                     }
@@ -403,17 +403,17 @@ abstract public class MetadataService extends DataService implements
                 
             }
 
-            for(int i=0; i<locators.length; i++) {
+            for(int i=0; i<newLocators.length; i++) {
                 
-                PartitionLocatorMetadataWithSeparatorKeys locator = locators[i];
+                PartitionLocator locator = newLocators[i];
                 
-                PartitionLocatorMetadata tmp = new PartitionLocatorMetadata(
-                        locator.getPartitionId(),
-                        locator.getDataServices()
-                );
+//                PartitionLocator tmp = new PartitionLocator(
+//                        locator.getPartitionId(),
+//                        locator.getDataServices()
+//                );
 
                 mdi.insert(locator.getLeftSeparatorKey(), SerializerUtil
-                        .serialize(tmp));
+                        .serialize(locator));
                 
             }
             
@@ -647,19 +647,25 @@ abstract public class MetadataService extends DataService implements
              * Map the partitions onto the data services.
              */
             
-            PartitionLocatorMetadata[] partitions = new PartitionLocatorMetadata[npartitions];
+            PartitionLocator[] partitions = new PartitionLocator[npartitions];
             
             for(int i=0; i<npartitions; i++) {
                 
-                PartitionLocatorMetadata pmd = new PartitionLocatorMetadata(//
+                final byte[] leftSeparator = separatorKeys[i];
+
+                final byte[] rightSeparator = i + 1 < npartitions ? separatorKeys[i + 1]
+                        : null;
+
+                PartitionLocator pmd = new PartitionLocator(//
                         mdi.nextPartitionId(),//
                         new UUID[] { //
                             dataServiceUUIDs[i]
-                        }
+                        },
+                        leftSeparator,
+                        rightSeparator
                         );
                 
-                log.info("name=" + scaleOutIndexName + ", partitionId="
-                        + pmd.getPartitionId());
+                log.info("name=" + scaleOutIndexName + ", pmd=" + pmd);
 
                 /*
                  * Map the initial partition onto that data service. This
@@ -673,8 +679,8 @@ abstract public class MetadataService extends DataService implements
                 // override the partition metadata.
                 md.setPartitionMetadata(new LocalPartitionMetadata(
                         pmd.getPartitionId(),//
-                        separatorKeys[i],// leftSeparator
-                        i + 1 < npartitions ? separatorKeys[i + 1] : null, // rightSeparator
+                        leftSeparator,//
+                        rightSeparator,//
                         /*
                          * Note: The resourceMetadata[] is set on the data
                          * service when the index is actually registered since
@@ -780,7 +786,7 @@ abstract public class MetadataService extends DataService implements
                 ITuple tuple = itr.next();
 
                 // @TODO use getValueStream() variant once I resolve problem with stream.
-                PartitionLocatorMetadata pmd = (PartitionLocatorMetadata) SerializerUtil
+                PartitionLocator pmd = (PartitionLocator) SerializerUtil
                         .deserialize(tuple.getValue());
 //                .deserialize(tuple.getValueStream());
 

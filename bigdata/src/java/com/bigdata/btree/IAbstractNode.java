@@ -36,7 +36,7 @@ public interface IAbstractNode {
     /**
      * Traversal of index values in key order.
      */
-    public IEntryIterator entryIterator();
+    public ITupleIterator entryIterator();
 
     /**
      * Post-order traveral of nodes and leaves in the tree. For any given

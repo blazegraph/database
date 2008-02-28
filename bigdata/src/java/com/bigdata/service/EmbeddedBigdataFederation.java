@@ -42,6 +42,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -675,15 +676,13 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                             MetadataService.getMetadataIndexName(name),
                             timestamp);
             
-            if (mdmd == null) {
+            assert mdmd != null;
+            
+        } catch (NoSuchIndexException ex) {
+            
+            return null;
 
-                // No such index.
-                
-                return null;
-
-            }
-
-        } catch (IOException ex) {
+        } catch (Exception ex) {
 
             throw new RuntimeException(ex);
 

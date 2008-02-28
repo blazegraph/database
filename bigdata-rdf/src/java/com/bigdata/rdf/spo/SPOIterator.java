@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.IAccessPath;
 import com.bigdata.rdf.util.KeyOrder;
@@ -121,7 +121,7 @@ public class SPOIterator implements ISPOIterator {
     /**
      * The source iterator reading on the selected statement index.
      */
-    private IEntryIterator src;
+    private ITupleIterator src;
     
     /**
      * The executor service for the {@link Reader} (iff the {@link Reader} runs

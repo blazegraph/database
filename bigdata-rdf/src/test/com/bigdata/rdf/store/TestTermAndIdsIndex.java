@@ -35,7 +35,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._BNode;
@@ -158,7 +158,7 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
             
             System.err.println("terms index (forward mapping).");
             
-            IEntryIterator itr = store.getTermIdIndex().rangeIterator(null,
+            ITupleIterator itr = store.getTermIdIndex().rangeIterator(null,
                     null);
             
             while(itr.hasNext()) {
@@ -198,7 +198,7 @@ public class TestTermAndIdsIndex extends AbstractEmbeddedTripleStoreTestCase {
 
             System.err.println("ids index (reverse mapping).");
 
-            IEntryIterator itr = store.getIdTermIndex().rangeIterator(null,
+            ITupleIterator itr = store.getIdTermIndex().rangeIterator(null,
                     null);
             
             while(itr.hasNext()) {

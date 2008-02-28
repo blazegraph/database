@@ -29,16 +29,19 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.IEntryFilter;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
@@ -47,12 +50,13 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * The data service interface provides remote access to named indices, provides
  * for both unisolated and isolated operations on those indices, and exposes the
- * {@link IRemoteTxCommitProtocol} interface to the {@link ITransactionManagerService}
- * service for the coordination of distributed transactions. Clients normally
- * write to the {@link IIndex} interface. The {@link ClientIndexView} provides
- * an implementation of that interface supporting range partitioned scale-out
- * indices which transparently handles lookup of data services in the metadata
- * index and mapping of operations across the appropriate data services.
+ * {@link IRemoteTxCommitProtocol} interface to the
+ * {@link ITransactionManagerService} service for the coordination of
+ * distributed transactions. Clients normally write to the {@link IIndex}
+ * interface. The {@link ClientIndexView} provides an implementation of that
+ * interface supporting range partitioned scale-out indices which transparently
+ * handles lookup of data services in the metadata index and mapping of
+ * operations across the appropriate data services.
  * </p>
  * <p>
  * Indices are identified by name. Scale-out indices are broken into index
@@ -144,6 +148,103 @@ import com.bigdata.sparse.SparseRowStore;
  * parallelism.
  * </p>
  * 
+ * <h2>Index Partitions: Split, Join, and Move</h2>
+ * 
+ * <p>
+ * 
+ * Scale-out indices are broken tranparently down into index partitions. When a
+ * scale-out index is initially registered, one or more index partitions are
+ * created and registered on one or more data services.
+ * </p>
+ * 
+ * <p>
+ * 
+ * Note that each index partitions is just an {@link IIndex} registered under
+ * the name assigned by {@link DataService#getIndexPartitionName(String, int)}
+ * and whose {@link IndexMetadata#getPartitionMetadata()} returns a description
+ * of the resources required to compose a view of that index partition from the
+ * resources located on a {@link DataService}. The {@link IDataService} will
+ * respond for that index partition IFF there is an index under that name
+ * registered on the {@link IDataService} as of the <i>timestamp</i> associated
+ * with the request. If the index is not registered then a
+ * {@link NoSuchIndexException} will be thrown. <em>All methods on this and
+ * derived interfaces which are defined for an index name and timestamp MUST
+ * conform to these semantics.</em>
+ * 
+ * </p>
+ * 
+ * <p>
+ * 
+ * As index partitions grow in size they may be <em>split</em> into 2 or more
+ * index partitions covering the same key range as the original index partition.
+ * When this happens a new index partition identifier is assigned by the
+ * metadata service to each of the new index partitions and the old index
+ * partition is retired in an atomic operation. A similar operation can
+ * <em>move</em> an index partition to a different {@link IDataService} in
+ * order to load balance a federation. Finally, when two index partitions shrink
+ * in size, they maybe moved to the same {@link IDataService} and an atomic
+ * <i>join</i> operation may re-combine them into a single index partition
+ * spanning the same key range.
+ * 
+ * </p>
+ * 
+ * <p>
+ * 
+ * Split, join, and move operations all result in the old index partition being
+ * dropped on the {@link IDataService}. Clients having a stale
+ * {@link PartitionLocator} record will attempt to reach the now defunct
+ * index partition after it has been dropped and will receive a
+ * {@link NoSuchIndexException}.
+ * 
+ * </p>
+ * 
+ * 
+ * <h2>{@link IOException}</h2>
+ * 
+ * <p>
+ * 
+ * Clients MUST handle this exception by refreshing their cached
+ * {@link PartitionLocator} for the key range associated with the index
+ * partition which they wished to query and then re-issuing their request. By
+ * following this simple rule the client will automatically handle index
+ * partition splits, joins, and moves without error and in a manner which is
+ * completely transparent to the application.
+ * 
+ * </p>
+ * 
+ * <p>
+ * 
+ * This exception is generally (but not always) wrapped. Applications typically
+ * DO NOT write directly to the {@link IDataService} interface and therefore DO
+ * NOT need to worry about this. See {@link ClientIndexView}, which
+ * automatically handles this exception.
+ * 
+ * </p>
+ * 
+ * <h2>{@link IOException}</h2>
+ * 
+ * <p>
+ * 
+ * All methods on this and derived interfaces can throw an {@link IOException}.
+ * In all cases an <em>unwrapped</em> exception that is an instance of
+ * {@link IOException} indicates an error in the Remote Method Invocation (RMI)
+ * layer.
+ * 
+ * </p>
+ * 
+ * <h2>{@link ExecutionException} and {@link InterruptedException}</h2>
+ * 
+ * <p>
+ * 
+ * An <em>unwrapped</em> {@link ExecutionException} or
+ * {@link InterruptedException} indicates a problem when running the request as
+ * a task in the {@link IConcurrencyManager} on the {@link IDataService}. The
+ * exception always wraps a root cause which may indicate the underlying
+ * problem. Methods which do not declare these exceptions are not run under the
+ * {@link IConcurrencyManager}.
+ * 
+ * </p>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -212,24 +313,25 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *            <code>-timestamp</code> for a historical view no later than
      *            the specified timestamp.
      * 
-     * @return The metadata for the named index -or- <code>null</code> if the
-     *         named index is not register on this {@link IDataService}.
-     *         
+     * @return The metadata for the named index.
+     * 
      * @throws IOException
      */
-    public IndexMetadata getIndexMetadata(String name, long timestamp) throws IOException;
-    
+    public IndexMetadata getIndexMetadata(String name, long timestamp)
+            throws IOException, InterruptedException, ExecutionException;
+
     /**
      * Return various statistics about the named index.
      * 
      * @param name
      *            The index name.
-     *            
+     * 
      * @return Statistics about the named index.
      * 
      * @throws IOException
      */
-    public String getStatistics(String name,long timestamp) throws IOException;
+    public String getStatistics(String name, long timestamp)
+            throws IOException, InterruptedException, ExecutionException;
         
     /**
      * Drops the named index.
@@ -296,54 +398,9 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *                error.
      */
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IEntryFilter filter)
+            byte[] toKey, int capacity, int flags, ITupleFilter filter)
             throws InterruptedException, ExecutionException, IOException;
     
-//    /**
-//     * <p>
-//     * Range count of entries in a key range for the named index on this
-//     * {@link DataService}.
-//     * </p>
-//     * <p>
-//     * Note: This method reports the upper bound estimate of the #of key-value
-//     * pairs in the key range of the the named index. The cost of computing this
-//     * estimate is comparable to two index lookup probes. The estimate is an
-//     * upper bound because deleted entries in the index that have not been
-//     * eradicated through a suitable compacting merge will be reported. An exact
-//     * count may be obtained using the
-//     * {@link #rangeIterator(long, String, byte[], byte[], int, int, IEntryFilter)}
-//     * by NOT requesting either the keys or the values.
-//     * </p>
-//     * 
-//     * @param tx
-//     *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
-//     *            operation is NOT isolated by a transaction -or-
-//     *            <code> - tx </code> to read from the most recent commit point
-//     *            not later than the absolute value of <i>tx</i> (a fully
-//     *            isolated read-only transaction using a historical start time).
-//     * @param name
-//     *            The index name (required).
-//     * @param fromKey
-//     *            The starting key for the scan (or <code>null</code> iff
-//     *            there is no lower bound).
-//     * @param toKey
-//     *            The first key that will not be visited (or <code>null</code>
-//     *            iff there is no upper bound).
-//     * 
-//     * @return The upper bound estimate of the #of key-value pairs in the key
-//     *         range of the named index.
-//     * 
-//     * @exception InterruptedException
-//     *                if the operation was interrupted (typically by
-//     *                {@link #shutdownNow()}.
-//     * @exception ExecutionException
-//     *                If the operation caused an error. See
-//     *                {@link ExecutionException#getCause()} for the underlying
-//     *                error.
-//     */
-//    public long rangeCount(long tx, String name, byte[] fromKey, byte[] toKey)
-//            throws InterruptedException, ExecutionException, IOException;
-        
     /**
      * <p>
      * Submit a procedure.

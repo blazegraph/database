@@ -76,7 +76,7 @@ import com.bigdata.service.IMetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IPartitionMetadata {
+public interface IPartitionMetadata extends ISeparatorKeys {
 
     /**
      * The unique partition identifier.

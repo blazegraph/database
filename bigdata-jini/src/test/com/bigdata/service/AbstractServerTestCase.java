@@ -45,7 +45,7 @@ import net.jini.core.lookup.ServiceTemplate;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocator;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -432,14 +432,14 @@ public abstract class AbstractServerTestCase extends TestCase2 {
     }
 
     /**
-     * Compares two representations of the {@link PartitionLocatorMetadata}
+     * Compares two representations of the {@link PartitionLocator}
      * without the left- and right-separator keys that bound the index
      * partition.
      * 
      * @param expected
      * @param actual
      */
-    protected void assertEquals(PartitionLocatorMetadata expected, PartitionLocatorMetadata actual) {
+    protected void assertEquals(PartitionLocator expected, PartitionLocator actual) {
         
         assertEquals("partitionId",expected.getPartitionId(), actual.getPartitionId());
         

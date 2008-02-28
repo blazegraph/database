@@ -445,7 +445,7 @@ public class FusedView implements IIndex {
      * appears in more than one index, the entry is choosen based on the order
      * in which the indices were declared to the constructor.
      */
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 DEFAULT/* flags */, null/* filter */);
@@ -455,8 +455,8 @@ public class FusedView implements IIndex {
     /**
      * Core implementation.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         return new FusedEntryIterator(srcs, fromKey, toKey, capacity, flags, filter);
 

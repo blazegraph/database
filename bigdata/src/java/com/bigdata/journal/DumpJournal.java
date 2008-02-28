@@ -33,7 +33,7 @@ import java.util.Date;
 import java.util.Properties;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.rawstore.Bytes;
 
@@ -232,7 +232,7 @@ public class DumpJournal {
                 
                 CommitRecordIndex commitRecordIndex = journal._commitRecordIndex;
                 
-                IEntryIterator itr = commitRecordIndex.entryIterator();
+                ITupleIterator itr = commitRecordIndex.entryIterator();
                 
                 while(itr.hasNext()) {
                     
@@ -285,7 +285,7 @@ public class DumpJournal {
 
         Name2Addr name2Addr = journal.name2Addr;
 
-        IEntryIterator itr = name2Addr.entryIterator();
+        ITupleIterator itr = name2Addr.entryIterator();
 
         while (itr.hasNext()) {
 
@@ -315,7 +315,7 @@ public class DumpJournal {
     private static void dumpIndex(BTree btree) {
 
         // @todo offer the version metadata also if the index supports isolation.
-        IEntryIterator itr = btree.rangeIterator(null, null);
+        ITupleIterator itr = btree.rangeIterator(null, null);
         
         int i = 0;
         

@@ -33,13 +33,35 @@ import java.util.UUID;
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.service.ClientIndexView;
+
 /**
- * An immutable object that may be used to locate an index partition.
+ * An immutable object that may be used to locate an index partition. Instances
+ * of this class are stored as the values in the {@link MetadataIndex}.
+ * <p>
+ * Note: The {@link ISeparatorKeys#getLeftSeparatorKey()} is always equal to the
+ * key under which the {@link PartitionLocator} is stored in the metadata index.
+ * Likewise, the {@link ISeparatorKeys#getRightSeparatorKey()} is always equal
+ * to the key under which the successor of the index entry is stored (or
+ * <code>null</code> iff there is no successor). However, the left and right
+ * separator keys are stored explicitly in the values of the metadata index
+ * because it <em>greatly</em> simplifies client operations. While the left
+ * separator key is directly obtainable from the key under which the locator was
+ * stored, the right separator key is much more difficult to obtain in the
+ * various contexts within which the {@link ClientIndexView} requires that
+ * information.
+ * 
+ * @todo write a custom serializer for the {@link MetadataIndex} that factors
+ *       out the left separator key and which uses prefix compression to only
+ *       write the delta for the right separator key over the left separator
+ *       key? this would require de-serialization of the partition locator and
+ *       then re-serialization in a compressed form and may not be worth it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionLocatorMetadata implements IPartitionMetadata, Externalizable {
+public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
     /**
      * 
@@ -57,10 +79,13 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
      */
     private UUID[] dataServices;
     
+    private byte[] leftSeparatorKey;
+    private byte[] rightSeparatorKey;
+    
     /**
      * De-serialization constructor.
      */
-    public PartitionLocatorMetadata() {
+    public PartitionLocator() {
         
     }
 
@@ -73,8 +98,20 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
      *            The ordered array of data service identifiers on which data
      *            for this partition will be written and from which data for
      *            this partition may be read.
+     * @param leftSeparatorKey
+     *            The separator key that defines the left edge of that index
+     *            partition (always defined) - this is the first key that can
+     *            enter the index partition. The left-most separator key for a
+     *            scale-out index is always an empty <code>byte[]</code> since
+     *            that is the smallest key that may be defined.
+     * @param rightSeparatorKey
+     *            The separator key that defines the right edge of that index
+     *            partition or <code>null</code> iff the index partition does
+     *            not have a right sibling (a <code>null</code> has the
+     *            semantics of having no upper bound).
      */
-    public PartitionLocatorMetadata(int partitionId, UUID[] dataServices) {
+    public PartitionLocator(int partitionId, UUID[] dataServices,
+            byte[] leftSeparatorKey, byte[] rightSeparatorKey) {
 
         if (dataServices == null)
             throw new IllegalArgumentException();
@@ -82,9 +119,32 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
         if (dataServices.length == 0)
             throw new IllegalArgumentException("No data services?");
 
+        if (leftSeparatorKey == null)
+            throw new IllegalArgumentException("leftSeparatorKey");
+        
+        // Note: rightSeparatorKey MAY be null.
+        
+        if(rightSeparatorKey!=null) {
+            
+            if(BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey)>=0) {
+                
+                throw new IllegalArgumentException(
+                        "Separator keys are out of order: left="
+                                + Arrays.toString(leftSeparatorKey)
+                                + ", right="
+                                + Arrays.toString(rightSeparatorKey));
+                
+            }
+            
+        }
+     
         this.partitionId = partitionId;
         
         this.dataServices = dataServices;
+
+        this.leftSeparatorKey = leftSeparatorKey;
+        
+        this.rightSeparatorKey = rightSeparatorKey;
 
     }
 
@@ -126,20 +186,32 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
         
     }
     
+    final public byte[] getLeftSeparatorKey() {
+
+        return leftSeparatorKey;
+        
+    }
+    
+    final public byte[] getRightSeparatorKey() {
+        
+        return rightSeparatorKey;
+        
+    }
+
     final public int hashCode() {
 
         // per the interface contract.
         return partitionId;
         
     }
-    
+
     // Note: used by assertEquals in the test cases.
     public boolean equals(Object o) {
 
         if (this == o)
             return true;
 
-        PartitionLocatorMetadata o2 = (PartitionLocatorMetadata) o;
+        PartitionLocator o2 = (PartitionLocator) o;
 
         if (partitionId != o2.partitionId)
             return false;
@@ -147,6 +219,22 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
         if (dataServices.length != o2.dataServices.length)
             return false;
 
+        for (int i = 0; i < dataServices.length; i++) {
+
+            if (!dataServices[i].equals(o2.dataServices[i]))
+                return false;
+
+        }
+
+        if (!BytesUtil.bytesEqual(leftSeparatorKey, o2.leftSeparatorKey))
+            return false;
+
+        if (rightSeparatorKey == null && o2.rightSeparatorKey != null)
+            return false;
+        
+        if (!BytesUtil.bytesEqual(rightSeparatorKey, o2.rightSeparatorKey))
+            return false;
+        
         return true;
 
     }
@@ -156,6 +244,8 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
         return 
             "{ partitionId="+partitionId+
             ", dataServices="+Arrays.toString(dataServices)+
+            ", leftSeparator="+BytesUtil.toString(leftSeparatorKey)+
+            ", rightSeparator="+(rightSeparatorKey==null?null:BytesUtil.toString(rightSeparatorKey))+
             "}"
             ;
 
@@ -185,6 +275,26 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
             
         }
         
+        final int leftLen = (int) LongPacker.unpackLong(in);
+
+        final int rightLen = (int) LongPacker.unpackLong(in);
+
+        leftSeparatorKey = new byte[leftLen];
+
+        in.read(leftSeparatorKey);
+
+        if (rightLen != 0) {
+
+            rightSeparatorKey = new byte[rightLen];
+
+            in.read(rightSeparatorKey);
+
+        } else {
+
+            rightSeparatorKey = null;
+
+        }
+        
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -207,6 +317,19 @@ public class PartitionLocatorMetadata implements IPartitionMetadata, Externaliza
             
             out.writeLong(serviceUUID.getLeastSignificantBits());
             
+        }
+        
+        LongPacker.packLong(out, leftSeparatorKey.length);
+
+        LongPacker.packLong(out, rightSeparatorKey == null ? 0
+                : rightSeparatorKey.length);
+
+        out.write(leftSeparatorKey);
+
+        if (rightSeparatorKey != null) {
+
+            out.write(rightSeparatorKey);
+
         }
         
     }

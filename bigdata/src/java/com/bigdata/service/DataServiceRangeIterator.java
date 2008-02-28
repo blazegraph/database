@@ -27,19 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractChunkedRangeIterator;
-import com.bigdata.btree.BatchRemove;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.ResultSet;
-import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.rawstore.IBlock;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.journal.NoSuchIndexException;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -48,93 +42,78 @@ import com.bigdata.rawstore.IBlock;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceRangeIterator extends AbstractChunkedRangeIterator {
+public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
     
     public static final transient Logger log = Logger
             .getLogger(DataServiceRangeIterator.class);
 
     /**
-     * Error message used by {@link #getKey()} when the iterator was not
-     * provisioned to request keys from the data service.
+     * Used to submit delete requests to the scale-out index in a robust
+     * manner.
      */
-    static public transient final String ERR_NO_KEYS = "Keys not requested";
+    protected final ClientIndexView ndx;
     
     /**
-     * Error message used by {@link #getValue()} when the iterator was not
-     * provisioned to request values from the data service.
-     */
-    static public transient final String ERR_NO_VALS = "Values not requested";
-    
-    /**
-     * The data service for the index.
      * 
-     * FIXME This should automatically redirect when an index partition has
-     * moved or been split. for that we need access to the metadata service or a
-     * cache aware {@link IMetadataIndex} object.
-     * 
-     * @todo this should failover if a data service dies.
+     * @param ndx
+     *            The scale-out index view.
+     * @param dataService
+     *            The data service to be queried.
+     * @param name
+     *            The name of an index partition of that scale-out index on the
+     *            data service.
+     * @param timestamp The timestamp for that scale-out index view.
+     * @param fromKey
+     * @param toKey
+     * @param capacity
+     * @param flags
+     * @param filter
      */
-    protected final IDataService dataService;
-    
-    /**
-     * The index on which the range query is being performed.
-     */
-    protected final String name;
-    
-    /**
-     * The transaction identifier -or- zero iff the request is unisolated.
-     */
-    protected final long tx;
+    public DataServiceRangeIterator(ClientIndexView ndx,
+            IDataService dataService, String name, long timestamp,
+            byte[] fromKey, byte[] toKey, int capacity, int flags,
+            ITupleFilter filter) {
 
-    public DataServiceRangeIterator(IDataService dataService, String name,
-            long tx, byte[] fromKey, byte[] toKey, int capacity, int flags,
-            IEntryFilter filter) {
-
-        super(fromKey, toKey, capacity, flags, filter);
+        super(dataService, name, timestamp, fromKey, toKey, capacity, flags,
+                filter);
         
-        if (dataService == null) {
+        if (ndx == null) {
 
             throw new IllegalArgumentException();
 
         }
 
-        if (name == null) {
-
+        if (timestamp != ndx.getTimestamp())
             throw new IllegalArgumentException();
-            
-        }
-        
-        if (capacity < 0) {
 
-            throw new IllegalArgumentException();
-            
-        }
-
-        this.dataService = dataService;
-        
-        this.name = name;
-        
-        this.tx = tx;
+        this.ndx = ndx;
 
     }
 
-    @Override
-    protected ResultSet getResultSet(byte[] _fromKey, byte[] toKey, int capacity,
-            int flags, IEntryFilter filter) {
-
-        log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
-                + ", toKey=" + BytesUtil.toString(toKey));
-
-        try {
-            
-            return dataService.rangeIterator(tx, name, _fromKey, toKey,
-                    capacity, flags, filter);
-            
-        } catch (Exception e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+    /**
+     * This method (and no other method on this class) will throw a (possibly
+     * wrapped) {@link NoSuchIndexException} if an index partition is split,
+     * joined or moved during traversal.
+     * <p>
+     * The caller MUST test any thrown exception. If the exception is, or wraps,
+     * a {@link NoSuchIndexException}, then the caller MUST refresh its
+     * {@link IPartitionLocatorMetadata locators}s for the key range of the
+     * index partition that it thought it was traversing, and then continue
+     * traversal based on the revised locators(s).
+     * <p>
+     * Note: The {@link NoSuchIndexException} CAN NOT arise from any other
+     * method since only
+     * {@link #getResultSet(byte[], byte[], int, int, ITupleFilter)} actually
+     * reads from the {@link IDataService} and ALL calls to that method are
+     * driven by {@link #hasNext()}.
+     * <p>
+     * Note: The methods that handle delete-behind use the
+     * {@link ClientIndexView} to be robust and therefore will never throw a
+     * {@link NoSuchIndexException}.
+     */
+    public boolean hasNext() {
+        
+        return super.hasNext();
         
     }
         
@@ -151,50 +130,48 @@ public class DataServiceRangeIterator extends AbstractChunkedRangeIterator {
             
         }
         
-        try {
+        /*
+         * Let the index view handle the delete in a robust manner.
+         */
 
-            dataService.submit(tx, name, new BatchRemove(n, 0/* offset */,
-                keys, false/* returnOldValues */));
+        ndx.submit(n, keys, null/* vals */,
+                BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
 
-        } catch (Exception e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+//        try {
+//
+//            dataService.submit(tx, name, new BatchRemove(n, 0/* offset */,
+//                    keys, false/* returnOldValues */));
+//
+//        } catch (Exception e) {
+//
+//            throw new RuntimeException(e);
+//
+//        }
 
     }
 
     @Override
     protected void deleteLast(byte[] key) {
 
-        try {
-            
-            dataService.submit(tx, name, new BatchRemove(1, 0/* offset */,
-                    new byte[][] { key }, false/* returnOldValues */));
+        /*
+         * Let the index view handle the delete in a robust manner.
+         */
 
-        } catch (Exception e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+        ndx.submit(1, new byte[][] { key }, null/* vals */,
+                BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+
+//        try {
+//            
+//            dataService.submit(tx, name, new BatchRemove(1, 0/* offset */,
+//                    new byte[][] { key }, false/* returnOldValues */));
+//
+//        } catch (Exception e) {
+//            
+//            throw new RuntimeException(e);
+//            
+//        }
         
     }
 
-    @Override
-    protected IBlock readBlock(final int sourceIndex, long addr) {
-        
-        final IResourceMetadata resource = rset.getSources()[sourceIndex];
-        
-        try {
-            
-            return dataService.readBlock(resource, addr);
-            
-        } catch (IOException e) {
-
-            throw new RuntimeException(e);
-            
-        }
-        
-    }
     
 }

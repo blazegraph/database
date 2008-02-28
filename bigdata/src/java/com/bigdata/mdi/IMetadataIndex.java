@@ -32,6 +32,7 @@ import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IBigdataClient.Options;
 
 /**
  * Interface for a metadata index.
@@ -49,7 +50,7 @@ import com.bigdata.service.IMetadataService;
  * 
  * @todo If these methods are to be invoked remotely then we will need to
  *       returning the byte[] rather than the de-serialized
- *       {@link PartitionLocatorMetadata}.
+ *       {@link PartitionLocator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -72,7 +73,7 @@ public interface IMetadataIndex extends IIndex, ILinearList {
      * 
      * @return The partition with that separator key or <code>null</code>.
      */
-    public PartitionLocatorMetadata get(byte[] key);
+    public PartitionLocator get(byte[] key);
 
     /**
      * Find the index of the partition spanning the given key.
@@ -93,7 +94,7 @@ public interface IMetadataIndex extends IIndex, ILinearList {
      * @return The partition spanning the given key or <code>null</code> if
      *         there are no partitions defined.
      */
-    public PartitionLocatorMetadata find(byte[] key);
+    public PartitionLocator find(byte[] key);
 
     /**
      * Return the index of the partitions corresponding to the fromKey and the
@@ -116,6 +117,16 @@ public interface IMetadataIndex extends IIndex, ILinearList {
      * 
      * @todo change return type to <code>long</code> and pack into high/low
      *       word if this method will be executed remotely.
+     * 
+     * @deprecated Use a key-range scan on the metadata index instead. This will
+     *             deliver a chunk of locators at a time. Unless the #of index
+     *             partitions spanned is very large, this will be an atomic read
+     *             of locators from the metadata index. When the #of index
+     *             partitions spanned is very large, then this will allow a
+     *             chunked approach. Note that the actual client parallelism is
+     *             limited by {@link Options#CLIENT_THREAD_POOL_SIZE}, which is
+     *             typically smaller than the capacity of the chunked iterator
+     *             used to read on the metadata index.
      */
     public int[] findIndices(byte[] fromKey,byte[] toKey);
     

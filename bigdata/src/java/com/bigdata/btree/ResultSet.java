@@ -253,7 +253,7 @@ public class ResultSet implements Externalizable {
      * @param filter
      */
     public ResultSet(IIndex ndx, byte[] fromKey, byte[] toKey, int capacity,
-            int flags, IEntryFilter filter) {
+            int flags, ITupleFilter filter) {
 
         /*
          * The upper bound on the #of key-value pairs in the range.
@@ -300,7 +300,7 @@ public class ResultSet implements Externalizable {
          * to the caller. This is necessary in order for us to set the [lastKey]
          * field on the result set.
          */
-        final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
+        final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
                 flags | IRangeQuery.KEYS, filter);
 
         /*

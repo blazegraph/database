@@ -38,7 +38,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
@@ -613,7 +613,7 @@ public class SparseRowStore {
              * as we go.
              */
 
-            final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+            final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
 
             // #of entries scanned for that primary key.
             int nscanned = 0;

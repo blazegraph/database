@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import com.bigdata.mdi.LocalPartitionMetadata;
+
 /**
  * This procedure computes a range count on an index.
  */
@@ -64,10 +66,10 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      * <p>
      * Note: When the index {@link IndexMetadata#getDeleteMarkers()} this method
      * reports the upper bound estimate of the #of key-value pairs in the key
-     * range of the index. The estimate is an upper bound because deleted
-     * entries in that have not been eradicated through a suitable compacting
-     * merge will be reported. An exact count may be obtained using a range
-     * iterator by NOT requesting either the keys or the values.
+     * range of the index. The estimate is an upper bound because duplicate or
+     * deleted entries in that have not been eradicated through a suitable
+     * compacting merge will be reported. An exact count may be obtained using a
+     * range iterator by NOT requesting either the keys or the values.
      * </p>
      * 
      * @return The upper bound estimate of the #of key-value pairs in the key
@@ -75,9 +77,25 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      */
     public Object apply(IIndex ndx) {
 
+        /*
+         * Constrain the (fromKey, toKey) so that they address only the current
+         * index partition. This allows the same instance of the procedure to be
+         * mapped across a range of index partitions while constaining the query
+         * to lie within the index partition.
+         * 
+         * Note: This uses a local variable to prevent side effects.
+         */
+
+        final LocalPartitionMetadata pmd = ndx.getIndexMetadata()
+                .getPartitionMetadata();
+
+        final byte[] fromKey = constrainFromKey(this.fromKey, pmd);
+
+        final byte[] toKey = constrainToKey(this.toKey, pmd);
+
         final long rangeCount = ndx.rangeCount(fromKey, toKey);
-        
-        return new Long( rangeCount );
+
+        return new Long(rangeCount);
 
     }
 

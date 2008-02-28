@@ -79,7 +79,7 @@ import com.bigdata.rawstore.IRawStore;
  *       {@link IndexSegmentBuilder}.
  * 
  * @todo reuse a buffer when copying keys and values out of the index, e.g., for
- *       the {@link IEntryIterator}, in order to minimize heap churn.
+ *       the {@link ITupleIterator}, in order to minimize heap churn.
  * 
  * @todo The B+Tree implementation does not support limits on the serialized
  *       size of a node or leaf. The design strategy is to allow flexible sizes
@@ -869,7 +869,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
              * copy-on-write for immutable node or leaves.
              */
 
-            final IEntryIterator itr = rangeIterator(null, null,
+            final ITupleIterator itr = rangeIterator(null, null,
                     0/* capacity */, REMOVEALL/* flags */, null/* filter */);
 
             while (itr.hasNext()) {

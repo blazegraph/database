@@ -33,7 +33,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -45,7 +45,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.repo.BigdataRepository.Options;
 
@@ -55,6 +55,10 @@ import com.bigdata.repo.BigdataRepository.Options;
  * 
  * @todo tests scenarios leading to simple overflow processing (index segment
  *       builds), to index partition splits, to index partition moves, etc.
+ * 
+ * FIXME test continued splits of the index by continuing to write data on the
+ * scale-out index and verify that the view remains consistent with the ground
+ * truth.
  * 
  * FIXME test when index would be copied to the new journal rather than
  * resulting in an index segment build.
@@ -148,7 +152,7 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         /*
          * Verify the initial index partition.
          */
-        final PartitionLocatorMetadata pmd0;
+        final PartitionLocator pmd0;
         {
             
             ClientIndexView ndx = (ClientIndexView)fed.getIndex(name,ITx.UNISOLATED);
@@ -284,9 +288,9 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
      */
     protected void assertSameEntryIterator(IIndex expected, IIndex actual) {
         
-        IEntryIterator expectedItr = expected.rangeIterator(null,null);
+        ITupleIterator expectedItr = expected.rangeIterator(null,null);
 
-        IEntryIterator actualItr = expected.rangeIterator(null,null);
+        ITupleIterator actualItr = expected.rangeIterator(null,null);
         
         while(expectedItr.hasNext()) {
 

@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocator;
 
 /**
  * A metadata service for a named index.
@@ -94,16 +94,15 @@ public interface IMetadataService extends IDataService, Remote {
     /**
      * Updates the {@link MetadataIndex} for the named scale-out index to
      * reflect the split of an index partition into N new index partitions. The
-     * old index partition is removed from the {@link MetadataIndex} and the new
-     * index partitions are inserted in a single atomic operation.
+     * old index partition locator is removed from the {@link MetadataIndex} and
+     * the new index partition locators are inserted in a single atomic
+     * operation.
      * 
      * @param name
      *            The name of the scale-out index.
-     * @param partitionId
-     *            The partition identifier.
-     * @param leftSeparator
-     *            The left separator key for the old index partition.
-     * @param locators
+     * @param oldLocator
+     *            The partition locator that is being split.
+     * @param newLocators
      *            The locator information for the new index partitions that were
      *            created by the split of the old index partition.
      * 
@@ -111,9 +110,9 @@ public interface IMetadataService extends IDataService, Remote {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void splitIndexPartition(String name, int partitionId, byte[] leftSeparator,
-            PartitionLocatorMetadataWithSeparatorKeys[] locators)
-            throws IOException, InterruptedException, ExecutionException;
+    public void splitIndexPartition(String name, PartitionLocator oldLocator,
+            PartitionLocator[] newLocators) throws IOException,
+            InterruptedException, ExecutionException;
 
     /**
      * Register and statically partition a scale-out index.

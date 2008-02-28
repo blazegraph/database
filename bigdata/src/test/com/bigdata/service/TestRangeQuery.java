@@ -30,9 +30,9 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
-import com.bigdata.btree.EntryFilter;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.TupleFilter;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -40,7 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
-import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocator;
 
 /**
  * Test suite for the {@link IRangeQuery} API.
@@ -103,8 +103,8 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
          * Get metadata for the index partitions that we will need to verify
          * the splits.
          */
-        final PartitionLocatorMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
-        final PartitionLocatorMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        final PartitionLocator pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionLocator pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
         assertNotNull("partition#0",pmd0);
         assertNotNull("partition#1",pmd1);
 
@@ -483,7 +483,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
          * Range delete the keys w/ limit of ONE (1).
          */
         {
-            IEntryIterator itr = ndx.rangeIterator(
+            ITupleIterator itr = ndx.rangeIterator(
                     null,// fromKey,
                     null,// toKey
                     1, // capacity (aka limit)
@@ -512,7 +512,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
             int nremaining = 0;
 
             // iterator visits deleted entries too.
-            IEntryIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
+            ITupleIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
                     IRangeQuery.ALL, null/*filter*/);
 
             int index = 0;
@@ -605,7 +605,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
         /*
          * Filter selects only the even keys.
          */
-        IEntryFilter filter = new EntryFilter() {
+        ITupleFilter filter = new TupleFilter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -628,7 +628,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
          * Range delete the keys matching the filter.
          */
         {
-            IEntryIterator itr = ndx.rangeIterator(
+            ITupleIterator itr = ndx.rangeIterator(
                     null/* fromKey */,
                     null/* toKey */,
                     capacity,
@@ -668,7 +668,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
 
             int nremaining = 0;
             
-            IEntryIterator itr = ndx.rangeIterator(null,null);
+            ITupleIterator itr = ndx.rangeIterator(null,null);
             
             while(itr.hasNext()) {
                 

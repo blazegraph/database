@@ -35,13 +35,13 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EntryIterator implements IEntryIterator {
+public class TupleIterator implements ITupleIterator {
 
     private final Leaf leaf;
 
     private final Tuple tuple;
     
-    private final IEntryFilter filter;
+    private final ITupleFilter filter;
     
     private int index;
 
@@ -57,19 +57,19 @@ public class EntryIterator implements IEntryIterator {
     // first index to NOT visit.
     private final int toIndex;
 
-    public EntryIterator(Leaf leaf) {
+    public TupleIterator(Leaf leaf) {
 
         this(leaf, new Tuple(IRangeQuery.DEFAULT), null, null, null);
 
     }
 
-    public EntryIterator(Leaf leaf, Tuple tuple) {
+    public TupleIterator(Leaf leaf, Tuple tuple) {
 
         this(leaf, tuple, null, null, null);
 
     }
 
-    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+    public TupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
 
         this(leaf, tuple, fromKey, toKey, null/*filter*/);
 
@@ -98,8 +98,8 @@ public class EntryIterator implements IEntryIterator {
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public EntryIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
-            IEntryFilter filter) {
+    public TupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey,
+            ITupleFilter filter) {
 
         assert leaf != null;
 
@@ -205,7 +205,7 @@ public class EntryIterator implements IEntryIterator {
      * until either all entries in this leaf have been exhausted -or- the an
      * entry is identified that passes the various criteria.
      * <p>
-     * Note: Criteria include (a) the optional {@link IEntryFilter}; and (b)
+     * Note: Criteria include (a) the optional {@link ITupleFilter}; and (b)
      * deleted entries are skipped unless {@link IRangeQuery#DELETED} has
      * been specified.
      */
@@ -279,7 +279,7 @@ public class EntryIterator implements IEntryIterator {
     }
     
     /**
-     * Used iff an {@link IEntryFilter} was specified.
+     * Used iff an {@link ITupleFilter} was specified.
      */
     private Tuple tmp = null;
     
@@ -294,6 +294,12 @@ public class EntryIterator implements IEntryIterator {
         lastVisited = index++;
 
         tuple.copy(lastVisited,leaf);
+        
+        if (filter != null) {
+            
+            filter.rewrite(tuple);
+            
+        }
         
         return tuple;
         

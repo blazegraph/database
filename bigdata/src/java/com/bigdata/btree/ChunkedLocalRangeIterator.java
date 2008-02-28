@@ -59,7 +59,7 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
      * @param filter
      */
     public ChunkedLocalRangeIterator(IIndex ndx, byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+            int capacity, int flags, ITupleFilter filter) {
         
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -72,7 +72,7 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
 
     @Override
     protected ResultSet getResultSet(byte[] fromKey, byte[] toKey, int capacity,
-            int flags, IEntryFilter filter) {
+            int flags, ITupleFilter filter) {
 
         /*
          * Note: This turns off the REMOVEALL flag for the result set's query in

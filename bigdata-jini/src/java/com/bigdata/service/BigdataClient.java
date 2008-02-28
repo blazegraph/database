@@ -36,8 +36,8 @@ import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -161,7 +161,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
     /*
      * IBigdataClient state.
      */
-    private final ExecutorService threadPool;
+    private final ThreadPoolExecutor threadPool;
     private final int defaultRangeQueryCapacity;
     private final boolean batchApiOnly;
 
@@ -169,7 +169,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      * IBigdataClient API.
      */
 
-    public ExecutorService getThreadPool() {
+    public ThreadPoolExecutor getThreadPool() {
         
         assertConnected();
         
@@ -555,8 +555,8 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
                 Options.CLIENT_THREAD_POOL_SIZE,
                 Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
         
-        threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
-                .defaultThreadFactory());
+        threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                nthreads, DaemonThreadFactory.defaultThreadFactory());
 
         defaultRangeQueryCapacity = Integer.parseInt(properties.getProperty(
                 Options.CLIENT_RANGE_QUERY_CAPACITY,

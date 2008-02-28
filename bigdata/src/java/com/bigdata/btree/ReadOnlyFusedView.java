@@ -109,8 +109,8 @@ public class ReadOnlyFusedView extends FusedView {
     /**
      * Iterator is read-only.
      */
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         if ((flags & REMOVEALL) != 0) {
 

@@ -41,7 +41,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
@@ -956,7 +956,7 @@ public abstract class AbstractJournal implements IJournal {
          */
         synchronized(name2Addr) {
             
-            IEntryIterator itr = name2Addr.entryIterator();
+            ITupleIterator itr = name2Addr.entryIterator();
 
             while (itr.hasNext()) {
 

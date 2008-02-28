@@ -34,6 +34,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.mdi.ISeparatorKeys;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -144,4 +145,85 @@ abstract public class AbstractKeyRangeIndexProcedure implements
 
 
     }
+    
+    /**
+     * Constrain the fromKey to lie within the index partition.
+     * 
+     * @param fromKey
+     *            The fromKey.
+     * @param pmd
+     *            The index partition metadata (MAY be null).
+     * 
+     * @return The <i>fromKey</i> -or- the leftSeparator key of the index
+     *         partition IFF <i>pmd</i> is non-<code>null</code> AND the
+     *         <i>fromKey</i> is LT the leftSeparator key.
+     */
+    public static byte[] constrainFromKey(byte[] fromKey, ISeparatorKeys pmd) {
+
+        if (pmd == null)
+            return fromKey;
+        
+        if (fromKey != null) {
+
+            /*
+             * Choose the left separator key if the fromKey is strictly less
+             * than the left separator. This has the effect of constraining the
+             * fromKey to be within the index partition key range.
+             */
+
+            final int ret = BytesUtil.compareBytes(fromKey, pmd
+                    .getLeftSeparatorKey());
+
+            if (ret < 0) {
+
+                fromKey = pmd.getLeftSeparatorKey();
+
+            }
+
+        }
+
+        return fromKey;
+            
+    }
+    
+    /**
+     * Constrain the toKey to lie within the index partition.
+     * 
+     * @param toKey
+     *            The toKey.
+     * @param pmd
+     *            The index partition metadata (MAY be null).
+     * 
+     * @return The <i>toKey</i> -or- the rightSeparator key of the index
+     *         partition IFF <i>pmd</i> is non-<code>null</code> AND the
+     *         <i>toKey</i> is GT the rightSeparator key.
+     */
+    public static byte[] constrainToKey(byte[] toKey, ISeparatorKeys pmd) {
+
+        if (pmd == null)
+            return toKey;
+
+        if (toKey != null && pmd.getRightSeparatorKey() != null) {
+
+            /*
+             * Choose the right separator key if the toKey is strictly greater
+             * than the right separator key. This has the effect of constraining
+             * the toKey to be within the index partition key range.
+             */
+
+            final int ret = BytesUtil.compareBytes(toKey, pmd
+                    .getRightSeparatorKey());
+
+            if (ret > 0) {
+
+                toKey = pmd.getRightSeparatorKey();
+
+            }
+
+        }
+
+        return toKey;
+
+    }
+
 }

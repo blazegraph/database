@@ -37,7 +37,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.TestFusedView;
@@ -161,7 +161,7 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
             /*
              * Verify all entries, included those that are marked as deleted.
              */
-            final IEntryIterator itr = view
+            final ITupleIterator itr = view
                     .rangeIterator(null, null, 0/* capacity */,
                             IRangeQuery.DEFAULT | IRangeQuery.DELETED, null/* filter */);
            

@@ -29,7 +29,7 @@ package com.bigdata.rdf.inf;
 
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
@@ -153,7 +153,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             {
                 
-                IEntryIterator itr = store.getJustificationIndex().rangeIterator(null, null);
+                ITupleIterator itr = store.getJustificationIndex().rangeIterator(null, null);
                 
                 while(itr.hasNext()) {
                     
@@ -221,7 +221,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             {
                 
-                IEntryIterator itr = store.getJustificationIndex().rangeIterator(null, null);
+                ITupleIterator itr = store.getJustificationIndex().rangeIterator(null, null);
                 
                 assertFalse(itr.hasNext());
                 

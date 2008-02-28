@@ -33,8 +33,8 @@ import java.util.Iterator;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
@@ -113,8 +113,8 @@ public class ReadOnlyMetadataIndexView extends MetadataIndexView {
     /**
      * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
      */
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         if ((flags & REMOVEALL) != 0) {
 

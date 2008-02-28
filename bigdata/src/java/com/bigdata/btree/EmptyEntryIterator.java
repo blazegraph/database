@@ -35,9 +35,9 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyEntryIterator implements IEntryIterator {
+public class EmptyEntryIterator implements ITupleIterator {
 
-    public static final transient IEntryIterator INSTANCE = new EmptyEntryIterator();
+    public static final transient ITupleIterator INSTANCE = new EmptyEntryIterator();
 
     private EmptyEntryIterator() {
     }

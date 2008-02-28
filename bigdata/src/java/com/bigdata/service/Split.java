@@ -111,4 +111,18 @@ public class Split {
 
     }
 
+    /**
+     * Human friendly representation.
+     */
+    public String toString() {
+        
+        return "Split"+
+        "{ ntuples="+ntuples+
+        ", fromIndex="+fromIndex+
+        ", toIndex="+toIndex+
+        ", pmd="+pmd+
+        "}";
+        
+    }
+    
 }

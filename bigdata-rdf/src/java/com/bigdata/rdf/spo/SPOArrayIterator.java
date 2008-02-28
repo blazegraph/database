@@ -30,7 +30,7 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.inf.SPOAssertionBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
@@ -219,7 +219,7 @@ public class SPOArrayIterator implements ISPOIterator {
          * @todo for scale-out, pass the filter to the data service.
          */
         
-        IEntryIterator itr = accessPath.rangeQuery();
+        ITupleIterator itr = accessPath.rangeQuery();
 
         int i = 0;
 

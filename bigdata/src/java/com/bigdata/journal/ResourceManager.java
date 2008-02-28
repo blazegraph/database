@@ -57,11 +57,11 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
@@ -75,7 +75,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -2470,7 +2470,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             int nindices = oldJournal.name2Addr.getEntryCount();
 
-            IEntryIterator itr = oldJournal.name2Addr.entryIterator();
+            ITupleIterator itr = oldJournal.name2Addr.entryIterator();
 
             while (itr.hasNext()) {
 
@@ -3074,7 +3074,7 @@ abstract public class ResourceManager implements IResourceManager {
             final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
                     nindices);
 
-            final IEntryIterator itr = oldJournal.name2Addr.entryIterator();
+            final ITupleIterator itr = oldJournal.name2Addr.entryIterator();
 
             while (itr.hasNext()) {
 
@@ -3485,7 +3485,7 @@ abstract public class ResourceManager implements IResourceManager {
           * Note: Delete markers are ignored so they will NOT be transferred to
           * the new index segment (compacting merge).
           */
-         final IEntryIterator itr = src
+         final ITupleIterator itr = src
                  .rangeIterator(fromKey, toKey, 0/* capacity */,
                          IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
          
@@ -4182,7 +4182,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src.getIndexMetadata().getPartitionMetadata();
 
-            final PartitionLocatorMetadataWithSeparatorKeys[] locators = new PartitionLocatorMetadataWithSeparatorKeys[splits.length];
+            final PartitionLocator[] locators = new PartitionLocator[splits.length];
             
             for(int i=0; i<splits.length; i++) {
 
@@ -4196,7 +4196,7 @@ abstract public class ResourceManager implements IResourceManager {
                 /*
                  * form locator for the new index partition for this split..
                  */
-                final PartitionLocatorMetadataWithSeparatorKeys locator = new PartitionLocatorMetadataWithSeparatorKeys(
+                final PartitionLocator locator = new PartitionLocator(
                         oldpmd.getPartitionId(),//
                         /*
                          * This is the set of failover services for this index
@@ -4257,12 +4257,23 @@ abstract public class ResourceManager implements IResourceManager {
             journal.dropIndex(name);
 
             /*
-             * Notify the metadata service that the index partition has been split.
+             * Notify the metadata service that the index partition has been
+             * split.
+             * 
+             * @todo Is it possible for the dataServiceUUIDs[] that we have
+             * locally to be out of sync with the one in the locator on the
+             * metadata service? If so, then the metadata service needs to
+             * ignore that field when validating the oldLocator that we form
+             * below.
              */
             getMetadataService().splitIndexPartition(
                     src.getIndexMetadata().getName(),//
-                    oldpmd.getPartitionId(),//
-                    oldpmd.getLeftSeparatorKey(),//
+                    new PartitionLocator(//
+                            oldpmd.getPartitionId(), //
+                            getDataServiceUUIDs(), //
+                            oldpmd.getLeftSeparatorKey(),//
+                            oldpmd.getRightSeparatorKey()//
+                            ),
                     locators);
             
             return null;

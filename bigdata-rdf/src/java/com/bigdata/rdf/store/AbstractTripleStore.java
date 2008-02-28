@@ -60,7 +60,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
@@ -1417,7 +1417,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         /**
          * @throws UnsupportedOperationException
          */
-        public IEntryIterator rangeQuery() {
+        public ITupleIterator rangeQuery() {
 
             throw new UnsupportedOperationException();
             
@@ -1529,7 +1529,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-        public IEntryIterator rangeQuery() {
+        public ITupleIterator rangeQuery() {
             
             return getStatementIndex().rangeIterator(fromKey, toKey);
             
@@ -2122,7 +2122,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             IIndex ndx = getStatementIndex();
             
-            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
+            ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, capacity,
                     IRangeQuery.KEYS, null/* filter */);
             
 //            long[] tmp = new long[IRawTripleStore.N];
@@ -2456,7 +2456,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         {
 
-            IEntryIterator itr = getSPOIndex().rangeIterator(null, null);
+            ITupleIterator itr = getSPOIndex().rangeIterator(null, null);
 
             int i = 0;
 
@@ -2507,7 +2507,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
             IIndex ndx = getJustificationIndex();
             
-            IEntryIterator itrj = ndx.rangeIterator(null, null);
+            ITupleIterator itrj = ndx.rangeIterator(null, null);
             
             while(itrj.hasNext()) {
                 

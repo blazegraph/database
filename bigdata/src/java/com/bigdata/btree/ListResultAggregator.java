@@ -46,6 +46,7 @@ public class ListResultAggregator<R, A extends List<R>> implements
         
     }
 
+    @SuppressWarnings("unchecked")
     private final A results = (A) new LinkedList<R>();
 
     public void aggregate(R result, Split split) {

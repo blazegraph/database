@@ -42,7 +42,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
@@ -266,7 +266,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
                             final byte[] toKey = null;
 
-                            IEntryIterator itr = ndx.rangeIterator(fromKey,
+                            ITupleIterator itr = ndx.rangeIterator(fromKey,
                                     toKey);
 
                             if (!itr.hasNext()) {

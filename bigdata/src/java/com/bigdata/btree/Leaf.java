@@ -1262,7 +1262,7 @@ public class Leaf extends AbstractNode implements ILeafData {
     /**
      * Iterator visits the values in key order.
      */
-    public IEntryIterator entryIterator() {
+    public ITupleIterator entryIterator() {
 
         if (nkeys == 0) {
 
@@ -1270,7 +1270,7 @@ public class Leaf extends AbstractNode implements ILeafData {
 
         }
 
-        return new EntryIterator(this);
+        return new TupleIterator(this);
 
     }
 

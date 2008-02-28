@@ -33,21 +33,21 @@ import java.io.Serializable;
 /**
  * Interface for filtering key range scans.
  * 
- * @see IEntryIterator
+ * @see ITupleIterator
  * 
  * @see AbstractBTree#rangeIterator(byte[], byte[], int, int, EntryFilter)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IEntryFilter extends Serializable {
+public interface ITupleFilter extends Serializable {
 
     /**
      * Chains a filter after this one.
      * 
      * @param filter
      */
-    public void add(IEntryFilter filter);
+    public void add(ITupleFilter filter);
     
     /**
      * Return <code>true</code> iff the index entry should be visited.

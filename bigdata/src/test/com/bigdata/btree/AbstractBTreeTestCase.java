@@ -1689,9 +1689,9 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     static public void doEntryIteratorTest(AbstractBTree expected, IIndex actual ) {
 
-        IEntryIterator expectedItr = expected.entryIterator();
+        ITupleIterator expectedItr = expected.entryIterator();
         
-        IEntryIterator actualItr = actual.rangeIterator(null,null);
+        ITupleIterator actualItr = actual.rangeIterator(null,null);
         
         int index = 0;
         
@@ -1795,7 +1795,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     static public void getKeysAndValues(AbstractBTree btree, byte[][] keys,
             byte[][] vals) {
         
-        IEntryIterator itr = btree.entryIterator();
+        ITupleIterator itr = btree.entryIterator();
 
         int i = 0;
         
@@ -1938,23 +1938,23 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
     
     /**
-     * Method verifies that the <i>actual</i> {@link IEntryIterator} produces the
+     * Method verifies that the <i>actual</i> {@link ITupleIterator} produces the
      * expected values in the expected order. Errors are reported if too few or
      * too many values are produced, etc.
      */
-    static public void assertSameIterator(byte[][] expected, IEntryIterator actual) {
+    static public void assertSameIterator(byte[][] expected, ITupleIterator actual) {
 
         assertSameIterator("", expected, actual);
 
     }
 
     /**
-     * Method verifies that the <i>actual</i> {@link IEntryIterator} produces
+     * Method verifies that the <i>actual</i> {@link ITupleIterator} produces
      * the expected values in the expected order. Errors are reported if too few
      * or too many values are produced, etc.
      */
     static public void assertSameIterator(String msg, byte[][] expected,
-            IEntryIterator actual) {
+            ITupleIterator actual) {
 
         int i = 0;
 

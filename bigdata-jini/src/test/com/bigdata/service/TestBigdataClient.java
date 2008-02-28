@@ -32,7 +32,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
@@ -344,7 +344,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         // verify data.
         {
         
-            IEntryIterator itr = ndx.rangeIterator(null,null);
+            ITupleIterator itr = ndx.rangeIterator(null,null);
             
             int i = 0;
             

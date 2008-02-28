@@ -9,7 +9,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
@@ -285,7 +285,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
                 Integer.MAX_VALUE);
 
-        final IEntryIterator itr = ndx.rangeIterator(null, null,
+        final ITupleIterator itr = ndx.rangeIterator(null, null,
                 0/* capacity */, IRangeQuery.KEYS, null/* filter */);
 
         ITuple tuple = null;

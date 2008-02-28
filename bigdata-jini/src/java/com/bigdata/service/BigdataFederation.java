@@ -23,17 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
@@ -257,15 +257,13 @@ public class BigdataFederation implements IBigdataFederation {
                             MetadataService.getMetadataIndexName(name),
                             timestamp);
             
-            if (mdmd == null) {
+            assert mdmd != null;
 
-                // No such index.
-                
-                return null;
-
-            }
-
-        } catch (IOException ex) {
+        } catch( NoSuchIndexException ex ) {
+            
+            return null;
+        
+        } catch (Exception ex) {
 
             throw new RuntimeException(ex);
 
@@ -304,7 +302,7 @@ public class BigdataFederation implements IBigdataFederation {
 
             mdmd = (MetadataIndexMetadata)metadataService.getIndexMetadata(metadataName,timestamp);
             
-        } catch(IOException ex) {
+        } catch(Exception ex) {
             
             throw new RuntimeException(ex);
             
@@ -336,10 +334,17 @@ public class BigdataFederation implements IBigdataFederation {
          * 
          * Note: This assumes that the metadata index is NOT partitioned and
          * DOES NOT support delete markers.
+         * 
+         * @todo the easiest way to handle a scale-out metadata index is to
+         * make it hash-partitioned (vs range-partitioned).  We can just flood
+         * queries to the hash partitioned index.  For the iterator, we have to
+         * buffer the results and place them back into order.  A fused view style
+         * iterator could be used to merge the iterator results from each partition
+         * into a single totally ordered iterator.
          */
         {
         
-            final IEntryIterator itr = new DataServiceRangeIterator(
+            final ITupleIterator itr = new RawDataServiceRangeIterator(
                     metadataService, metadataName, timestamp,
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);

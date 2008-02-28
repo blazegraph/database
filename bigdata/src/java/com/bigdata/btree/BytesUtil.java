@@ -158,6 +158,8 @@ public class BytesUtil {
      */
     final public static boolean bytesEqual(final byte[] a, final byte[] b) {
 
+        if(a == b ) return true;
+        
         final int alen = a.length;
 
         final int blen = b.length;
@@ -204,6 +206,7 @@ public class BytesUtil {
      *       comparison went.
      */
     final public static int compareBytes(final byte[] a, final byte[] b) {
+        if(a==b) return 0;
         final int alen = a.length;
         final int blen = b.length;
         if (linked && alen > minlen && blen > minlen) {

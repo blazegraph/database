@@ -36,7 +36,7 @@ import com.bigdata.rawstore.IRawStore;
 
 /**
  * Interface exposes more direct access to keys and values visited by an
- * {@link IEntryIterator}.
+ * {@link ITupleIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

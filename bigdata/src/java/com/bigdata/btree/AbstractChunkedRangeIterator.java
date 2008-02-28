@@ -49,7 +49,7 @@ import com.bigdata.service.DataServiceRangeIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractChunkedRangeIterator implements IEntryIterator {
+abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
     public static final transient Logger log = Logger
             .getLogger(DataServiceRangeIterator.class);
@@ -91,7 +91,7 @@ abstract public class AbstractChunkedRangeIterator implements IEntryIterator {
     /**
      * Optional filter.
      */
-    protected final IEntryFilter filter;
+    protected final ITupleFilter filter;
 
     /**
      * The #of range query operations executed.
@@ -169,7 +169,7 @@ abstract public class AbstractChunkedRangeIterator implements IEntryIterator {
     }
     
     public AbstractChunkedRangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+            int capacity, int flags, ITupleFilter filter) {
 
         if (capacity < 0) {
 
@@ -201,7 +201,7 @@ abstract public class AbstractChunkedRangeIterator implements IEntryIterator {
      * @return
      */
     abstract protected ResultSet getResultSet(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter);
+            int capacity, int flags, ITupleFilter filter);
 
     /**
      * Issues the original range query.
