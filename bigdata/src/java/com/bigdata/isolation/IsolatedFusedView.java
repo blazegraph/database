@@ -34,7 +34,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -429,7 +429,7 @@ public class IsolatedFusedView extends FusedView {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = writeSet.rangeIterator(null, null,
+        final ITupleIterator itr = writeSet.rangeIterator(null, null,
                 0/* capacity */, ALL /* flags */, null);
 
         // tuple for reading from the groundState index.
@@ -554,7 +554,7 @@ public class IsolatedFusedView extends FusedView {
              * value does NOT matter.
              */
 
-            final IEntryIterator tmpItr = tmp.rangeIterator(null, null,
+            final ITupleIterator tmpItr = tmp.rangeIterator(null, null,
                     0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.DELETED, null/* filter */);
 
@@ -638,7 +638,7 @@ public class IsolatedFusedView extends FusedView {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final IEntryIterator itr = writeSet.rangeIterator(null, null,
+        final ITupleIterator itr = writeSet.rangeIterator(null, null,
                 0/* capacity */, ALL/* flags */, null);
 
         while (itr.hasNext()) {

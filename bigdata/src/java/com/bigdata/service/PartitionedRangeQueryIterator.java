@@ -27,14 +27,17 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DelegateTuple;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.IEntryIterator;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.util.InnerCause;
 
 /**
  * Class supports range query across one or more index partitions.
@@ -45,13 +48,10 @@ import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
  * service depends on the #of index entries that are visited per partition and
  * the capacity specified to the ctor.
  * 
- * @todo if unisolated or read-committed, then we may need to re-assess the
- *       toIndex during the query.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PartitionedRangeQueryIterator implements IEntryIterator {
+public class PartitionedRangeQueryIterator implements ITupleIterator {
 
     protected static final transient Logger log = Logger
             .getLogger(PartitionedRangeQueryIterator.class);
@@ -88,7 +88,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
      */
     private final int flags;
     
-    private final IEntryFilter filter;
+    private final ITupleFilter filter;
     
     /**
      * Index of the first partition to be queried.
@@ -114,7 +114,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     /**
      * The metadata for the current index partition.
      */
-    private PartitionLocatorMetadataWithSeparatorKeys pmd = null;
+    private PartitionLocator pmd = null;
 
     /**
      * The data service for the current index partition (this should
@@ -159,7 +159,7 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
     }
     
     public PartitionedRangeQueryIterator(ClientIndexView ndx, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
         if (ndx == null) {
 
@@ -185,6 +185,14 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
         {
             
+            /*
+             * FIXME The indices into the metadata index are not stable for
+             * read-committed or unisolated queries. Either we have to cache the
+             * actual partition locators up front, or we have to convert the
+             * query for partition locators into a historical read as of a
+             * recent commit time, or we have to re-compute the partition
+             * locators each time before moving on to the next partition.
+             */
             int a[] = mdi.findIndices(fromKey, toKey);
             
             fromIndex = a[0];
@@ -214,32 +222,27 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
 
             /*
              * Note: The range query request is formed such that it addresses
-             * only those keys that actually lie within the partition. This has
-             * two benefits:
+             * only those keys that actually lie within the partition and also
+             * within the caller's given key range. This has two benefits:
              * 
-             * (1) The data service can check the range and notify clients that
-             * appear to be requesting data for index partitions that have been
-             * relocated.
+             * (1) The data service can check the range and report an error for
+             * clients that appear to be requesting data for index partitions
+             * that have been relocated.
              * 
-             * (2) In order to avoid double-counting when multiple partitions
-             * for the same index are mapped onto the same data service we MUST
-             * query at most the key range for a specific partition (or we must
-             * provide the data service with the index partition identifier and
-             * it must restrict the range on our behalf).
+             * (2) It avoids double-counting (or possible under-counting) when
+             * an index partition join (or split) causes the partition bounds to
+             * be greater than was originally anticipated.
              */
 
-            /*
-             * For the first (last) partition use the caller's fromKey
-             * (toKey) so that we do not count everything from the start of
-             * (up to the close) of the partition unless the caller
-             * specified fromKey := null (toKey := null).
-             */
+            final byte[] _fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey, pmd);
 
-            final byte[] _fromKey = (index == fromIndex ? fromKey : pmd
-                    .getLeftSeparatorKey());
-
-            final byte[] _toKey = (index == toIndex ? toKey : pmd
-                    .getRightSeparatorKey());
+            final byte[] _toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
+            
+//            final byte[] _fromKey = (index == fromIndex ? fromKey : pmd
+//                    .getLeftSeparatorKey());
+//
+//            final byte[] _toKey = (index == toIndex ? toKey : pmd
+//                    .getRightSeparatorKey());
 
             final int partitionId = pmd.getPartitionId();
             
@@ -247,11 +250,17 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
                     + partitionId + ", fromKey=" + BytesUtil.toString(_fromKey)
                     + ", toKey=" + BytesUtil.toString(_toKey));
             
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(ndx.getName(), partitionId);
+            /*
+             * Iterator will visit all data on that index partition.
+             * 
+             * Note: This merely initializes the variables on the iterator, but
+             * it DOES NOT send the request to the data service. That does not
+             * happen until you call [src.hasNext()].
+             */
             
-            src = new DataServiceRangeIterator(dataService, name, timestamp, _fromKey, _toKey,
-                    capacity, flags, filter);
+            src = new DataServiceRangeIterator(ndx, dataService, DataService
+                    .getIndexPartitionName(ndx.getName(), partitionId),
+                    ndx.getTimestamp(), _fromKey, _toKey, capacity, flags, filter);
 
             // increment the #of partitions visited.
             nparts++;
@@ -313,12 +322,33 @@ public class PartitionedRangeQueryIterator implements IEntryIterator {
             return false;
             
         }
-        
-        if(src.hasNext()) {
+
+        try {
+
+            if(src.hasNext()) {
             
-            // More from the current source iterator.
+                // More from the current source iterator.
+                
+                return true;
+                
+            }
             
-            return true;
+        } catch(RuntimeException ex) {
+            
+            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+                
+                /*
+                 * FIXME Handle NoSuchIndexException.
+                 * 
+                 * 1. advance the fromKey to the next key that we are supposed
+                 * to visit
+                 * 
+                 * 1. refresh locator(s) spanning the key range for the index
+                 * partition for which we got this exception
+                 */
+                throw new UnsupportedOperationException(ex);
+                
+            }
             
         }
         

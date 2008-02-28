@@ -36,8 +36,8 @@ import com.bigdata.btree.BatchInsert;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.IEntryFilter;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
@@ -282,16 +282,16 @@ public class DataServiceIndex implements IIndex {
 
     }
   
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, capacity, IRangeQuery.KEYS
                 | IRangeQuery.VALS, null/* filter */);
 
     }
 
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
-        return new DataServiceRangeIterator(dataService, name, timestamp, fromKey, toKey,
+        return new RawDataServiceRangeIterator(dataService, name, timestamp, fromKey, toKey,
                 capacity, flags, filter);
 
     }

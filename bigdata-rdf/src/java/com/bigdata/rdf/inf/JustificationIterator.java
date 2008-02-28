@@ -35,7 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rawstore.Bytes;
@@ -94,7 +94,7 @@ public class JustificationIterator implements IJustificationIterator {
     /**
      * The source iterator reading on the selected justification index.
      */
-    private IEntryIterator src;
+    private ITupleIterator src;
 
     /**
      * The executor service for the {@link Reader} (iff the {@link Reader} runs

@@ -35,7 +35,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocatorMetadata;
+import com.bigdata.mdi.PartitionLocator;
 
 /**
  * Test suite for the {@link EmbeddedBigdataClient}.
@@ -212,8 +212,8 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
          * Get metadata for the index partitions that we will need to verify
          * the splits.
          */
-        final PartitionLocatorMetadata pmd0 = ndx.getMetadataIndex().get(new byte[]{});
-        final PartitionLocatorMetadata pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
+        final PartitionLocator pmd0 = ndx.getMetadataIndex().get(new byte[]{});
+        final PartitionLocator pmd1 = ndx.getMetadataIndex().get(new byte[]{5});
         assertNotNull("partition#0",pmd0);
         assertNotNull("partition#1",pmd1);
         

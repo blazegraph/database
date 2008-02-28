@@ -64,15 +64,15 @@ public interface IRangeQuery {
 
     /**
      * Flag specifies that keys in the key range will be returned. The keys are
-     * guarenteed to be made available via {@link IEntryIterator#getKey()} only
+     * guarenteed to be made available via {@link ITupleIterator#getKey()} only
      * when this flag is given.
      */
     public static final int KEYS = 1 << 0;
 
     /**
      * Flag specifies that values in the key range will be returned. The values
-     * are guarenteed to be made available via {@link IEntryIterator#next()} and
-     * {@link IEntryIterator#getValue()} only when this flag is given.
+     * are guarenteed to be made available via {@link ITupleIterator#next()} and
+     * {@link ITupleIterator#getValue()} only when this flag is given.
      */
     public static final int VALS = 1 << 1;
 
@@ -145,7 +145,7 @@ public interface IRangeQuery {
      * 
      * @todo define behavior when the toKey is less than the fromKey.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey);
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey);
 
     /**
      * Designated variant (the one that gets overriden) for an iterator that
@@ -181,12 +181,13 @@ public interface IRangeQuery {
      * @see EntryFilter, which may be used to filter the entries visited by the
      *      iterator.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter);
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter);
 
-    // @todo removeAll() could be added, but the problem is that we often want
+    // removeAll() could be added, but the problem is that we often want
     // the keys or values of the deleted entries, at which point you have to
     // use the rangeIterator anyway.
+    
 //    /**
 //     * Removes all entries in the key range from the index. When running on a
 //     * scale-out index, this operation is atomic for each index partition. The
@@ -213,7 +214,7 @@ public interface IRangeQuery {
     // /**
     // * Interface
     // *
-    // * @todo alternative is to define an interface to recognize change in the
+    // * An alternative is to define an interface to recognize change in the
     // * "logical row". This way the sense of the limit/capacity is
     // * unchanged but we only would count logical rows rather than visited
     // * index entries.
@@ -230,7 +231,7 @@ public interface IRangeQuery {
     //        
     // }
     //    
-    // // @todo Externalizable impl.
+    // // Externalizable impl...
     // public static class RangeQueryLimit implements IRangeQueryLimit {
     //
     // /**

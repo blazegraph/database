@@ -30,7 +30,7 @@ package com.bigdata.rdf.store;
 import java.util.Iterator;
 
 import com.bigdata.btree.FusedEntryIterator;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPOArrayIterator;
@@ -113,7 +113,7 @@ public class AccessPathFusedView implements IAccessPath {
         
     }
 
-    public IEntryIterator rangeQuery() {
+    public ITupleIterator rangeQuery() {
 
         /*
          * @todo The modification to drive the range iterator capacity, flags
@@ -128,7 +128,7 @@ public class AccessPathFusedView implements IAccessPath {
          */
         return new FusedEntryIterator(
                 false, // ALLVERSIOSN
-                new IEntryIterator[] {
+                new ITupleIterator[] {
                 path1.rangeQuery(),//
                 path2.rangeQuery()//
                 }

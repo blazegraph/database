@@ -268,6 +268,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
     final private IResourceManager resourceManager;
     
     /**
+     * The local time at which this service was started.
+     */
+    final private long serviceStartTime = System.currentTimeMillis();
+    
+    /**
      * <code>true</code> until the service is shutdown.
      */
     private boolean open = true;
@@ -484,7 +489,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         // final status message.
         statusTask.run();
-        System.err.println(statusTask.status());
+//        System.err.println(getStatistics());
     
     }
 
@@ -801,8 +806,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
          */
         protected final Logger log = Logger.getLogger(StatusTask.class);
 
-        final protected long begin = System.currentTimeMillis();
-        
         public StatusTask() {
             
 //            System.err.println("class="+this.getClass().getName());
@@ -811,7 +814,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
         public void run() {
 
-            final String s = status();
+            final String s = getStatistics();
             
 //            System.err.println( s );
             
@@ -819,103 +822,102 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
-        /**
-         * Writes out the status on {@link #log}.
-         * 
-         * @todo format into a nicer tabular display.
-         * @todo measure the maximum latency for a task to begin execution.
-         * @todo measure the #of tasks that are retried.
-         * @todo measure the maximum latency for a task from submit to commit.
-         * @todo report averages also, not just maximums.
-         */
-        public String status() {
+    }
 
-//            /*
-//             * The #of commits on the _store_ (vs the #of commits since the
-//             * write service was started).
-//             * 
-//             * Note: if the journal is already closed then this information is
-//             * not available.
-//             */
-//            long commitCounter = -1;
-//            try {
-//                commitCounter = getCommitRecord().getCommitCounter();
-//            } catch (Throwable t) {
-//                log.warn("Commit record not available: "+t);
-//                /* ignore */
-//            }
-            
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-//            final long nextOffset = getBufferStrategy().getNextOffset();
+    /**
+     * 
+     * @todo format into a nicer tabular display.
+     * @todo measure the maximum latency for a task to begin execution.
+     * @todo measure the #of tasks that are retried.
+     * @todo measure the maximum latency for a task from submit to commit.
+     * @todo report averages also, not just maximums.
+     */
+    public String getStatistics() {
 
-            StringBuilder sb = new StringBuilder();
-            
-            // txService (#active,#queued,#completed,poolSize)
-            sb.append("transactions=("
-                    + ((ThreadPoolExecutor) txWriteService).getQueue().size()
-                    + ","
-                    + ((ThreadPoolExecutor) txWriteService).getActiveCount()
-                    + ","
-                    + ((ThreadPoolExecutor) txWriteService)
-                            .getCompletedTaskCount()
-                    + ","
-                    + ((ThreadPoolExecutor) txWriteService)
-                            .getPoolSize()
-                    + ")\n");
-            
-            // readService (#active,#queued,#completed,poolSize)
-            sb.append(
-                    "readers=("
-                    + ((ThreadPoolExecutor) readService).getQueue().size()
-                    + ","
-                    + ((ThreadPoolExecutor) readService).getActiveCount()
-                    + ","
-                    + ((ThreadPoolExecutor) readService)
-                            .getCompletedTaskCount()
-                    + ","
-                    + ((ThreadPoolExecutor) readService)
-                            .getPoolSize()
-                    + ")\n"
-                    );
-            
-            // writeService (#active,#queued,#completed,poolSize)
-            sb.append("writers=("
-                    + ((ThreadPoolExecutor) writeService).getQueue().size()
-                    + ","
-                    + ((ThreadPoolExecutor) writeService).getActiveCount()
-                    + ","
-                    + ((ThreadPoolExecutor) writeService)
-                            .getCompletedTaskCount()
-                    + ","
-                    + ((ThreadPoolExecutor) writeService)
-                            .getPoolSize()
-                    + ")\n"
-                    );
-            
-            // commitCounter and related stats.
-            sb.append(
-//                      "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
-                        "ncommits="+ writeService.getCommitCount()
-                    + ", naborts=" + writeService.getAbortCount()
-                    + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
-                    + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
-                    + ", maxRunning="+ writeService.getMaxRunning()
-                    + ", maxPoolSize="+ writeService.getMaxPoolSize()
-                    + ", elapsed=" + elapsed
-                    + "\n"
-                    );
+//        /*
+//         * The #of commits on the _store_ (vs the #of commits since the
+//         * write service was started).
+//         * 
+//         * Note: if the journal is already closed then this information is
+//         * not available.
+//         */
+//        long commitCounter = -1;
+//        try {
+//            commitCounter = getCommitRecord().getCommitCounter();
+//        } catch (Throwable t) {
+//            log.warn("Commit record not available: "+t);
+//            /* ignore */
+//        }
+        
+        final long elapsed = System.currentTimeMillis() - serviceStartTime;
+        
+//        final long nextOffset = getBufferStrategy().getNextOffset();
 
-//            if(getBufferStrategy() instanceof DiskOnlyStrategy) {
-//                
-//                sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
-//                
-//            }
-            
-            return sb.toString();
-            
-        }
+        StringBuilder sb = new StringBuilder();
+        
+        // txService (#active,#queued,#completed,poolSize)
+        sb.append("transactions=("
+                + ((ThreadPoolExecutor) txWriteService).getQueue().size()
+                + ","
+                + ((ThreadPoolExecutor) txWriteService).getActiveCount()
+                + ","
+                + ((ThreadPoolExecutor) txWriteService)
+                        .getCompletedTaskCount()
+                + ","
+                + ((ThreadPoolExecutor) txWriteService)
+                        .getPoolSize()
+                + ")\n");
+        
+        // readService (#active,#queued,#completed,poolSize)
+        sb.append(
+                "readers=("
+                + ((ThreadPoolExecutor) readService).getQueue().size()
+                + ","
+                + ((ThreadPoolExecutor) readService).getActiveCount()
+                + ","
+                + ((ThreadPoolExecutor) readService)
+                        .getCompletedTaskCount()
+                + ","
+                + ((ThreadPoolExecutor) readService)
+                        .getPoolSize()
+                + ")\n"
+                );
+        
+        // writeService (#active,#queued,#completed,poolSize)
+        sb.append("writers=("
+                + ((ThreadPoolExecutor) writeService).getQueue().size()
+                + ","
+                + ((ThreadPoolExecutor) writeService).getActiveCount()
+                + ","
+                + ((ThreadPoolExecutor) writeService)
+                        .getCompletedTaskCount()
+                + ","
+                + ((ThreadPoolExecutor) writeService)
+                        .getPoolSize()
+                + ")\n"
+                );
+        
+        // commitCounter and related stats.
+        sb.append(
+//                  "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
+                    "ncommits="+ writeService.getCommitCount()
+                + ", naborts=" + writeService.getAbortCount()
+                + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
+                + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
+                + ", maxRunning="+ writeService.getMaxRunning()
+                + ", maxPoolSize="+ writeService.getMaxPoolSize()
+                + ", elapsed=" + elapsed
+                + "\n"
+                );
 
+//        if(getBufferStrategy() instanceof DiskOnlyStrategy) {
+//            
+//            sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
+//            
+//        }
+        
+        return sb.toString();
+        
     }
 
     /**

@@ -98,8 +98,8 @@ public class ReadOnlyIndex extends DelegateIndex {
     /**
      * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
      */
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         if ((flags & REMOVEALL) != 0) {
 

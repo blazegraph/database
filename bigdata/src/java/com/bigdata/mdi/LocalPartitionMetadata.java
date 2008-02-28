@@ -52,7 +52,8 @@ import com.bigdata.journal.Journal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LocalPartitionMetadata implements IPartitionMetadata, Externalizable {
+public class LocalPartitionMetadata implements IPartitionMetadata,
+        Externalizable {
 
     /**
      * 
@@ -126,32 +127,32 @@ public class LocalPartitionMetadata implements IPartitionMetadata, Externalizabl
 
         if (leftSeparatorKey == null)
             throw new IllegalArgumentException("leftSeparatorKey");
-        
+
         // Note: rightSeparatorKey MAY be null.
-        
-        if(rightSeparatorKey!=null) {
-            
-            if(BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey)>=0) {
-                
+
+        if (rightSeparatorKey != null) {
+
+            if (BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey) >= 0) {
+
                 throw new IllegalArgumentException(
                         "Separator keys are out of order: left="
                                 + Arrays.toString(leftSeparatorKey)
                                 + ", right="
                                 + Arrays.toString(rightSeparatorKey));
-                
+
             }
-            
+
         }
-        
+
         this.leftSeparatorKey = leftSeparatorKey;
-        
+
         this.rightSeparatorKey = rightSeparatorKey;
-     
+
         if (resources != null) {
 
             if (resources.length == 0)
                 throw new IllegalArgumentException();
-            
+
             /*
              * This is the "live" journal.
              * 
@@ -162,9 +163,9 @@ public class LocalPartitionMetadata implements IPartitionMetadata, Externalizabl
              * strictly LT the commitTime of any other resource for this index
              * partition.
              */
-            
+
             IResourceMetadata resource = resources[0];
-            
+
             if (!(resource instanceof JournalMetadata)) {
 
                 throw new RuntimeException(
@@ -204,38 +205,18 @@ public class LocalPartitionMetadata implements IPartitionMetadata, Externalizabl
 
     }
 
-//    public LocalPartitionMetadata(byte[] leftSeparatorKey,
-//            IPartitionMetadata src, byte[] rightSeparatorKey) {
-//
-//        this(src.getPartitionId(), src.getDataServices(), src
-//                .getResources(), leftSeparatorKey, rightSeparatorKey);
-//        
-//    }
-    
     final public int getPartitionId() {
         
         return partitionId;
         
     }
     
-    /**
-     * The separator key that defines the left edge of that index partition
-     * (always defined) - this is the first key that can enter the index
-     * partition. The left-most separator key for a scale-out index is
-     * always an empty byte[] since that is the smallest key that may be
-     * defined.
-     */
     final public byte[] getLeftSeparatorKey() {
 
         return leftSeparatorKey;
         
     }
     
-    /**
-     * The separator key that defines the right edge of that index partition
-     * or [null] iff the index partition does not have a right sibling (a
-     * null has the semantics of no upper bound).
-     */
     final public byte[] getRightSeparatorKey() {
         
         return rightSeparatorKey;

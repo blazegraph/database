@@ -629,17 +629,28 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * <p>
      * Note: An index partition is identified by
      * {@link IndexMetadata#getPartitionMetadata()} returning non-<code>null</code>.
+     * <p>
+     * Note: This method is used liberally in <code>assert</code>s to detect
+     * errors that can arise is client code when an index partition is split,
+     * joined, or moved.
      * 
      * @param key
      *            The key.
+     * @param allowUpperBound
+     *            <code>true</code> iff the key represents an exclusive upper
+     *            bound and thus must be allowed to be LTE to the right
+     *            separator key for the index partition. For example, this would
+     *            be <code>true</code> for the <i>toKey</i> parameter on
+     *            rangeCount or rangeIterator methods.
      * 
-     * @exception RuntimeException
-     *                if the key does not lie within the partition.
+     * @return <code>true</code> always.
      * 
-     * @todo offer option to turn this on, perhaps use in asserts so that it is
-     *       conditionally enabled?
+     * @throws IllegalArgumentException
+     *             if the key is <code>null</code>
+     * @throws RuntimeException
+     *             if the key does not lie within the index partition.
      */
-    public void rangeCheck(byte[] key) {
+    protected boolean rangeCheck(byte[] key, boolean allowUpperBound) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -650,7 +661,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
             // nothing to check.
             
-            return;
+            return true;
             
         }
         
@@ -660,16 +671,46 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
 
-            throw new RuntimeException("KeyBeforePartition");
+            throw new RuntimeException("KeyBeforePartition: key="+BytesUtil.toString(key)+", pmd="+pmd);
 
         }
 
-        if (rightSeparatorKey != null
-                && BytesUtil.compareBytes(key, rightSeparatorKey) >= 0) {
+        if (rightSeparatorKey != null ) {
+            
+            final int ret = BytesUtil.compareBytes(key, rightSeparatorKey);
+            
+            if (allowUpperBound) {
 
-            throw new RuntimeException("KeyAfterPartition");
+                if (ret <= 0) {
+
+                    // key less than or equal to the exclusive upper bound.
+
+                } else {
+                    
+                    throw new RuntimeException("KeyAfterPartition: key="
+                            + BytesUtil.toString(key) + ", exclusive="
+                            + allowUpperBound + ", pmd=" + pmd);
+                }
+
+            } else {
+
+                if (ret < 0) {
+
+                    // key strictly less than the exclusive upper bound.
+                    
+                } else {
+                    
+                    throw new RuntimeException("KeyAfterPartition: key="
+                            + BytesUtil.toString(key) + ", exclusive="
+                            + allowUpperBound + ", pmd=" + pmd);
+                }
+                
+            }
 
         }
+        
+        // key lies within the index partition.
+        return true;
             
     }
      
@@ -747,37 +788,6 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             reopen();
 
         return root;
-
-    }
-
-    /**
-     * Add all entries from the given btree into this btree.
-     * 
-     * @param src
-     *            The given btree.
-     * 
-     * @exception IllegalArgumentException
-     *                if src is null.
-     * @exception IllegalArgumentException
-     *                if src is this btree.
-     */
-    public void addAll(AbstractBTree src) {
-
-        if (src == null)
-            throw new IllegalArgumentException();
-
-        if (src == this)
-            throw new IllegalArgumentException();
-
-        IEntryIterator itr = src.entryIterator();
-
-        while (itr.hasNext()) {
-
-            ITuple tuple = itr.next();
-            
-            insert(tuple.getKey(), tuple.getValue());
-            
-        }
 
     }
 
@@ -966,9 +976,12 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             throw new IllegalArgumentException();
 
         assertNotReadOnly();
-        
-        counters.ninserts++;
 
+        // conditional range check on the key.
+        assert rangeCheck(key,false);
+
+        counters.ninserts++;
+        
         return getRootOrFinger(key)
                 .insert(key, value, delete, timestamp, tuple);
 
@@ -1040,6 +1053,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         }
         
         assertNotReadOnly();
+
+        // conditional range check on the key.
+        assert rangeCheck(key,false);
         
         counters.nremoves++;
 
@@ -1094,6 +1110,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         // Note: Sometimes we pass in the containsTuple so this assert is too strong.
 //        assert tuple.getValuesRequested() : "tuple does not request values.";
         
+        // conditional range check on the key.
+        assert rangeCheck(key,false);
+
         counters.nfinds++;
 
         return getRootOrFinger(key).lookup(key,tuple);
@@ -1126,6 +1145,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
+        // conditional range check on the key.
+        assert rangeCheck(key,false);
+
         final ITuple tuple = getRootOrFinger(key).lookup(key, containsTuple.get());
         
         if(tuple == null || tuple.isDeletedVersion()) {
@@ -1142,6 +1164,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if (key == null)
             throw new IllegalArgumentException();
+
+        // conditional range check on the key.
+        assert rangeCheck(key,false);
 
         counters.nindexOf++;
 
@@ -1214,6 +1239,14 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
         
         final AbstractNode root = getRoot();
 
+        // conditional range check on the key.
+
+        if (fromKey != null)
+            assert rangeCheck(fromKey,false);
+        
+        if (toKey != null)
+            assert rangeCheck(toKey,true);
+
         int fromIndex = (fromKey == null ? 0 : root.indexOf(fromKey));
 
         int toIndex = (toKey == null ? getEntryCount() : root.indexOf(toKey));
@@ -1238,7 +1271,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
 
-    final public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey) {
+    final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
 
         return rangeIterator(fromKey, toKey, 0/* capacity */,
                 KEYS | VALS/* flags */, null/* filter */);
@@ -1249,8 +1282,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Returns a {@link ChunkedLocalRangeIterator} that supports
      * {@link Iterator#remove()}.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IEntryFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int capacity, int flags, ITupleFilter filter) {
 
         if ((flags & REMOVEALL) != 0) {
 
@@ -1258,7 +1291,15 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         }
 
-        final IEntryIterator src;
+        // conditional range check on the key.
+        
+        if (fromKey != null)
+            assert rangeCheck(fromKey,false);
+
+        if (toKey != null)
+            assert rangeCheck(toKey,true);
+
+        final ITupleIterator src;
 
         if ((flags & REMOVEALL) == 0) {
 
@@ -1326,7 +1367,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      */
     public long rangeCopy(IIndex src, byte[] fromKey, byte[] toKey) {
 
-        final IEntryIterator itr = src.rangeIterator(fromKey, toKey,
+        assertNotReadOnly();
+        
+        final ITupleIterator itr = src.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.ALL, null/* filter */);
 
         final boolean deleteMarkers = getIndexMetadata().getDeleteMarkers();
@@ -1393,6 +1436,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     
     public Object submit(byte[] key, IIndexProcedure proc) {
         
+        // conditional range check on the key.
+        if(key!=null) assert rangeCheck(key,false);
+
         return proc.apply(this);
         
     }
@@ -1400,6 +1446,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     @SuppressWarnings("unchecked")
     public void submit(byte[] fromKey, byte[] toKey,
             final IIndexProcedure proc, final IResultHandler handler) {
+
+        // conditional range check on the key.
+        if (fromKey != null)
+            assert rangeCheck(fromKey,false);
+
+        if (toKey != null)
+            assert rangeCheck(toKey,true);
 
         Object result = proc.apply(this);
         
@@ -1432,7 +1485,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * 
      * @todo rename as rangeIterator and promote to IRangeQuery interface.
      */
-    final public IEntryIterator entryIterator() {
+    final public ITupleIterator entryIterator() {
 
         return rangeIterator(null, null);
 
@@ -1478,6 +1531,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *         <li>2 - the total utilization percentage [0:100]. This is the
      *         average of the leaf utilization and the node utilization.</li>
      *         </ul>
+     * 
+     * @deprecated integrate into an xml result for {@link #getStatistics()}.
      */
     public int[] getUtilization() {
 

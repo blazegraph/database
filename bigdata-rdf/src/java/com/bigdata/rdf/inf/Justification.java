@@ -32,7 +32,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.NOPSerializer;
@@ -290,7 +290,7 @@ public class Justification implements Comparable<Justification> {
      * @param itr
      *            The iterator visiting the index entries.
      */
-    public Justification(IEntryIterator itr) {
+    public Justification(ITupleIterator itr) {
         
         final ITuple tuple = itr.next();
         

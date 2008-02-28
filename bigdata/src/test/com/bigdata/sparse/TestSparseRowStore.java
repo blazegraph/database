@@ -40,7 +40,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
@@ -243,7 +243,7 @@ public class TestSparseRowStore extends TestCase2 {
          */
         {
             
-            IEntryIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.entryIterator();
 
             /*
              * @todo this is tricky and hardcoded. we lack a general solution to

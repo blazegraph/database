@@ -77,7 +77,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         final Leaf root = (Leaf) btree.root;
         
-        final IEntryFilter filter = null;
+        final ITupleFilter filter = null;
         
         final byte[] k1 = i2k(1); // before any used key.
         final byte[] k3 = i2k(3);
@@ -449,7 +449,7 @@ public class TestIterators extends AbstractBTreeTestCase {
     }
 
     /**
-     * Test the use of an {@link EntryFilter} to visit only certain values.
+     * Test the use of an {@link TupleFilter} to visit only certain values.
      */
     public void test_entryFilter() {
         
@@ -476,7 +476,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         assertSameIterator(new byte[][]{v3,v5,v7},btree.rangeIterator(null,null));
 
         // visit everything in the root leaf using an explicit EntryIterator ctor.
-        assertSameIterator(new byte[][] { v3, v5, v7 }, new EntryIterator(a,
+        assertSameIterator(new byte[][] { v3, v5, v7 }, new TupleIterator(a,
                 new Tuple(IRangeQuery.DEFAULT), null, null, null));
         
         /*
@@ -489,7 +489,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         // visit everything except v3.
         assertSameIterator(new byte[][] { v5, v7 },//
-                a.rangeIterator(null, null, flags, new EntryFilter() {
+                a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
 
                     public boolean isValid(ITuple tuple) {
@@ -500,7 +500,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         // visit everything except v5.
         assertSameIterator(new byte[][]{v3,v7},//
-                a.rangeIterator(null, null, flags, new EntryFilter() {
+                a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
                     public boolean isValid(ITuple tuple) {
                         return BytesUtil.compareBytesWithLenAndOffset(0,
@@ -519,7 +519,7 @@ public class TestIterators extends AbstractBTreeTestCase {
         
         // visit everything except v7.
         assertSameIterator(new byte[][]{v3,v5},//
-                a.rangeIterator(null, null, flags, new EntryFilter() {
+                a.rangeIterator(null, null, flags, new TupleFilter() {
                     private static final long serialVersionUID = 1L;
                     public boolean isValid(ITuple tuple) {
                         return BytesUtil.compareBytesWithLenAndOffset(0,

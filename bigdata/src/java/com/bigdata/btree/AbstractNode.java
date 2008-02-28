@@ -588,7 +588,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      */
     abstract public Iterator<AbstractNode> postOrderNodeIterator(boolean dirtyNodesOnly);
 
-    public IEntryIterator entryIterator() {
+    public ITupleIterator entryIterator() {
 
         return rangeIterator(null/* fromKey */, null/* toKey */,
                 IRangeQuery.DEFAULT, null/*filter*/);
@@ -612,8 +612,8 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      *            An optional filter that will be applied to the values before
      *            they are visited by the returned iterator.
      */
-    public IEntryIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int flags, IEntryFilter filter) {
+    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
+            int flags, ITupleFilter filter) {
 
         return new PostOrderEntryIterator(postOrderIterator(fromKey, toKey),
                 fromKey, toKey, flags, filter);
@@ -658,7 +658,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * extent that it can follow the change from the persistent reference for a
      * node to the new mutable reference for that node.
      */
-    private static class PostOrderEntryIterator implements IEntryIterator {
+    private static class PostOrderEntryIterator implements ITupleIterator {
         
         private final Tuple tuple;
         
@@ -686,7 +686,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
         
         public PostOrderEntryIterator(Iterator postOrderNodeIterator,
                 final byte[] fromKey, final byte[] toKey, int flags,
-                final IEntryFilter filter) {
+                final ITupleFilter filter) {
             
             assert postOrderNodeIterator != null;
             
@@ -717,7 +717,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
 
                         }
 
-                        return new EntryIterator(leaf, tuple, fromKey, toKey, filter );
+                        return new TupleIterator(leaf, tuple, fromKey, toKey, filter );
 
 //                        return ((Leaf)child).entryIterator();
 
@@ -833,7 +833,7 @@ public abstract class AbstractNode extends PO implements IAbstractNode,
      * @param dstpos
      *            The index position to which the key will be copied on this
      *            node.
-     * @param src
+     * @param srckeys
      *            The source keys.
      * @param srcpos
      *            The index position from which the key will be copied.

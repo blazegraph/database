@@ -31,7 +31,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
@@ -1079,7 +1079,7 @@ public class BigdataRepository implements ContentRepository {
                 true/* unicode */, false/* successor */).append(version + 1)
                 .getKey();
 
-        final IEntryIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
+        final ITupleIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);
 
         while (itr.hasNext()) {
@@ -1279,7 +1279,7 @@ public class BigdataRepository implements ContentRepository {
         // delete file blocks.
         {
 
-            final IEntryIterator itr = getDataIndex()
+            final ITupleIterator itr = getDataIndex()
                     .rangeIterator(fromKey, toKey, 0/* capacity */,
                             IRangeQuery.REMOVEALL, null/* filter */);
 
@@ -2035,7 +2035,7 @@ public class BigdataRepository implements ContentRepository {
         final int flags = IRangeQuery.KEYS;
         
         // visits the keys for the file version in block order.
-        final IEntryIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
+        final ITupleIterator itr = getDataIndex().rangeIterator(fromKey, toKey,
                 0/* capacity */, flags, null/* filter */);
 
         // resolve keys to block identifiers.
@@ -2053,7 +2053,7 @@ public class BigdataRepository implements ContentRepository {
         
         final private String id;
         final private int version;
-        final private IEntryIterator src;
+        final private ITupleIterator src;
 
         public String getId() {
             
@@ -2067,7 +2067,7 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
-        public BlockIdentifierIterator(String id, int version, IEntryIterator src) {
+        public BlockIdentifierIterator(String id, int version, ITupleIterator src) {
         
             if (id == null)
                 throw new IllegalArgumentException();
@@ -2301,7 +2301,7 @@ public class BigdataRepository implements ContentRepository {
          * an atomic delete of the first block for this file version.
          */
 
-        final IEntryIterator itr = getDataIndex()
+        final ITupleIterator itr = getDataIndex()
                 .rangeIterator(fromKey, toKey,
                 1, // Note: limit is ONE block!
                 IRangeQuery.KEYS|IRangeQuery.REMOVEALL, null/* filter */);
@@ -2402,7 +2402,7 @@ public class BigdataRepository implements ContentRepository {
         /*
          * Resolve the requested block : keys and data.
          */
-        final IEntryIterator itr = getDataIndex()
+        final ITupleIterator itr = getDataIndex()
                 .rangeIterator(fromKey, toKey, 1/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
@@ -2456,7 +2456,7 @@ public class BigdataRepository implements ContentRepository {
         /*
          * Resolve the requested block : keys and data.
          */
-        final IEntryIterator itr = getDataIndex()
+        final ITupleIterator itr = getDataIndex()
                 .rangeIterator(fromKey, toKey, 1/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
 
@@ -2885,7 +2885,7 @@ public class BigdataRepository implements ContentRepository {
         // both keys and values.
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;
         
-        final IEntryIterator itr;
+        final ITupleIterator itr;
         
         final IIndex dataIndex;
         
@@ -3226,7 +3226,7 @@ public class BigdataRepository implements ContentRepository {
 
         protected final String id;
         protected final int version;
-        private final IEntryIterator src;
+        private final ITupleIterator src;
 
         /**
          * The current block# whose data are being read.
@@ -3280,7 +3280,7 @@ public class BigdataRepository implements ContentRepository {
             
         }
         
-        public FileVersionInputStream(String id, int version, IEntryIterator src) {
+        public FileVersionInputStream(String id, int version, ITupleIterator src) {
             
             this.id = id;
             

@@ -29,16 +29,16 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 /**
- * Abstract base class used to filter objects in an {@link IEntryIterator}.
+ * Abstract base class used to filter objects in an {@link ITupleIterator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class EntryFilter implements IEntryFilter {
+public abstract class TupleFilter implements ITupleFilter {
 
     protected final Object state;
 
-    public EntryFilter() {
+    public TupleFilter() {
         
         this( null );
         
@@ -51,7 +51,7 @@ public abstract class EntryFilter implements IEntryFilter {
      * @param state
      *            The user defined object.
      */
-    public EntryFilter(Object state) {
+    public TupleFilter(Object state) {
         
         this.state = state;
         
@@ -60,14 +60,14 @@ public abstract class EntryFilter implements IEntryFilter {
     /**
      * Lazily allocated.
      */
-    private ArrayList<IEntryFilter> filters = null; 
+    private ArrayList<ITupleFilter> filters = null; 
 
     /**
      * Chains a filter after this one.
      * 
      * @param filter
      */
-    synchronized public void add(IEntryFilter filter) {
+    synchronized public void add(ITupleFilter filter) {
         
         if (filter == null) {
             
@@ -77,7 +77,7 @@ public abstract class EntryFilter implements IEntryFilter {
         
         if (filters == null) {
             
-            filters = new ArrayList<IEntryFilter>();
+            filters = new ArrayList<ITupleFilter>();
             
         }
         
@@ -90,11 +90,11 @@ public abstract class EntryFilter implements IEntryFilter {
         if (filters == null)
             return true;
         
-        Iterator<IEntryFilter> itr = filters.iterator();
+        Iterator<ITupleFilter> itr = filters.iterator();
         
         while(itr.hasNext()) {
 
-            IEntryFilter filter = itr.next();
+            ITupleFilter filter = itr.next();
             
             if(!filter.isValid(tuple)) {
                 
@@ -116,39 +116,16 @@ public abstract class EntryFilter implements IEntryFilter {
             
         }
 
-        Iterator<IEntryFilter> itr = filters.iterator();
+        Iterator<ITupleFilter> itr = filters.iterator();
         
         while(itr.hasNext()) {
 
-            IEntryFilter filter = itr.next();
+            ITupleFilter filter = itr.next();
             
             filter.rewrite(tuple);
             
         }
         
     }
-    
-//    /**
-//     * The default implementation does nothing.
-//     */
-//    public boolean isValid(Object value) {
-//        
-//        return true;
-//        
-//    }
-//    
-//    /**
-//     * NOP resolver.
-//     * 
-//     * @param value
-//     *            The value that would be visited.
-//     * 
-//     * @return The value that will be visited.
-//     */
-//    public Object resolve(Object value) {
-//        
-//        return value;
-//        
-//    }
     
 }

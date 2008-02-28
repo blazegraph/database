@@ -25,7 +25,7 @@ package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.inf.Justification;
@@ -110,7 +110,7 @@ public class SPO {
      * @todo This decodes the key directly. It {@link RdfKeyBuilder} is to
      *       decode the key then the fields on this class can not be final.
      */
-    public SPO(KeyOrder keyOrder, IEntryIterator itr) {
+    public SPO(KeyOrder keyOrder, ITupleIterator itr) {
         
         assert keyOrder != null;
         assert itr != null;

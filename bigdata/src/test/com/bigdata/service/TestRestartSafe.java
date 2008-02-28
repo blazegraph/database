@@ -32,7 +32,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -165,7 +165,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
 
             assertEquals(nentries, ndx.rangeCount(null, null));
 
-            IEntryIterator itr = ndx.rangeIterator(null, null);
+            ITupleIterator itr = ndx.rangeIterator(null, null);
             
             int i = 0;
             
@@ -274,7 +274,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
 
             assertEquals(nentries, ndx.rangeCount(null, null));
 
-            IEntryIterator itr = ndx.rangeIterator(null, null);
+            ITupleIterator itr = ndx.rangeIterator(null, null);
             
             int i = 0;
             

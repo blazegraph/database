@@ -44,7 +44,7 @@ import org.openrdf.model.Value;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -324,7 +324,7 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getTermIdIndex();
 
-            IEntryIterator itr = ndx.rangeIterator(null, null);
+            ITupleIterator itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
 
@@ -369,7 +369,7 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getIdTermIndex();
 
-            IEntryIterator itr = ndx.rangeIterator(null, null);
+            ITupleIterator itr = ndx.rangeIterator(null, null);
 
             while (itr.hasNext()) {
 
@@ -429,7 +429,7 @@ abstract public class AbstractTestCase
 
             IIndex ndx = store.getFullTextIndex();
 
-            IEntryIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
+            ITupleIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
                     IRangeQuery.KEYS, null/*filter*/);
 
             while (itr.hasNext()) {
@@ -743,7 +743,7 @@ abstract public class AbstractTestCase
 
             final byte[] toKey = null;
 
-            IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+            ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
 
             if (!itr.hasNext()) {
 

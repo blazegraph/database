@@ -56,7 +56,7 @@ public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
     
     protected int capacity;
     protected int flags;
-    protected IEntryFilter filter;
+    protected ITupleFilter filter;
     
     /**
      * De-serialization ctor.
@@ -110,7 +110,7 @@ public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
      *      iterator.
      */
     public RangeIteratorProcedure(byte[] fromKey, byte[] toKey, int capacity,
-            int flags, IEntryFilter filter) {
+            int flags, ITupleFilter filter) {
 
         super(fromKey, toKey);
         
@@ -131,7 +131,7 @@ public class RangeIteratorProcedure extends AbstractKeyRangeIndexProcedure
 
         flags = in.readInt();
 
-        filter = (IEntryFilter) in.readObject();
+        filter = (ITupleFilter) in.readObject();
 
     }
 

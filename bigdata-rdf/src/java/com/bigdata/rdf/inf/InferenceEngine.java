@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
@@ -1588,7 +1588,7 @@ public class InferenceEngine extends RDFSHelper {
          * Note: this is initialized lazily so that the btree are fully
          * populated 1st.
          */
-        private IEntryIterator src;
+        private ITupleIterator src;
         
         /**
          * 

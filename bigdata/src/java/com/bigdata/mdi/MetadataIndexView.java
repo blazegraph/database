@@ -97,7 +97,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
 
     }
     
-    public PartitionLocatorMetadata find(byte[] key) {
+    public PartitionLocator find(byte[] key) {
         
         final int index = findIndexOf(key);
         
@@ -109,13 +109,13 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
         
         final byte[] val = valueAt(index);
         
-        return (PartitionLocatorMetadata) SerializerUtil.deserialize(val);
+        return (PartitionLocator) SerializerUtil.deserialize(val);
         
     }
     
-    public PartitionLocatorMetadata get(byte[] key) {
+    public PartitionLocator get(byte[] key) {
 
-        return (PartitionLocatorMetadata) SerializerUtil.deserialize(lookup(key));
+        return (PartitionLocator) SerializerUtil.deserialize(lookup(key));
 
 //        final byte[] val = lookup(key);
 //
@@ -146,7 +146,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      *                if the key identifies an existing partition but the
      *                partition identifers do not agree.
      */
-    public PartitionLocatorMetadata put(byte[] key, PartitionLocatorMetadata val) {
+    public PartitionLocator put(byte[] key, PartitionLocator val) {
 
         if (val == null) {
 
@@ -158,8 +158,8 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
         
         final byte[] oldval2 = insert(key, newval);
 
-        PartitionLocatorMetadata oldval = oldval2 == null ? null
-                : (PartitionLocatorMetadata) SerializerUtil.deserialize(oldval2);
+        PartitionLocator oldval = oldval2 == null ? null
+                : (PartitionLocator) SerializerUtil.deserialize(oldval2);
         
         if (oldval != null && oldval.getPartitionId() != val.getPartitionId()) {
 

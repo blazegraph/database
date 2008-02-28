@@ -34,13 +34,13 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.bigdata.btree.IEntryFilter;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.mdi.PartitionLocatorMetadataWithSeparatorKeys;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.service.IDataService;
@@ -299,7 +299,7 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public ResultSet rangeIterator(long tx, String name, byte[] fromKey, byte[] toKey, int capacity, int flags, IEntryFilter filter) throws InterruptedException, ExecutionException, IOException {
+        public ResultSet rangeIterator(long tx, String name, byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) throws InterruptedException, ExecutionException, IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -319,10 +319,14 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public void splitIndexPartition(String name, int partitionId, byte[] leftSeparator, PartitionLocatorMetadataWithSeparatorKeys[] locators) throws IOException, InterruptedException, ExecutionException {
+        public void splitIndexPartition(String name,
+                PartitionLocator oldLocator, PartitionLocator[] newLocators)
+                throws IOException, InterruptedException, ExecutionException {
 
-            log.info("Split index partition: name="+name+", partitionId="+partitionId+" into "+locators.length+" partitions");
-            
+            log.info("Split index partition: name=" + name + ", oldLocator="
+                    + oldLocator + " into " + newLocators.length
+                    + " partitions");
+
         }
 
         public String getStatistics(String name, long timestamp) throws IOException {

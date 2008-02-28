@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
@@ -1116,7 +1116,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     }
 //                    assertTrue(ndx instanceof ReadOnlyIndex);
                     
-                    IEntryIterator itr = ndx.rangeIterator(null, null);
+                    ITupleIterator itr = ndx.rangeIterator(null, null);
 
                     int n = 0;
 

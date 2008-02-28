@@ -23,52 +23,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Feb 14, 2008
+ * Created on Feb 28, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.mdi;
 
 /**
- * Iterator disallows {@link #remove()}.
+ * Interface provides access to the left and right separator keys for an index
+ * partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyEntryIterator implements ITupleIterator {
+public interface ISeparatorKeys {
 
-    private final ITupleIterator src;
+    /**
+     * The separator key that defines the left edge of that index partition
+     * (always defined) - this is the first key that can enter the index
+     * partition. The left-most separator key for a scale-out index is always an
+     * empty <code>byte[]</code> since that is the smallest key that may be
+     * defined.
+     */
+    public byte[] getLeftSeparatorKey();
     
     /**
-     * 
+     * The separator key that defines the right edge of that index partition or
+     * <code>null</code> iff the index partition does not have a right sibling
+     * (a <code>null</code> has the semantics of having no upper bound).
      */
-    public ReadOnlyEntryIterator(ITupleIterator src) {
-        
-        this.src = src;
-        
-    }
-
-    public ITuple next() {
-        
-        return src.next();
-        
-    }
-
-    public boolean hasNext() {
-        
-        return src.hasNext();
-        
-    }
-
-    /**
-     * Disallowed.
-     * 
-     * @throws UnsupportedOperationException
-     *             always
-     */
-    public void remove() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
+    public byte[] getRightSeparatorKey();
+    
 }

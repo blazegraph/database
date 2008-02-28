@@ -55,7 +55,7 @@ import org.CognitiveWeb.generic.core.ILinkSetIndexIterator;
 import org.CognitiveWeb.generic.core.LinkSetIndex;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 
@@ -76,7 +76,7 @@ public class LinkSetIndexIterator implements ILinkSetIndexIterator {
     private final BTree m_btree;
 
     // internally created.
-    private final IEntryIterator itr;
+    private final ITupleIterator itr;
 
 //    // parameter to the constructor.
 //    private final Object m_fromKey;

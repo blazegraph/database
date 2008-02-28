@@ -26,7 +26,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.KeyBuilder;
@@ -108,7 +108,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
          * Materialize the matching justifications.
          */
         
-        IEntryIterator itr = ndx.rangeIterator(fromKey, toKey,
+        ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.KEYS, null/* filter */);
 
         int i = 0;

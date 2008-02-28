@@ -80,7 +80,7 @@ public class SimpleEntry implements Serializable {
      * de-serialize the given object when it is a <code>byte[]</code>. This
      * is a hack that provides backwards compatibility for some of the unit
      * tests when assume that objects (and not byte[]s) are stored in the
-     * B+Tree and visited by the {@link IEntryIterator}.
+     * B+Tree and visited by the {@link ITupleIterator}.
      */
     public boolean equals(Object o) {
         

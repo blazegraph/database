@@ -30,7 +30,7 @@ package com.bigdata.rdf.store;
 
 import java.util.Iterator;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -90,7 +90,7 @@ public interface IAccessPath extends Iterable<SPO> {
      * @todo for scale-out version, the optional {@link ISPOFilter} should be
      *       sent to the data service.
      */
-    public IEntryIterator rangeQuery();
+    public ITupleIterator rangeQuery();
 
     /**
      * An iterator visiting {@link SPO}s using the natural order of the index

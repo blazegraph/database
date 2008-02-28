@@ -379,7 +379,7 @@ public class IndexSegmentBuilder {
             File outFile,//
             File tmpDir,//
             final int entryCount,//
-            IEntryIterator entryIterator, //
+            ITupleIterator entryIterator, //
             int m,
             IndexMetadata metadata,//
             final long commitTime

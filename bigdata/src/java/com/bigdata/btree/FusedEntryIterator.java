@@ -34,13 +34,13 @@ import com.bigdata.isolation.IsolatedFusedView;
 
 /**
  * <p>
- * An aggregate iterator view of the one or more source {@link IEntryIterator}s.
+ * An aggregate iterator view of the one or more source {@link ITupleIterator}s.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FusedEntryIterator implements IEntryIterator {
+public class FusedEntryIterator implements ITupleIterator {
 
     protected static final Logger log = Logger.getLogger(FusedEntryIterator.class);
 
@@ -69,7 +69,7 @@ public class FusedEntryIterator implements IEntryIterator {
     /**
      * The source iterators in the order given to the ctor.
      */
-    private final IEntryIterator[] itrs;
+    private final ITupleIterator[] itrs;
 
     /**
      * The current key from each source and <code>null</code> if we need to
@@ -100,7 +100,7 @@ public class FusedEntryIterator implements IEntryIterator {
     private int lastVisited = -1;
     
     public FusedEntryIterator(AbstractBTree[] srcs, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IEntryFilter filter) {
+            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
         FusedView.checkSources(srcs);
         
@@ -113,7 +113,7 @@ public class FusedEntryIterator implements IEntryIterator {
         // visit deleted entries?
         this.deleted = (flags & IRangeQuery.DELETED) != 0;
         
-        itrs = new IEntryIterator[n];
+        itrs = new ITupleIterator[n];
         
         for (int i = 0; i < n; i++) {
 
@@ -146,7 +146,7 @@ public class FusedEntryIterator implements IEntryIterator {
      *            index entry and discard a historical undeleted entry later in
      *            the predence order for the view.
      */
-    public FusedEntryIterator(boolean deleted, IEntryIterator[] srcs) {
+    public FusedEntryIterator(boolean deleted, ITupleIterator[] srcs) {
 
         assert srcs != null;
 

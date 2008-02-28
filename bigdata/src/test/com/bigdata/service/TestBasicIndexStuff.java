@@ -30,11 +30,14 @@ package com.bigdata.service;
 
 import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 
 /**
  * Test of basic index operations.
@@ -58,6 +61,89 @@ public class TestBasicIndexStuff extends
         super(arg0);
     }
 
+    /**
+     * Test verifies the behavior of the {@link IDataService} when requesting an
+     * operation for an index that is not registered on that data service.
+     * <p>
+     * Note: This test is very important. Clients depends on
+     * {@link NoSuchIndexException} being thrown when an index partition has
+     * been split, joined or moved in order to automatically refresh their cache
+     * information and reissue their request.
+     * 
+     * @throws Exception
+     */
+    public void test_noSuchIndex() throws Exception {
+       
+        final String name = "testIndex";
+
+        assertNull(fed.getIndex(name,ITx.UNISOLATED));
+        
+        /*
+         * Try various operations and make sure that they all throw the expected
+         * exception.
+         */
+
+        // obtaining index metadata
+        try {
+
+            dataService0.getIndexMetadata(name, ITx.UNISOLATED);
+            
+        } catch (Exception ex) {
+
+            assert isInnerCause(ex, NoSuchIndexException.class);
+
+            System.err.print("Ignoring expected exception: ");
+            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            
+        }
+        
+        // obtaining index statistics
+        try {
+
+            dataService0.getStatistics(name, ITx.UNISOLATED);
+            
+        } catch (Exception ex) {
+
+            assert isInnerCause(ex, NoSuchIndexException.class);
+
+            System.err.print("Ignoring expected exception: ");
+            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            
+        }
+        
+        // running a procedure
+        try {
+
+            dataService0.submit(ITx.UNISOLATED, name, new RangeCountProcedure(null,null));
+            
+        } catch (Exception ex) {
+
+            assert isInnerCause(ex, NoSuchIndexException.class);
+
+            System.err.print("Ignoring expected exception: ");
+            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            
+        }
+        
+        // range iterator
+        try {
+
+            dataService0
+                    .rangeIterator(ITx.UNISOLATED, name, null/* fromKey */,
+                            null/* toKey */, 0/* capacity */,
+                            IRangeQuery.DEFAULT, null/*filter*/);
+            
+        } catch (Exception ex) {
+
+            assert isInnerCause(ex, NoSuchIndexException.class);
+
+            System.err.print("Ignoring expected exception: ");
+            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            
+        }
+        
+    }
+    
     /**
      * Tests basics with a single scale-out index having a single partition.
      * 
@@ -103,6 +189,15 @@ public class TestBasicIndexStuff extends
         assertEquals(1, ndx.rangeCount(null, new byte[] { 2 }));
         assertEquals(1, ndx.rangeCount(null, null));
         
+        // verify iterator for the same queries.
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(new byte[] {}, new byte[] { 1 }));
+        assertSameIterator(new byte[][]{new byte[]{1}}, ndx.rangeIterator(new byte[] {}, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{new byte[]{1}}, ndx.rangeIterator(new byte[] { 1 }, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(null, new byte[] { 1 }));
+        assertSameIterator(new byte[][]{new byte[]{1}}, ndx.rangeIterator(new byte[] { 1 }, null));
+        assertSameIterator(new byte[][]{new byte[]{1}}, ndx.rangeIterator(null, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{new byte[]{1}}, ndx.rangeIterator(null, null));
+
         // remove the index entry.
         assertEquals(new byte[] { 1 }, ndx.remove(new byte[] { 1 }));
 
@@ -127,6 +222,15 @@ public class TestBasicIndexStuff extends
         assertEquals(1, ndx.rangeCount(new byte[] { 1 }, null));
         assertEquals(1, ndx.rangeCount(null, new byte[] { 2 }));
         assertEquals(1, ndx.rangeCount(null, null));
+
+        // verify iterator for the same queries.
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(new byte[] {}, new byte[] { 1 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(new byte[] {}, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(new byte[] { 1 }, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(null, new byte[] { 1 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(new byte[] { 1 }, null));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(null, new byte[] { 2 }));
+        assertSameIterator(new byte[][]{}, ndx.rangeIterator(null, null));
 
     }
 

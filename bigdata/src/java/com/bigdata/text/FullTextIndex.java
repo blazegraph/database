@@ -56,7 +56,7 @@ import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
-import com.bigdata.btree.IEntryIterator;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
@@ -766,7 +766,7 @@ public class FullTextIndex {
                  * for the current token.
                  */
                 
-                final IEntryIterator itr = ndx.rangeIterator(fromKey, toKey);
+                final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
                 
                 while(itr.hasNext()) {
                     

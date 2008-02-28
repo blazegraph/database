@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -188,7 +187,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
      *            The unique identifier assigned to all instances of that index.
      */
     final protected void assertIndexRegistered(IDataService dataService, String name,
-            UUID indexUUID) throws IOException {
+            UUID indexUUID) throws Exception {
 
         IndexMetadata metadata = dataService.getIndexMetadata(name,ITx.UNISOLATED);
         

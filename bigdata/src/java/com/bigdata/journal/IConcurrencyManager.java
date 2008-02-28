@@ -77,6 +77,13 @@ public interface IConcurrencyManager {
     public void shutdownNow();
 
     /**
+     * Return statistics about the {@link ConcurrencyManager}.
+     * 
+     * @todo use XML or Object to send data.
+     */
+    public String getStatistics();
+    
+    /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
      * appropriate thread pool with as much concurrency as possible.
      * <p>

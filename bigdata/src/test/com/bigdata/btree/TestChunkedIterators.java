@@ -58,7 +58,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  *       and are not supported and when DELETED are and are not requested). make
  *       sure that the concept of delete marker vs version timestamp is
  *       differentiated in the {@link ITuple} interface and the
- *       {@link IEntryIterator} implementations.
+ *       {@link ITupleIterator} implementations.
  * 
  * @todo check the last visited key when changing chunks and its interaction
  *       with the delete behind semantics.
@@ -371,7 +371,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
             
             int nremaining = 0;
             
-            IEntryIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.entryIterator();
             
             while(itr.hasNext()) {
                 
@@ -428,7 +428,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * Filter selects only the even keys.
          */
-        IEntryFilter filter = new EntryFilter() {
+        ITupleFilter filter = new TupleFilter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -492,7 +492,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
             int nremaining = 0;
             
-            IEntryIterator itr = btree.entryIterator();
+            ITupleIterator itr = btree.entryIterator();
             
             while(itr.hasNext()) {
                 

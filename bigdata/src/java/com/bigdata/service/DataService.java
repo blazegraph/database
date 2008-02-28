@@ -40,7 +40,7 @@ import java.util.concurrent.RejectedExecutionException;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.btree.IEntryFilter;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
@@ -402,9 +402,17 @@ abstract public class DataService implements IDataService,
         
         sb.append("dataService: uuid=" + getServiceUUID());
 
-        sb.append("\n");
+        sb.append("\nResourceManager:");
 
         sb.append(resourceManager.getStatistics());
+        
+        sb.append("\nConcurrencyManager:");
+
+        sb.append(concurrencyManager.getStatistics());
+
+        sb.append("\nLocalTransactionManager:");
+
+        sb.append(localTransactionManager.getStatistics());
         
         return sb.toString();
         
@@ -516,7 +524,7 @@ abstract public class DataService implements IDataService,
             
             if(ndx == null) {
                 
-                return null;
+                throw new NoSuchIndexException(name);
                 
             }
             
@@ -593,7 +601,7 @@ abstract public class DataService implements IDataService,
     }
 
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IEntryFilter filter)
+            byte[] toKey, int capacity, int flags, ITupleFilter filter)
             throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -691,11 +699,11 @@ abstract public class DataService implements IDataService,
         private final byte[] toKey;
         private final int capacity;
         private final int flags;
-        private final IEntryFilter filter;
+        private final ITupleFilter filter;
         
         public RangeIteratorTask(ConcurrencyManager concurrencyManager,
                 long startTime, String name, byte[] fromKey, byte[] toKey,
-                int capacity, int flags, IEntryFilter filter) {
+                int capacity, int flags, ITupleFilter filter) {
 
             super(concurrencyManager, startTime, name);
 

@@ -38,14 +38,16 @@ import java.util.NoSuchElementException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo add #prior() method so that we can scan in reverse key order.
  */
-public interface IEntryIterator extends Iterator<ITuple> {
+public interface ITupleIterator extends Iterator<ITuple> {
 
     /**
      * Advance the iterator and return the {@link ITuple} from which you can
      * extract the data and metadata for next entry.
      * <p>
-     * Note: An {@link IEntryIterator}s will generally return the <em>same</em>
+     * Note: An {@link ITupleIterator}s will generally return the <em>same</em>
      * {@link ITuple} reference on on each invocation of this method. The caller
      * is responsible for copying out any data or metadata of interest before
      * calling {@link #next()} again.
