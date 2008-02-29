@@ -391,14 +391,6 @@ public abstract class AbstractTask implements Callable<Object> {
 
             readOnly = tx.isReadOnly();
             
-//            if (tx.isReadOnly() != readOnly) {
-//
-//                throw new IllegalArgumentException("Tx readOnly="
-//                        + tx.isReadOnly() + ", but task readOnly="
-//                        + readOnly);
-//                
-//            }
-
         } else if (startTime < ITx.UNISOLATED) {
 
             /*

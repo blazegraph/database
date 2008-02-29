@@ -51,7 +51,6 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 
 /**
  * Implementation of a metadata service for a named scale-out index.
@@ -231,6 +230,28 @@ abstract public class MetadataService extends DataService implements
         
     }
     
+    public void joinIndexPartition(String name, PartitionLocator[] oldLocators,
+            PartitionLocator newLocator) throws IOException,
+            InterruptedException, ExecutionException {
+
+        setupLoggingContext();
+
+        try {
+
+            final AbstractTask task = new JoinIndexPartitionTask(
+                    concurrencyManager, getMetadataIndexName(name),
+                    oldLocators, newLocator);
+            
+            concurrencyManager.submit(task).get();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }        
+        
+    }
+    
     /**
      * @todo if if exits already? (and has consistent/inconsistent metadata)?
      */
@@ -383,7 +404,7 @@ abstract public class MetadataService extends DataService implements
             PartitionLocator pmd = (PartitionLocator) SerializerUtil
                     .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
             
-            if(oldLocator.equals(pmd)) {
+            if(!oldLocator.equals(pmd)) {
 
                 /*
                  * Sanity check failed - old locator not equal to the locator
@@ -480,6 +501,87 @@ abstract public class MetadataService extends DataService implements
 
     }
     
+    protected class JoinIndexPartitionTask extends AbstractTask {
+
+        protected final PartitionLocator oldLocators[];
+        protected final PartitionLocator newLocator;
+        
+        /**
+         * @param concurrencyManager
+         * @param resource
+         * @param oldLocators
+         * @param newLocator
+         */
+        protected JoinIndexPartitionTask(
+                IConcurrencyManager concurrencyManager, String resource,
+                PartitionLocator oldLocators[],
+                PartitionLocator newLocator) {
+
+            super(concurrencyManager, ITx.UNISOLATED, resource);
+
+            if (oldLocators == null)
+                throw new IllegalArgumentException();
+
+            if (newLocator == null)
+                throw new IllegalArgumentException();
+
+            this.oldLocators = oldLocators;
+            
+            this.newLocator = newLocator;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            log.info("name=" + getOnlyResource() + ", oldLocators=" + Arrays.toString(oldLocators)
+                    + ", newLocator=" + newLocator);
+            
+            MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
+            
+            // remove the old locators from the metadata index.
+            for(int i=0; i<oldLocators.length; i++) {
+                
+                PartitionLocator locator = oldLocators[i];
+                
+                PartitionLocator pmd = (PartitionLocator) SerializerUtil
+                        .deserialize(mdi.remove(locator.getLeftSeparatorKey()));
+
+                if (!locator.equals(pmd)) {
+
+                    /*
+                     * Sanity check failed - old locator not equal to the
+                     * locator found under that key in the metadata index.
+                     * 
+                     * @todo differences in just the data service failover chain
+                     * are probably not important and might be ignored.
+                     */
+
+                    throw new RuntimeException("Expected oldLocator=" + locator
+                            + ", but actual=" + pmd);
+                    
+                }
+
+                /*
+                 * FIXME validate that the newLocator is a perfect fit
+                 * replacement for the oldLocators in terms of the key range
+                 * spanned and that there are no gaps.  Add an API constaint
+                 * that the oldLocators are in key order by their leftSeparator
+                 * key.
+                 */
+                
+            }
+
+            // add the new locator to the metadata index.
+            mdi.insert(newLocator.getLeftSeparatorKey(), SerializerUtil
+                    .serialize(newLocator));
+            
+            return null;
+            
+        }
+
+    }
+
     /**
      * Registers a metadata index for a named scale-out index and statically
      * partition the index using the given separator keys and data services.

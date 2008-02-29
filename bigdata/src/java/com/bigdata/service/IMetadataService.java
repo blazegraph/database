@@ -115,6 +115,29 @@ public interface IMetadataService extends IDataService, Remote {
             InterruptedException, ExecutionException;
 
     /**
+     * Updates the {@link MetadataIndex} for the named scale-out index to
+     * reflect the join of N index partitions (which must be siblings) into a
+     * single index partition. The old idnex partition locators are removed from
+     * the {@link MetadataIndex} and the new index partition locator is inserted
+     * in a single atomic operation.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param oldLocators
+     *            The partition locators for the index partitions that were
+     *            joined.
+     * @param newLocator
+     *            The locator for the new index partition created by that join.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void joinIndexPartition(String name, PartitionLocator[] oldLocators,
+            PartitionLocator newLocator) throws IOException,
+            InterruptedException, ExecutionException;
+    
+    /**
      * Register and statically partition a scale-out index.
      * 
      * @param metadata

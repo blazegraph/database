@@ -132,6 +132,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @todo update javadoc.
  * 
+ * @todo recommend setting the
+ *       {@link com.bigdata.journal.Options#INITIAL_EXTENT} to the
+ *       {@link com.bigdata.journal.Options#MAXIMUM_EXTENT} in minimize the
+ *       likelyhood of having to extend the journal and in order to keep the
+ *       allocation size on the file system large to minimize fragmentation?
+ *       <p>
+ *       Also, consider moving the target journal size up to 500M.
+ * 
  * @todo track the disk space used by the {@link #getDataDir()} and the free
  *       space remaining on the mount point that hosts the data directory. if we
  *       approach the limit on the space in use then we need to shed index
@@ -197,7 +205,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       metadata index from the on hand data services.
  * 
  * FIXME review use of synchronization and make sure that there is no way in
- *       which we can double-open a store or index.
+ * which we can double-open a store or index.
  * 
  * @todo refactor logging calls into uses of a {@link ResourceManager} instance?
  * 
@@ -708,6 +716,8 @@ abstract public class ResourceManager implements IResourceManager {
     
     /**
      * Set based on {@link Options#INDEX_SEGMENT_BUILD_THRESHOLD}.
+     * 
+     * @todo make this a per-index option on {@link IndexMetadata}?
      */
     final int indexSegmentBuildThreshold;
     
