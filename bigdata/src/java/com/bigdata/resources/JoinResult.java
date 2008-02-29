@@ -23,32 +23,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Feb 22, 2008
+ * Created on Feb 29, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
-import java.io.File;
-import java.io.IOException;
+import com.bigdata.btree.IndexMetadata;
 
 /**
+ * The result of a {@link JoinIndexPartitionTask}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestResourceManagerBasics extends AbstractResourceManagerTestCase {
+public class JoinResult extends AbstractResult {
 
     /**
-     * 
+     * @param name
+     * @param indexMetadata
      */
-    public TestResourceManagerBasics() {
-        super();
-    }
+    public JoinResult(String name, IndexMetadata indexMetadata) {
+        
+        super(name, indexMetadata);
 
-    /**
-     * @param arg0
-     */
-    public TestResourceManagerBasics(String arg0) {
-        super(arg0);
+        // TODO Auto-generated constructor stub
+        throw new UnsupportedOperationException();
+        
     }
 
 }

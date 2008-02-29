@@ -47,6 +47,7 @@ import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * BTree mapping index names to the last metadata record committed for the named
@@ -592,7 +593,7 @@ public class Name2Addr extends BTree {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class EntrySerializer {
+    public static class EntrySerializer {
 
         public static transient final EntrySerializer INSTANCE = new EntrySerializer();
 

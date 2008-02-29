@@ -224,12 +224,7 @@ public class BigdataFederation implements IBigdataFederation {
     }
 
     /**
-     * 
-     * @todo Rather than synchronizing all requests, this should queue requests
-     *       for a specific metadata index iff there is a cache miss for that
-     *       index.
-     * 
-     * FIXME This should be a read-through view onto the metadata index.
+     * This is a read-through view onto the metadata index.
      * <p>
      * The easiest way to have the view be correct is for the operations to all
      * run against the remote metadata index (no caching).
@@ -255,6 +250,15 @@ public class BigdataFederation implements IBigdataFederation {
      * impose additional latency on clients, traffic on the network, and demands
      * on the metadata service. However, with high client concurrency mitigates
      * the increase in access latency to the metadata index.
+     * 
+     * @todo test with and without caching and see what works better. this can
+     *       evolve over time, probably some configuration options to control
+     *       cache behavior.  note that caching of result sets also makes sense
+     *       for historical reads or transactions.
+     * 
+     * @todo Rather than synchronizing all requests, this should queue requests
+     *       for a specific metadata index iff there is a cache miss for that
+     *       index.
      */
     synchronized public IMetadataIndex getMetadataIndex(String name,
             long timestamp) {
@@ -268,7 +272,6 @@ public class BigdataFederation implements IBigdataFederation {
                 
         if (true) {
 
-            // FIXME test with this and with caching and see what works better.
             return new NoCacheMetadataIndexView(name, timestamp, mdmd);
             
         } else {

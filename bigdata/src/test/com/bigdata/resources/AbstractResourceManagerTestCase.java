@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 22, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -38,11 +38,18 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.journal.AbstractLocalTransactionManager;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ValidationError;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.repo.BigdataRepository.Options;
+import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
@@ -82,6 +89,9 @@ public class AbstractResourceManagerTestCase extends
         // Note: test requires data on disk.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
+        
+        // Set threshold to minimum value such that any entries will cause an index segment build.
+        properties.setProperty(Options.INDEX_SEGMENT_BUILD_THRESHOLD,"1");
         
         return properties;
         

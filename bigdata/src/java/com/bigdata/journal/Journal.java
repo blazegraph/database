@@ -39,6 +39,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -595,7 +596,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * This request is always ignored for a {@link Journal} since it does not
      * have any resources to manage.
      */
-    public void releaseOldResources(long timestamp) {
+    public void setReleaseTime(long timestamp) {
 
         log.info("Request ignored for Journal: timestamp="+timestamp);
         

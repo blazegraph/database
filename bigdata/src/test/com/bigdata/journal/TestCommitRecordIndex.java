@@ -110,7 +110,7 @@ public class TestCommitRecordIndex extends AbstractCommitRecordTestCase {
         assertEquals(cr1,ndx.find(cr1.getTimestamp()+1));
 
         // write index on store.
-        long ndx_addr = ndx.checkpoint();
+        long ndx_addr = ndx.writeCheckpoint();
         
         {
             

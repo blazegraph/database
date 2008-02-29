@@ -40,14 +40,14 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.DefaultSplitHandler;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.repo.BigdataRepository.Options;
+import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Tests for various scenarios where the live journal backing a data service

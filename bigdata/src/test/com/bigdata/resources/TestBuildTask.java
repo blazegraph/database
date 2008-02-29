@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 21, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,7 +43,11 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
-import com.bigdata.journal.ResourceManager.BuildResult;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.IndexProcedureTask;
+import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -185,8 +189,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
             
             // task to run.
-            final AbstractTask task = resourceManager.new BuildIndexSegmentTask(
-                    concurrencyManager, startTime, name, outFile);
+            final AbstractTask task = new BuildIndexSegmentTask(
+                    resourceManager, concurrencyManager, startTime, name, outFile);
             
             // submit task and await result (metadata describing the new index segment).
             final BuildResult result = (BuildResult) concurrencyManager.submit(task).get();
@@ -218,8 +222,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // run task that re-defines the index partition view.
         {
 
-            AbstractTask task = resourceManager.new UpdateIndexPartition(
-                    concurrencyManager, name, segmentMetadata);
+            AbstractTask task = new UpdateIndexPartition(
+                    resourceManager, concurrencyManager, name, segmentMetadata);
 
             // run task, await completion.
             concurrencyManager.submit(task).get();

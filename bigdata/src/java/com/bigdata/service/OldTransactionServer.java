@@ -515,7 +515,7 @@ public class OldTransactionServer {
 }
 
 //* 
-//* FIXME Detect transaction identifiers that go backwards? For example tx0
+//* @todo Detect transaction identifiers that go backwards? For example tx0
 //* starts on one segment A while tx1 starts on segment B. Tx0 later starts
 //* on segment B. From the perspective of segment B, tx0 begins after tx1.
 //* This does not look like a problem unless there is an intevening commit,
@@ -586,7 +586,7 @@ public class OldTransactionServer {
 // // * </p>
 
 // /*
-// * FIXME Implement garbage collection of overwritten and unreachable
+// * @todo Implement garbage collection of overwritten and unreachable
 // * versions. Without migration to a read-optimized database, GC by
 // * itself is NOT sufficient to allow us to deallocate versions that have
 // * NOT been overwritten and hence is NOT sufficient to allow us to

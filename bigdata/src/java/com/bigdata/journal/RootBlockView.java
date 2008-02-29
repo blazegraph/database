@@ -36,6 +36,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.ChecksumUtility;
 
 /**

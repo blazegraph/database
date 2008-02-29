@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-
-import com.bigdata.service.IMetadataService;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -112,35 +109,6 @@ public class TestAll extends TestCase {
         }
 
         suite.addTest( TestDiskJournal.suite() );
-
-        /*
-         * Test management of local resources.
-         * 
-         * @todo convert to a proxy test suite per the examples above so that we
-         * can run any interesting conditions and gather the resource manager
-         * unit tests together into that proxy test suite and its bootstrap
-         * tests.
-         * 
-         * @todo add tests for access to read-committed and fully isolated
-         * indices.
-         * 
-         * @todo add tests for coordination of read locks with a transaction
-         * manager.
-         * 
-         * Note: More extensive tests are performed in the services package
-         * where we have access to the IMetadataService as well so that we can
-         * validate the results of an index split, etc.
-         */
-        // bootstrap tests of the resource manager
-        suite.addTestSuite(TestResourceManagerBootstrap.class);
-        // test basics.
-        suite.addTestSuite(TestResourceManagerBasics.class);
-        // test overflow handling.
-        suite.addTestSuite(TestOverflow.class);
-        // test of index segment build and full compacting merge tasks.
-        suite.addTestSuite(TestBuildTask.class);
-        // test merge/split of index partitions.
-        suite.addTestSuite(TestSplitTask.class);
 
         return suite;
 

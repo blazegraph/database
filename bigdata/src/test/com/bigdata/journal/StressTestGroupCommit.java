@@ -135,7 +135,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             final BTree ndx = BTree.create(journal, new IndexMetadata(resource,
                     indexUUID));
             
-            ndx.checkpoint();
+            ndx.writeCheckpoint();
             
             journal.registerIndex(resource, ndx);
 

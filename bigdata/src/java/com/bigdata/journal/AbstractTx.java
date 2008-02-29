@@ -32,6 +32,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.resources.ResourceManager;
+
 /**
  * An abstract base class that encapsulates the run state transitions and
  * constraints for transactions.

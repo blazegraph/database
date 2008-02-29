@@ -59,11 +59,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**

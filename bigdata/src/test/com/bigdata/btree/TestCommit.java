@@ -83,7 +83,7 @@ public class TestCommit extends TestCase2 {
             assertTrue(btree.root.isDirty());
 
             // Commit of tree with dirty root.
-            addrMetadata = btree.checkpoint();
+            addrMetadata = btree.writeCheckpoint();
 
             assertFalse(btree.root.isDirty());
 
@@ -115,7 +115,7 @@ public class TestCommit extends TestCase2 {
              * Commit of tree with clean root writes a new metadata record but
              * does not change the addrRoot.
              */
-            metadata2 = btree.checkpoint();
+            metadata2 = btree.writeCheckpoint();
             assertNotSame( addrMetadata, metadata2 );
 
         }

@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 21, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.util.Random;
 import java.util.UUID;
@@ -36,9 +36,14 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.IndexProcedureTask;
+import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.service.TestOverflow;
 
 /**
  * Basic tests of splitting an index partition.
@@ -66,8 +71,12 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
      * Test generation of N index splits based on an index partition that has
      * been pre-populated with index entries and a specified target #of index
      * entries per index partition.
+     * <p>
+     * Note: This test does NOT compare the resulting index partitions against
+     * ground truth. However, that comparison is performed by a similar test as
+     * part of the com.bigdata.services package. See {@link TestOverflow}.
      * 
-     * @throws Exception 
+     * @throws Exception
      */
     public void test_splitTask() throws Exception {
         
@@ -159,23 +168,17 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
 
         // run post-processing task.
-        resourceManager.new PostProcessOldJournalTask(lastCommitTime).call();
+        resourceManager.overflowAllowed.compareAndSet(true/*expect*/,false/*set*/);
+        new PostProcessOldJournalTask(resourceManager, lastCommitTime).call();
         
         // verify that the old index partition is no longer registered.
         assertNull(resourceManager.getIndex(name, ITx.UNISOLATED));
-        
+
         /*
-         * Compare the index against ground truth after the post-processing is
-         * done.
-         * 
-         * @todo verify the new index partitions are registered. 
-         * 
-         * FIXME This comparison can only be carried out piece meal or using a
-         * metadata index so that we have a view of the now partitioned index.
-         */
-//        AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
-        
-        fail("write test");
+         * Note: If you suspect a problem here you really need to examine the
+         * new index partitions as registered on the new journal after the
+         * post-processing step.
+         */ 
         
     }
     

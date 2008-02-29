@@ -26,9 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 22, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
@@ -37,6 +38,10 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IJournal;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
@@ -67,7 +72,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
     /**
      * A test for overflow of the {@link ResourceManager}. We begin with a
      * blank slate, so the {@link ResourceManager} creates an initial
-     * {@link Journal} for us and put its into play. The test then registers an
+     * {@link Journal} for us and put it into play. The test then registers an
      * initial partition of scale-out index on that journal and some data is
      * written on that index. An overflow operation is executed, which causes a
      * new {@link Journal} to be created and brought into play. The index is
@@ -138,10 +143,14 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             
             assertEquals(1, resourceManager.getJournalCount());
 
+            assertEquals(0, resourceManager.getIndexSegmentCount());
+            
             // do overflow.
             resourceManager.doOverflow();
 
             assertEquals(2, resourceManager.getJournalCount());
+
+            assertEquals(0, resourceManager.getIndexSegmentCount());
 
             // verify live journal is a different instance.
             assertTrue(oldJ != resourceManager.getLiveJournal());
@@ -158,7 +167,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             
             assertNotNull("sources",sources);
             
-            assertEquals("#sources",2,sources.length);
+            assertEquals("#sources: actual="+Arrays.toString(sources),2,sources.length);
 
             assertTrue(sources[0] != sources[1]);
             

@@ -109,7 +109,7 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
     
     /**
      * Stress test of {@link BTree#removeAll()} where the btree is flushed
-     * {@link BTree#checkpoint()}. This will cause problems unless the cache is also
+     * {@link BTree#writeCheckpoint()}. This will cause problems unless the cache is also
      * cleared since nodes that have been detached from their parents will be in
      * the cache.
      */
@@ -156,7 +156,7 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
             }
 
             // flush to the backing store.
-            btree.checkpoint();
+            btree.writeCheckpoint();
             
         }
         

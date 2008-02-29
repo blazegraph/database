@@ -503,7 +503,7 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
         
         public Object call() throws Exception {
 
-            // FIXME implement single point commit protocol.
+            // TODO implement single point commit protocol.
             throw new UnsupportedOperationException();
 
         }
@@ -521,7 +521,7 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
 
         public Object call() throws Exception {
 
-            // FIXME implement distributed commit protocol.
+            // TODO implement distributed commit protocol.
             throw new UnsupportedOperationException();
 
         }
@@ -552,7 +552,7 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
 
         public Object call() throws Exception {
 
-            // FIXME implement abort.
+            // TODO implement abort.
             throw new UnsupportedOperationException();
             
         }

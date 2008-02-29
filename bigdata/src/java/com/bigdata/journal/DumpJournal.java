@@ -33,6 +33,7 @@ import java.util.Date;
 import java.util.Properties;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.rawstore.Bytes;
@@ -283,9 +284,9 @@ public class DumpJournal {
     private static void dumpNamedIndicesMetadata(AbstractJournal journal,
             ICommitRecord commitRecord,boolean dumpIndices) {
 
-        Name2Addr name2Addr = journal.name2Addr;
+        IIndex name2Addr = journal.getName2Addr();
 
-        ITupleIterator itr = name2Addr.entryIterator();
+        ITupleIterator itr = name2Addr.rangeIterator(null,null);
 
         while (itr.hasNext()) {
 

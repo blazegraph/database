@@ -28,6 +28,7 @@ import java.util.UUID;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Interface for metadata about a {@link Journal} or {@link IndexSegment}.
@@ -54,13 +55,19 @@ public interface IResourceMetadata extends Cloneable {
     /**
      * The name of the file containing the resource (this is always relative to
      * some local data directory).
+     * 
+     * @deprecated drop this field - the {@link ResourceManager} does not appear to need
+     * this as it builds up the mapping from resource UUID to local filename during
+     * startup which greatly simplifies the alignment of files within working directories
+     * on different file systems.
      */
     public String getFile();
     
     /**
      * The #of bytes in the store file.
      * 
-     * @todo is this useful for any decision making?
+     * @todo Drop this field? I do not think that this is going to be useful for
+     *       any decision making.
      */
     public long size();
 
