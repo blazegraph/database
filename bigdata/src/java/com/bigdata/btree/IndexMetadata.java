@@ -36,10 +36,10 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
-import com.bigdata.journal.DefaultSplitHandler;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.sparse.SparseRowStore;
 
 /**

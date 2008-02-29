@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 17, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,9 +43,16 @@ import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractLocalTransactionManager;
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IJournal;
+import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -293,6 +300,9 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         // verify #of journals discovered.
         assertEquals(2,resourceManager.getJournalCount());
+
+        // verify no index segments discovered.
+        assertEquals(0,resourceManager.getIndexSegmentCount());
         
         // open one journal.
         assertNotNull(resourceManager.openStore(journalMetadata1.getUUID()));
@@ -313,8 +323,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
     /**
      * A test for restart of the {@link ResourceManager}. A directory is
      * created and pre-populated with a {@link Journal} and some
-     * {@link IndexSegment} constructed from data on that {@link Journal}. The
-     * {@link ResourceManager} is started and we verify that it locates the
+     * {@link IndexSegment}s are constructed from data on that {@link Journal}.
+     * The {@link ResourceManager} is started and we verify that it locates the
      * various resources and opens the correct {@link Journal} as its "live"
      * journal.
      * 
@@ -428,6 +438,9 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         // verify #of journals discovered.
         assertEquals(1, resourceManager.getJournalCount());
+
+        // #of index segments discovered.
+        assertEquals(nsegments, resourceManager.getIndexSegmentCount());
 
         // verify index segments discovered.
         for(int i=0; i<nsegments; i++) {
@@ -649,6 +662,9 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         // verify resource manager returns the same index object.
         assertEquals(journal.getIndex(indexName), resourceManager.getIndexOnStore(indexName,
                 0L/* timestamp */, journal));
+
+        // an index segment was found.
+        assertEquals(1, resourceManager.getIndexSegmentCount());
 
         // verify index segment discovered.
         IndexSegmentFileStore segStore = (IndexSegmentFileStore) resourceManager

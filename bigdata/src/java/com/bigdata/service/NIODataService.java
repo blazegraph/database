@@ -305,14 +305,14 @@ public class NIODataService implements IServiceShutdown {
 //            if( data == null ) {
 //                
 //                /*
-//                 * FIXME Resolve the object against the database.
+//                 * @todo Resolve the object against the database.
 //                 */
 //                throw new UnsupportedOperationException("Read from database");
 //                
 //            }
 //            
 //            /*
-//             * FIXME Write the data onto a socket to get it back to the client.
+//             * @todo Write the data onto a socket to get it back to the client.
 //             */
 //
 //        }

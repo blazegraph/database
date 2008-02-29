@@ -26,15 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 22, 2008
  */
 
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.io.File;
 import java.util.Properties;
 
-import com.bigdata.journal.ResourceManager.Options;
-import com.bigdata.util.MillisecondTimestampFactory;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.resources.ResourceManager.Options;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -63,7 +62,7 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
         log.info("Setting " + Options.DATA_DIR + "=" + dataDir);
         
         properties.setProperty(
-                com.bigdata.journal.ResourceManager.Options.DATA_DIR, dataDir
+                com.bigdata.resources.ResourceManager.Options.DATA_DIR, dataDir
                         .toString());
         
         return properties;

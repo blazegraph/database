@@ -322,25 +322,6 @@ public abstract class AbstractTask implements Callable<Object> {
             throw new NullPointerException();
 
         }
-
-//        if (startTime < ITx.UNISOLATED && !readOnly) {
-//
-//            throw new IllegalArgumentException(
-//                    "Historical reads must be flagged as read-only");
-//
-//        }
-//
-//        if (startTime == ITx.UNISOLATED && readOnly) {
-//
-//            /*
-//             * Note: For this you generally want to use ITx.READ_COMMITTED
-//             * instead.
-//             */
-//            
-//            throw new IllegalArgumentException(
-//                    "Unisolated operations may not be flagged as read-only.");
-//            
-//        }
         
         if (resource == null) {
 
@@ -367,8 +348,6 @@ public abstract class AbstractTask implements Callable<Object> {
         this.startTime = startTime;
 
         this.isTransaction = startTime > ITx.UNISOLATED;
-
-//        this.readOnly = readOnly;
         
         this.resource = resource;
 

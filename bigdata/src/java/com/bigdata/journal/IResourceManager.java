@@ -39,6 +39,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 
@@ -90,7 +91,7 @@ public interface IResourceManager {
     /**
      * The directory for managed resources.
      * 
-     * @see com.bigdata.journal.ResourceManager.Options#DATA_DIR
+     * @see com.bigdata.resources.ResourceManager.Options#DATA_DIR
      */
     public File getDataDir();
     
@@ -128,6 +129,9 @@ public interface IResourceManager {
      * of an index partition. The {@link AbstractBTree}s are ordered from the
      * most recent to the oldest and together comprise a coherent view of an
      * index partition.
+     * <p>
+     * Note: Index sources loaded from a historical timestamp (vs the live
+     * unisolated index view) will always be read-only.
      * 
      * @param name
      *            The name of the index.
@@ -146,7 +150,10 @@ public interface IResourceManager {
     public AbstractBTree[] getIndexSources(String name, long timestamp);
 
     /**
-     * Return the named index as of the specified timestamp.
+     * Return a view of the named index as of the specified timestamp.
+     * <p>
+     * Note: An index view loaded from a historical timestamp (vs the live
+     * unisolated index view) will always be read-only.
      * 
      * @param name
      *            The index name.
@@ -232,37 +239,22 @@ public interface IResourceManager {
     public void destroyAllResources();
 
     /**
-     * Deletes all resources having no data for the specified timestamp. This
-     * method is used by the {@link ITransactionManager} to request the release
-     * of old resources as the last possible historical commit state which can
-     * be read gets slide forward in time. The resource manager MAY ignore or
-     * queue the request if it would conflict with read locks required for any
-     * other reasons, e.g., the resource manager's own resource retention
-     * policy. Ignoring some requests generally has little impact since the
-     * transaction manager can be relied on to notify the resource manager of a
-     * new "delete" point as more transactions commit.
+     * Notify the {@link IResourceManager} that resources having no data for the
+     * specified <i>releaseTime</i> MAY be released.
      * <p>
-     * Note: The ability to read from a historical commit point requires the
-     * existence of the journals back until the one covering that historical
-     * commit point. This is because the distinct historical commit points for
-     * the indices are ONLY defined on the journals. The index segments carry
-     * forward the commit state of a specific index as of the commitTime of the
-     * index from which the segment was built. This means that you can
-     * substitute the index segment for the historical index state on older
-     * journals, but the index segment carries forward only a single commit
-     * state for the index so it can not be used to read from arbitrary
-     * historical commit points.
+     * This method is used by the {@link ITransactionManager} to notify the
+     * {@link IResourceManager} as the earliest running transactions commit and
+     * the maximum read-behind point is advanced.
      * 
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @todo the precise semantics of this method have not been nailed down yet
-     *       as the coordination between the resource manager and the
-     *       transaction manager has not been worked out in detail. One of the
-     *       issues is how to impose a resource release policy when distributed
-     *       transactions are not in use.
+     * @param releaseTime
+     *            A historical timestamp, typically a transaction identifier
+     *            that has completed and whose resources may now be reclaimed.
+     *            Resources whose lastCommitTime is LTE this timestamp MAY be
+     *            released (deleted) by the resource manager. Note that the
+     *            createTime of an {@link IndexSegmentFileStore} is equivalent
+     *            to its lastCommitTime.
      */
-    public void releaseOldResources(long timestamp);
+    public void setReleaseTime(long releaseTime);
     
     /**
      * Return the file on which a new {@link IndexSegment} should be written.

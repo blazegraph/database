@@ -330,7 +330,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * empty {@link Checkpoint} record containing the address of the
      * {@link IndexMetadata} for the index. Thereafter this reference is
      * maintained as the {@link Checkpoint} record last written by
-     * {@link #checkpoint()} or read by {@link #load(IRawStore, long)}.
+     * {@link #writeCheckpoint()} or read by {@link #load(IRawStore, long)}.
      */
     protected Checkpoint checkpoint = null;
     
@@ -656,7 +656,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      *       I have not yet seen a situation where that was more interesting
      *       than the address of the written {@link Checkpoint} record.
      */
-    final public long checkpoint() {
+    final public long writeCheckpoint() {
         
         assertNotReadOnly();
         
@@ -731,7 +731,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
     /**
      * Return true iff changes would be lost unless the B+Tree is flushed to the
-     * backing store using {@link #checkpoint()}.
+     * backing store using {@link #writeCheckpoint()}.
      * <p>
      * Note: In order to avoid needless checkpoints this method will return
      * <code>false</code> if:
@@ -751,7 +751,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * </ul>
      * 
      * @return <code>true</code> true iff changes would be lost unless the
-     *         B+Tree was flushed to the backing store using {@link #checkpoint()}.
+     *         B+Tree was flushed to the backing store using {@link #writeCheckpoint()}.
      */
     public boolean needsCheckpoint() {
 
@@ -774,7 +774,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     /**
      * Method updates the index metadata associated with this {@link BTree}.
      * The new metadata record will be written out as part of the next index
-     * {@link #checkpoint()}.
+     * {@link #writeCheckpoint()}.
      * <p>
      * Note: this method should be used with caution.
      * 
@@ -804,7 +804,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
-     * Handle request for a commit by {@link #checkpoint()}ing dirty nodes and
+     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes and
      * leaves onto the store, writing a new metadata record, and returning the
      * address of that metadata record.
      * <p>
@@ -824,7 +824,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
              * updated.
              */
 
-            return checkpoint();
+            return writeCheckpoint();
 
         }
 

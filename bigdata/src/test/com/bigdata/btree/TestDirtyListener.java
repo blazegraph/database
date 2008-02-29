@@ -91,7 +91,7 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
             listener.assertCounter(0);
 
             // flush the btree onto the store.
-            addr1 = btree.checkpoint();
+            addr1 = btree.writeCheckpoint();
 
             // verify btree is no longer dirty.
             assertFalse("dirty", btree.root.isDirty());
@@ -126,7 +126,7 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
              * Flush to the store.  This makes the tree clean again.
              */
             assertTrue("dirty",btree.root.dirty);
-            addr2 = btree.checkpoint();
+            addr2 = btree.writeCheckpoint();
             assertFalse("dirty",btree.root.dirty);
             
             /*
@@ -200,7 +200,7 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
             /*
              * Flush to the store making the tree clean again.
              */
-            addr3 = btree.checkpoint();
+            addr3 = btree.writeCheckpoint();
             
         }
 

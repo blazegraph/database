@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * A custom {@link ThreadPoolExecutor} used by the {@link ConcurrencyManager} to
@@ -71,7 +72,7 @@ import com.bigdata.rawstore.IRawStore;
  * after each unisolated operation that reaches its commit point successfully.
  * This can be acomplished by holding onto the btree reference, or even just the
  * address at which the metadata record for the btree was last written. We use
- * {@link AbstractJournal#name2Addr} for this purpose.
+ * {@link AbstractJournal#getName2Addr()} for this purpose.
  * <p>
  * However, if an unisolated write fails for any reason on a given index then we
  * MUST use the last successful check point for that index. This is handled by

@@ -42,11 +42,11 @@ import java.util.TreeMap;
 import org.CognitiveWeb.util.PropertyUtil;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.journal.ResourceManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Test harness for loading randomly generated files into a repository.

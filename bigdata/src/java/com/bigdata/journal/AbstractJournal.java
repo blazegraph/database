@@ -41,13 +41,15 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -58,6 +60,7 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -262,8 +265,36 @@ public abstract class AbstractJournal implements IJournal {
      * <p>
      * Note: access to the "live" {@link Name2Addr} index MUST be bracketed with
      * <code>synchronized({@link #name2Addr})</code>.
+     * 
+     * @see #getName2Addr()
      */
-    protected Name2Addr name2Addr;
+    /*private*/Name2Addr name2Addr; // Note: used by some unit tests.
+    
+    /**
+     * A read-only view of the {@link Name2Addr} object mapping index names to
+     * the last metadata record committed for the named index. The keys are
+     * index names (unicode strings). The values are {@link Entry}s containing
+     * the names and the last known address of the named {@link BTree} on the
+     * {@link Journal}.
+     */
+    public IIndex getName2Addr() {
+
+        final long checkpointAddr = name2Addr.getCheckpoint().getCheckpointAddr();
+        
+        /*
+         * Note: This uses the canonicalizing mapping to get an instance that is
+         * distinct from the live #name2Addr object while not allowing more than
+         * a single such distinct instance to exist for the current name2Addr
+         * object.
+         */ 
+        final BTree btree = getIndex(checkpointAddr);
+        
+        /*
+         * Wrap up in a read-only view since writes MUST NOT be allowed.
+         */
+        return new ReadOnlyIndex(btree);
+        
+    }
 
     /**
      * BTree mapping commit timestamps to the address of the corresponding
@@ -305,7 +336,20 @@ public abstract class AbstractJournal implements IJournal {
      * 
      * @see Options#MAXIMUM_EXTENT
      */
-    protected final long maximumExtent;
+    private final long maximumExtent;
+    
+    /**
+     * The maximum extent before a {@link #commit()} will {@link #overflow()}.
+     * In practice, overflow tries to trigger before this point in order to
+     * avoid extending the journal.
+     * 
+     * @see Options#MAXIMUM_EXTENT
+     */
+    final public long getMaximumExtent() {
+       
+        return maximumExtent;
+        
+    }
 
     /**
      * The default branching factor for indices created using {@link #registerIndex(String)}.
@@ -1498,7 +1542,7 @@ public abstract class AbstractJournal implements IJournal {
          * address, and add the entry to the CommitRecordIndex before we can
          * flush the CommitRecordIndex to the store.
          */
-        final long commitRecordIndexAddr = _commitRecordIndex.checkpoint();
+        final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
 
         /*
          * Force application data to stable storage _before_ we update the root
@@ -1711,18 +1755,23 @@ public abstract class AbstractJournal implements IJournal {
         if (addr == 0L) {
 
             /*
+             * Create btree mapping names to addresses.
+             * 
              * The btree has either never been created or if it had been created
              * then the store was never committed and the btree had since been
              * discarded. In any case we create a new btree now.
              */
 
-            // create btree mapping names to addresses.
             name2Addr = Name2Addr.create(this);
 
         } else {
 
             /*
-             * Reload the btree from its root address.
+             * Reload the btree from its checkpoint address.
+             * 
+             * Note: This is the live view of the B+Tree. In this specific case
+             * we DO NOT use the canonicalizing mapping since we do not want
+             * anyone else to have access to this same instance of the B+Tree.
              */
 
             name2Addr = (Name2Addr) BTree.load(this, addr);
@@ -1813,7 +1862,7 @@ public abstract class AbstractJournal implements IJournal {
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
      */
-    protected BTree getIndex(String name, ICommitRecord commitRecord) {
+    public BTree getIndex(String name, ICommitRecord commitRecord) {
 
         assertOpen();
 
@@ -1827,9 +1876,9 @@ public abstract class AbstractJournal implements IJournal {
          * The address of an historical Name2Addr mapping used to resolve named
          * indices for the historical state associated with this commit record.
          */
-        final long metaAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
+        final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
 
-        if (metaAddr == 0L) {
+        if (checkpointAddr == 0L) {
 
             log.warn("No name2addr entry in this commit record: "
                     + commitRecord);
@@ -1844,7 +1893,7 @@ public abstract class AbstractJournal implements IJournal {
          * Name2Addr objects springing into existance for the same commit
          * record.
          */
-        final Name2Addr name2Addr = (Name2Addr)getIndex(metaAddr);
+        final Name2Addr name2Addr = (Name2Addr)getIndex(checkpointAddr);
         
         /*
          * The address at which the named index was written for that historical
@@ -1919,14 +1968,14 @@ public abstract class AbstractJournal implements IJournal {
             new LRUCache<Long, ICommitter>(20));
     
     /**
-     * A canonicalizing mapping for index objects.
+     * A canonicalizing mapping for {@link BTree}s.
      * 
      * @param addr
-     *            The address of the index object.
+     *            The address of the {@link Checkpoint} record for the {@link BTree}.
      *            
-     * @return The index object.
+     * @return The {@link BTree} loaded from that {@link Checkpoint}.
      */
-    final protected BTree getIndex(long addr) {
+    final public BTree getIndex(long addr) {
         
         synchronized (objectCache) {
 

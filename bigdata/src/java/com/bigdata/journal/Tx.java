@@ -39,6 +39,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * <p>

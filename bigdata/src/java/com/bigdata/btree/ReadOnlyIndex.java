@@ -30,14 +30,18 @@ package com.bigdata.btree;
 import java.util.Iterator;
 
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
 /**
- * A fly-weight wrapper that does not permit write operations and reads
- * through onto an underlying {@link IIndex}.
+ * A fly-weight wrapper that does not permit write operations and reads through
+ * onto an underlying {@link IIndex}.
+ * <p>
+ * Note: use this class sparingly. An index loaded from a historical commit
+ * point will always be read-only.
  * 
- * @deprecated by {@link BTree#setReadOnly(boolean)}
+ * @see {@link IResourceManager#getIndex(String, long)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

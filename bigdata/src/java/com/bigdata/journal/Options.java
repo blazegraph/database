@@ -33,6 +33,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to

@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.journal;
+package com.bigdata.resources;
 
 import java.util.UUID;
 
@@ -31,14 +31,16 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.IJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * BTree mapping {@link IJournal} commit times to {@link IResourceMetadata}
- * records. The keys are the long integers. The values are
- * {@link IResourceMetadata} objects.
+ * {@link BTree} mapping {@link IJournal} commit times to
+ * {@link IResourceMetadata} records. The keys are the long integers. The values
+ * are {@link IResourceMetadata} objects.
  * <p>
  * Note: Access to this object MUST be synchronized.
  * <p>
@@ -77,7 +79,7 @@ public class JournalIndex extends BTree {
      *            The backing store.
      * @param checkpoint
      *            The {@link Checkpoint} record.
-     * @param metadataId
+     * @param metadata
      *            The metadata record for the index.
      */
     public JournalIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
@@ -102,52 +104,6 @@ public class JournalIndex extends BTree {
         return keyBuilder.reset().append(commitTime).getKey();
 
     }
-
-//    /**
-//     * Existence test for an index entry with the specified commit timestamp
-//     * (exact match).
-//     * 
-//     * @param commitTime
-//     *            The commit timestamp.
-//     * 
-//     * @return true iff such an {@link IResourceMetadata} entry exists in the
-//     *         index with that commit timestamp (exact match).
-//     */
-//    synchronized public boolean hasTimestamp(long commitTime) {
-//        
-//        return super.contains(getKey(commitTime));
-//        
-//    }
-//    
-//    /**
-//     * Return the {@link IResourceMetadata} with the given timestamp (exact
-//     * match).
-//     * 
-//     * @param commitTime
-//     *            The commit time.
-//     * 
-//     * @return The {@link IResourceMetadata} record for that timestamp or
-//     *         <code>null</code> iff there is no entry for for that timestamp.
-//     */
-//    synchronized public IResourceMetadata get(long commitTime) {
-//
-//        // exact match index lookup.
-//        final byte[] val = super.lookup(getKey(commitTime));
-//
-//        if (val == null) {
-//
-//            // nothing under that key.
-//            return null;
-//            
-//        }
-//        
-//        // deserialize the entry.
-//        final IResourceMetadata entry = deserializeEntry(new DataInputBuffer(val));
-//
-//        // return entry.
-//        return entry;
-//
-//    }
 
     /**
      * Return the {@link IResourceMetadata} identifying the journal having the
@@ -186,7 +142,8 @@ public class JournalIndex extends BTree {
         /*
          * Retrieve the entry from the index.
          */
-        final IResourceMetadata entry = deserializeEntry( super.valueAt( index ) );
+        final IResourceMetadata entry = (IResourceMetadata) SerializerUtil
+                .deserialize(super.valueAt(index));
 
         return entry;
 
@@ -260,6 +217,8 @@ public class JournalIndex extends BTree {
         if (resourceMetadata == null)
             throw new IllegalArgumentException();
 
+        assert resourceMetadata.isJournal();
+        
         final long createTime = resourceMetadata.getCreateTime();
 
         if (createTime == 0L)
@@ -275,38 +234,7 @@ public class JournalIndex extends BTree {
         }
         
         // add a serialized entry to the persistent index.
-        super.insert(key, serializeEntry(resourceMetadata));
-        
-    }
-    
-    /**
-     * Serialize an index entry.
-     * 
-     * @param entry
-     *            The entry.
-     * 
-     * @return The serialized entry.
-     */
-    protected byte[] serializeEntry(IResourceMetadata entry) {
-
-        if (entry == null)
-            throw new IllegalArgumentException();
-
-        return SerializerUtil.serialize(entry);
-
-    }
-
-    /**
-     * De-serialize an index entry
-     * 
-     * @param is
-     *            The serialized data.
-     * 
-     * @return The entry.
-     */
-    protected IResourceMetadata deserializeEntry(byte[] data ) {
-
-        return (IResourceMetadata) SerializerUtil.deserialize(data);
+        super.insert(key, SerializerUtil.serialize(resourceMetadata));
         
     }
     

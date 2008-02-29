@@ -36,6 +36,7 @@ import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * Abstract base class for {@link IBufferStrategy} implementation.

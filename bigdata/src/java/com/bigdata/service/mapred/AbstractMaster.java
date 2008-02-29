@@ -149,6 +149,13 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * FIXME get working with a distributed federation as well.
  * 
+ * FIXME rework to use local writes for intemediate values, send intermediate
+ * results to result services (unless already local).  Look at options for a
+ * total sort, including in-memory sort of the component intermediate results
+ * or buffering intermediate results into blocks on the map service and then
+ * doing a merged read or merge sort on those blocks either on the map service
+ * or on the reduce service when all blocks are combined into a total order.
+ * 
  * @todo offer option to buffer map outputs across map tasks within the service
  *       to increase the size of write operations and improve performance.
  *       <p>

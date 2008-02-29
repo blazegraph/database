@@ -25,7 +25,7 @@ package com.bigdata.btree;
 
 import java.io.IOException;
 
-import com.bigdata.journal.ResourceManager;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * An index segment is read-only btree corresponding to some key range of a
