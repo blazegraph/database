@@ -168,8 +168,13 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
 
         // run post-processing task.
-        resourceManager.overflowAllowed.compareAndSet(true/*expect*/,false/*set*/);
+
+        assertTrue(resourceManager.overflowAllowed.compareAndSet(
+                true/* expect */, false/* set */));
+
         new PostProcessOldJournalTask(resourceManager, lastCommitTime).call();
+
+        assertTrue(resourceManager.overflowAllowed.get());
         
         // verify that the old index partition is no longer registered.
         assertNull(resourceManager.getIndex(name, ITx.UNISOLATED));
@@ -178,6 +183,9 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
          * Note: If you suspect a problem here you really need to examine the
          * new index partitions as registered on the new journal after the
          * post-processing step.
+         * 
+         * FIXME we could force a join task to rejoin the index partitions
+         * and then verify the result against ground truth.
          */ 
         
     }

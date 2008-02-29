@@ -2,58 +2,70 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IJoinHandler;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
-import com.bigdata.service.IMetadataService;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.DataService;
 
 /**
  * Examine the named indices defined on the journal identified by the
  * <i>lastCommitTime</i> and, for each named index registered on that journal,
- * decides on and executes one of the following actions:
+ * determines which of the following conditions applies and then schedules any
+ * necessary tasks based on that decision:
  * <ul>
- * <li>Nothing (either no data or the data was already copied onto the live
- * journal rather than doing an index segment build).</li>
- * <li>Build a new {@link IndexSegment} for an existing index partition
- * (build).</li>
+ * <li>Build a new {@link IndexSegment} for an existing index partition - this
+ * is essentially a compacting merge (build).</li>
  * <li>Split an index partition into N index partitions (overflow).</li>
  * <li>Join N index partitions into a single index partition (underflow).</li>
- * <li>Move an index partition to another data service (redistribution).</li>
+ * <li>Move an index partition to another data service (redistribution). The
+ * decision here is made on the basis of (a) underutilized nodes elsewhere; and
+ * (b) overutilization of this node.</li>
+ * <li>Nothing. This option is selected when (a) synchronous overflow
+ * processing choose to copy the index entries from the old journal onto the new
+ * journal (this is cheaper when the index has not absorbed many writes); and
+ * (b) the index partition is not identified as the source for a move.</li>
  * </ul>
  * <p>
  * Processing is divided into three stages:
  * <dl>
- * <dt>decision making</dt>
+ * <dt>{@link #chooseTasks()}</dt>
  * <dd>This stage examines the named indices and decides what action (if any)
  * will be applied to each index partition.</dd>
- * <dt>{@link #chooseTasks()}</dt>
+ * <dt>{@link #runTasks()}</dt>
  * <dd>This stage reads on the historical state of the named index partitions,
  * building, splitting, joining, or moving their data as appropriate.</dd>
  * <dt>{@link #atomicUpdates()}</dt>
- * <dd>This stage uses {@link ITx#UNISOLATED} operations on the live journal to
- * make atomic updates to the index partition definitions and to the
- * {@link MetadataIndex} and/or a remote data service where necessary</dd>
+ * <dd>This stage runs tasks using {@link ITx#UNISOLATED} operations on the
+ * live journal to make atomic updates to the index partition definitions and to
+ * the {@link MetadataIndex} and/or a remote data service where necessary</dd>
  * </dl>
  * <p>
  * Note: This task is invoked after an
@@ -155,23 +167,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     private final long lastCommitTime;
 
-    /**
-     * A queue of results that are ready to be integrated into the current view
-     * of index partitions.
-     * 
-     * @todo We could directly submit tasks to the {@link IConcurrencyManager}
-     *       rather than building them up on this queue. However, it seems that
-     *       it might be better to have the views cut over all-at-once from the
-     *       old view definitions to the new view definitions (including on the
-     *       metadata index), in which case gathering up the results first will
-     *       be necessary. It also might give us somewhat better error
-     *       reporting. On the other hand, performance should improve as soon as
-     *       we put the new view definitions into play, so there is a good
-     *       reason to do that eagerly.
-     */
-    private final BlockingQueue<AbstractResult> resultQueue = new LinkedBlockingQueue<AbstractResult>(/*unbounded*/);
+    private IRawStore tmpStore;
     
-    /**
+    /**`
      * 
      * @param resourceManager
      * @param lastCommitTime
@@ -209,121 +207,363 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * @see #atomicUpdates()
      */
-    protected void chooseTasks() throws Exception {
+    protected List<AbstractTask> chooseTasks() throws Exception {
 
-        ResourceManager.log.info("begin: lastCommitTime="+lastCommitTime);
-        
-        int ndone = 0;
-        int nskip = 0;
-        
+        ResourceManager.log.info("begin: lastCommitTime=" + lastCommitTime);
+
         // the old journal.
-        final AbstractJournal oldJournal = resourceManager.getJournal(lastCommitTime);
-        
-        final int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
-        
-        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
-                nindices);
+        final AbstractJournal oldJournal = resourceManager
+                .getJournal(lastCommitTime);
 
-        final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(null,null);
+        // tasks to be created (capacity of the array is estimated).
+        final List<AbstractTask> tasks = new ArrayList<AbstractTask>((int)oldJournal
+                .getName2Addr().rangeCount(null, null));
 
-        while (itr.hasNext()) {
+        /*
+         * Map of the under capacity index partitions for each scale-out index
+         * having index partitions on the journal. Keys are the name of the
+         * scale-out index. The values are B+Trees. There is an entry for each
+         * scale-out index having index partitions on the journal.
+         * 
+         * Each B+Tree is sort of like a metadata index - its keys are the
+         * leftSeparator of the index partition but its values are the
+         * LocalPartitionMetadata records for the index partitions found on the
+         * journal.
+         * 
+         * This map is populated during the scan of the named indices with index
+         * partitions that are "undercapacity"
+         */
+        final Map<String, BTree> undercapacityIndexPartitions = new HashMap<String, BTree>();
+        {
 
-            final ITuple tuple = itr.next();
+            // counters : must sum to ndone as post-condition.
+            int ndone  = 0; // for each named index we process
+            int nskip  = 0; // nothing.
+            int nbuild = 0; // build task.
+            int nsplit = 0; // split task.
+            int njoin  = 0; // join task _candidate_.
 
-            final Entry entry = EntrySerializer.INSTANCE
-                    .deserialize(new DataInputBuffer(tuple.getValue()));
+            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
+                    null, null);
 
-            // the name of an index to consider.
-            final String name = entry.name;
+            while (itr.hasNext()) {
 
-            /*
-             * Check the index segment build threshold. If this threshold is
-             * not met then we presume that the data was already copied onto
-             * the live journal and we DO NOT build an index segment from
-             * the old view.
-             */
-            {
+                final ITuple tuple = itr.next();
+
+                final Entry entry = EntrySerializer.INSTANCE
+                        .deserialize(new DataInputBuffer(tuple.getValue()));
+
+                // the name of an index to consider.
+                final String name = entry.name;
+
+                /*
+                 * Check the index segment build threshold. If this threshold is
+                 * not met then we presume that the data was already copied onto
+                 * the live journal. In this case we DO NOT build an index
+                 * segment from the old view. Likewise, we will NOT choose
+                 * either a split or join for this index partition. However, it
+                 * MAY be nominated for a move based on utilization.
+                 */
+                final boolean didCopy;
+                {
+
+                    // get the B+Tree on the old journal.
+                    final BTree oldBTree = oldJournal.getIndex(entry.addr);
+
+                    final int entryCount = oldBTree.getEntryCount();
+
+                    // @todo write test directly on this fence post!
+                    didCopy = entryCount < resourceManager.indexSegmentBuildThreshold;
+
+                    if (!didCopy) {
+
+                        ResourceManager.log
+                                .warn("Will not build index segment: name="
+                                        + name
+                                        + ", entryCount="
+                                        + entryCount
+                                        + ", threshold="
+                                        + resourceManager.indexSegmentBuildThreshold);
+
+                        nskip++;
+
+                    }
+
+                }
+
+                if (!didCopy) {
+
+                    // historical view of that index at that time.
+                    final IIndex view = resourceManager.getIndexOnStore(name,
+                            lastCommitTime, oldJournal);
+
+                    if (view == null) {
+
+                        throw new AssertionError(
+                                "Index not registered on old journal: " + name
+                                        + ", lastCommitTime=" + lastCommitTime);
+
+                    }
+
+                    // index metadata for that index partition.
+                    final IndexMetadata indexMetadata = view.getIndexMetadata();
+
+                    // handler decides when and where to split an index
+                    // partition.
+                    final ISplitHandler splitHandler = indexMetadata
+                            .getSplitHandler();
+
+                    // handler decides when to join an index partition.
+                    final IJoinHandler joinHandler = indexMetadata
+                            .getJoinHandler();
+
+                    if (splitHandler != null && splitHandler.shouldSplit(view)) {
+
+                        /*
+                         * Do an index split task.
+                         */
+
+                        final AbstractTask task = new SplitIndexPartitionTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime, name);
+
+                        // add to set of tasks to be run.
+                        tasks.add(task);
+
+                        ResourceManager.log.info("index split: "+name);
+                        
+                        nsplit++;
+                        
+                    } else if (joinHandler != null
+                            && joinHandler.shouldJoin(view)) {
+
+                        /*
+                         * Add to the set of index partitions that are
+                         * candidates for join operations.
+                         * 
+                         * Note: If we decide to NOT join this with another
+                         * local partition then we MUST do an index segment
+                         * build in order to release the dependency on the old
+                         * journal. This is handled below when we consider the
+                         * JOIN candidates that were discovered in this loop.
+                         */
+
+                        final String scaleOutIndexName = indexMetadata.getName();
+
+                        BTree tmp = undercapacityIndexPartitions.get(scaleOutIndexName);
+
+                        if (tmp == null) {
+
+                            tmp = BTree.create(tmpStore, new IndexMetadata(UUID
+                                    .randomUUID()));
+
+                            undercapacityIndexPartitions.put(scaleOutIndexName, tmp);
+
+                        }
+
+                        LocalPartitionMetadata pmd = indexMetadata
+                                .getPartitionMetadata();
+
+                        tmp.insert(pmd.getLeftSeparatorKey(), pmd);
+
+                        ResourceManager.log.info("join candidate: "+name);
+                        
+                        njoin++;
+                        
+                    } else {
+
+                        /*
+                         * Just do an index build task.
+                         */
+
+                        // the file to be generated.
+                        final File outFile = resourceManager
+                                .getIndexSegmentFile(indexMetadata);
+
+                        final AbstractTask task = new BuildIndexSegmentTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime, name, outFile);
+
+                        ResourceManager.log.info("index build: "+name);
+                        
+                        // add to set of tasks to be run.
+                        tasks.add(task);
+
+                        nbuild++;
+                        
+                    }
+
+                }
+
+                ndone++;
                 
-                // get the B+Tree on the old journal.
-                final BTree oldBTree = oldJournal.getIndex(entry.addr);
-                
-                final int entryCount = oldBTree.getEntryCount();
-                
-                final boolean willBuildIndexSegment = entryCount >= resourceManager.indexSegmentBuildThreshold;
-                
-                if (!willBuildIndexSegment) {
+            }
 
-                    ResourceManager.log.warn("Will not build index segment: name=" + name
-                            + ", entryCount=" + entryCount + ", threshold="
-                            + resourceManager.indexSegmentBuildThreshold);
+            // verify counters.
+            assert ndone == nskip + nbuild + nsplit + njoin : "ndone=" + ndone
+                    + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
+                    + nsplit + ", njoin=" + njoin;
+
+        }
+
+        /*
+         * Consider the JOIN candidates. If we decide not to join the index
+         * partition and not to move the index partition to another data service
+         * so that it can be joined there then we will add an index build task
+         * so as to release the dependency on the old journal for the current
+         * index state.
+         */
+        {
+
+            Iterator<Map.Entry<String, BTree>> itr = undercapacityIndexPartitions
+                    .entrySet().iterator();
+
+            while(itr.hasNext()) {
+                
+                final Map.Entry<String,BTree> entry = itr.next();
+                
+                final String scaleOutIndexName = entry.getKey();
+                
+                ResourceManager.log.info("Considering join candidates: "+scaleOutIndexName);
+                
+                // keys := leftSeparator; value := LocalPartitionMetadata
+                final BTree tmp = entry.getValue();
+                
+                final ITupleIterator titr = tmp.entryIterator();
+                
+                while(titr.hasNext()) {
                     
-                    nskip++;
+                    ITuple tuple = titr.next();
                     
-                    continue;
+                    LocalPartitionMetadata pmd = (LocalPartitionMetadata) SerializerUtil.deserialize(tuple.getValue());
+
+                    final List<LocalPartitionMetadata> siblings = new ArrayList<LocalPartitionMetadata>();
+                    
+                    siblings.add(pmd);
+                    
+                    ResourceManager.log.info("Looking for siblings: " + pmd);
+                                        
+                    // while BTree also contains the rightSibling.
+                    while(tmp.contains(pmd.getRightSeparatorKey())) {
+                        
+                        // next tuple is the rightSibling.
+                        tuple = titr.next();
+
+                        LocalPartitionMetadata rightSibling = (LocalPartitionMetadata) SerializerUtil
+                                .deserialize(tuple.getValue());
+
+                        // verify that we have the right sibling.
+                        assert BytesUtil.bytesEqual(pmd.getRightSeparatorKey(),
+                                rightSibling.getLeftSeparatorKey());
+                    
+                        // replace with reference to the rightSibling.
+                        pmd = rightSibling;
+                        
+                        ResourceManager.log.info("Found rightSibling: "+pmd);
+                        
+                    }
+
+                    if (siblings.size() > 1) {
+
+                        /*
+                         * Note: when joining it is possible that we will put so
+                         * many siblings together that we trigger an overflow
+                         * (split).
+                         * 
+                         * However, this is quite unlikely if the IJoinHandler
+                         * and the ISplitHandler choose their trigger points so
+                         * as to leave a comfortable gap in the middle in which
+                         * the index can grow or shrink for a while without
+                         * triggering either underflow or overflow handling.
+                         * 
+                         * @todo Nothing enforces the "gap" between overflow and
+                         * underflow points. Right now these are just interfaces
+                         * (ISplitHandler and IJoinHandler) and there is no
+                         * constraint that looks across both interfaces. I would
+                         * suggest that this is best handled at a UI layer, but
+                         * perhaps these interfaces can be merged into a single
+                         * interface and then the implementation object could
+                         * check this constraint.
+                         */
+                        
+                        // names of the index resources that we will read.
+                        final String[] resources = new String[siblings.size()];
+                        
+                        for (int i = 0; i < resources.length; i++) {
+
+                            resources[i] = DataService.getIndexPartitionName(
+                                    scaleOutIndexName, siblings.get(i)
+                                            .getPartitionId());
+                            
+                        }
+                        
+                        // the join task.
+                        final AbstractTask task = new JoinIndexPartitionTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime, resources);
+
+                        // add to set of tasks to be run.
+                        tasks.add(task);
+                        
+                    } else {
+                        
+                        /*
+                         * Do a build since we will not do a join.
+                         * 
+                         * @todo or do a move to another data service where it
+                         * can be joined.
+                         */
+
+                        // name under which the index partition is registered.
+                        final String name = DataService.getIndexPartitionName(
+                                scaleOutIndexName, pmd.getPartitionId());
+                        
+                        // metadata for that index partition.
+                        final IndexMetadata indexMetadata = oldJournal
+                                .getIndex(name).getIndexMetadata();
+                        
+                        // the file to be generated.
+                        final File outFile = resourceManager
+                                .getIndexSegmentFile(indexMetadata);
+
+                        // the build task.
+                        final AbstractTask task = new BuildIndexSegmentTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime,
+                                name,
+                                outFile);
+
+                        // add to set of tasks to be run.
+                        tasks.add(task);
+                        
+                    }
                     
                 }
                 
             }
             
-            // historical view of that index at that time.
-            final IIndex view = resourceManager.getIndexOnStore(name, lastCommitTime, oldJournal );
-
-            if(view == null) {
-                
-                throw new AssertionError(
-                        "Index not registered on old journal: " + name
-                                + ", lastCommitTime=" + lastCommitTime);
-                
-            }
-            
-            // index metadata for that index partition.
-            final IndexMetadata indexMetadata = view.getIndexMetadata();
-
-            // optional object that decides whether and when to split the
-            // index partition.
-            final ISplitHandler splitHandler = indexMetadata
-                    .getSplitHandler();
-
-            final AbstractTask task;
-
-            if (splitHandler != null && splitHandler.shouldSplit(view)) {
-
-                /*
-                 * Do an index split task.
-                 */
-                task = new SplitIndexPartitionTask(resourceManager, resourceManager.getConcurrencyManager(),
-                        lastCommitTime, name);
-
-            } else {
-
-                /*
-                 * Just do an index build task.
-                 */
-                
-                
-                // the file to be generated.
-                final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
-
-                task = new BuildIndexSegmentTask(resourceManager, resourceManager.getConcurrencyManager(),
-                        lastCommitTime, name, outFile);
-
-            }
-
-            // add to set of tasks to be run.
-            tasks.add(task);
-
-            ndone++;
-            
         }
 
-        ResourceManager.log.info("Will process "+ndone+" indices");
+        ResourceManager.log.info("end");
+
+        return tasks;
         
-        assert ndone+nskip == nindices : "ndone="+ndone+", nskip="+nskip+", nindices="+nindices;
+    }
+
+    protected List<AbstractTask> runTasks(List<AbstractTask> inputTasks) throws Exception {
+        
+        ResourceManager.log.info("Will run "+inputTasks.size()+" tasks");
 
         // submit all tasks, awaiting their completion.
         final List<Future<Object>> futures = resourceManager.getConcurrencyManager()
-                .invokeAll(tasks);
+                .invokeAll(inputTasks);
 
+        final List<AbstractTask> updateTasks = new ArrayList<AbstractTask>(inputTasks.size());
+        
         // verify that all tasks completed successfully.
         for (Future<Object> f : futures) {
 
@@ -331,41 +571,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * @todo Is it Ok to trap exception and continue for non-errored
              * source index partitions?
              */
-            final AbstractResult result = (AbstractResult) f.get();
             
-            /*
-             * Add result to the queue of results to be processed.
-             */
-            
-            resultQueue.put(result);
-            
-        }
-        
-        ResourceManager.log.info("end");
-
-    }
-    
-    /**
-     * For each task that was completed, examine the result and create
-     * another task which will cause the live index partition definition to
-     * be either updated (for a build task) or replaced (for an index split
-     * task).
-     * <p>
-     * The {@link IMetadataService} is updated as a post-condition to
-     * reflect the index partition split.
-     * 
-     * @throws Exception
-     */
-    protected void atomicUpdates() throws Exception {
-
-        ResourceManager.log.info("begin");
-        
-        // set of tasks to be run.
-        final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
-
-        while (!resultQueue.isEmpty()) {
-
-            final AbstractResult tmp = resultQueue.take();
+            final AbstractResult tmp = (AbstractResult) f.get();
 
             if (tmp instanceof BuildResult) {
 
@@ -382,7 +589,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         result.segmentMetadata);
 
                 // add to set of tasks to be run.
-                tasks.add(task);
+                updateTasks.add(task);
 
             } else if (tmp instanceof SplitResult) {
 
@@ -401,12 +608,55 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         result.splits,result.buildResults);
 
                 // add to set of tasks to be run.
-                tasks.add(task);
+                updateTasks.add(task);
 
+            } else if(tmp instanceof JoinResult) {
+                
+                final JoinResult result = (JoinResult) tmp;
+                
+                // The array of index names on which we will need an exclusive lock.
+                final String[] names = new String[result.oldnames.length+1];
+                
+                names[0] = result.name;
+                
+                System.arraycopy(result.oldnames, 0, names, 1, result.oldnames.length);
+                
+                // The task to make the atomic updates on the live journal and the metadata index.
+                final AbstractTask task = new UpdateJoinIndexPartition(
+                        resourceManager, resourceManager
+                        .getConcurrencyManager(), names, result);
+
+                // add to set of tasks to be run.
+                updateTasks.add(task);                
+                
+            } else {
+                
+                // FIXME MoveResult
+                throw new UnsupportedOperationException();
+                
             }
 
         }
 
+        ResourceManager.log.info("end - ran " + inputTasks.size()
+                + " tasks, generated " + updateTasks.size() + " update tasks");
+
+        return updateTasks;
+        
+    }
+    
+    /**
+     * Run tasks that will cause the live index partition definition to be
+     * either updated (for a build task) or replaced (for an index split task).
+     * These tasks are also responsible for updating the appropriate
+     * {@link MetadataIndex} as required.
+     * 
+     * @throws Exception
+     */
+    protected void runUpdateTasks(List<AbstractTask> tasks) throws Exception {
+
+        ResourceManager.log.info("begin");
+        
         // submit all tasks, awaiting their completion.
         final List<Future<Object>> futures = resourceManager.getConcurrencyManager()
                 .invokeAll(tasks);
@@ -434,34 +684,30 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
 
-        if(!resultQueue.isEmpty()) {
-            
-            /*
-             * Note: This can happen if the post-processing of the previous
-             * journal terminated abnormally.
-             */
-            
-            ResourceManager.log.warn("Result queue not empty: "+resultQueue.size());
-            
-        }
-        
-        // clear queue as pre-condition.
-        resultQueue.clear();
+        tmpStore = new TemporaryRawStore();
         
         try {
 
-            chooseTasks();
-
+            /*
+             * @todo this stages the tasks which provides parallelism within
+             * each stage but not between the stages - each stage will run as
+             * long as the longest running task in that stage. Consider whether
+             * it would be better to use a finer grained parallelism but we need
+             * to be able to tell when all stages have been completed so that we
+             * can re-enable overflow on the journal.
+             */
             
+            List<AbstractTask> tasks = chooseTasks();
             
-            atomicUpdates();
+            List<AbstractTask> updateTasks = runTasks(tasks);
+            
+            runUpdateTasks(updateTasks);
 
             /*
-             * Note: At this point we have the history as of the
-             * lastCommitTime entirely contained in index segments. Also,
-             * since we constained the resource manager to refuse another
-             * overflow until we have handle the old journal, all new writes
-             * are on the live index.
+             * Note: At this point we have the history as of the lastCommitTime
+             * entirely contained in index segments. Also, since we constained
+             * the resource manager to refuse another overflow until we have
+             * handle the old journal, all new writes are on the live index.
              */
             
             return null;
@@ -475,6 +721,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             }
 
+            if(tmpStore!=null) {
+                
+                tmpStore.closeAndDelete();
+                
+            }
+            
         }
 
     }

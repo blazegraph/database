@@ -26,39 +26,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Feb 29, 2008
  */
 
-package com.bigdata.resources;
+package com.bigdata.btree;
 
-import com.bigdata.btree.IndexMetadata;
+import java.io.Serializable;
 
 /**
- * The result of a {@link JoinIndexPartitionTask}.
+ * Interface for deciding when an index partition should be joined.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JoinResult extends AbstractResult {
+public interface IJoinHandler extends Serializable {
 
-    public final long checkpointAddr;
-    
-    public final String[] oldnames;
-    
     /**
+     * Return <code>true</code> if a cursory examination of an index partition
+     * suggests that it SHOULD be joined with either its left or right sibling.
+     * The basic determination is that the index partition is "undercapacity".
+     * Normally this is decided in terms of the range count of the index
+     * partition.
      * 
-     * @todo javadoc
+     * @param ndx
+     *            An index partition.
      * 
-     * @param name
-     * @param indexMetadata
-     * @param checkpointAddr
-     * @param oldnames
+     * @return <code>true</code> if the index partition should be joined.
      */
-    public JoinResult(String name, IndexMetadata indexMetadata, long checkpointAddr, String[] oldnames) {
-        
-        super(name, indexMetadata);
-
-        this.checkpointAddr = checkpointAddr;
-        
-        this.oldnames = oldnames;
-        
-    }
-
+    public boolean shouldJoin(IIndex ndx);
+    
 }

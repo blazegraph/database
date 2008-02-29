@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.resources;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -334,8 +335,7 @@ public class AbstractResourceManagerTestCase extends
                 throws IOException, InterruptedException, ExecutionException {
 
             log.info("Split index partition: name=" + name + ", oldLocator="
-                    + oldLocator + " into " + newLocators.length
-                    + " partitions");
+                    + oldLocator + " into " + Arrays.toString(newLocators));
 
         }
 
@@ -351,6 +351,15 @@ public class AbstractResourceManagerTestCase extends
         public PartitionLocator find(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
             // TODO Auto-generated method stub
             return null;
+        }
+
+        public void joinIndexPartition(String name,
+                PartitionLocator[] oldLocators, PartitionLocator newLocator)
+                throws IOException, InterruptedException, ExecutionException {
+
+            log.info("Join index partitions: name=" + name + ", oldLocators="
+                    + Arrays.toString(oldLocators) + " into " + newLocator );
+            
         }
         
     }

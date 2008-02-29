@@ -61,7 +61,6 @@ public interface ISplitHandler extends Serializable {
      * @return <code>true</code> if the index partition should be split.
      */
     public boolean shouldSplit(IIndex ndx);
-    
 
     /**
      * Choose a set of splits that completely span the key range of the index

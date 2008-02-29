@@ -227,7 +227,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         return false;
 
     }
-
+    
     /**
      * A sample collected from a key-range scan.
      * 

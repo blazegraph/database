@@ -39,6 +39,7 @@ import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.DefaultJoinHandler;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -239,6 +240,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private double errorRate;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
+    private IJoinHandler joinHandler;
 //    private Object historyPolicy;
 
     /**
@@ -253,15 +255,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
     /**
      * The name associated with the index -or- <code>null</code> iff the index
-     * is is not named (internal indices are generally not named while
-     * application indices are always named).
+     * is not named (internal indices are generally not named while application
+     * indices are always named).
      * <p>
      * Note: When the index is a scale-out index, this is the name of the
      * scale-out index NOT the name under which an index partition is
      * registered.
      * <p>
      * Note: When the index is a metadata index, then this is the name of the
-     * metadata index NOT the name of the managed index.
+     * metadata index itself NOT the name of the managed scale-out index.
      */
     public final String getName() {return name;}
     
@@ -504,6 +506,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
     }
     
+    public IJoinHandler getJoinHandler() {
+
+        return joinHandler;
+        
+    }
+    
+    public void setJoinHandler(IJoinHandler joinHandler) {
+        
+        this.joinHandler = joinHandler;
+        
+    }
+    
     /**
      * De-serialization constructor.
      */
@@ -589,6 +603,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
                 20, // sampleRate
                 1.5, // overCapacityMultiplier
                 .75  // underCapacityMultiplier
+                );
+        
+        this.joinHandler = new DefaultJoinHandler(
+                1 * Bytes.megabyte32 // minmumEntryCount
                 );
         
     }
@@ -753,6 +771,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         splitHandler = (ISplitHandler)in.readObject();
         
+        joinHandler = (IJoinHandler)in.readObject();
+           
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
@@ -802,8 +822,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         out.writeDouble(errorRate);
         
         out.writeObject(overflowHandler);
-        
+
         out.writeObject(splitHandler);
+
+        out.writeObject(joinHandler);
         
     }
 
@@ -981,52 +1003,5 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         }
         
     }
-    
-//    /**
-//     * Create a {@link Checkpoint} for a {@link BTree}.
-//     * <p>
-//     * The caller is responsible for writing the {@link Checkpoint} record onto
-//     * the store.
-//     * <p>
-//     * The class identified by {@link #getCheckpointClassName()} MUST declare a
-//     * public constructor with the following method signature
-//     * 
-//     * <pre>
-//     *   ...( BTree btree )
-//     * </pre>
-//     * 
-//     * @param btree
-//     *            The {@link BTree}.
-//     * 
-//     * @return The {@link Checkpoint}.
-//     */
-//    final public Checkpoint overflowCheckpoint(BTree btree) {
-//        
-//        try {
-//            
-//            Class cl = Class.forName(getCheckpointClassName());
-//            
-//            /*
-//             * Note: A NoSuchMethodException thrown here means that you did not
-//             * declare the required public constructor.
-//             */
-//            
-//            Constructor ctor = cl.getConstructor(new Class[] {
-//                    BTree.class //
-//                    });
-//
-//            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
-//                    btree //
-//                    });
-//            
-//            return checkpoint;
-//            
-//        } catch(Exception ex) {
-//            
-//            throw new RuntimeException(ex);
-//            
-//        }
-//        
-//    }
-    
+        
 }
