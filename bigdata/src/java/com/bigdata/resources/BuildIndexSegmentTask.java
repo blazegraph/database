@@ -7,15 +7,14 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.WriteExecutorService;
 
 /**
- * Task builds an {@link IndexSegment} from the fused view of an index
- * partition as of some historical timestamp. This task is typically applied
- * after an {@link IResourceManager#overflow(boolean, WriteExecutorService)}
- * in order to produce a compact view of the index as of the lastCommitTime
- * on the old journal. Note that the task by itself does not update the
- * definition of the live index, merely builds an {@link IndexSegment}.
+ * Task builds an {@link IndexSegment} from the fused view of an index partition
+ * as of some historical timestamp. This task is typically applied after an
+ * {@link IResourceManager#overflow(boolean, boolean)} in order to produce a
+ * compact view of the index as of the lastCommitTime on the old journal. Note
+ * that the task by itself does not update the definition of the live index,
+ * merely builds an {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -27,6 +26,8 @@ public class BuildIndexSegmentTask extends AbstractTask {
      */
     private final ResourceManager resourceManager;
 
+    final protected long lastCommitTime;
+    
     final protected File outFile;
 
     final protected byte[] fromKey;
@@ -36,7 +37,7 @@ public class BuildIndexSegmentTask extends AbstractTask {
     /**
      * 
      * @param concurrencyManager
-     * @param timestamp
+     * @param lastCommitTime
      *            The lastCommitTime of the journal whose view of the index
      *            you wish to capture in the generated {@link IndexSegment}.
      * @param name
@@ -46,10 +47,10 @@ public class BuildIndexSegmentTask extends AbstractTask {
      *            written.
      */
     public BuildIndexSegmentTask(ResourceManager resourceManager,
-            IConcurrencyManager concurrencyManager, long timestamp,
+            IConcurrencyManager concurrencyManager, long lastCommitTime,
             String name, File outFile) {
 
-        this(resourceManager, concurrencyManager, timestamp, name, outFile,
+        this(resourceManager, concurrencyManager, lastCommitTime, name, outFile,
                 null/* fromKey */, null/* toKey */);
 
     }
@@ -57,7 +58,7 @@ public class BuildIndexSegmentTask extends AbstractTask {
     /**
      * 
      * @param concurrencyManager
-     * @param timestamp
+     * @param lastCommitTime
      *            The lastCommitTime of the journal whose view of the index
      *            you wish to capture in the generated {@link IndexSegment}.
      * @param name
@@ -73,15 +74,17 @@ public class BuildIndexSegmentTask extends AbstractTask {
      *            <code>null</code> there is no upper bound.
      */
     public BuildIndexSegmentTask(ResourceManager resourceManager, IConcurrencyManager concurrencyManager,
-            long timestamp, String name, File outFile, byte[] fromKey, byte[] toKey) {
+            long lastCommitTime, String name, File outFile, byte[] fromKey, byte[] toKey) {
 
-        super(concurrencyManager, timestamp, name);
+        super(concurrencyManager, -lastCommitTime/*historical read*/, name);
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
 
         this.resourceManager = resourceManager;
 
+        this.lastCommitTime = lastCommitTime;
+        
         if (outFile == null)
             throw new IllegalArgumentException();
 
@@ -107,18 +110,11 @@ public class BuildIndexSegmentTask extends AbstractTask {
         final IIndex src = getIndex( name );
         
         /*
-         * This MUST be the timestamp of the commit record from for the
-         * source view. The startTime specified for the task has exactly the
-         * correct semantics since you MUST choose the source view by
-         * choosing the startTime!
-         */
-        final long commitTime = Math.abs( startTime );
-        
-        /*
          * Build the index segment.
          */
         
-        return resourceManager.buildIndexSegment(name, src, outFile, commitTime, fromKey, toKey);
+        return resourceManager.buildIndexSegment(name, src, outFile,
+                lastCommitTime, fromKey, toKey);
 
     }
 

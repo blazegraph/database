@@ -135,9 +135,8 @@ public interface Options {
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * The journal will
-     * {@link IResourceManager#overflow(boolean, WriteExecutorService)} once it
-     * approaches this limit.
+     * The journal will {@link IResourceManager#overflow(boolean, boolean)} once
+     * it approaches this limit.
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */

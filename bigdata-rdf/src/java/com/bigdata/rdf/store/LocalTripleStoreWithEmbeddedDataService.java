@@ -34,13 +34,14 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
+import com.bigdata.service.IMetadataService;
 
 /**
  * A thread-safe variant that supports concurrent data load and query (the
@@ -98,11 +99,23 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
                 Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
         
         /*
+         * Note: The embedded data service does not support scale-out indices.
+         * Use an embedded federation for that.
+         * 
          * @todo the UUID of the data service might be best persisted with the
          * data service in case anything comes to rely on it, but as far as I
          * can tell nothing does or should.
          */
-        dataService = new EmbeddedDataService(UUID.randomUUID(),properties);
+        dataService = new EmbeddedDataService(UUID.randomUUID(),properties) {
+
+            @Override
+            protected IMetadataService getMetadataService() {
+
+                throw new UnsupportedOperationException();
+                
+            }
+            
+        };
 
         log.info("Using embedded data service: "+getFile());
         

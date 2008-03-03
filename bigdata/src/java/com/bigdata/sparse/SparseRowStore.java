@@ -38,14 +38,13 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.journal.Journal;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.sparse.ValueType.AutoIncCounter;
@@ -479,7 +478,7 @@ public class SparseRowStore {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class AtomicRead implements IIndexProcedure, Externalizable {
+    protected static class AtomicRead implements ISimpleIndexProcedure, Externalizable {
 
         /**
          * 

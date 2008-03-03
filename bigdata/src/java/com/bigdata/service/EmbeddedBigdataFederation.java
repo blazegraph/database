@@ -762,7 +762,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
         }
 
-        public IDataService getDataServiceByUUID(UUID dataService) throws IOException {
+        public IDataService getDataService(UUID dataService) throws IOException {
 
             return federation.getDataService(dataService);
             

@@ -40,6 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -585,8 +586,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @return This implementation returns <code>false</code> since it does
      *         NOT open a new journal.
      */
-    public boolean overflow(boolean exclusiveLock,
-            WriteExecutorService writeService) {
+    public boolean overflow(boolean forceOverflow, boolean exclusiveLock) {
 
         return false;
 
@@ -618,6 +618,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public IMetadataService getMetadataService() {
 
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public IDataService getDataService(UUID uuid) {
+        
         throw new UnsupportedOperationException();
         
     }

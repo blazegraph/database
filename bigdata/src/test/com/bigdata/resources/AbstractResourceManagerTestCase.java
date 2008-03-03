@@ -163,6 +163,12 @@ public class AbstractResourceManagerTestCase extends
 
             }
 
+            public IDataService getDataService(UUID dataService) {
+
+                throw new UnsupportedOperationException();
+
+            }
+
             public UUID getDataServiceUUID() {
                 
                 return dataServiceUUID;
@@ -266,7 +272,7 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
-        public IDataService getDataServiceByUUID(UUID serviceUUID) throws IOException {
+        public IDataService getDataService(UUID serviceUUID) throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -340,7 +346,9 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public String getStatistics(String name, long timestamp) throws IOException {
+            
             throw new UnsupportedOperationException();
+            
         }
 
         public PartitionLocator get(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
@@ -359,6 +367,21 @@ public class AbstractResourceManagerTestCase extends
 
             log.info("Join index partitions: name=" + name + ", oldLocators="
                     + Arrays.toString(oldLocators) + " into " + newLocator );
+            
+        }
+
+        public void forceOverflow() throws IOException {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        public void moveIndexPartition(String name,
+                PartitionLocator oldLocator, PartitionLocator newLocator)
+                throws IOException, InterruptedException, ExecutionException {
+
+            log.info("Move index partition: name=" + name + ", oldLocator="
+                    + oldLocator + " to " + newLocator);
             
         }
         

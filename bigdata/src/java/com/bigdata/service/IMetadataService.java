@@ -59,6 +59,8 @@ public interface IMetadataService extends IDataService, Remote {
     
     /**
      * Return the identifier of an under utilized data service.
+     * 
+     * @todo probably will be moved to {@link IStatisticsService} 
      */
     public UUID getUnderUtilizedDataService() throws IOException;
 
@@ -73,7 +75,7 @@ public interface IMetadataService extends IDataService, Remote {
      * 
      * @throws IOException
      */
-    public IDataService getDataServiceByUUID(UUID serviceUUID)
+    public IDataService getDataService(UUID serviceUUID)
             throws IOException;
 
     /**
@@ -113,11 +115,10 @@ public interface IMetadataService extends IDataService, Remote {
     public void splitIndexPartition(String name, PartitionLocator oldLocator,
             PartitionLocator[] newLocators) throws IOException,
             InterruptedException, ExecutionException;
-
     /**
      * Updates the {@link MetadataIndex} for the named scale-out index to
      * reflect the join of N index partitions (which must be siblings) into a
-     * single index partition. The old idnex partition locators are removed from
+     * single index partition. The old index partition locators are removed from
      * the {@link MetadataIndex} and the new index partition locator is inserted
      * in a single atomic operation.
      * 
@@ -134,6 +135,28 @@ public interface IMetadataService extends IDataService, Remote {
      * @throws ExecutionException
      */
     public void joinIndexPartition(String name, PartitionLocator[] oldLocators,
+            PartitionLocator newLocator) throws IOException,
+            InterruptedException, ExecutionException;
+
+    /**
+     * Updates the {@link MetadataIndex} for the named scale-out index to
+     * reflect the move of an index partition from one data service to another.
+     * The old index partition locator is removed from the {@link MetadataIndex}
+     * and the new index partition locator is inserted in a single atomic
+     * operation.
+     * 
+     * @param name
+     *            The name of the scale-out index.
+     * @param oldLocator
+     *            The partition locator for the source index partition.
+     * @param newLocator
+     *            The locator for the target index partition.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void moveIndexPartition(String name, PartitionLocator oldLocator,
             PartitionLocator newLocator) throws IOException,
             InterruptedException, ExecutionException;
     

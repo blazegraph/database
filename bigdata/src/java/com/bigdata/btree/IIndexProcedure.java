@@ -114,6 +114,13 @@ public interface IIndexProcedure extends Serializable {
     public Object apply(IIndex ndx);
 
     /**
+     * Interface for procedures that operation on a single index or index partition
+     */
+    public interface ISimpleIndexProcedure extends IIndexProcedure {
+        
+    }
+    
+    /**
      * Interface for procedures that are mapped across one or more index
      * partitions based on a key range (fromKey, toKey).  The keys are
      * interpreted as variable length unsigned byte[]s.

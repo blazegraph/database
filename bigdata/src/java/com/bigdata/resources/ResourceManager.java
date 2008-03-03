@@ -87,6 +87,7 @@ import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -2321,8 +2322,7 @@ abstract public class ResourceManager implements IResourceManager {
      *       {@link #getConcurrencyManager()} so drop it from the method
      *       signature.
      */
-    public boolean overflow(boolean exclusiveLock,
-            WriteExecutorService writeService) {
+    public boolean overflow(boolean forceOverflow, boolean exclusiveLock) {
 
         if (isTransient) {
 
@@ -2397,6 +2397,9 @@ abstract public class ResourceManager implements IResourceManager {
         
         if(!exclusiveLock) {
 
+            final WriteExecutorService writeService = concurrencyManager
+                    .getWriteService();
+            
             if(!writeService.isPaused()) {
 
                 log.info("Pausing write service");
@@ -2411,6 +2414,37 @@ abstract public class ResourceManager implements IResourceManager {
         
         log.info("Exclusive lock on write service");
 
+        overflowNow();
+        
+        // did overflow.
+        return true;
+
+    }
+
+    /**
+     * Core method for overflow with post-processing.
+     * <p>
+     * Note: This method does not test pre-conditions based on the extent of the
+     * journal.
+     * <p>
+     * Pre-conditions:
+     * <ol>
+     * <li>Exclusive lock on the {@link WriteExecutorService}</li>
+     * <li>{@link #isOverflowAllowed()}</li>
+     * </ol>
+     * <p>
+     * Post-conditions:
+     * <ol>
+     * <li>Overflowed onto new journal</li>
+     * <li>{@link PostProcessOldJournal} task was submitted.</li>
+     * <li>{@link #isOverflowAllowed()} was set <code>false</code> and will
+     * remain <code>false</code> until {@link PostProcessOldJournal}</li>
+     * </ol>
+     */
+    protected void overflowNow() {
+       
+        assert overflowAllowed.get();
+        
         /*
          * We have an exclusive lock and the overflow conditions are satisifed.
          */
@@ -2423,14 +2457,14 @@ abstract public class ResourceManager implements IResourceManager {
         } finally {
             
             // Allow the write service to resume executing tasks on the new journal.
-            writeService.resume();
+            concurrencyManager.getWriteService().resume();
 
             log.info("Resumed write service.");
 
         }
         
         // report event.
-        notifyJournalOverflowEvent(journal);
+        notifyJournalOverflowEvent(getLiveJournal());
 
         /*
          * Start the asynchronous processing of the named indices on the old
@@ -2448,11 +2482,8 @@ abstract public class ResourceManager implements IResourceManager {
          */
         service.submit(new PostProcessOldJournalTask(this, lastCommitTime));
 
-        // did overflow.
-        return true;
-
     }
-
+    
     /**
      * Performs the actual overflow handling once all pre-conditions have been
      * satisified and uses {@link #purgeOldResources()} to delete old resources
@@ -3341,7 +3372,7 @@ abstract public class ResourceManager implements IResourceManager {
      * @param createTime
      *            The timestamp of the view. This is typically the
      *            lastCommitTime of the old journal after an
-     *            {@link #overflow(boolean, WriteExecutorService)} operation.
+     *            {@link #overflow(boolean, boolean)} operation.
      * @param fromKey
      *            The lowest key that will be counted (inclusive). When
      *            <code>null</code> there is no lower bound.
@@ -3423,6 +3454,20 @@ abstract public class ResourceManager implements IResourceManager {
         sb.append("ResourceManager: dataService="+getDataServiceUUID()+", dataDir="+dataDir);
         
         return sb.toString();
+        
+    }
+    
+    public IDataService getDataService(UUID serviceUUID) {
+        
+        try {
+
+            return getMetadataService().getDataService(serviceUUID);
+            
+        } catch (IOException e) {
+            
+            throw new RuntimeException(e);
+            
+        }
         
     }
     

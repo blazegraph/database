@@ -31,7 +31,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
@@ -39,8 +38,10 @@ import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
@@ -48,7 +49,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.rawstore.IBlockStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataServiceIndex;
@@ -1398,7 +1398,7 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AtomicBlockAppendProc implements IIndexProcedure,
+    public static class AtomicBlockAppendProc implements ISimpleIndexProcedure,
             Externalizable {
 
         private static final long serialVersionUID = 1441331704737671258L;
@@ -1857,7 +1857,7 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AtomicBlockWriteProc implements IIndexProcedure,
+    public static class AtomicBlockWriteProc implements ISimpleIndexProcedure,
             Externalizable {
 
         private static final long serialVersionUID = 4982851251684333327L;

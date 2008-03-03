@@ -51,8 +51,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -715,6 +715,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         }
 
         public IMetadataService getMetadataService() {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        public IDataService getDataService(UUID serviceUUID) {
 
             throw new UnsupportedOperationException();
 

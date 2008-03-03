@@ -53,7 +53,8 @@ public class SplitIndexPartitionTask extends AbstractTask {
      * 
      */
     private final ResourceManager resourceManager;
-
+    private final long lastCommitTime;
+    
     /**
      * @param resourceManager 
      * @param concurrencyManager
@@ -70,6 +71,8 @@ public class SplitIndexPartitionTask extends AbstractTask {
             throw new IllegalArgumentException();
 
         this.resourceManager = resourceManager;
+        
+        this.lastCommitTime = lastCommitTime;
 
     }
 
@@ -211,7 +214,7 @@ public class SplitIndexPartitionTask extends AbstractTask {
         
         final IIndex src = getIndex(name);
         
-        final long createTime = Math.abs(startTime);
+//        final long createTime = Math.abs(startTime);
         
         final IndexMetadata indexMetadata = src.getIndexMetadata();
         
@@ -243,8 +246,8 @@ public class SplitIndexPartitionTask extends AbstractTask {
             // the file to be generated.
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
 
-            return resourceManager.buildIndexSegment(name, src, outFile, createTime,
-                    null/* fromKey */, null/*toKey*/);
+            return resourceManager.buildIndexSegment(name, src, outFile,
+                    lastCommitTime, null/* fromKey */, null/* toKey */);
             
         }
         
@@ -272,8 +275,9 @@ public class SplitIndexPartitionTask extends AbstractTask {
             
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
             
-            AbstractTask task = new BuildIndexSegmentTask(
-                    resourceManager, resourceManager.getConcurrencyManager(), -createTime, name, //
+            final AbstractTask task = new BuildIndexSegmentTask(resourceManager,
+                    resourceManager.getConcurrencyManager(), lastCommitTime,
+                    name, //
                     outFile,//
                     pmd.getLeftSeparatorKey(), //
                     pmd.getRightSeparatorKey());
