@@ -29,7 +29,6 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.UUID;
@@ -40,12 +39,13 @@ import java.util.concurrent.RejectedExecutionException;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -134,8 +134,8 @@ import com.bigdata.util.MillisecondTimestampFactory;
  *       a private network, but replicate across gateways is also a common use
  *       case. Do we have to handle it specially?
  */
-abstract public class DataService implements IDataService,
-        IWritePipeline, IResourceTransfer, IServiceShutdown {
+abstract public class DataService implements IDataService, IWritePipeline,
+        IServiceShutdown {
 
     public static final Logger log = Logger.getLogger(DataService.class);
 
@@ -589,6 +589,12 @@ abstract public class DataService implements IDataService,
             final AbstractTask task = new IndexProcedureTask(
                     concurrencyManager, startTime, name, proc);
             
+            if(proc instanceof IDataServiceIndexProcedure) {
+                
+                ((IDataServiceIndexProcedure)proc).setMetadataService( getMetadataService() );
+                
+            }
+            
             // await its completion.
             return concurrencyManager.submit(task).get();
         
@@ -725,16 +731,78 @@ abstract public class DataService implements IDataService,
     }
 
     /**
-     * @todo IResourceTransfer is not implemented. delegate this to the
-     *       {@link IResourceManager}. share code with
-     *       {@link #readBlock(IResourceMetadata, long)} and with media
-     *       replication system, all of which needs efficient socket-level
-     *       streaming IO.
+     * Method sets flag to force overflow processing for the
+     * {@link IResourceManager} and waits until overflow processing is complete.
+     * 
+     * @throws InterruptedException
      */
-    public void sendResource(String filename, InetSocketAddress sink) {
+    public void forceOverflow() throws IOException {
     
-        throw new UnsupportedOperationException();
+        setupLoggingContext();
+
+        try {
+
+            if (!(resourceManager instanceof ResourceManager)) {
+
+                throw new UnsupportedOperationException();
+
+            }
+
+            final WriteExecutorService writeService = concurrencyManager
+                    .getWriteService();
+
+            final ResourceManager resourceManager = (ResourceManager) this.resourceManager;
+
+            if (resourceManager.isOverflowAllowed()) {
+
+                log.info("Setting flag to force overflow processing");
+
+                writeService.forceOverflow.set(true);
+
+            }
+
+            while (writeService.forceOverflow.get()) {
+
+                try {
+
+                    log.info("Waiting for overflow procssing to complete");
+
+                    Thread.sleep(250/* ms */);
+
+                } catch (InterruptedException e) {
+
+                    throw new RuntimeException(e);
+
+                }
+
+            }
+
+            log.info("Overflow processing complete.");
+
+        } finally {
+
+            clearLoggingContext();
+
+        }
         
     }
+    
+    /**
+     * An interface that provides access to the federation.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static interface IDataServiceIndexProcedure extends ISimpleIndexProcedure {
         
+        /**
+         * Invoked before the task is executed to given the procedure a
+         * reference to the {@link IMetadataService} for the federation. Among
+         * other things this can be used to resolve a data service {@link UUID}
+         * to an {@link IDataService}.
+         */
+        public void setMetadataService(IMetadataService metadataService);
+        
+    }
+    
 }

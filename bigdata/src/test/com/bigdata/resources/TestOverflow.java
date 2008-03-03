@@ -41,14 +41,12 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Basic tests for
- * {@link ResourceManager#overflow(boolean, WriteExecutorService)}
+ * Basic tests for {@link ResourceManager#overflow(boolean, boolean)}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

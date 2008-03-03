@@ -64,10 +64,6 @@ import net.jini.lookup.ServiceDiscoveryManager;
  *       periodically so that we can track load and make load balancing
  *       decisions.
  * 
- * @todo note that the service update registration is _persistent_ (assuming
- *       that the service registrar is persistent I suppose) so that will add a
- *       wrinkle to how a bigdata instance must be configured.
- * 
  * @todo should destroy destroy the service instance or the persistent state as
  *       well? Locally, or as replicated?
  * 
@@ -124,11 +120,11 @@ public class MetadataServer extends DataServer {
             ServiceTemplate template = new ServiceTemplate(null,
                     new Class[] { IDataService.class }, null);
 
-            dataServiceLookupCache = serviceDiscoveryManager
-                    .createLookupCache(template,
-                            new DataServiceFilter() /* filter */, dataServiceMap/* ServiceDiscoveryListener */);
-            
-        } catch(RemoteException ex) {
+            dataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
+                    template, new DataServiceFilter() /* filter */,
+                    dataServiceMap/* ServiceDiscoveryListener */);
+
+        } catch (RemoteException ex) {
             
             throw new RuntimeException("Could not setup LookupCache", ex);
             
@@ -291,16 +287,31 @@ public class MetadataServer extends DataServer {
 
             ServiceItem item = server.dataServiceLookupCache.lookup(null);
 
+            // @todo if item is null...
             log.info(item.toString());
 
             return JiniUtil.serviceID2UUID(item.serviceID);
             
         }
 
-        public IDataService getDataServiceByUUID(UUID dataService) throws IOException {
-            
-            return (IDataService) server.dataServiceMap
-                    .getServiceItemByID(JiniUtil.uuid2ServiceID(dataService)).service;
+        public IDataService getDataService(UUID serviceUUID) throws IOException {
+
+            if (serviceUUID == null)
+                throw new IllegalArgumentException();
+
+            final ServiceItem serviceItem = server.dataServiceMap
+                    .getServiceItemByID(JiniUtil.uuid2ServiceID(serviceUUID));
+
+            if (serviceItem == null) {
+
+                log.warn("No such dataService: uuid=" + serviceUUID);
+
+                return null;
+
+            }
+
+            // return the data service.
+            return (IDataService) serviceItem.service;
             
         }
         

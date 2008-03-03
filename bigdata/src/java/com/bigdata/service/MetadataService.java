@@ -252,6 +252,28 @@ abstract public class MetadataService extends DataService implements
         
     }
     
+    public void moveIndexPartition(String name, PartitionLocator oldLocator,
+            PartitionLocator newLocator) throws IOException,
+            InterruptedException, ExecutionException {
+
+        setupLoggingContext();
+
+        try {
+
+            final AbstractTask task = new MoveIndexPartitionTask(
+                    concurrencyManager, getMetadataIndexName(name),
+                    oldLocator, newLocator);
+            
+            concurrencyManager.submit(task).get();
+            
+        } finally {
+            
+            clearLoggingContext();
+            
+        }        
+        
+    }
+    
     /**
      * @todo if if exits already? (and has consistent/inconsistent metadata)?
      */
@@ -500,7 +522,14 @@ abstract public class MetadataService extends DataService implements
         }
 
     }
-    
+
+    /**
+     * Updates the {@link MetadataIndex} to reflect the join of 2 or more index
+     * partitions.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     protected class JoinIndexPartitionTask extends AbstractTask {
 
         protected final PartitionLocator oldLocators[];
@@ -578,6 +607,87 @@ abstract public class MetadataService extends DataService implements
             
             return null;
             
+        }
+
+    }
+
+    /**
+     * Updates the {@link MetadataIndex} to reflect the move of an index
+     * partition.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class MoveIndexPartitionTask extends AbstractTask {
+
+        protected final PartitionLocator oldLocator;
+        protected final PartitionLocator newLocator;
+        
+        /**
+         * @param concurrencyManager
+         * @param resource
+         * @param oldLocator
+         * @param newLocator
+         */
+        protected MoveIndexPartitionTask(
+                IConcurrencyManager concurrencyManager, String resource,
+                PartitionLocator oldLocator,
+                PartitionLocator newLocator) {
+
+            super(concurrencyManager, ITx.UNISOLATED, resource);
+
+            if (oldLocator == null)
+                throw new IllegalArgumentException();
+
+            if (newLocator == null)
+                throw new IllegalArgumentException();
+
+            this.oldLocator = oldLocator;
+            
+            this.newLocator = newLocator;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            log.info("name=" + getOnlyResource() + ", oldLocator=" + oldLocator
+                    + ", newLocator=" + newLocator);
+
+            MetadataIndex mdi = (MetadataIndex) getIndex(getOnlyResource());
+
+            // remove the old locators from the metadata index.
+            PartitionLocator pmd = (PartitionLocator) SerializerUtil
+                    .deserialize(mdi.remove(oldLocator.getLeftSeparatorKey()));
+
+            if (!oldLocator.equals(pmd)) {
+
+                /*
+                 * Sanity check failed - old locator not equal to the locator
+                 * found under that key in the metadata index.
+                 * 
+                 * @todo differences in just the data service failover chain are
+                 * probably not important and might be ignored.
+                 */
+
+                throw new RuntimeException("Expected oldLocator=" + oldLocator
+                        + ", but actual=" + pmd);
+
+            }
+
+            /*
+             * FIXME validate that the newLocator is a perfect fit replacement
+             * for the oldLocators in terms of the key range spanned and that
+             * there are no gaps. Add an API constaint that the oldLocators are
+             * in key order by their leftSeparator key.
+             */
+
+            // add the new locator to the metadata index.
+            mdi.insert(newLocator.getLeftSeparatorKey(), SerializerUtil
+                    .serialize(newLocator));
+
+            return null;
+
         }
 
     }
@@ -729,7 +839,7 @@ abstract public class MetadataService extends DataService implements
 
                 try {
 
-                    IDataService dataService = getDataServiceByUUID(uuid);
+                    IDataService dataService = getDataService(uuid);
 
                     if(dataService==null) {
                         
@@ -958,7 +1068,7 @@ abstract public class MetadataService extends DataService implements
                     
                     final UUID serviceUUID = pmd.getDataServices()[0];
                     
-                    final IDataService dataService = getDataServiceByUUID(serviceUUID);
+                    final IDataService dataService = getDataService(serviceUUID);
                     
                     log.info("Dropping index partition: partitionId="+partitionId+", dataService="+dataService);
                     

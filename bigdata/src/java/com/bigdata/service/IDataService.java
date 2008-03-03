@@ -36,9 +36,11 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.Options;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
@@ -273,6 +275,13 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     
     /**
      * Register a named mutable index on the {@link DataService}.
+     * <p>
+     * Note: In order to register an index partition the
+     * {@link IndexMetadata#getPartitionMetadata() partition metadata} property
+     * MUST be set. The {@link LocalPartitionMetadata#getResources() resources}
+     * property will then be overriden when the index is actually registered so
+     * as to reflect the {@link IResourceMetadata} description of the journal on
+     * which the index actually resides.
      * 
      * @param name
      *            The name that can be used to recover the index. In order to
@@ -481,4 +490,17 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public IBlock readBlock(IResourceMetadata resource, long addr)
             throws IOException;
 
+    /**
+     * Method forces an {@link IResourceManager} for an {@link IDataService} to
+     * initiate overflow processing.
+     * <p>
+     * Note: This method is primarily used by unit tests. Normally there is no
+     * reason to invoke this method directly. Overflow processing is triggered
+     * automatically on a bottom-up basis when the extent of the live journal
+     * nears the {@link Options#MAXIMUM_EXTENT}.
+     * 
+     * @throws IOException
+     */
+    public void forceOverflow() throws IOException;
+    
 }

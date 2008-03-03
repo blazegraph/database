@@ -161,22 +161,37 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
      * from the primary to the secondaries in the same order as they appear in
      * this array.
      * 
-     * @todo data services should be placed into zones that handle replication.
-     *       There should be a distinct zone for the metadata services since
-     *       their data should not be co-mingled with the regular data services.
-     *       The clients should get failover information from the zone not this
-     *       method. Either replace this with the zone identifier and do lookup
-     *       of the data service on the zone or keep this as the primary in the
-     *       zone but have the zone know about failover services for the
-     *       primary. This will make it much easier to move an index partition
-     *       and handle failover since we will not be duplicating the data
-     *       server redundency chain throughout the metadata index.
+     * @todo There is redundency in the partition locators as stored today in
+     *       the metadata index. Instead of storing an array of data service
+     *       UUIDs per index partition, there should be a UUID that identifies a
+     *       logical data service. For each logical data service there are one
+     *       or more physical data service instances. The first instance is the
+     *       primary physical data service, or just the primary data service.
+     *       The remaining instances are failover data services. You can read
+     *       from a failover data service, but you can only write on the primary
+     *       data service.
      *       <p>
-     *       perhaps do lookup of the data service within the zone using that so
-     *       that we do not have to update the partition description at all when
-     *       we move an index partition. Alternative, retire the old partition
-     *       identifier and issue a new one each time the data service chain is
-     *       modified or the index partition is moved.
+     *       When a physical data service fails the replication manager drops it
+     *       from the set of failover services and begins an asynchronous
+     *       process to bring the replication count for that logical data
+     *       service up to the target value.
+     *       <p>
+     *       The clients should get physical data service UUIDs from the
+     *       replication manager, not this method. This method should be
+     *       replaced by <code>getLogicalDataServiceUUID()</code>. Clients
+     *       should discover the replication manager and use it to translate a
+     *       logical data service UUID into one or more phsyical data service
+     *       proxies.
+     *       <p>
+     * @todo The replication manager should hold replication state for
+     *       key-ranges of scale-out indices. A new scale-out index will be
+     *       provisioned with a single key-range on the replication manager and
+     *       a (configured) default replication factor.
+     *       <p>
+     * @todo Data services should be placed into groups for management purposes.
+     *       There should be a distinct group for the metadata services since
+     *       their data should not be co-mingled with the regular data services.
+     *       <p>
      * 
      * @return An array of the data service identifiers.
      */

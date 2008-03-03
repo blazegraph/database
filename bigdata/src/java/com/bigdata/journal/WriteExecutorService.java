@@ -175,7 +175,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
 
     /** true iff nothing new should start. */
-    private boolean isPaused;
+    private boolean pauseCount;
 
     /** Lock used for {@link Condition}s. */
     final private ReentrantLock lock = new ReentrantLock();
@@ -295,7 +295,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     public boolean isPaused() {
         
-        return isPaused;
+        return pauseCount;
         
     }
     
@@ -311,7 +311,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            isPaused = true;
+            pauseCount = true;
             
         } finally {
             
@@ -332,7 +332,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
         
-            isPaused = false;
+            pauseCount = false;
             
             unpaused.signalAll();
             
@@ -363,7 +363,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            while (isPaused)
+            while (pauseCount)
                 unpaused.await();
 
         } catch (InterruptedException ie) {
@@ -958,7 +958,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             log.info("Commit Ok");
 
             // allow overflow processing.
-            resourceManager.overflow(true/* exclusiveLock */, this);
+            if(resourceManager.overflow(forceOverflow.get(), true/* exclusiveLock */)) {
+
+                // clear force flag.
+                forceOverflow.set(false);
+                
+            }
             
             return true;
             
@@ -986,7 +991,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
 
     }
-
+    /**
+     * Flag used to force overflow processing by unit tests. The flag is cleared
+     * once an overflow has occurred.
+     */
+    public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
+    
     /**
      * Commit the store.
      * <p> 

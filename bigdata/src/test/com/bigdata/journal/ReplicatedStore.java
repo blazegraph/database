@@ -46,7 +46,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.service.IResourceTransfer;
 import com.bigdata.service.IWritePipeline;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 

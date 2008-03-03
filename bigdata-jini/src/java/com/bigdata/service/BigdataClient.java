@@ -294,16 +294,6 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         
     }
     
-    /**
-     * Resolve the {@link ServiceID} to an {@link IDataService} using a local
-     * cache.
-     * 
-     * @param serviceUUID
-     *            The identifier for a {@link DataService}.
-     * 
-     * @return The proxy for that {@link DataService} or <code>null</code> iff
-     *         the {@link DataService} could not be discovered.
-     */
     public IDataService getDataService(UUID serviceUUID) {
         
         // Note: allow before connected.

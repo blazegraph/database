@@ -205,7 +205,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
              * from a fused view of all data as of the final commit state of the
              * old journal.
              */
-            final long startTime = -oldJournal.getRootBlockView()
+            final long lastCommitTime = oldJournal.getRootBlockView()
                     .getLastCommitTime();
 
             final File outFile = resourceManager
@@ -213,7 +213,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             // task to run.
             final AbstractTask task = new BuildIndexSegmentTask(
-                    resourceManager, concurrencyManager, startTime, name,
+                    resourceManager, concurrencyManager, lastCommitTime, name,
                     outFile);
 
             // submit task and await result (metadata describing the new index

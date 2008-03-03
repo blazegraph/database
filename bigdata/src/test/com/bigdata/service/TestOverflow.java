@@ -50,8 +50,22 @@ import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
 
 /**
- * Tests for various scenarios where the live journal backing a data service
- * overflows.
+ * Tests for various scenarios that result in overflow of the live journal
+ * backing a data service.
+ * 
+ * @todo This test suite really needs to be re-run against the distributed
+ *       federation as well. This is especially important since the distributed
+ *       federation may have different behavior arising from client-side caching
+ *       of the metadata index and RMI marshalling is only performed when
+ *       running against the distributed federation.
+ *       <p>
+ *       It would be nice to get these tests to run as a proxy test suite, but
+ *       some of them rely on access to the data service objects so we would
+ *       have to provide for that access differently, e.g., by resolving the
+ *       service vs having the object available locally. Likewise, we can't just
+ *       reach in and inspect or tweak the objects running on the data service,
+ *       including the {@link ResourceManager} so the tests would have to be
+ *       re-written around that.
  * 
  * @todo tests scenarios leading to simple overflow processing (index segment
  *       builds), to index partition splits, to index partition moves, etc.
@@ -62,16 +76,6 @@ import com.bigdata.resources.ResourceManager;
  * 
  * FIXME test when index would be copied to the new journal rather than
  * resulting in an index segment build.
- * 
- * FIXME This test suite really needs to be re-run against the distributed
- * federation. This is especially important since the distributed federation
- * will have different behavior arising from client-side caching of the metadata
- * index. It would be nice to get these tests to run as a proxy test suite, but
- * some of them rely on access to the data service objects so we would have to
- * provide for that access differently, e.g., by resolving the service vs having
- * the object available locally. Likewise, we can't just reach in and inspect or
- * tweak the objects running on the data service, including the
- * {@link ResourceManager} so the tests would have to be re-written around that.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

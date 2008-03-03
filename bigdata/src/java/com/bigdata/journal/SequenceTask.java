@@ -116,7 +116,7 @@ public class SequenceTask extends AbstractTask {
 
         final IResourceManager resourceManager = tasks[0].getResourceManager();
         
-        final long startTime = tasks[0].startTime; 
+        final long startTime = tasks[0].timestamp; 
         
         final boolean readOnly = tasks[0].readOnly;
         
@@ -137,7 +137,7 @@ public class SequenceTask extends AbstractTask {
             if (task.getResourceManager() != resourceManager)
                 throw new IllegalArgumentException();
 
-            if (task.startTime != startTime)
+            if (task.timestamp != startTime)
                 throw new IllegalArgumentException();
 
             if (task.readOnly != readOnly)

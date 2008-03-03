@@ -38,6 +38,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
@@ -141,11 +142,11 @@ public abstract class AbstractTask implements Callable<Object> {
     protected final AbstractJournal getJournal() {
 
         final AbstractJournal journal = resourceManager.getJournal(Math
-                .abs(startTime));
+                .abs(timestamp));
 
         if (journal == null) {
 
-            log.warn("No such journal: timestamp=" + startTime);
+            log.warn("No such journal: timestamp=" + timestamp);
             
         }
         
@@ -153,74 +154,13 @@ public abstract class AbstractTask implements Callable<Object> {
         
     }
     
-//    /**
-//     * Find and cache the appropriate commit record for this task.
-//     * 
-//     * @return The commit record -or- <code>null</code> iff there is no commit
-//     *         record corresponding to the {@link #startTime} for this task.
-//     */
-//    protected final ICommitRecord getCommitRecord() {
-//        
-//        if (commitRecord == null) {
-//            
-//            final AbstractJournal journal = getJournal();
-//
-//            if (journal == null) return null;
-//            
-//            if (startTime < ITx.UNISOLATED) {
-//
-//                /*
-//                 * Historical read task.
-//                 */
-//                
-//                commitRecord = journal.getCommitRecord(-startTime);
-//
-//                if (commitRecord == null) {
-//
-//                    log.warn("No commit point less than startTime="
-//                            + (-startTime));
-//
-//                    return null;
-//                    
-//                }
-//
-//                log.info("Found historical committed state"+
-//                        ": startTime=" + startTime +
-//                        ", commitCounter=" + commitRecord.getCommitCounter() +
-//                        ", timestamp="+ commitRecord.getTimestamp()
-//                        );
-//
-//            } else {
-//
-//                /*
-//                 * Read only task. We note the most recent commit record so that
-//                 * we can base all read-only views off of the same consistent
-//                 * historical state (and so that we do not conflict with
-//                 * unisolated writers on the live versions of the indices).
-//                 */
-//
-//                commitRecord = journal.getCommitRecord();
-//
-//                log.info("Found most recent committed state"+
-//                        ": commitCounter="+ commitRecord.getCommitCounter()+
-//                        ", timestamp="+ commitRecord.getTimestamp()
-//                        );
-//
-//            }
-//
-//        }
-//
-//        return commitRecord;
-//        
-//    }
-
     /**
      * The transaction identifier -or- {@link ITx#UNISOLATED} IFF the operation
-     * is NOT isolated by a transaction -or- <code> - startTime </code> to read
+     * is NOT isolated by a transaction -or- <code> - timestamp </code> to read
      * from the most recent commit point not later than the absolute value of
-     * <i>startTime</i>.
+     * <i>timestamp</i>.
      */
-    protected final long startTime;
+    protected final long timestamp;
 
     /**
      * True iff the operation is isolated by a transaction.
@@ -250,15 +190,6 @@ public abstract class AbstractTask implements Callable<Object> {
      * and otherwise <code>null</code>. 
      */
     protected final ITx tx;
-
-//    /**
-//     * We note and save a reference to the most recent commit record when we
-//     * begin a task that is an <strong>unisolated reader</strong>. This allows
-//     * us to ensure that all index views requested by that reader are (a) from
-//     * the same committed state of the store; and (b) do NOT conflict with
-//     * unisolated writers (which are NOT thread-safe).
-//     */
-//    private ICommitRecord commitRecord = null;
     
     /**
      * Cache of resolved named indices.
@@ -278,12 +209,12 @@ public abstract class AbstractTask implements Callable<Object> {
      * 
      * @param concurrencyControl
      *            The object used to control access to the local resources.
-     * @param startTime
+     * @param timestamp
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
-     *            <code> - tx </code> to read from the most recent commit point
-     *            not later than the absolute value of <i>tx</i> (a fully
-     *            isolated read-only transaction using a historical start time).
+     *            <code> - timestamp </code> to read from the most recent commit
+     *            point not later than the absolute value of <i>timestamp</i>
+     *            (a historical read).
      * @param resource
      *            The resource on which the task will operate. E.g., the names
      *            of the index. When the task is an unisolated write task an
@@ -291,9 +222,9 @@ public abstract class AbstractTask implements Callable<Object> {
      *            task will NOT run until it has obtained that lock.
      */
     protected AbstractTask(IConcurrencyManager concurrencyManager,
-            long startTime, String resource) {
+            long timestamp, String resource) {
 
-        this(concurrencyManager, startTime, new String[] { resource });
+        this(concurrencyManager, timestamp, new String[] { resource });
         
     }
     
@@ -345,7 +276,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         this.resourceManager = concurrencyManager.getResourceManager();
         
-        this.startTime = startTime;
+        this.timestamp = startTime;
 
         this.isTransaction = startTime > ITx.UNISOLATED;
         
@@ -514,6 +445,37 @@ public abstract class AbstractTask implements Callable<Object> {
     abstract protected Object doTask() throws Exception;
 
     /**
+     * Adds the following fields to the {@link MDC} logging context:
+     * <dl>
+     * <dt>timestamp</dt>
+     * <dd>The {@link #timestamp} specified to the ctor.</dd>
+     * <dt>resources</dt>
+     * <dd>The named resource(s) specified to the ctor.</dd>
+     * </dl>
+     */
+    protected void setupLoggingContext() {
+
+        // Add to the logging context for the current thread.
+            
+        MDC.put("timestamp", ""+timestamp);
+        
+        MDC.put("resources", Arrays.toString(resource));
+        
+    }
+
+    /**
+     * Clear fields set by {@link #setupLoggingContext()} from the {@link MDC}
+     * logging context.
+     */
+    protected void clearLoggingContext() {
+        
+        MDC.remove("timestamp");
+
+        MDC.remove("resources");
+        
+    }
+
+    /**
      * Delegates the task behavior to {@link #doTask()}.
      * <p>
      * For an unisolated operation, this method provides safe commit iff the
@@ -554,7 +516,7 @@ public abstract class AbstractTask implements Callable<Object> {
             
             if (isTransaction) {
 
-                log.info("Running isolated operation: tx="+startTime);
+                log.info("Running isolated operation: tx="+timestamp);
                 
                 if(tx.isReadOnly()) {
 
@@ -594,7 +556,7 @@ public abstract class AbstractTask implements Callable<Object> {
                     
                     indexCache.clear();
                 
-                    log.info("Reader is done: startTime="+startTime);
+                    log.info("Reader is done: startTime="+timestamp);
                     
                 }
 
@@ -605,7 +567,7 @@ public abstract class AbstractTask implements Callable<Object> {
                  * the lock manager for the unisolated indices.
                  */
 
-                assert startTime == ITx.UNISOLATED;
+                assert timestamp == ITx.UNISOLATED;
                 
                 return doUnisolatedReadWriteTask();
                 
@@ -948,11 +910,11 @@ public abstract class AbstractTask implements Callable<Object> {
         // validate that this is a declared index.
         assertResource(name);
         
-        final IIndex tmp = resourceManager.getIndex(name, startTime);
+        final IIndex tmp = resourceManager.getIndex(name, timestamp);
         
         if (tmp == null) {
 
-            throw new NoSuchIndexException(name + ", timestamp=" + startTime);
+            throw new NoSuchIndexException(name + ", timestamp=" + timestamp);
 
         }
         

@@ -206,29 +206,32 @@ public interface IResourceManager {
     public String getStatistics();
     
     /**
-     * Creates a new journal migrate the named indices to the new journal.
-     * Typically this involves updating the view of the named indices such that
-     * they read from a fused view of an empty index on the new journal and the
-     * last committed state of the index on the old journal.
+     * Overflow processing creates a new journal, migrates the named indices on
+     * the current journal the new journal, and continues operations on the new
+     * journal. Typically this involves updating the view of the named indices
+     * such that they read from a fused view of an empty index on the new
+     * journal and the last committed state of the index on the old journal.
      * <p>
      * Note: When this method returns <code>true</code> journal references
      * MUST NOT be presumed to survive this method. In particular, the old
      * journal MAY be closed out by this method and marked as read-only
      * henceforth.
      * 
+     * @param forceOverflow
+     *            <code>true</code> iff the {@link Options#MAXIMUM_EXTENT}
+     *            pre-condition should be ignored (used to trigger overflow
+     *            without regard to the actual extent on the journal).
      * @param exclusiveLock
      *            <code>true</code> iff the current thread has an exclusive
-     *            lock on the journal.
-     * 
-     * @param writeService
-     *            The service on which {@link ITx#UNISOLATED} tasks are executed
-     *            and which is responsible for handling commits.
+     *            lock on the journal (overflow processing WILL NOT occur until
+     *            the {@link WriteExecutorService} invokes this method with
+     *            <code>exclusiveLock := true</code>).
      * 
      * @return true iff the journal was replaced by a new journal.
      * 
      * @see #getLiveJournal()
      */
-    public boolean overflow(boolean exclusiveLock,WriteExecutorService writeService);
+    public boolean overflow(boolean forceOverflow, boolean exclusiveLock);
     
     /**
      * Deletes all resources.
@@ -273,6 +276,18 @@ public interface IResourceManager {
      * moved, etc.
      */
     public IMetadataService getMetadataService();
+    
+    /**
+     * Return the {@link IDataService} identified by the given service
+     * {@link UUID}.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     *            
+     * @return That {@link IDataService} -or- <code>null</code> if the
+     *         {@link UUID} does not identify an {@link IDataService}.
+     */
+    public IDataService getDataService(UUID serviceUUID);
     
     /**
      * Return the {@link UUID} of the {@link IDataService} whose resources are

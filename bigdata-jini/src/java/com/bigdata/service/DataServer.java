@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -35,9 +36,15 @@ import java.util.Properties;
 import java.util.UUID;
 
 import net.jini.config.Configuration;
+import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceTemplate;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
+import net.jini.lease.LeaseRenewalManager;
+import net.jini.lookup.LookupCache;
+import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.MDC;
 
@@ -55,19 +62,25 @@ import org.apache.log4j.MDC;
  * @todo identify the minimum set of permissions required to run a
  *       {@link DataServer}.
  * 
- * @todo describe and implement the media replication mechanism and service
- *       failover. only the primary service is mutable. service instances for
- *       the same persistent data must determine whether or not another service
- *       is running (basically, can they obtain a lock to operate as the primary
- *       service). secondary service instances may provide redundent read-only
- *       operations from replicated media (or media on a distributed file
- *       system). the failover mechanisms are essentially the same for the data
- *       service and for the derived metadata service.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class DataServer extends AbstractServer {
+
+    private ServiceDiscoveryManager serviceDiscoveryManager = null;
+    private LookupCache metadataServiceLookupCache = null;
+    
+    /**
+     * Provides direct cached lookup of {@link MetadataService}s by their
+     * {@link ServiceID}.
+     */
+    public ServiceCache metadataServiceMap = new ServiceCache();
+
+    protected LookupCache getMetadataServiceLookupCache() {
+        
+        return metadataServiceLookupCache;
+        
+    }
 
     /**
      * Creates a new {@link DataServer}.
@@ -79,6 +92,42 @@ public class DataServer extends AbstractServer {
 
         super(args);
         
+        /*
+         * Setup a helper class that will be notified as services join or leave
+         * the various registrars to which the data server is listening.
+         */
+        try {
+
+            serviceDiscoveryManager = new ServiceDiscoveryManager(getDiscoveryManagement(),
+                    new LeaseRenewalManager());
+            
+        } catch(IOException ex) {
+            
+            throw new RuntimeException(
+                    "Could not initiate service discovery manager", ex);
+            
+        }
+
+        /*
+         * Setup a LookupCache that will be populated with all services that match a
+         * filter. This is used to keep track of all metadata services registered
+         * with any service registrar to which the data server is listening.
+         */
+        try {
+            
+            ServiceTemplate template = new ServiceTemplate(null,
+                    new Class[] { IDataService.class }, null);
+
+            metadataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
+                    template, new MetadataServiceFilter() /* filter */,
+                    metadataServiceMap/* ServiceDiscoveryListener */);
+
+        } catch (RemoteException ex) {
+            
+            throw new RuntimeException("Could not setup LookupCache", ex);
+            
+        }
+             
     }
     
 //    public DataServer(String[] args, LifeCycle lifeCycle) {
@@ -123,7 +172,17 @@ public class DataServer extends AbstractServer {
         return new AdministrableDataService(this,properties);
         
     }
+    
+    protected void terminateServiceManagementThreads() {
+        
+        metadataServiceLookupCache.terminate();
+        
+        serviceDiscoveryManager.terminate();
+        
+        super.terminateServiceManagementThreads();
 
+    }
+    
     /**
      * Extends the behavior to close and delete the journal in use by the data
      * service.
@@ -152,10 +211,10 @@ public class DataServer extends AbstractServer {
     public static class AdministrableDataService extends DataService implements
             RemoteAdministrable, RemoteDestroyAdmin {
         
-        protected AbstractServer server;
+        protected DataServer server;
         private UUID serviceUUID;
         
-        public AdministrableDataService(AbstractServer server,Properties properties) {
+        public AdministrableDataService(DataServer server,Properties properties) {
             
             super(properties);
             
@@ -258,10 +317,10 @@ public class DataServer extends AbstractServer {
 
         public UUID getServiceUUID() {
 
-            if(serviceUUID==null) {
+            if (serviceUUID == null) {
 
                 serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-                
+
             }
 
             return serviceUUID;
@@ -270,8 +329,29 @@ public class DataServer extends AbstractServer {
 
         @Override
         protected IMetadataService getMetadataService() {
-            // TODO Auto-generated method stub
-            return null;
+
+            /*
+             * @todo handle one metadata service. right now registering more
+             * than one will cause problems since different clients might
+             * discover different metadata services and the metadata services
+             * are not arranging themselves into a failover chain or a hash
+             * partitioned service.
+             */
+
+            final ServiceItem item = server.metadataServiceLookupCache
+                    .lookup(null);
+
+            if (item == null) {
+
+                // @todo vs throw execption?
+                log.warn("No metadata service in cache");
+
+                return null;
+                
+            }
+            
+            return (IMetadataService) item.service;
+
         }
 
 // /*
