@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -716,11 +717,11 @@ abstract public class ResourceManager implements IResourceManager {
     private final boolean isTransient;
     
     /**
-     * Set based on {@link Options#INDEX_SEGMENT_BUILD_THRESHOLD}.
+     * Set based on {@link Options#COPY_INDEX_THRESHOLD}.
      * 
      * @todo make this a per-index option on {@link IndexMetadata}?
      */
-    final int indexSegmentBuildThreshold;
+    final int copyIndexThreshold;
     
     /** Release time is zero (0L) until notified otherwise - 0L is ignored. */
     private long releaseTime = 0L;
@@ -799,6 +800,13 @@ abstract public class ResourceManager implements IResourceManager {
     protected final AtomicBoolean overflowAllowed = new AtomicBoolean(true);
 
     /**
+     * #of overflows that have taken place. This counter is incremented each
+     * time the entire overflow operation is complete, including any
+     * post-processing of the old journal.
+     */
+    public final AtomicLong overflowCounter = new AtomicLong(0L);
+    
+    /**
      * <code>true</code> unless an overflow event is currently being
      * processed.
      */
@@ -853,15 +861,17 @@ abstract public class ResourceManager implements IResourceManager {
         public static final String DATA_DIR = "data.dir";
 
         /**
-         * The minimum #of index entries before an {@link IndexSegment} will be
-         * built from an index during overflow processing (default is
-         * <code>5000</code>).
+         * Index partitions having no more than this many entries as reported by a 
+         * range count will be copied to the new journal during overflow processing
+         * rather than building a new index segment from the buffered writes (default
+         * is <code>1000</code>).  When ZERO (0), index partitions will never be copied
+         * during overflow processing.
          * 
-         * @see #DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD
+         * @see #DEFAULT_COPY_INDEX_THRESHOLD
          */
-        public static final String INDEX_SEGMENT_BUILD_THRESHOLD = "indexSegment.buildThreshold";
+        public static final String COPY_INDEX_THRESHOLD = "copyIndexThreshold";
 
-        public static final String DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD = "5000";
+        public static final String DEFAULT_COPY_INDEX_THRESHOLD = "1000";
         
         /**
          * How long you want to hold onto the database history (in milliseconds)
@@ -952,18 +962,18 @@ abstract public class ResourceManager implements IResourceManager {
         // index segment build threshold
         {
 
-            indexSegmentBuildThreshold = Integer.parseInt(properties
-                    .getProperty(Options.INDEX_SEGMENT_BUILD_THRESHOLD,
-                            Options.DEFAULT_INDEX_SEGMENT_BUILD_THRESHOLD));
+            copyIndexThreshold = Integer.parseInt(properties
+                    .getProperty(Options.COPY_INDEX_THRESHOLD,
+                            Options.DEFAULT_COPY_INDEX_THRESHOLD));
 
-            log.info(Options.INDEX_SEGMENT_BUILD_THRESHOLD + "="
-                    + indexSegmentBuildThreshold);
+            log.info(Options.COPY_INDEX_THRESHOLD + "="
+                    + copyIndexThreshold);
 
-            if (indexSegmentBuildThreshold < 1) {
+            if (copyIndexThreshold < 0) {
 
                 throw new RuntimeException(
-                        Options.INDEX_SEGMENT_BUILD_THRESHOLD
-                                + " must be positive");
+                        Options.COPY_INDEX_THRESHOLD
+                                + " must be non-negative");
 
             }
             
@@ -1050,7 +1060,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             if (!dataDir.exists()) {
 
-                log.warn("Creating: " + dataDir);
+                log.info("Creating: " + dataDir);
 
                 if (!dataDir.mkdirs()) {
 
@@ -1063,7 +1073,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             if (!journalsDir.exists()) {
 
-                log.warn("Creating: "+journalsDir);
+                log.info("Creating: "+journalsDir);
 
                 if (!journalsDir.mkdir()) {
 
@@ -1076,7 +1086,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             if (!segmentsDir.exists()) {
 
-                log.warn("Creating: "+segmentsDir);
+                log.info("Creating: "+segmentsDir);
                 
                 if (!segmentsDir.mkdir()) {
 
@@ -1135,7 +1145,7 @@ abstract public class ResourceManager implements IResourceManager {
 
             if (!tmpDir.exists()) {
 
-                log.warn("Creating temp directory: " + tmpDir);
+                log.info("Creating temp directory: " + tmpDir);
 
                 if (!tmpDir.mkdirs()) {
 
@@ -1227,7 +1237,7 @@ abstract public class ResourceManager implements IResourceManager {
                  * changing the existing semantics for CREATE_TEMP_FILE.
                  */
 
-                log.warn("Creating initial journal");
+                log.info("Creating initial journal");
 
                 // unique file name for new journal.
                 if (isTransient) {
@@ -1284,7 +1294,7 @@ abstract public class ResourceManager implements IResourceManager {
 
                 assert file != null : "No file? : resource=" + resource;
 
-                log.warn("Opening most recent journal: " + file + ", resource="
+                log.info("Opening most recent journal: " + file + ", resource="
                         + resource);
 
                 newJournal = false;
@@ -1936,8 +1946,9 @@ abstract public class ResourceManager implements IResourceManager {
 
                 if (commitRecord == null) {
 
-                    log.warn("Resource has no data for timestamp: timestamp="
-                            + ts + ", resource=" + store.getResourceMetadata());
+                    log.warn("Resource has no data for timestamp: name=" + name
+                            + ", timestamp=" + timestamp + ", resource="
+                            + store.getResourceMetadata());
 
                     return null;
                     
@@ -1963,20 +1974,24 @@ abstract public class ResourceManager implements IResourceManager {
 
         } else {
 
-            // use absolute value in case timestamp is negative.
-            final long ts = Math.abs(timestamp);
-
             final IndexSegmentFileStore segStore = ((IndexSegmentFileStore) store);
 
-            if (segStore.getCheckpoint().commitTime < ts) {
+            if (timestamp != ITx.READ_COMMITTED && timestamp != ITx.UNISOLATED) {
+            
+                // use absolute value in case timestamp is negative.
+                final long ts = Math.abs(timestamp);
 
-                log.warn("Resource has no data for timestamp: timestamp=" + ts
-                        + ", store=" + store);
-                
-                return null;
+                if (segStore.getCheckpoint().commitTime > ts) {
+
+                    log.warn("Resource has no data for timestamp: name=" + name
+                            + ", timestamp=" + timestamp + ", store=" + store);
+
+                    return null;
+
+                }
 
             }
-
+            
             // Open an index segment.
             btree = segStore.load();
 
@@ -2079,6 +2094,8 @@ abstract public class ResourceManager implements IResourceManager {
             // live resources for that index partition.
             final IResourceMetadata[] a = pmd.getResources();
 
+            assert a != null : "No resources: name="+name+", pmd="+pmd;
+            
             sources = new AbstractBTree[a.length];
 
             // the most recent is this btree.
@@ -2385,15 +2402,16 @@ abstract public class ResourceManager implements IResourceManager {
                 
             }
 
-            System.err.println("testing overflow: exclusiveLock="
-                    + exclusiveLock + ", nextOffset=" + nextOffset
-                    + ", maximumExtent=" + journal.getMaximumExtent()
-                    + ", willOverflow=" + shouldOverflow + ", dataServiceUUID="
+            System.err.println("testing overflow: forceOverflow="
+                    + forceOverflow + ", exclusiveLock=" + exclusiveLock
+                    + ", nextOffset=" + nextOffset + ", maximumExtent="
+                    + journal.getMaximumExtent() + ", shouldOverflow="
+                    + shouldOverflow + ", dataServiceUUID="
                     + getDataServiceUUID());
                
         }
 
-        if(!shouldOverflow) return false;
+        if(!forceOverflow && !shouldOverflow) return false;
         
         if(!exclusiveLock) {
 
@@ -2479,7 +2497,12 @@ abstract public class ResourceManager implements IResourceManager {
         /*
          * Submit task on private service that will run asynchronously and clear
          * [overflowAllowed] when done.
+         * 
+         * Note: No one ever checks the Future returned by this method. Instead
+         * the PostProcessOldJournalTask logs anything that it throws in its
+         * call() method.
          */
+
         service.submit(new PostProcessOldJournalTask(this, lastCommitTime));
 
     }
@@ -2615,10 +2638,11 @@ abstract public class ResourceManager implements IResourceManager {
                 /*
                  * When true, a new index segment will be build from the view
                  * defined by the old index on the old journal during
-                 * post-overflow processing.  Otherwise we will copy the data
+                 * post-overflow processing. Otherwise we will copy the data
                  * from the old index into the new index
                  */
-                final boolean willBuildIndexSegment = entryCount >= indexSegmentBuildThreshold;
+                final boolean willBuildIndexSegment = copyIndexThreshold == 0
+                        || entryCount >= copyIndexThreshold;
 
                 /*
                  * We will only create a new empty index, taking care to
@@ -2628,7 +2652,11 @@ abstract public class ResourceManager implements IResourceManager {
                  * its location on the new journal.
                  * 
                  * Note: The old index on the old journal is retained as part of
-                 * the view.
+                 * the view. We need it until the new index segment is ready. It
+                 * is also required for historical reads on the new journal
+                 * between its firstCommitTime and the commit point the index
+                 * partition view is updated to include the newly built index
+                 * segment.
                  */
                 if(willBuildIndexSegment) {
                     
@@ -2731,9 +2759,9 @@ abstract public class ResourceManager implements IResourceManager {
                          * the B+Tree on the new journal.
                          */
                         
-                        log.warn("Copying data to new journal: name=" + entry.name
+                        log.info("Copying data to new journal: name=" + entry.name
                                 + ", entryCount=" + entryCount + ", threshold="
-                                + indexSegmentBuildThreshold);
+                                + copyIndexThreshold);
                         
                         newBTree.rangeCopy(oldBTree, null, null);
                      
@@ -2846,21 +2874,21 @@ abstract public class ResourceManager implements IResourceManager {
                 
             }
             
-            log.warn("Removing: "+f);
+            log.info("Removing: "+f);
             
             if(!f.delete()) {
                 
-                log.error("Could not remove: "+f);
+                log.warn("Could not remove: "+f);
                 
             }
             
         }
             
-        log.warn("Removing: " + f);
+        log.info("Removing: " + f);
 
         if (!f.delete()) {
 
-            log.error("Could not remove: " + f);
+            log.warn("Could not remove: " + f);
 
         }
         
@@ -2931,7 +2959,7 @@ abstract public class ResourceManager implements IResourceManager {
             
         }
         
-        log.warn("Effective release time: " + t + ", currentTime="
+        log.info("Effective release time: " + t + ", currentTime="
                 + nextTimestamp());
 
         /*
@@ -3244,7 +3272,7 @@ abstract public class ResourceManager implements IResourceManager {
 
         }
 
-        log.warn("Created file: " + file);
+        log.info("Created file: " + file);
 
         return file;
 
@@ -3388,8 +3416,18 @@ abstract public class ResourceManager implements IResourceManager {
     public BuildResult buildIndexSegment(String name, IIndex src, File outFile,
             long createTime, byte[] fromKey, byte[] toKey) throws IOException {
 
-        assert createTime > 0L;
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        if (src == null)
+            throw new IllegalArgumentException();
+        
+        if (outFile == null)
+            throw new IllegalArgumentException();
 
+        if (createTime <= 0L)
+            throw new IllegalArgumentException();
+        
         // metadata for that index / index partition.
         final IndexMetadata indexMetadata = src.getIndexMetadata();
 
@@ -3397,10 +3435,40 @@ abstract public class ResourceManager implements IResourceManager {
         final int branchingFactor = indexMetadata
                 .getIndexSegmentBranchingFactor();
 
-         // Note: truncates nentries to int.
-        final int nentries = (int) Math.min(src.rangeCount(fromKey, toKey),
-                Integer.MAX_VALUE);
-         
+//         // Note: truncates nentries to int.
+//        final int nentries = (int) Math.min(src.rangeCount(fromKey, toKey),
+//                Integer.MAX_VALUE);
+
+        /*
+         * Use the range iterator to get an exact entry count for the view.
+         * 
+         * Note: We need the exact entry count for the IndexSegmentBuilder. It
+         * requires the exact #of index entries when it creates its plan for
+         * populating the index segment.
+         */
+        final int nentries;
+        {
+
+            final ITupleIterator itr = src
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            0/*no flags*/, null/* filter */);
+
+            int i = 0;
+
+            while(itr.hasNext()) {
+                
+                itr.next();
+                
+                i++;
+                
+            }
+            
+            nentries = i;
+            
+            log.info("There are "+nentries+" non-deleted index entries: "+name);
+            
+        }
+        
          /*
           * Note: Delete markers are ignored so they will NOT be transferred to
           * the new index segment (compacting merge).

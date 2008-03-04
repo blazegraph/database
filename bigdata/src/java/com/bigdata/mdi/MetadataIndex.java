@@ -166,11 +166,29 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
      * partitions. Requests for partition identifiers need to be directed to the
      * root partition (L0) for the {@link MetadataIndex}.
      */
-    public int nextPartitionId() {
+    public int incrementAndGetNextPartitionId() {
         
-        return nextPartitionId++;
+        final int tmp = nextPartitionId++;
+
+        /*
+         * Notify listener that the index is dirty.
+         */
+        
+        fireDirtyEvent();
+        
+        return tmp;
         
     }
+
+//    /**
+//     * Return the current value of the internal restart-safe
+//     * <code>nextPartitionId</code> property.
+//     */
+//    public int getNextPartitionId() {
+//        
+//        return nextPartitionId;
+//        
+//    }
     
     private int nextPartitionId;
     
@@ -228,6 +246,22 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
          */
 
         nextPartitionId = ((MetadataIndexCheckpoint)checkpoint).getNextPartitionId();
+        
+    }
+    
+    /**
+     * Extended to require a checkpoint if {@link #incrementAndGetNextPartitionId()} has been
+     * invoked.
+     */
+    public boolean needsCheckpoint() {
+
+        if(nextPartitionId != ((MetadataIndexCheckpoint)checkpoint).getNextPartitionId()) {
+            
+            return true;
+            
+        }
+        
+        return super.needsCheckpoint();
         
     }
     

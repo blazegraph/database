@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ChunkedLocalRangeIterator;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -48,6 +47,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -367,11 +367,15 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            final IIndex ndx = getIndex(getOnlyResource());
+            final MetadataIndex ndx = (MetadataIndex)getIndex(getOnlyResource());
+
+            final int partitionId = ndx.incrementAndGetNextPartitionId();
             
-            final int counter = (int) ndx.getCounter().incrementAndGet();
+            assert ndx.needsCheckpoint();
             
-            return counter;
+//            final int counter = (int) ndx.getCounter().incrementAndGet();
+            
+            return partitionId;
             
         }
         
@@ -503,6 +507,36 @@ abstract public class MetadataService extends DataService implements
                 
             }
 
+            /*
+             * Sanity check the partition identifers. They must be distinct from
+             * one another and distinct from the old partition identifier.
+             */
+
+            for(int i=0; i<newLocators.length; i++) {
+                
+                PartitionLocator tmp = newLocators[i];
+
+                if (tmp.getPartitionId() == oldLocator.getPartitionId()) {
+
+                    throw new RuntimeException("Same partition identifier: "
+                            + tmp + ", " + oldLocator);
+
+                }
+
+                for (int j = i + 1; j < newLocators.length; j++) {
+
+                    if (tmp.getPartitionId() == newLocators[j].getPartitionId()) {
+
+                        throw new RuntimeException(
+                                "Same partition identifier: " + tmp + ", "
+                                        + newLocators[j]);
+
+                    }
+
+                }
+                    
+            }
+
             for(int i=0; i<newLocators.length; i++) {
                 
                 PartitionLocator locator = newLocators[i];
@@ -567,7 +601,37 @@ abstract public class MetadataService extends DataService implements
                     + ", newLocator=" + newLocator);
             
             MetadataIndex mdi = (MetadataIndex)getIndex(getOnlyResource());
-            
+
+            /*
+             * Sanity check the partition identifers. They must be distinct from
+             * one another and distinct from the old partition identifier.
+             */
+
+            for(int i=0; i<oldLocators.length; i++) {
+                
+                PartitionLocator tmp = oldLocators[i];
+
+                if (tmp.getPartitionId() == newLocator.getPartitionId()) {
+
+                    throw new RuntimeException("Same partition identifier: "
+                            + tmp + ", " + newLocator);
+
+                }
+
+                for (int j = i + 1; j < oldLocators.length; j++) {
+
+                    if (tmp.getPartitionId() == oldLocators[j].getPartitionId()) {
+
+                        throw new RuntimeException(
+                                "Same partition identifier: " + tmp + ", "
+                                        + oldLocators[j]);
+
+                    }
+
+                }
+                    
+            }
+
             // remove the old locators from the metadata index.
             for(int i=0; i<oldLocators.length; i++) {
                 
@@ -698,11 +762,14 @@ abstract public class MetadataService extends DataService implements
      * 
      * @todo this does not attempt to handle errors on data services when
      *       attempting to register the index partitions. it should failover
-     *       rather than just dying. as it stands an error will result in the
-     *       task aborting but any registered index partitions will already
-     *       exist on the various data servers. that will make it impossible to
-     *       re-register the scale-out index until those index partitions have
-     *       been cleaned up, which is a more than insignificant pain!
+     *       rather than just dying.
+     * 
+     * @todo an error during execution can result in the task aborting but any
+     *       registered index partitions will already exist on the various data
+     *       servers. that will make it impossible to re-register the scale-out
+     *       index until those index partitions have been cleaned up, which is a
+     *       more than insignificant pain (they could be cleaned up by a
+     *       bottom-up index rebuild followed by dropping the rebuilt index).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -841,7 +908,7 @@ abstract public class MetadataService extends DataService implements
 
                     IDataService dataService = getDataService(uuid);
 
-                    if(dataService==null) {
+                    if (dataService == null) {
                         
                         throw new IllegalArgumentException(
                                 "Unknown data service: uuid=" + uuid);
@@ -926,7 +993,7 @@ abstract public class MetadataService extends DataService implements
                         : null;
 
                 PartitionLocator pmd = new PartitionLocator(//
-                        mdi.nextPartitionId(),//
+                        mdi.incrementAndGetNextPartitionId(),//
                         new UUID[] { //
                             dataServiceUUIDs[i]
                         },
@@ -951,15 +1018,14 @@ abstract public class MetadataService extends DataService implements
                         leftSeparator,//
                         rightSeparator,//
                         /*
-                         * Note: The resourceMetadata[] is set on the data
-                         * service when the index is actually registered since
-                         * that is the only time when we can guarentee that we
-                         * have access to the live journal. Otherwise the
-                         * journal MAY have overflowed and a different journal
-                         * COULD be the live journal by the time this request is
-                         * processed.
+                         * Note: By setting this to null we are indicating to
+                         * the RegisterIndexTask on the data service that it
+                         * needs to set the resourceMetadata[] when the index is
+                         * actually registered based on the live journal as of
+                         * the when the task actually executes on the data
+                         * service.
                          */
-                         null // resourceMetadata[]
+                         null // Signal to the RegisterIndexTask.
                     ));
                 
                 dataServices[i].registerIndex(DataService

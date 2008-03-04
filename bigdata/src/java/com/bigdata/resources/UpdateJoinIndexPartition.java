@@ -116,7 +116,11 @@ public class UpdateJoinIndexPartition extends AbstractTask {
             assert src != null;
             
             // same scale-out index.
-            assert btree.getIndexMetadata().getIndexUUID() == src.getIndexMetadata().getIndexUUID();
+            if( !btree.getIndexMetadata().getIndexUUID().equals(src.getIndexMetadata().getIndexUUID())) {
+                
+                throw new AssertionError();
+                
+            }
          
             final LocalPartitionMetadata pmd = src.getIndexMetadata().getPartitionMetadata(); 
             

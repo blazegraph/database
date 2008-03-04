@@ -83,8 +83,11 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
 
         }
 
-        if (timestamp != ndx.getTimestamp())
+        if (timestamp != ndx.getTimestamp()) {
+
             throw new IllegalArgumentException();
+        
+        }
 
         this.ndx = ndx;
 

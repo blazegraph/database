@@ -31,6 +31,7 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
@@ -85,11 +86,14 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
      * data services. The federation is then closed and a new instance of the
      * federation is opened and we verify that the metadata and data services
      * were discovered, that the index is still registered, and that the data is
-     * still in the index.
+     * still in the index. We also verify that the next partition number
+     * assigned to the metadata index is strictly ascending after restart.
      * 
-     * @throws IOException 
+     * @throws IOException
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
-    public void test_restartSafe() throws IOException {
+    public void test_restartSafe() throws IOException, InterruptedException, ExecutionException {
 
         /*
          * Verify the #of data services and note the UUID for the data and
@@ -185,6 +189,11 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
             
         }
 
+        // Have an index partition identifier assigned before restart.
+        final int nextPartitionId0 = metadataService.nextPartitionId(name);
+        final int nextPartitionId1 = metadataService.nextPartitionId(name);
+        assertEquals("nextPartitionId",nextPartitionId0+1,nextPartitionId1);
+        
         /*
          * Close down the embedded federation.
          * 
@@ -200,6 +209,8 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
         dataService0 = null;
         
         dataService1 = null;
+        
+        metadataService = null;
 
         /*
          * Open the embedded federation again.
@@ -217,6 +228,8 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
         dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
 
         dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
+
+        metadataService = ((EmbeddedBigdataFederation)fed).getMetadataService();
 
         /*
          * Verify the data and metadata service UUIDs.
@@ -264,6 +277,12 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
 
         assertEquals(indexUUID, fed.getIndex(name,ITx.UNISOLATED)
                 .getIndexMetadata().getIndexUUID());
+        
+        /*
+         * Verify the next partition identifier assigned.
+         */
+        assertEquals("nextPartitionId", nextPartitionId1 + 1, metadataService
+                .nextPartitionId(name));
         
         /*
          * Verify read-back of the data on the index.

@@ -24,13 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
-import com.bigdata.isolation.IsolatedFusedView;
 
 /**
  * <p>
@@ -118,13 +115,16 @@ public class FusedEntryIterator implements ITupleIterator {
         for (int i = 0; i < n; i++) {
 
             /*
+             * Note: We request KEYS since we need to compare the keys in order
+             * to decide which tuple to return next.
+             * 
              * Note: We request DELETED so that we will see deleted entries.
              * This is necessary in order for processing to stop at the first
              * entry for a give key regardless of whether it is deleted or not.
              */
             
             itrs[i] = srcs[i].rangeIterator(fromKey, toKey, capacity, flags
-                    | IRangeQuery.DELETED, filter);
+                    | IRangeQuery.KEYS | IRangeQuery.DELETED, filter);
 
         }
 

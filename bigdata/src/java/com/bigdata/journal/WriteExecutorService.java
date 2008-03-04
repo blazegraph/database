@@ -960,6 +960,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // allow overflow processing.
             if(resourceManager.overflow(forceOverflow.get(), true/* exclusiveLock */)) {
 
+                log.info("Did overflow");
+                
                 // clear force flag.
                 forceOverflow.set(false);
                 
@@ -992,8 +994,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     }
     /**
-     * Flag used to force overflow processing by unit tests. The flag is cleared
-     * once an overflow has occurred.
+     * Flag may be set to force overflow processing during the next group
+     * commit. The flag is cleared once an overflow has occurred.
      */
     public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
     

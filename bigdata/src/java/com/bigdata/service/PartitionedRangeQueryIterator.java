@@ -112,6 +112,13 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private PartitionLocator locator = null;
 
     /**
+     * The last locator for which we received a {@link NoSuchIndexException}.
+     * We note this so that we can avoid an endless retry if the same locator is
+     * reported when we attempt to restart the {@link #locatorItr}.
+     */
+    private PartitionLocator lastStaleLocator = null;
+    
+    /**
      * The #of partitions that have been queried so far. There will be one
      * {@link DataServiceRangeIterator} query issued per partition.
      * 
@@ -229,6 +236,34 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
                  * index partitions are split, joined, or moved.
                  */
 
+                if (lastStaleLocator != null) {
+
+                    if (lastStaleLocator.getPartitionId() == locator
+                            .getPartitionId()) {
+
+                        /*
+                         * This happens if we get a NoSuchIndexException,
+                         * restart the locator scan, and get another
+                         * NoSuchIndexException on the same index partition.
+                         * Since a new index partition identifier is assigned
+                         * every time there is a split/join/move this is a clear
+                         * indication that something is wrong with either the
+                         * locator or the data service. For example, the index
+                         * partition might have been dropped on the data service
+                         * (a no-no to be sure).
+                         */
+
+                        throw new RuntimeException(
+                                "Missing index partition on data service? "
+                                        + locator, ex);
+
+                    }
+                    
+                }
+                
+                // save reference
+                lastStaleLocator = locator;
+                
                 // clear since invalid.
                 locator = null;
                 

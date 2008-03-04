@@ -125,13 +125,11 @@ public interface IIndex extends ISimpleBTree {
      *            The values (optional depending on the procedure).
      * @param ctor
      *            An object that can create instances of the procedure.
-     * @param handler
-     *            An object that is responsible for handling the results
-     *            obtained from the procedure, including both when it is applied
-     *            to a unitary index and when it is applied to multiple index
-     *            partitions of a scale-out index.
+     * @param resultHandler
+     *            When defined, results from each procedure application will be
+     *            reported to this object.
      */
     public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler handler);
+            IIndexProcedureConstructor ctor, IResultHandler resultHandler);
 
 }

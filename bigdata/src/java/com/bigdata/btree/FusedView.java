@@ -474,7 +474,7 @@ public class FusedView implements IIndex {
 
         Object result = proc.apply(this);
         
-        if(handler!=null) {
+        if (handler != null) {
             
             handler.aggregate(result, new Split(null,0,0));
             
@@ -486,9 +486,14 @@ public class FusedView implements IIndex {
     final public void submit(int n, byte[][] keys, byte[][] vals,
             IIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
-        
-        aggregator.aggregate(result, new Split(null,0,n));
+        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(
+                this);
+
+        if (aggregator != null) {
+
+            aggregator.aggregate(result, new Split(null, 0, n));
+
+        }
         
     }
 

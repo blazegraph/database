@@ -6,6 +6,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
@@ -30,47 +31,31 @@ public class UpdateSplitIndexPartition extends AbstractTask {
      */
     private final ResourceManager resourceManager;
 
-    protected final Split[] splits;
-    
-    protected final BuildResult[] buildResults;
+    protected final SplitResult splitResult;
     
     public UpdateSplitIndexPartition(
             ResourceManager resourceManager, IConcurrencyManager concurrencyManager, String resource,
-            Split[] splits, BuildResult[] buildResults) {
+            SplitResult splitResult) {
 
         super(concurrencyManager, ITx.UNISOLATED, resource);
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
+
+        if (splitResult == null)
+            throw new IllegalArgumentException();
         
         this.resourceManager = resourceManager;
 
-        assert splits != null;
-        
-        assert buildResults != null;
-        
-        assert splits.length == buildResults.length;
-        
-        for(int i=0; i<splits.length; i++) {
-            
-            assert splits[i] != null;
-
-            assert splits[i].pmd != null;
-
-            assert splits[i].pmd instanceof LocalPartitionMetadata;
-            
-            assert buildResults[i] != null;
-            
-        }
-        
-        this.splits = splits;
-
-        this.buildResults = buildResults;
+        this.splitResult = splitResult;
         
     }
 
     @Override
     protected Object doTask() throws Exception {
+
+        // The name of the scale-out index.
+        final String scaleOutIndexName = splitResult.indexMetadata.getName();
         
         // the name of the source index.
         final String name = getOnlyResource();
@@ -90,24 +75,28 @@ public class UpdateSplitIndexPartition extends AbstractTask {
          * Locators for the new index partitions.
          */
 
-        final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src.getIndexMetadata().getPartitionMetadata();
+        final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src
+                .getIndexMetadata().getPartitionMetadata();
 
-        final PartitionLocator[] locators = new PartitionLocator[splits.length];
+        final Split[] splits = splitResult.splits;
         
-        for(int i=0; i<splits.length; i++) {
+        final PartitionLocator[] locators = new PartitionLocator[splits.length];
+
+        for (int i = 0; i < splits.length; i++) {
 
             // new metadata record (cloned).
             final IndexMetadata md = src.getIndexMetadata().clone();
-            
-            final LocalPartitionMetadata pmd = (LocalPartitionMetadata)splits[i].pmd;
-            
-            assert pmd.getResources() == null : "Not expecting resources for index segment: "+pmd;
 
+            final LocalPartitionMetadata pmd = (LocalPartitionMetadata) splits[i].pmd;
+
+            assert pmd.getResources() == null : "Not expecting resources for index segment: "
+                    + pmd;
+            
             /*
              * form locator for the new index partition for this split..
              */
             final PartitionLocator locator = new PartitionLocator(
-                    oldpmd.getPartitionId(),//
+                    pmd.getPartitionId(),//
                     /*
                      * This is the set of failover services for this index
                      * partition. The first element of the array is always
@@ -134,7 +123,18 @@ public class UpdateSplitIndexPartition extends AbstractTask {
             /*
              * Update the view definition.
              */
-            md.setPartitionMetadata(pmd);
+            md.setPartitionMetadata(new LocalPartitionMetadata(
+                    pmd.getPartitionId(),//
+                    pmd.getLeftSeparatorKey(),//
+                    pmd.getRightSeparatorKey(),//
+                    new IResourceMetadata[] {//
+                        /*
+                         * Resources are (a) the new btree; and (b) the new
+                         * index segment.
+                         */
+                        journal.getResourceMetadata(),
+                        splitResult.buildResults[i].segmentMetadata
+                    }));
             
             // create new btree.
             final BTree btree = BTree.create(journal, md);
@@ -143,7 +143,7 @@ public class UpdateSplitIndexPartition extends AbstractTask {
             final int partitionId = pmd.getPartitionId();
             
             // name of the new index partition.
-            final String name2 = DataService.getIndexPartitionName(name, partitionId);
+            final String name2 = DataService.getIndexPartitionName(scaleOutIndexName, partitionId);
             
             // register it on the live journal.
             journal.registerIndex(name2, btree);

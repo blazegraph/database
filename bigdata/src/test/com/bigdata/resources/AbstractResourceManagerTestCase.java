@@ -91,8 +91,8 @@ public class AbstractResourceManagerTestCase extends
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
         
-        // Set threshold to minimum value such that any entries will cause an index segment build.
-        properties.setProperty(Options.INDEX_SEGMENT_BUILD_THRESHOLD,"1");
+        // Disable index copy - overflow will always cause an index segment build.
+        properties.setProperty(Options.COPY_INDEX_THRESHOLD,"0");
         
         return properties;
         
@@ -345,6 +345,24 @@ public class AbstractResourceManagerTestCase extends
 
         }
 
+        public void joinIndexPartition(String name,
+                PartitionLocator[] oldLocators, PartitionLocator newLocator)
+                throws IOException, InterruptedException, ExecutionException {
+
+            log.info("Join index partitions: name=" + name + ", oldLocators="
+                    + Arrays.toString(oldLocators) + " into " + newLocator );
+            
+        }
+
+        public void moveIndexPartition(String name,
+                PartitionLocator oldLocator, PartitionLocator newLocator)
+                throws IOException, InterruptedException, ExecutionException {
+
+            log.info("Move index partition: name=" + name + ", oldLocator="
+                    + oldLocator + " to " + newLocator);
+            
+        }
+
         public String getStatistics(String name, long timestamp) throws IOException {
             
             throw new UnsupportedOperationException();
@@ -361,30 +379,28 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
-        public void joinIndexPartition(String name,
-                PartitionLocator[] oldLocators, PartitionLocator newLocator)
-                throws IOException, InterruptedException, ExecutionException {
-
-            log.info("Join index partitions: name=" + name + ", oldLocators="
-                    + Arrays.toString(oldLocators) + " into " + newLocator );
-            
-        }
-
         public void forceOverflow() throws IOException {
             
             throw new UnsupportedOperationException();
             
         }
 
-        public void moveIndexPartition(String name,
-                PartitionLocator oldLocator, PartitionLocator newLocator)
-                throws IOException, InterruptedException, ExecutionException {
+        public long getOverflowCounter() throws IOException {
 
-            log.info("Move index partition: name=" + name + ", oldLocator="
-                    + oldLocator + " to " + newLocator);
+            throw new UnsupportedOperationException();
             
         }
-        
+
+//        public boolean isOverflowAllowed() throws IOException {
+//            // TODO Auto-generated method stub
+//            return false;
+//        }
+//
+//        public long getJournalCreateTime() throws IOException {
+//            // TODO Auto-generated method stub
+//            return 0;
+//        }
+
     }
     
 }

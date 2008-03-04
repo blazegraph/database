@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.util.Arrays;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractTask;
@@ -102,6 +103,8 @@ public class JoinIndexPartitionTask extends AbstractTask {
         
         /*
          * Make a note of the expected left separator for the next partition.
+         * The first time through the loop this is just the left separator for
+         * the 1st index partition that to be joined.
          * 
          * Note: Do this _before_ we clear the partition metadata.
          */
@@ -132,11 +135,12 @@ public class JoinIndexPartitionTask extends AbstractTask {
             final IIndex src = getIndex(name);
 
             /*
-             * validate partition of same index
+             * Validate partition of same index
              */
-            final IndexMetadata md = src.getIndexMetadata();
             
-            if(!newMetadata.getIndexUUID().equals(md.getIndexUUID())) {
+            final IndexMetadata sourceIndexMetadata = src.getIndexMetadata();
+            
+            if(!newMetadata.getIndexUUID().equals(sourceIndexMetadata.getIndexUUID())) {
                 
                 throw new RuntimeException(
                         "Partition for the wrong index? : names="
@@ -144,18 +148,20 @@ public class JoinIndexPartitionTask extends AbstractTask {
                 
             }
             
-            final LocalPartitionMetadata pmd = md.getPartitionMetadata();
+            final LocalPartitionMetadata pmd = sourceIndexMetadata.getPartitionMetadata();
 
             if (pmd == null) {
 
-                throw new RuntimeException("Not an index partition: " + names);
+                throw new RuntimeException("Not an index partition: " + names[i]);
 
             }
 
-            oldpmd[i] = pmd;
-                
-            // validate that this is a rightSibling 
-            if (!leftSeparator.equals(pmd.getLeftSeparatorKey())) {
+            /*
+             * Validate that this is a rightSibling by checking the left
+             * separator of the index partition to be joined against the
+             * expected left separator.
+             */ 
+            if (!BytesUtil.bytesEqual(leftSeparator,pmd.getLeftSeparatorKey())) {
 
                 throw new RuntimeException("Partitions out of order: names="
                         + Arrays.toString(names) + ", have="
@@ -163,6 +169,8 @@ public class JoinIndexPartitionTask extends AbstractTask {
                 
             }
             
+            oldpmd[i] = pmd;
+                        
             /*
              * Copy all data into the new btree.
              */
@@ -170,6 +178,9 @@ public class JoinIndexPartitionTask extends AbstractTask {
             final long ncopied = btree.rangeCopy(src, null, null);
             
             log.info("Copied " + ncopied + " index entries from " + name);
+            
+            // the new left separator.
+            leftSeparator = pmd.getRightSeparatorKey();
             
         }
         
@@ -196,6 +207,7 @@ public class JoinIndexPartitionTask extends AbstractTask {
                 oldpmd[0].getLeftSeparatorKey(),//
                 oldpmd[names.length-1].getRightSeparatorKey(),//
                 new IResourceMetadata[]{//
+                    // Note: the live journal.
                     getJournal().getResourceMetadata()//
                 }
                 ));
@@ -205,7 +217,7 @@ public class JoinIndexPartitionTask extends AbstractTask {
          * available on reload).
          */
         
-        btree.setIndexMetadata(newMetadata);
+        btree.setIndexMetadata(newMetadata.clone());
         
         final long checkpointAddr = btree.writeCheckpoint();
         

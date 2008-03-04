@@ -1000,11 +1000,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * transaction and an unisolated reader both read from the last
              * committed state of the index.
              */
-            
-            log.info("Submitted to the read service");
+
+            log.info("Submitted to the read service: "
+                    + task.getClass().getName() + ", timestamp="
+                    + task.timestamp);
 
             return submitWithDynamicLatency(task, readService);
-            
+
         } else {
 
             if (task.isTransaction) {
@@ -1015,8 +1017,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * required for the isolated indices on the temporary store, but
                  * not for the reads against the historical data.
                  */
-                
-                log.info("Submitted to the transaction service");
+
+                log.info("Submitted to the transaction service: "
+                        + task.getClass().getName() + ", timestamp="
+                        + task.timestamp);
 
                 return submitWithDynamicLatency(task, txWriteService);
 
@@ -1028,8 +1032,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * partial order over the executing tasks such that there is
                  * never more than one task with access to a given live index.
                  */
-                
-                log.info("Submitted to the write service");
+
+                log.info("Submitted to the write service: "
+                        + task.getClass().getName() + ", timestamp="
+                        + task.timestamp);
 
                 return submitWithDynamicLatency(task, writeService);
 

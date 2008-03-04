@@ -14,7 +14,6 @@ import java.util.concurrent.Future;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IJoinHandler;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -371,7 +370,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final int entryCount = oldBTree.getEntryCount();
 
                     // @todo write test directly on this fence post!
-                    didCopy = entryCount < resourceManager.indexSegmentBuildThreshold;
+                    didCopy = resourceManager.copyIndexThreshold != 0
+                            && entryCount < resourceManager.copyIndexThreshold;
 
                     if (didCopy) {
 
@@ -381,7 +381,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                         + ", entryCount="
                                         + entryCount
                                         + ", threshold="
-                                        + resourceManager.indexSegmentBuildThreshold);
+                                        + resourceManager.copyIndexThreshold);
 
                         nskip++;
 
@@ -411,10 +411,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final ISplitHandler splitHandler = indexMetadata
                             .getSplitHandler();
 
-                    // handler decides when to join an index partition.
-                    final IJoinHandler joinHandler = indexMetadata
-                            .getJoinHandler();
-
+                    // index partition metadata
+                    final LocalPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
+                    
                     if (splitHandler != null && splitHandler.shouldSplit(view)) {
 
                         /*
@@ -433,12 +432,18 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                         nsplit++;
 
-                    } else if (joinHandler != null
-                            && joinHandler.shouldJoin(view)) {
+                    } else if (splitHandler != null
+                            && pmd.getRightSeparatorKey() != null
+                            && splitHandler.shouldJoin(view)) {
 
                         /*
                          * Add to the set of index partitions that are
                          * candidates for join operations.
+                         * 
+                         * Note: joins are only considered when the rightSibling
+                         * of an index partition exists. The last index
+                         * partition has [rightSeparatorKey == null] and there
+                         * is no rightSibling for that index partition.
                          * 
                          * Note: If we decide to NOT join this with another
                          * local partition then we MUST do an index segment
@@ -462,9 +467,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                     tmp);
 
                         }
-
-                        final LocalPartitionMetadata pmd = indexMetadata
-                                .getPartitionMetadata();
 
                         tmp.insert(pmd.getLeftSeparatorKey(), pmd);
 
@@ -559,6 +561,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // #of underutilized index partitions for that scale-out index.
                 final int ncandidates = tmp.getEntryCount();
                 
+                assert ncandidates > 0 : "Expecting at least one candidate";
+                
                 final ITupleIterator titr = tmp.entryIterator();
 
                 /*
@@ -572,13 +576,18 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * partition always has an open key range and is far more likely
                  * than any other index partition to recieve new writes.
                  */
+
                 ResourceManager.log
-                        .info("Building rightSiblings query="
+                        .info("Formulating rightSiblings query="
                                 + scaleOutIndexName + ", #underutilized="
                                 + ncandidates);
+                
                 final byte[][] keys = new byte[ncandidates][];
+                
                 final LocalPartitionMetadata[] underUtilizedPartitions = new LocalPartitionMetadata[ncandidates];
+                
                 int i = 0;
+                
                 while (titr.hasNext()) {
 
                     ITuple tuple = titr.next();
@@ -588,6 +597,22 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     underUtilizedPartitions[i] = pmd;
 
+                    /*
+                     * Note: the right separator key is also the key under which
+                     * we will find the rightSibling.
+                     * 
+                     */
+                    
+                    if (pmd.getRightSeparatorKey() == null) {
+
+                        throw new AssertionError(
+                                "The last index partition may not be a join candidate: name="
+                                        + scaleOutIndexName + ", " + pmd);
+
+                    }
+                    
+                    keys[i] = pmd.getRightSeparatorKey();
+                    
                     i++;
                     
                 } // next underutilized index partition.
@@ -596,7 +621,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         .info("Looking for rightSiblings: name=" + scaleOutIndexName
                                 + ", #underutilized=" + ncandidates);
 
-                final BatchLookup op = new BatchLookup(ncandidates, 0, keys);
+                final BatchLookup op = new BatchLookup(ncandidates, 0/*offset*/, keys);
 
                 final ResultBuffer resultBuffer = (ResultBuffer) resourceManager
                         .getMetadataService()
@@ -775,7 +800,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final AbstractTask task = new UpdateSplitIndexPartition(
                         resourceManager, resourceManager
                                 .getConcurrencyManager(), result.name,
-                        result.splits, result.buildResults);
+                        result);
 
                 // add to set of tasks to be run.
                 updateTasks.add(task);
@@ -860,18 +885,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     }
 
+    /**
+     * @return The return value is always null.
+     * 
+     * @throws Exception
+     *             This implementation does not throw anything since there is no
+     *             one to catch the exception. Instead it logs exceptions at a
+     *             high log level.
+     */
     public Object call() throws Exception {
 
-        if (resourceManager.overflowAllowed.get()) {
+        try {
+
+            if (resourceManager.overflowAllowed.get()) {
 
             // overflow must be disabled while we run this task.
-            throw new AssertionError();
+                throw new AssertionError();
 
-        }
+            }
 
-        tmpStore = new TemporaryRawStore();
-
-        try {
+            tmpStore = new TemporaryRawStore();
 
             /*
              * @todo this stages the tasks which provides parallelism within
@@ -894,13 +927,31 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * the resource manager to refuse another overflow until we have
              * handle the old journal, all new writes are on the live index.
              */
+            
+            final long overflowCounter = resourceManager.overflowCounter
+                    .incrementAndGet();
+
+            ResourceManager.log
+                    .info("Done: overflowCounter=" + overflowCounter);
+            
+            return null;
+            
+        } catch(Throwable t) {
+            
+            /*
+             * Note: This task is run from a Thread by the ResourceManager, but
+             * no one checks the Future for the task.  Therefore we need to log
+             * any errors here rather than throwing them out.
+             */
+            
+            ResourceManager.log.error(t/*msg*/, t/*stack trace*/);
 
             return null;
-
+            
         } finally {
 
             // enable overflow again as a post-condition.
-            if (!resourceManager.overflowAllowed.compareAndSet(false, true)) {
+            if (!resourceManager.overflowAllowed.compareAndSet(false/*expect*/, true/*set*/)) {
 
                 throw new AssertionError();
 

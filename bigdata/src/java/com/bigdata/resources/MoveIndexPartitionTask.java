@@ -41,6 +41,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -132,6 +133,22 @@ public class MoveIndexPartitionTask extends AbstractTask {
         final int newPartitionId = resourceManager.getMetadataService()
                 .nextPartitionId(scaleOutIndexName);
 
+        // the partition metadata for the source index partition.
+        final LocalPartitionMetadata oldpmd = newMetadata.getPartitionMetadata();
+        
+        newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
+                newPartitionId,//
+                oldpmd.getLeftSeparatorKey(),//
+                oldpmd.getRightSeparatorKey(),//
+                /*
+                 * Note: This is [null] to indicate that the resource metadata
+                 * needs to be filled in by the target data service when the
+                 * new index partition is registered.
+                 */
+                null
+                ));
+
+        
         // the data service on which we will register the new index partition.
         final IDataService targetDataService = resourceManager
                 .getDataService(targetDataServiceUUID);
@@ -143,7 +160,13 @@ public class MoveIndexPartitionTask extends AbstractTask {
         final String targetIndexName = DataService.getIndexPartitionName(
                 scaleOutIndexName, newPartitionId);
        
-        // register new index partition on the target data service.
+        /*
+         * Register new index partition on the target data service.
+         * 
+         * Note: The correct resource metadata for the new index partition will
+         * be assigned when it is registered on the target data service. See above
+         * and RegisterIndexTask.
+         */
         targetDataService.registerIndex(targetIndexName, newMetadata);
 
         /*

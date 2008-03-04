@@ -39,7 +39,6 @@ import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.DefaultJoinHandler;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -240,7 +239,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private double errorRate;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
-    private IJoinHandler joinHandler;
 //    private Object historyPolicy;
 
     /**
@@ -506,18 +504,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
     }
     
-    public IJoinHandler getJoinHandler() {
-
-        return joinHandler;
-        
-    }
-    
-    public void setJoinHandler(IJoinHandler joinHandler) {
-        
-        this.joinHandler = joinHandler;
-        
-    }
-    
     /**
      * De-serialization constructor.
      */
@@ -599,14 +585,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         this.overflowHandler = null;
         
         this.splitHandler = new DefaultSplitHandler(
+                1 * Bytes.megabyte32, // minmumEntryCount
                 5 * Bytes.megabyte32, // entryCountPerSplit
-                20, // sampleRate
                 1.5, // overCapacityMultiplier
-                .75  // underCapacityMultiplier
-                );
-        
-        this.joinHandler = new DefaultJoinHandler(
-                1 * Bytes.megabyte32 // minmumEntryCount
+                .75, // underCapacityMultiplier
+                20   // sampleRate
                 );
         
     }
@@ -770,8 +753,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         overflowHandler = (IOverflowHandler)in.readObject();
 
         splitHandler = (ISplitHandler)in.readObject();
-        
-        joinHandler = (IJoinHandler)in.readObject();
            
     }
 
@@ -825,8 +806,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         out.writeObject(splitHandler);
 
-        out.writeObject(joinHandler);
-        
     }
 
     /**
