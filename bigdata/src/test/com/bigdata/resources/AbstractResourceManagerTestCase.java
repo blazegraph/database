@@ -272,6 +272,11 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
         }
 
+        public UUID[] getUnderUtilizedDataServices(int limit, UUID exclude) throws IOException {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
         public IDataService getDataService(UUID serviceUUID) throws IOException {
             throw new UnsupportedOperationException();
         }

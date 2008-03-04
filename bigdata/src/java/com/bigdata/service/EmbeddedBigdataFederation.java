@@ -31,10 +31,13 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
@@ -761,6 +764,46 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             return federation.dataService[i].getServiceUUID();
             
         }
+
+        public UUID[] getUnderUtilizedDataServices(int limit, UUID exclude) throws IOException {
+
+            if(limit==0) {
+                
+                limit = federation.ndataServices;
+                
+            } else {
+            
+                limit = Math.min(limit, federation.ndataServices);
+                
+            }
+            
+            final List<UUID> a = new ArrayList<UUID>(limit);
+            
+            for(int i=0; i<federation.ndataServices; i++) {
+                
+                int index = _index.incrementAndGet();
+                
+                UUID uuid = federation.dataService[index % federation.ndataServices].getServiceUUID();
+                
+                if(exclude != null && exclude.equals(uuid)) {
+                    
+                    continue;
+                    
+                }
+                
+                a.add(uuid);
+                
+            }
+            
+            return a.toArray(new UUID[a.size()]);
+            
+        }
+        
+        /**
+         * Used to make {@link #getUnderUtilizedDataServices(int, UUID)} a
+         * thread-safe round-robin policy.
+         */
+        private AtomicInteger _index = new AtomicInteger(0);
 
         public IDataService getDataService(UUID dataService) throws IOException {
 

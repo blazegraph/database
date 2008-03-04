@@ -39,6 +39,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -50,6 +51,7 @@ import org.apache.log4j.MDC;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -2459,7 +2461,7 @@ abstract public class ResourceManager implements IResourceManager {
      * remain <code>false</code> until {@link PostProcessOldJournal}</li>
      * </ol>
      */
-    protected void overflowNow() {
+    protected Future<Object> overflowNow() {
        
         assert overflowAllowed.get();
         
@@ -2503,7 +2505,11 @@ abstract public class ResourceManager implements IResourceManager {
          * call() method.
          */
 
-        service.submit(new PostProcessOldJournalTask(this, lastCommitTime));
+        Counters totalCounters = ((ConcurrencyManager)concurrencyManager).getTotalCounters();
+
+        Map<String/*name*/,Counters> indexCounters = ((ConcurrencyManager)concurrencyManager).resetCounters();
+        
+        return service.submit(new PostProcessOldJournalTask(this, lastCommitTime, totalCounters, indexCounters));
 
     }
     

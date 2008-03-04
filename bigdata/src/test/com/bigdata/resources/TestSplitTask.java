@@ -30,6 +30,7 @@ package com.bigdata.resources;
 
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndexProcedure;
@@ -153,26 +154,29 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView().getUUID();
         
         // force overflow onto a new journal.
-        resourceManager.doOverflow();
+        Future future = resourceManager.overflowNow();
+
+        // await completion of the task.
+        future.get();
         
         // lookup the old journal again using its createTime.
         final AbstractJournal oldJournal = resourceManager.getJournal(createTime0);
         assertEquals("uuid",uuid0,oldJournal.getRootBlockView().getUUID());
         assertNotSame("closeTime",0L,oldJournal.getRootBlockView().getCloseTime());
         
-        /*
-         * Run task that will post-process the old journal.
-         */
-
-        // lastCreateTime on the old journal.
-        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
-
-        // run post-processing task.
-
-        assertTrue(resourceManager.overflowAllowed.compareAndSet(
-                true/* expect */, false/* set */));
-
-        new PostProcessOldJournalTask(resourceManager, lastCommitTime).call();
+//        /*
+//         * Run task that will post-process the old journal.
+//         */
+//
+//        // lastCreateTime on the old journal.
+//        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
+//
+//        // run post-processing task.
+//
+//        assertTrue(resourceManager.overflowAllowed.compareAndSet(
+//                true/* expect */, false/* set */));
+//
+//        new PostProcessOldJournalTask(resourceManager, lastCommitTime).call();
 
         assertTrue(resourceManager.overflowAllowed.get());
         
