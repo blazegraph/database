@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -528,7 +529,7 @@ public abstract class AbstractTask implements Callable<Object> {
                         
                         // release hard references to named read-only indices.
                         
-                        indexCache.clear();
+                        clearIndexCache();
                         
                     }
 
@@ -554,7 +555,7 @@ public abstract class AbstractTask implements Callable<Object> {
                     
                     // release hard references to the named read-only indices.
                     
-                    indexCache.clear();
+                    clearIndexCache();
                 
                     log.info("Reader is done: "+getClass().getName()+", timestamp="+timestamp);
                     
@@ -654,13 +655,8 @@ public abstract class AbstractTask implements Callable<Object> {
 
             } finally {
 
-                /*
-                 * Release hard references to named indices. Dirty indices will
-                 * exist on the Name2Addr's commitList until the next commit.
-                 */
-
-                indexCache.clear();
-
+                clearIndexCache();
+                
             }
             
             /*
@@ -786,7 +782,7 @@ public abstract class AbstractTask implements Callable<Object> {
                  * start time of the ReadWrite transaction.
                  */
                 
-                indexCache.clear();
+                clearIndexCache();
                 
             }
             
@@ -929,6 +925,40 @@ public abstract class AbstractTask implements Callable<Object> {
 
     }
 
+    /**
+     * Release hard references to named indices. Dirty indices will exist on the
+     * Name2Addr's commitList until the next commit.
+     */
+    private void clearIndexCache() {
+
+        if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
+            
+            /*
+             * Report counters for unisolated and read-committed indices.
+             */
+            
+            Iterator<Map.Entry<String, IIndex>> itr = indexCache.entrySet()
+                    .iterator();
+
+            while (itr.hasNext()) {
+
+                Map.Entry<String, IIndex> entry = itr.next();
+
+                String name = entry.getKey();
+
+                IIndex ndx = entry.getValue();
+
+                ((ConcurrencyManager) concurrencyManager)
+                        .addCounters(name, ndx);
+
+            }
+        
+        }
+        
+        indexCache.clear();
+
+    }
+    
     /**
      * This is thrown if you attempt to reuse (re-submit) the same
      * {@link AbstractTask} instance.

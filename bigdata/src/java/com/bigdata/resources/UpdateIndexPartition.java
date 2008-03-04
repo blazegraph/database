@@ -111,6 +111,8 @@ public class UpdateIndexPartition extends AbstractTask {
         // live index
         final BTree btree = journal.getIndex(getOnlyResource());
 
+        assert btree != null : "Expecting index: "+getOnlyResource();
+        
         // clone the current metadata record for the live index.
         final IndexMetadata indexMetadata = btree.getIndexMetadata().clone();
 

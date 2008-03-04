@@ -32,6 +32,8 @@ import java.net.InetAddress;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -47,6 +49,7 @@ import net.jini.io.context.ClientSubject;
 import net.jini.lease.LeaseRenewalManager;
 import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
+import net.jini.lookup.ServiceItemFilter;
 
 /**
  * A metadata server.
@@ -291,6 +294,49 @@ public class MetadataServer extends DataServer {
             log.info(item.toString());
 
             return JiniUtil.serviceID2UUID(item.serviceID);
+            
+        }
+
+        /**
+         * @todo this does not pay attention to utilization and there is no
+         *       guarentee that it is reporting the available data services in a
+         *       round-robin fashion.
+         */
+        public UUID[] getUnderUtilizedDataServices(int limit, final UUID exclude) throws IOException {
+
+            ServiceItemFilter filter = exclude != null ? new ServiceItemFilter() {
+
+                public boolean check(ServiceItem arg0) {
+
+                    if (exclude != null
+                            && JiniUtil.serviceID2UUID(arg0.serviceID).equals(
+                                    exclude)) {
+
+                        return false;
+
+                    }
+                    
+                    return true;
+
+                }
+
+            }
+                    : null;
+            
+            ServiceItem[] items = server.dataServiceLookupCache.lookup(filter,
+                    limit);
+
+            final List<UUID> a = new ArrayList<UUID>(limit);
+            
+            for(int i=0; i<items.length; i++) {
+                
+                UUID uuid = JiniUtil.serviceID2UUID(items[i].serviceID);
+                
+                a.add(uuid);
+                
+            }
+            
+            return a.toArray(new UUID[a.size()]);
             
         }
 

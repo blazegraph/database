@@ -1,6 +1,7 @@
 package com.bigdata.resources;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchLookup;
+import com.bigdata.btree.Counters;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
@@ -36,6 +38,7 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.MoveIndexPartitionTask.MoveResult;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 
@@ -82,70 +85,22 @@ import com.bigdata.service.MetadataService;
  * submitted as submits tasks to the {@link IConcurrencyManager} so that they
  * will obtain the appropriate locks as necessary on the named indices.
  * 
- * FIXME Moving index partitions around:
- * <p>
- * Consider failover vs moving index partitions around vs load-balancing.
- * <p>
- * In failover, we have a chain of data services that are replicating some index
- * partitions at the media level - using binary images of the journals and the
- * index segments. The failover chain can also support load-balancing of queries
- * by reading from any data service in the failover chain, not just the primary
- * data service. When a data service fails (assuming a hard failure of the
- * machine) we automatically failover the primary to the first secondary data
- * service and recruit another data service to re-populate the failover chain in
- * order to maintain the desired replication count.
- * <P>
- * When we move index partitions around we are distributing them in order to
- * make the use of CPU, RAM and DISK resources more even across the federation.
- * This is most important when a scale-out index is relatively new as we need to
- * distribute the index in order to realize performance benefits and smooth out
- * the index performance. This is also important when some index partitions are
- * so hot that they need to be wired into RAM. Finally, this is important when a
- * host is overloaded, especially when it is approaching resource exhaustion.
- * However, the fastest way to obtain more disk space on a host is to be more
- * aggressive in releasing old resources. Moving the current state of an index
- * partition does not release ANY DISK space on the host since only the current
- * state of the index partition is moved, not its historical states (which are
- * on a mixture of journals and index segments).
- * 
- * FIXME write join task tasks. The task identifies and joins index partitions
- * local to a given resource manager and then notifies the metadata index of the
- * index partition join (atomic operation, just like split). In addition, a
- * process can scan the metadata index for 2 or more sibling index partitions
- * that are under capacity and MOVE them onto a common data service, at which
- * point the resource manager on that data service will cause them to be joined.
- * 
- * FIXME write move task. it runs on a data service and sends the resources for
- * the current view of an index partition to another data service. the index
- * segments are copied as a binary image. the live btree is copied during an
- * unisolated operation which then updates the metadata index with the new
- * locator. the outcome is an atomic index partition move. overflow processing
- * should be suspended during the move so that the resources defining the index
- * partition do not change during the move, so basically this happens at the
- * same time as splits or joins. any given index partition can only participate
- * in one of these three operations during post-procesing for a given overflow -
- * split, join, or move. the target data service for a bottom-up move (to
- * support distribution of index partitions) should be selected using a round
- * robin over the under-utilized data services (maybe divide into low, medium,
- * high, and urgent utilization categories).
- * <p>
- * Note that it makes sense to move a "hot" index partition onto under utilized
- * hosts, but that we will lock up the index partition briefly for writers
- * during the move. Moving a "cold" index partition away from a data service
- * will have basically no effect on the CPU/RAM/IO/DISK profile of that host.
- * However, moving a "warm" index partition away would release those resources
- * to the remaining partitions and so might be a better choice than moving a hot
- * partition.
- * 
- * @todo another driver for moves is "urgent" overutilization, where we are CPU
- *       or RAM bound. "urgent" disk space overutilization would be handled by
- *       deleting older resources (pruning history agressibly and aborting older
- *       transactions as necessary). overutilization of disk IO would be highly
- *       correlated with CPU utilization. overutilization of network resources
- *       might be harder to diagnose since it is less of a local phenomenon.
- * 
- * @todo write unit tests for all of these operations in which we verify that
- *       the index remains correct against a ground truth index.
+ * @todo write alternative to the "build" task (which is basically a full
+ *       compacting merge) that builds an index segment from the buffered writes
+ *       on the journal and updates the view. This would let the #of index
+ *       segments grow before performing a full compacting merge on the index
+ *       partition. The advantage is that we only need to consider the buffered
+ *       writes for the index partition vs a full key range scan of the fused
+ *       view for the index partition. This lighter weight operation will copy
+ *       any deleted index entries in the btree write buffer as of the
+ *       lastCommitState of the old journal, but it will typically copy less
+ *       data than was buffered since overwrites will reduce to a single index
+ *       entry.
+ *       <P>
+ *       Think of a pithy name, such as "compact" vs "build" or "build" vs
+ *       "buffer". The distinction could also be "full compacting merge" vs
+ *       "compacting merge" but "merge" sounds too close to "join" for me and
+ *       those labels are too long.
  * 
  * @todo write unit tests for these operations where we guide moves and joins
  *       top-down. top-down behavior could be customized by placing a field on
@@ -155,9 +110,6 @@ import com.bigdata.service.MetadataService;
  *       seconds providing a histogram of the partitions they have touched (this
  *       could be input to the load balanced as well as info about the partition
  *       use that would inform load balancing decisions).
- * 
- * @todo edit above javadoc on resource utilization vs load balancing vs
- *       failover and move to a useful location.
  * 
  * @todo if an index partition is moved (or split or joined) while an active
  *       transaction has a write set for that index partition on a data service
@@ -186,24 +138,232 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     private IRawStore tmpStore;
 
+    /** Aggregated counters for the named indices. */ 
+    private final Counters totalCounters;
+    
+    /** Raw score computed for those aggregated counters. */
+    private final double totalRawStore;
+    
+    /** Individual counters for the named indices. */
+    private final Map<String/*name*/,Counters> indexCounters;
+
     /**
-     * `
+     * Scores computed for each named index in order by ascending score
+     * (increased activity).
+     */
+    private final Score[] scores;
+    /**
+     * Random access to the index {@link Score}s.
+     */
+    private final Map<String,Score> scoreMap;
+    
+    /**
+     * Helper class assigns a raw and a normalized score to each index based on
+     * its per-index {@link Counters} and on the global (non-restart safe)
+     * {@link Counters} for the data service during the life cycle of the last
+     * journal.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class Score implements Comparable<Score>{
+
+        /** The name of the index partition. */
+        public final String name;
+        /** The counters collected for that index partition. */
+        public final Counters counters;
+        /** The raw score computed for that index partition. */
+        public final double rawScore;
+        /** The normalized score computed for that index partition. */
+        public final double score;
+        /** The rank in [0:#scored].  This is an index into the Scores[]. */
+        public int rank = -1;
+        /** The normalized double precision rank in [0.0:1.0]. */
+        public double drank = -1d;
+        
+        public String toString() {
+            
+            return "Score{name=" + name + ", rawScore=" + rawScore + ", score="
+                    + score + ", rank=" + rank + ", drank=" + drank + "}";
+            
+        }
+        
+        public Score(String name,Counters counters, double totalRawScore) {
+            
+            assert name != null;
+            
+            assert counters != null;
+            
+            this.name = name;
+            
+            this.counters = counters;
+            
+            rawScore = counters.computeRawScore();
+            
+            score = Counters.normalize( rawScore , totalRawScore );
+            
+        }
+
+        /**
+         * Places elements into order by ascending {@link #rawScore}. The
+         * {@link #name} is used to break any ties.
+         */
+        public int compareTo(Score arg0) {
+            
+            if(rawScore < arg0.rawScore) {
+                
+                return -1;
+                
+            } else if(rawScore> arg0.rawScore ) {
+                
+                return 1;
+                
+            }
+            
+            return name.compareTo(arg0.name);
+            
+        }
+        
+    }
+    
+    /**
+     * Return <code>true</code> if the named index partition is "warm" for
+     * {@link ITx#UNISOLATED} and/or {@link ITx#READ_COMMITTED} operations.
+     * <p>
+     * Note: This method informs the selection of index partitions that will be
+     * moved to another {@link IDataService}. The preference is always to move
+     * an index partition that is "warm" rather than "hot" or "cold". Moving a
+     * "hot" index partition causes more latency since more writes will have
+     * been buffered and unisolated access to the index partition will be
+     * suspended during the atomic part of the move operation. Likewise, "cold"
+     * index partitions are not consuming any resources other than disk space
+     * for their history, and the history of an index is not moved when the
+     * index partition is moved.
+     * <p>
+     * Since the history of an index partition is not moved when the index
+     * partition is moved, the determination of cold, warm or hot is made in
+     * terms of the resources consumed by {@link ITx#READ_COMMITTED} and
+     * {@link ITx#UNISOLATED} access to named index partitions. If an index
+     * partition is hot for historical read, then your only choices are to shed
+     * other index partitions from the data service, to read from a failover
+     * data service having the same index partition, or possibly to increase the
+     * replication count for the index partition.
+     * 
+     * @param name
+     *            The name of an index partition.
+     * 
+     * @return The index {@link Score} -or- <code>null</code> iff the index
+     *         was not touched for read-committed or unisolated operations.
+     */
+    public Score getScore(String name) {
+        
+        Score score = scoreMap.get(name);
+        
+        if(score == null) {
+            
+            /*
+             * Index was not touched for read-committed or unisolated
+             * operations.
+             */
+
+            ResourceManager.log.info("Index is cold: "+name);
+            
+            return null;
+            
+        }
+        
+        ResourceManager.log.info("Index score: "+score);
+        
+        return score;
+        
+    }
+    
+    /**
+     * 
      * 
      * @param resourceManager
      * @param lastCommitTime
      *            The lastCommitTime on the old journal.
+     * @param totalCounters
+     *            The total {@link Counters} reported for all unisolated and
+     *            read-committed index views on the old journal.
+     * @param indexCounters
+     *            The per-index {@link Counters} for the unisolated and
+     *            read-committed index views on the old journal.
      */
     public PostProcessOldJournalTask(ResourceManager resourceManager,
-            long lastCommitTime) {
+            long lastCommitTime, Counters totalCounters,
+            Map<String/* name */, Counters> indexCounters) {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();
 
+        if( lastCommitTime <= 0)
+            throw new IllegalArgumentException();
+
+        if (totalCounters == null)
+            throw new IllegalArgumentException();
+
+        if (indexCounters == null)
+            throw new IllegalArgumentException();
+
         this.resourceManager = resourceManager;
 
-        assert lastCommitTime > 0L;
-
         this.lastCommitTime = lastCommitTime;
+
+        this.totalCounters = totalCounters;
+        
+        this.indexCounters = indexCounters;
+
+        final int nscores = indexCounters.size();
+        
+        this.scores = new Score[nscores];
+
+        this.scoreMap = new HashMap<String/*name*/,Score>(nscores);
+
+        this.totalRawStore = totalCounters.computeRawScore();
+
+        if (nscores > 0) {
+
+            final Iterator<Map.Entry<String, Counters>> itr = indexCounters
+                    .entrySet().iterator();
+
+            int i = 0;
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, Counters> entry = itr.next();
+
+                final String name = entry.getKey();
+
+                final Counters counters = entry.getValue();
+
+                scores[i] = new Score(name, counters, totalRawStore);
+
+                i++;
+
+            }
+
+            // sort into ascending order (inceasing activity).
+            Arrays.sort(scores);
+            
+            ResourceManager.log.info("The most active index was: "
+                    + scores[scores.length - 1]);
+
+            ResourceManager.log
+                    .info("The least active index was: " + scores[0]);
+
+            for(i=0;i<scores.length; i++) {
+                
+                scores[i].rank = i;
+                
+                scores[i].drank = ((double)i)/scores.length;
+                
+                scoreMap.put(scores[i].name, scores[i]);
+                
+            }
+            
+        }
 
     }
 
@@ -215,32 +375,60 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * present a coherent view of that index partition.
      * <p>
      * 
-     * @todo In order to choose when to join index partitions we need an vantage
-     *       from which we can see index partitions that are undercapacity and
-     *       whether or not they have a sibling on this journal that is also
-     *       undercapacity.
-     *       <p>
-     *       If an index partition is undercapacity, but its siblings are not
-     *       found on this journal then we need to move the undercapacity index
-     *       partition to the node where either its left or right sibling is
-     *       found so that is can be joined into one of its siblings.
-     *       <p>
-     *       We could join an undercapacity partition with a partition that is
-     *       not undercapacity as long as it is not overcapacity. This might
-     *       create more join opportunities. In order to do this we need to
-     *       identify the undercapacity partitions and then query the metadata
-     *       index for their left and right siblings. This will also give us the
-     *       information that we need to move an undercapacity partition to
-     *       another data service where it can be joined with one of its
-     *       siblings.
-     *       <p>
-     *       The easiest thing is to query the {@link IMetadataService} for the
-     *       right sibling of each underutilized partition. That can be done in
-     *       a batch query using {@link BatchLookup} on the read-committed
-     *       metadata index.  If the right sibling is local, then a join is 
-     *       performed.  Otherwise the underutilized index partition is moved
-     *       to the host where the right sibling resides (but take care that we
-     *       do not cross-move the partitions if both are underutilized).
+     * <h2> Build </h2>
+     * 
+     * A build is performed when there are buffered writes, when they buffered
+     * writes were not simply copied onto the new journal during the atomic
+     * overflow operation, and when the index partition is neither overcapacity
+     * nor undercapacity.
+     * 
+     * <h2> Split </h2>
+     * 
+     * A split is considered when an index partition appears to be overcapacity.
+     * The split operation will inspect the index partition in more detail when
+     * it runs. If the index partition does not, in fact, have sufficient
+     * capacity to warrant a split then a build will be performed instead (the
+     * build is treated more or less as a one-to-one split). An index partition
+     * which is WAY overcapacity can be split into more than 2 new index
+     * partitions.
+     * 
+     * <h2> Join </h2>
+     * 
+     * A join is considered when an index partition is undercapacity. Since the
+     * rightSeparatorKey for an index partition is also the key under which the
+     * rightSibling would be found, we use the rightSeparatorKey to lookup the
+     * rightSibling of an index partition in the {@link MetadataIndex}. If that
+     * rightSibling is local (same {@link ResourceManager}) then we will JOIN
+     * the index partitions. Otherwise we will MOVE the undercapacity index
+     * partition to the {@link IDataService} on which its rightSibling was
+     * found.
+     * 
+     * <h2> Move </h2>
+     * 
+     * We move index partitions around in order to make the use of CPU, RAM and
+     * DISK resources more even across the federation and prevent hosts or data
+     * services from being either under- or over-utilized. Index partition moves
+     * are necessary when a scale-out index is relatively new in to distribute
+     * the index over more than a single data service. Index partition moves are
+     * is important when a host is overloaded, especially when it is approaching
+     * resource exhaustion. However, index partition moves DO NOT release ANY
+     * DISK space on a host since only the current state of the index partition
+     * is moved, not its historical states (which are on a mixture of journals
+     * and index segments). When a host is close to exhausting its DISK space
+     * temporary files should be purge and the resource manager may aggressively
+     * release old resources, even at the expense of forcing transactions to
+     * abort.
+     * 
+     * <p>
+     * 
+     * We generally choose to move "warm" or "hot" index partitions. Cold index
+     * partitions are not consuming any CPU/RAM/IO resources and moving them to
+     * another host will not effect the utilization of either the source or the
+     * target host. Moving "warm" index partitions is preferrable since it will
+     * introduce less latency when we suspect writes on the index partition for
+     * the atomic cutover to the new data service.
+     * 
+     * <p>
      * 
      * @todo If this is a high utilization node and there are low utilization
      *       nodes then we move some index partitions to those nodes in order to
@@ -299,10 +487,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      *       moves unless the node itself is either overutilized or other nodes
      *       are at very low utilization.
      * 
-     * @todo an index partition that is very "hot" on the write service might be
-     *       split in order to distribute that load onto two machines.
-     * 
-     * @see #atomicUpdates()
+     * @todo A host with enough CPU/RAM/IO/DISK can support more than one data
+     *       service thereby using more than 2G of RAM (a limit on 32 bit
+     *       hosts). In this case it is important that we can move index
+     *       partitions between those data services or the additional resources
+     *       will not be fully exploited. We do this by looking at not just host
+     *       utilization but also at process utilization, where the process is a
+     *       data service.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -333,12 +524,48 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         final Map<String, BTree> undercapacityIndexPartitions = new HashMap<String, BTree>();
         {
 
+            /*
+             * Set true if this node/data service is highly utilized. We will
+             * consider moves IFF this is a highly utilized service.
+             * 
+             * FIXME set highlyUtilizedService based on recent load for this
+             * host and service.
+             */
+            final boolean highlyUtilizedService = true;
+
+            /*
+             * Obtain some data service UUIDs onto which we will try and offload
+             * some index partitions iff this data service is deemed to be
+             * highly utilized.
+             */
+            
+            UUID[] underUtilizedDataServiceUUIDs = null;
+
+            if (highlyUtilizedService) {
+                
+                try {
+
+                    underUtilizedDataServiceUUIDs = resourceManager
+                            .getMetadataService().getUnderUtilizedDataServices(
+                                    0/* limit */,
+                                    resourceManager.getDataServiceUUID());
+
+                } catch (IOException ex) {
+
+                    ResourceManager.log.warn(
+                            "Could not obtain target service UUIDs: ", ex);
+
+                }
+                
+            }
+            
             // counters : must sum to ndone as post-condition.
             int ndone = 0; // for each named index we process
             int nskip = 0; // nothing.
             int nbuild = 0; // build task.
             int nsplit = 0; // split task.
             int njoin = 0; // join task _candidate_.
+            int nmove = 0; // move task (to underutilized node).
 
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
                     null, null);
@@ -475,27 +702,107 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         njoin++;
 
                     } else {
-
+                        
+                        boolean moved = false;
+                        
                         /*
-                         * Just do an index build task.
+                         * Note: This makes sure that we don't do a move if
+                         * there are only a few index partitions on this data
+                         * service.
                          */
+                        
+                        final int MIN_INDEX_PARTITIONS_BEFORE_MOVE = 3;
+                        
+                        /*
+                         * Note: We make sure that we do not move all the
+                         * index partitions to the same target by moving at
+                         * most M index partitions per under-utilized data
+                         * service recommended to us.
+                         */
+                        final int MAX_MOVES_PER_TARGET = 3;
+                        
+                        final int maxMoves = MAX_MOVES_PER_TARGET * underUtilizedDataServiceUUIDs.length;
+                        
+                        if (highlyUtilizedService
+                                && underUtilizedDataServiceUUIDs != null
+                                && scores.length > MIN_INDEX_PARTITIONS_BEFORE_MOVE
+                                && nmove < maxMoves) {
 
-                        // the file to be generated.
-                        final File outFile = resourceManager
-                                .getIndexSegmentFile(indexMetadata);
+                            /*
+                             * Note: We make sure that we don't move all the
+                             * hot/warm index partitions by choosing the index
+                             * partitions to be moved from the middle of the
+                             * range.
+                             * 
+                             * Note: This could lead to a failure to recommend a
+                             * move if all the "warm" index partitions happen to
+                             * require a split or join. However, this is
+                             * unlikely since the "warm" index partitions change
+                             * size, if not slowly, then at least not as rapidly
+                             * as the hot index partitions. Eventually a lot of
+                             * splits will lead to some index partition not
+                             * being split during an overflow and then we can
+                             * move it.
+                             * 
+                             * @todo could adjust the bounds here based on how
+                             * important it is to begin moving index partitions
+                             * off of this data service.
+                             */
 
-                        final AbstractTask task = new BuildIndexSegmentTask(
-                                resourceManager, resourceManager
-                                        .getConcurrencyManager(),
-                                lastCommitTime, name, outFile);
+                            final Score score = getScore(name);
 
-                        ResourceManager.log.info("index build: " + name);
+                            if (score != null && score.drank > .3
+                                    && score.drank < .8) {
 
-                        // add to set of tasks to be run.
-                        tasks.add(task);
+                                /*
+                                 * Move this index partition to an
+                                 * under-utilized data service.
+                                 */
 
-                        nbuild++;
+                                // choose the target round robin among those offered to us.
+                                final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
+                                        % underUtilizedDataServiceUUIDs.length];
+                                
+                                final AbstractTask task = new MoveIndexPartitionTask(
+                                        resourceManager, resourceManager
+                                                .getConcurrencyManager(),
+                                        lastCommitTime, name,
+                                        targetDataServiceUUID);
 
+                                tasks.add(task);
+
+                                nmove++;
+
+                                moved = true;
+
+                            }
+
+                        }
+
+                        if (!moved) {
+
+                            /*
+                             * Just do an index build task.
+                             */
+
+                            // the file to be generated.
+                            final File outFile = resourceManager
+                                    .getIndexSegmentFile(indexMetadata);
+
+                            final AbstractTask task = new BuildIndexSegmentTask(
+                                    resourceManager, resourceManager
+                                            .getConcurrencyManager(),
+                                    lastCommitTime, name, outFile);
+
+                            ResourceManager.log.info("index build: " + name);
+
+                            // add to set of tasks to be run.
+                            tasks.add(task);
+
+                            nbuild++;
+                            
+                        }
+                        
                     }
 
                 } // if(!didCopy)
@@ -505,9 +812,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             } // itr.hasNext()
 
             // verify counters.
-            assert ndone == nskip + nbuild + nsplit + njoin : "ndone=" + ndone
-                    + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
-                    + nsplit + ", njoin=" + njoin;
+            assert ndone == nskip + nbuild + nsplit + njoin + nmove : "ndone="
+                    + ndone + ", nskip=" + nskip + ", nbuild=" + nbuild
+                    + ", nsplit=" + nsplit + ", njoin=" + njoin + ", nmove";
 
         }
 
@@ -541,9 +848,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     .entrySet().iterator();
 
             int ndone = 0;
-            int njoin = 0;
-            int nmove = 0;
-            int nbuild = 0;
+            int njoin = 0; // do index partition join on local service.
+            int nmove = 0; // move to another service for index partition join.
+//            int nbuild = 0; // 
             
             while (itr.hasNext()) {
 
@@ -706,7 +1013,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             } // next scale-out index with underutilized index partition(s).
 
-            assert ndone == njoin + nmove + nbuild;
+            assert ndone == njoin + nmove; // + nbuild;
             
         } // consider JOIN candidates.
 
@@ -834,12 +1141,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 AbstractTask task = new UpdateMoveIndexPartitionTask(
                         resourceManager, resourceManager
                                 .getConcurrencyManager(), result.name, result);
-                
+
+                // add to set of tasks to be run.
                 updateTasks.add(task);
                 
-                // @todo handle MoveResult
-                throw new UnsupportedOperationException();
-
             } else {
 
                 throw new AssertionError("Unexpected result type: " + tmp.toString());
@@ -939,14 +1244,15 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         } catch(Throwable t) {
             
             /*
-             * Note: This task is run from a Thread by the ResourceManager, but
-             * no one checks the Future for the task.  Therefore we need to log
-             * any errors here rather than throwing them out.
+             * Note: This task is run normally from a Thread by the
+             * ResourceManager so no one checks the Future for the task.
+             * Therefore it is very important to log any errors here since
+             * otherwise they will not be noticed.
              */
             
             ResourceManager.log.error(t/*msg*/, t/*stack trace*/);
 
-            return null;
+            throw new RuntimeException( t );
             
         } finally {
 

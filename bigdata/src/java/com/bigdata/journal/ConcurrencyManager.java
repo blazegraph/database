@@ -1,8 +1,10 @@
 package com.bigdata.journal;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -21,7 +23,11 @@ import java.util.concurrent.TimeoutException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Counters;
+import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -1316,4 +1322,91 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
     }
 
+    private Map<String/* name */, Counters> indexCounters = new HashMap<String, Counters>();
+
+    private Counters totalCounters = new Counters();
+    
+    public Counters getTotalCounters() {
+        
+        synchronized(totalCounters) {
+
+            return new Counters(totalCounters);
+            
+        }
+        
+    }
+    
+    public Map<String/* name */, Counters> resetCounters() {
+
+        final Map<String,Counters> tmp;
+        
+        synchronized (totalCounters) {
+
+            tmp = indexCounters;
+            
+            indexCounters = new HashMap<String,Counters>();
+
+            totalCounters = new Counters();
+
+        }
+        
+        return tmp;
+        
+    }
+    
+    /**
+     * Adds the counters to the global total and to the total for the named
+     * index.
+     * 
+     * @param name
+     *            The index name.
+     * @param ndx
+     *            An {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} index
+     *            view.
+     * 
+     * @todo this does not account for writes isolated by a transaction.
+     */
+    protected void addCounters(String name, IIndex ndx) {
+        
+        final Counters c;
+        if(ndx instanceof AbstractBTree) {
+            
+            c = ((AbstractBTree)ndx).counters;
+            
+        } else {
+            
+            FusedView view = (FusedView)ndx;
+            
+            AbstractBTree[] sources = view.getSources();
+            
+            c = new Counters();
+            
+            for(int i=0; i<sources.length; i++) {
+                
+                c.add(sources[i].counters);
+                
+            }
+            
+        }
+                    
+        synchronized(totalCounters) {
+            
+            totalCounters.add(c);
+
+            Counters tmp = indexCounters.get(name);
+            
+            if (tmp == null) {
+                
+                tmp = new Counters();
+                
+                indexCounters.put(name, tmp);
+                
+            }
+            
+            tmp.add(c);
+            
+        }
+        
+    }
+    
 }

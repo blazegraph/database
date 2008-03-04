@@ -42,17 +42,54 @@ import java.text.NumberFormat;
  */
 public class Counters {
 
-//    private final AbstractBTree btree;
-    
-//    public Counters(AbstractBTree btree) {
-//        
-//        assert btree != null;
-//        
-//        this.btree = btree;
-//        
-//    }
-
     public Counters() {
+        
+    }
+
+    /**
+     * Copy constructor.
+     * 
+     * @param c
+     */
+    public Counters(Counters c) {
+        
+        add(c);
+        
+    }
+    
+    /**
+     * Adds the values from another {@link Counters} object to this one.
+     * 
+     * @param o
+     */
+    public void add(Counters o) {
+        
+        nfinds += o.nfinds;
+        nbloomRejects += o.nbloomRejects;
+        ninserts += o.ninserts;
+        nremoves += o.nremoves;
+        nindexOf += o.nindexOf;
+        ngetKey  += o.ngetKey;
+        ngetValue += o.ngetValue;
+        rootsSplit += o.rootsSplit;
+        rootsJoined += o.rootsJoined;
+        nodesSplit += o.nodesSplit;
+        nodesJoined += o.nodesJoined;
+        leavesSplit += o.leavesSplit;
+        leavesJoined += o.leavesJoined;
+        nodesCopyOnWrite += o.nodesCopyOnWrite;
+        leavesCopyOnWrite += o.leavesCopyOnWrite;
+        nodesRead += o.nodesRead;
+        leavesRead += o.leavesRead;
+        nodesWritten += o.nodesWritten;
+        leavesWritten += o.leavesWritten;
+        bytesRead += o.bytesRead;
+        bytesWritten += o.bytesWritten;
+        
+        serializeTimeNanos += o.serializeTimeNanos;
+        deserializeTimeNanos += o.deserializeTimeNanos;
+        writeTimeNanos += o.writeTimeNanos;
+        readTimeNanos += o.readTimeNanos;
         
     }
     
@@ -84,6 +121,47 @@ public class Counters {
     long deserializeTimeNanos = 0;
     long writeTimeNanos = 0;
     long readTimeNanos = 0;
+    
+    /**
+     * Return a score whose increasing value is correlated with the amount of
+     * activity on an index as reflected in these {@link Counters}.
+     * 
+     * @return The computed score.
+     */
+    public double computeRawScore() {
+        
+        /*
+         * FIXME consider sum of operations or sum of bytes read/written.
+         * 
+         */
+        return nfinds+ninserts+nremoves;
+//        throw new UnsupportedOperationException();
+        
+//        return 0d;
+        
+    }
+    
+    /**
+     * Normalizes a raw score in the context of totals for some data service.
+     * 
+     * @param rawScore
+     *            The raw score.
+     * @param totalRawScore
+     *            The raw score computed from the totals.
+     *            
+     * @return The normalized score.
+     */
+    static public double normalize(double rawScore, double totalRawScore ) {
+        
+        if(totalRawScore == 0d) {
+            
+            return 0d;
+            
+        }
+        
+        return rawScore / totalRawScore;
+        
+    }
     
     /**
      * The #of nodes written on the backing store.

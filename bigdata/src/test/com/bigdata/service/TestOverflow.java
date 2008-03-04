@@ -38,6 +38,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -54,6 +55,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Tests for various scenarios that result in overflow of the live journal
@@ -72,6 +74,48 @@ import com.bigdata.resources.ResourceManager;
  *       reach in and inspect or tweak the objects running on the data service,
  *       including the {@link ResourceManager} so the tests would have to be
  *       re-written around that.
+ * 
+ * @todo write test where the {@link ISplitHandler} applies additional
+ *       constraints when choosen the split points, e.g., for the
+ *       {@link SparseRowStore}.
+ * 
+ * @todo test where we write enough data that we cause the index partition to be
+ *       split into more than one index partition on overflow.
+ * 
+ * @todo Note that additional writes may have been generated such that an
+ *       overflow could even re-trigger a split. In order to get a JOIN to occur
+ *       we need to focus on an index partition and remove keys until we know
+ *       that the index partition is undercapacity. We can figure out the actual
+ *       capacity by reading the index partition locators, choosing an index
+ *       partition that we want to force a join with its rightSibling, and then
+ *       using a rangeCount on the ground truth to figure out how many tuples
+ *       need to be removed. We can select the keys for those tuples from the
+ *       ground truth, which makes it easy to remove them from the index
+ *       partition. Once the ground truth index is undercapacity we set the
+ *       forceOverflow flag and the next write on the index partition will cause
+ *       an overflow and trigger the index partition join.
+ * 
+ * @todo factor out a test that does continuous writes, including both inserts
+ *       and removes, and verify that the scale-out index tracks ground truth.
+ *       Periodically delete keys in an index partition until it would underflow
+ *       and add keys into an index partition until it would overflow.
+ *       <p>
+ *       It is important that this test write ahead of overflow processing for
+ *       two reasons. First, it will cause writes to be outstanding on the data
+ *       service based on the locators as of the time that the clients submitted
+ *       the writes. Those locators will be invalidated if a split/join/move
+ *       occurs, forcing the client to resolve the new index partition and
+ *       re-issue the request.
+ *       <p>
+ *       If the test merely writes and removes index entries under random keys
+ *       then it will fairely quickly converge on a stable set of index
+ *       partitions. Therefor this should be a "torture" test in the sense that
+ *       it should focus on causing splits, joins, and moves by its actions.
+ *       E.g., write so much data on an index partition that it will be split on
+ *       overflow or delete most of the data from an index partition. The client
+ *       should execute a few threads in parallel, each of which tackles some
+ *       part of the scale-out index so that we trigger overflows in which more
+ *       than one thing is happening.
  * 
  * @todo tests scenarios leading to simple overflow processing (index segment
  *       builds), to index partition splits, to index partition moves, etc.
@@ -160,36 +204,6 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
      * scale-out index agrees with the ground truth.
      * 
      * @throws IOException
-     * 
-     * @todo test where we write enough data that we cause the index partition
-     *       to be split into more than one index partition on overflow.
-     * 
-     * @todo Note that additional writes may have been generated such that an
-     *       overflow could even re-trigger a split. In order to get a JOIN to
-     *       occur we need to focus on an index partition and remove keys until
-     *       we know that the index partition is undercapacity. We can figure
-     *       out the actual capacity by reading the index partition locators,
-     *       choosing an index partition that we want to force a join with its
-     *       rightSibling, and then using a rangeCount on the ground truth to
-     *       figure out how many tuples need to be removed. We can select the
-     *       keys for those tuples from the ground truth, which makes it easy to
-     *       remove them from the index partition. Once the ground truth index
-     *       is undercapacity we set the forceOverflow flag and the next write
-     *       on the index partition will cause an overflow and trigger the index
-     *       partition join.
-     * 
-     * @todo factor out a test that does do continuous writes, including both
-     *       inserts and removes, and verify that the scale-out index tracks
-     *       ground truth. Periodically delete keys in an index partition until
-     *       it would underflow and add keys into an index partition until it
-     *       would overflow.
-     *       <p>
-     *       It is important that this test write ahead of overflow processing
-     *       for two reasons. First, it will cause writes to be outstanding on
-     *       the data service based on the locators as of the time that the
-     *       clients submitted the writes. Those locators will be invalidated if
-     *       a split/join/move occurs, forcing the client to resolve the new
-     *       index partition and re-issue the request.
      */
     public void test_splitJoin() throws IOException {
         

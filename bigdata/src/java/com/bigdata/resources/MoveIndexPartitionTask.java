@@ -114,6 +114,12 @@ public class MoveIndexPartitionTask extends AbstractTask {
         this.lastCommitTime = lastCommitTime;
         
         this.targetDataServiceUUID = targetDataServiceUUID;
+        
+        if(resourceManager.getDataServiceUUID().equals(targetDataServiceUUID)) {
+            
+            throw new IllegalArgumentException("Target must be a different data service");
+            
+        }
                 
     }
 
