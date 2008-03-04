@@ -730,12 +730,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
 
-    /**
-     * Method sets flag to force overflow processing for the
-     * {@link IResourceManager} and waits until overflow processing is complete.
+    /*
      * 
-     * @throws InterruptedException
      */
+    
     public void forceOverflow() throws IOException {
     
         setupLoggingContext();
@@ -757,27 +755,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
                 log.info("Setting flag to force overflow processing");
 
+                // trigger overflow on the next group commit.
                 writeService.forceOverflow.set(true);
 
             }
-
-            while (writeService.forceOverflow.get()) {
-
-                try {
-
-                    log.info("Waiting for overflow procssing to complete");
-
-                    Thread.sleep(250/* ms */);
-
-                } catch (InterruptedException e) {
-
-                    throw new RuntimeException(e);
-
-                }
-
-            }
-
-            log.info("Overflow processing complete.");
 
         } finally {
 
@@ -786,6 +767,66 @@ abstract public class DataService implements IDataService, IWritePipeline,
         }
         
     }
+    
+    public long getOverflowCounter() throws IOException {
+    
+        setupLoggingContext();
+
+        try {
+
+            if (!(resourceManager instanceof ResourceManager)) {
+
+                throw new UnsupportedOperationException();
+
+            }
+
+            return ((ResourceManager)resourceManager).overflowCounter.get();
+
+        } finally {
+
+            clearLoggingContext();
+
+        }
+        
+    }
+    
+//    public boolean isOverflowAllowed() throws IOException {
+//
+//        setupLoggingContext();
+//
+//        try {
+//
+//            if (!(resourceManager instanceof ResourceManager)) {
+//
+//                throw new UnsupportedOperationException();
+//
+//            }
+//
+//            return ((ResourceManager)resourceManager).isOverflowAllowed();
+//                
+//        } finally {
+//
+//            clearLoggingContext();
+//
+//        }
+//
+//    }
+//    
+//    public long getJournalCreateTime() throws IOException {
+//
+//        setupLoggingContext();
+//
+//        try {
+//
+//            return resourceManager.getLiveJournal().getRootBlockView().getCreateTime();
+//                
+//        } finally {
+//
+//            clearLoggingContext();
+//
+//        }
+//
+//    }
     
     /**
      * An interface that provides access to the federation.

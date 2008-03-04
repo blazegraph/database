@@ -344,7 +344,11 @@ public class DataServiceIndex implements IIndex {
             Object result = dataService.submit(timestamp, name, ctor.newInstance(
                     n, 0/* offset */, keys, vals));
             
-            aggregator.aggregate(result, new Split(null,0,n));
+            if(aggregator != null) {
+
+                aggregator.aggregate(result, new Split(null,0,n));
+                
+            }
 
         } catch (Exception ex) {
 

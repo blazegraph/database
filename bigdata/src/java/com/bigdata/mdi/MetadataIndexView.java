@@ -74,7 +74,19 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
      */
     public PartitionLocator find(byte[] key) {
         
-        final int index = findIndexOf(key);
+        final int index;
+        
+        if (key == null) {
+            
+            // use the index of the last partition.
+            index = delegate.getEntryCount() - 1;
+            
+        } else {
+
+            // locate the index partition for that key.
+            index = findIndexOf(key);
+            
+        }
         
         if(index == -1) {
             

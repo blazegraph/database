@@ -72,6 +72,8 @@ public class DefaultSplitHandler implements ISplitHandler {
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
+    private int minimumEntryCount;
+    
     private int entryCountPerSplit;
 
     private int sampleRate;
@@ -87,17 +89,119 @@ public class DefaultSplitHandler implements ISplitHandler {
 
     }
 
-    public DefaultSplitHandler(int entryCountPerSplit, int sampleRate,
-            double overCapacityMultiplier, double underCapacityMultiplier) {
+    /**
+     * Setup a split handler.
+     * 
+     * @param minimumEntryCount
+     *            An index partition which has no more than this many tuples
+     *            should be joined with its rightSibling (if any).
+     * @param entryCountPerSplit
+     *            The target #of tuples for an index partition.
+     * @param overCapacityMultiplier
+     *            The index partition will be split when its actual entry count
+     *            is GTE to
+     *            <code>overCapacityMultiplier * entryCountPerSplit</code>
+     * @param underCapacityMultiplier
+     *            When an index partition will be split, the #of new index
+     *            partitions will be choosen such that each index partition is
+     *            approximately <i>underCapacityMultiple</i> full.
+     * @param sampleRate
+     *            #of samples to take per estimated split.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument, or combination or arguments, is out of
+     *             range.
+     */
+    public DefaultSplitHandler(int minimumEntryCount, int entryCountPerSplit,
+            double overCapacityMultiplier, double underCapacityMultiplier,
+            int sampleRate) {
+
+        /*
+         * Bootstap parameter settings. 
+         * 
+         * First, verify combination of parameters is legal.
+         */
+        assertSplitJoinStable(minimumEntryCount, entryCountPerSplit,
+                underCapacityMultiplier);
+
+        /*
+         * Now that we know the combination is legal, set individual parameters
+         * that have dependencies in their legal range. This will let us set the
+         * individual parameters with their settor methods below.
+         */
+        this.minimumEntryCount = minimumEntryCount;
+        this.entryCountPerSplit = entryCountPerSplit;
+        this.underCapacityMultiplier = underCapacityMultiplier;
+        
+        /*
+         * Use individual set methods to validate each parameter by itself.
+         */
+
+        setMinimumEntryCount(minimumEntryCount);
 
         setEntryCountPerSplit(entryCountPerSplit);
-
-        setSampleRate(sampleRate);
 
         setOverCapacityMultiplier(overCapacityMultiplier);
 
         setUnderCapacityMultiplier(underCapacityMultiplier);
 
+        setSampleRate(sampleRate);
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the range count of the index is less than
+     * the {@link #getMinimumEntryCount()}.
+     * <p>
+     * Note: This relies on the fast range count, which is the upper bound on
+     * the #of index entries. For this reason an index partition which has
+     * undergone a lot of deletes will not underflow until it has gone through a
+     * build to purge the deleted index entries. This is true even when all
+     * index entries in the index partition have been deleted!
+     */
+    public boolean shouldJoin(IIndex ndx) {
+
+        final long rangeCount = ndx.rangeCount(null, null);
+        
+        return rangeCount <= getMinimumEntryCount();
+        
+    }
+    
+    /**
+     * 
+     * 
+     */
+    static void assertSplitJoinStable(int minimumEntryCount,
+            int entryCountPerSplit, double underCapacityMultiplier) {
+
+        if (minimumEntryCount >= underCapacityMultiplier * entryCountPerSplit) {
+            
+            throw new IllegalArgumentException("minimumEntryCount("
+                    + minimumEntryCount + ") exceeds underCapacityMultiplier("
+                    + underCapacityMultiplier + ") * entryCountPerSplit("
+                    + entryCountPerSplit + ")");
+            
+        }
+
+    }
+
+    /**
+     * The minimum #of index entries before the index partition becomes eligible
+     * to be joined.
+     */
+    public int getMinimumEntryCount() {
+
+        return minimumEntryCount;
+        
+    }
+
+    public void setMinimumEntryCount(int minimumEntryCount) {
+
+        assertSplitJoinStable(minimumEntryCount, getEntryCountPerSplit(),
+                getUnderCapacityMultiplier());
+
+        this.minimumEntryCount = minimumEntryCount;
+        
     }
 
     /**
@@ -117,8 +221,11 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         }
 
+        assertSplitJoinStable(getMinimumEntryCount(), entryCountPerSplit,
+                getUnderCapacityMultiplier());
+        
         this.entryCountPerSplit = entryCountPerSplit;
-
+        
     }
 
     /**
@@ -199,6 +306,9 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         }
 
+        assertSplitJoinStable(getMinimumEntryCount(), getEntryCountPerSplit(),
+                underCapacityMultiplier);
+        
         this.underCapacityMultiplier = underCapacityMultiplier;
 
     }
@@ -280,8 +390,6 @@ public class DefaultSplitHandler implements ISplitHandler {
      */
     public Sample[] sampleIndex(IIndex ndx, AtomicLong nvisited) {
 
-        final int sampleRate = getSampleRate();
-
         final int rangeCount = (int) Math.min(ndx.rangeCount(null, null),
                 Integer.MAX_VALUE);
 
@@ -290,8 +398,20 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         ITuple tuple = null;
 
-        final List<Sample> samples = new ArrayList<Sample>(rangeCount
-                / sampleRate);
+        // The estimated #of splits based on the range count.
+        final int numSplitsEstimate = Math.max(1,rangeCount / getEntryCountPerSplit());
+        
+        // Compute the #of samples to take (the sample rate is the #of samples per split).
+        final int numSamplesEstimate = numSplitsEstimate * getSampleRate();
+        
+        final int sampleEveryNTuples = rangeCount / numSamplesEstimate;
+        
+        log.info("Estimating " + numSplitsEstimate + " with sampleRate="
+                + getSampleRate() + " yeilding ~ " + numSamplesEstimate
+                + " samples with one sample every" + sampleEveryNTuples
+                + " tuples");
+        
+        final List<Sample> samples = new ArrayList<Sample>(numSamplesEstimate);
 
         while (itr.hasNext()) {
 
@@ -314,7 +434,7 @@ public class DefaultSplitHandler implements ISplitHandler {
 
             }
 
-            if ((offset % sampleRate) == 0) {
+            if ((offset % sampleEveryNTuples) == 0) {
 
                 // take a sample.
 
@@ -337,7 +457,9 @@ public class DefaultSplitHandler implements ISplitHandler {
         nvisited.set(tuple == null ? 0L : tuple.getVisitCount());
 
         log.info("Collected " + samples.size() + " samples from " + nvisited
-                + " index entries");
+                + " index entries; estimatedSplitCount=" + numSplitsEstimate
+                + ", sampleRate=" + getSampleRate() + ", sampling every "
+                + sampleEveryNTuples);
 
         return samples.toArray(new Sample[samples.size()]);
 
@@ -379,7 +501,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         }
 
         /*
-         * 5. Compute the actual #of splits
+         * Compute the actual #of splits
          */
         final int nsplits = (int) Math
                 .floor((nvisited.get() / getUnderCapacityMultiplier())

@@ -193,7 +193,9 @@ public class CommitRecordIndex extends BTree {
      * than the start time of the transaction.
      * 
      * @param timestamp
-     *            The given timestamp.
+     *            The given timestamp (may be negative for historical reads or
+     *            positive for transaction identifiers, but MAY NOT be
+     *            {@link ITx#UNISOLATED} NOR {@link ITx#READ_COMMITTED}).
      * 
      * @return The commit record -or- <code>null</code> iff there are no
      *         {@link ICommitRecord}s in the index that satisify the probe.
@@ -202,8 +204,20 @@ public class CommitRecordIndex extends BTree {
      */
     synchronized public ICommitRecord find(long timestamp) {
 
+        if (timestamp == ITx.UNISOLATED) {
+
+            throw new IllegalArgumentException("Can not specify 'UNISOLATED' as timestamp");
+            
+        }
+
+        if (timestamp == ITx.READ_COMMITTED) {
+
+            throw new IllegalArgumentException("Can not specify 'READ_COMMITTED' as timestamp");
+            
+        }
+        
         // find (first less than or equal to).
-        final int index = findIndexOf(timestamp);
+        final int index = findIndexOf(Math.abs(timestamp));
         
         if(index == -1) {
             

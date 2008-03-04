@@ -35,8 +35,9 @@ import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * An interface used to decided whether and where to split an index partition
- * into 2 or more index partitions.
+ * An interface used to decide when and index partition is overcapacity and
+ * should be split, including the split point(s), and when an index partition is
+ * undercapacity and should be joined with its right sibling.
  * <p>
  * Note: applications frequency must constrain the allowable separator keys when
  * splitting an index partition into two or more index partitions. For example,
@@ -80,4 +81,18 @@ public interface ISplitHandler extends Serializable {
      */
     public Split[] getSplits(IResourceManager resourceManager, IIndex ndx);
     
+    /**
+     * Return <code>true</code> if a cursory examination of an index partition
+     * suggests that it SHOULD be joined with either its left or right sibling.
+     * The basic determination is that the index partition is "undercapacity".
+     * Normally this is decided in terms of the range count of the index
+     * partition.
+     * 
+     * @param ndx
+     *            An index partition.
+     * 
+     * @return <code>true</code> if the index partition should be joined.
+     */
+    public boolean shouldJoin(IIndex ndx);
+
 }

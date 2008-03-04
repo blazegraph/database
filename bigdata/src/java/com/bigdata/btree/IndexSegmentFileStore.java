@@ -158,6 +158,13 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
         reopen();
 
     }
+    
+    public String toString() {
+        
+        // @todo add filename if filename dropped from resourcemetadata.
+        return getResourceMetadata().toString();
+        
+    }
 
     public IResourceMetadata getResourceMetadata() {
         

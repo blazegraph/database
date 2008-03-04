@@ -1455,11 +1455,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             assert rangeCheck(toKey,true);
 
         Object result = proc.apply(this);
-        
-        if(handler!=null) {
-            
-            handler.aggregate(result, new Split(null,0,0));
-            
+
+        if (handler != null) {
+
+            handler.aggregate(result, new Split(null, 0, 0));
+
         }
         
     }
@@ -1470,7 +1470,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
         
-        aggregator.aggregate(result, new Split(null,0,n));
+        if (aggregator != null) {
+
+            aggregator.aggregate(result, new Split(null, 0, n));
+
+        }
         
     }
     

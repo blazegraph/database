@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.util.Arrays;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -100,30 +99,65 @@ public class RegisterIndexTask extends AbstractTask {
         }
 
         /*
-         * Note: If this is an index partition then we set the resource metadata
-         * for the index partition based on the current live journal so that it
-         * will be correct. The caller SHOULD NOT have set this field, so we log
-         * a warning if it was set.
+         * Verify some aspects of the partition metadata.
          */
-        LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
-
+        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
         if (pmd != null) {
 
-            if (pmd.getResources() != null) {
+            if (pmd.getResources() == null) {
 
-                log.warn("Ignoring resource metadata: name=" + name
-                        + ", resources=" + Arrays.toString(pmd.getResources()));
+                /*
+                 * A [null] for the resources field is a specific indication
+                 * that we need to specify the resource metadata for the live
+                 * journal at the time that the index partition is registered.
+                 * This indicator is used when the metadata service registers an
+                 * index partition remotely on a data service since it does not
+                 * (and can not) have access to the resource metadata for the
+                 * live journal as of the time that the index partition actually
+                 * gets registered on the data service.
+                 * 
+                 * The index partition split and join tasks do not have this
+                 * problem since they are run locally. However, an index
+                 * partition move operation also needs to do this.
+                 */
+
+                metadata.setPartitionMetadata(new LocalPartitionMetadata(//
+                        pmd.getPartitionId(),//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey(),//
+                        new IResourceMetadata[] {//
+                            // The live journal.
+                            getJournal().getResourceMetadata() //
+                        }));
+
+            } else {
+
+                if (pmd.getResources().length == 0) {
+
+                    throw new RuntimeException(
+                            "Missing resource description: name=" + name
+                                    + ", pmd=" + pmd);
+
+                }
+
+                if (!pmd.getResources()[0].isJournal()) {
+
+                    throw new RuntimeException(
+                            "Expecting resources[0] to be journal: name="
+                                    + name + ", pmd=" + pmd);
+
+                }
+
+                if (!pmd.getResources()[0].getUUID().equals(
+                        getJournal().getRootBlockView().getUUID())) {
+
+                    throw new RuntimeException(
+                            "Expecting resources[0] to be this journal but has wrong UUID: name="
+                                    + name + ", pmd=" + pmd);
+
+                }
 
             }
-
-            pmd = new LocalPartitionMetadata(pmd.getPartitionId(),//
-                    pmd.getLeftSeparatorKey(),//
-                    pmd.getRightSeparatorKey(),//
-                    new IResourceMetadata[] {//
-                    getJournal().getResourceMetadata() //
-                    });
-
-            metadata.setPartitionMetadata(pmd);
             
         }
         

@@ -29,14 +29,13 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.NoSuchIndexException;
@@ -490,9 +489,15 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public IBlock readBlock(IResourceMetadata resource, long addr)
             throws IOException;
 
+    /*
+     * Methods in support of unit tests.
+     * 
+     * @todo could be moved to their own interface.
+     */
+    
     /**
-     * Method forces an {@link IResourceManager} for an {@link IDataService} to
-     * initiate overflow processing.
+     * Method sets a flag that will force overflow processing during the next
+     * group commit.
      * <p>
      * Note: This method is primarily used by unit tests. Normally there is no
      * reason to invoke this method directly. Overflow processing is triggered
@@ -502,5 +507,30 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @throws IOException
      */
     public void forceOverflow() throws IOException;
+    
+    /**
+     * The #of overflows that have taken place on this data service (the counter
+     * is not restart safe).
+     */
+    public long getOverflowCounter() throws IOException;
+    
+//    /**
+//     * Returns <code>true</code> unless the data service is currently
+//     * performing either overflow or overflow post-processing actions.
+//     * 
+//     * @return <code>true</code> iff the data service is able to initiate
+//     *         overflow processing.
+//     * 
+//     * @throws IOException
+//     */
+//    public boolean isOverflowAllowed() throws IOException;
+//    
+//    /**
+//     * The createTime of the live journal backing the data service. This field
+//     * will be updated each time the data service overflows.
+//     * 
+//     * @throws IOException
+//     */
+//    public long getJournalCreateTime() throws IOException;
     
 }

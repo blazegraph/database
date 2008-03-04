@@ -516,7 +516,7 @@ public abstract class AbstractTask implements Callable<Object> {
             
             if (isTransaction) {
 
-                log.info("Running isolated operation: tx="+timestamp);
+                log.info("Running isolated operation: timestamp="+timestamp);
                 
                 if(tx.isReadOnly()) {
 
@@ -556,7 +556,7 @@ public abstract class AbstractTask implements Callable<Object> {
                     
                     indexCache.clear();
                 
-                    log.info("Reader is done: startTime="+timestamp);
+                    log.info("Reader is done: "+getClass().getName()+", timestamp="+timestamp);
                     
                 }
 
@@ -575,7 +575,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         } finally {
 
-            log.info("done");
+            log.info("done: "+getClass().getName()+", timestamp="+timestamp);
 
         }
         

@@ -77,6 +77,10 @@ public interface IMetadataIndex extends IRangeQuery { //extends IIndex {
     /**
      * Find and return the partition spanning the given key.
      * 
+     * @param key
+     *            A key (optional). When <code>null</code> the locator for the
+     *            last index partition will be returned.
+     * 
      * @return The partition spanning the given key or <code>null</code> if
      *         there are no partitions defined.
      */

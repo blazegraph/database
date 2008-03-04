@@ -65,6 +65,9 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("embedded services");
 
+        // tests of the metadata index.
+        suite.addTestSuite( TestMetadataIndex.class );
+        
         // client basics, including static partitioning of indices.
         suite.addTestSuite( TestEmbeddedBigdataClient.class );
         

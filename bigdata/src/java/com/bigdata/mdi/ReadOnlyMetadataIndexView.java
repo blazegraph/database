@@ -172,7 +172,11 @@ public class ReadOnlyMetadataIndexView extends MetadataIndexView {
 
         Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
         
-        aggregator.aggregate(result, new Split(null,0,n));
+        if(aggregator != null) {
+
+            aggregator.aggregate(result, new Split(null,0,n));
+            
+        }
         
     }
 

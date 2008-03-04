@@ -123,8 +123,22 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
             IResourceMetadata[] resources//
             ) {
 
+        /*
+         * Set fields first so that toString() can be used in thrown exceptions.
+         */
+        
         this.partitionId = partitionId;
 
+        this.leftSeparatorKey = leftSeparatorKey;
+
+        this.rightSeparatorKey = rightSeparatorKey;
+
+        this.resources = resources;
+
+        /*
+         * Test arguments.
+         */
+        
         if (leftSeparatorKey == null)
             throw new IllegalArgumentException("leftSeparatorKey");
 
@@ -135,23 +149,19 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
             if (BytesUtil.compareBytes(leftSeparatorKey, rightSeparatorKey) >= 0) {
 
                 throw new IllegalArgumentException(
-                        "Separator keys are out of order: left="
-                                + Arrays.toString(leftSeparatorKey)
-                                + ", right="
-                                + Arrays.toString(rightSeparatorKey));
+                        "Separator keys are out of order: " + this);
 
             }
 
         }
 
-        this.leftSeparatorKey = leftSeparatorKey;
-
-        this.rightSeparatorKey = rightSeparatorKey;
-
         if (resources != null) {
 
-            if (resources.length == 0)
-                throw new IllegalArgumentException();
+            if (resources.length == 0) {
+                
+                throw new IllegalArgumentException("Empty resources array.");
+                
+            }
 
             /*
              * This is the "live" journal.
@@ -164,33 +174,33 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
              * partition.
              */
 
-            IResourceMetadata resource = resources[0];
-
-            if (!(resource instanceof JournalMetadata)) {
+            if (!(resources[0] instanceof JournalMetadata)) {
 
                 throw new RuntimeException(
-                        "Expecting a journal as the first resource");
+                        "Expecting a journal as the first resource: " + this);
 
             }
 
-            // scan from 1 to n-1 - these are historical resources
-            // (non-writable).
+            /*
+             * Scan from 1 to n-1 - these are historical resources
+             * (non-writable). Each successive entry in the resources[] should
+             * have an earlier createTime (smaller number) than the one that
+             * follows it.
+             */
             {
 
-                long lastTimestamp = Long.MIN_VALUE;
+                long lastTimestamp = resources[0].getCreateTime();
 
                 for (int i = 1; i < resources.length; i++) {
 
                     // createTime of the resource.
                     final long thisTimestamp = resources[i].getCreateTime();
 
-                    if (thisTimestamp <= lastTimestamp) {
+                    if (lastTimestamp <= thisTimestamp) {
 
                         throw new RuntimeException(
-                                "Resources are out of timestamp order @ index="
-                                        + i + ", lastTimestamp="
-                                        + lastTimestamp + ", this timestamp="
-                                        + thisTimestamp);
+                                "Resources out of timestamp order @ index="
+                                        + i + " : "+ this);
 
                     }
 
@@ -200,8 +210,6 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
             }
         }
-
-        this.resources = resources;
 
     }
 
