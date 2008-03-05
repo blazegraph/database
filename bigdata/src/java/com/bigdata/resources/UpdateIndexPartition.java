@@ -15,24 +15,22 @@ import com.bigdata.mdi.SegmentMetadata;
 
 /**
  * Task updates the definition of an index partition such that the specified
- * index segment is used in place of any older index segments and any
- * journal last commitTime is less than or equal to the createTime of the
- * new index segment.
+ * index segment is used in place of any older index segments and any journal
+ * last commitTime is less than or equal to the createTime of the new index
+ * segment.
  * <p>
  * The use case for this task is that you have just done an overflow on a
- * journal, placing empty indices on the new journal and defining their
- * views to read from the new index and the old journal. Then you built an
- * index segment from the last committed state of the index on the old
- * journal. Finally you use this task to update the view on the new journal
- * such that the index now reads from the new index segment rather than the
- * old journal.
+ * journal, placing empty indices on the new journal and defining their views to
+ * read from the new index and the old journal. Then you built an index segment
+ * from the last committed state of the index on the old journal. Finally you
+ * use this task to update the view on the new journal such that the index now
+ * reads from the new index segment rather than the old journal.
  * <p>
- * Note: this implementation only works with a full compacting merge
- * scenario. It does NOT handle the case when multiple index segments are
- * required to complete the index partition view. the presumption is that
- * the new index segment was built from the fused view as of the last
- * committed state on the old journal, not just from the {@link BTree} on
- * the old journal.
+ * Note: this implementation only works with a full compacting merge scenario.
+ * It does NOT handle the case when multiple index segments are required to
+ * complete the index partition view. the presumption is that the new index
+ * segment was built from the fused view as of the last committed state on the
+ * old journal, not just from the {@link BTree} on the old journal.
  * <h2>Pre-conditions</h2>
  * 
  * <ol>
@@ -42,24 +40,22 @@ import com.bigdata.mdi.SegmentMetadata;
  * 
  * <li>the live journal</li>
  * <li>the previous journal</li>
- * <li>an index segment having data for some times earlier than the old
- * journal (optional) </li>
+ * <li>an index segment having data for some times earlier than the old journal
+ * (optional) </li>
  * </ol>
  * </li>
  * 
  * <li> The createTime on the live journal MUST be GT the createTime on the
  * previous journal (it MUST be newer).</li>
  * 
- * <li> The createTime of the new index segment MUST be LTE the
- * firstCommitTime on the live journal. (The new index segment should have
- * been built from a view that did not read on the live journal. In fact,
- * the createTime on the new index segment should be exactly the
- * lastCommitTime on the oldJournal.)</li>
+ * <li> The createTime of the new index segment MUST be LTE the firstCommitTime
+ * on the live journal. (The new index segment should have been built from a
+ * view that did not read on the live journal. In fact, the createTime on the
+ * new index segment should be exactly the lastCommitTime on the oldJournal.)</li>
  * 
- * <li> The optional index segment in the view MUST have a createTime LTE to
- * the createTime of the previous journal. (That is, it must have been from
- * a prior overflow operation and does not include any data from the prior
- * journal.)
+ * <li> The optional index segment in the view MUST have a createTime LTE to the
+ * createTime of the previous journal. (That is, it must have been from a prior
+ * overflow operation and does not include any data from the prior journal.)
  * </ol>
  * 
  * <h2>Post-conditions</h2>
@@ -70,41 +66,65 @@ import com.bigdata.mdi.SegmentMetadata;
  * <li>the new index segment</li>
  * </ol>
  * 
+ * @todo modify to support view consisting of more than one historical component
+ *       so that we can do incremental builds (just the buffered writes) as well
+ *       as full builds (the index view).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class UpdateIndexPartition extends AbstractTask {
 
-    /**
-     * 
-     */
     private final ResourceManager resourceManager;
 
-    final protected SegmentMetadata segmentMetadata;
-
+    final protected BuildResult buildResult;
+    
     /**
+     * @param resourceManager 
      * @param concurrencyManager
      * @param resource
-     * @param resourceManager TODO
+     * @param buildResult
      */
     protected UpdateIndexPartition(ResourceManager resourceManager,
             IConcurrencyManager concurrencyManager, String resource,
-            SegmentMetadata segmentMetadata) {
+            BuildResult buildResult) {
 
         super(concurrencyManager, ITx.UNISOLATED, resource);
 
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
+        if (resourceManager == null) {
 
+            throw new IllegalArgumentException();
+            
+        }
+
+        if(buildResult == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
         this.resourceManager = resourceManager;
 
-        this.segmentMetadata = segmentMetadata;
+        this.buildResult = buildResult;
 
+        assert resource.equals( buildResult.name );
+        
     }
 
     @Override
     protected Object doTask() throws Exception {
 
+        final SegmentMetadata segmentMetadata = buildResult.segmentMetadata;
+
+        log.info("Begin: name="+getOnlyResource()+", newSegment="+segmentMetadata);
+
+        /*
+         * Open the unisolated B+Tree on the live journal that is absorbing
+         * writes. We are going to update its index metadata. Note that we do
+         * NOT open the index using AbstractTask#getIndex(String name) because
+         * we only want to mutable B+Tree and not the full view.
+         */
+        
         // the live journal.
         final AbstractJournal journal = getJournal();
 

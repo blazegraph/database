@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -725,6 +726,16 @@ abstract public class ResourceManager implements IResourceManager {
      */
     final int copyIndexThreshold;
     
+    /**
+     * Set based on {@link Options#MINIMUM_ACTIVE_INDEX_PARTITIONS}. 
+     */
+    protected final int minimumActiveIndexPartitions;
+    
+    /**
+     * Set based on {@link Options#MAXIMUM_MOVES_PER_TARGET}.
+     */
+    protected final int maximumMovesPerTarget;
+    
     /** Release time is zero (0L) until notified otherwise - 0L is ignored. */
     private long releaseTime = 0L;
 
@@ -897,6 +908,57 @@ abstract public class ResourceManager implements IResourceManager {
         /** Default minimum release age is one day. */
         public static final String DEFAULT_MIN_RELEASE_AGE = MIN_RELEASE_AGE_1D;
 
+        /**
+         * The minimum #of active index partitions on a data service before the
+         * resource manager will consider moving an index partition to another
+         * service (default <code>3</code>).
+         * <p>
+         * Note: This makes sure that we don't do a move if there are only a few
+         * active index partitions on this service. This value is also used to
+         * place an upper bound on the #of index partitions that can be moved
+         * away from this service - if we move too many (or too many at once)
+         * then this service stands a good chance of becoming under-utilized and
+         * index partitions will just bounce around which is very inefficient.
+         * <p>
+         * Note: Even when only a single index partition for a new scale-out
+         * index is initially allocated on this service, if it is active and
+         * growing it will eventually split into enough index partitions that we
+         * will begin to re-distribute those index partitions across the
+         * federation.
+         * <p>
+         * Note: Index partitions are considered to be "active" iff
+         * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} operations are
+         * run against the index partition during the life cycle of the live
+         * journal. There may be many other index partitions on the same service
+         * that either are never read or are subject only to historical reads.
+         * However, since only the current state of the index partition is
+         * moved, not its history, moving index partitions which are only the
+         * target for historical reads will not reduce the load on the service.
+         * 
+         * @see #DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS
+         */
+        public static final String MINIMUM_ACTIVE_INDEX_PARTITIONS = "minimumActiveIndexPartitions";
+        
+        public static final String DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS = "3";
+        
+        /**
+         * This is the maximum #of index partitions that the resource manager is
+         * willing to move in a given overflow onto identified under-utilized
+         * service (default <code>3</code>).
+         * <p>
+         * Note: Index partitions are moved to the identified under-utilized
+         * services using a round-robin approach which aids in distributing the
+         * load across the federation.
+         * <p>
+         * Note: Index partition moves MAY be disabled by setting this property
+         * to ZERO (0).
+         * 
+         * @see #DEFAULT_MAXIMUM_MOVES_PER_TARGET
+         */
+        public static final String MAXIMUM_MOVES_PER_TARGET = "maximumMovesPerTarget";
+
+        public static final String DEFAULT_MAXIMUM_MOVES_PER_TARGET = "3";
+        
     }
     
     private IConcurrencyManager concurrencyManager;
@@ -977,6 +1039,45 @@ abstract public class ResourceManager implements IResourceManager {
                         Options.COPY_INDEX_THRESHOLD
                                 + " must be non-negative");
 
+            }
+            
+        }
+        
+        // minimumActiveIndexPartitions
+        {
+
+            minimumActiveIndexPartitions = Integer.parseInt(properties
+                    .getProperty(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS,
+                            Options.DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS));
+
+            log.info(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS + "="
+                    + minimumActiveIndexPartitions);
+
+            if (minimumActiveIndexPartitions <= 0) {
+
+                throw new RuntimeException(
+                        Options.MINIMUM_ACTIVE_INDEX_PARTITIONS
+                                + " must be positive");
+                
+            }
+            
+        }
+        
+        // maximum moves per target
+        {
+            
+            maximumMovesPerTarget = Integer.parseInt(properties.getProperty(
+                    Options.MAXIMUM_MOVES_PER_TARGET,
+                    Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET));
+
+            log.info(Options.MAXIMUM_MOVES_PER_TARGET + "="
+                    + maximumMovesPerTarget);
+
+            if (maximumMovesPerTarget < 0) {
+
+                throw new RuntimeException(Options.MAXIMUM_MOVES_PER_TARGET
+                        + " must be non-negative");
+                
             }
             
         }
@@ -1930,7 +2031,7 @@ abstract public class ResourceManager implements IResourceManager {
                     
                     ((BTree)btree).setReadOnly(true);
                     
-                    ((BTree)btree).setLastCommitTime(ts);
+                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
                     
                 }
 
@@ -1968,7 +2069,7 @@ abstract public class ResourceManager implements IResourceManager {
                     
                     ((BTree)btree).setReadOnly(true);
                     
-                    ((BTree)btree).setLastCommitTime(ts);
+                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
                     
                 }
 
@@ -2336,10 +2437,6 @@ abstract public class ResourceManager implements IResourceManager {
      *       on the new journal and that the read-committed task can read from
      *       the fused view of the new (empty) index on the new journal and the
      *       old index on the old journal.
-     * 
-     * @todo we can reach the {@link WriteExecutorService} from
-     *       {@link #getConcurrencyManager()} so drop it from the method
-     *       signature.
      */
     public boolean overflow(boolean forceOverflow, boolean exclusiveLock) {
 
@@ -2447,6 +2544,9 @@ abstract public class ResourceManager implements IResourceManager {
      * Note: This method does not test pre-conditions based on the extent of the
      * journal.
      * <p>
+     * Note: The caller is responsible for ensuring that this method is invoked
+     * with an exclusive lock on the write service.
+     * <p>
      * Pre-conditions:
      * <ol>
      * <li>Exclusive lock on the {@link WriteExecutorService}</li>
@@ -2469,10 +2569,11 @@ abstract public class ResourceManager implements IResourceManager {
          * We have an exclusive lock and the overflow conditions are satisifed.
          */
         final long lastCommitTime;
+        final Set<String> copied = new HashSet<String>();
         try {
 
             // Do overflow processing.
-            lastCommitTime = doOverflow();
+            lastCommitTime = doOverflow(copied);
             
         } finally {
             
@@ -2505,18 +2606,27 @@ abstract public class ResourceManager implements IResourceManager {
          * call() method.
          */
 
-        Counters totalCounters = ((ConcurrencyManager)concurrencyManager).getTotalCounters();
+        final Counters totalCounters = ((ConcurrencyManager) concurrencyManager)
+                .getTotalCounters();
 
-        Map<String/*name*/,Counters> indexCounters = ((ConcurrencyManager)concurrencyManager).resetCounters();
-        
-        return service.submit(new PostProcessOldJournalTask(this, lastCommitTime, totalCounters, indexCounters));
+        final Map<String/* name */, Counters> indexCounters = ((ConcurrencyManager) concurrencyManager)
+                .resetCounters();
+
+        return service.submit(new PostProcessOldJournalTask(this,
+                lastCommitTime, copied, totalCounters, indexCounters));
 
     }
     
     /**
-     * Performs the actual overflow handling once all pre-conditions have been
-     * satisified and uses {@link #purgeOldResources()} to delete old resources
-     * from the local file system that are no longer required as determined by
+     * Synchronous overflow processing.
+     * <p>
+     * This is invoked once all pre-conditions have been satisified.
+     * <p>
+     * Index partitions that have fewer than some threshold #of index entries
+     * will be copied onto the new journal.
+     * <p>
+     * This uses {@link #purgeOldResources()} to delete old resources from the
+     * local file system that are no longer required as determined by
      * {@link #setReleaseTime(long)} and {@link #getEffectiveReleaseTime()}.
      * <p>
      * Note: This method does NOT start a {@link PostProcessOldJournalTask}.
@@ -2524,20 +2634,16 @@ abstract public class ResourceManager implements IResourceManager {
      * Note: You MUST have an exclusive lock on the {@link WriteExecutorService}
      * before you invoke this method!
      * 
+     * @param copied
+     *            Any index partitions that are copied are added to this set.
+     * 
      * @return The lastCommitTime of the old journal.
      * 
      * @todo closing out and re-opening the old journal as read-only is going to
      *       discard some buffering that we might prefer to keep on hand during
      *       the {@link PostProcessOldJournalTask}.
-     * 
-     * @todo If a very large #of index partitions are hosted on the same journal
-     *       then they should be re-distributed regardless of their size.
-     * 
-     * @todo Work out high-level alerting for resource exhaustion and failure to
-     *       maintain QOS on individual machines, indices, and across the
-     *       federation. Consider resource limits on indices.
      */
-    protected long doOverflow() {
+    protected long doOverflow(Set<String> copied) {
         
         log.info("begin");
         
@@ -2770,7 +2876,10 @@ abstract public class ResourceManager implements IResourceManager {
                                 + copyIndexThreshold);
                         
                         newBTree.rangeCopy(oldBTree, null, null);
-                     
+
+                        // Note that index partition was copied for the caller.
+                        copied.add(entry.name);
+
                     }
                     
                     /*

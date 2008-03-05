@@ -227,7 +227,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         final boolean isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
-        log.warn("federation is "+(isTransient?"not ":"")+"persistent");
+        log.info("federation is "+(isTransient?"not ":"")+"persistent");
         
         // true if temp files are being requested.
         final boolean createTempFile = Boolean.parseBoolean(properties

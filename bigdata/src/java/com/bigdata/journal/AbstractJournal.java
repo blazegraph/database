@@ -438,7 +438,7 @@ public abstract class AbstractJournal implements IJournal {
 
         log.info(Options.BUFFER_MODE + "=" + bufferMode);
 
-        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
+//        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
         
         /*
          * "useDirectBuffers"
@@ -527,28 +527,6 @@ public abstract class AbstractJournal implements IJournal {
 
         log.info(Options.OFFSET_BITS + "=" + offsetBits);
 
-//        if (offsetBits != WormAddressManager.DEFAULT_OFFSET_BITS) {
-//
-//            /*
-//             * FIXME The problem is that the CommitRecordIndex and the Name2Addr
-//             * class both define IValueSerializer objects that need to know how
-//             * to pack and unpack addresses. Those objects are serialized into
-//             * the BTreeMetadata records using Java default serialization. When
-//             * when they are de-serialized they no longer have a reference to
-//             * the store and therefore do not know the #of offset bits to use
-//             * when encoding and decoding addresses. This has been patched by
-//             * requiring the use of the default #of offset bits. A proper
-//             * solution would take an approach similar to the extSer package
-//             * which provides a marker interface used to identify objects who
-//             * need to have the store reference set during de-serialization.
-//             */
-//
-//            throw new RuntimeException("Only "
-//                    + WormAddressManager.DEFAULT_OFFSET_BITS
-//                    + " is supported at this time");
-//
-//        }
-        
         /*
          * "createTempFile"
          */

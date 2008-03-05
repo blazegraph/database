@@ -29,6 +29,7 @@ package com.bigdata.btree;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -571,7 +572,12 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * Sets the lastCommitTime
      * 
      * @param lastCommitTime
-     *            The timestamp of the last committed state of this index.
+     *            The timestamp of the last committed state of this index. This
+     *            should always be {@link ICommitRecord#getTimestamp()}.
+     * 
+     * @throws IllegalStateException
+     *             if you attempt to replace a non-zero lastCommitTime with a
+     *             different timestamp.
      */
     final public void setLastCommitTime(long lastCommitTime) {
         
@@ -581,13 +587,13 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 //            
 //        }
         
-        if(this.lastCommitTime!=0L && this.lastCommitTime != lastCommitTime) {
-        
-            log.warn("Updated lastCommitTime: old=" + this.lastCommitTime
-                    + ", new=" + lastCommitTime);
+        if (this.lastCommitTime != 0L && this.lastCommitTime != lastCommitTime) {
+
+            throw new IllegalStateException("Updated lastCommitTime: old="
+                    + this.lastCommitTime + ", new=" + lastCommitTime);
             
         }
-        
+
         this.lastCommitTime = lastCommitTime;
         
     }

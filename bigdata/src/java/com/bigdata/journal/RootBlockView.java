@@ -631,7 +631,7 @@ public class RootBlockView implements IRootBlockView {
 
         if (checker == null) {
             
-            log.warn("Checksum not validated");
+            log.info("Checksum not validated");
 
             return storedChecksum;
 
@@ -685,7 +685,7 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
         sb.append(", uuid="+getUUID());
         sb.append(", offsetBits="+getOffsetBits());
-        sb.append(", checksum="+getChecksum(null));
+        sb.append(", checksum="+(checker==null?"N/A":""+calcChecksum(checker)));
         sb.append(", createTime="+getCreateTime());
         sb.append(", closeTime="+getCloseTime());
         

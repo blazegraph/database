@@ -34,6 +34,12 @@ public class BuildResult extends AbstractResult {
             SegmentMetadata segmentMetadata) {
 
         super(name, indexMetadata);
+        
+        if (segmentMetadata == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
 
         this.segmentMetadata = segmentMetadata;
 

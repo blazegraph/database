@@ -300,7 +300,9 @@ public class MetadataServer extends DataServer {
         /**
          * @todo this does not pay attention to utilization and there is no
          *       guarentee that it is reporting the available data services in a
-         *       round-robin fashion.
+         *       round-robin fashion.  This method probably needs to be moved to
+         *       a service that is specialized in load balancing the hosts and
+         *       services in the federation.
          */
         public UUID[] getUnderUtilizedDataServices(int limit, final UUID exclude) throws IOException {
 

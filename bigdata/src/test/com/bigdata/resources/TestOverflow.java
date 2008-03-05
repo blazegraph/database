@@ -30,6 +30,8 @@ package com.bigdata.resources;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
@@ -143,9 +145,14 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
 
             assertEquals(0, resourceManager.getIndexSegmentCount());
             
+            Set<String> copied = new HashSet<String>();
+            
             // do overflow.
-            resourceManager.doOverflow();
+            resourceManager.doOverflow(copied);
 
+            // expecting the index partition to be copied over.
+            assertEquals(1,copied.size());
+            
             assertEquals(2, resourceManager.getJournalCount());
 
             assertEquals(0, resourceManager.getIndexSegmentCount());

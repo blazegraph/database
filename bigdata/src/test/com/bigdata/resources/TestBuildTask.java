@@ -30,7 +30,9 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -51,7 +53,6 @@ import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -183,8 +184,13 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView()
                 .getUUID();
 
+        final Set<String> copied = new HashSet<String>();
+        
         // force overflow onto a new journal.
-        resourceManager.doOverflow();
+        resourceManager.doOverflow( copied );
+        
+        // nothing should have been copied to the new journal.
+        assertEquals(0,copied.size());
 
         // lookup the old journal again using its createTime.
         final AbstractJournal oldJournal = resourceManager
@@ -194,7 +200,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                 .getCloseTime());
 
         // run merge task.
-        final SegmentMetadata segmentMetadata;
+        final BuildResult result;
         {
 
             /*
@@ -218,10 +224,10 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             // submit task and await result (metadata describing the new index
             // segment).
-            final BuildResult result = (BuildResult) concurrencyManager.submit(
+            result = (BuildResult) concurrencyManager.submit(
                     task).get();
 
-            segmentMetadata = result.segmentMetadata;
+            final IResourceMetadata segmentMetadata = result.segmentMetadata;
 
             System.err.println(segmentMetadata.toString());
 
@@ -238,7 +244,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         {
 
             IndexSegmentFileStore segStore = new IndexSegmentFileStore(
-                    new File(segmentMetadata.getFile()));
+                    new File(result.segmentMetadata.getFile()));
 
             IndexSegment seg = segStore.load();
 
@@ -250,7 +256,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         {
 
             AbstractTask task = new UpdateIndexPartition(resourceManager,
-                    concurrencyManager, name, segmentMetadata);
+                    concurrencyManager, name, result);
 
             // run task, await completion.
             concurrencyManager.submit(task).get();

@@ -125,19 +125,41 @@ public class Counters {
     /**
      * Return a score whose increasing value is correlated with the amount of
      * activity on an index as reflected in these {@link Counters}.
+     * <p>
+     * The raw score is the (de)-serialization time plus the read/write time.
+     * Time was choosen since it is a common unit and since it reflects the
+     * combination of CPU time, memory time (for allocations and garbage
+     * collection - the latter can be quite significant), and the disk wait
+     * time. The other main component of time is key search, but that is not
+     * instrumented right now.
+     * <p>
+     * (de-)serialization is basically a CPU activity and drives memory to the
+     * extent that allocations are made. At present, de-serialization is much
+     * slower than serialization, primarily because a lot of object creation
+     * occurs during de-serialization. Changing to a raw record format for nodes
+     * and leaves would likely reduce the de-serialization costs significantly.
+     * <p>
+     * The read/write time is strongly dominated by actual DISK IO and by
+     * garbage collection time (garbage collection can cause threads to be
+     * suspended at any time). For deep B+Trees, DISK READ time dominates DISK
+     * WRITE time since increasing numbers of random reads are required to
+     * materialize any given leaf.
      * 
      * @return The computed score.
+     * 
+     * @todo The leaf cache does not resize as the depth of the tree grows.
+     * 
+     * @todo instrument key search time.
+     * 
+     * @todo change to a raw record format to minimize de-serialization time and
+     *       heap allocations and thus indirectly minimize GC time as well.
      */
     public double computeRawScore() {
         
-        /*
-         * FIXME consider sum of operations or sum of bytes read/written.
-         * 
-         */
-        return nfinds+ninserts+nremoves;
-//        throw new UnsupportedOperationException();
-        
-//        return 0d;
+        return //
+            (serializeTimeNanos + deserializeTimeNanos) + //
+            (writeTimeNanos + readTimeNanos)//
+            ;
         
     }
     
@@ -275,7 +297,7 @@ public class Counters {
     }
 
     static private final NumberFormat commaFormat = NumberFormat.getInstance();
-    static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
+//    static private final NumberFormat percentFormat = NumberFormat.getPercentInstance();
     static private final NumberFormat secondsFormat = NumberFormat.getInstance();
     
     static
