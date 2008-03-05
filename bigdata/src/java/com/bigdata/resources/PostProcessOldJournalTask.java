@@ -1135,6 +1135,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     // add to set of tasks to be run.
                     tasks.add(task);
 
+                    markUsed(name);
+                    
                     log.info("index split: " + name);
 
                     nsplit++;
@@ -1192,6 +1194,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                             tasks.add(task);
 
+                            markUsed(name);
+                            
                             nmove++;
 
                             moved = true;
@@ -1220,6 +1224,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         // add to set of tasks to be run.
                         tasks.add(task);
 
+                        markUsed(name);
+                        
                         nbuild++;
 
                     }
