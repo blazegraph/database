@@ -5,12 +5,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BatchLookup;
@@ -34,7 +40,6 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.MoveIndexPartitionTask.MoveResult;
 import com.bigdata.service.DataService;
@@ -60,6 +65,12 @@ import com.bigdata.service.MetadataService;
  * journal (this is cheaper when the index has not absorbed many writes); and
  * (b) the index partition is not identified as the source for a move.</li>
  * </ul>
+ * Each task has two phases
+ * <ol>
+ * <li>historical read from the lastCommitTime of the old journal</li>
+ * <li>unisolated task performing an atomic update of the index partition view
+ * and the metadata index</li>
+ * </ol>
  * <p>
  * Processing is divided into three stages:
  * <dl>
@@ -102,9 +113,21 @@ import com.bigdata.service.MetadataService;
  *       "compacting merge" but "merge" sounds too close to "join" for me and
  *       those labels are too long.
  * 
- * @todo write unit tests for these operations where we guide moves and joins
- *       top-down. top-down behavior could be customized by placing a field on
- *       the {@link MetadataIndexMetadata} record.
+ * @todo Work out high-level alerting for resource exhaustion and failure to
+ *       maintain QOS on individual machines, indices, and across the
+ *       federation.
+ * 
+ * @todo consider side-effects of post-processing tasks (build, split, join, or
+ *       move ) on a distributed index rebuild operation. It is possible that
+ *       the new index partitions may have been defined (but not yet registered
+ *       in the metadata index) and that new index resources (on journals or
+ *       index segment files) may have been defined. However, none of these
+ *       operations should produce incoherent results so it should be possible
+ *       to restore a coherent state of the metadata index by picking and
+ *       choosing carefully. The biggest danger is choosing a new index
+ *       partition which does not yet have all of its state on hand. There may
+ *       need to be some flag to note when the index partition goes live so that
+ *       we never select it for the rebuild until it is complete.
  * 
  * @todo the client (or the data services?) should send as async message every N
  *       seconds providing a histogram of the partitions they have touched (this
@@ -129,6 +152,8 @@ import com.bigdata.service.MetadataService;
  */
 public class PostProcessOldJournalTask implements Callable<Object> {
 
+    protected static final Logger log = Logger.getLogger(PostProcessOldJournalTask.class);
+    
     /**
      * 
      */
@@ -136,6 +161,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     private final long lastCommitTime;
 
+    /**
+     * The names of any index partitions that were copied onto the new journal during
+     * synchronous overflow processing.
+     */
+    private final Set<String> copied; 
+    
     private IRawStore tmpStore;
 
     /** Aggregated counters for the named indices. */ 
@@ -156,6 +187,59 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * Random access to the index {@link Score}s.
      */
     private final Map<String,Score> scoreMap;
+    
+    /**
+     * This is populated with each index partition that has been "used",
+     * starting with those that were copied during synchronous overflow
+     * processing. This allows us to detect when a possible join candidate can
+     * not in fact be joined because we have already applied another task to its
+     * rightSibling.
+     */
+    private final Set<String> used = new HashSet<String>();
+
+    /**
+     * Return <code>true</code> if the named index partition has already been
+     * "used" by assigning it to partitipate in some build, split, join, or move
+     * operation.
+     * 
+     * @param name
+     *            The name of the index partition.
+     */
+    protected boolean isUsed(String name) {
+        
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        return used.contains(name);
+        
+    }
+    
+    /**
+     * This method is invoked each time an index partition is "used" by
+     * assigning it to partitipate in some build, split, join, or move
+     * operation.
+     * 
+     * @param name
+     *            The name of the index partition.
+     * 
+     * @throws IllegalStateException
+     *             if the index partition was already used by some other
+     *             operation.
+     */
+    protected void markUsed(String name) {
+        
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        if(used.contains(name)) {
+            
+            throw new IllegalStateException("Already used: "+name);
+            
+        }
+        
+        used.add(name);
+        
+    }
     
     /**
      * Helper class assigns a raw and a normalized score to each index based on
@@ -266,13 +350,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * operations.
              */
 
-            ResourceManager.log.info("Index is cold: "+name);
+            log.debug("Index is cold: "+name);
             
             return null;
             
         }
         
-        ResourceManager.log.info("Index score: "+score);
+        log.debug("Index score: "+score);
         
         return score;
         
@@ -280,10 +364,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     
     /**
      * 
-     * 
      * @param resourceManager
      * @param lastCommitTime
      *            The lastCommitTime on the old journal.
+     * @param copied 
+     *            The names of any index partitions that were copied onto the
+     *            new journal during synchronous overflow processing.
      * @param totalCounters
      *            The total {@link Counters} reported for all unisolated and
      *            read-committed index views on the old journal.
@@ -292,7 +378,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      *            read-committed index views on the old journal.
      */
     public PostProcessOldJournalTask(ResourceManager resourceManager,
-            long lastCommitTime, Counters totalCounters,
+            long lastCommitTime, Set<String> copied, Counters totalCounters,
             Map<String/* name */, Counters> indexCounters) {
 
         if (resourceManager == null)
@@ -301,6 +387,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if( lastCommitTime <= 0)
             throw new IllegalArgumentException();
 
+        if( copied == null ) 
+            throw new IllegalArgumentException();
+        
         if (totalCounters == null)
             throw new IllegalArgumentException();
 
@@ -311,6 +400,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         this.lastCommitTime = lastCommitTime;
 
+        this.copied = copied;
+        
+        // copied indices are used and should not be processed further.
+        used.addAll(copied);
+        
         this.totalCounters = totalCounters;
         
         this.indexCounters = indexCounters;
@@ -347,13 +441,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // sort into ascending order (inceasing activity).
             Arrays.sort(scores);
             
-            ResourceManager.log.info("The most active index was: "
-                    + scores[scores.length - 1]);
-
-            ResourceManager.log
-                    .info("The least active index was: " + scores[0]);
-
-            for(i=0;i<scores.length; i++) {
+            for (i = 0; i < scores.length; i++) {
                 
                 scores[i].rank = i;
                 
@@ -363,10 +451,387 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
             }
             
+            log.debug("The most active index was: "
+                            + scores[scores.length - 1]);
+
+            log.debug("The least active index was: " + scores[0]);
+
         }
 
     }
 
+    /**
+     * Scans the registered named indices and decides which ones (if any) are
+     * undercapacity and should be joined.
+     * <p>
+     * If the rightSibling of an undercapacity index partition is also local
+     * then a {@link JoinIndexPartitionTask} is created to join those index
+     * partitions and both index partitions will be marked as "used".
+     * <p>
+     * If the rightSibling of an undercapacity index partition is remote, then a
+     * {@link MoveIndexPartitionTask} is created to move the undercapacity index
+     * partition to the remove data service and the undercapacity index partition
+     * will be marked as "used".
+     */
+    protected List<AbstractTask> chooseIndexPartitionJoins() {
+
+        // list of tasks that we create (if any).
+        final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
+
+        log.info("begin: lastCommitTime=" + lastCommitTime);
+
+        // the old journal.
+        final AbstractJournal oldJournal = resourceManager
+                .getJournal(lastCommitTime);
+        
+        /*
+         * Map of the under capacity index partitions for each scale-out index
+         * having index partitions on the journal. Keys are the name of the
+         * scale-out index. The values are B+Trees. There is an entry for each
+         * scale-out index having index partitions on the journal.
+         * 
+         * Each B+Tree is sort of like a metadata index - its keys are the
+         * leftSeparator of the index partition but its values are the
+         * LocalPartitionMetadata records for the index partitions found on the
+         * journal.
+         * 
+         * This map is populated during the scan of the named indices with index
+         * partitions that are "undercapacity"
+         */
+        final Map<String, BTree> undercapacityIndexPartitions = new HashMap<String, BTree>();
+        {
+
+            // counters : must sum to ndone as post-condition.
+            int ndone = 0; // for each named index we process
+            int nskip = 0; // nothing.
+            int njoin = 0; // join task _candidate_.
+            int nignored = 0; // #of index partitions that are NOT join candidates.
+
+            final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
+                    null, null);
+
+            while (itr.hasNext()) {
+
+                final ITuple tuple = itr.next();
+
+                final Entry entry = EntrySerializer.INSTANCE
+                        .deserialize(new DataInputBuffer(tuple.getValue()));
+
+                // the name of an index to consider.
+                final String name = entry.name;
+
+                if(isUsed(name)) {
+                    
+                    log.info("Skipping name="+name+" - already used.");
+                    
+                    nskip++;
+                    
+                    ndone++;
+                    
+                    continue;
+                    
+                }
+
+                /* 
+                 * Open the historical view of that index at that time.
+                 */
+                final IIndex view = resourceManager.getIndexOnStore(name,
+                        lastCommitTime, oldJournal);
+
+                if (view == null) {
+
+                    throw new AssertionError(
+                            "Index not registered on old journal: " + name
+                                    + ", lastCommitTime=" + lastCommitTime);
+
+                }
+
+                // index metadata for that index partition.
+                final IndexMetadata indexMetadata = view.getIndexMetadata();
+
+                // handler decides when and where to split an index partition.
+                final ISplitHandler splitHandler = indexMetadata
+                        .getSplitHandler();
+
+                // index partition metadata
+                final LocalPartitionMetadata pmd = indexMetadata
+                        .getPartitionMetadata();
+
+                if (splitHandler != null
+                        && pmd.getRightSeparatorKey() != null
+                        && splitHandler.shouldJoin(view)) {
+
+                    /*
+                     * Add to the set of index partitions that are candidates
+                     * for join operations.
+                     * 
+                     * Note: joins are only considered when the rightSibling of
+                     * an index partition exists. The last index partition has
+                     * [rightSeparatorKey == null] and there is no rightSibling
+                     * for that index partition.
+                     * 
+                     * Note: If we decide to NOT join this with another local
+                     * partition then we MUST do an index segment build in order
+                     * to release the dependency on the old journal. This is
+                     * handled below when we consider the JOIN candidates that
+                     * were discovered in this loop.
+                     */
+
+                    final String scaleOutIndexName = indexMetadata.getName();
+
+                    BTree tmp = undercapacityIndexPartitions
+                            .get(scaleOutIndexName);
+
+                    if (tmp == null) {
+
+                        tmp = BTree.create(tmpStore, new IndexMetadata(UUID
+                                .randomUUID()));
+
+                        undercapacityIndexPartitions
+                                .put(scaleOutIndexName, tmp);
+
+                    }
+
+                    tmp.insert(pmd.getLeftSeparatorKey(), pmd);
+
+                    log.info("join candidate: " + name);
+
+                    njoin++;
+
+                } else {
+                    
+                    nignored++;
+                    
+                }
+
+                ndone++;
+
+            } // itr.hasNext()
+
+            // verify counters.
+            assert ndone == nskip + njoin + nignored : "ndone=" + ndone
+                    + ", nskip=" + nskip + ", njoin=" + njoin + ", nignored="
+                    + nignored;
+
+        }
+
+        /*
+         * Consider the JOIN candidates. These are underutilized index
+         * partitions on this data service. They are grouped by the scale-out
+         * index to which they belong.
+         * 
+         * In each case we will lookup the rightSibling of the underutilized
+         * index partition using its rightSeparatorKey and the metadata index
+         * for that scale-out index.
+         * 
+         * If the rightSibling is local, then we will join those siblings.
+         * 
+         * If the rightSibling is remote, then we will move the index partition
+         * to the remote data service.
+         * 
+         * Note: If we decide neither to join the index partition NOR to move
+         * the index partition to another data service then we MUST add an index
+         * build task for that index partition in order to release the history
+         * dependency on the old journal.
+         */
+        {
+
+            /*
+             * This iterator visits one entry per scale-out index on this data
+             * service having an underutilized index partition on this data
+             * service.
+             */
+            final Iterator<Map.Entry<String, BTree>> itr = undercapacityIndexPartitions
+                    .entrySet().iterator();
+
+            int ndone = 0;
+            int njoin = 0; // do index partition join on local service.
+            int nmove = 0; // move to another service for index partition join.
+
+            final UUID sourceDataService = resourceManager.getDataServiceUUID();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, BTree> entry = itr.next();
+
+                // the name of the scale-out index.
+                final String scaleOutIndexName = entry.getKey();
+
+                log.info("Considering join candidates: " + scaleOutIndexName);
+
+                // keys := leftSeparator; value := LocalPartitionMetadata
+                final BTree tmp = entry.getValue();
+
+                // #of underutilized index partitions for that scale-out index.
+                final int ncandidates = tmp.getEntryCount();
+                
+                assert ncandidates > 0 : "Expecting at least one candidate";
+                
+                final ITupleIterator titr = tmp.entryIterator();
+
+                /*
+                 * Setup a BatchLookup query designed to locate the rightSibling
+                 * of each underutilized index partition for the current
+                 * scale-out index.
+                 * 
+                 * Note: This approach makes it impossible to join the last
+                 * index partition when it is underutilized since it does not,
+                 * by definition, have a rightSibling. However, the last index
+                 * partition always has an open key range and is far more likely
+                 * than any other index partition to recieve new writes.
+                 */
+
+                log.info("Formulating rightSiblings query=" + scaleOutIndexName
+                        + ", #underutilized=" + ncandidates);
+                
+                final byte[][] keys = new byte[ncandidates][];
+                
+                final LocalPartitionMetadata[] underUtilizedPartitions = new LocalPartitionMetadata[ncandidates];
+                
+                int i = 0;
+                
+                while (titr.hasNext()) {
+
+                    ITuple tuple = titr.next();
+
+                    LocalPartitionMetadata pmd = (LocalPartitionMetadata) SerializerUtil
+                            .deserialize(tuple.getValue());
+
+                    underUtilizedPartitions[i] = pmd;
+
+                    /*
+                     * Note: the right separator key is also the key under which
+                     * we will find the rightSibling.
+                     * 
+                     */
+                    
+                    if (pmd.getRightSeparatorKey() == null) {
+
+                        throw new AssertionError(
+                                "The last index partition may not be a join candidate: name="
+                                        + scaleOutIndexName + ", " + pmd);
+
+                    }
+                    
+                    keys[i] = pmd.getRightSeparatorKey();
+                    
+                    i++;
+                    
+                } // next underutilized index partition.
+
+                log.info("Looking for rightSiblings: name=" + scaleOutIndexName
+                        + ", #underutilized=" + ncandidates);
+
+                /*
+                 * Submit a single batch request to identify rightSiblings for
+                 * all of the undercapacity index partitions for this scale-out
+                 * index.
+                 */
+                final BatchLookup op = new BatchLookup(ncandidates, 0/*offset*/, keys);
+                final ResultBuffer resultBuffer;
+                try {
+                    resultBuffer = (ResultBuffer) resourceManager
+                            .getMetadataService()
+                            .submit(
+                                    -lastCommitTime,
+                                    MetadataService
+                                            .getMetadataIndexName(scaleOutIndexName),
+                                    op);
+                } catch (Exception e) {
+                    
+                    log.error("Could not locate rightSiblings: index="
+                            + scaleOutIndexName, e);
+
+                    continue;
+                    
+                }
+
+                for (i = 0; i < ncandidates; i++) {
+
+                    final LocalPartitionMetadata pmd = underUtilizedPartitions[i];
+                    
+                    final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
+                            .deserialize(resultBuffer.getResult()[i]);
+
+                    final UUID targetDataServiceUUID = rightSiblingLocator.getDataServices()[0];
+
+                    if (sourceDataService.equals(targetDataServiceUUID)) {
+
+                        /*
+                         * JOIN underutilized index partition with its local
+                         * rightSibling.
+                         * 
+                         * Note: This is only joining two index partitions at a
+                         * time. It's possible to do more than that if it
+                         * happens that N > 2 underutilized sibling index
+                         * partitions are on the same data service, but that is
+                         * a relatively unlikley combination of events.
+                         */
+                        
+                        final String[] resources = new String[2];
+                        
+                        resources[0] = DataService
+                                .getIndexPartitionName(scaleOutIndexName,
+                                        underUtilizedPartitions[i].getPartitionId());
+                        
+                        resources[1] = DataService.getIndexPartitionName(
+                                scaleOutIndexName, rightSiblingLocator.getPartitionId());
+
+                        log.info("Will JOIN: " + Arrays.toString(resources));
+                        
+                        final AbstractTask task = new JoinIndexPartitionTask(
+                                    resourceManager, resourceManager
+                                            .getConcurrencyManager(),
+                                    lastCommitTime, resources);
+
+                        // add to set of tasks to be run.
+                        tasks.add(task);
+                        
+                        markUsed(resources[0]);
+
+                        markUsed(resources[1]);
+                        
+                        njoin++;
+
+                    } else {
+                        
+                        /*
+                         * MOVE underutilized index partition to data service
+                         * hosting the right sibling.
+                         */
+                        
+                        final String sourceIndexName = DataService
+                                .getIndexPartitionName(scaleOutIndexName, pmd
+                                        .getPartitionId());
+
+                        final AbstractTask task = new MoveIndexPartitionTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime, sourceIndexName,
+                                targetDataServiceUUID);
+
+                        tasks.add(task);
+                        
+                        markUsed(sourceIndexName);
+                        
+                        nmove++;
+                        
+                    }
+
+                    ndone++;
+                    
+                }
+                
+            } // next scale-out index with underutilized index partition(s).
+
+            assert ndone == njoin + nmove;
+            
+        } // consider JOIN candidates.
+
+        return tasks;
+        
+    }
+    
     /**
      * Examine each named index on the old journal and decide what, if anything,
      * to do with that index. These indices are key range partitions of named
@@ -497,7 +962,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
-        ResourceManager.log.info("begin: lastCommitTime=" + lastCommitTime);
+        log.info("begin: lastCommitTime=" + lastCommitTime);
 
         // the old journal.
         final AbstractJournal oldJournal = resourceManager
@@ -508,63 +973,103 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 (int) oldJournal.getName2Addr().rangeCount(null, null));
 
         /*
-         * Map of the under capacity index partitions for each scale-out index
-         * having index partitions on the journal. Keys are the name of the
-         * scale-out index. The values are B+Trees. There is an entry for each
-         * scale-out index having index partitions on the journal.
-         * 
-         * Each B+Tree is sort of like a metadata index - its keys are the
-         * leftSeparator of the index partition but its values are the
-         * LocalPartitionMetadata records for the index partitions found on the
-         * journal.
-         * 
-         * This map is populated during the scan of the named indices with index
-         * partitions that are "undercapacity"
+         * First, identify any index partitions that have underflowed and will
+         * either be joined or moved. When an an index partition is joined its
+         * rightSibling is also processed. This is why we identify the index
+         * partition joins first - so that we can avoid attempts to process the
+         * rightSibling now that we know it is being used by the join operation.
          */
-        final Map<String, BTree> undercapacityIndexPartitions = new HashMap<String, BTree>();
+        tasks.addAll(chooseIndexPartitionJoins());
+        
+        /*
+         * Set true if this node/data service is highly utilized. We will
+         * consider moves IFF this is a highly utilized service.
+         * 
+         * FIXME set highlyUtilizedService based on recent load for this
+         * host and service. If the host is at 80% or more load and the
+         * service is at 1/#servicesOnHost % or more load then the host is
+         * highly utilized.
+         * 
+         * An under-utilized host is one where the host is at 50% or less
+         * load.  An under-utilized service on that host is one where the
+         * service is ....
+         */
+        final boolean highlyUtilizedService = true;
+
+        /*
+         * The minimum #of active index partitions on a data service. We
+         * will consider moving index partitions iff this threshold is
+         * exceeeded.
+         */
+        final int minActiveIndexPartitions = resourceManager.minimumActiveIndexPartitions;
+        
+        /*
+         * Note: We make sure that we do not move all the index partitions
+         * to the same target by moving at most M index partitions per
+         * under-utilized data service recommended to us.
+         */
+        final int maxMovesPerTarget = resourceManager.maximumMovesPerTarget;
+
+        /*
+         * Obtain some data service UUIDs onto which we will try and offload
+         * some index partitions iff this data service is deemed to be
+         * highly utilized.
+         */
+        final UUID[] underUtilizedDataServiceUUIDs;
+        if (highlyUtilizedService) {
+
+            UUID[] a = null;
+            
+            try {
+
+                // request under utilized data services (RMI).
+                
+                a = resourceManager
+                        .getMetadataService().getUnderUtilizedDataServices(
+                                0/* limit */,
+                                resourceManager.getDataServiceUUID());
+
+            } catch (IOException ex) {
+
+                log.warn("Could not obtain target service UUIDs: ", ex);
+
+            }
+
+            underUtilizedDataServiceUUIDs = a;
+            
+        } else {
+            
+            underUtilizedDataServiceUUIDs = null;
+            
+        }
+        
+        /*
+         * The #of active index partitions on this data service.
+         */
+        final int nactive = scores.length;
+
+        /*
+         * The maximum #of index partition moves that we will attempt. This
+         * is zero unless this service is "highly utilized" and will be zero
+         * if there are no under-utilized services onto which we can move an
+         * index partition. Also, it will be zero unless there is a surplus
+         * of active index partitions on this data service.
+         */
+        final int maxMoves = Math.min(//
+                Math.min(0, nactive - minActiveIndexPartitions),
+                (underUtilizedDataServiceUUIDs == null
+                        ? 0
+                        : maxMovesPerTarget * underUtilizedDataServiceUUIDs.length
+                )
+        );
+
         {
 
-            /*
-             * Set true if this node/data service is highly utilized. We will
-             * consider moves IFF this is a highly utilized service.
-             * 
-             * FIXME set highlyUtilizedService based on recent load for this
-             * host and service.
-             */
-            final boolean highlyUtilizedService = true;
-
-            /*
-             * Obtain some data service UUIDs onto which we will try and offload
-             * some index partitions iff this data service is deemed to be
-             * highly utilized.
-             */
-            
-            UUID[] underUtilizedDataServiceUUIDs = null;
-
-            if (highlyUtilizedService) {
-                
-                try {
-
-                    underUtilizedDataServiceUUIDs = resourceManager
-                            .getMetadataService().getUnderUtilizedDataServices(
-                                    0/* limit */,
-                                    resourceManager.getDataServiceUUID());
-
-                } catch (IOException ex) {
-
-                    ResourceManager.log.warn(
-                            "Could not obtain target service UUIDs: ", ex);
-
-                }
-                
-            }
-            
             // counters : must sum to ndone as post-condition.
             int ndone = 0; // for each named index we process
             int nskip = 0; // nothing.
             int nbuild = 0; // build task.
             int nsplit = 0; // split task.
-            int njoin = 0; // join task _candidate_.
             int nmove = 0; // move task (to underutilized node).
 
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
@@ -581,443 +1086,158 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final String name = entry.name;
 
                 /*
-                 * Check the index segment build threshold. If this threshold is
-                 * not met then we presume that the data was already copied onto
-                 * the live journal. In this case we DO NOT build an index
-                 * segment from the old view. Likewise, we will NOT choose
-                 * either a split or join for this index partition. However, it
-                 * MAY be nominated for a move based on utilization.
+                 * The index partition has already been handled.
                  */
-                final boolean didCopy;
-                {
+                if(isUsed(name)) {
+                    
+                    log.info("Skipping name="+name);
+                    
+                    nskip++;
 
-                    // get the B+Tree on the old journal.
-                    final BTree oldBTree = oldJournal.getIndex(entry.addr);
+                    ndone++;
+                    
+                    continue;
+                    
+                }
 
-                    final int entryCount = oldBTree.getEntryCount();
+                /* 
+                 * Open the historical view of that index at that time.
+                 */
+                final IIndex view = resourceManager.getIndexOnStore(name,
+                        lastCommitTime, oldJournal);
 
-                    // @todo write test directly on this fence post!
-                    didCopy = resourceManager.copyIndexThreshold != 0
-                            && entryCount < resourceManager.copyIndexThreshold;
+                if (view == null) {
 
-                    if (didCopy) {
-
-                        ResourceManager.log
-                                .warn("Will not build index segment: name="
-                                        + name
-                                        + ", entryCount="
-                                        + entryCount
-                                        + ", threshold="
-                                        + resourceManager.copyIndexThreshold);
-
-                        nskip++;
-
-                    }
+                    throw new AssertionError(
+                            "Index not registered on old journal: " + name
+                                    + ", lastCommitTime=" + lastCommitTime);
 
                 }
 
-                if (!didCopy) {
+                // index metadata for that index partition.
+                final IndexMetadata indexMetadata = view.getIndexMetadata();
 
-                    // historical view of that index at that time.
-                    final IIndex view = resourceManager.getIndexOnStore(name,
-                            lastCommitTime, oldJournal);
+                // handler decides when and where to split an index partition.
+                final ISplitHandler splitHandler = indexMetadata
+                        .getSplitHandler();
 
-                    if (view == null) {
+                if (splitHandler != null && splitHandler.shouldSplit(view)) {
 
-                        throw new AssertionError(
-                                "Index not registered on old journal: " + name
-                                        + ", lastCommitTime=" + lastCommitTime);
+                    /*
+                     * Do an index split task.
+                     */
+
+                    final AbstractTask task = new SplitIndexPartitionTask(
+                            resourceManager, resourceManager
+                                    .getConcurrencyManager(), lastCommitTime,
+                            name);
+
+                    // add to set of tasks to be run.
+                    tasks.add(task);
+
+                    log.info("index split: " + name);
+
+                    nsplit++;
+
+                } else {
+                    
+                    /*
+                     * Either a move or a build.
+                     */
+                    
+                    boolean moved = false;
+
+                    if (highlyUtilizedService
+                            && underUtilizedDataServiceUUIDs != null
+                            && scores.length > minActiveIndexPartitions
+                            && nmove < maxMoves) {
+
+                        /*
+                         * Note: We make sure that we don't move all the
+                         * hot/warm index partitions by choosing the index
+                         * partitions to be moved from the middle of the range.
+                         * 
+                         * Note: This could lead to a failure to recommend a
+                         * move if all the "warm" index partitions happen to
+                         * require a split or join. However, this is unlikely
+                         * since the "warm" index partitions change size, if not
+                         * slowly, then at least not as rapidly as the hot index
+                         * partitions. Eventually a lot of splits will lead to
+                         * some index partition not being split during an
+                         * overflow and then we can move it.
+                         * 
+                         * @todo could adjust the bounds here based on how
+                         * important it is to begin moving index partitions off
+                         * of this data service.
+                         */
+
+                        final Score score = getScore(name);
+
+                        if (score != null && score.drank > .3
+                                && score.drank < .8) {
+
+                            /*
+                             * Move this index partition to an under-utilized
+                             * data service.
+                             */
+
+                            // choose target using round robin among candidates.
+                            final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
+                                    % underUtilizedDataServiceUUIDs.length];
+
+                            final AbstractTask task = new MoveIndexPartitionTask(
+                                    resourceManager, resourceManager
+                                            .getConcurrencyManager(),
+                                    lastCommitTime, name, targetDataServiceUUID);
+
+                            tasks.add(task);
+
+                            nmove++;
+
+                            moved = true;
+
+                        }
 
                     }
 
-                    // index metadata for that index partition.
-                    final IndexMetadata indexMetadata = view.getIndexMetadata();
-
-                    // handler decides when and where to split an index
-                    // partition.
-                    final ISplitHandler splitHandler = indexMetadata
-                            .getSplitHandler();
-
-                    // index partition metadata
-                    final LocalPartitionMetadata pmd = indexMetadata.getPartitionMetadata();
-                    
-                    if (splitHandler != null && splitHandler.shouldSplit(view)) {
+                    if (!moved) {
 
                         /*
-                         * Do an index split task.
+                         * Just do an index build task.
                          */
 
-                        final AbstractTask task = new SplitIndexPartitionTask(
+                        // the file to be generated.
+                        final File outFile = resourceManager
+                                .getIndexSegmentFile(indexMetadata);
+
+                        final AbstractTask task = new BuildIndexSegmentTask(
                                 resourceManager, resourceManager
                                         .getConcurrencyManager(),
-                                lastCommitTime, name);
+                                lastCommitTime, name, outFile);
+
+                        log.info("index build: " + name);
 
                         // add to set of tasks to be run.
                         tasks.add(task);
 
-                        ResourceManager.log.info("index split: " + name);
+                        nbuild++;
 
-                        nsplit++;
-
-                    } else if (splitHandler != null
-                            && pmd.getRightSeparatorKey() != null
-                            && splitHandler.shouldJoin(view)) {
-
-                        /*
-                         * Add to the set of index partitions that are
-                         * candidates for join operations.
-                         * 
-                         * Note: joins are only considered when the rightSibling
-                         * of an index partition exists. The last index
-                         * partition has [rightSeparatorKey == null] and there
-                         * is no rightSibling for that index partition.
-                         * 
-                         * Note: If we decide to NOT join this with another
-                         * local partition then we MUST do an index segment
-                         * build in order to release the dependency on the old
-                         * journal. This is handled below when we consider the
-                         * JOIN candidates that were discovered in this loop.
-                         */
-
-                        final String scaleOutIndexName = indexMetadata
-                                .getName();
-
-                        BTree tmp = undercapacityIndexPartitions
-                                .get(scaleOutIndexName);
-
-                        if (tmp == null) {
-
-                            tmp = BTree.create(tmpStore, new IndexMetadata(UUID
-                                    .randomUUID()));
-
-                            undercapacityIndexPartitions.put(scaleOutIndexName,
-                                    tmp);
-
-                        }
-
-                        tmp.insert(pmd.getLeftSeparatorKey(), pmd);
-
-                        ResourceManager.log.info("join candidate: " + name);
-
-                        njoin++;
-
-                    } else {
-                        
-                        boolean moved = false;
-                        
-                        /*
-                         * Note: This makes sure that we don't do a move if
-                         * there are only a few index partitions on this data
-                         * service.
-                         */
-                        
-                        final int MIN_INDEX_PARTITIONS_BEFORE_MOVE = 3;
-                        
-                        /*
-                         * Note: We make sure that we do not move all the
-                         * index partitions to the same target by moving at
-                         * most M index partitions per under-utilized data
-                         * service recommended to us.
-                         */
-                        final int MAX_MOVES_PER_TARGET = 3;
-                        
-                        final int maxMoves = MAX_MOVES_PER_TARGET * underUtilizedDataServiceUUIDs.length;
-                        
-                        if (highlyUtilizedService
-                                && underUtilizedDataServiceUUIDs != null
-                                && scores.length > MIN_INDEX_PARTITIONS_BEFORE_MOVE
-                                && nmove < maxMoves) {
-
-                            /*
-                             * Note: We make sure that we don't move all the
-                             * hot/warm index partitions by choosing the index
-                             * partitions to be moved from the middle of the
-                             * range.
-                             * 
-                             * Note: This could lead to a failure to recommend a
-                             * move if all the "warm" index partitions happen to
-                             * require a split or join. However, this is
-                             * unlikely since the "warm" index partitions change
-                             * size, if not slowly, then at least not as rapidly
-                             * as the hot index partitions. Eventually a lot of
-                             * splits will lead to some index partition not
-                             * being split during an overflow and then we can
-                             * move it.
-                             * 
-                             * @todo could adjust the bounds here based on how
-                             * important it is to begin moving index partitions
-                             * off of this data service.
-                             */
-
-                            final Score score = getScore(name);
-
-                            if (score != null && score.drank > .3
-                                    && score.drank < .8) {
-
-                                /*
-                                 * Move this index partition to an
-                                 * under-utilized data service.
-                                 */
-
-                                // choose the target round robin among those offered to us.
-                                final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
-                                        % underUtilizedDataServiceUUIDs.length];
-                                
-                                final AbstractTask task = new MoveIndexPartitionTask(
-                                        resourceManager, resourceManager
-                                                .getConcurrencyManager(),
-                                        lastCommitTime, name,
-                                        targetDataServiceUUID);
-
-                                tasks.add(task);
-
-                                nmove++;
-
-                                moved = true;
-
-                            }
-
-                        }
-
-                        if (!moved) {
-
-                            /*
-                             * Just do an index build task.
-                             */
-
-                            // the file to be generated.
-                            final File outFile = resourceManager
-                                    .getIndexSegmentFile(indexMetadata);
-
-                            final AbstractTask task = new BuildIndexSegmentTask(
-                                    resourceManager, resourceManager
-                                            .getConcurrencyManager(),
-                                    lastCommitTime, name, outFile);
-
-                            ResourceManager.log.info("index build: " + name);
-
-                            // add to set of tasks to be run.
-                            tasks.add(task);
-
-                            nbuild++;
-                            
-                        }
-                        
                     }
 
-                } // if(!didCopy)
+                }
 
                 ndone++;
 
             } // itr.hasNext()
 
             // verify counters.
-            assert ndone == nskip + nbuild + nsplit + njoin + nmove : "ndone="
-                    + ndone + ", nskip=" + nskip + ", nbuild=" + nbuild
-                    + ", nsplit=" + nsplit + ", njoin=" + njoin + ", nmove";
+            assert ndone == nskip + nbuild + nsplit + nmove : "ndone=" + ndone
+                    + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
+                    + nsplit + ", nmove=" + nmove;
 
         }
 
-        /*
-         * Consider the JOIN candidates. These are underutilized index
-         * partitions on this data service. They are grouped by the scale-out
-         * index to which they belong.
-         *  
-         * In each case we will lookup the rightSibling of the underutilized
-         * index partition using its rightSeparatorKey and the metadata index
-         * for that scale-out index.
-         * 
-         * If the rightSibling is local, then we will join those siblings.
-         * 
-         * If the rightSibling is remote, then we will move the index partition
-         * to the remote data service.
-         * 
-         * Note: If we decide neither to join the index partition NOR to move
-         * the index partition to another data service then we MUST add an index
-         * build task for that index partition in order to release the history
-         * dependency on the old journal.
-         */
-        {
-
-            /*
-             * This iterator visits one entry per scale-out index on this data
-             * service having an underutilized index partition on this data
-             * service.
-             */
-            final Iterator<Map.Entry<String, BTree>> itr = undercapacityIndexPartitions
-                    .entrySet().iterator();
-
-            int ndone = 0;
-            int njoin = 0; // do index partition join on local service.
-            int nmove = 0; // move to another service for index partition join.
-//            int nbuild = 0; // 
-            
-            while (itr.hasNext()) {
-
-                final Map.Entry<String, BTree> entry = itr.next();
-
-                // the name of the scale-out index.
-                final String scaleOutIndexName = entry.getKey();
-
-                ResourceManager.log.info("Considering join candidates: "
-                        + scaleOutIndexName);
-
-                // keys := leftSeparator; value := LocalPartitionMetadata
-                final BTree tmp = entry.getValue();
-
-                // #of underutilized index partitions for that scale-out index.
-                final int ncandidates = tmp.getEntryCount();
-                
-                assert ncandidates > 0 : "Expecting at least one candidate";
-                
-                final ITupleIterator titr = tmp.entryIterator();
-
-                /*
-                 * Setup a BatchLookup query designed to locate the rightSibling
-                 * of each underutilized index partition for the current
-                 * scale-out index.
-                 * 
-                 * Note: This approach makes it impossible to join the last
-                 * index partition when it is underutilized since it does not,
-                 * by definition, have a rightSibling. However, the last index
-                 * partition always has an open key range and is far more likely
-                 * than any other index partition to recieve new writes.
-                 */
-
-                ResourceManager.log
-                        .info("Formulating rightSiblings query="
-                                + scaleOutIndexName + ", #underutilized="
-                                + ncandidates);
-                
-                final byte[][] keys = new byte[ncandidates][];
-                
-                final LocalPartitionMetadata[] underUtilizedPartitions = new LocalPartitionMetadata[ncandidates];
-                
-                int i = 0;
-                
-                while (titr.hasNext()) {
-
-                    ITuple tuple = titr.next();
-
-                    LocalPartitionMetadata pmd = (LocalPartitionMetadata) SerializerUtil
-                            .deserialize(tuple.getValue());
-
-                    underUtilizedPartitions[i] = pmd;
-
-                    /*
-                     * Note: the right separator key is also the key under which
-                     * we will find the rightSibling.
-                     * 
-                     */
-                    
-                    if (pmd.getRightSeparatorKey() == null) {
-
-                        throw new AssertionError(
-                                "The last index partition may not be a join candidate: name="
-                                        + scaleOutIndexName + ", " + pmd);
-
-                    }
-                    
-                    keys[i] = pmd.getRightSeparatorKey();
-                    
-                    i++;
-                    
-                } // next underutilized index partition.
-
-                ResourceManager.log
-                        .info("Looking for rightSiblings: name=" + scaleOutIndexName
-                                + ", #underutilized=" + ncandidates);
-
-                final BatchLookup op = new BatchLookup(ncandidates, 0/*offset*/, keys);
-
-                final ResultBuffer resultBuffer = (ResultBuffer) resourceManager
-                        .getMetadataService()
-                        .submit(
-                                -lastCommitTime,
-                                MetadataService
-                                        .getMetadataIndexName(scaleOutIndexName),
-                                op);
-
-                final UUID sourceDataService = resourceManager
-                        .getDataServiceUUID();
-
-                for (i = 0; i < ncandidates; i++) {
-
-                    final LocalPartitionMetadata pmd = underUtilizedPartitions[i];
-                    
-                    final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
-                            .deserialize(resultBuffer.getResult()[i]);
-
-                    final UUID targetDataServiceUUID = rightSiblingLocator.getDataServices()[0];
-
-                    if (sourceDataService.equals(targetDataServiceUUID)) {
-
-                        /*
-                         * JOIN underutilized index partition with its right
-                         * sibling on same data service.
-                         * 
-                         * Note: This is only joining two index partitions at a
-                         * time. It's possible to do more than that if it
-                         * happens that N > 2 underutilized sibling index
-                         * partitions are on the same data service, but that is
-                         * a relatively unlikley combination of events.
-                         */
-                        
-                        final String[] resources = new String[2];
-                        
-                        resources[0] = DataService
-                                .getIndexPartitionName(scaleOutIndexName,
-                                        underUtilizedPartitions[i].getPartitionId());
-                        
-                        resources[1] = DataService.getIndexPartitionName(
-                                scaleOutIndexName, rightSiblingLocator.getPartitionId());
-
-                        ResourceManager.log.info("Will JOIN: "+Arrays.toString(resources));
-                        
-                        final AbstractTask task = new JoinIndexPartitionTask(
-                                    resourceManager, resourceManager
-                                            .getConcurrencyManager(),
-                                    lastCommitTime, resources);
-
-                        // add to set of tasks to be run.
-                        tasks.add(task);
-                        
-                        njoin++;
-
-                    } else {
-                        
-                        /*
-                         * MOVE underutilized index partition to data service
-                         * hosting the right sibling.
-                         */
-                        
-                        final String sourceIndexName = DataService
-                                .getIndexPartitionName(scaleOutIndexName, pmd
-                                        .getPartitionId());
-
-                        final AbstractTask task = new MoveIndexPartitionTask(
-                                resourceManager, resourceManager
-                                        .getConcurrencyManager(),
-                                lastCommitTime, sourceIndexName,
-                                targetDataServiceUUID);
-
-                        tasks.add(task);
-                        
-                        nmove++;
-                        
-                    }
-
-                    ndone++;
-                    
-                }
-                
-            } // next scale-out index with underutilized index partition(s).
-
-            assert ndone == njoin + nmove; // + nbuild;
-            
-        } // consider JOIN candidates.
-
-        ResourceManager.log.info("end");
+        log.info("end");
 
         return tasks;
 
@@ -1053,11 +1273,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     protected List<AbstractTask> runTasks(List<AbstractTask> inputTasks)
             throws Exception {
 
-        ResourceManager.log.info("Will run " + inputTasks.size() + " tasks");
+        log.info("Will run " + inputTasks.size() + " tasks");
 
-        // submit all tasks, awaiting their completion.
+        /*
+         * Submit all tasks, awaiting their completion.
+         * 
+         * Note: We will wait only up to a specified timeout limit for
+         * post-processing to complete normally.
+         * 
+         * @todo config param for timeout.
+         */
         final List<Future<Object>> futures = resourceManager
-                .getConcurrencyManager().invokeAll(inputTasks);
+                .getConcurrencyManager().invokeAll(inputTasks, 2 * 60,
+                        TimeUnit.SECONDS);
 
         final List<AbstractTask> updateTasks = new ArrayList<AbstractTask>(
                 inputTasks.size());
@@ -1066,11 +1294,46 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         for (Future<Object> f : futures) {
 
             /*
-             * @todo Is it Ok to trap exception and continue for non-errored
-             * source index partitions?
+             * Note: We trap exceptions, log them, and ignore them.
+             * 
+             * Note: All of the operations (build, split, join, move) are safe
+             * in the following sense. If the operation does not succeed then
+             * the current state of the index remains on the old journal. Since
+             * failure of the operation results in a failure to update the view
+             * on the new journal (because we do not queue the task that updates
+             * the view), the outcome is that the index view will remain as it
+             * was defined during overflow.
+             * 
+             * However, if these errors persist then they will become a problem.
+             * First, the #of resources in an index view will grow without
+             * bound. Second, the index view will have dependencies on older and
+             * older journals with the consequence that old journal can not be
+             * released on the local file system so the disk space will grow
+             * without bounds as well.
              */
 
-            final AbstractResult tmp = (AbstractResult) f.get();
+            AbstractResult tmp;
+            try {
+
+                /*
+                 * Don't wait long - we gave tasks a chance to complete above.
+                 * 
+                 * @todo I am choosing not to interrupt tasks which have not
+                 * completed since interrupts during IO operations will cause a
+                 * FileChannel backing the journal or index segment to be
+                 * closed, which is a pain. However, this means that the task
+                 * will continue to consume CPU resources until it completes,
+                 * which is also a pain.
+                 */
+                tmp = (AbstractResult) f.get(100,TimeUnit.MILLISECONDS);
+                
+            } catch(Throwable t) {
+            
+                log.error("Post-processing task failed", t);
+                
+                continue;
+                
+            }
 
             assert tmp != null;
             
@@ -1086,8 +1349,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // task will update the index partition view definition.
                 final AbstractTask task = new UpdateIndexPartition(
                         resourceManager, resourceManager
-                                .getConcurrencyManager(), result.name,
-                        result.segmentMetadata);
+                                .getConcurrencyManager(), result.name, result);
 
                 // add to set of tasks to be run.
                 updateTasks.add(task);
@@ -1153,7 +1415,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
 
-        ResourceManager.log.info("end - ran " + inputTasks.size()
+        log.info("end - ran " + inputTasks.size()
                 + " tasks, generated " + updateTasks.size() + " update tasks");
 
         return updateTasks;
@@ -1170,23 +1432,56 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     protected void runUpdateTasks(List<AbstractTask> tasks) throws Exception {
 
-        ResourceManager.log.info("begin");
+        log.info("begin : will run "+tasks.size()+" update tasks");
 
-        // submit all tasks, awaiting their completion.
+        /*
+         * Submit all tasks, awaiting their completion.
+         * 
+         * Note: The update tasks should be relatively fast, excepting possibly
+         * moves of a hot index partition since there could be a lot of buffered
+         * writes.
+         * 
+         * @todo config param for timeout.
+         */
         final List<Future<Object>> futures = resourceManager
-                .getConcurrencyManager().invokeAll(tasks);
+                .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
 
         // verify that all tasks completed successfully.
         for (Future<Object> f : futures) {
 
             /*
-             * @todo error handling?
+             * Note: An error here, like an error in the build/split/join/move
+             * tasks above, MAY be ignored. The consequences are exactly like
+             * those above. The index partition will remain coherent and valid
+             * but its view will continue to have a dependency on the old
+             * journal until a post-processing task for that index partition
+             * succeeds.
              */
-            f.get();
+            try {
+
+                /*
+                 * Note: Don't wait long - we already gave the tasks a chance to
+                 * complete up above.
+                 * 
+                 * @todo Verify that no problems can arise if we allow
+                 * post-processing to complete while update tasks are still
+                 * executing. Ideally the atomic update operations will either
+                 * succeed fully or fail, and failure will mean that the view
+                 * was not changed.
+                 */
+                f.get(100,TimeUnit.MILLISECONDS);
+                
+            } catch(Throwable t) {
+            
+                log.error("Update task failed", t);
+                
+                continue;
+                
+            }
 
         }
 
-        ResourceManager.log.info("end");
+        log.info("end");
 
     }
 
@@ -1236,8 +1531,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final long overflowCounter = resourceManager.overflowCounter
                     .incrementAndGet();
 
-            ResourceManager.log
-                    .info("Done: overflowCounter=" + overflowCounter);
+            log.info("Done: overflowCounter=" + overflowCounter);
             
             return null;
             
@@ -1250,7 +1544,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * otherwise they will not be noticed.
              */
             
-            ResourceManager.log.error(t/*msg*/, t/*stack trace*/);
+            log.error(t/*msg*/, t/*stack trace*/);
 
             throw new RuntimeException( t );
             

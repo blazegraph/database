@@ -37,6 +37,12 @@ public abstract class AbstractResult {
      */
     public AbstractResult(String name, IndexMetadata indexMetadata) {
 
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        if (indexMetadata == null)
+            throw new IllegalArgumentException();
+        
         this.name = name;
         
         this.indexMetadata = indexMetadata;

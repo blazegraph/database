@@ -168,12 +168,6 @@ import com.bigdata.sparse.SparseRowStore;
  * a backward compatible manner.
  * </p>
  * 
- * @todo Introduce the various methods for finding split points (or refining /
- *       rejecting them), for handling overflow extensions (such as copying raw
- *       records from the journal to the image segment (bigdatarepository) and
- *       keeping them in play through successive overflows, history policy,
- *       etc).
- * 
  * @todo Consider just having a property set since there are so many possible
  *       properties.
  * 
@@ -184,6 +178,15 @@ import com.bigdata.sparse.SparseRowStore;
  *       partition metadata so that appropriate policies are enforcable locally
  *       (access control, latency requirements, replication, purging of
  *       historical deleted versions, etc).
+ * 
+ * @todo add optional property containing IndexMetadata to be used as of the
+ *       next overflow so that people can swap out key and value serializers and
+ *       the like during overflow operations. the conops is that you map the new
+ *       metadata over the index partitions and either lazily or eagerly
+ *       overflow is triggered and the resulting {@link BTree} and
+ *       {@link IndexSegment} objects will begin to use the new key / value
+ *       serializers, etc. while the existing objects will still have their old
+ *       key/val serializers and therefore can still be read.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

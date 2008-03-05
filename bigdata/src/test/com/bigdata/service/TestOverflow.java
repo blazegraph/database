@@ -158,6 +158,9 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         // @todo also test with copy enabled.
         properties.setProperty(com.bigdata.resources.ResourceManager.Options.COPY_INDEX_THRESHOLD,"0");
         
+        // Note: disables index partition moves.
+        properties.setProperty(com.bigdata.resources.ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+        
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);

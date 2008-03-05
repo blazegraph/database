@@ -40,6 +40,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -557,6 +559,15 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     
     /**
      * The timestamp of the last committed state of this index.
+     * <p>
+     * Note: This is fixed for an {@link IndexSegment}.
+     * <p>
+     * Note: This is NOT normally set on the {@link ITx#UNISOLATED} view of a
+     * {@link BTree}.
+     * <p>
+     * Note: If you are reading from a historical state of a {@link BTree} then
+     * this MAY be set to {@link ICommitRecord#getTimestamp()} for that
+     * historical state - it MUST NOT be set to any other value.
      */
     abstract public long getLastCommitTime();
     

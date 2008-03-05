@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
 
@@ -30,6 +32,8 @@ public class ResourceFileFilter implements FileFilter {
      */
     private final ResourceManager resourceManager;
 
+    protected static final Logger log = Logger.getLogger(ResourceFileFilter.class);
+    
     /**
      * @param resourceManager
      */
@@ -111,7 +115,7 @@ public class ResourceFileFilter implements FileFilter {
 
         }
 
-        ResourceManager.log.warn("Unknown file: " + f);
+        log.warn("Unknown file: " + f);
 
         return false;
 

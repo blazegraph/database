@@ -194,7 +194,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
                 btree.setReadOnly(true);
                 
-                btree.setLastCommitTime(ts);
+                btree.setLastCommitTime(commitRecord.getTimestamp());
                 
             }
             
@@ -228,7 +228,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
                 btree.setReadOnly(true);
                 
-                btree.setLastCommitTime(ts);
+                btree.setLastCommitTime(commitRecord.getTimestamp());
                 
             }
 
