@@ -1356,6 +1356,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * supported by the source and target. The goal is an exact copy of the data
      * in the source btree.
      * 
+     * @param overflow
+     *            When <code>true</code> the {@link IOverflowHandler} defined
+     *            for the source index (if any) will be applied to copy raw
+     *            records onto the backing store for this index. This value
+     *            SHOULD be <code>false</code> if the two indices have the
+     *            same backing store and <code>true</code> otherwise.
+     * 
      * @throws UnsupportedOperationException
      *             if the <i>src</i> and <i>this</i> do not have the same
      *             setting for {@link IndexMetadata#getDeleteMarkers()}
@@ -1366,33 +1373,41 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * 
      * @return The #of index entries that were copied.
      * 
-     * @todo write tests for all variations (delete markers, timestamps, etc).
+     * @todo write tests for all variations (delete markers, timestamps,
+     *       overflow handler, etc).
      */
-    public long rangeCopy(IIndex src, byte[] fromKey, byte[] toKey) {
+    public long rangeCopy(IIndex src, byte[] fromKey, byte[] toKey, boolean overflow) {
 
         assertNotReadOnly();
-        
+
         final ITupleIterator itr = src.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.ALL, null/* filter */);
 
-        final boolean deleteMarkers = getIndexMetadata().getDeleteMarkers();
+        final IndexMetadata thisMetadata = getIndexMetadata();
+        
+        final IndexMetadata sourceMetadata = src.getIndexMetadata();
+        
+        final boolean deleteMarkers = thisMetadata.getDeleteMarkers();
 
-        final boolean versionTimestamps = getIndexMetadata().getVersionTimestamps();
+        final boolean versionTimestamps = thisMetadata.getVersionTimestamps();
 
-        if (src.getIndexMetadata().getDeleteMarkers() != deleteMarkers) {
+        if (sourceMetadata.getDeleteMarkers() != deleteMarkers) {
 
             throw new UnsupportedOperationException(
                     "Support for delete markers not consistent");
 
         }
 
-        if (src.getIndexMetadata().getVersionTimestamps() != versionTimestamps) {
+        if (sourceMetadata.getVersionTimestamps() != versionTimestamps) {
 
             throw new UnsupportedOperationException(
                     "Support for version timestamps not consistent");
 
         }
 
+        final IOverflowHandler overflowHandler = (overflow ? sourceMetadata
+                .getOverflowHandler() : null);
+        
         ITuple tuple = null;
         
         while (itr.hasNext()) {
@@ -1401,31 +1416,59 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
             final byte[] key = tuple.getKey();
 
+            final boolean deletedVersion = deleteMarkers && tuple.isDeletedVersion();
+            
+            final byte[] val;
+            
+            if (deletedVersion) {
+                
+                val = null;
+                
+            } else {
+                
+                if (overflowHandler != null) {
+
+                    /*
+                     * Provide the handler with the opportunity to copy the
+                     * blob's data onto the backing store for this index and
+                     * re-write the value, which is presumably the blob
+                     * reference.
+                     */
+
+                    val = overflowHandler.handle(tuple, getStore());
+
+                } else {
+
+                    val = tuple.getValue();
+
+                }
+
+            }
+
             if (versionTimestamps) {
 
                 final long timestamp = tuple.getVersionTimestamp();
 
-                if (deleteMarkers && tuple.isDeletedVersion()) {
+                if (deletedVersion) {
 
-                    insert(key, null/* value */, true/* delete */,
-                            timestamp, null/* tuple */);
+                    insert(key, null/* value */, true/* delete */, timestamp,
+                            null/* tuple */);
 
                 } else {
 
-                    insert(key, tuple.getValue(), false/* delete */,
-                            timestamp, null/* tuple */);
+                    insert(key, val, false/* delete */, timestamp, null/* tuple */);
 
                 }
 
             } else {
 
-                if (deleteMarkers && tuple.isDeletedVersion()) {
+                if (deletedVersion) {
 
                     remove(key);
 
                 } else {
 
-                    insert(key, tuple.getValue());
+                    insert(key, val);
 
                 }
 

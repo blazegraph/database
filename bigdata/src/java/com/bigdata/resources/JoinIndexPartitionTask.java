@@ -172,10 +172,12 @@ public class JoinIndexPartitionTask extends AbstractTask {
             oldpmd[i] = pmd;
                         
             /*
-             * Copy all data into the new btree.
+             * Copy all data into the new btree. Since we are copying from the
+             * old journal onto the new journal [overflow := true] so that any
+             * referenced raw records are copied as well.
              */
             
-            final long ncopied = btree.rangeCopy(src, null, null);
+            final long ncopied = btree.rangeCopy(src, null, null, true/*overflow*/);
             
             log.info("Copied " + ncopied + " index entries from " + name);
             

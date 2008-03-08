@@ -611,7 +611,7 @@ public class IndexSegmentBuilder {
             /*
              * Open buffer for blobs iff an overflow handler was specified.
              */
-            IOverflowHandler overflowHandler = metadata.getOverflowHandler();
+            final IOverflowHandler overflowHandler = metadata.getOverflowHandler();
             
             blobBuffer = overflowHandler == null ? null
                     : new TemporaryRawStore(offsetBits);
@@ -723,7 +723,7 @@ public class IndexSegmentBuilder {
 
                     final byte[] val;
                     
-                    if(overflowHandler!=null) {
+                    if (overflowHandler != null) {
                     
                         /*
                          * Provide the handler with the opportunity to copy the
