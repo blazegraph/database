@@ -2731,6 +2731,10 @@ abstract public class ResourceManager implements IResourceManager {
          * Overflow each index by re-defining its view on the new journal.
          */
         int noverflow = 0;
+        // #of indices with at least one index entry that were copied.
+        int numNonZeroCopy = 0;
+        // Maximum #of non-zero indices that we will copy over.
+        final int maxNonZeroCopy = 100;
         final AbstractJournal oldJournal = getLiveJournal();
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         {
@@ -2759,6 +2763,9 @@ abstract public class ResourceManager implements IResourceManager {
                 // old partition metadata.
                 final LocalPartitionMetadata oldpmd = indexMetadata
                         .getPartitionMetadata();
+                
+                // true iff an overflow handler is defined.
+                final boolean hasOverflowHandler = indexMetadata.getOverflowHandler() != null;
 
                 if (oldpmd == null) {
 
@@ -2792,13 +2799,21 @@ abstract public class ResourceManager implements IResourceManager {
                  * When an index partition is non-empty, the copyIndexThreshold
                  * is non-zero, and the entry count of the buffered write set is
                  * LTE the threshold then the buffered writes will be copied to
-                 * the new journal.
+                 * the new journal UNLESS an overflow handler is defined
+                 * (overflow handlers are used to copy raw records from the
+                 * journal onto the index segment - such records can be quite
+                 * large, for example the distributed file system allows records
+                 * up to 64M each, so we do not want to copy over even a small
+                 * index with an overflow handler since there may be large
+                 * records on the journal that would have to be copied as well).
                  * 
                  * Otherwise we will let the asynchronous post-processing figure
                  * out what it wants to do with this index partition.
                  */
                 final boolean copyIndex = (entryCount == 0)
-                        || (copyIndexThreshold > 0 && entryCount <= copyIndexThreshold);
+                        || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
+                                && numNonZeroCopy < maxNonZeroCopy//
+                                && !hasOverflowHandler);
 
                 if(copyIndex) {
                     
@@ -2919,16 +2934,29 @@ abstract public class ResourceManager implements IResourceManager {
                         /*
                          * Copy the data from the B+Tree on the old journal into
                          * the B+Tree on the new journal.
+                         * 
+                         * Note: [overflow := true] since we are copying from
+                         * the old journal onto the new journal, but the
+                         * overflow handler will never be applied since we do
+                         * NOT copy an index with a non-null overflow handler
+                         * (see above).
                          */
                         
                         log.info("Copying data to new journal: name=" + entry.name
                                 + ", entryCount=" + entryCount + ", threshold="
                                 + copyIndexThreshold);
                         
-                        newBTree.rangeCopy(oldBTree, null, null);
+                        newBTree.rangeCopy(oldBTree, null, null, true/*overflow*/);
 
                         // Note that index partition was copied for the caller.
                         copied.add(entry.name);
+                        
+                        if (entryCount > 0) {
+                            
+                            // count copied indices with at least one index entry.
+                            numNonZeroCopy++;
+                            
+                        }
 
                     }
                     

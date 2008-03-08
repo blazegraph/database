@@ -159,8 +159,13 @@ public class UpdateSplitIndexPartition extends AbstractTask {
             // upper bound (exclusive) for copy.
             final byte[] toKey = pmd.getRightSeparatorKey();
             
-            // copy all data in this split from the source index.
-            final long ncopied = btree.rangeCopy(src, fromKey, toKey);
+            /*
+             * Copy all data in this split from the source index.
+             * 
+             * Note: [overflow := false] since the btrees are on the same
+             * backing store.
+             */
+            final long ncopied = btree.rangeCopy(src, fromKey, toKey, false/*overflow*/);
             
             log.info("Copied " + ncopied
                     + " index entries from the live index " + name

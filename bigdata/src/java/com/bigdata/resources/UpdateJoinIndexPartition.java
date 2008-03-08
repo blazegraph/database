@@ -43,7 +43,7 @@ import com.bigdata.mdi.PartitionLocator;
  * changes made by a {@link JoinIndexPartitionTask}.
  * <p>
  * This task obtains an exclusive lock on the new index partition and on all of
- * the index partions on the live journal that are being joined. It then copies
+ * the index partitons on the live journal that are being joined. It then copies
  * all writes absorbed by the index partitions that are being since the overflow
  * onto the new index partition and atomically (a) drops the old index
  * partitions; (b) registers the new index partition; and (c) updates the
@@ -131,8 +131,13 @@ public class UpdateJoinIndexPartition extends AbstractTask {
                     pmd.getRightSeparatorKey()
                     );
             
-            // copy in all data.
-            btree.rangeCopy(src, null, null);
+            /*
+             * Copy in all data.
+             * 
+             * Note: [overflow := false] since the btrees are on the same
+             * backing store.
+             */
+            btree.rangeCopy(src, null, null, false/*overflow*/);
             
             // drop the old index partition.
             getJournal().dropIndex(name);
