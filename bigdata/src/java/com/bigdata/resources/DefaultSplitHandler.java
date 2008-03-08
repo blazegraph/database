@@ -581,6 +581,8 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         final Split[] splits = new Split[nsplits];
 
+        final LocalPartitionMetadata oldpmd = ndx.getIndexMetadata().getPartitionMetadata();
+        
         // index into the samples[].
         int j = 0;
         // #of index entries assigned into splits so far.
@@ -588,8 +590,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         // begin at index zero into the source index partition.
         int fromIndex = 0;
         // begin with the leftSeparator for the source index partition.
-        byte[] fromKey = ndx.getIndexMetadata().getPartitionMetadata()
-                .getLeftSeparatorKey();
+        byte[] fromKey = oldpmd.getLeftSeparatorKey();
 
         for (int i = 0; i < nsplits; i++) {
 
@@ -666,7 +667,10 @@ public class DefaultSplitHandler implements ISplitHandler {
                     /*
                      * Note: no resources for an index segment
                      */
-                    null);
+                    null,//
+                    oldpmd.getHistory()+
+                    "split("+oldpmd.getPartitionId()+") "
+                    );
 
             splits[i] = new Split(pmd, fromIndex, toIndex);
 

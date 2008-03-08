@@ -1877,9 +1877,9 @@ public abstract class AbstractJournal implements IJournal {
          * The address at which the named index was written for that historical
          * state.
          */
-        final long indexAddr = name2Addr.getAddr(name);
+        final long indexCheckpointAddr = name2Addr.getAddr(name);
         
-        if (indexAddr == 0L) {
+        if (indexCheckpointAddr == 0L) {
 
             // No such index by name for that historical state.
 
@@ -1893,7 +1893,7 @@ public abstract class AbstractJournal implements IJournal {
          * address on which it was written in the store.
          */
 
-        return getIndex(indexAddr);
+        return getIndex(indexCheckpointAddr);
 
     }
     

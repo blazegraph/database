@@ -33,7 +33,8 @@ import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
@@ -462,7 +463,7 @@ public class FusedView implements IIndex {
 
     }
     
-    final public Object submit(byte[] key, IIndexProcedure proc) {
+    final public Object submit(byte[] key, ISimpleIndexProcedure proc) {
         
         return proc.apply(this);
         
@@ -470,7 +471,7 @@ public class FusedView implements IIndex {
 
     @SuppressWarnings("unchecked")
     final public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler handler) {
+            final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         Object result = proc.apply(this);
         
@@ -483,15 +484,15 @@ public class FusedView implements IIndex {
     }
     
     @SuppressWarnings("unchecked")
-    final public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(
-                this);
+        Object result = ctor.newInstance(this, fromIndex, toIndex, keys, vals)
+                .apply(this);
 
         if (aggregator != null) {
 
-            aggregator.aggregate(result, new Split(null, 0, n));
+            aggregator.aggregate(result, new Split(null, fromIndex, toIndex));
 
         }
         

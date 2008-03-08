@@ -63,7 +63,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchInsertConstructor implements IIndexProcedureConstructor {
+    public static class BatchInsertConstructor extends AbstractIndexProcedureConstructor<BatchInsert> {
 
         /**
          * Singleton requests the return of the old values that were overwritten
@@ -79,16 +79,17 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
 
         private boolean returnOldValues;
         
-        public BatchInsertConstructor(boolean returnOldValues) {
+        private BatchInsertConstructor(boolean returnOldValues) {
             
             this.returnOldValues = returnOldValues;
             
         }
         
-        public IKeyArrayIndexProcedure newInstance(int n, int offset, byte[][] keys,
-                byte[][] vals) {
+        public BatchInsert newInstance(IDataSerializer keySer,
+                IDataSerializer valSer, int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
 
-            return new BatchInsert(n, offset, keys, vals, returnOldValues);
+            return new BatchInsert(keySer,valSer,fromIndex, toIndex, keys, vals, returnOldValues);
             
         }
         
@@ -109,11 +110,6 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * operation can be very efficient if the tuples are presented sorted by key
      * order.
      * 
-     * @param n
-     *            The #of tuples that are being inserted.
-     * @param offset
-     *            The offset into <i>keys</i> and <i>vals</i> of the 1st
-     *            tuple.
      * @param keys
      *            A series of keys paired to values. Each key is an variable
      *            length unsigned byte[]. The keys MUST be presented in sorted
@@ -124,11 +120,14 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @param returnOldValues
      *            When <code>true</code> the old values for those keys will be
      *            returned by {@link #apply(IIndex)}.
+     * 
+     * @see BatchInsertConstructor
      */
-    public BatchInsert(int n, int offset, byte[][] keys, byte[][] vals,
+    protected BatchInsert(IDataSerializer keySer, IDataSerializer valSer,
+            int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             boolean returnOldValues) {
 
-        super(n, offset, keys, vals);
+        super(keySer, valSer, fromIndex, toIndex, keys, vals);
 
         if (vals == null)
             throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
@@ -173,25 +172,12 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         
         if (returnOldValues) {
             
-            ResultBuffer result = (ResultBuffer) newResult();
-
-            result.setResult(n, ret);
-
-            return result;
+            return new ResultBuffer(n,ret,ndx.getIndexMetadata().getValueSerializer());
             
         }
         
         return null;
 
-    }
-    
-    /**
-     * Note: Override to customize serialization for the {@link ResultBuffer}.
-     */
-    public ResultBuffer newResult() {
-        
-        return new ResultBuffer();
-        
     }
     
     @Override

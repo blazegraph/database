@@ -28,7 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.mdi.IResourceMetadata;
 
 /**
@@ -101,16 +102,16 @@ public class DelegateIndex implements IIndex {
         return delegate.remove(key);
     }
 
-    public void submit(byte[] fromKey, byte[] toKey, IIndexProcedure proc, IResultHandler handler) {
-        delegate.submit(fromKey, toKey, proc, handler);
-    }
-
-    public Object submit(byte[] key, IIndexProcedure proc) {
+    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
         return delegate.submit(key, proc);
     }
 
-    public void submit(int n, byte[][] keys, byte[][] vals, IIndexProcedureConstructor ctor, IResultHandler handler) {
-        delegate.submit(n, keys, vals, ctor, handler);
+    public void submit(byte[] fromKey, byte[] toKey, IKeyRangeIndexProcedure proc, IResultHandler handler) {
+        delegate.submit(fromKey, toKey, proc, handler);
+    }
+
+    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals, AbstractIndexProcedureConstructor ctor, IResultHandler handler) {
+        delegate.submit(fromIndex, toIndex, keys, vals, ctor, handler);
     }
 
 }

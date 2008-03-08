@@ -60,17 +60,15 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
-import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -97,13 +95,18 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOIterator;
+import com.bigdata.rdf.store.AddIds.AddIdsConstructor;
+import com.bigdata.rdf.store.AddTerms.AddTermsConstructor;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
+import com.bigdata.rdf.store.IndexWriteProc.IndexWriteProcConstructor;
+import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.EmbeddedDataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.text.FullTextIndex;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
@@ -120,6 +123,12 @@ import cutthecrap.utils.striterators.Striterator;
  *       the federation and use that to locate the indices. This will give us
  *       more than one rdf store per federation and will also let us persist
  *       other metadata about the rdf store.
+ * 
+ * @todo term prefix scan. write prefix scan procedure (aka distinct term scan).
+ *       possible use for both the {@link SparseRowStore} and the triple store?
+ *       do efficent merge join of two such iterators to support backchaining.
+ *       do term prefix scan in key range so that it can be restricted to just
+ *       the URIs for backchaining.
  * 
  * @todo performance improvements:
  *       <p>
@@ -947,18 +956,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 }
 
                 // run the procedure.
-                termIdIndex.submit(numTerms, keys, null/* vals */,
-
-                new IIndexProcedureConstructor() {
-
-                    public IKeyArrayIndexProcedure newInstance(int n, int offset,
-                            byte[][] keys, byte[][] vals) {
-
-                        return new AddTerms(n, offset, keys);
-
-                    }
-
-                }, new IResultHandler<AddTerms.Result, Void>() {
+                termIdIndex.submit(0/* fromIndex */, numTerms/* toIndex */, keys,
+                        null/* vals */, AddTermsConstructor.INSTANCE,
+                        new IResultHandler<AddTerms.Result, Void>() {
 
                     /**
                      * Copy the assigned/discovered term identifiers onto the
@@ -1050,18 +1050,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             }
 
             // run the procedure on the index.
-            idTermIndex.submit(numTerms, keys, vals,
-
-            new IIndexProcedureConstructor() {
-
-                public IKeyArrayIndexProcedure newInstance(int n, int offset,
-                        byte[][] keys, byte[][] vals) {
-
-                    return new AddIds(n, offset, keys, vals);
-
-                }
-
-            }, new IResultHandler<Void, Void>() {
+            idTermIndex.submit(0/* fromIndex */, numTerms/* toIndex */, keys,
+                    vals, AddIdsConstructor.INSTANCE,
+                    new IResultHandler<Void, Void>() {
 
                 /**
                  * Since the unisolated write succeeded the client knows that
@@ -3170,23 +3161,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                         
                         final LongAggregator aggregator = new LongAggregator();
                         
-                        ndx.submit(numToAdd, keys, vals,
-                                new IIndexProcedureConstructor() {
-
-                                    public IKeyArrayIndexProcedure newInstance(int n,
-                                            int offset, byte[][] keys,
-                                            byte[][] vals) {
-
-                                        return new IndexWriteProc(n, offset,
-                                                keys, vals);
-
-                                    }
-
-                                },
-
-                                aggregator
-
-                        );
+                        ndx.submit(0/* fromIndex */, numToAdd/* toIndex */,
+                                keys, vals, IndexWriteProcConstructor.INSTANCE,
+                                aggregator);
                         
                         final long writeCount = aggregator.getResult();
 
@@ -3347,17 +3324,11 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
                 final LongAggregator aggregator = new LongAggregator();
                 
-                ndx.submit(n, keys, null/*vals*/, new IIndexProcedureConstructor(){
+                ndx.submit(0/*fromIndex*/, n/*toIndex*/, keys, null/* vals */,
+                                WriteJustificationsProcConstructor.INSTANCE,
+                                aggregator);
 
-                    public IKeyArrayIndexProcedure newInstance(int n,
-                                    int offset, byte[][] keys, byte[][] vals) {
-                                
-                        return new WriteJustificationsProc(n, offset, keys);
-                        
-                            }
-                        }, aggregator);
-                
-                    nwritten += aggregator.getResult();
+                nwritten += aggregator.getResult();
                     
             }
 

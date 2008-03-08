@@ -34,6 +34,8 @@ import java.util.UUID;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
+import com.bigdata.btree.IDataSerializer.SimplePrefixSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -231,8 +233,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     private LocalPartitionMetadata pmd;
     private String className;
     private String checkpointClassName;
-    private IKeySerializer keySer;
-    private IValueSerializer valSer;
+    private IDataSerializer nodeKeySer;
+    private IDataSerializer leafKeySer;
+    private IDataSerializer valSer;
     private IConflictResolver conflictResolver;
     private RecordCompressor recordCompressor;
     // @todo store booleans as bit flags.
@@ -324,16 +327,27 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
     public final void setCheckpointClassName(String className) {
         this.checkpointClassName = className;
     }
+
+    /**
+     * Object used to (de-)serialize the keys in a node.
+     * <p>
+     * Note: The keys for nodes are separator keys for the leaves. Since they
+     * are choosen to be the minimum length separator keys dynamically when a
+     * leaf is split or joined the keys in the node typically DO NOT conform to
+     * application expectations and are normally assigned a different serializer
+     * for that reason.
+     */
+    public final IDataSerializer getNodeKeySerializer() {return nodeKeySer;}
     
     /**
      * The object used to (de-)serialize the keys in a leaf.
      */
-    public final IKeySerializer getKeySerializer() {return keySer;}
+    public final IDataSerializer getLeafKeySerializer() {return leafKeySer;}
     
     /**
      * The object used to (de-)serialize the values in a leaf.
      */
-    public final IValueSerializer getValueSerializer() {return valSer;}
+    public final IDataSerializer getValueSerializer() {return valSer;}
     
     /**
      * The optional object for handling write-write conflicts.
@@ -366,6 +380,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
      * nodes and leaves and verified on read. Checksums provide a check for
      * corrupt media and make the database more robust at the expense of some
      * added cost to compute a validate the checksums.
+     * <p>
+     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
+     * <p>
+     * When the backing store is fully buffered (it is entirely in RAM) then
+     * checksums are automatically disabled.
      */
     public final boolean getUseChecksum() {return useChecksum;}
     
@@ -414,15 +433,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         setVersionTimestamps(isolatable);
     }
 
-    public void setKeySerializer(IKeySerializer keySer) {
-        this.keySer = keySer;
-    }
-
     public void setPartitionMetadata(LocalPartitionMetadata pmd) {
         this.pmd = pmd;
     }
 
-    public void setValueSerializer(IValueSerializer valueSer) {
+    public void setNodeKeySerializer(IDataSerializer nodeKeySer) {
+        this.nodeKeySer = nodeKeySer;
+    }
+
+    public void setLeafKeySerializer(IDataSerializer leafKeySer) {
+        this.leafKeySer = leafKeySer;
+    }
+
+    public void setValueSerializer(IDataSerializer valueSer) {
         this.valSer = valueSer;
     }
 
@@ -569,9 +592,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         this.checkpointClassName = Checkpoint.class.getName();
         
-        this.keySer = KeyBufferSerializer.INSTANCE;
+        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
         
-        this.valSer = ByteArrayValueSerializer.INSTANCE;
+        this.leafKeySer = SimplePrefixSerializer.INSTANCE;
+        
+        this.valSer = DefaultDataSerializer.INSTANCE;
         
         this.conflictResolver = null;
         
@@ -676,7 +701,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + className);
         sb.append(", checkpointClass=" + checkpointClassName);
-        sb.append(", keySerializer=" + keySer.getClass().getName());
+        sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
+        sb.append(", leafKeySerializer=" + leafKeySer.getClass().getName());
         sb.append(", valueSerializer=" + valSer.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
@@ -737,9 +763,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
         
         checkpointClassName = in.readUTF();
         
-        keySer = (IKeySerializer)in.readObject();
+        nodeKeySer = (IDataSerializer)in.readObject();
 
-        valSer = (IValueSerializer)in.readObject();
+        leafKeySer = (IDataSerializer)in.readObject();
+
+        valSer = (IDataSerializer)in.readObject();
 
         conflictResolver = (IConflictResolver)in.readObject();
         
@@ -789,7 +817,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable {
 
         out.writeUTF(checkpointClassName);
         
-        out.writeObject(keySer);
+        out.writeObject(nodeKeySer);
+
+        out.writeObject(leafKeySer);
 
         out.writeObject(valSer);
         

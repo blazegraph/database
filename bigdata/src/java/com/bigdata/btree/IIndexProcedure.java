@@ -59,7 +59,7 @@ import com.bigdata.sparse.SparseRowStore;
  * performing a datum {@link ISimpleBTree#lookup(Object)}. These procedures are
  * always directed to a single index partition. Since they are never mapped
  * across index partitions, there is no "aggregation" phase. Likewise, there is
- * no {@link IIndexProcedureConstructor} since the procedure instance is always
+ * no {@link AbstractIndexProcedureConstructor} since the procedure instance is always
  * created directly by the application.</dd>
  * 
  * <dt>A key range, <code>byte[] toKey, byte[] fromKey</code></dt>
@@ -130,6 +130,18 @@ public interface IIndexProcedure extends Serializable {
      */
     public interface IKeyRangeIndexProcedure extends IIndexProcedure {
         
+        /**
+         * Return the lowest key that will be visited (inclusive). When
+         * <code>null</code> there is no lower bound.
+         */
+        public byte[] getFromKey();
+
+        /**
+         * Return the first key that will not be visited (exclusive). When
+         * <code>null</code> there is no upper bound.
+         */
+        public byte[] getToKey();
+
     }
 
     /**
@@ -141,7 +153,7 @@ public interface IIndexProcedure extends Serializable {
      * by the keys.
      * <p>
      * Note: Implementations of this interface MUST declare an
-     * {@link IIndexProcedureConstructor} that will be used to create the
+     * {@link AbstractIndexProcedureConstructor} that will be used to create the
      * instances of the procedure mapped onto the index partitions.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -149,42 +161,30 @@ public interface IIndexProcedure extends Serializable {
      */
     public interface IKeyArrayIndexProcedure extends IIndexProcedure {
 
-    }
-
-    /**
-     * A factory for {@link IKeyArrayIndexProcedure}s so that their data may be
-     * key range partitions and mapped against each relevant index partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface IIndexProcedureConstructor {
+        /**
+         * The #of keys/tuples
+         */
+        public int getKeyCount();
         
         /**
+         * Return the key at the given index.
          * 
-         * @param n
-         *            The #of tuples on which the procedure will operate.
-         * @param offset
-         *            The offset of the 1st tuple into <i>keys[]</i> and
-         *            <i>vals[]</i>.
-         * @param keys
-         *            The keys.
-         * @param vals
-         *            The values.
+         * @param i
+         *            The index (origin zero).
          * 
-         * @return An instance of the procedure.
-         * 
-         * @todo we will need a different method signature to support
-         *       hash-partitioned (vs range partitioned) indices.
+         * @return The key at that index.
          */
-        public IKeyArrayIndexProcedure newInstance(int n, int offset,
-                byte[][] keys, byte[][] vals);
-
-//        /**
-//         * Factory for object that will combine the results from each index
-//         * partition against which the procedure was mapped.
-//         */
-//        public H newResultHandler();
+        public byte[] getKey(int i);
+        
+        /**
+         * Return the value at the given index.
+         * 
+         * @param i
+         *            The index (origin zero).
+         * 
+         * @return The value at that index.
+         */
+        public byte[] getValue(int i);
         
     }
 

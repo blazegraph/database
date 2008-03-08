@@ -38,6 +38,8 @@ import com.bigdata.io.DataOutputBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link IDataSerializer}
  */
 public interface IValueSerializer extends Serializable {
 

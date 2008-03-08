@@ -155,7 +155,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
 
             IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
-            ndx.submit(nentries, keys, vals,
+            ndx.submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                     BatchInsertConstructor.RETURN_NO_VALUES, null/*handler*/);
 
         }

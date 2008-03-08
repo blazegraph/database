@@ -33,7 +33,10 @@ import java.util.UUID;
 
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.service.BigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
@@ -69,9 +72,6 @@ import com.bigdata.service.IDataService;
  * Such fail-safe retry semantics are available when data load operations are
  * executed as part of a map-reduce job.
  * <p>
- * 
- * @todo test with indices split into more than one partition, preferrably using
- *       dynamic splits.
  * 
  * @todo provide a mechanism to make document loading robust to client failure.
  *       When loads are unisolated, a client failure can result in the
@@ -168,6 +168,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
             IndexMetadata md = new IndexMetadata(name_just, UUID.randomUUID());
             
             md.setDeleteMarkers(true);
+       
+            md.setValueSerializer(NoDataSerializer.INSTANCE);
             
             justMetadata = md;
         }
@@ -292,39 +294,26 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         md.setDeleteMarkers(true);
 
-        // @todo enable key and value compression (API alignment required).
+        md.setLeafKeySerializer(FastRDFKeyCompression.N3);
         
-//        md.setKeySerializer(new FastRDFKeyCompression(N));
-//
-//        md.setValueSerializer(new FastRDFValueCompression());
-        
+        md.setValueSerializer(new FastRDFValueCompression());
+
         return md;
         
     }
     
     /**
-     * @todo this must be an atomic drop/add or concurrent clients will not have
-     *       a coherent view of the database during a {@link #clear()}. That
-     *       could be achieved using a procedure that runs on the metadata
-     *       service and which handles the drop/add while holding a lock on the
-     *       resources corresponding to the indices to be dropped/added.
+     * Note: this is not an atomic drop/add and concurrent clients will NOT have
+     * a coherent view of the database during a {@link #clear()}.
+     * 
+     * @todo It may not be possible to achieve atomic semantics for this
+     *       {@link #clear()}. You are better taking the scale-out triple store
+     *       off line entirely, e.g., by the atomic delete of the object that
+     *       describes it, waiting until noone is running against the scale-out
+     *       triple store, and then having a client that still holds that object
+     *       drop all of the indices.
      */
     final public void clear() {
-
-        if(true) {
-            
-            /*
-             * FIXME we need to drop the indices from the federation!
-             * 
-             * Right now the logic has not been implemented to drop the mdi and
-             * partitions for a scale-out index!
-             */
-
-            log.warn("request ignored!");
-            
-            return;
-        
-        }
 
         if (lexicon) {
          

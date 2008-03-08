@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BatchInsert;
+import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -314,8 +315,10 @@ abstract public class MapService
 
             }
 
-            BatchInsert proc = new BatchInsert(ntuples, 0/* offset */, keys,
-                    vals, false/*returnOldValues*/);
+            // @todo default key/val serializer is used.
+            BatchInsert proc = BatchInsertConstructor.RETURN_NO_VALUES
+                    .newInstance(0/* fromIndex */, ntuples/* toIndex */, keys,
+                            vals);
 
             ds.submit(ITx.UNISOLATED, name/*unpartitioned*/, proc);
             

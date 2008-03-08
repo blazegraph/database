@@ -23,6 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
 /**
  * A compact and efficient representation of immutable keys. The largest common
  * prefix for the keys is factored out into the start of an internal buffer and
@@ -34,24 +38,6 @@ package com.bigdata.btree;
  * buffer. It is essential that we maintain this information since the branching
  * factor of all nodes in a given level of the tree must be the same in order
  * for the btree split and join operations to work correctly.
- * 
- * @todo use a delta from key to key specifying how much to be reused - works
- *       well if deserializing keys or for a linear key scan, but not for binary
- *       search on the raw node/leaf record.
- * 
- * @todo verify that keys are monotonic during constructor from mutable keys and
- *       during de-serialization.
- * 
- * @todo add nkeys to the abstract base class and keep a final (read-only) copy
- *       on this class. if the value in the base class is changed then it is an
- *       error but this allows direct access to the field in the base class for
- *       the mutable key buffer implementation.
- * 
- * @todo even more compact serialization of sorted byte[]s is doubtless
- *       possible, perhaps as a patricia tree, trie, or other recursive
- *       decomposition of the prefixes. figure out what decomposition is the
- *       most compact, easy to compute from sorted byte[]s, and supports fast
- *       search on the keys to identify the corresponding values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -116,6 +102,12 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
+    final public boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
     /**
      * Creates an immutable key buffer from a mutable one.
      */
@@ -339,6 +331,30 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
     }
 
+    final public void setKey(int index, byte[] key) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public int add(byte[] key) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    final public int add(byte[] key,int off, int len) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public int add(DataInput in, int len) throws IOException {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
     /**
      * Return the full key.
      * 
@@ -349,7 +365,8 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      */
     final public byte[] getKey(int index) {
         
-        assert index >= 0 && index <= nkeys;
+//        assert index >= 0 && index <= nkeys;
+        assert index >= 0 && index < nkeys;
         
         final int remainderLength = getRemainderLength(index);
 
@@ -368,6 +385,42 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
+    final public int getLength(int index) {
+        
+        assert index >= 0 && index < nkeys;
+
+        final int prefixLength = offsets[0];
+
+        final int remainderLength = getRemainderLength(index);
+
+        return prefixLength + remainderLength;
+        
+    }
+    
+    final public int copyKey(int index, DataOutput out) throws IOException {
+        
+        assert index >= 0 && index < nkeys;
+
+        final int prefixLength = offsets[0];
+
+        final int remainderLength = getRemainderLength(index);
+
+        out.write(buf, 0, prefixLength);
+        
+        out.write(buf, offsets[index], remainderLength);
+        
+        return prefixLength + remainderLength;
+        
+    }
+    
+    final public boolean isNull(int index) {
+        
+        assert index >= 0 && index < maxKeys;
+        
+        return index >= nkeys;
+        
+    }
+    
     /**
      * Return the remainder of the key (the key less the prefix).
      * 
@@ -628,5 +681,5 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         return -(low + 1);
 
     }
-
+    
 }

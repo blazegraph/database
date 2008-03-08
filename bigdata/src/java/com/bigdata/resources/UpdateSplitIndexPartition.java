@@ -134,7 +134,12 @@ public class UpdateSplitIndexPartition extends AbstractTask {
                          */
                         journal.getResourceMetadata(),
                         splitResult.buildResults[i].segmentMetadata
-                    }));
+                    },
+                    /* 
+                     * Note: history is record of the split.
+                     */
+                    pmd.getHistory()
+                    ));
             
             // create new btree.
             final BTree btree = BTree.create(journal, md);

@@ -46,10 +46,10 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
                         1);
 
                 // visible in the repo.
-                TestLocalTripleStore.assertTrue(store.hasStatement(s, p, o));
+                assertTrue(store.hasStatement(s, p, o));
 
                 // not visible in the view.
-                TestLocalTripleStore.assertFalse(view.hasStatement(s, p, o));
+                assertFalse(view.hasStatement(s, p, o));
 
                 // commit the transaction.
                 store.commit();
@@ -61,12 +61,12 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
                 // discard the write set.
                 store.abort();
 
-                TestLocalTripleStore.fail("Unexpected exception: " + t, t);
+                fail("Unexpected exception: " + t, t);
 
             }
 
             // now visible in the view.
-            TestLocalTripleStore.assertTrue(view.hasStatement(s, p, o));
+            assertTrue(view.hasStatement(s, p, o));
 
         } finally {
 
@@ -98,7 +98,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
                     1);
 
             // visible in the repo.
-            TestLocalTripleStore.assertTrue(store.hasStatement(s, p, o));
+            assertTrue(store.hasStatement(s, p, o));
 
             throw new AbortException();
 
@@ -108,7 +108,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             store.abort();
 
             // no longer visible in the repo.
-            TestLocalTripleStore.assertFalse(store.hasStatement(s, p, o));
+            assertFalse(store.hasStatement(s, p, o));
 
         } catch (Throwable t) {
 
@@ -117,7 +117,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             // discard the write set.
             store.abort();
 
-            TestLocalTripleStore.fail("Unexpected exception: " + t, t);
+            fail("Unexpected exception: " + t, t);
 
         } finally {
 

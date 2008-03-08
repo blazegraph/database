@@ -66,6 +66,7 @@ import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ICommitRecord;
@@ -135,7 +136,84 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <li>transactions per second</li>
  * </ol>
  * 
+ * FIXME The transaction write service needs to be paused during synchronous
+ * overflow handling and buffered transaction write sets need to be split and
+ * moved with their index partitions since validation depends on an unisolated
+ * operation comparing the local write set for an index partition with the local
+ * index partition.
+ * <p>
+ * The {@link AbstractJournal#close(long)} method should be reworked as
+ * "sealStore(long)" or something of that nature whose semantics are a restart
+ * safe conversion of the store into a read-only store with the specified
+ * closeTime. The method should drive through the buffer strategy and release
+ * any write cache since write are no longer allowed. The file channel could be
+ * converted to read-only, but that it not necessary and it would effect
+ * concurrent readers. The method should be safe for concurrent reads so that we
+ * do not need to pause the historical read service during synchronous overflow.
+ * <p>
+ * When a historical resource is released it is closed (if open) and the backing
+ * file is deleted. This will cause any active readers to throw an exception,
+ * most probably indicating that the store or the file channel is "not open".
+ * 
+ * FIXME The {@link AbstractTask} needs to explicitly coordinate with this class
+ * (or an IndexManager) so that we know which index views are in use.
+ * AbstractTask has the advantage that all concurrent access to any index views
+ * will go through that class and it knows when indices are opened and when the
+ * task completes so it is the ideal point from which to maintain reference
+ * counts on read-only and read-write indices. This is important for buffer
+ * management for the indices. Indices should be on an "touch" style LRU (like
+ * the nodes and leaves of a btree) together with a reference count so that they
+ * get closed out once they are no longer active and also on a weak reference
+ * cache so that we have a canonicalizing mapping. There is logic for all of
+ * this already in the journal and btree classes and it could probably be
+ * refactored to create an IndexManager.
+ * <P>
+ * review use of synchronization and make sure that there is no way in which we
+ * can double-open a store or index.
+ * <P>
+ * Use a hard reference queue to track recently used AbstractBTrees (and
+ * stores?). Add a public referenceCount field on AbstractBTree and close the
+ * AbstractBTree on eviction from the hard reference queue iff the
+ * referenceCount is zero (no references to that AbstractBTree remain on the
+ * hard reference queue).
+ * <p>
+ * re-examine the caching for B+Trees from the perspective of the
+ * {@link ResourceManager}. Ideally a checkpoint operation will not discard the
+ * per-btree node / leaf cache (the write retention and/or read retention
+ * queues). Equally, it would be nice if read-committed and historical reads for
+ * "hot" points (such as the lastCommitTime of the old journal or an intensive
+ * tx) were able to benefit from a read-cache at the node/leaf or record level.
+ * Also, note that {@link IndexSegment}s may be reused in a number of views,
+ * e.g., both the unisolated and read-committed view of an index, but that all
+ * of those views share the same {@link IndexSegment} instance and hence the
+ * same read cache. This makes it worth while to fully buffer the nodes of the
+ * index segment, but since the branching factor is larger the write/read
+ * retention queue should be smaller.
+ * <P>
+ * consider handling close out of index partitions "whole at once" to include
+ * all index segments in the current view of that partition. this probably does
+ * not matter but might be a nicer level of aggregation than the individual
+ * index segment. It's easy enough to identify the index segments from the btree
+ * using the partition metadata record. However, it is harder to go the other
+ * way (and in fact impossible since the same index segment can be used in
+ * multiple index partition views as the partition definition evolves - in
+ * contrast 1st btree in the index partition view always has the current
+ * partition metadata description and therefore could be used to decrement the
+ * usage counters on the other components of that view (but not to directly
+ * close them out)).
+ * <p>
+ * this still does not suggest a mechanism for close by timeout. one solutions
+ * is to just close down all open indices if the server quieses. if the server
+ * is not quiesent then unused indices will get shutdown in any case (this is
+ * basically how we are closing btrees and index segments now, so they remain
+ * available but release their resources).
+ * 
  * @todo update javadoc.
+ * 
+ * @todo refactor into an IndexManager and a ResourceManager. This class would
+ *       continue to be responsible for journals and index segment files while
+ *       the other class would make decisions about when to close out indices
+ *       based on use (or lack of use).
  * 
  * @todo recommend setting the
  *       {@link com.bigdata.journal.Options#INITIAL_EXTENT} to the
@@ -209,60 +287,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       Work through a federated index recovery where we re-generate the
  *       metadata index from the on hand data services.
  * 
- * FIXME review use of synchronization and make sure that there is no way in
- * which we can double-open a store or index.
- * 
  * @todo refactor logging calls into uses of a {@link ResourceManager} instance?
  * 
  * @todo use {@link MDC} to put metadata into the logging context {thread, host,
  *       dataService, global index name, local index name (includes the index
  *       partition), etc}.
- * 
- * @todo Use a hard reference queue to track recently used AbstractBTrees (and
- *       stores?). Add a public referenceCount field on AbstractBTree and close
- *       the AbstractBTree on eviction from the hard reference queue iff the
- *       referenceCount is zero (no references to that AbstractBTree remain on
- *       the hard reference queue).
- * 
- * @todo re-examine the caching for B+Trees from the perspective of the
- *       {@link ResourceManager}. Ideally a checkpoint operation will not
- *       discard the per-btree node / leaf cache (the write retention and/or
- *       read retention queues). Equally, it would be nice if read-committed and
- *       historical reads for "hot" points (such as the lastCommitTime of the
- *       old journal or an intensive tx) were able to benefit from a read-cache
- *       at the node/leaf or record level. Also, note that {@link IndexSegment}s
- *       may be reused in a number of views, e.g., both the unisolated and
- *       read-committed view of an index, but that all of those views share the
- *       same {@link IndexSegment} instance and hence the same read cache. This
- *       makes it worth while to fully buffer the nodes of the index segment,
- *       but since the branching factor is larger the write/read retention queue
- *       should be smaller.
- * 
- * @todo Consider the use of an inner class to impose read-only semantics on a
- *       BTree in {@link #getIndex(String, long)} or
- *       {@link #getIndexOnStore(String, long, IRawStore)} so that the result
- *       will still be a BTree but it will not be mutable. This is just extract
- *       protection against attempts to write on historical views. Since the
- *       IndexSegment is always read-only we do not have to anything for that
- *       case.
- * 
- * @todo consider handling close out of index partitions "whole at once" to
- *       include all index segments in the current view of that partition. this
- *       probably does not matter but might be a nicer level of aggregation than
- *       the individual index segment. It's easy enough to identify the index
- *       segments from the btree using the partition metadata record. However,
- *       it is harder to go the other way (and in fact impossible since the same
- *       index segment can be used in multiple index partition views as the
- *       partition definition evolves - in contrast 1st btree in the index
- *       partition view always has the current partition metadata description
- *       and therefore could be used to decrement the usage counters on the
- *       other components of that view (but not to directly close them out)).
- * 
- * @todo this still does not suggest a mechanism for close by timeout. one
- *       solutions is to just close down all open indices if the server quieses.
- *       if the server is not quiesent then unused indices will get shutdown in
- *       any case (this is basically how we are closing btrees and index
- *       segments now, so they remain available but release their resources).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -874,11 +903,15 @@ abstract public class ResourceManager implements IResourceManager {
         public static final String DATA_DIR = "data.dir";
 
         /**
-         * Index partitions having no more than this many entries as reported by a 
-         * range count will be copied to the new journal during overflow processing
-         * rather than building a new index segment from the buffered writes (default
-         * is <code>1000</code>).  When ZERO (0), index partitions will never be copied
-         * during overflow processing.
+         * Index partitions having no more than this many entries as reported by
+         * a range count will be copied to the new journal during synchronous
+         * overflow processing rather than building a new index segment from the
+         * buffered writes (default is <code>1000</code>). When ZERO (0),
+         * index partitions will not be copied during overflow processing
+         * (unless they are empty). While it is important to keep down the
+         * latency of synchronous overflow processing, small indices can be
+         * copied so quickly that it is worth it to avoid the heavier index
+         * segment build operation.
          * 
          * @see #DEFAULT_COPY_INDEX_THRESHOLD
          */
@@ -2699,6 +2732,7 @@ abstract public class ResourceManager implements IResourceManager {
          */
         int noverflow = 0;
         final AbstractJournal oldJournal = getLiveJournal();
+        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         {
 
             int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
@@ -2748,29 +2782,70 @@ abstract public class ResourceManager implements IResourceManager {
                 }
                 
                 /*
-                 * When true, a new index segment will be build from the view
-                 * defined by the old index on the old journal during
-                 * post-overflow processing. Otherwise we will copy the data
-                 * from the old index into the new index
+                 * When an index partition is empty we always just copy it onto
+                 * the new journal (since there is no data, all that we are
+                 * doing is registering the index on the new journal).
+                 * 
+                 * When the copyIndexThreshold is ZERO (0) index partitions will
+                 * not be copied unless they are empty.
+                 * 
+                 * When an index partition is non-empty, the copyIndexThreshold
+                 * is non-zero, and the entry count of the buffered write set is
+                 * LTE the threshold then the buffered writes will be copied to
+                 * the new journal.
+                 * 
+                 * Otherwise we will let the asynchronous post-processing figure
+                 * out what it wants to do with this index partition.
                  */
-                final boolean willBuildIndexSegment = copyIndexThreshold == 0
-                        || entryCount >= copyIndexThreshold;
+                final boolean copyIndex = (entryCount == 0)
+                        || (copyIndexThreshold > 0 && entryCount <= copyIndexThreshold);
 
-                /*
-                 * We will only create a new empty index, taking care to
-                 * propagate the index local counter.
-                 * 
-                 * Update the partition metadata so that the new index reflects
-                 * its location on the new journal.
-                 * 
-                 * Note: The old index on the old journal is retained as part of
-                 * the view. We need it until the new index segment is ready. It
-                 * is also required for historical reads on the new journal
-                 * between its firstCommitTime and the commit point the index
-                 * partition view is updated to include the newly built index
-                 * segment.
-                 */
-                if(willBuildIndexSegment) {
+                if(copyIndex) {
+                    
+                    /*
+                     * We will copy the index data from the B+Tree old journal
+                     * (but not from the full index view) onto the new journal.
+                     * In this case the index will use a view that DOES NOT
+                     * include the old index on the old journal.
+                     */
+
+                    final IResourceMetadata[] oldResources = oldpmd.getResources();
+
+                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length];
+
+                    System.arraycopy(oldResources, 0, newResources, 0, oldResources.length);
+
+                    // new resource is listed first (reverse chronological order)
+                    newResources[0] = newJournal.getResourceMetadata();
+
+                    // describe the index partition.
+                    indexMetadata
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    oldpmd.getPartitionId(),//
+                                    oldpmd.getLeftSeparatorKey(),//
+                                    oldpmd.getRightSeparatorKey(),//
+                                    newResources, //
+                                    oldpmd.getHistory()+
+                                    "copy(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+") "
+                            ));
+
+                } else {
+
+                    /*
+                     * We will only create a empty index on the new journal.
+                     * 
+                     * We will update the partition metadata so that the new
+                     * index reflects its location on the new journal. The index
+                     * view will continue to read from the old journal as well
+                     * until asynchronous post-processing decides what to do
+                     * with the index partition.
+                     * 
+                     * Note that the old journal will continue to be required
+                     * for historical reads on the new journal between its
+                     * firstCommitTime and the commit point at which the index
+                     * partition view is updated to no longer include the old
+                     * journal.
+                     */
                     
                     final IResourceMetadata[] oldResources = oldpmd
                             .getResources();
@@ -2790,34 +2865,9 @@ abstract public class ResourceManager implements IResourceManager {
                                     oldpmd.getPartitionId(),//
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
-                                    newResources //
-                            ));
-                    
-                } else {
-                    
-                    /*
-                     * When false we will copy the index data from the B+Tree
-                     * old journal (but not from the full index view) onto the
-                     * new journal. In this case the index will use a view that
-                     * DOES NOT include the old index on the old journal.
-                     */
-
-                    final IResourceMetadata[] oldResources = oldpmd.getResources();
-
-                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length];
-
-                    System.arraycopy(oldResources, 0, newResources, 0, oldResources.length);
-
-                    // new resource is listed first (reverse chronological order)
-                    newResources[0] = newJournal.getResourceMetadata();
-
-                    // describe the index partition.
-                    indexMetadata
-                            .setPartitionMetadata(new LocalPartitionMetadata(
-                                    oldpmd.getPartitionId(),//
-                                    oldpmd.getLeftSeparatorKey(),//
-                                    oldpmd.getRightSeparatorKey(),//
-                                    newResources //
+                                    newResources, //
+                                    oldpmd.getHistory()+
+                                    "overflow(lastCommitTime="+lastCommitTime+",entryCount="+entryCount+") "
                             ));
 
                 }
@@ -2864,7 +2914,7 @@ abstract public class ResourceManager implements IResourceManager {
 
                     assert newBTree.getCounter().get() == oldCounter;
                     
-                    if(!willBuildIndexSegment) {
+                    if(copyIndex) {
                         
                         /*
                          * Copy the data from the B+Tree on the old journal into
@@ -2908,7 +2958,6 @@ abstract public class ResourceManager implements IResourceManager {
         /*
          * Close out the old journal.
          */
-        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
         {
             
             // writes no longer accepted.

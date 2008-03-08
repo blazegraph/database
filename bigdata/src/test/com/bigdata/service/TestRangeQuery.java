@@ -474,7 +474,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
             
         }
         
-        ndx.submit(nentries, keys, vals,
+        ndx.submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                 BatchInsertConstructor.RETURN_NO_VALUES, null/*handler*/);
 
         assertEquals(nentries, ndx.rangeCount(null,null));
@@ -487,12 +487,13 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
                     null,// fromKey,
                     null,// toKey
                     1, // capacity (aka limit)
-                    IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.REMOVEALL,
+//                    IRangeQuery.KEYS | IRangeQuery.VALS | 
+                    IRangeQuery.REMOVEALL,
                     null// filter
             );
 
             /*
-             * This should delete the first indedx entry but NOT buffer the next
+             * This should delete the first index entry but NOT buffer the next
              * entry.
              */
             itr.next();
@@ -599,7 +600,7 @@ public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
             
         }
 
-        ndx.submit(nentries, keys, vals,
+        ndx.submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                 BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
 
         /*

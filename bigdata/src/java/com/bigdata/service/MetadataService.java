@@ -1025,7 +1025,11 @@ abstract public class MetadataService extends DataService implements
                          * the when the task actually executes on the data
                          * service.
                          */
-                         null // Signal to the RegisterIndexTask.
+                         null, // Signal to the RegisterIndexTask.
+                         /*
+                          * History.
+                          */
+                         "create() "
                     ));
                 
                 dataServices[i].registerIndex(DataService

@@ -71,11 +71,12 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      */
     public DataServiceRangeIterator(ClientIndexView ndx,
             IDataService dataService, String name, long timestamp,
+            boolean readConsistent,
             byte[] fromKey, byte[] toKey, int capacity, int flags,
             ITupleFilter filter) {
 
-        super(dataService, name, timestamp, fromKey, toKey, capacity, flags,
-                filter);
+        super(dataService, name, timestamp, readConsistent, fromKey, toKey,
+                capacity, flags, filter);
         
         if (ndx == null) {
 
@@ -137,7 +138,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
          * Let the index view handle the delete in a robust manner.
          */
 
-        ndx.submit(n, keys, null/* vals */,
+        ndx.submit(0/*fromIndex*/,n/*toIndex*/, keys, null/* vals */,
                 BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
 
 //        try {
@@ -160,7 +161,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
          * Let the index view handle the delete in a robust manner.
          */
 
-        ndx.submit(1, new byte[][] { key }, null/* vals */,
+        ndx.submit(0/*fromIndex*/,1/*toIndex*/, new byte[][] { key }, null/* vals */,
                 BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
 
 //        try {

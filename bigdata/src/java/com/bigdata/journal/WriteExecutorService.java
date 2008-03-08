@@ -534,7 +534,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 //                     * it did not notice the interrupt itself.
 //                     */
 //                
-//                    log.warn("Task interrupted: task="+ r.getClass().getName());
+//                    log.warn("Task interrupted: task="+ r);
 //
 //                } else
                     
@@ -549,8 +549,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * cause.
                      */
                     
-                    log.warn("Validation failed: task=" + r.getClass().getName()
-                            + " : " + t);
+                    log.warn("Validation failed: task=" + r + " : " + t);
 
                 } else if (t instanceof InterruptedException
                         || t.getCause() != null
@@ -563,8 +562,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * cause.
                      */
                     
-                    log.warn("Thread interrupted: task=" + r.getClass().getName()
-                            + " : " + t);
+                    log.warn("Thread interrupted: task=" + r + " : " + t);
 
                 } else {
 
@@ -572,8 +570,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * The task throw some other kind of exception.
                      */
                     
-                    log.warn("Task failed: task=" + r.getClass().getName()
-                            + " : " + t, t);
+                    log.warn("Task failed: task=" + r + " : " + t, t);
 
                 }
 

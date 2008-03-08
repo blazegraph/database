@@ -43,6 +43,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.NOPSerializer;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Rule.IConstraint;
@@ -1359,7 +1360,7 @@ public class InferenceEngine extends RDFSHelper {
 
                     IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
                     
-                    metadata.setValueSerializer(NOPSerializer.INSTANCE);
+                    metadata.setValueSerializer(NoDataSerializer.INSTANCE);
           
                     subjects = BTree.create(tempStore,metadata);
                 
@@ -1370,7 +1371,7 @@ public class InferenceEngine extends RDFSHelper {
                     
                     IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
                     
-                    metadata.setValueSerializer(NOPSerializer.INSTANCE);
+                    metadata.setValueSerializer(NoDataSerializer.INSTANCE);
           
                     objects = BTree.create(tempStore, metadata);
                     

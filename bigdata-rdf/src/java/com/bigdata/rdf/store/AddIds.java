@@ -26,10 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.store;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IDataSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
@@ -56,14 +58,32 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    public AddIds(int n, int offset, byte[][] keys, byte[][] vals) {
+    protected AddIds(IDataSerializer keySer, IDataSerializer valSer,
+            int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-        super(n, offset, keys, vals);
+        super(keySer, valSer, fromIndex, toIndex, keys, vals);
         
         assert vals != null;
         
     }
     
+    public static class AddIdsConstructor extends
+            AbstractIndexProcedureConstructor<AddIds> {
+
+        public static AddIdsConstructor INSTANCE = new AddIdsConstructor();
+
+        private AddIdsConstructor() {}
+        
+        public AddIds newInstance(IDataSerializer keySer,
+                IDataSerializer valSer,int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
+
+            return new AddIds(keySer,valSer,fromIndex, toIndex, keys, vals);
+
+        }
+
+    }
+
     /**
      * Conditionally inserts each key-value pair into the index. The keys
      * are the term identifiers. The values are the terms as serialized by
@@ -163,13 +183,4 @@ public class AddIds extends AbstractKeyArrayIndexProcedure implements
         
     }
 
-    /**
-     * Note: This method is not used as the procedure returns <code>null</code>.
-     */
-    protected Void newResult() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-    
 }

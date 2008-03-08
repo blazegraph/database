@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,6 +47,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.ResourceManager.Options;
 
 /**
  * Basic tests for {@link ResourceManager#overflow(boolean, boolean)}
@@ -69,6 +71,21 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
         super(arg0);
     }
 
+//    /**
+//     * Forces the use of persistent journals so that we can do overflow
+//     * operations and the like.
+//     */
+//    public Properties getProperties() {
+//        
+//        Properties properties = new Properties( super.getProperties() );
+//        
+//        // Enable index copy
+//        properties.setProperty(Options.COPY_INDEX_THRESHOLD,Options.DEFAULT_COPY_INDEX_THRESHOLD);
+//        
+//        return properties;
+//        
+//    }
+    
     /**
      * A test for overflow of the {@link ResourceManager}. We begin with a
      * blank slate, so the {@link ResourceManager} creates an initial
@@ -105,7 +122,9 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
                     null, // rightSeparator.
                     new IResourceMetadata[]{
                             journal.getResourceMetadata()
-                    }));
+                    },//
+                    ""//history
+                    ));
             
             // create index and register on the journal.
             IIndex ndx = journal.registerIndex(indexName, BTree.create(journal,
@@ -150,8 +169,8 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
             // do overflow.
             resourceManager.doOverflow(copied);
 
-            // expecting the index partition to be copied over.
-            assertEquals(1,copied.size());
+            // Not expecting the index partition to be copied over.
+            assertEquals(0,copied.size());
             
             assertEquals(2, resourceManager.getJournalCount());
 

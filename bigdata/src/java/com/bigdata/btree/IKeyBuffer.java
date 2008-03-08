@@ -35,28 +35,44 @@ package com.bigdata.btree;
  * references to keys rather than allocating new byte[]s and copying the data.
  * There are mutable and immutable implementations of this interface.
  * 
+ * FIXME (a) the prefix compression form should be serialization only so the
+ * {@link ImmutableKeyBuffer} should be deprecated. This will leave
+ * {@link MutableKeyBuffer} (copies references) and there should be a
+ * CompactingKeyBuffer as well (copies bytes into its buffer, uses a journal
+ * style allocator, and compacts when it would overflow).
+ * <p>
+ * (De-)serialization needs to be decoupled from the choice of how the key
+ * buffer gets implemented, so that means that we are not going to be able to
+ * read in a raw byte[] and "just" process the record directly. Instead, there
+ * needs to be an API for populating the key buffer when it is de-serialized.
+ * Since there is no longer an immutable version we can just add(byte[]) or
+ * add(byte[],off,len) for each key read from the serialized form - this will
+ * let us do dictionary style compression without requiring that we keep the
+ * leaf compressed in memory.
+ * <p>
+ * The only hope in this for a raw record read and processing would be to have
+ * the node or leaf state and its keys/children/value state all in the same
+ * CompactingBuffer and have an API suitable for partitioning the buffer into
+ * some fixed size regions (values that are overwritten when they are replaced)
+ * and a variable length region that is used to store keys, values, timestamps,
+ * and child addresses and compacted as necessary.
+ * <p>
+ * Even that is not really a "raw record" since the data are still
+ * de-serialized, e.g., undoing dictionary compression or other techniques as
+ * applied to keys, values, etc. It is really a technique to reduce the #of
+ * distinct references in the heap and to reduce the amount of allocation by
+ * copying data into a CompactingBuffer. In this way it is very much like the
+ * GOM data record and it might be possible to reuse that as the basis for this.
+ * In that case it was more efficient to operate with a long[] than a byte[]. In
+ * fact, an int[] might be best for the 32bit generation while a long[] would be
+ * better for 64bit machines. For GOM, we have a lot of long values so that
+ * long[] had a bit of an edge in that way as well.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyBuffer {
+public interface IKeyBuffer extends IRandomAccessByteArray {
     
-    /**
-     * The #of defined keys.
-     */
-    public int getKeyCount();
-
-    /**
-     * Return the key at the specified index.  Whenever possible, the reference
-     * to the key is returned.  When necessary, a new byte[] will be allocated
-     * and returned to the caller.
-     * 
-     * @param index
-     *            The key index in [0:nkeys-1].
-     *            
-     * @return The key.
-     */
-    public byte[] getKey(int index);
-
     /**
      * Return a mutable instance. If the instance is mutable, returns
      * <code>this</code>.
@@ -109,13 +125,21 @@ public interface IKeyBuffer {
     public int getPrefixLength();
 
     /**
-     * The maximum #of keys that may be held in the buffer (its capacity).
-     */
-    public int getMaxKeys();
-    
-    /**
      * True iff the key buffer can not contain another key.
      */
     public boolean isFull();
 
+//    /**
+//     * @todo methods are being added to this API as the btree implementation
+//     *       becomes decoupled from the {@link MutableKeyBuffer} so that we can
+//     *       also try out a CompactingKeyBuffer implementation.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public interface IMutableKeyBuffer {
+//        
+//        
+//    }
+    
 }

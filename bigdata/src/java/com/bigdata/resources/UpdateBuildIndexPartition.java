@@ -9,7 +9,6 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 
@@ -68,12 +67,14 @@ import com.bigdata.mdi.SegmentMetadata;
  * 
  * @todo modify to support view consisting of more than one historical component
  *       so that we can do incremental builds (just the buffered writes) as well
- *       as full builds (the index view).
+ *       as full builds (the index view).  Incremental build index segments need
+ *       to be marked as such in the {@link BuildResult} and would only replace
+ *       the old journal rather than all historical entries in the view.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class UpdateIndexPartition extends AbstractTask {
+public class UpdateBuildIndexPartition extends AbstractTask {
 
     private final ResourceManager resourceManager;
 
@@ -85,7 +86,7 @@ public class UpdateIndexPartition extends AbstractTask {
      * @param resource
      * @param buildResult
      */
-    protected UpdateIndexPartition(ResourceManager resourceManager,
+    protected UpdateBuildIndexPartition(ResourceManager resourceManager,
             IConcurrencyManager concurrencyManager, String resource,
             BuildResult buildResult) {
 
@@ -157,30 +158,48 @@ public class UpdateIndexPartition extends AbstractTask {
                     journal.getRootBlockView().getUUID()) : "Expecting live journal to the first resource: "
                     + oldResources;
 
-            // the old journal's resource metadata.
-            final IResourceMetadata oldJournalMetadata = oldResources[1];
-            assert oldJournalMetadata != null;
-            assert oldJournalMetadata instanceof JournalMetadata;
-
-            // live journal must be newer.
-            assert journal.getRootBlockView().getCreateTime() > oldJournalMetadata
-                    .getCreateTime();
+            /*
+             * Note: I have commented out a bunch of pre-condition tests that are not 
+             * valid for histories such as:
+             * 
+             * history=create() register(0) split(0) copy(entryCount=314)
+             * 
+             * This case arises when there are not enough index entries written on the
+             * journal after a split to warrant a build so the buffered writes are just
+             * copied to the new journal. The resources in the view are:
+             * 
+             * 1. journal
+             * 2. segment
+             * 
+             * And this update will replace the segment. 
+             */
+                    
+//            // the old journal's resource metadata.
+//            final IResourceMetadata oldJournalMetadata = oldResources[1];
+//            assert oldJournalMetadata != null;
+//            assert oldJournalMetadata instanceof JournalMetadata : "name="
+//                    + getOnlyResource() + ", old pmd=" + oldpmd
+//                    + ", segmentMetadata=" + buildResult.segmentMetadata;
+//
+//            // live journal must be newer.
+//            assert journal.getRootBlockView().getCreateTime() > oldJournalMetadata
+//                    .getCreateTime();
 
             // new index segment build from a view that did not include data from the live journal.
             assert segmentMetadata.getCreateTime() < journal.getRootBlockView()
                     .getFirstCommitTime();
 
-            if (oldResources.length == 3) {
-
-                // the old index segment's resource metadata.
-                final IResourceMetadata oldSegmentMetadata = oldResources[2];
-                assert oldSegmentMetadata != null;
-                assert oldSegmentMetadata instanceof SegmentMetadata;
-
-                assert oldSegmentMetadata.getCreateTime() <= oldJournalMetadata
-                        .getCreateTime();
-
-            }
+//            if (oldResources.length == 3) {
+//
+//                // the old index segment's resource metadata.
+//                final IResourceMetadata oldSegmentMetadata = oldResources[2];
+//                assert oldSegmentMetadata != null;
+//                assert oldSegmentMetadata instanceof SegmentMetadata;
+//
+//                assert oldSegmentMetadata.getCreateTime() <= oldJournalMetadata
+//                        .getCreateTime();
+//
+//            }
 
         }
 
@@ -189,11 +208,13 @@ public class UpdateIndexPartition extends AbstractTask {
                 journal.getResourceMetadata(), segmentMetadata };
 
         // describe the index partition.
-        indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(oldpmd
-                .getPartitionId(),//
+        indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
+                oldpmd.getPartitionId(),//
                 oldpmd.getLeftSeparatorKey(),//
                 oldpmd.getRightSeparatorKey(),//
-                newResources //
+                newResources, //
+                oldpmd.getHistory()+
+                "replaceHistory(lastCommitTime="+segmentMetadata.getCreateTime()+",segment="+segmentMetadata.getUUID()+") "
                 ));
 
         // update the metadata associated with the btree.

@@ -32,7 +32,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IOverflowHandler;
@@ -41,6 +40,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
@@ -1038,6 +1038,19 @@ public class BigdataRepository implements ContentRepository {
         
     }
 
+    /**
+     * Note: A new file version is marked as deleted and then the file blocks
+     * for the old version are deleted from the data index. This sequence means
+     * (a) that clients attempting to read on the file using the high level API
+     * will not see the file as soon as its metadata is updated; (b) that the
+     * timestamp on the deleted version will be strictly LESS THAN the commit
+     * time(s) when the file blocks are deleted, so reading from the timestamp
+     * of the deleted version will let you see the deleted file blocks. This is
+     * a deliberate convenience - if we were to delete the file blocks first
+     * then we would not have ready access to a timestamp that would be before
+     * the first file block delete and hence sufficient to perform a historical
+     * read on the last state of the file before it was deleted.
+     */
     public long delete(String id) {
 
         final RepositoryDocumentImpl doc = (RepositoryDocumentImpl) read(id);
@@ -1053,6 +1066,27 @@ public class BigdataRepository implements ContentRepository {
         }
 
         final int version = doc.getVersion();
+        
+        /*
+         * Mark the file version as deleted.
+         * 
+         * Note: This only deletes the "version" property - the other properties
+         * are not changed.
+         */
+        {
+            
+            final Map<String, Object> metadata = new HashMap<String, Object>();
+
+            // primary key.
+            metadata.put(MetadataSchema.ID, id);
+
+            // delete marker.
+            metadata.put(MetadataSchema.VERSION, null);
+
+            getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
+                    AUTO_TIMESTAMP, null/* filter */);
+            
+        }
 
         /*
          * Delete blocks from the file version.
@@ -1092,27 +1126,6 @@ public class BigdataRepository implements ContentRepository {
 
         log.info("Deleted " + blockCount + " blocks : id=" + id + ", version="
                 + version);
-        
-        /*
-         * Mark the file version as deleted.
-         * 
-         * Note: This only deletes the "version" property - the other properties
-         * are not changed.
-         */
-        {
-            
-            final Map<String, Object> metadata = new HashMap<String, Object>();
-
-            // primary key.
-            metadata.put(MetadataSchema.ID, id);
-
-            // delete marker.
-            metadata.put(MetadataSchema.VERSION, null);
-
-            getMetadataIndex().write(getKeyBuilder(), metadataSchema, metadata,
-                    AUTO_TIMESTAMP, null/* filter */);
-            
-        }
 
         /*
          * There was a current version for the file. We have written a delete
@@ -1144,8 +1157,8 @@ public class BigdataRepository implements ContentRepository {
      * <p>
      * Likewise, in order to read the historical version data you need to know
      * the version identifer which you wish to read as well as the timestamp.
-     * Again, this should be timestamp when that version was <em>deleted</em>
-     * MINUS ONE in order to read the last committed state for the file version.
+     * In this case, use the timestamp when that version was <em>deleted</em>
+     * in order to read the last committed state for the file version.
      * <p>
      * Historical file version metadata is eradicated atomically since the
      * entire logical row will be hosted on the same index partition. Either the
@@ -1191,7 +1204,7 @@ public class BigdataRepository implements ContentRepository {
         Vector<ITPV> vec = new Vector<ITPV>();
 
         /*
-         * Filter for only the version propertys, skipping "delete" entries.
+         * Filter for only the version properties, skipping "delete" entries.
          */
         Iterator<? extends ITPV> itr = tps.iterator();
         
@@ -1247,9 +1260,10 @@ public class BigdataRepository implements ContentRepository {
 
     /**
      * Efficient delete of file metadata and file data for all files and file
-     * versions spanned by the specified file identifiers.
-     * 
-     * @todo run this in two threads?
+     * versions spanned by the specified file identifiers.  File versions are
+     * marked "deleted" before the file blocks are deleted so that you can
+     * read on historical file version with exactly the same semantics as
+     * {@link #delete(String)}.
      */
     public long deleteAll(String fromId, String toId) {
         
@@ -1271,8 +1285,11 @@ public class BigdataRepository implements ContentRepository {
             /*
              * Delete file version metadata.
              */
-            getMetadataIndex().getIndex().submit(fromKey, toKey,
-                    new FileVersionDeleteProc(fromId, toId), null/* handler */);
+//            getMetadataIndex().getIndex().submit(fromKey, toKey,
+//                    new FileVersionDeleteProc(fromId, toId), null/* handler */);
+            
+            // FIXME deleteAll()
+            if(true) throw new UnsupportedOperationException();
             
         }
         
@@ -1310,7 +1327,7 @@ public class BigdataRepository implements ContentRepository {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class FileVersionDeleteProc implements IIndexProcedure {
+    abstract protected static class FileVersionDeleteProc implements IKeyRangeIndexProcedure {
 
         /**
          * 
@@ -2237,7 +2254,7 @@ public class BigdataRepository implements ContentRepository {
         }
 
         // construct the atomic write operation.
-        final IIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
+        final ISimpleIndexProcedure proc = new AtomicBlockWriteProc(this, id, version,
                 block, b, off, len);
 
         // the key for the {file,version,block}
@@ -2246,26 +2263,6 @@ public class BigdataRepository implements ContentRepository {
                 .append(block).getKey();
 
         return (Boolean) getDataIndex().submit(key, proc);
-
-//        if (getDataIndex() instanceof ClientIndexView) {
-//            
-//            /*
-//             * Remote index - figure out which index partition will get the
-//             * write.
-//             */
-//
-//            return (Boolean) ((ClientIndexView) getDataIndex()).submit(key,
-//                    proc);
-//
-//        } else {
-//
-//            /*
-//             * Run on a local index.
-//             */
-//
-//            return ((Boolean) proc.apply(getDataIndex())).booleanValue();
-//
-//        }
 
     }
 
@@ -2599,7 +2596,7 @@ public class BigdataRepository implements ContentRepository {
         }
 
         // construct the atomic append operation.
-        final IIndexProcedure proc = new AtomicBlockAppendProc(this, id, version, b,
+        final ISimpleIndexProcedure proc = new AtomicBlockAppendProc(this, id, version, b,
                 off, len);
 
         // the last possible key for this file
@@ -2624,20 +2621,6 @@ public class BigdataRepository implements ContentRepository {
          * until the next compacting merge.
          */
         return (Long) getDataIndex().submit(key, proc);
-
-// if (getDataIndex() instanceof ClientIndexView) {
-//
-// return (Long) ((ClientIndexView) getDataIndex()).submit(key, proc);
-//            
-//        } else {
-//
-//            /*
-//             * Run on a local index.
-//             */
-//            
-//            return (Long) proc.apply( getDataIndex() );
-//            
-//        }
         
     }
 

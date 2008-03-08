@@ -123,7 +123,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
     /**
      * The metadata record for the index segment.
      */
-    public final IndexMetadata getMetadata() {
+    public final IndexMetadata getIndexMetadata() {
     
         assertOpen();
         

@@ -31,8 +31,11 @@ import it.unimi.dsi.mg4j.io.OutputBitStream;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -44,7 +47,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IParallelizableIndexProcedure;
+import com.bigdata.btree.IRandomAccessByteArray;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -111,14 +116,39 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     }
 
-    public IndexWriteProc(int n, int offset, byte[][] keys, byte[][] vals) {
+    /**
+     * 
+     * @param fromIndex
+     * @param toIndex
+     * @param keys
+     * @param vals
+     */
+    protected IndexWriteProc(IDataSerializer keySer,
+            IDataSerializer valSer,int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-        super(n, offset, keys, vals);
+        super(keySer,valSer,fromIndex, toIndex, keys, vals);
 
         assert vals != null;
 
     }
 
+    public static class IndexWriteProcConstructor extends
+            AbstractIndexProcedureConstructor<IndexWriteProc> {
+
+        public static IndexWriteProcConstructor INSTANCE = new IndexWriteProcConstructor();
+        
+        private IndexWriteProcConstructor() {}
+        
+        public IndexWriteProc newInstance(IDataSerializer keySer,
+                IDataSerializer valSer,int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
+
+            return new IndexWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
+
+        }
+        
+    }
+    
     /**
      * 
      * @return The #of statements actually written on the index as an
@@ -219,15 +249,6 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         return Long.valueOf(writeCount);
 
     }
-
-    /**
-     * Note: This method is not used.
-     */
-    final protected Long newResult() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
     
     /**
      * A fast bit-coding of the keys and values for an RDF statement index. The
@@ -255,20 +276,37 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class FastRDFKeyCompression implements IDataSerializer {
+    static public class FastRDFKeyCompression implements IDataSerializer, Externalizable {
 
         /**
          * 
          */
         private static final long serialVersionUID = -6920004199519508113L;
 
-        final private int N;
+        private int N;
 
         /**
          * The natural log of 2.
          */
-        final private double LOG2 = Math.log(2);
+        final static transient private double LOG2 = Math.log(2);
 
+        /**
+         * Triple store.
+         */
+        final static transient public IDataSerializer N3 = new FastRDFKeyCompression(3);
+
+        /**
+         * Quad store.
+         */
+        final static transient public IDataSerializer N4 = new FastRDFKeyCompression(4);
+        
+        /**
+         * De-serialization ctor.
+         */
+        public FastRDFKeyCompression() {
+            
+        }
+        
         /**
          * @param N
          *            Either 3 or 4 depending on whether it is a triple or a
@@ -278,7 +316,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             this.N = N;
 
-            assert N == 3 || N == 4;
+            assert N == 3 || N == 4 : "Expecting either 3 or 4 not "+N;
 
         }
 
@@ -295,21 +333,23 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
          * Identifies the distinct symbols (64-bit long integers) in the keys
          * and assigns each symbol a unique integer code.
          * 
-         * @param nkeys
-         * @param offset
          * @param keys
          * @return A map from the long value to the size of the map at the time
-         *         that the value was encountered (a one up integer in [0:n-1]).
+         *         that the value was encountered (a one up integer in [0:n-1]
+         *         where n := toIndex-fromIndex).
          */
-        protected HashMap<Long, Integer> getSymbols(int nkeys, int offset,
-                byte[][] keys) {
+        protected HashMap<Long, Integer> getSymbols(IRandomAccessByteArray raba) {
 
-            final HashMap<Long, Integer> symbols = new HashMap<Long, Integer>(
-                    nkeys * N);
+            int n = raba.getKeyCount();
+            
+            assert n >= 0;
+            
+            final HashMap<Long, Integer> symbols = new HashMap<Long, Integer>(n
+                    * N);
 
-            for (int i = 0; i < nkeys; i++) {
+            for (int i = 0; i < n; i++) {
 
-                final byte[] key = keys[offset + i];
+                final byte[] key = raba.getKey( i );
 
                 assert key.length == N * Bytes.SIZEOF_LONG : "Expecting key with "
                         + N * Bytes.SIZEOF_LONG + " bytes, not " + key.length;
@@ -326,20 +366,15 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public byte[][] read(DataInput in) throws IOException {
-
-            // #of keys.
-            final int n = in.readInt();
-            
-            if (n == 0)
-                return new byte[0][];
-            
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+          
             InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
 
             /*
              * read the header.
              */
-//            final int n = ibs.readNibble();
+            final int n = ibs.readNibble();
+            if(n==0) return;
             final int nsymbols = ibs.readNibble();
             final int codeBitLength = ibs.readNibble();
 
@@ -369,7 +404,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             /*
              * read the codes, expanding them into keys.
              */
-            final byte[][] keys = new byte[n][];
+//            final byte[][] keys = new byte[deserializedSize][];
             {
 
                 KeyBuilder keyBuilder = new KeyBuilder(N * Bytes.SIZEOF_LONG);
@@ -388,27 +423,40 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                     }
 
-                    keys[i] = keyBuilder.getKey();
+//                    keys[i] = keyBuilder.getKey();
+                    raba.add(keyBuilder.getBuffer(), 0/*off*/, keyBuilder.getLength());
 
                 }
 
             }
             
-            return keys;
+//            return keys;
             
         }
 
-        public void write(int n, int offset, byte[][] keys, DataOutput out)
+        public void write( DataOutput out, IRandomAccessByteArray raba)
                 throws IOException {
 
-            // #of keys.
-            out.writeInt(n);
+            final OutputBitStream obs = new OutputBitStream((OutputStream) out,0/*unbuffered*/);
+
+            final int n = raba.getKeyCount();
             
-            if (n == 0) {
+            assert n >= 0;
+            
+            obs.writeNibble(n);
+            
+            if(n==0) {
+             
+                /*
+                 * Note: ALWAYS flush.
+                 */
+                obs.flush();
+
                 return;
+                
             }
-            
-            final HashMap<Long, Integer> symbols = getSymbols(n, offset, keys);
+        
+            final HashMap<Long, Integer> symbols = getSymbols(raba);
 
             final int nsymbols = symbols.size();
 
@@ -418,17 +466,18 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
              * Note: The code for a long value is simply its index in the
              * symbols[].
              */
-            final int codeBitLength = (int) Math
-                    .ceil(Math.log(nsymbols) / LOG2);
+            final int codeBitLength = (int) Math.ceil(Math.log(nsymbols)
+                    / LOG2);
+
+            assert codeBitLength > 0 : "nstmts=" + n + ", nsymbols="
+                    + nsymbols + ", codeBitLength=" + codeBitLength;
 
             {
 
-                final OutputBitStream obs = new OutputBitStream((OutputStream) out,0/*unbuffered*/);
-                
                 /*
                  * write the header {nsymbols, codeBitLength}.
                  */
-//                obs.writeNibble(n);
+                // obs.writeNibble(n);
                 obs.writeNibble(nsymbols);
                 obs.writeNibble(codeBitLength);
 
@@ -441,8 +490,8 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  */
                 {
 
-                    Iterator<Map.Entry<Long, Integer>> itr = symbols.entrySet()
-                            .iterator();
+                    Iterator<Map.Entry<Long, Integer>> itr = symbols
+                            .entrySet().iterator();
 
                     while (itr.hasNext()) {
 
@@ -463,7 +512,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                     for (int i = 0; i < n; i++) {
 
-                        final byte[] key = keys[offset + i];
+                        final byte[] key = raba.getKey(i);
 
                         for (int j = 0, off = 0; j < N; j++, off += 8) {
 
@@ -478,6 +527,9 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                 }
 
+                /*
+                 * Note: ALWAYS flush.
+                 */
                 obs.flush();
 
                 /*
@@ -501,12 +553,26 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            out.writeByte(N);
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+            N = in.readByte();
+            
+        }
+
     }
 
     /**
      * We encode the value in 3 bits per statement. The 1st bit is the override
      * flag. The remaining two bits are the statement type {inferred, explicit,
-     * or axiom}.
+     * or axiom}.  The value b111 is used as a placeholder for a deleted index
+     * entry and will be present iff delete markers are used by the index - it
+     * de-serializes to a [null].
      * <p>
      * Note: the 'override' flag is NOT stored in the statement indices, but it
      * is passed by the procedure that writes on the statement indices so that
@@ -515,21 +581,26 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @todo test suite.
      * 
+     * @see StatementEnum
+     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class FastRDFValueCompression implements IDataSerializer {
+    static public class FastRDFValueCompression implements IDataSerializer, Externalizable {
 
         /**
          * 
          */
         private static final long serialVersionUID = 1933430721504168533L;
 
+        /**
+         * Sole constructor (handles de-serialization also).
+         */
         public FastRDFValueCompression() {
 
         }
 
-        public byte[][] read(DataInput in) throws IOException {
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
 
             InputBitStream ibs = new InputBitStream((InputStream) in, 0/* unbuffered! */);
 
@@ -538,43 +609,75 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure implements
              */
             
             final int n = ibs.readNibble();
-            
-            byte[][] vals = new byte[n][];
 
             for (int i = 0; i < n; i++) {
 
-                vals[i] = new byte[] {
-
-                (byte) ibs.readInt(3)
-
-                };
+                int b = ibs.readInt(3);
+                
+                if (b == 7) {
+                 
+                    // A deleted value.
+                    
+                    raba.add(null);
+                    
+                } else {
+                
+                    raba.add(new byte[] { (byte) b });
+                    
+                }
 
             }
-
-            return vals;
             
         }
 
-        public void write(int n,int offset, byte[][] vals, DataOutput out) throws IOException {
+        public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
 
             final OutputBitStream obs = new OutputBitStream((OutputStream) out, 0 /* unbuffered! */);
 
             /*
              * write the values.
              */
+
+            final int n = raba.getKeyCount();
+            
+            assert n >= 0;
             
             obs.writeNibble(n);
-            
+
             for (int i = 0; i < n; i++) {
 
-                final byte[] val = vals[offset + i];
+                if (raba.isNull(i)) {
 
-                obs.writeInt((int) val[0], 3);
+                    // flag a deleted value (de-serialize to a null).
+                    obs.writeInt( 7, 3 );
+                    
+                } else {
+
+                    final byte[] val = raba.getKey(i);
+
+                    obs.writeInt((int) val[0], 3);
+                    
+                }
 
             }
 
+            /*
+             * Note: ALWAYS flush!
+             */
             obs.flush();
 
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            // NOP
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            // NOP
+            
         }
 
     }

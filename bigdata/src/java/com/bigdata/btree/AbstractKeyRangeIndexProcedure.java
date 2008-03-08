@@ -47,6 +47,18 @@ abstract public class AbstractKeyRangeIndexProcedure implements
 
     protected byte[] toKey;
 
+    public byte[] getFromKey() {
+        
+        return fromKey;
+        
+    }
+    
+    public byte[] getToKey() {
+        
+        return toKey;
+        
+    }
+    
     /**
      * De-serialization ctor.
      */

@@ -37,7 +37,8 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ICommitRecord;
@@ -392,24 +393,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         this.readRetentionQueue = newReadRetentionQueue();
 
-        /*
-         * Note: there is less need to use checksum for stores that are fully
-         * buffered since the data are always read from memory which we presume
-         * is already parity checked. While a checksum on a fully buffered store
-         * could detect an overwrite, the journal architecture makes that
-         * extremely unlikely and one has never been observed.
-         */
-        final boolean useChecksum = metadata.getUseChecksum() && !store.isFullyBuffered();
-        
         this.nodeSer = new NodeSerializer(//
                 nodeFactory,//
                 branchingFactor,//
                 0, //initialBufferCapacity
                 addrSer, //
-                metadata.getKeySerializer(), //
-                metadata.getValueSerializer(),//
-                metadata.getRecordCompressor(),//
-                useChecksum//metadata.getUseChecksum()//
+                metadata,//
+                store.isFullyBuffered()
                 );
 
     }
@@ -563,11 +553,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * Note: This is fixed for an {@link IndexSegment}.
      * <p>
      * Note: This is NOT normally set on the {@link ITx#UNISOLATED} view of a
-     * {@link BTree}.
+     * {@link BTree} (it SHOULD be ZERO(0L)).
      * <p>
      * Note: If you are reading from a historical state of a {@link BTree} then
-     * this MAY be set to {@link ICommitRecord#getTimestamp()} for that
+     * this SHOULD be set to {@link ICommitRecord#getTimestamp()} for that
      * historical state - it MUST NOT be set to any other value.
+     * 
+     * @todo add to {@link IIndex}?
      */
     abstract public long getLastCommitTime();
     
@@ -1445,7 +1437,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     }
     
-    public Object submit(byte[] key, IIndexProcedure proc) {
+    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
         
         // conditional range check on the key.
         if(key!=null) assert rangeCheck(key,false);
@@ -1456,7 +1448,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     @SuppressWarnings("unchecked")
     public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler handler) {
+            final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         // conditional range check on the key.
         if (fromKey != null)
@@ -1476,14 +1468,15 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
     
     @SuppressWarnings("unchecked")
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
+        Object result = ctor.newInstance(this, fromIndex, toIndex, keys, vals)
+                .apply(this);
         
         if (aggregator != null) {
 
-            aggregator.aggregate(result, new Split(null, 0, n));
+            aggregator.aggregate(result, new Split(null, fromIndex, toIndex));
 
         }
         

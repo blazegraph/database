@@ -31,12 +31,13 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ByteArrayValueSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.NOPSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 
 /**
  * A temporary triple store based on the <em>bigdata</em> architecture. Data
@@ -297,10 +298,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
                 ndx_termId = (BTree) store.registerIndex(name_termId, BTree
                         .create(store, metadata));
-                // new BTree(store,
-                // branchingFactor, UUID.randomUUID(),
-                // // TermIdSerializer.INSTANCE
-                // ByteArrayValueSerializer.INSTANCE)
+
             }
 
             {
@@ -313,12 +311,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 ndx_idTerm = (BTree) store.registerIndex(name_idTerm, BTree
                         .create(store, metadata));
 
-//                new BTree(store,
-//                        branchingFactor, UUID.randomUUID(),
-////                        RdfValueSerializer.INSTANCE
-//                        ByteArrayValueSerializer.INSTANCE
-//                        )
-                }
+            }
             
             if(textIndex) {
 
@@ -327,12 +320,10 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
                 metadata.setBranchingFactor(branchingFactor);
 
+                metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+                
                 ndx_freeText = (BTree) store.registerIndex(name_freeText, BTree
                         .create(store, metadata));
-
-//                new BTree(store,
-//                        branchingFactor, UUID.randomUUID(),
-//                        NOPSerializer.INSTANCE)
 
             }
             
@@ -354,14 +345,11 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
             
             metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
 
-            metadata.setValueSerializer(NOPSerializer.INSTANCE);
+            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
             
             ndx_just = (BTree) store.registerIndex(name_just, 
                     BTree.create(store, metadata));
             
-//            new BTree(store,
-//                    branchingFactor, UUID.randomUUID(),
-//                                        NOPSerializer.INSTANCE)
         }
 
     }
@@ -371,14 +359,12 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
         IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
         
         metadata.setBranchingFactor(BTree.DEFAULT_BRANCHING_FACTOR);
+
+        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
         
+        metadata.setValueSerializer(new FastRDFValueCompression());
+
         return BTree.create(store, metadata);
-        
-//        (BTree) store.registerIndex(name_osp, new BTree(store,
-//                branchingFactor, UUID.randomUUID(),
-////                StatementSerializer.INSTANCE
-//                ByteArrayValueSerializer.INSTANCE
-//                ));
         
     }
     

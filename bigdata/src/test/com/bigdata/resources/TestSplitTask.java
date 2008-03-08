@@ -86,10 +86,12 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
          */
         final String name = "testIndex";
         final UUID indexUUID = UUID.randomUUID();
+        final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
         {
 
-            final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
-
+            // The minimum #of index entries per partition before they will be joined.
+            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setMinimumEntryCount(100);
+            
             // The target #of index entries per partition.
             ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setEntryCountPerSplit(400);
             
@@ -101,7 +103,8 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
                     0, // partitionId (arbitrary since no metadata index).
                     new byte[]{}, //leftSeparator
                     null, // rightSeparator
-                    new IResourceMetadata[]{resourceManager.getLiveJournal().getResourceMetadata()}
+                    new IResourceMetadata[]{resourceManager.getLiveJournal().getResourceMetadata()},
+                    "" // history
                     ));
             
             // submit task to register the index and wait for it to complete.
@@ -135,7 +138,8 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
             }
 
             IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
-                    .newInstance(nentries, 0/* offset */, keys, vals);
+                    .newInstance(indexMetadata, 0/* fromIndex */,
+                            nentries/*toIndex*/, keys, vals);
 
             // submit the task and wait for it to complete.
             concurrencyManager.submit(

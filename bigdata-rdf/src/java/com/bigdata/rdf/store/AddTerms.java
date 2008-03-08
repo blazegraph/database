@@ -33,11 +33,12 @@ import java.io.ObjectOutput;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
-import org.openrdf.model.BNode;
 
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IDataSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataInputBuffer;
@@ -119,12 +120,34 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    public AddTerms(int n, int offset, byte[][] keys) {
+    protected AddTerms(IDataSerializer keySer, int fromIndex, int toIndex,
+            byte[][] keys) {
 
-        super( n, offset, keys, null /*vals*/ );
+        super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
         
     }
-    
+
+    public static class AddTermsConstructor extends
+            AbstractIndexProcedureConstructor<AddTerms> {
+
+        public static AddTermsConstructor INSTANCE = new AddTermsConstructor();
+
+        private AddTermsConstructor() {
+            
+        }
+        
+        public AddTerms newInstance(IDataSerializer keySer,
+                IDataSerializer valSer,int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
+
+            assert vals == null;
+            
+            return new AddTerms(keySer, fromIndex, toIndex, keys);
+
+        }
+
+    }
+
     /**
      * For each term whose serialized key is mapped to the current index
      * partition, lookup the term in the <em>terms</em> index. If it is there
@@ -244,20 +267,10 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        Result result = newResult();
+        return new Result(ids);
 
-        result.setResult(ids);
-        
-        return result;
-        
     }
 
-    final protected Result newResult() {
-    
-        return new Result();
-        
-    }
-    
     /**
      * Object encapsulates the discovered / assigned term identifiers and
      * provides efficient serialization for communication of those data to
@@ -283,14 +296,8 @@ public class AddTerms extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-//        public Result(long[] ids) {
-//
-//            setResult(ids);
-//            
-//        }
-        
-        protected void setResult(long[] ids) {
-            
+        public Result(long[] ids) {
+
             assert ids != null;
             
             assert ids.length > 0;

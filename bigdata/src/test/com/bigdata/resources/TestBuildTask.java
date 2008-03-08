@@ -117,17 +117,16 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             indexMetadata.setDeleteMarkers(true);
 
             // must be an index partition.
-            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(0, // partitionId
-                                                                                // (arbitrary
-                                                                                // since
-                                                                                // no
-                                                                                // metadata
-                                                                                // index).
+            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
+                    // partitionId (arbitrary since no metadata index).
+                    0,//
                     new byte[] {}, // leftSeparator
                     null, // rightSeparator
                     new IResourceMetadata[] {//
-                    resourceManager.getLiveJournal().getResourceMetadata() //
-                    }));
+                            resourceManager.getLiveJournal().getResourceMetadata(), //
+                    }, //
+                    "" // history
+                    ));
 
             // submit task to register the index and wait for it to complete.
             concurrencyManager.submit(
@@ -163,7 +162,8 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             }
 
             IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
-                    .newInstance(nentries, 0/* offset */, keys, vals);
+                    .newInstance(indexMetadata, 0/* fromIndex */,
+                            nentries/*toIndex*/, keys, vals);
 
             // submit the task and wait for it to complete.
             concurrencyManager.submit(
@@ -255,7 +255,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // run task that re-defines the index partition view.
         {
 
-            AbstractTask task = new UpdateIndexPartition(resourceManager,
+            AbstractTask task = new UpdateBuildIndexPartition(resourceManager,
                     concurrencyManager, name, result);
 
             // run task, await completion.

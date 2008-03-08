@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IDataService;
 
@@ -39,9 +40,11 @@ import com.bigdata.service.IDataService;
  * Procedure for key range scan of an index.
  * 
  * @deprecated This procedure has not been worked through at the
- *             {@link ClientIndexView} level. Instead this is just a method call
- *             on the {@link IDataService} unlike nearly every other remote
- *             operation on an index.
+ *             {@link ClientIndexView} level. Instead the range iterator is
+ *             handled as a method call on the {@link IDataService} unlike
+ *             nearly every other remote operation on an index. I have not
+ *             yet decided whether it makes sense to re-implement the range
+ *             iterator as an {@link IKeyRangeIndexProcedure}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

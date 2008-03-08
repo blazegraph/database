@@ -49,6 +49,8 @@ import com.bigdata.io.DataOutputBuffer;
  *       could be restricted to the range of a signed short so there may be an
  *       efficiency possible there.
  * 
+ * @deprecated by {@link IDataSerializer} and SimplePrefixSerializer
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

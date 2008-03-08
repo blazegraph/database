@@ -23,13 +23,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
 /**
- * A mutable implementation of {@link IKeyBuffer}.
+ * A flyweight mutable implementation of {@link IKeyBuffer} (does not support
+ * the concept of a non-zero fromIndex and treats the number of keys in the
+ * buffer as the toIndex).
  * 
  * @todo 27% of the search cost is dealing with the prefix.
+ * 
  * @todo track prefix length for mutable keys (update when first/last key are
- *       updated).  at present the node/leaf logic directly manipulates the
- *       keys. that will have to be changed to track the prefix length.
+ *       updated). at present the node/leaf logic directly manipulates the keys.
+ *       that will have to be changed to track the prefix length.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -38,12 +45,19 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     /**
      * The #of defined keys.
+     * 
+     * @todo must become private in order to decouple the btree implementation
+     *       from the {@link MutableKeyBuffer} implementation.
      */
     int nkeys;
     
     /**
-     * An array containing the keys.  The size of the array is the maximum
+     * An array containing the keys. The size of the array is the maximum
      * capacity of the key buffer.
+     * 
+     * @todo must become private in order to decouple the btree implementation
+     *       from the {@link MutableKeyBuffer} implementation. Callers should
+     *       use random access API and copy key by value.
      */
     final byte[][] keys;
 
@@ -132,12 +146,49 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      */
     final public byte[] getKey(int index) {
 
+        /*
+         * @todo nkeys is not always updated before using this method by the
+         * btree code so the range check causes errors.
+         */
+        
 //        assert index >= 0 && index < nkeys;
 
         return keys[index];
 
     }
 
+    final public int getLength(int index) {
+
+        assert index >= 0 && index < nkeys;
+
+        byte[] tmp = keys[index];
+        
+        if(tmp==null) throw new NullPointerException();
+        
+        return tmp.length;
+
+    }
+    
+    final public int copyKey(int index, DataOutput out) throws IOException {
+
+        assert index >= 0 && index < nkeys;
+
+        byte[] tmp = keys[index];
+
+        out.write(tmp, 0, tmp.length);
+        
+        return tmp.length;
+        
+    }
+
+    final public boolean isNull(int index) {
+        
+        assert index >= 0 && index < keys.length;
+        
+        return index >= nkeys;
+                
+    }
+    
     final public int getKeyCount() {
 
         return nkeys;
@@ -159,6 +210,12 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     final public boolean isFull() {
         
         return nkeys == keys.length;
+        
+    }
+    
+    final public boolean isReadOnly() {
+        
+        return false;
         
     }
     
@@ -215,7 +272,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @param index
      *            The key index in [0:maxKeys-1];
      */
-    final protected void zeroKey(int index) {
+    final public void zeroKey(int index) {
         
 //        assert index >= 0 && index < nkeys;
         
@@ -223,22 +280,11 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    /**
-     * Append a key to the end of the buffer, incrementing the #of keys in the
-     * buffer.
-     * 
-     * @param key
-     *            A key.
-     * 
-     * @return The #of keys in the buffer.
-     * 
-     * @todo update prefixLength, lazily compute prefix.
-     */
     final public int add(byte[] key) {
         
         assert nkeys < keys.length;
         
-        assert key != null;
+//        assert key != null;
         
         keys[nkeys++] = key;
         
@@ -246,6 +292,40 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
+    final public int add(byte[] key, int off, int len) {
+        
+        assert nkeys < keys.length;
+        
+//        assert key != null;
+        
+        byte[] b = new byte[len];
+        
+        for(int i=0; i<len; i++) {
+            
+            b[i] = key[off+i];
+            
+        }
+        
+        keys[nkeys++] = b;
+        
+        return nkeys;
+        
+    }
+
+    public int add(DataInput in, int len) throws IOException {
+
+        assert nkeys < keys.length;
+      
+        final byte[] b = new byte[len];
+        
+        in.readFully(b, 0, len);
+        
+        keys[nkeys++] = b;
+      
+        return nkeys;
+
+    }
+    
     /**
      * Insert a key into the buffer at the specified index, incrementing the #of
      * keys in the buffer by one and moving down all keys from that index on
@@ -624,5 +704,5 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     }
     
     private static final transient byte[] EMPTY_PREFIX = new byte[]{};
-    
+
 }

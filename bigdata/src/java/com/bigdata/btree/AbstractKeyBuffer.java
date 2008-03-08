@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.util.Iterator;
+
 /**
  * Class with implementations supporting mutable and immutable variable length
  * byte[] keys.
@@ -73,5 +75,27 @@ public abstract class AbstractKeyBuffer implements IKeyBuffer {
      * Binary search.
      */
     abstract protected int _binarySearch(final int searchKeyOffset, final byte[] searchKey);
+
+    public Iterator<byte[]> iterator() {
+
+        return new Iterator<byte[]>() {
+
+            int i = 0;
+            
+            public boolean hasNext() {
+                return i < getKeyCount();
+            }
+
+            public byte[] next() {
+                return getKey(i++);
+            }
+
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+            
+        };
+
+    }
 
 }
