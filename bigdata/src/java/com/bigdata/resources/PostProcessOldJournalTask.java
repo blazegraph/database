@@ -28,6 +28,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -401,9 +402,16 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         this.lastCommitTime = lastCommitTime;
 
         this.copied = copied;
-        
-        // copied indices are used and should not be processed further.
-        used.addAll(copied);
+
+        /*
+         * Note: An index that has been copied because its write set on the old
+         * journal was small should not undergo an incremental build. It could
+         * be used in a full build if its view has too much history. Likewise we
+         * can still use it in a join operation. So we do not add the copied
+         * indices to the "used" set.
+         */ 
+//        // copied indices are used and should not be processed further.
+//        used.addAll(copied);
         
         this.totalCounters = totalCounters;
         
@@ -510,6 +518,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
                     null, null);
 
+            assert used.isEmpty() : "There are "+used.size()+" used index partitions";
+            
             while (itr.hasNext()) {
 
                 final ITuple tuple = itr.next();
@@ -520,17 +530,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // the name of an index to consider.
                 final String name = entry.name;
 
-                if(isUsed(name)) {
-                    
-                    log.info("Skipping name="+name+" - already used.");
-                    
-                    nskip++;
-                    
-                    ndone++;
-                    
-                    continue;
-                    
-                }
+//                if(isUsed(name)) {
+//                    
+//                    log.info("Skipping name="+name+" - already used.");
+//                    
+//                    nskip++;
+//                    
+//                    ndone++;
+//                    
+//                    continue;
+//                    
+//                }
 
                 /* 
                  * Open the historical view of that index at that time.
@@ -648,6 +658,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int njoin = 0; // do index partition join on local service.
             int nmove = 0; // move to another service for index partition join.
 
+            assert used.isEmpty() : "There are "+used.size()+" used index partitions";
+
             final UUID sourceDataService = resourceManager.getDataServiceUUID();
 
             while (itr.hasNext()) {
@@ -726,8 +738,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Submit a single batch request to identify rightSiblings for
                  * all of the undercapacity index partitions for this scale-out
                  * index.
+                 * 
+                 * Note: default key/val serializers are used.
                  */
-                final BatchLookup op = new BatchLookup(ncandidates, 0/*offset*/, keys);
+                final BatchLookup op = BatchLookupConstructor.INSTANCE
+                        .newInstance(0/* fromIndex */, ncandidates/* toIndex */,
+                                keys, null/*vals*/);
                 final ResultBuffer resultBuffer;
                 try {
                     resultBuffer = (ResultBuffer) resourceManager
@@ -751,7 +767,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final LocalPartitionMetadata pmd = underUtilizedPartitions[i];
                     
                     final PartitionLocator rightSiblingLocator = (PartitionLocator) SerializerUtil
-                            .deserialize(resultBuffer.getResult()[i]);
+                            .deserialize(resultBuffer.getResult(i));
 
                     final UUID targetDataServiceUUID = rightSiblingLocator.getDataServices()[0];
 
@@ -985,35 +1001,33 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * Set true if this node/data service is highly utilized. We will
          * consider moves IFF this is a highly utilized service.
          * 
-         * FIXME set highlyUtilizedService based on recent load for this
-         * host and service. If the host is at 80% or more load and the
-         * service is at 1/#servicesOnHost % or more load then the host is
-         * highly utilized.
+         * FIXME set highlyUtilizedService based on recent load for this host
+         * and service. If the host is at 80% or more load and the service is at
+         * 1/#servicesOnHost % or more load then the host is highly utilized.
          * 
-         * An under-utilized host is one where the host is at 50% or less
-         * load.  An under-utilized service on that host is one where the
-         * service is ....
+         * An under-utilized host is one where the host is at 50% or less load.
+         * An under-utilized service on that host is one where the service is
+         * ....
          */
         final boolean highlyUtilizedService = true;
 
         /*
-         * The minimum #of active index partitions on a data service. We
-         * will consider moving index partitions iff this threshold is
-         * exceeeded.
+         * The minimum #of active index partitions on a data service. We will
+         * consider moving index partitions iff this threshold is exceeeded.
          */
         final int minActiveIndexPartitions = resourceManager.minimumActiveIndexPartitions;
-        
+
         /*
-         * Note: We make sure that we do not move all the index partitions
-         * to the same target by moving at most M index partitions per
+         * Note: We make sure that we do not move all the index partitions to
+         * the same target by moving at most M index partitions per
          * under-utilized data service recommended to us.
          */
         final int maxMovesPerTarget = resourceManager.maximumMovesPerTarget;
 
         /*
          * Obtain some data service UUIDs onto which we will try and offload
-         * some index partitions iff this data service is deemed to be
-         * highly utilized.
+         * some index partitions iff this data service is deemed to be highly
+         * utilized.
          */
         final UUID[] underUtilizedDataServiceUUIDs;
         if (highlyUtilizedService) {
@@ -1090,7 +1104,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  */
                 if(isUsed(name)) {
                     
-                    log.info("Skipping name="+name);
+                    log.info("Skipping name="+name+" - already used.");
                     
                     nskip++;
 
@@ -1128,9 +1142,11 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      */
 
                     final AbstractTask task = new SplitIndexPartitionTask(
-                            resourceManager, resourceManager
-                                    .getConcurrencyManager(), lastCommitTime,
-                            name);
+                            resourceManager,//
+                            resourceManager.getConcurrencyManager(), //
+                            lastCommitTime,//
+                            name//
+                            );
 
                     // add to set of tasks to be run.
                     tasks.add(task);
@@ -1144,70 +1160,90 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 } else {
                     
                     /*
-                     * Either a move or a build.
+                     * Either a move or a build or an index partition whose
+                     * write set was already copied to the new journal.
                      */
                     
-                    boolean moved = false;
+                    /*
+                     * Move candidate?
+                     * 
+                     * Note: We make sure that we don't move all the hot/warm
+                     * index partitions by choosing the index partitions to be
+                     * moved from the middle of the range. However, note that
+                     * "cold" index partitions are NOT assigned scores, so there
+                     * has been either an unisolated or read-committed operation
+                     * on any index partition that was assigned a score.
+                     * 
+                     * Note: This could lead to a failure to recommend a move if
+                     * all the "warm" index partitions happen to require a split
+                     * or join. However, this is unlikely since the "warm" index
+                     * partitions change size, if not slowly, then at least not
+                     * as rapidly as the hot index partitions. Eventually a lot
+                     * of splits will lead to some index partition not being
+                     * split during an overflow and then we can move it.
+                     * 
+                     * @todo could adjust the bounds here based on how important
+                     * it is to begin moving index partitions off of this data
+                     * service.
+                     */
 
-                    if (highlyUtilizedService
-                            && underUtilizedDataServiceUUIDs != null
-                            && scores.length > minActiveIndexPartitions
-                            && nmove < maxMoves) {
+                    final Score score = getScore(name);
+
+                    final boolean moveCandidate = (score != null && (score.drank > .3 && score.drank < .8));
+                    
+                    if (highlyUtilizedService//
+                            && underUtilizedDataServiceUUIDs != null//
+                            && scores.length > minActiveIndexPartitions//
+                            && nmove < maxMoves //
+                            && moveCandidate //
+                            ) {
 
                         /*
-                         * Note: We make sure that we don't move all the
-                         * hot/warm index partitions by choosing the index
-                         * partitions to be moved from the middle of the range.
-                         * 
-                         * Note: This could lead to a failure to recommend a
-                         * move if all the "warm" index partitions happen to
-                         * require a split or join. However, this is unlikely
-                         * since the "warm" index partitions change size, if not
-                         * slowly, then at least not as rapidly as the hot index
-                         * partitions. Eventually a lot of splits will lead to
-                         * some index partition not being split during an
-                         * overflow and then we can move it.
-                         * 
-                         * @todo could adjust the bounds here based on how
-                         * important it is to begin moving index partitions off
-                         * of this data service.
+                         * Move this index partition to an under-utilized data
+                         * service.
                          */
 
-                        final Score score = getScore(name);
+                        // choose target using round robin among candidates.
+                        final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
+                                % underUtilizedDataServiceUUIDs.length];
 
-                        if (score != null && score.drank > .3
-                                && score.drank < .8) {
+                        final AbstractTask task = new MoveIndexPartitionTask(
+                                resourceManager, resourceManager
+                                        .getConcurrencyManager(),
+                                lastCommitTime, name, targetDataServiceUUID);
 
-                            /*
-                             * Move this index partition to an under-utilized
-                             * data service.
-                             */
+                        tasks.add(task);
 
-                            // choose target using round robin among candidates.
-                            final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
-                                    % underUtilizedDataServiceUUIDs.length];
+                        markUsed(name);
 
-                            final AbstractTask task = new MoveIndexPartitionTask(
-                                    resourceManager, resourceManager
-                                            .getConcurrencyManager(),
-                                    lastCommitTime, name, targetDataServiceUUID);
+                        nmove++;
 
-                            tasks.add(task);
+                    } else if (copied.contains(name)) {
 
-                            markUsed(name);
-                            
-                            nmove++;
+                        /*
+                         * The write set from the old journal was already copied
+                         * to the new journal so we do not need to do a build.
+                         */
 
-                            moved = true;
+                        markUsed(name);
 
-                        }
+                        nskip++;
 
-                    }
-
-                    if (!moved) {
+                    } else {
 
                         /*
                          * Just do an index build task.
+                         * 
+                         * @todo could do an incremental build if the amount of
+                         * history in the view is not too great.
+                         * 
+                         * @todo mark incremental build segments differently in
+                         * the file system since that might be important
+                         * information when doing a distributed index rebuild.
+                         * This mark probably needs to be driven through the
+                         * index segment build API so that it shows up in the
+                         * view history and in the index segment checkpoint
+                         * record.
                          */
 
                         // the file to be generated.
@@ -1225,7 +1261,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         tasks.add(task);
 
                         markUsed(name);
-                        
+
                         nbuild++;
 
                     }
@@ -1241,6 +1277,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
                     + nsplit + ", nmove=" + nmove;
 
+            // verify all indices were handled in one way or another.
+            assert ndone == used.size() : "ndone="+ndone+", but #used="+used.size();
+            
         }
 
         log.info("end");
@@ -1353,7 +1392,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final BuildResult result = (BuildResult) tmp;
 
                 // task will update the index partition view definition.
-                final AbstractTask task = new UpdateIndexPartition(
+                final AbstractTask task = new UpdateBuildIndexPartition(
                         resourceManager, resourceManager
                                 .getConcurrencyManager(), result.name, result);
 

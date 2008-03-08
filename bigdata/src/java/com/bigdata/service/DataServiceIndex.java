@@ -31,22 +31,24 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.ICounter;
-import com.bigdata.btree.ITupleFilter;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
+import com.bigdata.btree.ITupleFilter;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -168,25 +170,6 @@ public class DataServiceIndex implements IIndex {
 
     }
 
-    public boolean contains(byte[] key) {
-        
-        if (batchOnly)
-            throw new RuntimeException(NON_BATCH_API);
-        else
-            log.warn(NON_BATCH_API);
-
-        final BatchContains proc = new BatchContains(//
-                1, // n,
-                0, // offset
-                new byte[][] { key } // keys
-        );
-
-        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
-
-        return ret[0];
-        
-    }
-
     /**
      * Counters are local to a specific index partition and are only available
      * to unisolated procedures.
@@ -200,6 +183,32 @@ public class DataServiceIndex implements IIndex {
         
     }
     
+    public boolean contains(byte[] key) {
+        
+        if (batchOnly)
+            throw new RuntimeException(NON_BATCH_API);
+        else
+            log.warn(NON_BATCH_API);
+
+        final byte[][] keys = new byte[][] { key };
+        
+//        final BatchContains proc = new BatchContains(//
+//                1, // n,
+//                0, // offset
+//                keys
+//        );
+//
+//        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchContainsConstructor.INSTANCE, resultHandler);
+
+        return ((ResultBitBuffer) resultHandler.getResult()).getResult()[0];
+        
+    }
+    
     public byte[] insert(byte[] key, byte[] value) {
 
         if (batchOnly)
@@ -207,17 +216,27 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchInsert proc = new BatchInsert(//
-                1, // n,
-                0, // offset
-                new byte[][] { key }, // keys
-                new byte[][] { value }, // vals
-                true // returnOldValues
-        );
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+//        final BatchInsert proc = new BatchInsert(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key }, // keys
+//                new byte[][] { value }, // vals
+//                true // returnOldValues
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/* fromIndex */, 1/* toIndex */, keys, vals,
+                BatchInsertConstructor.RETURN_OLD_VALUES, resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -228,15 +247,24 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchLookup proc = new BatchLookup(//
-                1, // n,
-                0, // offset
-                new byte[][] { key } // keys
-        );
+        final byte[][] keys = new byte[][]{key};
+        
+//        final BatchLookup proc = new BatchLookup(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key } // keys
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchLookupConstructor.INSTANCE, resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -247,16 +275,25 @@ public class DataServiceIndex implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchRemove proc = new BatchRemove(//
-                1, // n,
-                0, // offset
-                new byte[][] { key }, // keys
-                true // returnOldValues
-        );
+        final byte[][] keys = new byte[][]{key};
+        
+//        final BatchRemove proc = new BatchRemove(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key }, // keys
+//                true // returnOldValues
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
+                BatchRemoveConstructor.RETURN_OLD_VALUES, resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -291,12 +328,15 @@ public class DataServiceIndex implements IIndex {
 
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
-        return new RawDataServiceRangeIterator(dataService, name, timestamp, fromKey, toKey,
-                capacity, flags, filter);
+        // @todo make this a ctor argument or settable property?
+        final boolean readConsistent = (timestamp == ITx.UNISOLATED?false:true);
+        
+        return new RawDataServiceRangeIterator(dataService, name, timestamp,
+                readConsistent, fromKey, toKey, capacity, flags, filter);
 
     }
 
-    public Object submit(byte[] key, IIndexProcedure proc) {
+    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
 
         try {
 
@@ -312,7 +352,7 @@ public class DataServiceIndex implements IIndex {
 
     @SuppressWarnings("unchecked")
     public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler handler) {
+            final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         if (proc == null)
             throw new IllegalArgumentException();
@@ -336,17 +376,18 @@ public class DataServiceIndex implements IIndex {
     }
 
     @SuppressWarnings("unchecked")
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         try {
 
-            Object result = dataService.submit(timestamp, name, ctor.newInstance(
-                    n, 0/* offset */, keys, vals));
+            Object result = dataService.submit(timestamp, name, ctor
+                    .newInstance(this,fromIndex, toIndex, keys, vals));
             
             if(aggregator != null) {
 
-                aggregator.aggregate(result, new Split(null,0,n));
+                aggregator.aggregate(result,
+                        new Split(null, fromIndex, toIndex));
                 
             }
 

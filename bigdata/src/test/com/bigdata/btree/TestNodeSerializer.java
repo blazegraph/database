@@ -37,7 +37,6 @@ import java.util.zip.Deflater;
 import org.apache.log4j.Level;
 
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.rawstore.Addr;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.util.ChecksumError;
@@ -332,11 +331,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
         NodeSerializer nodeSer = ndx.getNodeSerializer();
         
-
-        // final int BUF_SIZE = getSize(nodeSer,expected);
-
-        // ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
-
         final ByteBuffer buf;
 
         if (isLeaf) {
@@ -546,10 +540,10 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
                 
             }
 
-            // Show the counters.
-            System.err
-                    .println(((KeyBufferSerializer) ndx.getNodeSerializer().keySerializer).counters
-                            .toString());
+//            // Show the counters.
+//            System.err
+//                    .println(((KeyBufferSerializer) ndx.getNodeSerializer().keySerializer).counters
+//                            .toString());
             
         }
         
@@ -571,8 +565,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     }
     
     /**
-     * A random {@link Addr} that is only syntactically valid (do not
-     * dereference).
+     * A random address that is only syntactically valid (do not dereference).
      */
     protected long nextAddr() {
 
@@ -580,7 +573,9 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
         int nbytes = r.nextInt(1024);
         
-        return Addr.toLong(nbytes,offset);
+//        return Addr.toLong(nbytes,offset);
+        
+        return ((long) offset) << 32 | nbytes;
         
     }
 

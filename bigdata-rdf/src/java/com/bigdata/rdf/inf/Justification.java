@@ -31,11 +31,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.btree.NOPSerializer;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -744,7 +744,7 @@ public class Justification implements Comparable<Justification> {
             
             metadata.setBranchingFactor(32);
             
-            metadata.setValueSerializer(NOPSerializer.INSTANCE);
+            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
   
             btree = BTree.create(tempStore,metadata);
             

@@ -28,9 +28,11 @@
 
 package com.bigdata.rdf.store;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.IDataSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
+import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.rdf.inf.Justification;
 
 /**
@@ -40,7 +42,7 @@ import com.bigdata.rdf.inf.Justification;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class WriteJustificationsProc
+public class WriteJustificationsProc
         extends AbstractKeyArrayIndexProcedure
         implements IParallelizableIndexProcedure {
 
@@ -56,15 +58,36 @@ class WriteJustificationsProc
     public WriteJustificationsProc() {
         
         super();
-        
+
     }
-    
-    public WriteJustificationsProc(int n, int offset, byte[][] keys) {
-        
-        super(n, offset, keys, null/* vals */);
-        
+
+    public WriteJustificationsProc(IDataSerializer keySer, int fromIndex,
+            int toIndex, byte[][] keys) {
+
+        super(keySer, null, fromIndex, toIndex, keys, null/* vals */);
+
     }
-    
+
+    public static class WriteJustificationsProcConstructor extends
+            AbstractIndexProcedureConstructor<WriteJustificationsProc> {
+
+        public static WriteJustificationsProcConstructor INSTANCE = new WriteJustificationsProcConstructor();
+
+        private WriteJustificationsProcConstructor() {
+        }
+
+        public WriteJustificationsProc newInstance(IDataSerializer keySer,
+                IDataSerializer valSer, int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
+
+            assert vals == null;
+
+            return new WriteJustificationsProc(keySer, fromIndex, toIndex, keys);
+
+        }
+
+    }
+
     /**
      * @return The #of justifications actually written on the index as a
      *         {@link Long}.
@@ -90,18 +113,6 @@ class WriteJustificationsProc
         }
         
         return Long.valueOf(nwritten);
-        
-    }
-    
-    /**
-     * @todo This method is not used. It could be implemented to change the data
-     *       type for the operation to something that was more efficiently
-     *       serialized than {@link Long}. It would have to be a mutable value
-     *       as well.
-     */
-    final protected Object newResult() {
-        
-        throw new UnsupportedOperationException();
         
     }
     

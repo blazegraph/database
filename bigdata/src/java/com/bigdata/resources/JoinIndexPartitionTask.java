@@ -201,7 +201,7 @@ public class JoinIndexPartitionTask extends AbstractTask {
         final String scaleOutIndexName = newMetadata.getName();
         
         final int partitionId = resourceManager.getMetadataService().nextPartitionId(scaleOutIndexName);
-        
+
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 partitionId,//
                 oldpmd[0].getLeftSeparatorKey(),//
@@ -209,7 +209,9 @@ public class JoinIndexPartitionTask extends AbstractTask {
                 new IResourceMetadata[]{//
                     // Note: the live journal.
                     getJournal().getResourceMetadata()//
-                }
+                },//
+                // new history line.
+                "join("+Arrays.toString(names)+") "
                 ));
         
         /*

@@ -335,7 +335,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         }
 
         // batch insert.
-        ndx.submit(limit, keys, vals, BatchInsertConstructor.RETURN_NO_VALUES,
+        ndx.submit(0/*fromIndex*/, limit/*toIndex*/, keys, vals, BatchInsertConstructor.RETURN_NO_VALUES,
                 null);
 
         // verify #of index entries.

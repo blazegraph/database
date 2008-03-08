@@ -201,6 +201,12 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    final public byte[] getBuffer() {
+        
+        return buf;
+        
+    }
+    
     /**
      * Sets the position to any non-negative length less than the current
      * capacity of the buffer.

@@ -37,16 +37,12 @@ package com.bigdata.btree;
  */
 public class Errors {
 
-    public static final transient String ERR_NTUPLES_NON_POSITIVE = "ntuples is non-positive";
+    public static final transient String ERR_FROM_INDEX = "fromIndex is invalid";
 
-    public static final transient String ERR_OFFSET_NEGATIVE = "offset is negative";
+    public static final transient String ERR_TO_INDEX = "toIndex is invalid";
 
     public static final transient String ERR_KEYS_NULL = "keys is null";
 
     public static final transient String ERR_VALS_NULL = "values is null";
-
-    public static final transient String ERR_NOT_ENOUGH_KEYS = "not enough keys";
-
-    public static final transient String ERR_NOT_ENOUGH_VALS = "not enough values";
 
 }

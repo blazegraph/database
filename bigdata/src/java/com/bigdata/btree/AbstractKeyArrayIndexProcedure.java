@@ -28,11 +28,9 @@
 
 package com.bigdata.btree;
 
-import it.unimi.dsi.fastutil.io.RepositionableStream;
 import it.unimi.dsi.mg4j.io.InputBitStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,59 +40,13 @@ import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.service.Split;
-import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Abstract base class supports compact serialization and compression for remote
  * {@link IKeyArrayIndexProcedure} execution (procedures may be executed on a
  * local index, but they are only (de-)serialized when executed on a remote
  * index).
- * 
- * FIXME use efficient serialization for the rangeIterator for bigdata-rdf and
- * validate when applied to a partitioned index. I think that the right way to
- * do this is to have the key and value serializer specified for the btree used
- * by the {@link ResultSet}. I believe that this is going to require moving the
- * timestamp and delete markers into the node/leaf data structures -- this
- * appears to be necessary in order to be able to apply custom serialization and
- * compression to values stored in nodes and leafs for an index
- * 
- * FIXME custom key compression can already be done - all we have to do is to
- * align the {@link IKeyBuffer}'s serializer with {@link IDataSerializer} and I
- * will be able to write compressed keys for the RDF statement indices. See
- * {@link IKeySerializer} and {@link KeyBufferSerializer}. The
- * {@link ValueSerializer} can be "adapted" to accept a delegate that handles
- * the byte[] values without changing the btree architecture.
- * <p>
- * The main point of misalignment is direct access to the byte[][] vs random
- * access to the individual keys. That could be fixed by allocating a byte[][]
- * and copying over the key references before applying an
- * {@link IDataSerializer}.
- * <P>
- * The other mismatch is that {@link DataOutputBuffer} vs an
- * {@link OutputStream} for serialization. Going to, e.g., a
- * {@link ByteArrayOutputStream} is going to cause pain since the backing buffer
- * will wind up NOT being reused for each node or leaf written.
- * <p>
- * Add {@link RepositionableStream} to the {@link DataOutputBuffer} or the
- * fastbytearrayoutputstream and that will allow buffer rewind and reuse.
- * <p>
- * 
- * FIXME logical row scan for the {@link SparseRowStore} using extension of the
- * {@link RangeIteratorProcedure}. Right now this is not being realized as an
- * index procedure since there is a bunch of custom logic for re-issuing the
- * range query until the iterator is exhausted on each index partition in turn.
- * This is definately limiting the generality of the key range scan since you
- * can not easily customize it, e.g., to handle logical row scans for the sparse
- * row store.
- * 
- * FIXME term prefix scan.
- * 
- * @todo write prefix scan procedure (aka distinct term scan). possible use for
- *       both the {@link SparseRowStore} and the triple store?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -121,74 +73,107 @@ abstract public class AbstractKeyArrayIndexProcedure implements
         IKeyArrayIndexProcedure, Externalizable {
 
     /**
-     * #of keys/values.
+     * The object used to (de-)serialize the keys when they are sent to the
+     * remote service.
      */
-    private int n;
+    private IDataSerializer keySer;
 
     /**
-     * Offset into {@link #keys} and {@link #vals} (always zero when
-     * de-serializing). This makes it possible to reuse the original keys[] and
-     * vals[] by specifying the offset identified for a {@link Split}.
+     * The object used to (de-)serialize the values when they are sent to the
+     * remote service.
      */
-    private int offset;
+    private IDataSerializer valSer;
+    
+    /**
+     * Index of the first element to be used in {@link #keys} and {@link #vals}
+     * and serialized as <code>0</code>. This makes it possible to reuse the
+     * original keys[] and vals[] when the procedure is mapped across a
+     * key-range partitioned index while only sending the minimum amount of data
+     * when the procedure is serialized.
+     */
+    private int fromIndex;
+    
+    /**
+     * Index of the first element to NOT be used in {@link #keys} and
+     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
+     * This makes it possible to reuse the original keys[] and vals[] when the
+     * procedure is mapped across a key-range partitioned index while only
+     * sending the minimum amount of data when the procedure is serialized.
+     */
+    private int toIndex;
 
     /**
      * The keys.
      */
-    private byte[][] keys;
+    private IRandomAccessByteArray keys;
 
     /**
      * The values.
      */
-    private byte[][] vals;
+    private IRandomAccessByteArray vals;
 
     /**
-     * Offset into {@link #keys} and {@link #vals} (always zero when
-     * de-serializing). This makes it possible to reuse the original keys[] and
-     * vals[] by specifying the offset identified for a {@link Split}.
+     * Index of the first element to be used in {@link #keys} and {@link #vals}
+     * and serialized as <code>0</code>. This makes it possible to reuse the
+     * original keys[] and vals[] when the procedure is mapped across a
+     * key-range partitioned index while only sending the minimum amount of data
+     * when the procedure is serialized.
      */
-    public int offset() {
+    final public int getFromIndex() {
 
-        return offset;
+        return fromIndex;
 
     }
 
     /**
+     * Index of the first element to NOT be used in {@link #keys} and
+     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
+     * This makes it possible to reuse the original keys[] and vals[] when the
+     * procedure is mapped across a key-range partitioned index while only
+     * sending the minimum amount of data when the procedure is serialized.
+     */
+    final public int getToIndex() {
+
+        return toIndex;
+        
+    }
+    
+    /**
      * The #of keys/tuples
      */
-    public int getKeyCount() {
+    final public int getKeyCount() {
 
-        return n;
+        return toIndex - fromIndex;
 
     }
 
     /**
      * Return the key at the given index (after adjusting for the
-     * {@link #offset}).
+     * {@link #fromIndex}).
      * 
      * @param i
      *            The index (origin zero).
      * 
      * @return The key at that index.
      */
-    protected byte[] getKey(int i) {
+    public byte[] getKey(int i) {
 
-        return keys[offset + i];
+        return keys.getKey(i);
 
     }
 
     /**
      * Return the value at the given index (after adjusting for the
-     * {@link #offset}).
+     * {@link #fromIndex}).
      * 
      * @param i
      *            The index (origin zero).
      * 
      * @return The value at that index.
      */
-    protected byte[] getValue(int i) {
+    public byte[] getValue(int i) {
 
-        return vals[offset + i];
+        return vals.getKey( i );
 
     }
 
@@ -200,12 +185,16 @@ abstract public class AbstractKeyArrayIndexProcedure implements
     }
 
     /**
-     * 
-     * @param n
-     *            The #of tuples.
-     * @param offset
-     *            The offset into <i>keys</i> and <i>vals</i> of the 1st
-     *            tuple.
+     * @param keySer
+     *            The object used to serialize the <i>keys</i>.
+     * @param valSer
+     *            The object used to serialize the <i>vals</i> (optional IFF
+     *            <i>vals</i> is <code>null</code>).
+     * @param fromIndex
+     *            The index of the first key in <i>keys</i> to be processed
+     *            (inclusive).
+     * @param toIndex
+     *            The index of the last key in <i>keys</i> to be processed.
      * @param keys
      *            The keys (<em>unsigned</em> variable length byte[]s) MUST
      *            be in sorted order (the logic to split procedures across
@@ -215,86 +204,110 @@ abstract public class AbstractKeyArrayIndexProcedure implements
      *            The values (optional, must be co-indexed with <i>keys</i>
      *            when non-<code>null</code>).
      */
-    protected AbstractKeyArrayIndexProcedure(int n, int offset, byte[][] keys, byte[][] vals) {
+    protected AbstractKeyArrayIndexProcedure(IDataSerializer keySer,
+            IDataSerializer valSer, int fromIndex, int toIndex, byte[][] keys,
+            byte[][] vals) {
 
-        if (n <= 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
-        if (offset < 0)
-            throw new IllegalArgumentException(Errors.ERR_NTUPLES_NON_POSITIVE);
-
+        if (keySer == null)
+            throw new IllegalArgumentException();
+        
+        if (valSer == null && vals != null)
+            throw new IllegalArgumentException();
+        
         if (keys == null)
             throw new IllegalArgumentException(Errors.ERR_KEYS_NULL);
 
-        if (keys.length < offset + n)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_KEYS);
-//
-//        if (vals == null)
-//            throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
+        if (fromIndex < 0)
+            throw new IllegalArgumentException(Errors.ERR_FROM_INDEX);
 
-        if (vals != null && vals.length < offset + n)
-            throw new IllegalArgumentException(Errors.ERR_NOT_ENOUGH_VALS);
+        if (fromIndex >= toIndex )
+            throw new IllegalArgumentException(Errors.ERR_FROM_INDEX);
 
-        this.n = n;
+        if (toIndex > keys.length )
+            throw new IllegalArgumentException(Errors.ERR_TO_INDEX);
 
-        this.offset = offset;
+        if (vals != null && toIndex > vals.length)
+            throw new IllegalArgumentException(Errors.ERR_TO_INDEX);
 
-        this.keys = keys;
+        this.fromIndex = fromIndex;
+        
+        this.toIndex = toIndex;
 
-        this.vals = vals;
+        this.keys = new RandomAccessByteArray(fromIndex,toIndex,keys);
+
+        this.vals = (vals == null ? null : new RandomAccessByteArray(fromIndex,
+                toIndex, vals));
 
     }
 
     /**
-     * Return the object used to (de-)serialize the keys.
+     * Return the object used to (de-)serialize the keys when they are sent to
+     * the remote service.
      */
     protected IDataSerializer getKeySerializer() {
         
-        return new DefaultDataSerializer();
+        return keySer;
         
     }
     
     /**
-     * Return the object used to (de-)serialize the values.
+     * Return the object used to (de-)serialize the values when they are sent to
+     * the remote service.
      */
     protected IDataSerializer getValSerializer() {
         
-        return new DefaultDataSerializer();
+        return valSer;
         
     }
-
-    /**
-     * Return the object that will be the result from
-     * {@link IIndexProcedure#apply(IIndex)}.
-     */
-    abstract protected Object newResult();
     
     final public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         readMetadata(in);
-        
-        keys = getKeySerializer().read(in);
 
-        vals = getValSerializer().read(in);
+        final boolean haveVals = in.readBoolean();
+        
+        final int n = toIndex - fromIndex;
+        
+        keys = new RandomAccessByteArray( 0, 0, new byte[n][] );
+        
+        getKeySerializer().read(in, keys );
+
+        if(haveVals) {
+        
+            vals = new RandomAccessByteArray( 0, 0, new byte[n][] );
+        
+            getValSerializer().read(in, vals);
+            
+        } else {
+            
+            vals = null;
+            
+        }
         
     }
 
     final public void writeExternal(ObjectOutput out) throws IOException {
 
         writeMetadata(out);
-        
-        getKeySerializer().write(n,offset,keys,out);
-        
-        getValSerializer().write(n,offset,vals,out);
+
+        out.writeBoolean(vals != null); // haveVals
+
+        getKeySerializer().write(out, keys);
+
+        if (vals != null) {
+
+            getValSerializer().write(out, vals);
+
+        }
         
     }
 
     /**
      * Reads metadata written by {@link #writeMetadata(ObjectOutput)}.
      * <p>
-     * The default implementation reads and sets {@link #n}. The
-     * {@link #offset} is always set to zero on de-serialization.
+     * The default implementation reads and sets {@link #toIndex}. The
+     * {@link #fromIndex} is always set to zero on de-serialization.
      * 
      * @param in
      * 
@@ -302,9 +315,9 @@ abstract public class AbstractKeyArrayIndexProcedure implements
      */
     protected void readMetadata(ObjectInput in) throws IOException {
         
-        n = (int) LongPacker.unpackLong(in);
-       
-        offset = 0;
+        fromIndex = 0;
+        
+        toIndex = (int) LongPacker.unpackLong(in);
         
     }
 
@@ -312,13 +325,16 @@ abstract public class AbstractKeyArrayIndexProcedure implements
      * Writes metadata (not the keys or values, but just other metadata used by
      * the procedure).
      * <p>
-     * The default implementation writes {@link #n}.
+     * The default implementation writes <code>toIndex - fromIndex</code>, which
+     * is the #of keys.
      * 
      * @param out
      * 
      * @throws IOException
      */
     protected void writeMetadata(ObjectOutput out) throws IOException {
+        
+        final int n = toIndex - fromIndex;
         
         LongPacker.packLong(out, n);
         
@@ -338,9 +354,10 @@ abstract public class AbstractKeyArrayIndexProcedure implements
          */
         private static final long serialVersionUID = -5705501700787163863L;
 
-        private int n;
-        private byte[][] a;
+        private IRandomAccessByteArray a;
 
+        private IDataSerializer valSer;
+        
         /**
          * De-serialization ctor.
          *
@@ -348,22 +365,6 @@ abstract public class AbstractKeyArrayIndexProcedure implements
         public ResultBuffer() {
             
         }
-
-        /**
-         * Return the object used to (de-)serialize the data.
-         * <p>
-         * Note: this uses {@link DefaultDataSerializer} by default. You can
-         * override this method and {@link AbstractKeyArrayIndexProcedure} in order to
-         * customize the serialization for an index procedure. For example, if
-         * you are using custom serialization to send values to a procedure and
-         * this object is returning values then you can use the same custom
-         * serialization here.
-         */
-        protected IDataSerializer getDataSerializer() {            
-            
-            return DefaultDataSerializer.INSTANCE;
-            
-        }
         
         /**
          * 
@@ -371,52 +372,55 @@ abstract public class AbstractKeyArrayIndexProcedure implements
          *            #of values in <i>a</i> containing data.
          * @param a
          *            The data.
+         * @param valSer
+         *            The data are serialized using using this object. Typically
+         *            this is the value returned by
+         *            {@link IndexMetadata#getValueSerializer()}.
          */
-        public ResultBuffer(int n, byte[][] a) {
+        public ResultBuffer(int n, byte[][] a, IDataSerializer valSer) {
 
-            setResult( n, a );
+            assert n >= 0;
+            assert a != null;
+            assert valSer != null;
+                        
+            this.a = new RandomAccessByteArray(0/*fromIndex*/,n/*toIndex*/,a);
             
-        }
-
-        /**
-         * 
-         * @param n
-         *            #of values in <i>a</i> containing data.
-         * @param a
-         *            The data.
-         */
-        public void setResult(int n, byte[][] a) {
-
-            this.n = n;
-            
-            this.a = a;
+            this.valSer = valSer;
             
         }
         
         public int getResultCount() {
             
-            return n;
+            return a.getKeyCount();
             
         }
         
-        public byte[][] getResult() {
+        public byte[] getResult(int index) {
 
-            return a;
+            return a.getKey(index);
 
         }
 
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            a = getDataSerializer().read(in);
-            
-            n = a.length; // always.
+            final int n = in.readInt();
 
+            valSer = (IDataSerializer) in.readObject();
+            
+            a = new RandomAccessByteArray(0, 0, new byte[n][]);
+
+            valSer.read(in, a);
+            
         }
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            getDataSerializer().write(n, 0/* offset */, a, out);
+            out.writeInt(a.getKeyCount());
+            
+            out.writeObject(valSer);
+            
+            valSer.write(out, a);
 
         }
         

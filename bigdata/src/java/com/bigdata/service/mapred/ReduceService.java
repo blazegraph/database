@@ -150,8 +150,8 @@ abstract public class ReduceService
 
             // index scan. @todo this is not a robust scan, but all of this needs to be reworked anyway.
             ITupleIterator itr = new RawDataServiceRangeIterator(ds, name,
-                    ITx.UNISOLATED, null/* fromKey */, null/* toKey */,
-                    capacity, flags, null/*filter*/);
+                    ITx.UNISOLATED, false/* readConsistent */,
+                    null/* fromKey */, null/* toKey */, capacity, flags, null/* filter */);
 
             long ntuples = 0L;
             

@@ -57,4 +57,13 @@ public class IndexProcedureTask extends AbstractTask {
 
     }
 
+    /**
+     * Returns the name of the {@link IIndexProcedure} that is being executed.
+     */
+    final protected String getTaskName() {
+        
+        return proc.getClass().getName();
+        
+    }
+    
 }

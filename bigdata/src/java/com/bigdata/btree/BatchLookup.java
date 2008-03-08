@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-
-
 /**
  * Batch lookup operation.
  * 
@@ -48,17 +46,21 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatc
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchLookupConstructor implements IIndexProcedureConstructor {
+    public static class BatchLookupConstructor extends AbstractIndexProcedureConstructor<BatchLookup> {
 
         public static final BatchLookupConstructor INSTANCE = new BatchLookupConstructor(); 
         
-        public BatchLookupConstructor() {
+        private BatchLookupConstructor() {
             
         }
         
-        public IKeyArrayIndexProcedure newInstance(int n, int offset, byte[][] keys, byte[][] vals) {
+        public BatchLookup newInstance(IDataSerializer keySer,
+                IDataSerializer valSer, int fromIndex, int toIndex,
+                byte[][] keys, byte[][] vals) {
 
-            return new BatchLookup(n, offset, keys);
+            assert vals == null;
+            
+            return new BatchLookup(keySer,valSer,fromIndex, toIndex, keys);
             
         }
         
@@ -75,17 +77,15 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatc
     /**
      * Create a batch lookup operation.
      * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * @param offset
-     *            The offset into <i>keys</i> and <i>vals</i> of the 1st
-     *            tuple.
      * @param keys
      *            The array of keys (one key per tuple).
+     * 
+     * @see BatchLookupConstructor
      */
-    public BatchLookup(int ntuples, int offset, byte[][] keys) {
+    protected BatchLookup(IDataSerializer keySer, IDataSerializer valSer,
+            int fromIndex, int toIndex, byte[][] keys) {
 
-        super(ntuples, offset, keys, null/* values */);
+        super(keySer, valSer, fromIndex, toIndex, keys, null/* values */);
         
     }
 
@@ -108,21 +108,8 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements IBatc
 
         }
         
-        ResultBuffer result = (ResultBuffer) newResult();
-
-        result.setResult(n, ret);
-
-        return result;
+        return new ResultBuffer(n,ret,ndx.getIndexMetadata().getValueSerializer());
 
     }
 
-    /**
-     * Note: Override to customize serialization for the {@link ResultBuffer}.
-     */
-    public ResultBuffer newResult() {
-
-        return new ResultBuffer();
-
-    }
-    
 }

@@ -30,12 +30,12 @@ package com.bigdata.service;
 
 import java.util.UUID;
 
-import com.bigdata.btree.BatchLookup;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
+import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 
@@ -283,20 +283,24 @@ public class TestBasicIndexStuff extends
         assertEquals(new byte[] { 1 }, ((ResultBuffer) dataService0.submit(
                 ITx.UNISOLATED,//
                 DataService.getIndexPartitionName(name, partitionId0),//
-                new BatchLookup(//
-                        1,// n
-                        0,// offset
-                        new byte[][] { new byte[] { 1 } }// keys
-                ))).getResult()[0]);
+                BatchLookupConstructor.INSTANCE.newInstance(//
+                        metadata, //
+                        0,// fromIndex
+                        1,// toIndex
+                        new byte[][] { new byte[] { 1 } },// keys
+                        null //vals
+                ))).getResult(0));
         //
         assertEquals(new byte[] { 5 }, ((ResultBuffer) dataService1.submit(
                 ITx.UNISOLATED,//
                 DataService.getIndexPartitionName(name, partitionId1),//
-                new BatchLookup(//
-                        1,// n
-                        0,// offset
-                        new byte[][] { new byte[] { 5 } }// keys
-                ))).getResult()[0]);
+                BatchLookupConstructor.INSTANCE.newInstance(//
+                        metadata,//
+                        0,// fromIndex
+                        1,// toIndex
+                        new byte[][] { new byte[] { 5 } },// keys
+                        null//vals
+                ))).getResult(0));
 
         // verify some range counts.
         assertEquals(0,ndx.rangeCount(new byte[]{}, new byte[]{1}));

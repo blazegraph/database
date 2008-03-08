@@ -121,14 +121,22 @@ public class RegisterIndexTask extends AbstractTask {
                  * partition move operation also needs to do this.
                  */
 
-                metadata.setPartitionMetadata(new LocalPartitionMetadata(//
-                        pmd.getPartitionId(),//
-                        pmd.getLeftSeparatorKey(),//
-                        pmd.getRightSeparatorKey(),//
-                        new IResourceMetadata[] {//
-                            // The live journal.
-                            getJournal().getResourceMetadata() //
-                        }));
+                metadata.setPartitionMetadata(//
+                        new LocalPartitionMetadata(//
+                                pmd.getPartitionId(),//
+                                pmd.getLeftSeparatorKey(),//
+                                pmd.getRightSeparatorKey(),//
+                                new IResourceMetadata[] {//
+                                    // The live journal.
+                                    getJournal().getResourceMetadata() //
+                                },
+                                /*
+                                 * Note: Retains whatever history given by the
+                                 * caller.
+                                 */
+                                pmd.getHistory()+
+                                "register("+pmd.getPartitionId()+") "
+                                ));
 
             } else {
 

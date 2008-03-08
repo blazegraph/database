@@ -30,10 +30,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DelegateTuple;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ResultSet;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.util.InnerCause;
@@ -71,6 +74,11 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private final long timestamp;
 
     /**
+     * From the {@link ClientIndexView}.
+     */
+    private final boolean readConsistent;
+    
+    /**
      * The first key to visit -or- <code>null</code> iff no lower bound (from
      * the ctor).
      */
@@ -103,6 +111,14 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      * identified when we refresh our {@link PartitionLocator}s. This is
      * <code>null</code> initially and is set to the non-<code>null</code>
      * value of each key that we visit by {@link #next()}.
+     * 
+     * FIXME This adds a requirement that the {@link IRangeQuery#KEYS} are
+     * always requested so that we can avoid double-counting. However,
+     * {@link NoSuchIndexException}s can only arise when we request the next
+     * result set so we SHOULD be able to get by without the KEYS at this layer
+     * (which means that we do not have to send them across the network) by
+     * using {@link ResultSet#getLastKey()}.  Change this since we otherwise
+     * will always send KEYS which can add significant NIO costs.
      */
     private byte[] lastKeyVisited = null;
 
@@ -166,8 +182,36 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         
     }
     
-    public PartitionedRangeQueryIterator(ClientIndexView ndx, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
+    /**
+     * <p>
+     * Note: The {@link PartitionedRangeQueryIterator} uses a sequential scan
+     * (rather than mapping across the index partitions in parallel) and always
+     * picks up from the successor of the last key visited. Therefore it is safe
+     * to choose either read-consistent or read-inconsistent semantics (the
+     * latter are only available for {@link ITx#READ_COMMITTED}).
+     * 
+     * @param ndx
+     * @param readConsistent
+     *            <code>true</code> iff read-consistent semantics should be
+     *            applied. Read-consistent semantics are only optional for
+     *            {@link ITx#READ_COMMITTED} operations. Historical reads and
+     *            transactional operations are always read-consistent.
+     *            {@link ITx#UNISOLATED} operations are NOT read-consistent
+     *            since unisolated writes are, by definition, against the live
+     *            index.
+     * @param fromKey
+     * @param toKey
+     * @param capacity
+     * @param flags
+     * @param filter
+     * 
+     * @throws IllegalArgumentException
+     *             if the index view is {@link ITx#UNISOLATED} and
+     *             readConsistent is requested.
+     */
+    public PartitionedRangeQueryIterator(ClientIndexView ndx,
+            boolean readConsistent, byte[] fromKey, byte[] toKey, int capacity,
+            int flags, ITupleFilter filter) {
 
         if (ndx == null) {
 
@@ -181,12 +225,30 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
             
         }
 
+        if (ndx.getTimestamp() == ITx.UNISOLATED && readConsistent) {
+            
+            throw new IllegalArgumentException(
+                    "Read-consistent not available for unisolated operations");
+            
+        }
+        
         this.ndx = ndx;
         this.timestamp = ndx.getTimestamp();
+        this.readConsistent = readConsistent;
         this.fromKey = fromKey;
         this.toKey = toKey;
         this.capacity = capacity;
-        this.flags = flags;
+        
+//        // Note: need keys for REMOVEALL.
+//        this.flags = ((flags & IRangeQuery.REMOVEALL)==0) ? flags : flags|IRangeQuery.KEYS;
+
+        /*
+         * FIXME we need the KEYS in order to keep [lastKeyVisited] up to date.
+         * See [lastKeyVisited] to resolve this, but we STILL will need KEYS for
+         * REMOVEALL (above).
+         */
+        this.flags = IRangeQuery.KEYS | flags;
+        
         this.filter = filter;
 
         // scan spanned index partition locators in key order.
@@ -330,10 +392,8 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
         assert ! exhausted;
         
         if(!locatorItr.hasNext()) return false;
-        
-        ITuple tuple = locatorItr.next();
-        
-        locator = (PartitionLocator)SerializerUtil.deserialize(tuple.getValue());
+       
+        locator = (PartitionLocator)SerializerUtil.deserialize(locatorItr.next().getValue());
         
         // submit query to the next partition.
         
@@ -398,8 +458,9 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
              */
             
             src = new DataServiceRangeIterator(ndx, dataService, DataService
-                    .getIndexPartitionName(ndx.getName(), partitionId),
-                    ndx.getTimestamp(), _fromKey, _toKey, capacity, flags, filter);
+                    .getIndexPartitionName(ndx.getName(), partitionId), ndx
+                    .getTimestamp(), readConsistent, _fromKey, _toKey,
+                    capacity, flags, filter);
 
             // increment the #of partitions visited.
             nparts++;

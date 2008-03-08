@@ -31,34 +31,50 @@ package com.bigdata.btree;
 import it.unimi.dsi.mg4j.io.InputBitStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.Externalizable;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.CognitiveWeb.extser.LongPacker;
-import org.apache.log4j.Logger;
 
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.IRawStore;
+import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 
 /**
- * Interface for custom serialization of <code>byte[][]</code> data such are
- * used to represent keys or values. Some implementations work equally well for
- * both (e.g., no compression, huffman compression, dictionary compression)
- * while others can require that the data are fully ordered (e.g., hu-tucker
- * compression which only works for keys).
+ * Interface for custom serialization of logical <code>byte[][]</code> data
+ * such are used to represent keys or values. Some implementations work equally
+ * well for both (e.g., no compression, huffman compression, dictionary
+ * compression) while others can require that the data are fully ordered (e.g.,
+ * hu-tucker compression which only works for keys).
+ * <p>
+ * Note: there are a few odd twists to this API. It is designed to be used both
+ * for the keys and values in the {@link AbstractBTree} and for the keys and
+ * values in {@link IKeyArrayIndexProcedure}s, which are auto-split against the
+ * index partitions and hence use a {fromIndex, toIndex}. This leads to the
+ * requirement that the caller allocate the {@link IRandomAccessByteArray} into
+ * which the data will be de-serialized so that they can specify the capacity of
+ * that object.
+ * <p>
+ * The standard practice is to write out <code>toIndex</code> as (toIndex -
+ * fromIndex), which is the #of keys to be written. When the data are read back
+ * in the fromIndex is assumed to be zero and toIndex will be the #of elements
+ * to read. This has the effect of making the array compact. Likewise, when
+ * <code>deserializedSize == 0</code> the size of the array to be allocated on
+ * deserialization is normally computed as <code>toIndex - fromIndex</code> so
+ * that the resulting array will be compact on deserialization. A non-zero value
+ * is specified by the {@link NodeSerializer} so that the array is correctly
+ * dimensioned for the branching factor of the {@link AbstractBTree} when it is
+ * de-serialized.
+ * <p>
+ * Note: When the {@link IDataSerializer} will be used for values stored in an
+ * {@link AbstractBTree} then it MUST handle [null] elements. The B+Tree both
+ * allows <code>null</code>s and the {@link MutableKeyBuffer} will report a
+ * <code>null</code> when the corresponding index entry is deleted (in an
+ * index that supports deletion markers).
  * 
  * FIXME Verify that RMI serialization is heavily buffered since we are NOT
  * buffering the {@link OutputBitStream} and {@link InputBitStream} objects in
@@ -70,77 +86,76 @@ import com.bigdata.rawstore.IRawStore;
  *       <p>
  *       user-defined tokenization into symbols (hu-tucker, huffman)
  * 
- * FIXME reconcile with btree node and leaf serialization, including
- * {@link IKeyBuffer} and {@link IKeySerializer}. Since everything is now
- * byte[]s we should be able to make this work out more efficiently.
- * 
  * @todo test suites for each of the {@link IDataSerializer}s, including when
  *       the reference is a null byte[][], when it has zero length, and when
  *       there are null elements in the byte[][].
- * 
- * @todo The actual use of keys and values by the procedure logic SHOULD be
- *       restricted to materializing a key or value one at a time in a shared
- *       buffer. Right now it is generally necessary to make an <b>exact length
- *       copy</b> of the key or value in order to perform index operations.
- *       That should be changed as part of a move toward greater efficiency of
- *       the heap such that we can do, e.g., insert(key,off,len,val,off,len) and
- *       thereby reuse buffers consistently throughout.
- *       <p>
- *       Another twist is that it is more efficient from the perspective of the
- *       garbage collector to use a single byte[] to represent all of the keys
- *       or values (or both) for a node or leaf. E.g., using an extensible
- *       byte[] buffer with a maximum capacity and an append only strategy with
- *       compaction when the buffer would overflow.
- *       <p>
- *       So, one approach is to use an iterator strategy in which the caller
- *       gets an updated {byte[],off,len} tuple each time they call next(). This
- *       would allow us to reconcile the various ways in which the data might be
- *       stored - except for the one where the prefix is factored out, which
- *       might be treated purely as a serialization form. So, there should also
- *       be a method that reports whether the data are sorted, and another to
- *       either access the data randomly or to compute the prefix for any two
- *       indices. This might be doable by a variant of the ITuple-based methods
- *       on the {@link AbstractBTree}.
- *       <p>
- *       One last refinement is to make the interpretation of {byte[],off,len}
- *       in terms of <i>bits</i> so that we can store non-aligned keys if
- *       necessary - of course that only works for hu-tucker encoding and that
- *       again seems more a serialization issue that anything else.
  */
 public interface IDataSerializer extends Serializable {
 
     /**
-     * Read a byte[][], possibly empty and possibly <code>null</code>.
+     * Write a byte[][], possibly empty and possibly <code>null</code>.
      * 
-     * @param in
-     *            An {@link InputStream} that implements the {@link DataInput}
-     *            interface.
-     * 
-     * @return The keys.
-     * 
-     * @throws IOException
-     */
-    byte[][] read(DataInput in) throws IOException;
-
-    /**
-     * Write a byte[][].
-     * 
-     * @param n
-     *            The #of items in the array that contain data.
-     * @param offset
-     *            The offset of the first item in the array to be serialized.
-     * @param keys
-     *            The data (may be a <code>null</code> reference, may be an
-     *            empty array, and may contain <code>null</code> elements in
-     *            the array).
      * @param out
      *            An {@link OutputStream} that implements the {@link DataOutput}
      *            interface.
+     * @param fromIndex
+     *            The index of the first key in <i>keys</i> to be processed
+     *            (inclusive).
+     * @param toIndex
+     *            The index of the last key in <i>keys</i> to be processed.
+     * @param keys
+     *            The data (MAY be a <code>null</code> reference IFF
+     *            <code>toIndex-fromIndex == 0</code>, MAY be an empty array,
+     *            and MAY contain <code>null</code> elements in the array).
      * 
      * @throws IOException
      */
-    void write(int n, int offset, byte[][] keys, DataOutput out)
-            throws IOException;
+    void write(DataOutput out, IRandomAccessByteArray raba) throws IOException;
+
+//    void write(DataOutput out, int fromIndex, int toIndex, byte[][] keys) throws IOException;
+
+//    public byte[][] read(DataInput in) throws IOException;
+
+    /**
+     * Variant that may be used to read into a caller provided
+     * {@link IKeyBuffer}. The <code>byte[]</code>s are appended to the
+     * {@link IKeyBuffer}. An exception is thrown if the {@link IKeyBuffer} is
+     * not large enough.
+     * 
+     * @param in The elements will be read from here.
+     * @param raba The elements will be appended to this object.
+     * @throws IOException
+     * 
+     * @todo make sure that we can obtain an OutputStream that will let us
+     *       append a key to the {@link IKeyBuffer} so that we can avoid
+     *       allocation of byte[]s during de-serialization.
+     */
+    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException;
+    
+//    /**
+//     * Return an interface that may be used to read the data. When efficient
+//     * this method MAY be implemented such that it buffers the data as a byte[]
+//     * operates directly on that buffer. For example, this may be used to allow
+//     * access to data stored in compressed form.
+//     * 
+//     * @param in
+//     * @return
+//     * @throws IOException
+//     */
+//    void read(DataInput in,Constructor<IRandomAccessByteArray>ctor) throws IOException; 
+    
+//    /**
+//     * Read a byte[][], possibly empty and possibly <code>null</code>.
+//     * 
+//     * @param in
+//     *            An {@link InputStream} that implements the {@link DataInput}
+//     *            interface.
+//     * 
+//     * @return The keys.
+//     * 
+//     * @throws IOException
+//     */
+//    byte[][] read(DataInput in) throws IOException;
 
     /**
      * No compression.
@@ -148,264 +163,357 @@ public interface IDataSerializer extends Serializable {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class DefaultDataSerializer implements IDataSerializer {
+    static public class DefaultDataSerializer implements IDataSerializer, Externalizable {
 
         /**
          * 
          */
         private static final long serialVersionUID = -7960255442029142379L;
 
-        public static DefaultDataSerializer INSTANCE = new DefaultDataSerializer();
+        public transient static DefaultDataSerializer INSTANCE = new DefaultDataSerializer();
         
-        public byte[][] read(DataInput in) throws IOException {
-            final boolean haveVals = in.readBoolean();
-            if (!haveVals) {
-                return null;
-            }
+        /**
+         * Sole constructor (handles de-serialization also).
+         */
+        public DefaultDataSerializer() {
+            
+        }
+        
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+//            final boolean notNull = in.readBoolean();
+//            if (!notNull) {
+//                return null;
+//            }
             final int n = (int) LongPacker.unpackLong(in);
-            final byte[][] a = new byte[n][];
             for (int i = 0; i < n; i++) {
                 // when lenPlus == 0 the value is null (vs byte[0]).
                 final int lenPlus1 = (int) LongPacker.unpackLong(in);
                 if (lenPlus1 > 0) {
                     byte[] tmp = new byte[lenPlus1 - 1];
                     in.readFully(tmp);
-                    a[i] = tmp;
+                    raba.add(tmp);
                 } else
-                    a[i] = null;
+                    raba.add(null);
             }
-            return a;
+//            return new RandomAccessByteArray(0/*fromIndex*/,n/*toIndex*/,a);
         }
 
-        public void write(int n, int offset, byte[][] a, DataOutput out)
+        public void write(DataOutput out, IRandomAccessByteArray raba)
                 throws IOException {
-            out.writeBoolean(a != null);
-            if (a != null) {
+            final int n = raba.getKeyCount();
+//            if (a == null && n != 0)
+//                throw new IllegalArgumentException();
+//            out.writeBoolean(a != null); // notNull
+//            if (a != null) {
                 LongPacker.packLong(out, n);
-                for (int i = 0; i < n; i++) {
-                    final byte[] e = a[offset + i];
-                    // this differentiates a null value from an empty byte[].
-                    final int lenPlus1 = e == null ? 0 : e.length + 1;
-                    LongPacker.packLong(out, lenPlus1);
-                    if (e != null) {
-                        out.write(e);
-                    }
+//                for (int i = fromIndex; i < toIndex; i++) {
+//                    final byte[] e = a[i];
+//                for(final byte[] e : raba) {
+                  for(int i=0; i<n; i++) {
+                      // differentiate a null value from an empty byte[].
+                      final boolean isNull = raba.isNull(i);
+                      final int lenPlus1 = isNull ? 0 : raba.getLength(i) + 1;
+                      LongPacker.packLong(out, lenPlus1);
+                      if (!isNull) {
+                          raba.copyKey(i, out);
+                      }
                 }
-            }
+//            }
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            // NOP
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+            
+            // NOP
+            
         }
 
     }
 
     /**
-     * Builds an {@link ImmutableKeyBuffer} from the keys and then uses the
-     * {@link KeyBufferSerializer} to write them onto the output stream.
-     * <p>
-     * Note: This is not very efficient since we have to create the immutable
-     * node from the keys[] first, write it onto a temporary buffer, and then
-     * write the buffer onto the output stream.
+     * Simple prefix compression of ordered keys. The common prefix shared by
+     * all keys is factored out and written once followed by the remainder for
+     * each key. This implementation does not permit null values.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo could use hamming codes for bytes.
+     * 
+     * @todo variants for custom parsing into symbols for hamming codes.
+     * 
+     * @todo use a delta from key to key specifying how much to be reused -
+     *       works well if deserializing keys or for a linear key scan, but not
+     *       for binary search on the raw node/leaf record.
+     * 
+     * @todo verify that keys are monotonic during constructor from mutable keys
+     *       and during de-serialization.
+     * 
+     * @todo add nkeys to the abstract base class and keep a final (read-only)
+     *       copy on this class. if the value in the base class is changed then
+     *       it is an error but this allows direct access to the field in the
+     *       base class for the mutable key buffer implementation.
+     * 
+     * @todo even more compact serialization of sorted byte[]s is doubtless
+     *       possible, perhaps as a patricia tree, trie, or other recursive
+     *       decomposition of the prefixes. figure out what decomposition is the
+     *       most compact, easy to compute from sorted byte[]s, and supports
+     *       fast search on the keys to identify the corresponding values.
      */
-    public static class BTreeKeySerializer implements IDataSerializer {
+    public static class SimplePrefixSerializer implements IDataSerializer, Externalizable {
 
         /**
          * 
          */
-        private static final long serialVersionUID = -2142221841898109636L;
+        private static final long serialVersionUID = -8354230015113732733L;
 
-        public byte[][] read(DataInput in) throws IOException {
+        public transient static SimplePrefixSerializer INSTANCE = new SimplePrefixSerializer();
 
-//            /*
-//             * Read the entire input stream into a buffer.
-//             */
-//            DataOutputBuffer buf = new DataOutputBuffer((InputStream) in);
-//
-//            /*
-//             * Unpack the buffer.
-//             */
-//            DataInputBuffer is = new DataInputBuffer(buf.array(), 0, buf
-//                    .pos());
-
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+            
+            // #of keys in the node or leaf.
+            final int nkeys = (int) LongPacker.unpackLong(in);
+            
+            if(nkeys==0) return;
+            
+//            // maximum #of keys allowed in the node or leaf.
+//            final int maxKeys = (int) LongPacker.unpackLong(in);
+            
+            // length of the byte[] containing the prefix and the remainder for each key.
+            final int bufferLength = (int) LongPacker.unpackLong(in);
+            
             /*
-             * The offset is always zero when the de-serialized since we only
-             * send along the relevant data for the split.
+             * Read in deltas for each key and re-create the offsets.
              */
+            final int[] offsets = new int[nkeys];
+            
+            int lastOffset = 0; // prefixLength;
 
-            return ((ImmutableKeyBuffer) KeyBufferSerializer.INSTANCE
-                    .getKeys(in)).toKeyArray();
+            for( int i=0; i<nkeys; i++ ) {
+                
+                final int delta = (int) LongPacker.unpackLong(in);
+                
+                final int offset = lastOffset + delta;
+                
+                offsets[i] = offset;
+                
+                lastOffset = offset;
+                
+            }
+            
+            final byte[] buf = new byte[bufferLength];
+            
+            in.readFully(buf);
 
+//            final byte[][] keys = new byte[maxKeys][];
+
+            final int prefixLength = offsets[0];
+            
+            for (int i = 0; i < nkeys; i++) {
+
+//              final int remainderLength = getRemainderLength(index);
+                final int remainderLength;
+                {
+                    int offset = offsets[i];
+
+                    int next_offset = i == nkeys - 1 ? buf.length
+                            : offsets[i + 1];
+
+                    remainderLength = next_offset - offset;
+                }
+
+                final int len = prefixLength + remainderLength;
+
+                final byte[] key = new byte[len];
+                
+                System.arraycopy(buf, 0, key, 0, prefixLength);
+
+                System.arraycopy(buf, offsets[i], key, prefixLength, remainderLength);
+                
+                raba.add(key);
+
+            }
+            
         }
 
-        public void write(int n, int offset, byte[][] a, DataOutput out)
-                throws IOException {
+        public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
 
-            IKeyBuffer tmp = new ImmutableKeyBuffer(offset, n,
-                    n/* maxKeys */, a);
+            final int nkeys = raba.getKeyCount();
+                
+            // #of keys in the node or leaf.
+//            LongPacker.packLong(os, nkeys);
+            LongPacker.packLong(out,nkeys);
             
-            if (out instanceof DataOutputBuffer) {
+            if(nkeys==0) return;
 
-                KeyBufferSerializer.INSTANCE.putKeys((DataOutputBuffer)out, tmp);
+            if(raba instanceof ImmutableKeyBuffer) {
+                
+                /*
+                 * Optimized since the source is generally an
+                 * ImmutableKeyBuffer, at least until we remove that dependency
+                 * in the BTree code.
+                 */
+                
+                final ImmutableKeyBuffer keys = (ImmutableKeyBuffer)raba;
+                
+                final int bufferLength = keys.buf.length;
+                
+                // maximum #of keys allowed in the node or leaf.
+//                LongPacker.packLong(os, keys.maxKeys);
 
+                // length of the byte[] buffer containing the prefix and remainder for each key.
+                LongPacker.packLong(out, bufferLength);
+//                os.packLong(bufferLength);
+                
+                /*
+                 * Write out deltas between offsets.
+                 */
+                int lastOffset = 0; // keys.prefixLength;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    int offset = keys.offsets[i];
+                    
+                    int delta = offset - lastOffset;
+                    
+                    LongPacker.packLong(out, delta);
+//                    os.packLong(delta);
+                    
+                    lastOffset = offset;
+                    
+                }
+                
+                out.write(keys.buf, 0, bufferLength);
+//                os.write(keys.buf, 0, bufferLength);
+                
+                return;
+                
             } else {
                 
-                DataOutputBuffer buf = new DataOutputBuffer();
-
-                KeyBufferSerializer.INSTANCE.putKeys(buf, tmp);
-
-                out.write(buf.array(), 0, buf.pos());
+                /*
+                 * Computes the length of the prefix by computed by counting the #of leading
+                 * bytes that match for the first and last key in the buffer.
+                 */
+    
+                final int prefixLength;// = keys.getPrefixLength();
                 
+                if (nkeys == 0) {
+                    
+                    prefixLength = 0;
+                    
+                } else if (nkeys == 1) {
+                    
+                    prefixLength = raba.getKey(0).length;
+                    
+                } else {
+                 
+                    prefixLength = BytesUtil.getPrefixLength(raba.getKey(0), raba.getKey(nkeys - 1));
+                    
+                }
+                
+                // offsets into the serialized key buffer.
+                final int[] offsets = new int[nkeys];
+                
+                // compute the total length of the key buffer.
+                int bufferLength = prefixLength;
+                
+                for(int i=0; i<nkeys; i++) {
+                    
+                    // offset to the remainder of the ith key in the buffer.
+                    offsets[i] = bufferLength;
+                    
+                    int remainder = raba.getKey(i).length - prefixLength;
+                    
+                    assert remainder >= 0;
+                    
+                    bufferLength += remainder;
+                    
+                }
+    
+                // maximum #of keys allowed in the node or leaf.
+    //            LongPacker.packLong(os, keys.getMaxKeys());
+    //            LongPacker.packLong(os,(deserializedSize==0?nkeys:deserializedSize));//keys.getMaxKeys());
+    
+                // length of the byte[] buffer containing the prefix and remainder for each key.
+    //            LongPacker.packLong(os, bufferLength);
+                LongPacker.packLong(out,bufferLength);
+                
+                /*
+                 * Write out deltas between offsets.
+                 * 
+                 * Note: this is 60% of the cost of this method. This is not pack long
+                 * so much as doing individual byte put operations on the output stream
+                 * (which is over a ByteBuffer).  Just using a BAOS here doubles the 
+                 * index segment build throughput.
+                 */
+                {
+    //                ByteArrayOutputStream baos = new ByteArrayOutputStream(nkeys*8);
+    //                DataOutputStream dbaos = new DataOutputStream(baos);
+    
+                    int lastOffset = 0;
+                
+                for( int i=0; i<nkeys; i++) {
+                    
+                    int offset = offsets[i];
+                    
+                    int delta = offset - lastOffset;
+                    
+                    LongPacker.packLong(out, delta);
+    //                os.packLong(delta);
+                    
+                    lastOffset = offset;
+                    
+                }
+                
+    //            dbaos.flush();
+    //            
+    //            os.write(baos.toByteArray());
+                }
+                
+                /*
+                 * write out the prefix followed by the remainder of each key in
+                 * turn.
+                 */
+    
+                if (nkeys > 0) {
+    
+                    out.write(raba.getKey(0), 0, prefixLength);
+    
+                    for (int i = 0; i < nkeys; i++) {
+    
+                        final byte[] key = raba.getKey(i);
+                        
+                        final int remainder = key.length - prefixLength;
+    
+                        out.write(key, prefixLength, remainder);
+    
+                    }
+                    
+                }
+
             }
             
         }
 
-    }
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
-    /**
-     * Wraps an {@link IDataSerializer} so that it may be used as an
-     * {@link IKeySerializer}.
-     * 
-     * @todo if things work out then this class and the {@link IKeySerializer}
-     *       interface can be discarded and we can use the
-     *       {@link IDataSerializer} interface directly for the btree.
-     * 
-     * FIXME In order to be efficient we need to discard or modify the
-     * {@link ImmutableKeyBuffer} class which currently requires us to create a
-     * new byte[] each time we need to materialize a key, which we do below in
-     * order to serialize the data. Likewise, the de-serialization is returning
-     * an {@link ImmutableKeyBuffer} because that is the expectation on read
-     * from the store. The sense of "immutable" is Ok, but the implementation
-     * should probably do something like use random access to decode the keys in
-     * the original byte[] buffer. The {@link IDataSerializer} API would have to
-     * be changed to support such random access.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class WrappedKeySerializer implements IKeySerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -7460457251255645482L;
-        
-        private IDataSerializer delegate;
-        
-        public WrappedKeySerializer(IDataSerializer delegate) {
-        
-            assert delegate != null;
-            
-            this.delegate = delegate;
-            
-        }
-        
-        public IKeyBuffer getKeys(DataInput is) throws IOException {
-            
-            // max keys
-            final int maxKeys = is.readInt();
-            
-            // read keys using delegate.
-            final byte[][] a = delegate.read(is);
-            
-            return new ImmutableKeyBuffer(0/* offset */, a.length/* nkeys */,
-                    maxKeys, a/* keys */);
+            // NOP
             
         }
 
-        public void putKeys(DataOutputBuffer os, IKeyBuffer keys) throws IOException {
-
-            // max keys.
-            os.writeInt(keys.getMaxKeys());
+        public void writeExternal(ObjectOutput out) throws IOException {
             
-            // nkeys
-            final int nkeys = keys.getKeyCount();
-
-            // copy byte[] keys into byte[][] for API alignment.
-            final byte[][] a = new byte[nkeys][];
-            
-            for(int i=0; i<nkeys; i++) {
-                
-                a[i] = keys.getKey( i );
-                
-            }
-
-            // write keys using delegate.
-            delegate.write(nkeys, 0/*offset*/, a, os);
+            // NOP.
             
         }
         
     }
-
-    /**
-     * A delegation pattern using an {@link IDataSerializer} to serialize byte[]
-     * values.
-     * 
-     * @todo There is a bit of an API mismatch since the
-     *       {@link IValueSerializer} is handed an array pre-dimensioned array
-     *       whose dimensions correspond to the branching factor of the btree
-     *       but the {@link IDataSerializer} assumes that the array size is
-     *       exactly the size of the serialized byte[][].
-     *       <p>
-     *       To align those APIs better we might define an alterative method
-     *       signature for {@link IDataSerializer} in which the array is
-     *       pre-dimensioned.
-     *       <p>
-     *       The {@link IValueSerializer} happens to know the #of values in the
-     *       array since that is written separately by the
-     *       {@link NodeSerializer} but it could be refactored such that it was
-     *       only written with the keys and values and not by the
-     *       {@link NodeSerializer} itself. The reason for this redundent
-     *       writing on the #of elements with valid data is that it allows reuse
-     *       of the {@link IDataSerializer} for keys, values, keys and values,
-     *       or a btree node or leaf.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class WrappedValueSerializer implements IValueSerializer {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -2197255334001683007L;
-        
-        private IDataSerializer delegate;
-        
-        public WrappedValueSerializer(IDataSerializer delegate) {
-        
-            assert delegate != null;
-            
-            this.delegate = delegate;
-            
-        }
-
-        public void getValues(DataInput is, byte[][] values, int nvals)
-                throws IOException {
-
-            // read values.
-            final byte[][] b = delegate.read(is);
-
-            assert b.length == nvals;
-
-            // copy the byte[]s onto the caller's object.
-            for (int i = 0; i < nvals; i++) {
-
-                values[i] = b[i];
-
-            }
-
-        }
-
-        public void putValues(DataOutputBuffer os, byte[][] values,
-                final int nvals) throws IOException {
-
-            // write values.
-            delegate.write(nvals, 0/* offset */, values, os);
-
-        }
-        
-    }
-
+    
 // /**
 // * Dictionary based compression for the values. Each byte[] value is treated
 // * as a single term for the purposes of the dictionary.
@@ -642,233 +750,233 @@ public interface IDataSerializer extends Serializable {
 //    
 //}
 
-    /**
-     * A cache for recycling byte[] buffers. This is designed to minimize the
-     * impact on the heap when there is rapid turnover for byte[]s of a fixed
-     * capacity. Buffers are allocated on demand and must be released
-     * explicitly. Released buffers are recycled unless the internal queue is at
-     * capacity, in which case they are presumably swept by the garbage
-     * collector.
-     * <p>
-     * Note: Weak references can not be used to create caches with the desired
-     * semantics since the weak reference will have been cleared before we are
-     * notified (via the reference queue). This makes it impossible to trap the
-     * reference for reuse. Therefore this class uses an explicit close protocol
-     * on the {@link RecycleBuffer} to indicate that a buffer is available for
-     * reuse.
-     * 
-     * @todo I have NOT proven that a JVM Nursery does a worse job than this
-     *       class. It is possible for a Nursery to do something very similar
-     *       for short lived but relatively large byte[]s. You would have to
-     *       test it out to be sure. This could be done by creating a variant
-     *       (or using an option to the ctor) that never cached references (or
-     *       setting the cacheSize to zero). This would expose the JVM behavior.
-     * 
-     * @todo problems: (1) trading off the cache size against the consumers of
-     *       the cache; (2) cache is for buffers of a fixed length, so this
-     *       would work {@link OutputBitStream} or the {@link DiskOnlyStrategy}
-     *       but it can not cache byte[]s of varying lengths such as records for
-     *       the {@link Journal}; and (3) the scope in which the cache is used,
-     *       for example a single static reference, one per journal, etc. It
-     *       does not make sense to use one per thread. Likewise, a thread-local
-     *       buffer is not sufficient for {@link OutputBitStream} in case there
-     *       are nested calls that allocate an {@link OutputBitStream} (this is
-     *       more likely than you think since delegating serializers may well
-     *       wrap the underlying {@link OutputStream} and then find that it is
-     *       wrapped again by the delegate). The best choice may be the static
-     *       option. E.g., static getCache(int capacity). If we then adjust the
-     *       queue size dynamically based on demand all might be good.
-     * 
-     * @todo the buffer for a {@link BufferedInputStream} or
-     *       {@link BufferedOutputStream} would be another place where this
-     *       class would be useful IF we were allowed to pass in the buffer.
-     * 
-     * @todo since the {@link IRawStore} API is defined in terms of ByteBuffer
-     *       we could modify (or encapsulate) this class to keep a variety of
-     *       frequently used byte[]s on hand and then wrap them up in a
-     *       {@link ByteBuffer} - but there is no way to handle the recycle
-     *       semantics. I would have to replace the {@link ByteBuffer} with
-     *       another class for this purpose, perhaps the {@link ByteArrayBuffer}
-     *       if I added a read-only mode to that class.
-     *       <p>
-     *       Perhaps the {@link BufferCache} could simply be stated in terms of
-     *       {@link ByteBuffer}s? While a read-only byte buffer would not let
-     *       me gain access to the backing byte[] I could track that internally
-     *       in a hash map indexed by the ByteBuffer - no, again, the wrong byte
-     *       buffer reference would be in the hash map - the read-write vs the
-     *       read-only.
-     */
-    public static class BufferCache {
-        
-        protected static final Logger log = Logger.getLogger(BufferCache.class);
-        
-        private final int bufSize;
-        private final int cacheSize;
-        private final BlockingQueue<byte[]> queue; 
-
-        /**
-         * #of byte[]s allocated and not yet recycled.
-         * 
-         * FIXME When this is counter is small compared to the queue size we
-         * release byte[]s back to the JVM. When it is large compared to the
-         * queue size, we start to retain more byte[]s. This needs to be done
-         * carefully so that periodic bursts do not wind up causing byte[]s to
-         * be held just long enough to get out of the nursery and into the
-         * mature heap where they are more expensive to GC.
-         */
-        private AtomicInteger nallocated = new AtomicInteger(0);
-        
-        /**
-         * 
-         * @param bufSize
-         *            The size of the byte[] buffers to be allocated and
-         *            managed. Instances of this class are generally useful when
-         *            byte[]s are relatively large (kilobytes or better)
-         * 
-         * @param cacheSize
-         *            The capacity of the internal queue. When zero (0) the
-         *            internal queue is disabled and a new byte[] will always be
-         *            created by {@link #get()} and recycled byte[]s will be
-         *            left in the hands of the garbage collector. This choice
-         *            makes sense if your JVM does a better job than this class.
-         */
-        public BufferCache(int bufSize, int cacheSize) {
-            
-            assert bufSize > 0;
-
-            assert cacheSize >= 0;
-
-            this.bufSize = bufSize;
-
-            this.cacheSize = cacheSize;
-
-            if (cacheSize == 0) {
-
-                queue = null;
-
-            } else {
-
-                queue = new LinkedBlockingQueue<byte[]>(cacheSize);
-
-            }
-
-        }
-        
-        /**
-         * Recycle a buffer. When the queue is under its capacity, the buffer
-         * reference will be cached and made available for reuse. When the queue
-         * is at capacity the reference will be not be saved and will become
-         * available for garbage collection.
-         * 
-         * @param buffer
-         *            A buffer
-         */
-        protected void recycle(final RecycleBuffer buffer) {
-            
-            assert buffer != null;
-
-            // reference to byte[].
-            final byte[] tmp = buffer.buffer;
-
-            // clear reference on RecycleBuffer, marking it as "closed".
-            buffer.buffer = null;
-
-            assert tmp != null;
-            
-            assert tmp.length == bufSize;
-
-            nallocated.decrementAndGet();
-            
-            if (queue == null) return;
-            
-            // offer byte[] to the queue.
-            if (!queue.offer(tmp)) {
-
-                // queue is over capacity, so byte[] will get swept by GC.
-                log.info("Over capacity: discarding buffer");
-
-            }
-            
-        }
-
-        /**
-         * Obtain a byte[] buffer. When the queue contains a byte[], that
-         * reference will be returned. Otherwise a new byte[] will be allocated
-         * and returned to the caller.
-         */
-        public RecycleBuffer get() {
-            
-            // Note: null iff queue is empty (no wait)
-            byte[] buffer = (queue != null ? queue.poll() : null);
-
-            if (buffer == null) {
-
-                // allocate new buffer.
-                buffer = new byte[bufSize];
-
-            }
-
-            nallocated.incrementAndGet();
-            
-            // return to caller.
-            return new RecycleBuffer(this, buffer);
-
-        }
-     
-    }
-
-    /**
-     * Instances of this object are managed via the {@link BufferCache}. The
-     * wrapped byte[] MUST be explicitly "recycled" by calling {@link #close()}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class RecycleBuffer {
- 
-        private BufferCache cache;
-        private byte[] buffer;
-
-        protected RecycleBuffer(BufferCache cache, byte[] buffer) {
-
-            assert cache != null;
-            assert buffer != null;
-
-            this.cache = cache;
-
-            this.buffer = buffer;
-            
-        }
-        
-        /**
-         * Return the buffer.
-         */
-        public byte[] buffer() {
-
-            if (buffer == null)
-                throw new IllegalStateException();
-
-            return buffer;
-            
-        }
-        
-        /**
-         * Release the buffer, declaring that it MAY be reused by others.
-         * <p>
-         * Note: It is an undetectable error to retain a reference to the
-         * {@link RecycleBuffer#buffer() buffer} after calling this method.
-         */
-        synchronized public void close() {
-
-            if (buffer == null)
-                throw new IllegalStateException();
-            
-            // Note: clears the byte[] reference.
-            cache.recycle(this);
-
-        }
-
-    }
+//    /**
+//     * A cache for recycling byte[] buffers. This is designed to minimize the
+//     * impact on the heap when there is rapid turnover for byte[]s of a fixed
+//     * capacity. Buffers are allocated on demand and must be released
+//     * explicitly. Released buffers are recycled unless the internal queue is at
+//     * capacity, in which case they are presumably swept by the garbage
+//     * collector.
+//     * <p>
+//     * Note: Weak references can not be used to create caches with the desired
+//     * semantics since the weak reference will have been cleared before we are
+//     * notified (via the reference queue). This makes it impossible to trap the
+//     * reference for reuse. Therefore this class uses an explicit close protocol
+//     * on the {@link RecycleBuffer} to indicate that a buffer is available for
+//     * reuse.
+//     * 
+//     * @todo I have NOT proven that a JVM Nursery does a worse job than this
+//     *       class. It is possible for a Nursery to do something very similar
+//     *       for short lived but relatively large byte[]s. You would have to
+//     *       test it out to be sure. This could be done by creating a variant
+//     *       (or using an option to the ctor) that never cached references (or
+//     *       setting the cacheSize to zero). This would expose the JVM behavior.
+//     * 
+//     * @todo problems: (1) trading off the cache size against the consumers of
+//     *       the cache; (2) cache is for buffers of a fixed length, so this
+//     *       would work {@link OutputBitStream} or the {@link DiskOnlyStrategy}
+//     *       but it can not cache byte[]s of varying lengths such as records for
+//     *       the {@link Journal}; and (3) the scope in which the cache is used,
+//     *       for example a single static reference, one per journal, etc. It
+//     *       does not make sense to use one per thread. Likewise, a thread-local
+//     *       buffer is not sufficient for {@link OutputBitStream} in case there
+//     *       are nested calls that allocate an {@link OutputBitStream} (this is
+//     *       more likely than you think since delegating serializers may well
+//     *       wrap the underlying {@link OutputStream} and then find that it is
+//     *       wrapped again by the delegate). The best choice may be the static
+//     *       option. E.g., static getCache(int capacity). If we then adjust the
+//     *       queue size dynamically based on demand all might be good.
+//     * 
+//     * @todo the buffer for a {@link BufferedInputStream} or
+//     *       {@link BufferedOutputStream} would be another place where this
+//     *       class would be useful IF we were allowed to pass in the buffer.
+//     * 
+//     * @todo since the {@link IRawStore} API is defined in terms of ByteBuffer
+//     *       we could modify (or encapsulate) this class to keep a variety of
+//     *       frequently used byte[]s on hand and then wrap them up in a
+//     *       {@link ByteBuffer} - but there is no way to handle the recycle
+//     *       semantics. I would have to replace the {@link ByteBuffer} with
+//     *       another class for this purpose, perhaps the {@link ByteArrayBuffer}
+//     *       if I added a read-only mode to that class.
+//     *       <p>
+//     *       Perhaps the {@link BufferCache} could simply be stated in terms of
+//     *       {@link ByteBuffer}s? While a read-only byte buffer would not let
+//     *       me gain access to the backing byte[] I could track that internally
+//     *       in a hash map indexed by the ByteBuffer - no, again, the wrong byte
+//     *       buffer reference would be in the hash map - the read-write vs the
+//     *       read-only.
+//     */
+//    public static class BufferCache {
+//        
+//        protected static final Logger log = Logger.getLogger(BufferCache.class);
+//        
+//        private final int bufSize;
+//        private final int cacheSize;
+//        private final BlockingQueue<byte[]> queue; 
+//
+//        /**
+//         * #of byte[]s allocated and not yet recycled.
+//         * 
+//         * @todo When this is counter is small compared to the queue size we
+//         * release byte[]s back to the JVM. When it is large compared to the
+//         * queue size, we start to retain more byte[]s. This needs to be done
+//         * carefully so that periodic bursts do not wind up causing byte[]s to
+//         * be held just long enough to get out of the nursery and into the
+//         * mature heap where they are more expensive to GC.
+//         */
+//        private AtomicInteger nallocated = new AtomicInteger(0);
+//        
+//        /**
+//         * 
+//         * @param bufSize
+//         *            The size of the byte[] buffers to be allocated and
+//         *            managed. Instances of this class are generally useful when
+//         *            byte[]s are relatively large (kilobytes or better)
+//         * 
+//         * @param cacheSize
+//         *            The capacity of the internal queue. When zero (0) the
+//         *            internal queue is disabled and a new byte[] will always be
+//         *            created by {@link #get()} and recycled byte[]s will be
+//         *            left in the hands of the garbage collector. This choice
+//         *            makes sense if your JVM does a better job than this class.
+//         */
+//        public BufferCache(int bufSize, int cacheSize) {
+//            
+//            assert bufSize > 0;
+//
+//            assert cacheSize >= 0;
+//
+//            this.bufSize = bufSize;
+//
+//            this.cacheSize = cacheSize;
+//
+//            if (cacheSize == 0) {
+//
+//                queue = null;
+//
+//            } else {
+//
+//                queue = new LinkedBlockingQueue<byte[]>(cacheSize);
+//
+//            }
+//
+//        }
+//        
+//        /**
+//         * Recycle a buffer. When the queue is under its capacity, the buffer
+//         * reference will be cached and made available for reuse. When the queue
+//         * is at capacity the reference will be not be saved and will become
+//         * available for garbage collection.
+//         * 
+//         * @param buffer
+//         *            A buffer
+//         */
+//        protected void recycle(final RecycleBuffer buffer) {
+//            
+//            assert buffer != null;
+//
+//            // reference to byte[].
+//            final byte[] tmp = buffer.buffer;
+//
+//            // clear reference on RecycleBuffer, marking it as "closed".
+//            buffer.buffer = null;
+//
+//            assert tmp != null;
+//            
+//            assert tmp.length == bufSize;
+//
+//            nallocated.decrementAndGet();
+//            
+//            if (queue == null) return;
+//            
+//            // offer byte[] to the queue.
+//            if (!queue.offer(tmp)) {
+//
+//                // queue is over capacity, so byte[] will get swept by GC.
+//                log.info("Over capacity: discarding buffer");
+//
+//            }
+//            
+//        }
+//
+//        /**
+//         * Obtain a byte[] buffer. When the queue contains a byte[], that
+//         * reference will be returned. Otherwise a new byte[] will be allocated
+//         * and returned to the caller.
+//         */
+//        public RecycleBuffer get() {
+//            
+//            // Note: null iff queue is empty (no wait)
+//            byte[] buffer = (queue != null ? queue.poll() : null);
+//
+//            if (buffer == null) {
+//
+//                // allocate new buffer.
+//                buffer = new byte[bufSize];
+//
+//            }
+//
+//            nallocated.incrementAndGet();
+//            
+//            // return to caller.
+//            return new RecycleBuffer(this, buffer);
+//
+//        }
+//     
+//    }
+//
+//    /**
+//     * Instances of this object are managed via the {@link BufferCache}. The
+//     * wrapped byte[] MUST be explicitly "recycled" by calling {@link #close()}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class RecycleBuffer {
+// 
+//        private BufferCache cache;
+//        private byte[] buffer;
+//
+//        protected RecycleBuffer(BufferCache cache, byte[] buffer) {
+//
+//            assert cache != null;
+//            assert buffer != null;
+//
+//            this.cache = cache;
+//
+//            this.buffer = buffer;
+//            
+//        }
+//        
+//        /**
+//         * Return the buffer.
+//         */
+//        public byte[] buffer() {
+//
+//            if (buffer == null)
+//                throw new IllegalStateException();
+//
+//            return buffer;
+//            
+//        }
+//        
+//        /**
+//         * Release the buffer, declaring that it MAY be reused by others.
+//         * <p>
+//         * Note: It is an undetectable error to retain a reference to the
+//         * {@link RecycleBuffer#buffer() buffer} after calling this method.
+//         */
+//        synchronized public void close() {
+//
+//            if (buffer == null)
+//                throw new IllegalStateException();
+//            
+//            // Note: clears the byte[] reference.
+//            cache.recycle(this);
+//
+//        }
+//
+//    }
 
 //    /**
 //     * An {@link OutputBitStream} that uses a {@link BufferCache} to recycle its
@@ -951,5 +1059,44 @@ public interface IDataSerializer extends Serializable {
 //        }
 //
 //    }
+
+    /**
+     * Useful when no data will be written.
+     */
+    public static class NoDataSerializer implements IDataSerializer {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6683355231100666183L;
+
+        public transient static NoDataSerializer INSTANCE = new NoDataSerializer();
+
+        public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+
+            // NOP
+            
+        }
+
+        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+
+            // NOP
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+
+            // NOP
+
+        }
+
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            // NOP
+
+        }
+
+    }
 
 }

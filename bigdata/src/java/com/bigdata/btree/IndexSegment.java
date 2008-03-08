@@ -125,8 +125,7 @@ public class IndexSegment extends AbstractBTree {
                 ImmutableNodeFactory.INSTANCE,
                 // FIXME use packed address serializer.
                 AddressSerializer.INSTANCE,
-//                new CustomAddressSerializer(fileStore.getCheckpoint()),
-                fileStore.getMetadata()
+                fileStore.getIndexMetadata()
                 );
 
         // Type-safe reference to the backing store.

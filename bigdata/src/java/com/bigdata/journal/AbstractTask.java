@@ -270,8 +270,11 @@ public abstract class AbstractTask implements Callable<Object> {
             }
             
         }
-        
-        this.concurrencyManager = concurrencyManager;
+
+        // make sure we have the real ConcurrencyManager for addCounters()
+        this.concurrencyManager = (ConcurrencyManager) (concurrencyManager instanceof Journal ? ((Journal) concurrencyManager)
+                .getConcurrencyManager()
+                : concurrencyManager);
 
         this.transactionManager = concurrencyManager.getTransactionManager();
 
@@ -377,6 +380,24 @@ public abstract class AbstractTask implements Callable<Object> {
             throw new IllegalStateException("More than one resource was declared");
         
         return resource[0];
+        
+    }
+    
+    /**
+     * Returns Task{taskName,timestamp,resource[]}
+     */
+    public String toString() {
+        
+        return "Task{"+getTaskName()+",timestamp="+timestamp+",resource="+Arrays.toString(resource)+"}";
+        
+    }
+    
+    /**
+     * Returns the name of the class by default.
+     */
+    protected String getTaskName() {
+        
+        return getClass().getName();
         
     }
     
@@ -509,7 +530,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         if (!submitted.compareAndSet(false, true)) {
 
-            throw new ResubmitException(getClass().getName());
+            throw new ResubmitException(toString());
             
         }
         
@@ -557,7 +578,7 @@ public abstract class AbstractTask implements Callable<Object> {
                     
                     clearIndexCache();
                 
-                    log.info("Reader is done: "+getClass().getName()+", timestamp="+timestamp);
+                    log.info("Reader is done: "+this);
                     
                 }
 
@@ -576,7 +597,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         } finally {
 
-            log.info("done: "+getClass().getName()+", timestamp="+timestamp);
+            log.info("done: "+this);
 
         }
         
@@ -597,8 +618,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
         // resource(s) to lock (exclusive locks are used).
 
-        log.info("Unisolated write task: resources="
-                + Arrays.toString(resource));
+        log.info("Unisolated write task: "+this);
 
         // declare resource(s).
         lockManager.addResource(resource);
@@ -639,7 +659,7 @@ public abstract class AbstractTask implements Callable<Object> {
                 // set flag.
                 ran = true;
                 
-                log.info("Task Ok: class="+getClass().getName());
+                log.info("Task Ok: class="+this);
                 
                 /*
                  * Note: I am choosing NOT to flush dirty indices to the store
@@ -679,7 +699,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
                 // Do not re-invoke it afterTask failed above.
 
-                log.info("Task failed: class="+getClass().getName()+" : "+t);
+                log.info("Task failed: class="+this+" : "+t);
                 
                 writeService.afterTask(this, t);
 

@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -70,8 +69,12 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
         
     }
 
+    /**
+     * Note: <i>timestamp</i> is ignored since we are reading against a local
+     * index object.
+     */
     @Override
-    protected ResultSet getResultSet(byte[] fromKey, byte[] toKey, int capacity,
+    protected ResultSet getResultSet(long timestamp, byte[] fromKey, byte[] toKey, int capacity,
             int flags, ITupleFilter filter) {
 
         /*
@@ -192,6 +195,31 @@ public class ChunkedLocalRangeIterator extends AbstractChunkedRangeIterator {
             throw new UnsupportedOperationException();
             
         }
+        
+    }
+
+    /**
+     * Always returns 0L.  This value is ignored by {@link #getResultSet(long, byte[], byte[], int, int, ITupleFilter)}.
+     */
+    @Override
+    protected long getTimestamp() {
+        
+        return 0L;
+        
+    }
+
+    /**
+     * Returns <code>true</code> since the read will be consistent (it reads
+     * against the same index object for each {@link ResultSet}) but the values
+     * returned by {@link #getTimestamp()} and {@link #getReadTime()} are
+     * ignored by
+     * {@link #getResultSet(long, byte[], byte[], int, int, ITupleFilter)}
+     * (since it is reading against a local index object).
+     */
+    @Override
+    public boolean getReadConsistent() {
+        
+        return false;
         
     }
 

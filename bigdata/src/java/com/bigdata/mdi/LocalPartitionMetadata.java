@@ -40,6 +40,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.journal.Journal;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.service.DataService;
 
 
 /**
@@ -81,6 +83,21 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * listed last.
      */
     private IResourceMetadata[] resources;
+
+    /**
+     * @todo Consider one of the following:
+     *       <p>
+     *       A history of operations giving rise to the current partition
+     *       metadata. E.g., register(timestamp), copyOnOverflow(timestamp),
+     *       split(timestamp), join(partitionId,partitionId,timestamp), etc.
+     *       This is truncated when serialized to keep it from growing without
+     *       bound.
+     *       <p>
+     *       Recording the timestamp and partitionId of the view from which this
+     *       view was derived so that we can trace things backwards by writing
+     *       some code.
+     */
+    private String history;
     
     /**
      * De-serialization constructor.
@@ -114,13 +131,23 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            Note: This is required if the {@link LocalPartitionMetadata}
      *            record will be saved on the {@link IndexMetadata} of a
      *            {@link BTree}. It is NOT recommended when it will be saved on
-     *            the {@link IndexMetadata} of an {@link IndexSegment}.
+     *            the {@link IndexMetadata} of an {@link IndexSegment}. When
+     *            the {@link IndexMetadata} is sent to a remote
+     *            {@link DataService} this field MUST be <code>null</code> and
+     *            the remote {@link DataService} will fill it in on arrival.
+     * @param history
+     *            A human interpretable history of the index partition. The
+     *            history is a series of whitespace delimited records each of
+     *            more or less the form <code>foo(x,y,z)</code>. The history
+     *            gets truncated when the {@link LocalPartitionMetadata} is
+     *            serialized in order to prevent it from growing without bound.
      */
     public LocalPartitionMetadata(//
             int partitionId,//
             byte[] leftSeparatorKey,//
             byte[] rightSeparatorKey,// 
-            IResourceMetadata[] resources//
+            IResourceMetadata[] resources,//
+            String history
             ) {
 
         /*
@@ -135,6 +162,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         this.resources = resources;
 
+        this.history = history;
+        
         /*
          * Test arguments.
          */
@@ -257,6 +286,12 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
     }
 
+    final public String getHistory() {
+        
+        return history;
+        
+    }
+    
     final public int hashCode() {
 
         // per the interface contract.
@@ -309,7 +344,6 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
     }
 
-
     public String toString() {
 
         return 
@@ -317,10 +351,15 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         ", leftSeparator="+Arrays.toString(getLeftSeparatorKey())+
         ", rightSeparator="+(getRightSeparatorKey()==null?"null":Arrays.toString(getRightSeparatorKey()))+
         ", resourceMetadata="+Arrays.toString(getResources())+
+        ", history="+getHistory()+
         "}"
         ;
 
     }
+    
+    /*
+     * Externalizable
+     */
     
     private static final transient short VERSION0 = 0x0;
     
@@ -358,6 +397,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         }
 
+        history = in.readUTF();
+        
         resources = nresources>0 ? new IResourceMetadata[nresources] : null;
 
         for (int j = 0; j < nresources; j++) {
@@ -405,6 +446,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
             out.write(rightSeparatorKey);
 
         }
+
+        out.writeUTF(history.substring(0,Math.min(history.length(), 4*Bytes.kilobyte32)));
         
         /*
          * Note: we serialize using the IResourceMetadata interface so that we

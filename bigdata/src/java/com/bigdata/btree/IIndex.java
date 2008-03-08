@@ -25,8 +25,8 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
@@ -77,7 +77,7 @@ public interface IIndex extends ISimpleBTree {
      * 
      * @return The value returned by {@link IIndexProcedure#apply(IIndex)}
      */
-    public Object submit(byte[] key, IIndexProcedure proc);
+    public Object submit(byte[] key, ISimpleIndexProcedure proc);
     
     /**
      * The procedure will be transparently applied against each index partition
@@ -101,11 +101,9 @@ public interface IIndex extends ISimpleBTree {
      * @param resultHandler
      *            When defined, results from each procedure application will be
      *            reported to this object.
-     * 
-     * @todo change type to {@link IKeyRangeIndexProcedure}? 
      */
     public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler handler); 
+            final IKeyRangeIndexProcedure proc, final IResultHandler handler); 
     
     /**
      * Runs a procedure against an index.
@@ -117,8 +115,10 @@ public interface IIndex extends ISimpleBTree {
      * Note: The scale-out indices add support for auto-split of the procedure
      * such that it runs locally against each relevant index partition.
      * 
-     * @param n
-     *            The #of tuples (positive integer).
+     * @param fromIndex
+     *            The index of the first key to be used (inclusive).
+     * @param toIndex
+     *            The index of the last key to be used (exclusive).
      * @param keys
      *            The keys (required).
      * @param vals
@@ -129,7 +129,8 @@ public interface IIndex extends ISimpleBTree {
      *            When defined, results from each procedure application will be
      *            reported to this object.
      */
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler resultHandler);
+    public void submit(int fromIndex, int toIndex, byte[][] keys,
+            byte[][] vals, AbstractIndexProcedureConstructor ctor,
+            IResultHandler resultHandler);
 
 }

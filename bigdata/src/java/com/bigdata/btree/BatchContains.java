@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-
 /**
  * Batch existence test operation. Existence tests SHOULD be used in place of
  * lookup tests to determine key existence if null values are allowed in an
@@ -51,18 +50,21 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBa
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchContainsConstructor implements IIndexProcedureConstructor {
+    public static class BatchContainsConstructor extends AbstractIndexProcedureConstructor<BatchContains> {
 
         public static final BatchContainsConstructor INSTANCE = new BatchContainsConstructor(); 
         
-        public BatchContainsConstructor() {
+        private BatchContainsConstructor() {
             
         }
-        
-        public IKeyArrayIndexProcedure newInstance(int n, int offset,
+ 
+        public BatchContains newInstance(IDataSerializer keySer,
+                IDataSerializer valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
-            return new BatchContains(n, offset, keys);
+            assert vals == null;
+            
+            return new BatchContains(keySer, fromIndex, toIndex, keys);
             
         }
         
@@ -79,16 +81,16 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBa
     /**
      * Create a batch existence test operation.
      * 
-     * @param ntuples
-     *            The #of tuples in the operation (in).
-     * @param offset
      * @param keys
      *            A series of keys. Each key is an variable length unsigned
      *            byte[]. The keys MUST be presented in sorted order.
+     * 
+     * @see BatchContainsConstructor
      */
-    public BatchContains(int ntuples, int offset, byte[][] keys) {
-        
-        super( ntuples, offset, keys, null/*vals*/);
+    protected BatchContains(IDataSerializer keySer, int fromIndex, int toIndex,
+            byte[][] keys) {
+
+        super(keySer, null, fromIndex, toIndex, keys, null/*vals*/);
 
     }
 
@@ -115,17 +117,7 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements IBa
 
         }
 
-        ResultBitBuffer result = newResult();
-        
-        result.setResult( n, ret );
-        
-        return result;
-        
-    }
-    
-    protected ResultBitBuffer newResult() {
-        
-        return new ResultBitBuffer();
+        return new ResultBitBuffer(n,ret);
         
     }
     

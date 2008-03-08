@@ -37,14 +37,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
 
 /**
  * A chunked iterator that proceeds a {@link ResultSet} at a time.
- * 
- * @todo if unisolated or read-committed, then we may need to re-assess the
- *       toIndex during the query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -122,6 +120,71 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
     protected ResultSet rset = null;
 
     /**
+     * The timestamp for the operation as specified by the ctor (this is used
+     * for remote index queries but when running against a local index).
+     */
+    protected abstract long getTimestamp();
+    
+    /**
+     * Note: value is 0L until the first {@link ResultSet} has been read.
+     */
+    private long commitTime = 0L;
+    
+    /**
+     * The timestamp returned by the initial {@link ResultSet}. 
+     */
+    public long getCommitTime() {
+        
+        return commitTime;
+        
+    }
+    
+    /**
+     * When <code>true</code> the {@link #getCommitTime()} will be used to
+     * ensure that {@link #continuationQuery()}s run against the same commit
+     * point thereby producing a consistent view even when the iterator is
+     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED}. When
+     * <code>false</code> {@link #continuationQuery()}s will use whatever
+     * value is returned by {@link #getTimestamp()}.
+     */
+    abstract public boolean getReadConsistent();
+    
+    /**
+     * Return the timestamp used for {@link #continuationQuery()}s. The value
+     * returned depends on whether or not {@link #getReadConsistent()} is
+     * <code>true</code>. When consistent reads are required the timestamp
+     * will be the {@link ResultSet#getCommitTime()} for the initial
+     * {@link ResultSet}. Otherwise it is the value returned by
+     * {@link #getTimestamp()}.
+     * 
+     * @throws IllegalStateException
+     *             if {@link #getReadConsistent()} is <code>true</code> and
+     *             the initial {@link ResultSet} has not been read since the
+     *             commitTime for that {@link ResultSet} is not yet available.
+     */
+    final public long getReadTime() {
+        
+        if(getReadConsistent() ) {
+            
+            if (commitTime == 0L) {
+
+                /*
+                 * The commitTime is not yet available (nothing has been read).
+                 */
+                
+                throw new IllegalStateException();
+                
+            }
+            
+            return commitTime;
+            
+        }
+        
+        return getTimestamp();
+        
+    }
+    
+    /**
      * The #of enties visited so far.
      */
     protected long nvisited = 0;
@@ -193,6 +256,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      * Abstract method must return the next {@link ResultSet} based on the
      * supplied parameter values.
      * 
+     * @param timestamp 
      * @param fromKey
      * @param toKey
      * @param capacity
@@ -200,7 +264,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      * @param filter
      * @return
      */
-    abstract protected ResultSet getResultSet(byte[] fromKey, byte[] toKey,
+    abstract protected ResultSet getResultSet(long timestamp,byte[] fromKey, byte[] toKey,
             int capacity, int flags, ITupleFilter filter);
 
     /**
@@ -213,8 +277,12 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         log.info("fromKey=" + BytesUtil.toString(fromKey) + ", toKey="
                 + BytesUtil.toString(toKey));
 
-        rset = getResultSet(fromKey, toKey, capacity, flags, filter);
+        // initial query.
+        rset = getResultSet(getTimestamp(), fromKey, toKey, capacity, flags, filter);
 
+        // Note: will be 0L if reading on a local index.
+        commitTime = rset.getCommitTime();
+        
         // reset index into the ResultSet.
         lastVisited = -1;
 
@@ -250,7 +318,8 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         log.info("fromKey=" + BytesUtil.toString(_fromKey) + ", toKey="
                 + BytesUtil.toString(toKey));
 
-        rset = getResultSet(_fromKey, toKey, capacity, flags, filter);
+        // continuation query.
+        rset = getResultSet(getReadTime(),_fromKey, toKey, capacity, flags, filter);
 
         // reset index into the ResultSet.
         lastVisited = -1;
@@ -408,7 +477,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
             if (!getKeysRequested())
                 throw new UnsupportedOperationException();
 
-            return rset.getKeys()[lastVisited];
+            return rset.getKey(lastVisited);
 
         }
 
@@ -438,7 +507,7 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
             if (!getValuesRequested())
                 throw new UnsupportedOperationException();
 
-            return rset.getValues()[lastVisited];
+            return rset.getValue(lastVisited);
 
         }
 

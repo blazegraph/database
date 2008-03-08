@@ -143,7 +143,12 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
             final ResultSet rset = new ResultSet(src, fromKey, toKey,
                     chunkSize/* capacity */, IRangeQuery.ALL, null/* filter */);
 
-            // Copy data in result set onto the target index partition.
+            /*
+             * Copy data in result set onto the target index partition.
+             * 
+             * Note: This task does not handle re-directs. The target index
+             * partition MUST be on the target data service.
+             */
             targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                     new CopyBufferedWritesProcedure(rset));
 
@@ -194,10 +199,13 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
     }
 
     /**
-     * Task copy data described in a {@link ResultSet} onto the target index
+     * Task copies data described in a {@link ResultSet} onto the target index
      * partition. This task is invoked by the
      * {@link UpdateMoveIndexPartitionTask} while the latter holds an exclusive
      * lock on the source index partition.
+     * <p>
+     * Note: This task does not handle re-directs. The target index partition
+     * MUST be on the target data service.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -220,7 +228,8 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
 
         public CopyBufferedWritesProcedure(ResultSet rset) {
         
-            if(rset==null) throw new IllegalArgumentException();
+            if (rset == null)
+                throw new IllegalArgumentException();
             
             this.rset = rset;
             
@@ -255,7 +264,7 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
             
             for(int i=0; i<n; i++) {
                 
-                final byte[] key = rset.getKeys()[i];
+                final byte[] key = rset.getKey(i);
                 
                 if (versionTimestamps) {
 
@@ -268,7 +277,7 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
 
                     } else {
 
-                        dst.insert(key, rset.getValues()[i],
+                        dst.insert(key, rset.getValue(i),
                                         false/* delete */, timestamp, null/* tuple */);
 
                     }
@@ -281,7 +290,7 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
 
                     } else {
 
-                        dst.insert(key, rset.getValues()[i]);
+                        dst.insert(key, rset.getValue(i));
 
                     }
 

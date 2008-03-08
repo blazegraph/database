@@ -141,7 +141,17 @@ public class MoveIndexPartitionTask extends AbstractTask {
 
         // the partition metadata for the source index partition.
         final LocalPartitionMetadata oldpmd = newMetadata.getPartitionMetadata();
-        
+
+//        newMetadata.setPartitionMetadata(oldpmd.move(//
+//                newPartitionId,
+//                /*
+//                 * Note: This is [null] to indicate that the resource metadata
+//                 * needs to be filled in by the target data service when the
+//                 * new index partition is registered.
+//                 */
+//                null
+//                ));
+
         newMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
                 newPartitionId,//
                 oldpmd.getLeftSeparatorKey(),//
@@ -151,7 +161,9 @@ public class MoveIndexPartitionTask extends AbstractTask {
                  * needs to be filled in by the target data service when the
                  * new index partition is registered.
                  */
-                null
+                null,
+                oldpmd.getHistory()+
+                "move("+oldpmd.getPartitionId()+"->"+newPartitionId+") "
                 ));
 
         
@@ -312,9 +324,16 @@ public class MoveIndexPartitionTask extends AbstractTask {
             
             // iterator reading from the source index partition.
             final ITupleIterator itr = new RawDataServiceRangeIterator(
-                    sourceDataService, sourceIndexName, lastCommitTime,
-                    null/* fromKey */, null/* toKey */, 0/* capacity */,
-                    IRangeQuery.KEYS | IRangeQuery.VALS, null/* filter */);
+                    sourceDataService, //
+                    sourceIndexName, //
+                    lastCommitTime,//
+                    true, // readConsistent,
+                    null, // fromKey
+                    null, // toKey
+                    0,    // capacity
+                    IRangeQuery.KEYS | IRangeQuery.VALS,//
+                    null  // filter
+                    );
 
             final boolean isIsolatable = ndx.getIndexMetadata().isIsolatable();
 

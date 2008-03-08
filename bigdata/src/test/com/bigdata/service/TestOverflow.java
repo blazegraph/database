@@ -82,19 +82,6 @@ import com.bigdata.sparse.SparseRowStore;
  * @todo test where we write enough data that we cause the index partition to be
  *       split into more than one index partition on overflow.
  * 
- * @todo Note that additional writes may have been generated such that an
- *       overflow could even re-trigger a split. In order to get a JOIN to occur
- *       we need to focus on an index partition and remove keys until we know
- *       that the index partition is undercapacity. We can figure out the actual
- *       capacity by reading the index partition locators, choosing an index
- *       partition that we want to force a join with its rightSibling, and then
- *       using a rangeCount on the ground truth to figure out how many tuples
- *       need to be removed. We can select the keys for those tuples from the
- *       ground truth, which makes it easy to remove them from the index
- *       partition. Once the ground truth index is undercapacity we set the
- *       forceOverflow flag and the next write on the index partition will cause
- *       an overflow and trigger the index partition join.
- * 
  * @todo factor out a test that does continuous writes, including both inserts
  *       and removes, and verify that the scale-out index tracks ground truth.
  *       Periodically delete keys in an index partition until it would underflow
@@ -126,6 +113,10 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * FIXME test when index would be copied to the new journal rather than
  * resulting in an index segment build.
+ * 
+ * FIXME test index partition move based on utilization. We will have to
+ * satisify the various pre-conditions for a move. A mock (or extended) service
+ * can be used to specify the move target.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -170,34 +161,68 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
     }
 
     /**
-     * Sets the forceOverflow flag and then registers a scale-out index.
-     * 
-     * @todo verify index not moved and still available.
-     * 
-     * @todo verify Ok when index build threshold is zero and when non-zero.
+     * Sets the forceOverflow flag and then registers a scale-out index. The
+     * test verifies that overflow occurred and that the index is still
+     * available after the overflow operation.
      * 
      * @throws IOException
      */
     public void test_register1ThenOverflow() throws IOException {
 
-        fail("write test");
+        /*
+         * Register the index.
+         */
+        final String name = "testIndex";
+        final UUID indexUUID = UUID.randomUUID();
+        final long overflowCounter0;
+        final long overflowCounter1;
+        {
 
-    }
-    
-    /**
-     * Registers two scale-out indices with one index partition each on the same
-     * data service, setting the forceOverflow flag before we register the
-     * second index.
-     * 
-     * @todo verify one of the index partitions was moved to the other data
-     *       service in order to load balance the federation.
-     * 
-     * @throws IOException
-     */
-    public void test_register2ThenOverflow() throws IOException {
-    
-        fail("write test");
+            final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
+            
+            // must support delete markers
+            indexMetadata.setDeleteMarkers(true);
+
+            overflowCounter0 = dataService0.getOverflowCounter();
+            
+            assertEquals(0,overflowCounter0);
+            
+            dataService0.forceOverflow();
+            
+            // register the scale-out index, creating a single index partition.
+            fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
+
+            overflowCounter1 = dataService0.getOverflowCounter();
+            
+            assertEquals(1,overflowCounter1);
+
+        }
+
+        /*
+         * Verify the initial index partition.
+         */
+        final PartitionLocator pmd0;
+        {
+            
+            ClientIndexView ndx = (ClientIndexView)fed.getIndex(name,ITx.UNISOLATED);
+            
+            IMetadataIndex mdi = ndx.getMetadataIndex();
+            
+            assertEquals("#index partitions", 1, mdi.rangeCount(null, null));
+
+            // This is the initial partition locator metadata record.
+            pmd0 = mdi.get(new byte[]{});
+
+            assertEquals("partitionId", 0L, pmd0.getPartitionId());
+
+            assertEquals("dataServiceUUIDs", new UUID[] { dataService0
+                    .getServiceUUID() }, pmd0.getDataServices());
+            
+        }
+        assertEquals("partitionCount", 1, getPartitionCount(name));
         
+        assertEquals(0L,fed.getIndex(name,ITx.UNISOLATED).rangeCount(null,null));
+
     }
     
     /**
@@ -314,7 +339,7 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
 
             // insert the data into the ground truth index.
             groundTruth
-                    .submit(nentries, keys, vals,
+                    .submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                             BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
 
             /*
@@ -331,7 +356,7 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
 
             // insert the data into the scale-out index.
             fed.getIndex(name, ITx.UNISOLATED)
-                    .submit(nentries, keys, vals,
+                    .submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                             BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
             
             assertEquals("rangeCount", groundTruth.getEntryCount(), fed
@@ -395,12 +420,12 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
             System.err.println("Will delete " + ndelete + " entries from "
                     + locator + " to trigger underflow");
             
-            groundTruth.submit(ndelete, keys, null/* vals */,
+            groundTruth.submit(0/*fromIndex*/,ndelete/*toIndex*/, keys, null/* vals */,
                     BatchRemoveConstructor.RETURN_NO_VALUES, null/*handler*/);
 
             dataService0.forceOverflow();
             
-            fed.getIndex(name, ITx.UNISOLATED).submit(ndelete, keys,
+            fed.getIndex(name, ITx.UNISOLATED).submit(0/*fromIndex*/,ndelete/*toIndex*/, keys,
                     null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
                     null/*handler*/);
             
@@ -443,20 +468,21 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
                     ITx.READ_COMMITTED).find(null);
 
             final byte[][] keys = new byte[][] { locator.getLeftSeparatorKey() };
-            final byte[][] vals = new byte[][] { /*empty byte[] */ };
+//            final byte[][] vals = new byte[][] { /*empty byte[] */ };
 
             // overwrite the value (if any) under the left separator key.
-            groundTruth.submit(1, keys, vals,
+            groundTruth.submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,
                     BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
 
             // overwrite the value (if any) under the left separator key.
-            fed.getIndex(name, ITx.UNISOLATED).submit(1, keys, vals,
+            fed.getIndex(name, ITx.UNISOLATED).submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,
                     BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
             
         }
 
         // wait until overflow processing is done.
-        final long overflowCounter3 = awaitOverflow(dataService0, overflowCounter2);
+//        final long overflowCounter3 = 
+            awaitOverflow(dataService0, overflowCounter2);
         
         /*
          * Confirm index partitions were joined.
@@ -476,14 +502,6 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         System.err.println("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
-
-        /*
-         * FIXME if moves enabled then one of the index partitions might not be
-         * where we are expecting to find it so an underflow might result in a
-         * move followed by an underflow rather than directly causing an
-         * underflow. Address this before writing more tests so that all bases
-         * are being covered.
-         */
         
     }
     
@@ -564,9 +582,10 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
                 metadataService,//
                 MetadataService.getMetadataIndexName(name), //
                 ITx.READ_COMMITTED,//
-                null, //fromKey
-                null, //toKey
-                0, // capacity,
+                true, // readConsistent
+                null, // fromKey
+                null, // toKey
+                0,    // capacity,
                 IRangeQuery.DEFAULT,// flags
                 null // filter
                 );

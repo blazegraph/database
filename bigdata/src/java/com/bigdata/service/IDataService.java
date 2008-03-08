@@ -44,6 +44,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -249,7 +250,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo add support for triggers. unisolated triggers must be asynchronous if
+ * @todo add support for triggers? unisolated triggers must be asynchronous if
  *       they will take actions with high latency (such as writing on a
  *       different index partition, which could be remote). Low latency actions
  *       might include emitting asynchronous messages. transactional triggers
@@ -441,8 +442,9 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @param name
      *            The name of the scale-out index.
      * @param proc
-     *            The procedure to be executed. This MUST be downloadable code
-     *            since it will be executed on the {@link DataService}.
+     *            The procedure to be executed. This MUST be a serializable
+     *            object with downloadable code since it will be executed on the
+     *            remote {@link DataService}.
      * 
      * @return The result, which is entirely defined by the procedure
      *         implementation and which MAY be null. In general, this MUST be
@@ -457,16 +459,8 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
             throws InterruptedException, ExecutionException, IOException;
 
     /**
-     * @todo This is a first try at adding support for reading low-level records
-     *       from a journal or index segment in support of the
-     *       {@link BigdataRepository}.
-     *       <p>
-     *       The API should provide a means to obtain a socket from which record
-     *       data may be streamed. The client sends the resource identifier
-     *       (UUID of the journal or index segment) and the address of the
-     *       record and the data service sends the record data. This is designed
-     *       for streaming reads of up to 64M or more (a record recorded on the
-     *       store as identified by the address).
+     * Read a low-level record from the described {@link IRawStore} described by
+     * the {@link IResourceMetadata}.
      * 
      * @param resource
      *            The description of the resource containing that block.
@@ -485,6 +479,17 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @throws IllegalArgumentException
      *             if the record identified by addr can not be read from the
      *             resource.
+     * 
+     * @todo This is a first try at adding support for reading low-level records
+     *       from a journal or index segment in support of the
+     *       {@link BigdataRepository}.
+     *       <p>
+     *       The API should provide a means to obtain a socket from which record
+     *       data may be streamed. The client sends the resource identifier
+     *       (UUID of the journal or index segment) and the address of the
+     *       record and the data service sends the record data. This is designed
+     *       for streaming reads of up to 64M or more (a record recorded on the
+     *       store as identified by the address).
      */
     public IBlock readBlock(IResourceMetadata resource, long addr)
             throws IOException;

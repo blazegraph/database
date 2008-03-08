@@ -36,6 +36,7 @@ import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.RangeCountProcedure;
+import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
@@ -50,6 +51,13 @@ import com.bigdata.rawstore.IRawStore;
  * This class encapsulates access to the metadata and data services for a
  * bigdata federation - it is in effect a proxy object for the distributed set
  * of services that comprise the federation.
+ * 
+ * FIXME This should be in the core bigdata module since it has nothing to do
+ * with jini. It might be tightly coupled with the {@link BigdataClient} but the
+ * problem then is with the {@link BigdataClient} which needs to be refactored
+ * to isolated the jini services facet from the {@link IBigdataClient} API.
+ * 
+ * @todo support failover metadata service discovery.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -253,12 +261,46 @@ public class BigdataFederation implements IBigdataFederation {
      * 
      * @todo test with and without caching and see what works better. this can
      *       evolve over time, probably some configuration options to control
-     *       cache behavior.  note that caching of result sets also makes sense
+     *       cache behavior. note that caching of result sets also makes sense
      *       for historical reads or transactions.
      * 
      * @todo Rather than synchronizing all requests, this should queue requests
      *       for a specific metadata index iff there is a cache miss for that
      *       index.
+     * @todo Use a weak-ref cache with an LRU (or hard reference cache) to evict
+     *       cached {@link PartitionLocator}. The client needs access by {
+     *       indexName, timestamp, key }. We need to eventually evict the cached
+     *       locators to prevent the client from building up too much state
+     *       locally. Also the cached locators can not be shared across
+     *       different timestamps, so clients will build up a locator cache when
+     *       working on a transaction but then never go back to that cache once
+     *       the transaction completes.
+     *       <p>
+     *       While it may be possible to share cached locators between
+     *       historical reads and transactions for the same point in history, we
+     *       do not have enough information on hand to make those decisions.
+     *       What we would need to know is the historical commit time
+     *       corresponding to an assigned transaction startTime. This is not
+     *       one-to-one since the start times for transactions must be unique
+     *       (among those in play). See
+     *       {@link ITransactionManager#newTx(com.bigdata.journal.IsolationEnum)}
+     *       for more on this.
+     * 
+     * @todo cache leased information about index partitions of interest to the
+     *       client. The cache will be a little tricky since we need to know
+     *       when the client does not possess a partition definition. Index
+     *       partitions are defined by the separator key - the first key that
+     *       lies beyond that partition. the danger then is that a client will
+     *       presume that any key before the first leased partition is part of
+     *       that first partition. To guard against that the client needs to
+     *       know both the separator key that represents the upper and lower
+     *       bounds of each partition. If a lookup in the cache falls outside of
+     *       any known partitions upper and lower bounds then it is a cache miss
+     *       and we have to ask the metadata service for a lease on the
+     *       partition. the cache itself is just a btree data structure with the
+     *       proviso that some cache entries represent missing partition
+     *       definitions (aka the lower bounds for known partitions where the
+     *       left sibling partition is not known to the client).
      */
     synchronized public IMetadataIndex getMetadataIndex(String name,
             long timestamp) {
@@ -401,6 +443,7 @@ public class BigdataFederation implements IBigdataFederation {
                     getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     timestamp,//
+                    true, // readConsistent
                     null, // fromKey
                     null, // toKey
                     0, // capacity
@@ -538,6 +581,7 @@ public class BigdataFederation implements IBigdataFederation {
             return new RawDataServiceRangeIterator(getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     (timestamp==ITx.UNISOLATED?ITx.READ_COMMITTED:timestamp),//
+                    true, // read-consistent semantics.
                     null, // fromKey
                     null, // toKey
                     0, // capacity

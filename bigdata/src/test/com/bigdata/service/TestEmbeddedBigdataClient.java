@@ -225,8 +225,6 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
          */
         {
             
-            final int ntuples = 5;
-            
             final byte[][] keys = new byte[][] {//
             new byte[]{1}, // [0]
             new byte[]{2}, // [1]
@@ -235,7 +233,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             new byte[]{9}  // [4]
             };
             
-            List<Split> splits = ndx.splitKeys(ntuples, keys);
+            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
         
             assertNotNull(splits);
             
@@ -257,8 +255,6 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
          */
         {
             
-            final int ntuples = 5;
-            
             final byte[][] keys = new byte[][] {//
             new byte[]{1}, // [0]
             new byte[]{2}, // [1]
@@ -267,7 +263,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             new byte[]{9}  // [4]
             };
             
-            List<Split> splits = ndx.splitKeys(ntuples, keys);
+            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
         
             assertNotNull(splits);
             

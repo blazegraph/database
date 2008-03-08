@@ -231,7 +231,7 @@ public class TPS implements ITPS, Externalizable {
         return schema;
         
     }
-
+    
     public Iterator<ITPV> iterator() {
 
         return Collections.unmodifiableCollection(tuples.values()).iterator();
@@ -587,6 +587,12 @@ public class TPS implements ITPS, Externalizable {
         public Object getValue() {
 
             return value;
+            
+        }
+        
+        public String toString() {
+            
+            return "TPS{name="+name+",timestamp="+timestamp+",value="+value+"}";
             
         }
 

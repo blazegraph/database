@@ -42,14 +42,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BatchContains;
-import com.bigdata.btree.BatchInsert;
-import com.bigdata.btree.BatchLookup;
-import com.bigdata.btree.BatchRemove;
+import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
@@ -62,10 +60,14 @@ import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
+import com.bigdata.btree.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
+import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
@@ -80,22 +82,28 @@ import com.bigdata.util.InnerCause;
  * <p>
  * A client-side view of a scale-out index as of some <i>timestamp</i>.
  * </p>
- * 
  * <p>
- * 
  * This view automatically handles the split, join, or move of index partitions
  * within the federation. The {@link IDataService} throws back a (sometimes
  * wrapped) {@link NoSuchIndexException} when it does not have a registered
  * index as of some timestamp. If this exception is observed when the client
- * makes a request using a cached {@link PartitionLocator} record then
- * the locator record is stale. The client automatically fetches the locator
+ * makes a request using a cached {@link PartitionLocator} record then the
+ * locator record is stale. The client automatically fetches the locator
  * record(s) covering the same key range as the stale locator record and the
  * re-issues the request against the index partitions identified in those
  * locator record(s). This behavior correctly handles index partition split,
  * merge, and move scenarios. The implementation of this policy is limited to
- * exactly three places in the code: {@link DataServiceProcedureTask},
+ * exactly three places in the code: {@link AbstractDataServiceProcedureTask},
  * {@link PartitionedRangeQueryIterator}, and {@link DataServiceRangeIterator}.
- * 
+ * </p>
+ * <p>
+ * Note that only {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED}
+ * operations are subject to stale locators since they are not based on a
+ * historical committed state of the database. Historical read and
+ * fully-isolated operations both read from historical committed states and the
+ * locators are never updated for historical states (only the current state of
+ * an index partition is split, joined, or moved - the historical states always
+ * remain behind).
  * </p>
  * 
  * @todo If the index was dropped then that should cause the operation to abort
@@ -112,55 +120,16 @@ import com.bigdata.util.InnerCause;
  *       Offer policies for handling index partitions that are unavailable at
  *       the time of the request (continued operation during partial failure).
  * 
- * @todo Use a weak-ref cache with an LRU (or hard reference cache) to evict
- *       cached {@link PartitionLocator}. The client needs access by {
- *       indexName, timestamp, key }. We need to eventually evict the cached
- *       locators to prevent the client from building up too much state locally.
- *       Also the cached locators can not be shared across different timestamps,
- *       so clients will build up a locator cache when working on a transaction
- *       but then never go back to that cache once the transaction completes.
- *       <p>
- *       While it may be possible to share cached locators between historical
- *       reads and transactions for the same point in history, we do not have
- *       enough information on hand to make those decisions. What we would need
- *       to know is the historical commit time corresponding to an assigned
- *       transaction startTime. This is not one-to-one since the start times for
- *       transactions must be unique (among those in play). See
- *       {@link ITransactionManager#newTx(com.bigdata.journal.IsolationEnum)}
- *       for more on this.
- * 
  * @todo We should be able to transparently use either a hash mod N approach to
  *       distributed index partitions or a dynamic approach based on overflow.
  *       This could even be decided on a per-index basis. The different
  *       approaches would be hidden by appropriate implementations of this
  *       class.
- * 
- * @todo It is a design goal (not yet obtained) that the client should interact
- *       with an interface rather than directly with {@link MetadataIndex} so
- *       that this code can look identical regardless of whether the metadata
- *       index is local (embedded) or remote. (We do in fact use the same code
- *       for both scenarios, but only because, at this time, the metadata index
- *       is fully cached in the remote case).
- * 
- * @todo cache leased information about index partitions of interest to the
- *       client. The cache will be a little tricky since we need to know when
- *       the client does not possess a partition definition. Index partitions
- *       are defined by the separator key - the first key that lies beyond that
- *       partition. the danger then is that a client will presume that any key
- *       before the first leased partition is part of that first partition. To
- *       guard against that the client needs to know both the separator key that
- *       represents the upper and lower bounds of each partition. If a lookup in
- *       the cache falls outside of any known partitions upper and lower bounds
- *       then it is a cache miss and we have to ask the metadata service for a
- *       lease on the partition. the cache itself is just a btree data structure
- *       with the proviso that some cache entries represent missing partition
- *       definitions (aka the lower bounds for known partitions where the left
- *       sibling partition is not known to the client).
- * 
- * @todo support isolated views, share cached data service information between
- *       isolated and unisolated views.
- * 
- * @todo support failover metadata service discovery.
+ *       <p>
+ *       A hash partitioned index will need to enforce optional read-consistent
+ *       semantics. This can be done by choosing a recent broadcast commitTime
+ *       for the read or by re-issuing queries that come in with a different
+ *       commitTime.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -295,7 +264,8 @@ public class ClientIndexView implements IIndex {
      *            the specified timestamp.
      * @param metadataIndexMetadata
      *            The metadata for the {@link MetadataIndex} as of that
-     *            timestamp.
+     *            timestamp. This also contains the template
+     *            {@link IndexMetadata} for the scale-out index partitions.
      */
     public ClientIndexView(IBigdataFederation fed, String name, long timestamp,
             MetadataIndexMetadata metadataIndexMetadata) {
@@ -334,11 +304,14 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
-     * The metadata for the managed scale-out index.
+     * The metadata for the managed scale-out index. Among other things, this
+     * gets used to determine how we serialize keys and values for
+     * {@link IKeyArrayIndexProcedure}s when we serialize a procedure to be
+     * sent to a remote {@link IDataService}.
      */
     public IndexMetadata getIndexMetadata() {
 
-        return getMetadataIndexMetadata().getManagedIndexMetadata();
+        return metadataIndexMetadata.getManagedIndexMetadata();
 
     }
 
@@ -389,7 +362,7 @@ public class ClientIndexView implements IIndex {
                 
                 final ITuple tuple = itr.next();
                 
-                final PartitionLocator pmd = (PartitionLocator) SerializerUtil.deserialize(tuple.getValueStream());
+                final PartitionLocator pmd = (PartitionLocator) SerializerUtil.deserialize(tuple.getValue());
                 
                 final String _name = DataService.getIndexPartitionName(name, pmd.getPartitionId());
                 
@@ -437,15 +410,21 @@ public class ClientIndexView implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchContains proc = new BatchContains(//
-                1, // n,
-                0, // offset
-                new byte[][] { key } // keys
-        );
+        final byte[][] keys = new byte[][] { key };
+        
+//        final BatchContains proc = new BatchContains(//
+//                1, // n,
+//                0, // offset
+//                keys
+//        );
+//
+//        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
+        
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/*fromIndex*/,1/*toIndex*/, keys, null/*vals*/,BatchContainsConstructor.INSTANCE, resultHandler);
 
-        final boolean[] ret = ((ResultBitBuffer) submit(key, proc)).getResult();
-
-        return ret[0];
+        return ((ResultBitBuffer) resultHandler.getResult()).getResult()[0];
         
     }
     
@@ -456,17 +435,26 @@ public class ClientIndexView implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchInsert proc = new BatchInsert(//
-                1, // n,
-                0, // offset
-                new byte[][] { key }, // keys
-                new byte[][] { value }, // vals
-                true // returnOldValues
-        );
+        final byte[][] keys = new byte[][] { key };
+        final byte[][] vals = new byte[][] { value };
+        
+//        final BatchInsert proc = new BatchInsert(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key }, // keys
+//                new byte[][] { value }, // vals
+//                true // returnOldValues
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/*fromIndex*/,1/*toIndex*/,keys,vals,BatchInsertConstructor.RETURN_OLD_VALUES,resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -477,15 +465,23 @@ public class ClientIndexView implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchLookup proc = new BatchLookup(//
-                1, // n,
-                0, // offset
-                new byte[][] { key } // keys
-        );
+        final byte[][] keys = new byte[][]{key};
+        
+//        final BatchLookup proc = new BatchLookup(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key } // keys
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer)submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/*fromIndex*/,1/*toIndex*/,keys,null/*vals*/,BatchLookupConstructor.INSTANCE,resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -496,16 +492,24 @@ public class ClientIndexView implements IIndex {
         else
             log.warn(NON_BATCH_API);
 
-        final BatchRemove proc = new BatchRemove(//
-                1, // n,
-                0, // offset
-                new byte[][] { key }, // keys
-                true // returnOldValues
-        );
+        final byte[][] keys = new byte[][]{key};
+        
+//        final BatchRemove proc = new BatchRemove(//
+//                1, // n,
+//                0, // offset
+//                new byte[][] { key }, // keys
+//                true // returnOldValues
+//        );
+//
+//        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
+//
+//        return ret[0];
 
-        final byte[][] ret = ((ResultBuffer) submit(key, proc)).getResult();
-
-        return ret[0];
+        final IResultHandler resultHandler = new IdentityHandler();
+        
+        submit(0/*fromIndex*/,1/*toIndex*/,keys,null/*vals*/,BatchRemoveConstructor.RETURN_OLD_VALUES,resultHandler);
+     
+        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
 
     }
 
@@ -560,15 +564,18 @@ public class ClientIndexView implements IIndex {
 
         }
         
-        return new PartitionedRangeQueryIterator(this, fromKey, toKey,
-                capacity, flags, filter);
+        // @todo make this a ctor argument or settable property?
+        final boolean readConsistent = (timestamp == ITx.UNISOLATED?false:true);
+        
+        return new PartitionedRangeQueryIterator(this, readConsistent, fromKey,
+                toKey, capacity, flags, filter);
         
     }
 
-    public Object submit(byte[] key, IIndexProcedure proc) {
+    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
 
         // Find the index partition spanning that key.
-        final PartitionLocator pmd = getMetadataIndex().find(key);
+        final PartitionLocator locator = getMetadataIndex().find(key);
 
         /*
          * Submit procedure to that data service.
@@ -578,7 +585,7 @@ public class ClientIndexView implements IIndex {
             if (INFO) {
 
                 log.info("Submitting " + proc.getClass() + " to partition"
-                        + pmd);
+                        + locator);
 
             }
 
@@ -586,8 +593,8 @@ public class ClientIndexView implements IIndex {
             final IResultHandler resultHandler = new IdentityHandler();
 
             // run on the thread pool in order to limit client parallelism
-            final DataServiceProcedureTask task = new DataServiceProcedureTask(
-                    new Split(pmd, 0, 0), proc, resultHandler);
+            final SimpleDataServiceProcedureTask task = new SimpleDataServiceProcedureTask(
+                    key, new Split(locator, 0, 0), proc, resultHandler);
 
             // submit procedure and await completion.
             getThreadPool().submit(task).get();
@@ -619,6 +626,16 @@ public class ClientIndexView implements IIndex {
      * {@link Options#CLIENT_THREAD_POOL_SIZE}. This value is typically smaller
      * than the capacity of the chunked iterator used to read on the metadata
      * index.
+     * <p>
+     * Note: It is possible that a split or join could occur during the process
+     * of mapping the procedure across the index partitions. When the view is
+     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} this could make the
+     * set of mapped index partitions inconsistent in the sense that it might
+     * double count some parts of the key range or that it might skip some parts
+     * of the key range. In order to avoid this problem the locator scan MUST
+     * use <em>read-consistent</em> semantics and issue continuation queries
+     * with respect to the commitTime for which the first locator
+     * {@link ResultSet} was materialized.
      * 
      * @param fromKey
      *            The scale-out index first key that will be visited
@@ -659,6 +676,8 @@ public class ClientIndexView implements IIndex {
         final ITupleIterator itr;
         {
          
+            final IMetadataIndex mdi = getMetadataIndex();
+            
             /*
              * Note: The scan on the metadata index needs to start at the index
              * partition in which the fromKey would be located. Therefore when
@@ -668,10 +687,10 @@ public class ClientIndexView implements IIndex {
 
             final byte[] _fromKey = fromKey == null //
                 ? null //
-                : getMetadataIndex().find(fromKey).getLeftSeparatorKey()//
+                : mdi.find(fromKey).getLeftSeparatorKey()//
                 ;
 
-            itr = getMetadataIndex().rangeIterator(_fromKey,//
+            itr = mdi.rangeIterator(_fromKey,//
                     toKey, //
                     0, // capacity, //
                     IRangeQuery.VALS,// the values are the locators.
@@ -696,7 +715,7 @@ public class ClientIndexView implements IIndex {
      * time and in key order.
      */
     public void submit(byte[] fromKey, byte[] toKey,
-            final IIndexProcedure proc, final IResultHandler resultHandler) {
+            final IKeyRangeIndexProcedure proc, final IResultHandler resultHandler) {
 
         if (proc == null)
             throw new IllegalArgumentException();
@@ -738,12 +757,12 @@ public class ClientIndexView implements IIndex {
                 
                 final ITuple tuple = itr.next();
                 
-                final PartitionLocator pmd = (PartitionLocator) SerializerUtil
+                final PartitionLocator locator = (PartitionLocator) SerializerUtil
                         .deserialize(tuple.getValue());
 
-                final Split split = new Split(pmd, 0/* fromIndex */, 0/* toIndex */);
-                
-                tasks.add(new DataServiceProcedureTask(split, proc,
+                final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);                
+
+                tasks.add(new KeyRangeDataServiceProcedureTask(fromKey, toKey, split, proc,
                         resultHandler));
                 
                 nparts++;
@@ -787,8 +806,8 @@ public class ClientIndexView implements IIndex {
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
      */
-    public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
         if (ctor == null) {
 
@@ -812,7 +831,7 @@ public class ClientIndexView implements IIndex {
          * splits and bounded by [n].
          */
 
-        final List<Split> splits = splitKeys(n, keys);
+        final List<Split> splits = splitKeys(fromIndex, toIndex, keys);
 
         final int nsplits = splits.size();
 
@@ -833,8 +852,8 @@ public class ClientIndexView implements IIndex {
 
                 final Split split = itr.next();
 
-                final IIndexProcedure proc = ctor.newInstance(split.ntuples,
-                        split.fromIndex, keys, vals);
+                final IKeyArrayIndexProcedure proc = ctor.newInstance(this,
+                        split.fromIndex, split.toIndex, keys, vals);
 
                 if (!(proc instanceof IParallelizableIndexProcedure)) {
 
@@ -842,8 +861,8 @@ public class ClientIndexView implements IIndex {
 
                 }
 
-                tasks.add(new DataServiceProcedureTask(split, proc,
-                                aggregator));
+                tasks.add(new KeyArrayDataServiceProcedureTask(keys, vals,
+                        split, proc, aggregator, ctor));
                 
             }
             
@@ -910,7 +929,7 @@ public class ClientIndexView implements IIndex {
                     
                 } catch (ExecutionException e) {
                     
-                    DataServiceProcedureTask task = (DataServiceProcedureTask) tasks
+                    AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) tasks
                             .get(i);
                     
                     log.error("Execution failed: task=" + task, e);
@@ -959,7 +978,7 @@ public class ClientIndexView implements IIndex {
 
         while (itr.hasNext()) {
 
-            final DataServiceProcedureTask task = (DataServiceProcedureTask) itr
+            final AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) itr
                     .next();
 
             try {
@@ -983,17 +1002,34 @@ public class ClientIndexView implements IIndex {
     
     /**
      * Helper class for submitting an {@link IIndexProcedure} to run on an
-     * {@link IDataService}.
+     * {@link IDataService}. The class traps {@link NoSuchIndexException}s and
+     * handles the redirection of requests to the appropriate
+     * {@link IDataService}. When necessary, the data for an
+     * {@link IKeyArrayIndexProcedure} will be re-split in order to distribute
+     * the requests to the new index partitions following a split of the target
+     * index partition.
+     * <p>
+     * Note: If an index partition is moved then the key range is unchanged.
+     * <p>
+     * Note: If an index partition is split, then the key range for each new
+     * index partition is a sub-range of the original key range and the total
+     * key range for the new index partitions is exactly the original key range.
+     * <p>
+     * Note: If an index partition is joined with another index partition then
+     * the key range of the new index partition is increased. However, we will
+     * wind up submitting one request to the new index partition for each index
+     * partition that we knew about at the time that the procedure was first
+     * mapped across the index partitions.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class DataServiceProcedureTask implements Callable<Void> {
+    protected abstract class AbstractDataServiceProcedureTask implements Callable<Void> {
 
         protected final Split split;
         protected final IIndexProcedure proc;
         protected final IResultHandler resultHandler;
-
+        
         /**
          * A human friendly representation.
          */
@@ -1004,30 +1040,29 @@ public class ClientIndexView implements IIndex {
         }
 
         /**
+         * Variant used for procedures that are NOT instances of
+         * {@link IKeyArrayIndexProcedure}.
          * 
          * @param split
          * @param proc
          * @param resultHandler
-         * @param ctor
-         *            The object used to create the <i>proc</i> instance IFF
-         *            the <i>proc</i> is an {@link IKeyArrayIndexProcedure}.
-         *            This is used to re-split the data if necessary in response
-         *            to stale locator information.
          */
-        public DataServiceProcedureTask(Split split,
+        public AbstractDataServiceProcedureTask(Split split,
                 IIndexProcedure proc,
                 IResultHandler resultHandler
-//              IIndexProcedureConstructor ctor, FIXME re-split support.
         ) {
-
+            
             if (split.pmd == null)
                 throw new IllegalArgumentException();
             
+            if(!(split.pmd instanceof PartitionLocator)) {
+                
+                throw new IllegalArgumentException("Split does not have a locator");
+                
+            }
+
             if (proc == null)
                 throw new IllegalArgumentException();
-
-//            if (resultHandler == null)
-//                throw new IllegalArgumentException();
 
             this.split = split;
             
@@ -1036,14 +1071,34 @@ public class ClientIndexView implements IIndex {
             this.resultHandler = resultHandler;
             
         }
-
+        
         final public Void call() throws Exception {
 
             // the index partition locator.
-            final PartitionLocator pmd = (PartitionLocator) split.pmd;
+            final PartitionLocator locator = (PartitionLocator) split.pmd;
 
+            submit(locator);
+            
+            return null;
+
+        }
+
+        /**
+         * Submit the procedure to the {@link IDataService} identified by the
+         * locator.
+         * 
+         * @param locator
+         *            An index partition locator.
+         *            
+         * @throws Exception
+         */
+        final protected void submit(PartitionLocator locator) throws Exception {
+            
+            if (locator == null)
+                throw new IllegalArgumentException();
+            
             // resolve service UUID to data service.
-            final IDataService dataService = getDataService(pmd);
+            final IDataService dataService = getDataService(locator);
 
             // the name of the index partition.
             final String name = DataService.getIndexPartitionName(//
@@ -1072,8 +1127,6 @@ public class ClientIndexView implements IIndex {
                 }
                 
             }
-            
-            return null;
 
         }
         
@@ -1085,6 +1138,12 @@ public class ClientIndexView implements IIndex {
          *            The data service on which the procedure will be executed.
          * @param name
          *            The name of the index partition on that data service.
+         * 
+         * @todo do not require aggregator for {@link ISimpleIndexProcedure} so
+         *       make this abstract in the base class or just override for
+         *       {@link ISimpleIndexProcedure}. This would also mean that
+         *       {@link #call()} would return the value for
+         *       {@link ISimpleIndexProcedure}.
          */
         @SuppressWarnings("unchecked")
         protected void submit(IDataService dataService, String name) throws Exception {
@@ -1106,20 +1165,192 @@ public class ClientIndexView implements IIndex {
          * stale. We re-cache the locator(s) for the same key range as the index
          * partition which we thought we were addressing and then re-map the
          * operation against those updated locator(s). Note that a split will go
-         * from one locator to N locators for a key range while a merge will go
+         * from one locator to N locators for a key range while a join will go
          * from N locators for a key range to 1. A move does not change the #of
          * locators for the key range, just where that index partition is living
          * at this time.
          * 
          * @throws Exception
          */
-        protected void retry() throws Exception {
+        abstract protected void retry() throws Exception;
+
+    }
+
+    /**
+     * Class handles stale locators by finding the current locator for the
+     * <i>key</i> and redirecting the request to execute the procedure on the
+     * {@link IDataService} identified by that locator.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class SimpleDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+
+        protected final byte[] key;
+        
+        private int MAX_RETRIES = 3;
+        private int ntries = 1;
+        
+        /**
+         * @param key
+         * @param split
+         * @param proc
+         * @param resultHandler
+         */
+        public SimpleDataServiceProcedureTask(byte[] key, Split split,
+                ISimpleIndexProcedure proc, IResultHandler resultHandler) {
+
+            super(split, proc, resultHandler);
             
-            // FIXME Handle NoSuchIndexException
-            throw new UnsupportedOperationException();
+            if (key == null)
+                throw new IllegalArgumentException();
+        
+            this.key = key;
             
         }
 
+        /**
+         * The locator is stale. We locate the index partition that spans the
+         * {@link #key} and re-submit the request.
+         */
+        @Override
+        protected void retry() throws Exception {
+            
+            if (ntries++ > MAX_RETRIES)
+                throw new RuntimeException("Retry count exceeded: ntries="+ntries);
+
+            final PartitionLocator locator = getMetadataIndex().find(key);
+
+            log.warn("Retrying: proc=" + proc.getClass().getName()
+                    + ", locator=" + locator + ", ntries=" + ntries);
+
+            submit(locator);
+            
+        }
+        
+    }
+
+    /**
+     * Handles stale locators for {@link IKeyRangeIndexProcedure}s.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class KeyRangeDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+
+        final byte[] fromKey;
+        final byte[] toKey;
+        
+        /**
+         * @param fromKey
+         * @param toKey
+         * @param split
+         * @param proc
+         * @param resultHandler
+         */
+        public KeyRangeDataServiceProcedureTask(byte[] fromKey, byte[] toKey,
+                Split split, IKeyRangeIndexProcedure proc,
+                IResultHandler resultHandler) {
+
+            super(split, proc, resultHandler);
+            
+            /*
+             * Constrain the range to the index partition. This constraint will
+             * be used if we discover that the locator data was stale in order
+             * to discover the new locator(s).
+             */
+            
+            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(
+                    fromKey, split.pmd);
+
+            this.toKey = AbstractKeyRangeIndexProcedure.constrainFromKey(toKey,
+                    split.pmd);
+            
+        }
+
+        /**
+         * The {@link IKeyRangeIndexProcedure} is re-mapped for the constrained
+         * key range of the stale locator using
+         * {@link ClientIndexView#submit(byte[], byte[], IKeyRangeIndexProcedure, IResultHandler)}.
+         */
+        @Override
+        protected void retry() throws Exception {
+
+            //@todo place limit on #of recursive retries.
+            
+            ClientIndexView.this.submit(fromKey, toKey,
+                    (IKeyRangeIndexProcedure) proc, resultHandler);
+            
+        }
+        
+    }
+
+    /**
+     * Handles stale locators for {@link IKeyArrayIndexProcedure}s. When
+     * necessary the procedure will be re-split.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class KeyArrayDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
+
+        protected final byte[][] keys;
+        protected final byte[][] vals;
+        protected final AbstractIndexProcedureConstructor ctor;
+        
+        /**
+         * Variant used for {@link IKeyArrayIndexProcedure}s.
+         * 
+         * @param keys
+         *            The original keys[][].
+         * @param vals
+         *            The original vals[][].
+         * @param split
+         *            The split identifies the subset of keys and values to be
+         *            applied by this procedure.
+         * @param proc
+         *            The procedure instance.
+         * @param resultHandler
+         *            The result aggregator.
+         * @param ctor
+         *            The object used to create instances of the <i>proc</i>.
+         *            This is used to re-split the data if necessary in response
+         *            to stale locator information.
+         */
+        public KeyArrayDataServiceProcedureTask(byte[][] keys, byte[][] vals,
+                Split split, IKeyArrayIndexProcedure proc,
+                IResultHandler resultHandler, AbstractIndexProcedureConstructor ctor
+        ) {
+            
+            super( split, proc, resultHandler );
+            
+            if (ctor == null)
+                throw new IllegalArgumentException();
+
+            this.ctor = ctor;
+            
+            this.keys = keys;
+            
+            this.vals = vals;
+            
+        }
+
+        /**
+         * Submit using
+         * {@link ClientIndexView#submit(int, int, byte[][], byte[][], AbstractIndexProcedureConstructor, IResultHandler)}.
+         * This will recompute the split points and re-map the procedure across
+         * the newly determined split points.
+         */
+        @Override
+        protected void retry() throws Exception {
+
+            //@todo place limit on #of recursive retries.
+
+            ClientIndexView.this.submit(split.fromIndex, split.toIndex, keys,
+                    vals, ctor, resultHandler);
+            
+        }
+        
     }
     
     /**
@@ -1128,10 +1359,7 @@ public class ClientIndexView implements IIndex {
      * <p>
      * Find the partition for the first key. Check the last key, if it is in the
      * same partition then then this is the simplest case and we can just send
-     * the data along, perhaps breaking it down into smaller batches (note that
-     * batch break points MUST respect the "row" identity for a sparse row
-     * store, but we get that constraint by maintaining the index partition
-     * boundaries in agreement with the split point constraints for the index).
+     * the data along.
      * <p>
      * Otherwise, perform a binary search on the remaining keys looking for the
      * index of the first key GTE the right separator key for that partition.
@@ -1143,14 +1371,21 @@ public class ClientIndexView implements IIndex {
      * <p>
      * Examine the next key and repeat the process until all keys have been
      * allocated to index partitions.
+     * <p>
+     * Note: Split points MUST respect the "row" identity for a sparse row
+     * store, but we get that constraint by maintaining the index partition
+     * boundaries in agreement with the split point constraints for the index.
      * 
-     * @param ntuples
-     *            The #of keys.
+     * @param fromIndex
+     *            The index of the first key in <i>keys</i> to be processed
+     *            (inclusive).
+     * @param toIndex
+     *            The index of the last key in <i>keys</i> to be processed.
      * @param keys
      *            An array of keys. Each key is an interpreted as an unsigned
      *            byte[]. All keys must be non-null. The keys must be in sorted
      *            order.
-     *            
+     * 
      * @return The {@link Split}s that you can use to form requests based on
      *         the identified first/last key and partition identified by this
      *         process.
@@ -1158,23 +1393,41 @@ public class ClientIndexView implements IIndex {
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 
      * @see BytesUtil#compareBytes(byte[], byte[])
+     * 
+     * @todo Caching? This procedure performs the minimum #of lookups using
+     *       {@link IMetadataIndex#find(byte[])} since that operation will be an
+     *       RMI in a distributed federation. The find(byte[] key) operation is
+     *       difficult to cache since it locates the index partition that would
+     *       span the key and many, many different keys could fit into that same
+     *       index partition. The only effective cache technique may be an LRU
+     *       that scans ~10 caches locators to see if any of them is a match
+     *       before reaching out to the remote {@link IMetadataService}. Or
+     *       perhaps the locators can be cached in a local BTree and a miss
+     *       there would result in a read through to the remote
+     *       {@link IMetadataService} but then we have the problem of figuring
+     *       out when to release locators if the client is long-lived.
      */
-    public List<Split> splitKeys(int ntuples, byte[][] keys) {
+    public List<Split> splitKeys(final int fromIndex, final int toIndex,
+            final byte[][] keys) {
+
+        assert keys != null;
         
-        if (ntuples <= 0)
-            throw new IllegalArgumentException();
+        assert fromIndex >= 0;
+        assert fromIndex < toIndex;
+
+        assert toIndex <= keys.length;
         
-        List<Split> splits = new LinkedList<Split>();
+        final List<Split> splits = new LinkedList<Split>();
         
         // start w/ the first key.
-        int fromIndex = 0;
-
-        while (fromIndex < ntuples) {
+        int currentIndex = fromIndex;
         
-            // partition spanning that key.
-            final PartitionLocator pmd = getMetadataIndex().find(keys[fromIndex]);
+        while (currentIndex < toIndex) {
+                
+            // partition spanning the current key (RMI)
+            final PartitionLocator locator = getMetadataIndex().find(keys[currentIndex]);
 
-            final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
+            final byte[] rightSeparatorKey = locator.getRightSeparatorKey();
 
             if (rightSeparatorKey == null) {
 
@@ -1183,11 +1436,11 @@ public class ClientIndexView implements IIndex {
                  * will absorb any keys that order GTE to its left separator
                  * key.
                  */
-                final int toIndex = ntuples;
 
-                splits.add(new Split(pmd, fromIndex, toIndex));
+                splits.add(new Split(locator, currentIndex, toIndex));
 
-                fromIndex = toIndex;
+                // done.
+                currentIndex = toIndex;
 
             } else {
 
@@ -1195,20 +1448,21 @@ public class ClientIndexView implements IIndex {
                  * Otherwise this partition has an upper bound, so figure out
                  * the index of the last key that would go into this partition.
                  */
-                int toIndex = BytesUtil.binarySearch(keys, fromIndex, ntuples
-                        - fromIndex, rightSeparatorKey);
+                int pos = BytesUtil.binarySearch(keys, currentIndex, toIndex
+                        - currentIndex, rightSeparatorKey);
 
-                if (toIndex < 0) {
+                if (pos < 0) {
 
-                    toIndex = -toIndex - 1;
+                    pos = -pos - 1;
 
                 }
 
-                assert toIndex > fromIndex;
+                assert pos > currentIndex && pos <= toIndex : "Expected pos in ["
+                        + currentIndex + ":" + toIndex + ") but pos=" + pos;
 
-                splits.add(new Split(pmd, fromIndex, toIndex));
+                splits.add(new Split(locator, currentIndex, pos));
 
-                fromIndex = toIndex;
+                currentIndex = pos;
 
             }
 
@@ -1264,46 +1518,6 @@ public class ClientIndexView implements IIndex {
     public IResourceMetadata[] getResourceMetadata() {
         
         throw new UnsupportedOperationException();
-        
-    }
-
-    /**
-     * Hands back the object visited for a single index partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    @SuppressWarnings("unused")
-    private static class IdentityHandler implements IResultHandler<Object, Object> {
-
-        int nvisited = 0;
-        private Object ret;
-        
-        public void aggregate(Object result, Split split) {
-
-            if (nvisited != 0) {
-            
-                /*
-                 * You can not use this handler if the procedure is mapped over
-                 * more than one split.
-                 */
-                
-                throw new UnsupportedOperationException();
-
-            }
-            
-            this.ret = result;
-            
-            nvisited++;
-            
-            
-        }
-
-        public Object getResult() {
-
-            return ret;
-            
-        }
         
     }
 

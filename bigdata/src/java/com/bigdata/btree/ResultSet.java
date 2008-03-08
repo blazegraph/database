@@ -27,7 +27,6 @@ package com.bigdata.btree;
 import it.unimi.dsi.mg4j.io.InputBitStream;
 import it.unimi.dsi.mg4j.io.OutputBitStream;
 
-import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +38,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IDataSerializer.DefaultDataSerializer;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -67,9 +66,9 @@ public class ResultSet implements Externalizable {
 
     private byte[] lastKey;
 
-    private byte[][] keys;
+    private RandomAccessByteArray keys;
 
-    private byte[][] vals;
+    private RandomAccessByteArray vals;
 
     private long[] versionTimestamps;
     
@@ -79,18 +78,24 @@ public class ResultSet implements Externalizable {
     
     private IResourceMetadata[] sources;
     
+    private long commitTime;
+    
     /**
      * Total #of key-value pairs within the key range (approximate).
      */
     public int getRangeCount() {
+       
         return rangeCount;
+        
     }
 
     /**
      * Actual #of key-value pairs in the {@link ResultSet}
      */
     final public int getNumTuples() {
+        
         return ntuples;
+        
     }
 
     /**
@@ -99,7 +104,9 @@ public class ResultSet implements Externalizable {
      * {@link #lastKey}.
      */
     public boolean isExhausted() {
+        
         return exhausted;
+        
     }
 
     /**
@@ -110,7 +117,9 @@ public class ResultSet implements Externalizable {
      * @see #successor()
      */
     public byte[] getLastKey() {
+        
         return lastKey;
+        
     }
 
     /**
@@ -134,23 +143,35 @@ public class ResultSet implements Externalizable {
 
     }
 
-    /**
-     * The visited keys iff the keys were requested.
-     */
-    public byte[][] getKeys() {
+//    /**
+//     * The visited keys iff the keys were requested.
+//     */
+//    public byte[][] getKeys() {
+//        
+//        return keys;
+//        
+//    }
+    
+    public byte[] getKey(int index) {
         
-        return keys;
+        return keys.getKey(index);
         
     }
 
-    /**
-     * The visited values iff the values were requested.
-     */
-    public byte[][] getValues() {
+    public byte[] getValue(int index) {
         
-        return vals;
+        return vals.getKey(index);
         
     }
+    
+//    /**
+//     * The visited values iff the values were requested.
+//     */
+//    public byte[][] getValues() {
+//        
+//        return vals;
+//        
+//    }
 
     /**
      * The visited version timestamps iff the index maintains version
@@ -195,6 +216,21 @@ public class ResultSet implements Externalizable {
         return sourceIndices[index];
         
     }
+
+    /**
+     * Return the commitTime of the index view from which this result set was
+     * read. This may be used to force a {@link ITx#UNISOLATED} or
+     * {@link ITx#READ_COMMITTED} chunked iterator to produce a consistent view
+     * by issuing continuation queries for the commitTime that was returned by
+     * the initial {@link ResultSet}.
+     * 
+     * @return
+     */
+    public long getCommitTime() {
+
+        return commitTime;
+        
+    }
     
     /**
      * Deserialization constructor.
@@ -203,28 +239,38 @@ public class ResultSet implements Externalizable {
     }
 
     /**
-     * Return the object used to (de-)serialize the keys.
-     * <p>
-     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
-     * be overriden to use custom serialization or compression of the keys.
+     * Set automatically based on the {@link IndexMetadata}.
      */
-    protected IDataSerializer getKeySerializer() {
-
-        return new DefaultDataSerializer();
-
-    }
+    private IDataSerializer keySerializer;
 
     /**
-     * Return the object used to (de-)serialize the values.
-     * <p>
-     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
-     * be overriden to use custom serialization or compression of the values.
+     * Set automatically based on the {@link IndexMetadata}.
      */
-    protected IDataSerializer getValSerializer() {
-
-        return new DefaultDataSerializer();
-
-    }
+    private IDataSerializer valSerializer;
+    
+//    /**
+//     * Return the object used to (de-)serialize the keys.
+//     * <p>
+//     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
+//     * be overriden to use custom serialization or compression of the keys.
+//     */
+//    protected IDataSerializer getKeySerializer() {
+//
+//        return new DefaultDataSerializer();
+//
+//    }
+//
+//    /**
+//     * Return the object used to (de-)serialize the values.
+//     * <p>
+//     * Note: This returns the {@link DefaultDataSerializer} by default and MAY
+//     * be overriden to use custom serialization or compression of the values.
+//     */
+//    protected IDataSerializer getValSerializer() {
+//
+//        return new DefaultDataSerializer();
+//
+//    }
 
     /**
      * Return the ordered array of sources from which the iterator read and the
@@ -264,35 +310,45 @@ public class ResultSet implements Externalizable {
 
         final int limit = (rangeCount > capacity ? capacity : rangeCount);
 
-        int ntuples = 0;
+//        int ntuples = 0;
 
         final boolean sendKeys = (flags & IRangeQuery.KEYS) != 0;
 
         final boolean sendVals = (flags & IRangeQuery.VALS) != 0;
 
-        keys = (sendKeys ? new byte[limit][] : null);
+        keys = (sendKeys ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
 
-        vals = (sendVals ? new byte[limit][] : null);
+        vals = (sendVals ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
         
-        if(ndx.getIndexMetadata().getDeleteMarkers()) {
+        final IndexMetadata indexMetadata = ndx.getIndexMetadata();
+        
+        if(indexMetadata.getDeleteMarkers()) {
             
             // index has delete markers so we send them along.
             deleteMarkers = new byte[limit];
             
         }
 
-        if(ndx.getIndexMetadata().getVersionTimestamps()) {
+        if(indexMetadata.getVersionTimestamps()) {
 
             // index has version timestamps so we send them along.
             versionTimestamps = new long[limit];
 
         }
 
+        keySerializer = indexMetadata.getLeafKeySerializer();
+        
+        valSerializer = indexMetadata.getValueSerializer();
+        
         sources = ndx.getResourceMetadata();
 
-        // if one source then the index is always zero.
+        // if one source then the index is always zero @todo presumes #sources in view <= 127
         sourceIndices = sources.length > 1 ? new byte[limit] : null;
 
+        commitTime = (ndx instanceof AbstractBTree ? ((AbstractBTree) ndx)
+                .getLastCommitTime() : ((FusedView) ndx).srcs[0]
+                .getLastCommitTime());
+        
         /*
          * Iterator that will visit the key range.
          * 
@@ -331,11 +387,11 @@ public class ResultSet implements Externalizable {
 
             tuple = itr.next();
             
-            if (sendKeys)
-                keys[ntuples] = tuple.getKey();
+            if (sendKeys) // @todo define and use copyKey(ITuple)?
+                keys.add(tuple.getKey());
 
-            if (sendVals)
-                vals[ntuples] = tuple.getValue();
+            if (sendVals) // @todo define and use copyValue(ITuple)?
+                vals.add(tuple.getValue());
 
             if (deleteMarkers != null) {
 
@@ -365,7 +421,7 @@ public class ResultSet implements Externalizable {
 
         }
 
-        this.ntuples = ntuples;
+//        this.ntuples = ntuples;
 
         this.lastKey = (anything ? tuple.getKey() : null);
 
@@ -375,7 +431,8 @@ public class ResultSet implements Externalizable {
                 + ", exhausted=" + exhausted + ", sendKeys=" + sendKeys
                 + ", sendVals=" + sendVals + ", deleteMarkers="
                 + (deleteMarkers != null ? true : false) + ", timestamps="
-                + (versionTimestamps != null ? true : false));
+                + (versionTimestamps != null ? true : false) + ", commitTime="
+                + commitTime);
 
     }
 
@@ -393,6 +450,8 @@ public class ResultSet implements Externalizable {
 
         ntuples = (int) LongPacker.unpackLong(in);
 
+        commitTime = in.readLong();
+        
         final int nsources = (int) LongPacker.unpackLong(in);
 
         sources = new IResourceMetadata[nsources];
@@ -421,6 +480,10 @@ public class ResultSet implements Externalizable {
 
         }
         
+        keySerializer = (IDataSerializer)in.readObject();
+
+        valSerializer = (IDataSerializer)in.readObject();
+        
 // if (ntuples == 0) {
 //
 //            // Nothing more to read.
@@ -430,13 +493,15 @@ public class ResultSet implements Externalizable {
 //        }
         
         if (haveKeys) {
-            keys = getKeySerializer().read(in);
+            keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
+            keySerializer.read(in, keys);
         } else {
             keys = null;
         }
 
         if (haveVals) {
-            vals = getValSerializer().read(in);
+            vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
+            valSerializer.read(in, vals);
         } else {
             vals = null;
         }
@@ -475,7 +540,7 @@ public class ResultSet implements Externalizable {
             
             sourceIndices = new byte[ntuples];
             
-            // FIXME use a compressed encoding, e.g., bit length or huffman.
+            // @todo use a compressed encoding, e.g., bit length or huffman.
             for(int i=0; i<ntuples; i++) {
                 
                 sourceIndices[i] = in.readByte();
@@ -493,40 +558,44 @@ public class ResultSet implements Externalizable {
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        DataOutput dos = out;
+        ShortPacker.packShort(out, VERSION0);
 
-        ShortPacker.packShort(dos, VERSION0);
+        LongPacker.packLong(out, rangeCount);
 
-        LongPacker.packLong(dos, rangeCount);
+        LongPacker.packLong(out, ntuples);
 
-        LongPacker.packLong(dos, ntuples);
-
-        LongPacker.packLong(dos, sources.length);
+        out.writeLong(commitTime);
+        
+        LongPacker.packLong(out, sources.length);
 
         // @todo write as bits?
-        dos.writeBoolean(exhausted);
+        out.writeBoolean(exhausted);
 
-        dos.writeBoolean(keys != null);
+        out.writeBoolean(keys != null);
 
-        dos.writeBoolean(vals != null);
+        out.writeBoolean(vals != null);
 
-        dos.writeBoolean(deleteMarkers != null);
+        out.writeBoolean(deleteMarkers != null);
         
-        dos.writeBoolean(versionTimestamps != null);
-
-        LongPacker.packLong(dos, lastKey == null ? 0 : lastKey.length);
+        out.writeBoolean(versionTimestamps != null);
+        
+        LongPacker.packLong(out, lastKey == null ? 0 : lastKey.length);
 
         if (lastKey != null) {
 
-            dos.write(lastKey);
+            out.write(lastKey);
 
         }
 
         for (int i = 0; i < sources.length; i++) {
 
-                out.writeObject(sources[i]);
+            out.writeObject(sources[i]);
 
         }
+        
+        out.writeObject(keySerializer);
+
+        out.writeObject(valSerializer);
         
 // if (ntuples == 0) {
 //
@@ -538,13 +607,13 @@ public class ResultSet implements Externalizable {
             
         if (keys != null) {
 
-            getKeySerializer().write(ntuples, 0/*offset*/, keys, out);
-
+            keySerializer.write(out, keys);
+            
         }
 
         if (vals != null) {
 
-            getValSerializer().write(ntuples, 0/*offset*/, vals, out);
+            valSerializer.write(out, vals);
 
         }
         
@@ -561,7 +630,8 @@ public class ResultSet implements Externalizable {
         /*
          * @todo reuse the timestamp serialization logic from the NodeSerializer
          * once something efficient has been identifier, e.g., huffman encoding
-         * of timestamps.
+         * of timestamps.  @todo config on IndexMetadata along with serialization
+         * for the deletemarkers.
          */
 
         if (versionTimestamps != null) {

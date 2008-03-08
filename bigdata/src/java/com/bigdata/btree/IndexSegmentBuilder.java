@@ -416,13 +416,16 @@ public class IndexSegmentBuilder {
                  * BTree, not on the IndexSegment.
                  */
 
-                this.metadata.setPartitionMetadata(//
+                this.metadata.setPartitionMetadata(
                         new LocalPartitionMetadata(//
                                 pmd.getPartitionId(),//
                                 pmd.getLeftSeparatorKey(),//
                                 pmd.getRightSeparatorKey(),//
-                                null // No resource metadata.
-                        ));
+                                null, // No resource metadata.
+                                pmd.getHistory()+
+                                "build("+pmd.getPartitionId()+") "
+                        )
+                        );
                 
             }
             
@@ -544,10 +547,8 @@ public class IndexSegmentBuilder {
                     plan.m,
                     0, /*initialBufferCapacity - will be estimated. */
                     AddressSerializer.INSTANCE, // FIXME Packed address serializer.
-                    metadata.getKeySerializer(),
-                    metadata.getValueSerializer(),
-                    metadata.getRecordCompressor(),
-                    metadata.getUseChecksum()
+                    metadata, //
+                    false     // isFullyBuffered
                     );
 
             elapsed_setup = System.currentTimeMillis() - begin_setup;

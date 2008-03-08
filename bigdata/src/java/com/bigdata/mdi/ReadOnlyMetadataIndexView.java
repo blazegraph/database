@@ -33,6 +33,7 @@ import java.util.Iterator;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.DelegateIndex;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndexProcedure;
@@ -41,7 +42,6 @@ import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.ReadOnlyEntryIterator;
-import com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor;
 import com.bigdata.service.EmbeddedBigdataFederation;
 import com.bigdata.service.Split;
 
@@ -167,14 +167,14 @@ public class ReadOnlyMetadataIndexView extends MetadataIndexView {
      * not the {@link DelegateIndex}.
      */
     @SuppressWarnings("unchecked")
-    final public void submit(int n, byte[][] keys, byte[][] vals,
-            IIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
+            AbstractIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(n, 0/* offset */, keys, vals).apply(this);
+        Object result = ctor.newInstance(this,fromIndex,toIndex, keys, vals).apply(this);
         
         if(aggregator != null) {
 
-            aggregator.aggregate(result, new Split(null,0,n));
+            aggregator.aggregate(result, new Split(null,fromIndex,toIndex));
             
         }
         

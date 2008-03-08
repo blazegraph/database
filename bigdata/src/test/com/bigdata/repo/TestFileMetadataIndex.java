@@ -402,12 +402,15 @@ public class TestFileMetadataIndex extends AbstractRepositoryTestCase {
         /*
          * Verify that you can still read back the file version data using a
          * historical view of the file data index whose commit time is less than
-         * version1's timestamp.
+         * or equal to version1's timestamp. If it is equal then you will be
+         * reading from the last state of the prior version. If it is less than
+         * then you may be reading from some historical state of the prior
+         * version.
          */
         {
 
             // the timestamp before the version was deleted.
-            final long timestamp = a[1].getTimestamp() - 1;
+            final long timestamp = a[1].getTimestamp();
             
             // verify read back.
             assertEquals("version0", expected0, read(repo.inputStream(id,

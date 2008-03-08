@@ -36,8 +36,11 @@ import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
+import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
@@ -148,7 +151,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
     }
     
-    private class RegisterIndexTask implements Callable<Object> {
+    private abstract class RegisterIndexTask implements Callable<Object> {
      
         final String name;
         
@@ -156,41 +159,112 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
             this.name = name;
         }
         
+        protected IndexMetadata getIndexMetadata() {
+            
+            IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+
+            metadata.setBranchingFactor(branchingFactor);
+            
+            return metadata;
+            
+        }
+        
         public Object call() throws Exception {
             
-//            IKeySerializer keySer = KeyBufferSerializer.INSTANCE;
-//            
-//            IValueSerializer valSer = ByteArrayValueSerializer.INSTANCE;
-            
-//            if(name.equals(name_spo)||name.equals(name_pos)||name.equals(name_osp)) {
-//                
-//                keySer = new WrappedKeySerializer(new FastRDFKeyCompression(N));
-//                
-//                valSer = new ValueSerializer(new FastRDFValueCompression());
-//                
-//            }
-
-            /*
-             * FIXME make sure custom key/val serializers are always specified
-             * for statement indices and that the value serializer is a NOP for
-             * the full text and justifications indices.
-             */
-            IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-            
-            dataService.registerIndex(name, metadata);
-            
-//            dataService
-//                    .registerIndex(
-//                            name,
-//                            UUID.randomUUID(),
-//                            new UnisolatedBTreeConstructor(branchingFactor,
-//                                    keySer, valSer, null/* conflictResolver */),
-//                            null/* pmd */);
+            dataService.registerIndex(name, getIndexMetadata());
             
             return null;
             
         }
 
+    }
+
+    private class RegisterTermIdIndexTask extends RegisterIndexTask {
+
+        public RegisterTermIdIndexTask(String name) {
+            super(name);
+        }
+
+        protected IndexMetadata getIndexMetadata() {
+            
+            final IndexMetadata metadata = super.getIndexMetadata();
+
+            return metadata;
+            
+        }
+        
+    }
+    
+    private class RegisterIdTermIndexTask extends RegisterIndexTask {
+
+        public RegisterIdTermIndexTask(String name) {
+            super(name);
+        }
+
+        protected IndexMetadata getIndexMetadata() {
+            
+            final IndexMetadata metadata = super.getIndexMetadata();
+
+            return metadata;
+            
+        }
+        
+    }
+    
+    private class RegisterFreeTextIndexTask extends RegisterIndexTask {
+
+        public RegisterFreeTextIndexTask(String name) {
+            super(name);
+        }
+
+        protected IndexMetadata getIndexMetadata() {
+            
+            final IndexMetadata metadata = super.getIndexMetadata();
+            
+            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+
+            return metadata;
+            
+        }
+        
+    }
+    
+    private class RegisterStatementIndexTask extends RegisterIndexTask {
+
+        public RegisterStatementIndexTask(String name) {
+            super(name);
+        }
+
+        protected IndexMetadata getIndexMetadata() {
+         
+            final IndexMetadata metadata = super.getIndexMetadata();
+            
+            metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
+            
+            metadata.setValueSerializer(new FastRDFValueCompression());
+
+            return metadata;
+            
+        }
+        
+    }
+    
+    private class RegisterJustIndexTask extends RegisterIndexTask {
+
+        public RegisterJustIndexTask(String name) {
+            super(name);
+        }
+
+        protected IndexMetadata getIndexMetadata() {
+            
+            final IndexMetadata metadata = super.getIndexMetadata();
+            
+            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+
+            return metadata;
+            
+        }
+        
     }
     
     /**
@@ -206,13 +280,13 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
         if (lexicon) {
 
-            tasks.add(new RegisterIndexTask(name_termId));
+            tasks.add(new RegisterTermIdIndexTask(name_termId));
 
-            tasks.add(new RegisterIndexTask(name_idTerm));
+            tasks.add(new RegisterIdTermIndexTask(name_idTerm));
 
             if (textIndex) {
 
-                tasks.add(new RegisterIndexTask(name_freeText));
+                tasks.add(new RegisterFreeTextIndexTask(name_freeText));
 
             }
 
@@ -220,21 +294,21 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
         if (oneAccessPath) {
 
-            tasks.add(new RegisterIndexTask(name_spo));
+            tasks.add(new RegisterStatementIndexTask(name_spo));
 
         } else {
 
-            tasks.add(new RegisterIndexTask(name_spo));
+            tasks.add(new RegisterStatementIndexTask(name_spo));
 
-            tasks.add(new RegisterIndexTask(name_pos));
+            tasks.add(new RegisterStatementIndexTask(name_pos));
 
-            tasks.add(new RegisterIndexTask(name_osp));
+            tasks.add(new RegisterStatementIndexTask(name_osp));
 
         }
 
         if (justify) {
 
-            tasks.add(new RegisterIndexTask(name_just));
+            tasks.add(new RegisterJustIndexTask(name_just));
 
         }
 

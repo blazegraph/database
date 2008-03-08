@@ -201,8 +201,8 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
      * sequences known to the unit test. The correct behavior of the
      * {@link Leaf#entryIterator()} is also tested.
      * 
-     * @see Leaf#insert(int, com.bigdata.btree.TestBTree.SimpleEntry)
-     * @see Leaf#lookup(int)
+     * @see Leaf#insert(byte[], byte[], boolean, long, Tuple)
+     * @see Leaf#lookup(byte[], Tuple)
      * @see Leaf#entryIterator()
      */
     public void test_insertKeyIntoLeaf03() {

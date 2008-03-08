@@ -34,10 +34,11 @@ import java.util.Iterator;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractChunkedRangeIterator;
-import com.bigdata.btree.BatchRemove;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 
@@ -48,6 +49,8 @@ import com.bigdata.rawstore.IBlock;
  * <p>
  * Note: This class exists mainly to support caching of the remove metadata
  * index, which does not use index partitions, by the bigdata federation.
+ * 
+ * @todo write tests for read-consistent.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -75,7 +78,10 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      * Note: Be careful when using this field since you take on responsibilty
      * for handling index partition splits, joins, and moves!
      * 
-     * @todo this should failover if a data service dies.
+     * @todo this should failover if a data service dies. we need the logical
+     *       data service UUID for that and we need to have (or discover) the
+     *       service that maps logical data service UUIDs to physical data
+     *       service UUIDs
      */
     protected final IDataService dataService;
     
@@ -85,10 +91,15 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
     protected final String name;
     
     /**
-     * The transaction identifier -or- zero iff the request is unisolated.
+     * From the ctor.
      */
-    protected final long tx;
+    private final long timestamp;
 
+    /**
+     * From the ctor.
+     */
+    private final boolean readConsistent;
+    
     /**
      * 
      * @param dataService
@@ -103,8 +114,8 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
      * @param filter
      */
     public RawDataServiceRangeIterator(IDataService dataService, String name,
-            long timestamp, byte[] fromKey, byte[] toKey, int capacity, int flags,
-            ITupleFilter filter) {
+            long timestamp, boolean readConsistent, byte[] fromKey,
+            byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -126,27 +137,41 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
             
         }
 
+        if (timestamp == ITx.UNISOLATED && readConsistent) {
+            
+            throw new IllegalArgumentException(
+                    "Read-consistent not available for unisolated operations");
+            
+        }
+
         this.dataService = dataService;
         
         this.name = name;
         
-        this.tx = timestamp;
+        this.timestamp = timestamp;
+        
+        this.readConsistent = readConsistent;
 
     }
 
     /**
      * Atomic operation caches a chunk of results from an {@link IDataService}.
+     * <P>
+     * Note: This uses the <i>timestamp</i> specified by the caller NOT the
+     * {@link #timestamp} value stored by this class. This allows us to have
+     * read-consistent semantics if desired for {@link ITx#UNISOLATED} or 
+     * {@link ITx#READ_COMMITTED} operations.
      */
     @Override
-    protected ResultSet getResultSet(byte[] _fromKey, byte[] toKey, int capacity,
+    protected ResultSet getResultSet(long timestamp, byte[] _fromKey, byte[] toKey, int capacity,
             int flags, ITupleFilter filter) {
 
         log.info("name=" + name + ", fromKey=" + BytesUtil.toString(_fromKey)
                 + ", toKey=" + BytesUtil.toString(toKey)+", dataService="+dataService);
 
         try {
-            
-            return dataService.rangeIterator(tx, name, _fromKey, toKey,
+
+            return dataService.rangeIterator(timestamp, name, _fromKey, toKey,
                     capacity, flags, filter);
             
         } catch (Exception e) {
@@ -172,8 +197,11 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
         
         try {
 
-            dataService.submit(tx, name, new BatchRemove(n, 0/* offset */,
-                keys, false/* returnOldValues */));
+            // Note: default key serializer is used.
+            dataService.submit(timestamp, name,
+                    BatchRemoveConstructor.RETURN_NO_VALUES
+                            .newInstance(0/* fromIndex */, n/* toIndex */, keys,
+                                    null/*vals*/));
 
         } catch (Exception e) {
             
@@ -188,8 +216,11 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
 
         try {
             
-            dataService.submit(tx, name, new BatchRemove(1, 0/* offset */,
-                    new byte[][] { key }, false/* returnOldValues */));
+            // Note: default key serializer is used.
+            dataService.submit(timestamp, name,
+                    BatchRemoveConstructor.RETURN_NO_VALUES.newInstance(
+                            0/* fromIndex */, 1/* toIndex */,
+                            new byte[][] { key }, null/*vals*/));
 
         } catch (Exception e) {
             
@@ -213,6 +244,20 @@ public class RawDataServiceRangeIterator extends AbstractChunkedRangeIterator {
             throw new RuntimeException(e);
             
         }
+        
+    }
+
+    @Override
+    final protected long getTimestamp() {
+     
+        return timestamp;
+        
+    }
+
+    @Override
+    final public boolean getReadConsistent() {
+        
+        return readConsistent;
         
     }
     

@@ -37,6 +37,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.repo.BigdataRepository.Options;
+import com.bigdata.resources.ResourceManager;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data
@@ -79,6 +80,9 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         // when the data are persistent use the test to name the data directory.
         properties.setProperty(EmbeddedBigdataFederation.Options.DATA_DIR,
                 getName());
+        
+        // disable moves.
+        properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
         
         return properties;
         
