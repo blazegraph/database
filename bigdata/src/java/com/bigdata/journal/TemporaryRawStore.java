@@ -67,9 +67,9 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
 
     protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
     
-    protected final static int DEFAULT_INITIAL_IN_MEMORY_EXTENT = Bytes.megabyte32 * 10;
+    protected final static int DEFAULT_INITIAL_IN_MEMORY_EXTENT = Bytes.megabyte32 * 1;
 
-    protected final static int DEFAULT_MAXIMUM_IN_MEMORY_EXTENT = Bytes.megabyte32 * 100;
+    protected final static int DEFAULT_MAXIMUM_IN_MEMORY_EXTENT = Bytes.megabyte32 * 10;
     
     /**
      * The initial size of the in-memory buffer. This buffer will grow as
@@ -212,10 +212,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
 
     /**
      * Note: This operation is a NOP since {@link #close()} always deletes the
-     * backing file and {@link #destroyAllResources()} requires that the store is closed as a
+     * backing file and {@link #deleteResources()} requires that the store is closed as a
      * pre-condition.
      */
-    public void destroyAllResources() {
+    public void deleteResources() {
         
         if(open) throw new IllegalStateException();
         

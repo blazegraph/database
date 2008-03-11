@@ -49,6 +49,8 @@ import com.bigdata.btree.IndexMetadata;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated unless and until {@link SequenceTask} is back in good graces.
  */
 public class TestSequenceTask extends ProxyTestCase {
 
@@ -88,12 +90,13 @@ public class TestSequenceTask extends ProxyTestCase {
         
         final UUID indexUUID = UUID.randomUUID();
         
-        Future<Object> future = journal.submit(SequenceTask.newSequence(
-                
-                new AbstractTask[] {
-
-                new RegisterIndexTask(journal,resource[0], new IndexMetadata(
-                        resource[0], indexUUID)),
+        Future<Object> future = journal.submit(
+//                SequenceTask.newSequence(
+//                
+//                new AbstractTask[] {
+//
+//                new RegisterIndexTask(journal,resource[0], new IndexMetadata(
+//                        resource[0], indexUUID)),
                                 
                 new AbstractTask(journal, ITx.UNISOLATED, resource) {
 
@@ -104,6 +107,8 @@ public class TestSequenceTask extends ProxyTestCase {
                      */
                     protected Object doTask() throws Exception {
 
+                        getJournal().registerIndex(resource[0], new IndexMetadata(resource[0],indexUUID));
+                        
                         ran.compareAndSet(false, true);
                         
                         return getOnlyResource();
@@ -111,7 +116,8 @@ public class TestSequenceTask extends ProxyTestCase {
                     }
                 }
                 
-        }));
+//        })
+        );
 
         // the test task returns the resource as its value.
         assertEquals("result", //
@@ -137,7 +143,7 @@ public class TestSequenceTask extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.destroyAllResources();
+        journal.deleteResources();
 
     }
 
@@ -233,7 +239,7 @@ public class TestSequenceTask extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.destroyAllResources();
+        journal.deleteResources();
 
     }
 

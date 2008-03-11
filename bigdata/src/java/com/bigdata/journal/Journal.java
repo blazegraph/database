@@ -578,18 +578,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     
     /**
-     * Note: This implementation does not handle overflow of the journal and
-     * always returns <code>false</code>. As a consequence the journal
-     * capacity will simply be extended by {@link #write(ByteBuffer)} until the
-     * available disk space is exhausted.
+     * Note: This implementation always returns <code>false</code>. As a
+     * consequence the journal capacity will simply be extended by
+     * {@link #write(ByteBuffer)} until the available disk space is exhausted.
      * 
-     * @return This implementation returns <code>false</code> since it does
-     *         NOT open a new journal.
+     * @return This implementation returns <code>false</code> since overflow
+     *         is NOT supported.
      */
-    public boolean overflow(boolean forceOverflow, boolean exclusiveLock) {
+    public boolean shouldOverflow() {
 
         return false;
 
+    }
+    
+    public Future<Object> overflow() {
+        
+        throw new UnsupportedOperationException();
+        
     }
 
     /**

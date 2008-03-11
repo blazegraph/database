@@ -158,7 +158,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
     }
 
@@ -282,7 +282,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
 
     }
     
@@ -309,23 +309,28 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 
         properties.setProperty(Options.WRITE_SERVICE_QUEUE_CAPACITY, "100");
         
-        Result result = doComparisonTest(properties);
-            
-        /*
-         * Note: You SHOULD expect 80%+ of the tasks to participate in each
-         * commit group. However, the actual number can be lower due to various
-         * startup costs so sometimes this test will fail - it is really a
-         * stress test and should be done once the store is up and running
-         * already.
-         */
+//        Result result = 
+            doComparisonTest(properties);
 
-        final double tasksPerCommit = Double.parseDouble(result.get("tasks/commit"));
-        
-        assertTrue(
-                "average group commit size is too small? size="
-                        + tasksPerCommit + ", corePoolSize="
-                        + writeServiceCorePoolSize,
-                tasksPerCommit > writeServiceCorePoolSize * .5);
+        /*
+         * Note: This is not true any more since group commit does not need to
+         * wait for running tasks.
+         */
+//        /*
+//         * Note: You SHOULD expect 80%+ of the tasks to participate in each
+//         * commit group. However, the actual number can be lower due to various
+//         * startup costs so sometimes this test will fail - it is really a
+//         * stress test and should be done once the store is up and running
+//         * already.
+//         */
+//
+//        final double tasksPerCommit = Double.parseDouble(result.get("tasks/commit"));
+//        
+//        assertTrue(
+//                "average group commit size is too small? size="
+//                        + tasksPerCommit + ", corePoolSize="
+//                        + writeServiceCorePoolSize,
+//                tasksPerCommit > writeServiceCorePoolSize * .5);
         
     }
 
@@ -385,15 +390,18 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
             
             final UUID indexUUID = UUID.randomUUID();
             
-            tasks.add( SequenceTask.newSequence(new AbstractTask[]{
+            tasks.add( 
+//                    SequenceTask.newSequence(new AbstractTask[]{
 
-                    new RegisterIndexTask(journal, resource, 
-                            new IndexMetadata(resource, indexUUID)),
+//                    new RegisterIndexTask(journal, resource, 
+//                            new IndexMetadata(resource, indexUUID)),
 
                     new AbstractTask(journal, ITx.UNISOLATED, resource) {
                         
                         protected Object doTask() throws Exception {
 
+                            getJournal().registerIndex(resource, new IndexMetadata(resource, indexUUID));
+                            
                             if(ninsert>0) {
 
                                 KeyBuilder keyBuilder = new KeyBuilder(4);
@@ -416,7 +424,8 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                         }
 
                     }
-            }));
+//            })
+        );
 
         }
 
@@ -506,7 +515,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
         return result;
         

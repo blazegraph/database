@@ -134,6 +134,19 @@ public class Checkpoint implements Externalizable {
         return counter;
         
     }
+
+    /**
+     * A human readable representation of the state of the {@link Checkpoint}
+     * record.
+     */
+    public final String toString() {
+
+        return "Checkpoint{height=" + height + ",nnodes=" + nnodes
+                + ",nleaves=" + nleaves + ",nentries=" + nentries + ",counter="
+                + counter + ",addrRoot=" + addrRoot + ",addrMetadata="
+                + addrMetadata + ",addrCheckpoint=" + addrCheckpoint + "}";
+        
+    }
     
     /**
      * De-serialization ctor.

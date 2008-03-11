@@ -128,7 +128,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             assertEquals("commitCount", 0,
                     journal.getConcurrencyManager().writeService
-                            .getCommitCount());
+                            .getGroupCommitCount());
 
             /*
              * Submit a task that waits for 10 seconds or until interrupted. It
@@ -180,7 +180,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
             while (journal.getConcurrencyManager().writeService.getAbortCount() == 0
                     && journal.getConcurrencyManager().writeService
-                            .getCommitCount() == 0) {
+                            .getGroupCommitCount() == 0) {
                 
                 Thread.sleep(10);
                 
@@ -193,7 +193,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             // did not commit.
             assertEquals("commitCount", 0,
-                    journal.getConcurrencyManager().writeService.getCommitCount());
+                    journal.getConcurrencyManager().writeService.getGroupCommitCount());
             
             /*
              * write on the store and flush the store to disk in order to provoke an

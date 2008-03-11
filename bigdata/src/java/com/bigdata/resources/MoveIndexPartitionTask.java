@@ -193,7 +193,7 @@ public class MoveIndexPartitionTask extends AbstractTask {
          */
         targetDataService.submit(ITx.UNISOLATED, targetIndexName,
                 new CopyIndexPartitionProcedure(sourceDataServiceUUIDs,
-                        sourceIndexName,lastCommitTime));
+                        sourceIndexName,-lastCommitTime));
         
         /*
          * At this point the historical view as of the [lastCommitTime] has been
@@ -288,11 +288,25 @@ public class MoveIndexPartitionTask extends AbstractTask {
 
             }
 
+            for(int i=0; i<sourceDataServiceUUIDs.length; i++) {
+                
+                if(sourceDataServiceUUIDs[i]==null) {
+                    
+                    throw new IllegalArgumentException();
+                    
+                }
+                
+            }
+            
             if (sourceIndexName == null) {
 
                 throw new IllegalArgumentException();
                 
             }
+            
+            this.sourceDataServiceUUIDs = sourceDataServiceUUIDs;
+            
+            this.sourceIndexName = sourceIndexName; 
             
             this.lastCommitTime = lastCommitTime;
             
@@ -315,6 +329,7 @@ public class MoveIndexPartitionTask extends AbstractTask {
             final BTree dst = (BTree)ndx;
             
             // @todo handle failover / read from secondaries.
+            assert metadataService != null : "MetadataService was not set";
             IDataService sourceDataService;
             try {
                 sourceDataService = metadataService.getDataService(sourceDataServiceUUIDs[0]);
@@ -372,6 +387,11 @@ public class MoveIndexPartitionTask extends AbstractTask {
 
         public void setMetadataService(IMetadataService metadataService) {
 
+            if (metadataService == null)
+                throw new IllegalArgumentException();
+            
+            log.info("Set metadata service: "+metadataService);
+            
             this.metadataService = metadataService;
             
         }

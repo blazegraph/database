@@ -280,7 +280,7 @@ public class Name2Addr extends BTree {
             log.info("Will commit: "+name);
             
             // request commit.
-            long addr = ((ICommitter)btree).handleCommit();
+            final long addr = ((ICommitter)btree).handleCommit();
             
             // encode the index name as a key.
             final byte[] key = getKey(name);

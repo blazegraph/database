@@ -44,6 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
@@ -235,8 +236,8 @@ public class StressTestConcurrent extends
         
         int nclients = 20;
         long timeout = 20;
-        int ntrials = 10000;
-        int keyLen = 3;
+        int ntrials = 1000;
+        int keyLen = 4;
         int nops = 100;
         
         doConcurrentClientTest(client, dataService, nclients, timeout, ntrials,
@@ -346,7 +347,6 @@ public class StressTestConcurrent extends
             indexMetadata.setDeleteMarkers(true);
 
             // register the scale-out index, creating a single index partition.
-            // FIXME verify that partition moves occur - the index should be spread onto both data services.
             federation.registerIndex(indexMetadata,dataService.getServiceUUID());
             
         }
@@ -374,15 +374,19 @@ public class StressTestConcurrent extends
         
         final long begin = System.currentTimeMillis();
         
-        List<Future<Void>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
-
+        final List<Future<Void>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+        
         final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.err.println("Examining task results: elapsed="+elapsed);
         
         Iterator<Future<Void>> itr = results.iterator();
         
         int nfailed = 0; // #of operations that failed
         int ncommitted = 0; // #of operations that committed.
         int nuncommitted = 0; // #of operations that did not complete in time.
+        int ntimeout = 0;
+        int ninterrupted = 0;
         
         while(itr.hasNext()) {
 
@@ -398,7 +402,8 @@ public class StressTestConcurrent extends
 
             try {
 
-                future.get();
+                // Don't wait
+                future.get(0L,TimeUnit.MILLISECONDS);
                 
                 ncommitted++;
                 
@@ -417,6 +422,14 @@ public class StressTestConcurrent extends
                     fail("Not expecting: "+ex, ex);
                     
                 }
+                
+            } catch (InterruptedException e) {
+
+                ninterrupted++;
+                
+            } catch (TimeoutException e) {
+                
+                ntimeout++;
                 
             }
             
@@ -445,6 +458,8 @@ public class StressTestConcurrent extends
         ret.put("ncommitted",""+ncommitted);
         ret.put("nfailed",""+nfailed);
         ret.put("nuncommitted", ""+nuncommitted);
+        ret.put("ntimeout", ""+ntimeout);
+        ret.put("ninterrupted", ""+ninterrupted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
 

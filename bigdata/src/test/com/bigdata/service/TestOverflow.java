@@ -528,16 +528,12 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
      */
     protected long awaitOverflow(IDataService dataService,long priorOverflowCounter) throws IOException {
         
-        log.info("Awaiting overflow: " + dataService);
-
-        // // pre-condition.
-        // assert dataService.getForceOverflow() : "Expecting forceOverflow to
-        // be set: "+dataService;
+        log.info("Awaiting overflow: priorOverflowCounter="+priorOverflowCounter+", service=" + dataService);
 
         final long begin = System.currentTimeMillis();
 
         long newOverflowCounter;
-
+        
         while ((newOverflowCounter = dataService.getOverflowCounter()) == priorOverflowCounter) {
 
             try {
@@ -548,6 +544,10 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
 
             System.err.println("Awaiting overflow: " + dataService);
 
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            if(elapsed > 2000) fail("No overflow after "+elapsed+"ms?");
+            
         }
 
         final long elapsed = System.currentTimeMillis() - begin;

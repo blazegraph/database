@@ -175,7 +175,10 @@ public class UpdateSplitIndexPartition extends AbstractTask {
 
         // drop the source index (the old index partition).
         journal.dropIndex(name);
-
+        
+        // will notify tasks that index partition was split.
+        resourceManager.setIndexPartitionGone(name, "split");
+       
         /*
          * Notify the metadata service that the index partition has been
          * split.

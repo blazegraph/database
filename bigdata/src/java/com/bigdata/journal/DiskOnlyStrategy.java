@@ -43,6 +43,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -69,8 +70,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * http://mail-archives.apache.org/mod_mbox/db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
  * 
  * <pre>
- *    /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
- *    /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
+ *      /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
+ *      /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
  * </pre>
  * 
  * @todo The flush of the write cache could be made asynchronous if we had two
@@ -153,6 +154,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       we do not need to allocate a separate writeCache. However, we will
  *       still need to track the {@link #writeCacheOffset} and maintain a
  *       {@link #writeCacheIndex}.
+ * 
+ * FIXME add a read cache for records that are misses in the disk write cache.
+ * This will be useful for things like the {@link CommitRecord}s,
+ * {@link Checkpoint} records and the {@link IndexMetadata} records for
+ * frequently read indices since they will eventually get flushed from the write
+ * cache.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -914,7 +921,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
-    public void destroyAllResources() {
+    public void deleteResources() {
         
         if (isOpen()) {
 

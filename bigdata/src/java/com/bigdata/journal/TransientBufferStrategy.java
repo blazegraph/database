@@ -65,7 +65,7 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         
     }
     
-    public void destroyAllResources() {
+    public void deleteResources() {
         
         if( isOpen() ) {
             

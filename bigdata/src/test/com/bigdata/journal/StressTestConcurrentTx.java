@@ -315,7 +315,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         log.warn("Shutting down now!");
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
         Result ret = new Result();
         

@@ -63,6 +63,7 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -76,6 +77,7 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IsolationEnum;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -142,7 +144,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * operation comparing the local write set for an index partition with the local
  * index partition.
  * <p>
- * The {@link AbstractJournal#close(long)} method should be reworked as
+ * The {@link AbstractJournal#closeForWrites(long)} method should be reworked as
  * "sealStore(long)" or something of that nature whose semantics are a restart
  * safe conversion of the store into a read-only store with the specified
  * closeTime. The method should drive through the buffer strategy and release
@@ -348,12 +350,6 @@ abstract public class ResourceManager implements IResourceManager {
         leadingZeros.setGroupingUsed(false);
         
     }
-
-    // /*
-    // * Unisolated index reporting.
-    // */
-    // private Map<String/*name*/,Counters> unisolated = new
-    // ConcurrentHashMap<String, Counters>();
 
     /**
      * Report opening of a mutable unisolated named index on an {@link IJournal}.
@@ -765,7 +761,9 @@ abstract public class ResourceManager implements IResourceManager {
      */
     protected final int maximumMovesPerTarget;
     
-    /** Release time is zero (0L) until notified otherwise - 0L is ignored. */
+    /**
+     * Release time is zero (0L) until notified otherwise - 0L is ignored.
+     */
     private long releaseTime = 0L;
 
     /**
@@ -817,6 +815,78 @@ abstract public class ResourceManager implements IResourceManager {
     private Map<UUID, IRawStore> openStores = new HashMap<UUID, IRawStore>();
 
     /**
+     * This cache is used to provide remote clients with an unambiguous
+     * indication that an index partition has been rather than simply not
+     * existing or having been dropped.
+     * 
+     * The keys are the name of an index partitions that has been split, joined,
+     * or moved. Such index partitions are no longer available and have been
+     * replaced by one or more new index partitions (having a distinct partition
+     * identifier) either on the same or on another data service. The value is a
+     * reason, e.g., "split", "join", or "move".
+     * 
+     * FIXME integrate into {@link AbstractTask}, {@link WriteExecutorService}
+     * and {@link ClientIndexView}. Throw back an exception other than
+     * {@link NoSuchIndexException}, do not abort the commit group for that
+     * exception, and modify the client code to test for that exception rather
+     * than {@link NoSuchIndexException}.  
+     */
+    private LRUCache<String/*name*/, String/*reason*/> staleIndexCache = new LRUCache<String, String>(10000);  
+    
+    /**
+     * Return non-<code>null</code> iff <i>name</i> is the name of an index
+     * partition that was located on this data service but which is now gone.
+     * <p>
+     * Note: this information is based on an LRU cache with a large fixed
+     * capacity. It is expected that the cache size is sufficient to provide
+     * good information to clients having queued write tasks.  If the index
+     * partition split/move/join changes somehow outpace the cache size then
+     * the client would see a {@link NoSuchIndexException} instead.
+     * 
+     * @param name
+     *            The name of an index partition.
+     * 
+     * @return The reason (split, join, or move) -or- <code>null</code> iff
+     *         the index partition is not known to be gone.
+     */
+    protected String getIndexPartitionGone(String name) {
+    
+        synchronized(staleIndexCache) {
+        
+            return staleIndexCache.get(name);
+            
+        }
+        
+    }
+    
+    /**
+     * Notify the {@link ResourceManager} that the named index partition was
+     * split, joined or moved. This effects only the unisolated view of that
+     * index partition. Historical views will continue to exist and reside as
+     * before.
+     * 
+     * @param name
+     *            The name of the index partition.
+     * @param reason
+     *            The reason (split, join, or move).
+     */
+    protected void setIndexPartitionGone(String name,String reason) {
+        
+        assert name != null;
+        
+        assert reason != null;
+        
+        synchronized(staleIndexCache) {
+        
+            log.warn("name="+name+", reason="+reason);
+            
+            staleIndexCache.put(name, reason, true);
+            
+        }
+        
+    }
+    
+    /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
      * 
      * @todo config param.
@@ -831,7 +901,7 @@ abstract public class ResourceManager implements IResourceManager {
      * partitions need to be co-located on a data service before we can join
      * them.
      */
-    ExecutorService service;
+    protected ExecutorService service;
 
     /**
      * A flag used to disable overflow of the live journal until asynchronous
@@ -1624,6 +1694,8 @@ abstract public class ResourceManager implements IResourceManager {
 
     public void shutdown() {
 
+        log.info("Shutdown");
+        
         assertOpen();
         
         /*
@@ -2295,6 +2367,10 @@ abstract public class ResourceManager implements IResourceManager {
     
     /**
      * Note: logic duplicated by {@link Journal#getIndex(String, long)}
+     * 
+     * @todo consider throwing {@link StaleLocatorException} from here and
+     *       removing {@link #getIndexPartitionGone(String)} from
+     *       {@link IResourceManager}
      */
     public IIndex getIndex(String name, long timestamp) {
         
@@ -2377,7 +2453,7 @@ abstract public class ResourceManager implements IResourceManager {
         } else {
             
             /*
-             * historical read -or- unisolated read operation.
+             * historical read -or- read-committed operation.
              */
 
             if (readOnly) {
@@ -2418,6 +2494,16 @@ abstract public class ResourceManager implements IResourceManager {
 
                 assert timestamp == ITx.UNISOLATED;
                 
+                // Check to see if an index partition was split, joined or moved.
+                final String reason = getIndexPartitionGone(name);
+
+                if (reason != null) {
+
+                    // Notify client of stale locator.
+                    throw new StaleLocatorException(name, reason);
+                    
+                }
+                
                 final AbstractBTree[] sources = getIndexSources(name, ITx.UNISOLATED);
                 
                 if (sources == null) {
@@ -2450,29 +2536,11 @@ abstract public class ResourceManager implements IResourceManager {
 
     /**
      * An overflow condition is recognized when the journal is within some
-     * declared percentage of {@link com.bigdata.journal.Options#MAXIMUM_EXTENT}.
-     * <p>
-     * Once an overflow condition is recognized the {@link ResourceManager} will
-     * {@link WriteExecutorService#pause()} the {@link WriteExecutorService}
-     * unless it already has an <i>exclusiveLock</i>. Eventually the
-     * {@link WriteExecutorService} will quiese, at which point there will be
-     * another group commit and this method will be invoked again, this time
-     * with an <i>exclusiveLock</i> on the {@link WriteExecutorService}.
-     * <p>
-     * Once this method is invoked with an <i>exclusiveLock</i> and when an
-     * overflow condition is recognized it will create a new journal and
-     * re-define the views for all named indices to include the pre-overflow
-     * view with reads being absorbed by a new btree on the new journal.
+     * declared percentage of {@link Options#MAXIMUM_EXTENT}.
      * 
-     * @todo write unit test for an overflow edge case in which we attempt to
-     *       perform an read-committed task on a pre-existing index immediately
-     *       after an {@link #overflow()} and verify that a commit record exists
-     *       on the new journal and that the read-committed task can read from
-     *       the fused view of the new (empty) index on the new journal and the
-     *       old index on the old journal.
      */
-    public boolean overflow(boolean forceOverflow, boolean exclusiveLock) {
-
+    public boolean shouldOverflow() {
+     
         if (isTransient) {
 
             /*
@@ -2491,9 +2559,11 @@ abstract public class ResourceManager implements IResourceManager {
             /*
              * Note: overflow is disabled until we are done processing the old
              * journal.
+             * 
+             * @todo show elapsed time since disabled in log message.
              */
             
-            log.warn("Overflow processing still disabled");
+            log.info("Overflow processing disabled");
             
             return false;
             
@@ -2534,41 +2604,14 @@ abstract public class ResourceManager implements IResourceManager {
                 
             }
 
-            System.err.println("testing overflow: forceOverflow="
-                    + forceOverflow + ", exclusiveLock=" + exclusiveLock
-                    + ", nextOffset=" + nextOffset + ", maximumExtent="
-                    + journal.getMaximumExtent() + ", shouldOverflow="
-                    + shouldOverflow + ", dataServiceUUID="
-                    + getDataServiceUUID());
+            log.info("testing overflow" + ": nextOffset=" + nextOffset
+                    + ", maximumExtent=" + journal.getMaximumExtent()
+                    + ", shouldOverflow=" + shouldOverflow);
                
         }
 
-        if(!forceOverflow && !shouldOverflow) return false;
+        return shouldOverflow;
         
-        if(!exclusiveLock) {
-
-            final WriteExecutorService writeService = concurrencyManager
-                    .getWriteService();
-            
-            if(!writeService.isPaused()) {
-
-                log.info("Pausing write service");
-                
-                writeService.pause();
-                
-            }
-            
-            return false;
-
-        }
-        
-        log.info("Exclusive lock on write service");
-
-        overflowNow();
-        
-        // did overflow.
-        return true;
-
     }
 
     /**
@@ -2593,8 +2636,15 @@ abstract public class ResourceManager implements IResourceManager {
      * <li>{@link #isOverflowAllowed()} was set <code>false</code> and will
      * remain <code>false</code> until {@link PostProcessOldJournal}</li>
      * </ol>
+     * 
+     * @todo write unit test for an overflow edge case in which we attempt to
+     *       perform an read-committed task on a pre-existing index immediately
+     *       after an {@link #overflow()} and verify that a commit record exists
+     *       on the new journal and that the read-committed task can read from
+     *       the fused view of the new (empty) index on the new journal and the
+     *       old index on the old journal.
      */
-    protected Future<Object> overflowNow() {
+    public Future<Object> overflow() {
        
         assert overflowAllowed.get();
         
@@ -2989,7 +3039,7 @@ abstract public class ResourceManager implements IResourceManager {
         {
             
             // writes no longer accepted.
-            oldJournal.close(closeTime);
+            oldJournal.closeForWrites(closeTime);
             
             // remove from list of open journals.
             if (this.openStores.remove(oldJournal.getRootBlockView().getUUID()) != oldJournal) {
@@ -3033,7 +3083,7 @@ abstract public class ResourceManager implements IResourceManager {
 
     }
     
-    public void destroyAllResources() {
+    public void deleteResources() {
         
         if (open)
             throw new IllegalStateException();
@@ -3089,7 +3139,7 @@ abstract public class ResourceManager implements IResourceManager {
     /**
      * Returns a filter that is used to recognize files that are managed by this
      * class. The {@link ResourceManager} will log warnings if it sees an
-     * unexpected file and will NOT {@link #destroyAllResources()} files that it does not
+     * unexpected file and will NOT {@link #deleteResources()} files that it does not
      * recognize.
      * 
      * @see ResourceFileFilter

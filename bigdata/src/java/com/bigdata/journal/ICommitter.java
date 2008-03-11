@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-
 /**
  * An interface implemented by a persistence capable data structure such as a
  * btree so that it can participate in the commit protocol for the store.

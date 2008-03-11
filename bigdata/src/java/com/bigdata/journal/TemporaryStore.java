@@ -97,21 +97,21 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      * Registers a {@link BTree} whose values are variable length byte[]s and
      * which does NOT support isolation.
      */
-    public IIndex registerIndex(String name) {
+    public BTree registerIndex(String name) {
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        return registerIndex( name, new IndexMetadata(UUID.randomUUID()));
         
+    }
+
+    public BTree registerIndex(String name, IndexMetadata metadata) {
+    
         BTree btree = BTree.create(this, metadata);
 
         return registerIndex(name,btree);
         
-//        return registerIndex(name, new BTree(this,
-//                BTree.DEFAULT_BRANCHING_FACTOR, // @todo configurable.
-//                UUID.randomUUID()));
-        
     }
     
-    public IIndex registerIndex(String name, BTree btree) {
+    public BTree registerIndex(String name, BTree btree) {
 
         synchronized (name2Addr) {
 

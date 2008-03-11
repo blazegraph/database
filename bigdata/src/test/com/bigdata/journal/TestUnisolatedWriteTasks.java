@@ -33,9 +33,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
@@ -109,17 +108,27 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         }
 
         // submit task to create index and do batch insert on that index.
-        journal.submit(SequenceTask.newSequence(new AbstractTask[]{
+        journal.submit(
+//                SequenceTask.newSequence(new AbstractTask[]{
                 
-                new RegisterIndexTask(journal, //
-                                resource[0],//
-                                new IndexMetadata(resource[0], indexUUID)),
+//                new RegisterIndexTask(journal, //
+//                                resource[0],//
+//                                new IndexMetadata(resource[0], indexUUID))
+//                                ).get();
+//                                
+//        journal.submit(
                 
                 new AbstractTask(journal,ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
+
+                        log.info("Will register " + getOnlyResource());
+
+                        getJournal().registerIndex(getOnlyResource(),new IndexMetadata(resource[0], indexUUID));
                         
-                        IIndex ndx = getIndex(getOnlyResource());
+                        log.info("Will write on " + getOnlyResource());
+                        
+                        final IIndex ndx = getIndex(getOnlyResource());
 
                         assertEquals("indexUUID",indexUUID,ndx.getIndexMetadata().getIndexUUID());
                         
@@ -138,7 +147,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                     
                 }
                 
-        })).get();
+        ).get();
 
         // verify a commit was performed.
         assertEquals("commitCounter", commitCounterBefore + 1, journal
@@ -153,7 +162,9 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
                     protected Object doTask() throws Exception {
 
-                        IIndex ndx = getIndex(getOnlyResource());
+                        log.info("Will read from " + getOnlyResource());
+                        
+                        final IIndex ndx = getIndex(getOnlyResource());
 
                         assertEquals("indexUUID", indexUUID, ndx
                                 .getIndexMetadata().getIndexUUID());
@@ -199,7 +210,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
     }
     
@@ -250,65 +261,48 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         }
 
         // submit task to create index and do batch insert on that index.
-        journal.submit(SequenceTask.newSequence(new AbstractTask[]{
-                
-                new RegisterIndexTask(journal, resource[0], //
-                        new IndexMetadata(resource[0], indexUUID1)),
+        journal.submit(new AbstractTask(journal, ITx.UNISOLATED, resource) {
 
-                        new RegisterIndexTask(journal, resource[1], //
-                                new IndexMetadata(resource[1], indexUUID2)),
-                
-                new AbstractTask(journal, ITx.UNISOLATED,resource) {
+            protected Object doTask() throws Exception {
 
-                    protected Object doTask() throws Exception {
+                getJournal().registerIndex(resource[0], //
+                        new IndexMetadata(resource[0], indexUUID1));
 
-                        {
+                getJournal().registerIndex(resource[1], //
+                        new IndexMetadata(resource[1], indexUUID2));
 
-                            IIndex ndx = getIndex("foo");
+                {
+                    IIndex ndx = getIndex("foo");
 
-                            assertEquals("indexUUID", indexUUID1, ndx
-                                    .getIndexMetadata().getIndexUUID());
+                    assertEquals("indexUUID", indexUUID1, ndx
+                            .getIndexMetadata().getIndexUUID());
 
-//                            // Note: clone values since replaced with
-//                            // old values by the batch op.
-//                            ndx.insert(new BatchInsert(ninserts, keys1,
-//                                    vals1.clone()));
+                    for (int i = 0; i < keys1.length; i++) {
 
-                            for (int i = 0; i < keys1.length; i++) {
-                                
-                                ndx.insert(keys1[i], vals1[i]);
-                                
-                            }
+                        ndx.insert(keys1[i], vals1[i]);
 
-                        }
-                        
-                        {
-
-                            IIndex ndx = getIndex("bar");
-
-                            assertEquals("indexUUID", indexUUID2, ndx
-                                    .getIndexMetadata().getIndexUUID());
-
-//                            // Note: clone values since replaced with
-//                            // old values by the batch op.
-//                            ndx.insert(new BatchInsert(ninserts, keys2,
-//                                    vals2.clone()));
-                            
-                            for (int i = 0; i < keys2.length; i++) {
-                                
-                                ndx.insert(keys2[i], vals2[i]);
-                                
-                            }
-
-                        }
-                        
-                        return null;
-                        
                     }
-                    
                 }
-                
-        })).get();
+
+                {
+
+                    IIndex ndx = getIndex("bar");
+
+                    assertEquals("indexUUID", indexUUID2, ndx
+                            .getIndexMetadata().getIndexUUID());
+
+                    for (int i = 0; i < keys2.length; i++) {
+
+                        ndx.insert(keys2[i], vals2[i]);
+
+                    }
+
+                }
+
+                return null;
+
+            }
+        }).get();
 
         // verify a commit was performed.
         assertEquals("commitCounter", commitCounterBefore + 1, journal
@@ -419,7 +413,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
     }
    
@@ -499,35 +493,23 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
         final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
         // submit task to create indices and do batch inserts those indices.
-        journal.submit(SequenceTask.newSequence(new AbstractTask[]{
-                
-                // register all indices.
+        journal.submit(
+
                 new AbstractTask(journal, ITx.UNISOLATED,resource) {
 
                     protected Object doTask() throws Exception {
                         
+                        // register all indices.
                         for(int i=0; i<nindices; i++) {
                             
                             getJournal().registerIndex(//
                                     indices[i].name,//
-                                    BTree.create(//
-                                            getJournal(),//
                                             new IndexMetadata(indices[i].name,indices[i].indexUUID)
-                                    ));
+                                );
                             
                         }
                         
-                        return null;
-                        
-                    }
-                    
-                },
-
-                // write on all indices.
-                new AbstractTask(journal, ITx.UNISOLATED,resource) {
-
-                    protected Object doTask() throws Exception {
-
+                        // write on all indices.
                         for(int i=0; i<nindices; i++) {
                             
                             IIndex ndx = getIndex(indices[i].name);
@@ -537,13 +519,6 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                                                     .getIndexMetadata()
                                                     .getIndexUUID());
                             
-//                            // Note: clone values since replaced with old values
-//                            // by the batch op.
-//                            ndx.insert(new BatchInsert(
-//                                    indices[i].ninserts,
-//                                    indices[i].keys, indices[i].vals
-//                                    .clone()));
-                            
                             for (int j = 0; j < indices[i].keys.length; j++) {
                                 
                                 ndx.insert(indices[i].keys[j], indices[i].vals[j]);
@@ -551,14 +526,14 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
                             }
 
                         }
-                        
+                    
                         return null;
                         
-                    }
+//                    }
                     
-                }
+//                }
                 
-        })).get();
+                    }}).get();
 
         // verify a commit was performed.
         assertEquals("commitCounter", commitCounterBefore + 1, journal
@@ -615,7 +590,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase {
 
         journal.shutdown();
 
-        journal.destroyAllResources();
+        journal.deleteResources();
 
     }
 

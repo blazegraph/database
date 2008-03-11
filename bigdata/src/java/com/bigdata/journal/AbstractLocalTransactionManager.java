@@ -7,12 +7,8 @@ import java.util.concurrent.ExecutionException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.FusedView;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ReadOnlyFusedView;
-import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.InnerCause;
 
 /**
  * Abstract base class for local transaction either when running a standalone
@@ -446,14 +442,15 @@ abstract public class AbstractLocalTransactionManager implements
 
         } catch (ExecutionException ex) {
 
-            Throwable cause = ex.getCause();
-
-            if (cause instanceof ValidationError) {
-
+            final ValidationError cause = (ValidationError) InnerCause
+                    .getInnerCause(ex, ValidationError.class);
+            
+            if(cause != null) {
+                
                 throw (ValidationError) cause;
-
+                
             }
-
+            
             // this is an unexpected error.
             throw new RuntimeException(ex);
 

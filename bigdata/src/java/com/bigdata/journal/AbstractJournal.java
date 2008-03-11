@@ -57,6 +57,7 @@ import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
@@ -310,7 +311,7 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * True iff the journal was opened in a read-only mode.
      */
-    protected final boolean readOnly;
+    private final boolean readOnly;
     
     /**
      * Option controls whether the journal forces application data to disk
@@ -894,7 +895,7 @@ public abstract class AbstractJournal implements IJournal {
      * The delegate that implements the {@link BufferMode}.
      * <p>
      * Note: this method MUST NOT check to see whether the journal is open since
-     * we need to use it if we want to invoke {@link IBufferStrategy#destroyAllResources()}
+     * we need to use it if we want to invoke {@link IBufferStrategy#deleteResources()}
      * and we can only invoke that method once the journal is closed.
      */
     final public IBufferStrategy getBufferStrategy() {
@@ -1029,7 +1030,7 @@ public abstract class AbstractJournal implements IJournal {
              * live data.
              */
 
-            destroyAllResources();
+            deleteResources();
             
         }
 
@@ -1044,13 +1045,13 @@ public abstract class AbstractJournal implements IJournal {
      * @exception IllegalStateException
      *                if the journal is open.
      */
-    public void destroyAllResources() {
+    public void deleteResources() {
 
         if(isOpen()) throw new IllegalStateException();
 
         log.info("");
         
-        _bufferStrategy.destroyAllResources();
+        _bufferStrategy.deleteResources();
 
         ResourceManager.deleteJournal(getFile() == null ? null : getFile()
                 .toString());
@@ -1059,17 +1060,40 @@ public abstract class AbstractJournal implements IJournal {
     
     /**
      * Sets the "closeTime" on the root block such that the journal will no
-     * longer accept writes and then closes the journal.
+     * longer accept writes, flushes all buffered writes, and releases any write
+     * cache buffers since they will no longer be used. This method is normally
+     * used when one journal is being closed out for writes during synchronous
+     * overflow processing and new writes will be buffered on a new journal. The
+     * has advantages over closing the journal directly including that it does
+     * not disturb concurrent readers.
      * <p>
-     * Note: The caller MUST have exclusive access to the journal.
+     * Note: The caller MUST have exclusive write access to the journal.
      * <p>
      * Note: This does NOT perform a commit - any uncommitted writes will be
      * discarded.
      * 
      * @todo write unit tests for this. Make sure that the journal can not be
      *       re-opened in a read-write mode (only as a read-only journal).
+     * 
+     * FIXME rework so that this does not close the journal, just "seals" it in
+     * a restart-safe manner against further writes (including flushing the
+     * final root block to disk) and discards the write cache (if any) since it
+     * will no longer be used. At present there is not much logic testing for
+     * read-only - the transient store appears to always be read/write while the
+     * disk backed stores appear to rely on the mode in which the file was
+     * opened. One choice is to close the {@link IBufferStrategy} and then
+     * re-open it as readOnly, but that requires a synchronization point for
+     * readers as well. Even then, the {@link DiskOnlyStrategy} does not
+     * consider the file mode or {@link FileMetadata#readOnly} and will
+     * therefore reallocate a write cache.
+     * 
+     * FIXME There should also be an option to convert a journal from
+     * {@link BufferMode#Direct} to {@link BufferMode#Disk}. We would want to
+     * do that not when the journal is sealed but as soon as asynchronous
+     * overflow processing is done. Ideally this will not require us to close
+     * and reopen the journal since that will disturb concurrent readers.
      */
-    public void close(long closeTime) {
+    public void closeForWrites(long closeTime) {
         
         log.info("Closing journal for further writes: closeTime=" + closeTime
                 + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
@@ -1105,14 +1129,15 @@ public abstract class AbstractJournal implements IJournal {
          * operation.
          */
         _bufferStrategy.writeRootBlock(newRootBlock, ForceEnum.Force);
+
+//        _bufferStrategy.closeForWrites();
         
         // replace the root block reference.
         _rootBlock = newRootBlock;
 
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;
-        
-        // close down the journal.
+       
         close();
         
     }
@@ -1141,7 +1166,7 @@ public abstract class AbstractJournal implements IJournal {
              * was already deleted by _close().
              */
             
-            destroyAllResources();
+            deleteResources();
             
         }
         
@@ -1251,7 +1276,9 @@ public abstract class AbstractJournal implements IJournal {
             if (_committers[i] == null)
                 continue;
 
-            rootAddrs[i] = _committers[i].handleCommit();
+            final long addr = _committers[i].handleCommit();
+            
+            rootAddrs[i] = addr;
 
             ncommitters++;
 
@@ -1301,6 +1328,16 @@ public abstract class AbstractJournal implements IJournal {
     public void abort() {
 
         log.info("start");
+        
+        /*
+         * Discard hard references to any indices. The Name2Addr reference will
+         * also be discarded below. This should be sufficient to ensure that any
+         * index requested by the methods on the AbstractJournal will be re-read
+         * from disk using the commit record which we re-load below. This is
+         * necessary in order to discard any checkpoints that may have been
+         * written on indices since the last commit.
+         */
+        objectCache.clear();
         
         // clear the root addresses - they will be reloaded.
         _commitRecord = null;
@@ -2011,19 +2048,90 @@ public abstract class AbstractJournal implements IJournal {
         
         metadata.setIsolatable(true);
         
-        BTree btree = BTree.create(this, metadata);
+        return registerIndex(name,metadata);
+        
+    }
+    
+    /**
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
+    public BTree registerIndex(String name, IndexMetadata metadata) {
+
+        /*
+         * Verify some aspects of the partition metadata.
+         */
+        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
+        if (pmd != null) {
+
+            if (pmd.getResources() == null) {
+
+                /*
+                 * A [null] for the resources field is a specific indication
+                 * that we need to specify the resource metadata for the live
+                 * journal at the time that the index partition is registered.
+                 * This indicator is used when the metadata service registers an
+                 * index partition remotely on a data service since it does not
+                 * (and can not) have access to the resource metadata for the
+                 * live journal as of the time that the index partition actually
+                 * gets registered on the data service.
+                 * 
+                 * The index partition split and join tasks do not have this
+                 * problem since they are run locally. However, an index
+                 * partition move operation also needs to do this.
+                 */
+
+                metadata.setPartitionMetadata(//
+                        new LocalPartitionMetadata(//
+                                pmd.getPartitionId(),//
+                                pmd.getLeftSeparatorKey(),//
+                                pmd.getRightSeparatorKey(),//
+                                new IResourceMetadata[] {//
+                                    // The live journal.
+                                    getResourceMetadata() //
+                                },
+                                /*
+                                 * Note: Retains whatever history given by the
+                                 * caller.
+                                 */
+                                pmd.getHistory()+
+                                "register("+pmd.getPartitionId()+") "
+                                ));
+
+            } else {
+
+                if (pmd.getResources().length == 0) {
+
+                    throw new RuntimeException(
+                            "Missing resource description: name=" + name
+                                    + ", pmd=" + pmd);
+
+                }
+
+                if (!pmd.getResources()[0].isJournal()) {
+
+                    throw new RuntimeException(
+                            "Expecting resources[0] to be journal: name="
+                                    + name + ", pmd=" + pmd);
+
+                }
+
+                if (!pmd.getResources()[0].getUUID().equals(
+                        getRootBlockView().getUUID())) {
+
+                    throw new RuntimeException(
+                            "Expecting resources[0] to be this journal but has wrong UUID: name="
+                                    + name + ", pmd=" + pmd);
+
+                }
+
+            }
+            
+        }
+
+        final BTree btree = BTree.create(this, metadata);
 
         return registerIndex(name,btree);
-        
-//        return registerIndex(name, //
-//                new BTree(this, //
-//                        defaultBranchingFactor, //
-//                        UUID.randomUUID(), //
-//                        true, // isolatable
-//                        null,// conflictResolver
-//                        KeyBufferSerializer.INSTANCE,//
-//                        ByteArrayValueSerializer.INSTANCE//
-//                ));
         
     }
     

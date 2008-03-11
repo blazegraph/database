@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -89,13 +91,14 @@ import com.bigdata.service.MetadataService;
  * <p>
  * Note: This task is invoked after an
  * {@link ResourceManager#overflow(boolean, boolean)}. It is run on the
- * {@link ResourceManager#service} so that its execution is asynchronous with
- * respect to the {@link IConcurrencyManager}. While it does not require any
- * locks for some of its processing stages, this task relies on the
- * {@link ResourceManager#overflowAllowed} flag to disallow additional overflow
- * operations until it has completed. The various actions taken by this task are
- * submitted as submits tasks to the {@link IConcurrencyManager} so that they
- * will obtain the appropriate locks as necessary on the named indices.
+ * {@link ResourceManager}'s {@link ExecutorService} so that its execution is
+ * asynchronous with respect to the {@link IConcurrencyManager}. While it does
+ * not require any locks for some of its processing stages, this task relies on
+ * the {@link ResourceManager#overflowAllowed} flag to disallow additional
+ * overflow operations until it has completed. The various actions taken by this
+ * task are submitted as submits tasks to the {@link IConcurrencyManager} so
+ * that they will obtain the appropriate locks as necessary on the named
+ * indices.
  * 
  * @todo write alternative to the "build" task (which is basically a full
  *       compacting merge) that builds an index segment from the buffered writes
@@ -848,6 +851,169 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
     }
     
+    @SuppressWarnings("unchecked")
+    private final List<AbstractTask> EMPTY_LIST = Collections.EMPTY_LIST; 
+    
+    protected List<AbstractTask> chooseIndexPartitionMoves() {
+        
+        /*
+         * Set true if this node/data service is highly utilized. We will
+         * consider moves IFF this is a highly utilized service.
+         * 
+         * FIXME set highlyUtilizedService based on recent load for this host
+         * and service. If the host is at 80% or more load and the service is at
+         * 1/#servicesOnHost % or more load then the host is highly utilized.
+         * 
+         * An under-utilized host is one where the host is at 50% or less load.
+         * An under-utilized service on that host is one where the service is
+         * ....
+         */
+        final boolean highlyUtilizedService = true;
+
+        /*
+         * The minimum #of active index partitions on a data service. We will
+         * consider moving index partitions iff this threshold is exceeeded.
+         */
+        final int minActiveIndexPartitions = resourceManager.minimumActiveIndexPartitions;
+
+        /*
+         * The #of active index partitions on this data service.
+         */
+        final int nactive = scores.length;
+
+        if (!highlyUtilizedService || nactive <= minActiveIndexPartitions) {
+
+            log.info("Preconditions for move not satisified: highlyUtilized="
+                    + highlyUtilizedService + ", nactive=" + nactive
+                    + ", minActive=" + minActiveIndexPartitions);
+            
+            return EMPTY_LIST;
+            
+        }
+
+        /*
+         * Note: We make sure that we do not move all the index partitions to
+         * the same target by moving at most M index partitions per
+         * under-utilized data service recommended to us.
+         */
+        final int maxMovesPerTarget = resourceManager.maximumMovesPerTarget;
+
+        /*
+         * Obtain some data service UUIDs onto which we will try and offload
+         * some index partitions iff this data service is deemed to be highly
+         * utilized.
+         */
+        final UUID[] underUtilizedDataServiceUUIDs;
+        try {
+
+            // request under utilized data services (RMI).
+
+            underUtilizedDataServiceUUIDs = resourceManager
+                    .getMetadataService()
+                    .getUnderUtilizedDataServices(0/* limit */,
+                            resourceManager.getDataServiceUUID());
+
+        } catch (IOException ex) {
+
+            log.warn("Could not obtain target service UUIDs: ", ex);
+
+            return EMPTY_LIST;
+
+        }
+
+        /*
+         * The maximum #of index partition moves that we will attempt. This will
+         * be zero if there are no under-utilized services onto which we can
+         * move an index partition. Also, it will be zero unless there is a
+         * surplus of active index partitions on this data service.
+         */
+        final int maxMoves;
+        {
+            
+            final int nactiveSurplus = nactive - minActiveIndexPartitions;
+            
+            assert nactiveSurplus > 0;
+            
+            assert underUtilizedDataServiceUUIDs != null;
+            
+            final int maxTargetMoves = maxMovesPerTarget
+                    * underUtilizedDataServiceUUIDs.length;
+            
+            maxMoves = Math.min(nactiveSurplus, maxTargetMoves);
+            
+        }
+
+        /*
+         * Move candidates.
+         * 
+         * Note: We make sure that we don't move all the hot/warm index
+         * partitions by choosing the index partitions to be moved from the
+         * middle of the range. However, note that "cold" index partitions are
+         * NOT assigned scores, so there has been either an unisolated or
+         * read-committed operation on any index partition that was assigned a
+         * score.
+         * 
+         * Note: This could lead to a failure to recommend a move if all the
+         * "warm" index partitions happen to require a split or join. However,
+         * this is unlikely since the "warm" index partitions change size, if
+         * not slowly, then at least not as rapidly as the hot index partitions.
+         * Eventually a lot of splits will lead to some index partition not
+         * being split during an overflow and then we can move it.
+         * 
+         * @todo could adjust the bounds here based on how important it is to
+         * begin moving index partitions off of this data service.
+         */
+
+        log.info("Considering index partition moves: #targetServices="
+                + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
+                + maxMovesPerTarget + ", maxMoves=" + maxMoves + ", nactive="
+                + nactive);
+        
+        int nmove = 0;
+        
+        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxMoves);
+
+        for (int i = 0; i < scores.length && nmove < maxMoves; i++) {
+
+            final Score score = scores[i];
+                        
+            final String name = score.name;
+            
+            if(isUsed(name)) continue;
+
+            System.err.println("Considering move candidate: "+score);
+            
+            if (score.drank > .3 && score.drank < .8) {
+
+                /*
+                 * Move this index partition to an under-utilized data service.
+                 */
+
+                // choose target using round robin among candidates.
+                final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
+                        % underUtilizedDataServiceUUIDs.length];
+
+                final AbstractTask task = new MoveIndexPartitionTask(
+                        resourceManager, resourceManager
+                                .getConcurrencyManager(), lastCommitTime, name,
+                        targetDataServiceUUID);
+
+                tasks.add(task);
+
+                markUsed(name);
+
+                nmove++;
+
+            }
+
+        }
+        
+        System.err.println("Will move "+nmove+" index partitions based on utilization.");
+
+        return tasks;
+
+    }
+    
     /**
      * Examine each named index on the old journal and decide what, if anything,
      * to do with that index. These indices are key range partitions of named
@@ -990,93 +1156,22 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         /*
          * First, identify any index partitions that have underflowed and will
-         * either be joined or moved. When an an index partition is joined its
+         * either be joined or moved. When an index partition is joined its
          * rightSibling is also processed. This is why we identify the index
          * partition joins first - so that we can avoid attempts to process the
          * rightSibling now that we know it is being used by the join operation.
          */
         tasks.addAll(chooseIndexPartitionJoins());
-        
+
         /*
-         * Set true if this node/data service is highly utilized. We will
-         * consider moves IFF this is a highly utilized service.
+         * Identify index partitions that will be moved based on utilization.
          * 
-         * FIXME set highlyUtilizedService based on recent load for this host
-         * and service. If the host is at 80% or more load and the service is at
-         * 1/#servicesOnHost % or more load then the host is highly utilized.
-         * 
-         * An under-utilized host is one where the host is at 50% or less load.
-         * An under-utilized service on that host is one where the service is
-         * ....
+         * We only identify index partitions when this data service is highly
+         * utilized and when there is at least one underutilized data service
+         * available.
          */
-        final boolean highlyUtilizedService = true;
-
-        /*
-         * The minimum #of active index partitions on a data service. We will
-         * consider moving index partitions iff this threshold is exceeeded.
-         */
-        final int minActiveIndexPartitions = resourceManager.minimumActiveIndexPartitions;
-
-        /*
-         * Note: We make sure that we do not move all the index partitions to
-         * the same target by moving at most M index partitions per
-         * under-utilized data service recommended to us.
-         */
-        final int maxMovesPerTarget = resourceManager.maximumMovesPerTarget;
-
-        /*
-         * Obtain some data service UUIDs onto which we will try and offload
-         * some index partitions iff this data service is deemed to be highly
-         * utilized.
-         */
-        final UUID[] underUtilizedDataServiceUUIDs;
-        if (highlyUtilizedService) {
-
-            UUID[] a = null;
-            
-            try {
-
-                // request under utilized data services (RMI).
-                
-                a = resourceManager
-                        .getMetadataService().getUnderUtilizedDataServices(
-                                0/* limit */,
-                                resourceManager.getDataServiceUUID());
-
-            } catch (IOException ex) {
-
-                log.warn("Could not obtain target service UUIDs: ", ex);
-
-            }
-
-            underUtilizedDataServiceUUIDs = a;
-            
-        } else {
-            
-            underUtilizedDataServiceUUIDs = null;
-            
-        }
+        tasks.addAll(chooseIndexPartitionMoves());
         
-        /*
-         * The #of active index partitions on this data service.
-         */
-        final int nactive = scores.length;
-
-        /*
-         * The maximum #of index partition moves that we will attempt. This
-         * is zero unless this service is "highly utilized" and will be zero
-         * if there are no under-utilized services onto which we can move an
-         * index partition. Also, it will be zero unless there is a surplus
-         * of active index partitions on this data service.
-         */
-        final int maxMoves = Math.min(//
-                Math.min(0, nactive - minActiveIndexPartitions),
-                (underUtilizedDataServiceUUIDs == null
-                        ? 0
-                        : maxMovesPerTarget * underUtilizedDataServiceUUIDs.length
-                )
-        );
-
         {
 
             // counters : must sum to ndone as post-condition.
@@ -1084,7 +1179,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int nskip = 0; // nothing.
             int nbuild = 0; // build task.
             int nsplit = 0; // split task.
-            int nmove = 0; // move task (to underutilized node).
 
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
                     null, null);
@@ -1157,114 +1251,50 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     nsplit++;
 
+                } else if (copied.contains(name)) {
+
+                    /*
+                     * The write set from the old journal was already copied to
+                     * the new journal so we do not need to do a build.
+                     */
+
+                    markUsed(name);
+
+                    nskip++;
+
                 } else {
-                    
+
                     /*
-                     * Either a move or a build or an index partition whose
-                     * write set was already copied to the new journal.
-                     */
-                    
-                    /*
-                     * Move candidate?
+                     * Just do an index build task.
                      * 
-                     * Note: We make sure that we don't move all the hot/warm
-                     * index partitions by choosing the index partitions to be
-                     * moved from the middle of the range. However, note that
-                     * "cold" index partitions are NOT assigned scores, so there
-                     * has been either an unisolated or read-committed operation
-                     * on any index partition that was assigned a score.
+                     * @todo could do an incremental build if the amount of
+                     * history in the view is not too great.
                      * 
-                     * Note: This could lead to a failure to recommend a move if
-                     * all the "warm" index partitions happen to require a split
-                     * or join. However, this is unlikely since the "warm" index
-                     * partitions change size, if not slowly, then at least not
-                     * as rapidly as the hot index partitions. Eventually a lot
-                     * of splits will lead to some index partition not being
-                     * split during an overflow and then we can move it.
-                     * 
-                     * @todo could adjust the bounds here based on how important
-                     * it is to begin moving index partitions off of this data
-                     * service.
+                     * @todo mark incremental build segments differently in the
+                     * file system since that might be important information
+                     * when doing a distributed index rebuild. This mark
+                     * probably needs to be driven through the index segment
+                     * build API so that it shows up in the view history and in
+                     * the index segment checkpoint record.
                      */
 
-                    final Score score = getScore(name);
+                    // the file to be generated.
+                    final File outFile = resourceManager
+                            .getIndexSegmentFile(indexMetadata);
 
-                    final boolean moveCandidate = (score != null && (score.drank > .3 && score.drank < .8));
-                    
-                    if (highlyUtilizedService//
-                            && underUtilizedDataServiceUUIDs != null//
-                            && scores.length > minActiveIndexPartitions//
-                            && nmove < maxMoves //
-                            && moveCandidate //
-                            ) {
+                    final AbstractTask task = new BuildIndexSegmentTask(
+                            resourceManager, resourceManager
+                                    .getConcurrencyManager(), lastCommitTime,
+                            name, outFile);
 
-                        /*
-                         * Move this index partition to an under-utilized data
-                         * service.
-                         */
+                    log.info("index build: " + name);
 
-                        // choose target using round robin among candidates.
-                        final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
-                                % underUtilizedDataServiceUUIDs.length];
+                    // add to set of tasks to be run.
+                    tasks.add(task);
 
-                        final AbstractTask task = new MoveIndexPartitionTask(
-                                resourceManager, resourceManager
-                                        .getConcurrencyManager(),
-                                lastCommitTime, name, targetDataServiceUUID);
+                    markUsed(name);
 
-                        tasks.add(task);
-
-                        markUsed(name);
-
-                        nmove++;
-
-                    } else if (copied.contains(name)) {
-
-                        /*
-                         * The write set from the old journal was already copied
-                         * to the new journal so we do not need to do a build.
-                         */
-
-                        markUsed(name);
-
-                        nskip++;
-
-                    } else {
-
-                        /*
-                         * Just do an index build task.
-                         * 
-                         * @todo could do an incremental build if the amount of
-                         * history in the view is not too great.
-                         * 
-                         * @todo mark incremental build segments differently in
-                         * the file system since that might be important
-                         * information when doing a distributed index rebuild.
-                         * This mark probably needs to be driven through the
-                         * index segment build API so that it shows up in the
-                         * view history and in the index segment checkpoint
-                         * record.
-                         */
-
-                        // the file to be generated.
-                        final File outFile = resourceManager
-                                .getIndexSegmentFile(indexMetadata);
-
-                        final AbstractTask task = new BuildIndexSegmentTask(
-                                resourceManager, resourceManager
-                                        .getConcurrencyManager(),
-                                lastCommitTime, name, outFile);
-
-                        log.info("index build: " + name);
-
-                        // add to set of tasks to be run.
-                        tasks.add(task);
-
-                        markUsed(name);
-
-                        nbuild++;
-
-                    }
+                    nbuild++;
 
                 }
 
@@ -1273,9 +1303,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             } // itr.hasNext()
 
             // verify counters.
-            assert ndone == nskip + nbuild + nsplit + nmove : "ndone=" + ndone
+            assert ndone == nskip + nbuild + nsplit : "ndone=" + ndone
                     + ", nskip=" + nskip + ", nbuild=" + nbuild + ", nsplit="
-                    + nsplit + ", nmove=" + nmove;
+                    + nsplit;
 
             // verify all indices were handled in one way or another.
             assert ndone == used.size() : "ndone="+ndone+", but #used="+used.size();

@@ -307,7 +307,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
 
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
                 
         /*
          * Compute bytes written per second.

@@ -144,5 +144,12 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * @throws IOException
      */
     public long transferTo(RandomAccessFile out) throws IOException;
+
+//    /**
+//     * Seals the store against further writes and discards any write caches
+//     * since they will no longer be used.  The method should be implemented
+//     * such that concurrent readers are not disturbed.
+//     */
+//    public void closeForWrites();
     
 }

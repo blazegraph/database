@@ -41,6 +41,7 @@ import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
@@ -436,7 +437,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * {@link #reopen() reopened} at any time (conditional on the continued
      * availability of the backing store). The index reference remains valid
      * after a {@link #close()}. A closed index is transparently restored by
-     * either {@link #getRoot()} or {@link #reopen()}.
+     * either {@link #getRoot()} or {@link #reopen()}. A {@link #close()} on a
+     * dirty index MUST discard writes rather than flushing them to the store
+     * and MUST NOT update its {@link Checkpoint} record ({@link #close()} is
+     * used to discard indices with partial writes when an {@link AbstractTask}
+     * fails).
      * <p>
      * This implementation clears the hard reference queue (releasing all node
      * references), releases the hard reference to the root node, and releases
@@ -467,7 +472,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if (root.dirty) {
 
-            throw new IllegalStateException("Root node is dirty");
+//            throw new IllegalStateException("Root node is dirty");
+            log.warn("Root is dirty - discarding writes");
 
         }
 
@@ -2011,7 +2017,7 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             
             assert tmp.limit() == store.getByteCount(addr) : "limit="
                     + tmp.limit() + ", byteCount(addr)="
-                    + store.getByteCount(addr);
+                    + store.getByteCount(addr)+", addr="+store.toString(addr);
 
             counters.readTimeNanos += System.nanoTime() - begin;
             

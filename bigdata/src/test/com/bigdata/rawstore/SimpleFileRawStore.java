@@ -196,7 +196,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
 
-    public void destroyAllResources() {
+    public void deleteResources() {
         
         if(open) throw new IllegalStateException();
         
@@ -213,7 +213,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
         close();
 
-        destroyAllResources();
+        deleteResources();
         
     }
 

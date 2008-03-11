@@ -228,10 +228,12 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * @exception RuntimeException
      *                if the backing file exists and could not be deleted.
      */
-    public void destroyAllResources();
+    public void deleteResources();
     
     /**
-     * Closes the store immediately and releases its persistent resources.
+     * Closes the store immediately and deletes its persistent resources.
+     * 
+     * @see #deleteResources()
      */
     public void closeAndDelete();
     
