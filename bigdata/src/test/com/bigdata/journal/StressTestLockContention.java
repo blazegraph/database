@@ -126,7 +126,7 @@ public class StressTestLockContention extends ProxyTestCase {
 
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
 
         Iterator<Future<Object>> itr = futures.iterator();
 

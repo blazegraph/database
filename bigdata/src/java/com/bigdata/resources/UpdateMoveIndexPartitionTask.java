@@ -130,7 +130,8 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
 
         final String scaleOutIndexName = src.getIndexMetadata().getName();
         
-        final String targetIndexName = DataService.getIndexPartitionName(scaleOutIndexName, moveResult.newPartitionId);
+        final String targetIndexName = DataService.getIndexPartitionName(
+                scaleOutIndexName, moveResult.newPartitionId);
 
         int nchunks = 0; // #of passes.
         long ncopied = 0; // #of tuples copied.
@@ -171,6 +172,12 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
             
         }
 
+        // drop the old index partition.
+        getJournal().dropIndex(getOnlyResource());
+        
+        // will notify tasks that index partition has moved.
+        resourceManager.setIndexPartitionGone(getOnlyResource(), "move");
+        
         final LocalPartitionMetadata pmd = src.getIndexMetadata()
                 .getPartitionMetadata();
         
@@ -261,6 +268,28 @@ public class UpdateMoveIndexPartitionTask extends AbstractTask {
             final boolean deleteMarkers = ndx.getIndexMetadata().getDeleteMarkers();
             
             final boolean versionTimestamps = ndx.getIndexMetadata().getVersionTimestamps();
+      
+            if(ndx.getIndexMetadata().getOverflowHandler()!=null) {
+
+                /*
+                 * FIXME Must apply overflowHandler - see
+                 * AbstractBTree#rangeCopy.
+                 * 
+                 * Probably the easiest way to handle this is to do an
+                 * UNISOLATED build on the view, or to combine an build on the
+                 * old view (from the lastCommitTime) which runs before the
+                 * update task with an UNISOLATED build on the BTree buffering
+                 * writes. The send the resulting index segment(s) to the target
+                 * data service while holding an exclusive write lock. Once the
+                 * target puts those files into place as a view we do the atomic
+                 * update thing here. The "send two index segments" version will
+                 * have the lowest latency since we can build and send one while
+                 * we continue to absorb writes and then send another with just
+                 * the buffered writes.
+                 */
+                throw new UnsupportedOperationException("Must apply overflowHandler");
+
+            }
             
             for(int i=0; i<n; i++) {
                 

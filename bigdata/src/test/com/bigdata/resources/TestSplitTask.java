@@ -158,7 +158,7 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         final UUID uuid0 = resourceManager.getLiveJournal().getRootBlockView().getUUID();
         
         // force overflow onto a new journal.
-        Future future = resourceManager.overflowNow();
+        Future future = resourceManager.overflow();
 
         // await completion of the task.
         future.get();
@@ -185,7 +185,11 @@ public class TestSplitTask extends AbstractResourceManagerTestCase {
         assertTrue(resourceManager.overflowAllowed.get());
         
         // verify that the old index partition is no longer registered.
-        assertNull(resourceManager.getIndex(name, ITx.UNISOLATED));
+        try {
+            resourceManager.getIndex(name, ITx.UNISOLATED);
+        } catch(StaleLocatorException ex) {
+            assertEquals("split",ex.getReason());
+        }
 
         /*
          * Note: If you suspect a problem here you really need to examine the

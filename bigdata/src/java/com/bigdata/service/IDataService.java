@@ -46,6 +46,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.repo.BigdataRepository;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -169,9 +170,11 @@ import com.bigdata.sparse.SparseRowStore;
  * respond for that index partition IFF there is an index under that name
  * registered on the {@link IDataService} as of the <i>timestamp</i> associated
  * with the request. If the index is not registered then a
- * {@link NoSuchIndexException} will be thrown. <em>All methods on this and
- * derived interfaces which are defined for an index name and timestamp MUST
- * conform to these semantics.</em>
+ * {@link NoSuchIndexException} will be thrown. If the index was registered and
+ * has since been split, joined or moved then a {@link StaleLocatorException}
+ * will be thrown (this will occur only for index partitions of scale-out
+ * indices). <strong>All methods on this and derived interfaces which are
+ * defined for an index name and timestamp MUST conform to these semantics.</strong>
  * 
  * </p>
  * 
@@ -194,9 +197,9 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * Split, join, and move operations all result in the old index partition being
  * dropped on the {@link IDataService}. Clients having a stale
- * {@link PartitionLocator} record will attempt to reach the now defunct
- * index partition after it has been dropped and will receive a
- * {@link NoSuchIndexException}.
+ * {@link PartitionLocator} record will attempt to reach the now defunct index
+ * partition after it has been dropped and will receive a
+ * {@link StaleLocatorException}.
  * 
  * </p>
  * 

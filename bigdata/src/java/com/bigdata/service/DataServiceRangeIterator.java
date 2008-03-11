@@ -96,16 +96,16 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
 
     /**
      * This method (and no other method on this class) will throw a (possibly
-     * wrapped) {@link NoSuchIndexException} if an index partition is split,
+     * wrapped) {@link StaleLocatorException} if an index partition is split,
      * joined or moved during traversal.
      * <p>
      * The caller MUST test any thrown exception. If the exception is, or wraps,
-     * a {@link NoSuchIndexException}, then the caller MUST refresh its
+     * a {@link StaleLocatorException}, then the caller MUST refresh its
      * {@link IPartitionLocatorMetadata locators}s for the key range of the
      * index partition that it thought it was traversing, and then continue
      * traversal based on the revised locators(s).
      * <p>
-     * Note: The {@link NoSuchIndexException} CAN NOT arise from any other
+     * Note: The {@link StaleLocatorException} CAN NOT arise from any other
      * method since only
      * {@link #getResultSet(byte[], byte[], int, int, ITupleFilter)} actually
      * reads from the {@link IDataService} and ALL calls to that method are
@@ -113,7 +113,7 @@ public class DataServiceRangeIterator extends RawDataServiceRangeIterator {
      * <p>
      * Note: The methods that handle delete-behind use the
      * {@link ClientIndexView} to be robust and therefore will never throw a
-     * {@link NoSuchIndexException}.
+     * {@link StaleLocatorException}.
      */
     public boolean hasNext() {
         

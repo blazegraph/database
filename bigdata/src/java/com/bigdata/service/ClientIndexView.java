@@ -75,6 +75,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.util.InnerCause;
 
@@ -85,7 +86,7 @@ import com.bigdata.util.InnerCause;
  * <p>
  * This view automatically handles the split, join, or move of index partitions
  * within the federation. The {@link IDataService} throws back a (sometimes
- * wrapped) {@link NoSuchIndexException} when it does not have a registered
+ * wrapped) {@link StaleLocatorException} when it does not have a registered
  * index as of some timestamp. If this exception is observed when the client
  * makes a request using a cached {@link PartitionLocator} record then the
  * locator record is stale. The client automatically fetches the locator
@@ -1002,7 +1003,7 @@ public class ClientIndexView implements IIndex {
     
     /**
      * Helper class for submitting an {@link IIndexProcedure} to run on an
-     * {@link IDataService}. The class traps {@link NoSuchIndexException}s and
+     * {@link IDataService}. The class traps {@link StaleLocatorException}s and
      * handles the redirection of requests to the appropriate
      * {@link IDataService}. When necessary, the data for an
      * {@link IKeyArrayIndexProcedure} will be re-split in order to distribute
@@ -1114,9 +1115,9 @@ public class ClientIndexView implements IIndex {
                 
             } catch(Exception ex) {
                 
-                if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+                if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
                     
-                    log.warn("Index partition split, joined or moved: name=" + name, ex);
+                    log.warn("Locator stale (will retry) : name="+name+", stale locator="+locator+" : "+ex);
                     
                     retry();
                     
@@ -1159,7 +1160,7 @@ public class ClientIndexView implements IIndex {
         }
         
         /**
-         * Invoked when {@link NoSuchIndexException} was thrown. Since the
+         * Invoked when {@link StaleLocatorException} was thrown. Since the
          * procedure was being run against an index partition of some scale-out
          * index this exception indicates that the index partition locator was
          * stale. We re-cache the locator(s) for the same key range as the index

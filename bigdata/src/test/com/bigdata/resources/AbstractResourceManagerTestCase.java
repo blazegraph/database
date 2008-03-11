@@ -211,7 +211,7 @@ public class AbstractResourceManagerTestCase extends
         shutdownNow();
         
         if (resourceManager != null)
-            resourceManager.destroyAllResources();
+            resourceManager.deleteResources();
 
     }
 

@@ -39,6 +39,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -106,7 +107,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     
     /**
      * The last key that was visited on the {@link #src} iterator. This is used
-     * in case we trap a {@link NoSuchIndexException}. It provides the
+     * in case we trap a {@link StaleLocatorxception}. It provides the
      * exclusive lower bound for the query against the new index partitions
      * identified when we refresh our {@link PartitionLocator}s. This is
      * <code>null</code> initially and is set to the non-<code>null</code>
@@ -114,7 +115,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
      * 
      * FIXME This adds a requirement that the {@link IRangeQuery#KEYS} are
      * always requested so that we can avoid double-counting. However,
-     * {@link NoSuchIndexException}s can only arise when we request the next
+     * {@link StaleLocatorException}s can only arise when we request the next
      * result set so we SHOULD be able to get by without the KEYS at this layer
      * (which means that we do not have to send them across the network) by
      * using {@link ResultSet#getLastKey()}.  Change this since we otherwise
@@ -128,7 +129,7 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     private PartitionLocator locator = null;
 
     /**
-     * The last locator for which we received a {@link NoSuchIndexException}.
+     * The last locator for which we received a {@link StaleLocatorException}.
      * We note this so that we can avoid an endless retry if the same locator is
      * reported when we attempt to restart the {@link #locatorItr}.
      */
@@ -290,10 +291,10 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
             
         } catch(RuntimeException ex) {
             
-            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+            if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
                 
                 /*
-                 * Handle NoSuchIndexException. This exception indicates that we
+                 * Handle StaleLocatorException. This exception indicates that we
                  * have a stale index partition locator. This can happen when
                  * index partitions are split, joined, or moved.
                  */
@@ -304,9 +305,9 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
                             .getPartitionId()) {
 
                         /*
-                         * This happens if we get a NoSuchIndexException,
+                         * This happens if we get a StaleLocatorException,
                          * restart the locator scan, and get another
-                         * NoSuchIndexException on the same index partition.
+                         * StaleLocatorException on the same index partition.
                          * Since a new index partition identifier is assigned
                          * every time there is a split/join/move this is a clear
                          * indication that something is wrong with either the

@@ -142,6 +142,9 @@ public class UpdateJoinIndexPartition extends AbstractTask {
             // drop the old index partition.
             getJournal().dropIndex(name);
             
+            // will notify tasks that index partition was joined.
+            resourceManager.setIndexPartitionGone(name, "join");
+            
         }
         
         // register the new index partition.

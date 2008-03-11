@@ -31,9 +31,9 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
- * Unit tests for the close/reopen protocol designed to manage the resource
- * burden of indices without invalidating the index objects (indices opens can
- * be reopened as long as their backing store remains available).
+ * Unit tests for the close/checkpoint/reopen protocol designed to manage the
+ * resource burden of indices without invalidating the index objects (indices
+ * opens can be reopened as long as their backing store remains available).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,21 +60,19 @@ public class TestReopen extends AbstractBTreeTestCase {
      */
     public void test_reopen01() {
 
-//        BTree btree = getBTree(3);
-
         final IRawStore store = new SimpleMemoryRawStore();
 
-        final UUID indexUUID = UUID.randomUUID();
-        
         /*
          * The btree under test.
          */
         final BTree btree;
         {
-            IndexMetadata md = new IndexMetadata(indexUUID);
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
             md.setBranchingFactor(3);
             
             btree = BTree.create(store, md);
+            
         }
 
         assertTrue(btree.isOpen());
@@ -103,17 +101,17 @@ public class TestReopen extends AbstractBTreeTestCase {
      
         final IRawStore store = new SimpleMemoryRawStore();
 
-        final UUID indexUUID = UUID.randomUUID();
-        
         /*
          * The btree under test.
          */
         final BTree btree;
         {
-            IndexMetadata md = new IndexMetadata(indexUUID);
+            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            
             md.setBranchingFactor(3);
             
             btree = BTree.create(store, md);
+            
         }
 
         btree.insert(KeyBuilder.asSortKey(1), new SimpleEntry(1));
@@ -130,6 +128,9 @@ public class TestReopen extends AbstractBTreeTestCase {
         // dump after inserts.
         System.out.println("Dump of final btree:");
         btree.dump(Level.DEBUG,System.out);
+        
+        // checkpoint the index.
+        btree.writeCheckpoint();
         
         // force close.
         btree.close();
@@ -207,8 +208,11 @@ public class TestReopen extends AbstractBTreeTestCase {
             int n = r.nextInt(100);
 
             if (n < 5) {
-                // periodically force a close of the btree.
-                if(btree.isOpen()) btree.close();
+                /* periodically force a checkpoint + close of the btree. */
+                if(btree.isOpen()) {
+                    btree.writeCheckpoint();
+                    btree.close();
+                }
             } else if (n < 20) {
                 // remove an entry.
                 byte[] key = new byte[keylen];

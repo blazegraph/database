@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,19 +42,20 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
-import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrencyManager.Options;
-import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceRangeIterator;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -93,7 +95,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdown();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
         
     }
 
@@ -105,7 +107,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         journal.shutdownNow();
         
-        journal.destroyAllResources();
+        journal.deleteResources();
 
     }
     
@@ -121,47 +123,53 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         Journal journal = new Journal(properties);
         
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+        try {
 
-        final String resource = "foo";
-        
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.READ_COMMITTED, resource) {
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
 
-            /**
-             * The task just sets a boolean value and returns the name of the
-             * sole resource. It does not actually read anything.
+            final String resource = "foo";
+
+            final AtomicBoolean ran = new AtomicBoolean(false);
+
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    ITx.READ_COMMITTED, resource) {
+
+                /**
+                 * The task just sets a boolean value and returns the name of
+                 * the sole resource. It does not actually read anything.
+                 */
+                protected Object doTask() throws Exception {
+
+                    ran.compareAndSet(false, true);
+
+                    return getOnlyResource();
+
+                }
+            });
+
+            // the test task returns the resource as its value.
+            assertEquals("result", resource, future.get());
+
+            /*
+             * make sure that the flag was set (not reliably set until we get()
+             * the future).
              */
-            protected Object doTask() throws Exception {
+            assertTrue("ran", ran.get());
 
-                ran.compareAndSet(false, true);
+            /*
+             * Verify that a commit was NOT performed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
 
-                return getOnlyResource();
+        } finally {
 
-            }
-        });
+            journal.shutdown();
 
-        // the test task returns the resource as its value.
-        assertEquals("result",resource,future.get());
-        
-        /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
-        
-        /*
-         * Verify that a commit was NOT performed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
-        
-        journal.shutdown();
+            journal.deleteResources();
 
-        journal.destroyAllResources();
+        }
 
     }
 
@@ -177,48 +185,55 @@ public class TestConcurrentJournal extends ProxyTestCase {
         Properties properties = getProperties();
         
         Journal journal = new Journal(properties);
-        
-        final String resource = "foo";
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, resource) {
+        try {
 
-            /**
-             * The task just sets a boolean value and returns the name of the
-             * sole resource. It does not actually read or write on anything.
+            final String resource = "foo";
+
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
+            final AtomicBoolean ran = new AtomicBoolean(false);
+
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    ITx.UNISOLATED, resource) {
+
+                /**
+                 * The task just sets a boolean value and returns the name of
+                 * the sole resource. It does not actually read or write on
+                 * anything.
+                 */
+                protected Object doTask() throws Exception {
+
+                    ran.compareAndSet(false, true);
+
+                    return getOnlyResource();
+
+                }
+            });
+
+            // the test task returns the resource as its value.
+            assertEquals("result", resource, future.get());
+
+            /*
+             * make sure that the flag was set (not reliably set until we get()
+             * the future).
              */
-            protected Object doTask() throws Exception {
+            assertTrue("ran", ran.get());
 
-                ran.compareAndSet(false, true);
+            /*
+             * Verify that the commit counter was changed.
+             */
+            assertEquals("commit counter unchanged?", commitCounterBefore + 1,
+                    journal.getRootBlockView().getCommitCounter());
 
-                return getOnlyResource();
+        } finally {
 
-            }
-        });
+            journal.shutdown();
 
-        // the test task returns the resource as its value.
-        assertEquals("result",resource,future.get());
-        
-        /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
+            journal.deleteResources();
 
-        /*
-         * Verify that the commit counter was changed.
-         */
-        assertEquals("commit counter unchanged?",
-                commitCounterBefore+1, journal.getRootBlockView()
-                        .getCommitCounter());
-
-        journal.shutdown();
-
-        journal.destroyAllResources();
+        }
 
     }
 
@@ -234,55 +249,62 @@ public class TestConcurrentJournal extends ProxyTestCase {
         Properties properties = getProperties();
         
         Journal journal = new Journal(properties);
-        
-        final String resource = "foo";
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        final long tx = journal.newTx(IsolationEnum.ReadOnly);
+        try {
 
-        assertNotSame(ITx.UNISOLATED,tx);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                tx, resource) {
+            final String resource = "foo";
 
-            /**
-             * The task just sets a boolean value and returns the name of the
-             * sole resource. It does not actually read or write on anything.
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
+            final AtomicBoolean ran = new AtomicBoolean(false);
+
+            final long tx = journal.newTx(IsolationEnum.ReadOnly);
+
+            assertNotSame(ITx.UNISOLATED, tx);
+
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    tx, resource) {
+
+                /**
+                 * The task just sets a boolean value and returns the name of
+                 * the sole resource. It does not actually read or write on
+                 * anything.
+                 */
+                protected Object doTask() throws Exception {
+
+                    ran.compareAndSet(false, true);
+
+                    return getOnlyResource();
+
+                }
+            });
+
+            // the test task returns the resource as its value.
+            assertEquals("result", resource, future.get());
+
+            /*
+             * make sure that the flag was set (not reliably set until we get()
+             * the future).
              */
-            protected Object doTask() throws Exception {
+            assertTrue("ran", ran.get());
 
-                ran.compareAndSet(false, true);
+            /*
+             * Verify that the commit counter was NOT changed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
 
-                return getOnlyResource();
+            // commit of a read-only tx returns commitTime of ZERO(0L).
+            assertEquals(0L, journal.commit(tx));
 
-            }
-        });
+        } finally {
 
-        // the test task returns the resource as its value.
-        assertEquals("result",resource,future.get());
-        
-        /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
+            journal.shutdown();
 
-        /*
-         * Verify that the commit counter was NOT changed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
+            journal.deleteResources();
 
-        // commit of a read-only tx returns commitTime of ZERO(0L).
-        assertEquals(0L,journal.commit(tx));
-        
-        journal.shutdown();
-
-        journal.destroyAllResources();
+        }
 
     }
     
@@ -298,64 +320,71 @@ public class TestConcurrentJournal extends ProxyTestCase {
             throws InterruptedException, ExecutionException {
         
         Properties properties = getProperties();
-        
+
         Journal journal = new Journal(properties);
-        
-        final String resource = "foo";
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        final long tx = ITx.READ_COMMITTED;
-//        final long tx = journal.newTx(IsolationEnum.ReadCommitted);
-//      assertNotSame(ITx.UNISOLATED, tx);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal, tx,
-                resource) {
-
-            /**
-             * The task just sets a boolean value and returns the name of the
-             * sole resource. It does not actually read or write on anything.
-             */
-            protected Object doTask() throws Exception {
-
-                ran.compareAndSet(false, true);
-
-                return getOnlyResource();
-
-            }
-        });
-
-        // the test task returns the resource as its value.
-        assertEquals("result",resource,future.get());
-        
-        /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
-
-        /*
-         * Verify that the commit counter was NOT changed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
-
-//        // commit of a readCommitted tx returns commitTime of ZERO(0L).
-//        assertEquals(0L,journal.commit(tx));
-        // should be illegal since this is not a full transaction.
         try {
-            journal.abort(tx);
-            fail("Expecting: "+IllegalStateException.class);
-        } catch(IllegalStateException ex) {
-            log.info("Ignoring expected exception: "+ex);
+
+            final String resource = "foo";
+
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
+
+            final AtomicBoolean ran = new AtomicBoolean(false);
+
+            final long tx = ITx.READ_COMMITTED;
+            // final long tx = journal.newTx(IsolationEnum.ReadCommitted);
+            // assertNotSame(ITx.UNISOLATED, tx);
+
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    tx, resource) {
+
+                /**
+                 * The task just sets a boolean value and returns the name of
+                 * the sole resource. It does not actually read or write on
+                 * anything.
+                 */
+                protected Object doTask() throws Exception {
+
+                    ran.compareAndSet(false, true);
+
+                    return getOnlyResource();
+
+                }
+            });
+
+            // the test task returns the resource as its value.
+            assertEquals("result", resource, future.get());
+
+            /*
+             * make sure that the flag was set (not reliably set until we get()
+             * the future).
+             */
+            assertTrue("ran", ran.get());
+
+            /*
+             * Verify that the commit counter was NOT changed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
+
+            // // commit of a readCommitted tx returns commitTime of ZERO(0L).
+            // assertEquals(0L,journal.commit(tx));
+            // should be illegal since this is not a full transaction.
+            try {
+                journal.abort(tx);
+                fail("Expecting: " + IllegalStateException.class);
+            } catch (IllegalStateException ex) {
+                log.info("Ignoring expected exception: " + ex);
+            }
+
+        } finally {
+
+            journal.shutdown();
+
+            journal.deleteResources();
+
         }
-
-        journal.shutdown();
-
-        journal.destroyAllResources();
 
     }
 
@@ -373,55 +402,63 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         Journal journal = new Journal(properties);
         
-        final String resource = "foo";
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+        try {
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        final long tx = journal.newTx(IsolationEnum.ReadWrite);
+            final String resource = "foo";
 
-        assertNotSame(ITx.UNISOLATED,tx);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                tx, resource) {
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
 
-            /**
-             * The task just sets a boolean value and returns the name of the
-             * sole resource. It does not actually read or write on anything.
+            final AtomicBoolean ran = new AtomicBoolean(false);
+
+            final long tx = journal.newTx(IsolationEnum.ReadWrite);
+
+            assertNotSame(ITx.UNISOLATED, tx);
+
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    tx, resource) {
+
+                /**
+                 * The task just sets a boolean value and returns the name of
+                 * the sole resource. It does not actually read or write on
+                 * anything.
+                 */
+                protected Object doTask() throws Exception {
+
+                    ran.compareAndSet(false, true);
+
+                    return getOnlyResource();
+
+                }
+            });
+
+            // the test task returns the resource as its value.
+            assertEquals("result", resource, future.get());
+
+            /*
+             * make sure that the flag was set (not reliably set until we get()
+             * the future).
              */
-            protected Object doTask() throws Exception {
+            assertTrue("ran", ran.get());
 
-                ran.compareAndSet(false, true);
+            /*
+             * Verify that the commit counter was NOT changed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
 
-                return getOnlyResource();
+            // commit of a readWrite tx with an empty result set returns
+            // commitTime
+            // of ZERO(0L).
+            assertEquals(0L, journal.commit(tx));
 
-            }
-        });
+        } finally {
 
-        // the test task returns the resource as its value.
-        assertEquals("result",resource,future.get());
-        
-        /*
-         * make sure that the flag was set (not reliably set until we get() the
-         * future).
-         */
-        assertTrue("ran",ran.get());
+            journal.shutdown();
 
-        /*
-         * Verify that the commit counter was NOT changed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
+            journal.deleteResources();
 
-        // commit of a readWrite tx with an empty result set returns commitTime
-        // of ZERO(0L).
-        assertEquals(0L,journal.commit(tx));
-        
-        journal.shutdown();
-
-        journal.destroyAllResources();
+        }
 
     }
 
@@ -441,92 +478,100 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         Journal journal = new Journal(properties);
 
-        // Note:
-        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"500");
+        try {
 
-        final String[] resource = new String[]{"foo"};
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+            // Note:
+            properties.setProperty(Options.SHUTDOWN_TIMEOUT, "500");
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, resource) {
+            final String[] resource = new String[] { "foo" };
 
-            /**
-             * The task just sets a boolean value and then sleeps.
-             */
-            protected Object doTask() throws Exception {
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
 
-                ran.compareAndSet(false, true);
+            final AtomicBoolean ran = new AtomicBoolean(false);
 
-                while(true) {
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    ITx.UNISOLATED, resource) {
 
-                    if(Thread.interrupted()) {
+                /**
+                 * The task just sets a boolean value and then sleeps.
+                 */
+                protected Object doTask() throws Exception {
 
-                        System.err.println("Interrupted.");
+                    ran.compareAndSet(false, true);
+
+                    while (true) {
+
+                        if (Thread.interrupted()) {
+
+                            System.err.println("Interrupted.");
+
+                            /*
+                             * Note: If you simply continue processing rather
+                             * than throwing an exception then the interrupt is
+                             * _ignored_.
+                             */
+
+                            throw new InterruptedException(
+                                    "Task was interrupted");
+
+                        }
 
                         /*
-                         * Note: If you simply continue processing rather than
-                         * throwing an exception then the interrupt is
-                         * _ignored_.
+                         * Note: this will notice if the Thread is interrupted.
                          */
 
-                        throw new InterruptedException("Task was interrupted");
-                        
+                        Thread.sleep(Long.MAX_VALUE);
+
                     }
 
-                    /*
-                     * Note: this will notice if the Thread is interrupted.
-                     */
-
-                    Thread.sleep(Long.MAX_VALUE);
-                    
                 }
+
+            });
+
+            // wait until the task starts executing.
+
+            while (true) {
+
+                if (ran.get())
+                    break;
+
+                Thread.sleep(100);
 
             }
 
-        });
+            // interrupts and cancels the task.
+            assertTrue(future.cancel(true/* mayInterruptWhileRunning */));
 
-        // wait until the task starts executing.
-        
-        while(true) {
-            
-            if(ran.get()) break;
-            
-            Thread.sleep(100);
-            
+            // the task was cancelled.
+            assertTrue(future.isCancelled());
+
+            // verify that get() throws the expected exception.
+            try {
+
+                future.get();
+
+                fail("Expecting: " + CancellationException.class);
+
+            } catch (CancellationException ex) {
+
+                System.err.println("Ignoring expected exception: " + ex);
+
+            }
+
+            /*
+             * Verify that the commit counter was changed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
+
+        } finally {
+
+            journal.shutdown();
+
+            journal.deleteResources();
+
         }
-
-        // interrupts and cancels the task.
-        assertTrue(future.cancel(true/*mayInterruptWhileRunning*/));
-
-        // the task was cancelled.
-        assertTrue(future.isCancelled());
-        
-        // verify that get() throws the expected exception.
-        try {
-            
-            future.get();
-            
-            fail("Expecting: "+CancellationException.class);            
-            
-        } catch(CancellationException ex) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-        
-        /*
-         * Verify that the commit counter was changed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
-
-        journal.shutdown();
-
-        journal.destroyAllResources();
 
     }
 
@@ -557,265 +602,296 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void test_submit_interrupt02() throws InterruptedException, ExecutionException {
-        
+    public void test_submit_interrupt02() throws InterruptedException,
+            ExecutionException {
+
         Properties properties = getProperties();
-        
-        properties.setProperty(Options.SHUTDOWN_TIMEOUT,"500");
-        
+
+        properties.setProperty(Options.SHUTDOWN_TIMEOUT, "500");
+
         Journal journal = new Journal(properties);
-        
-        final String[] resource = new String[]{"foo"};
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
 
-        final AtomicBoolean ran = new AtomicBoolean(false);
-        
-        Future<Object> future = journal.submit(new AbstractTask(journal, 
-                ITx.UNISOLATED, resource) {
-
-            /**
-             * The task just sets a boolean value and then runs an infinite
-             * loop, <strong>ignoring interrupts</strong>.
-             */
-            protected Object doTask() throws Exception {
-
-                ran.compareAndSet(false, true);
-
-                while(true) {
-                    try {
-                        Thread.sleep(Long.MAX_VALUE);
-                    } catch(InterruptedException ex) {
-                        /*ignore*/
-                        System.err.println("Ignoring interrupt: "+ex);
-                    }
-                }
-
-            }
-
-        });
-
-        // wait until the task starts executing.
-        
-        while(true) {
-            
-            if(ran.get()) break;
-            
-            Thread.sleep(100);
-            
-        }
-
-        // this aggressively terminates the task.
-        assertTrue(future.cancel(false/*mayInterruptWhileRunning*/));
-
-        // the task was cancelled.
-        assertTrue(future.isCancelled());
-        
-        // verify that get() throws the expected exception.
         try {
-            
-            future.get();
-            
-            fail("Expecting: "+CancellationException.class);            
-            
-        } catch(CancellationException ex) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
-            
-        }
-        
-        /*
-         * Verify that the commit counter was NOT changed.
-         */
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
 
-        journal.shutdown();
+            final String[] resource = new String[] { "foo" };
 
-        journal.destroyAllResources();
+            final long commitCounterBefore = journal.getRootBlockView()
+                    .getCommitCounter();
 
-    }
+            final AtomicBoolean ran = new AtomicBoolean(false);
 
-    /**
-     * This task verifies that an abort will wait until all running tasks
-     * complete (ie, join the "abort group") before aborting.
-     * <p>
-     * If the abort occurs while task(s) are still running then actions by those
-     * tasks can break the concurrency control mechanisms. For example, writes
-     * on unisolated indices by tasks in the abort group could be made restart
-     * safe with the next commit.  However, the lock system SHOULD still keep
-     * new tasks from writing on resources locked by tasks that have not yet
-     * terminated.
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
-    public void test_submit_interrupt03() throws InterruptedException, ExecutionException {
-        
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
-        
-        final String[] resource = new String[]{"foo"};
+            Future<Object> future = journal.submit(new AbstractTask(journal,
+                    ITx.UNISOLATED, resource) {
 
-        {
-            journal.registerIndex(resource[0]);
-            journal.commit();
-        }
-        
-        final long commitCounterBefore = journal.getRootBlockView().getCommitCounter();
+                /**
+                 * The task just sets a boolean value and then runs an infinite
+                 * loop, <strong>ignoring interrupts</strong>.
+                 */
+                protected Object doTask() throws Exception {
 
-        /* 4 - done.
-         */
-        final AtomicInteger runState = new AtomicInteger(0);
-        
-        final Lock lock = new ReentrantLock();
+                    ran.compareAndSet(false, true);
 
-        /**
-         * Used to force an abort.
-         */
-        class PrivateException extends RuntimeException {
-
-            private static final long serialVersionUID = 1L;
-
-            PrivateException(String msg) {
-                super(msg);
-            }
-            
-        }
-        
-        Future<Object> f1 = journal.submit(new AbstractTask(journal,
-                ITx.UNISOLATED, resource) {
-
-            /**
-             */
-            protected Object doTask() throws Exception {
-
-                runState.compareAndSet(0, 1);
-
-                // low-level write so there is some data to be committed.
-                getJournal().write(getRandomData());
-
-                // wait more before exiting.
-                {
-                    final long begin = System.currentTimeMillis();
-                    final long timeout = 5000; // ms
-                    log.warn("Sleeping " + timeout + "ms");
-                    try {
-                        final long elapsed = System.currentTimeMillis() - begin;
-                        Thread.sleep(timeout - elapsed/* ms */);
-                    } catch (InterruptedException ex) {
-                        log.warn(ex);
+                    while (true) {
+                        try {
+                            Thread.sleep(Long.MAX_VALUE);
+                        } catch (InterruptedException ex) {
+                            /* ignore */
+                            System.err.println("Ignoring interrupt: " + ex);
+                        }
                     }
+
                 }
 
-                lock.lock();
-                try {
-                    runState.compareAndSet(1, 4);
-                    log.warn("Done");
-                } finally {
-                    lock.unlock();
-                }
-                
-                return null;
-                
-            }
+            });
 
-        });
+            // wait until the task starts executing.
 
-        // force async abort of the commit group.
-        
-        Future<Object> f2 = journal.submit(new AbstractTask(journal, 
-                ITx.UNISOLATED, new String[] { }) {
+            while (true) {
 
-            protected Object doTask() throws Exception {
-
-                log.warn("Running task that will force abort of the commit group.");
-                
-                // low-level write.
-                getJournal().write(getRandomData());
-
-                throw new PrivateException("Forcing abort of the commit group.");
-                
-            }
-            
-        });
-        
-        // Verify that the commit counter was NOT changed.
-        assertEquals("commit counter changed?",
-                commitCounterBefore, journal.getRootBlockView()
-                        .getCommitCounter());
-
-        /*
-         * Verify that the write service waits for the interrupted task to join
-         * the abort group.
-         */
-        log.warn("Waiting for 1st task to finish");
-        while(runState.get()<4) {
-            
-            lock.lock();
-            try {
-                if(runState.get()<4) {
-                    // No abort yet.
-                    assertEquals("Not expecting abort",0,journal.getConcurrencyManager().writeService.getAbortCount());
-                }
-            } finally {
-                lock.unlock();
-            }
-            Thread.sleep(20);
-            
-        }
-        log.warn("Reached runState="+runState);
-        
-        // wait for the abort or a timeout.
-        {
-            log.warn("Waiting for the abort.");
-            final long begin = System.currentTimeMillis();
-            while ((begin - System.currentTimeMillis()) < 1000) {
-                if (journal.getConcurrencyManager().writeService.getAbortCount() > 0) {
-                    log.warn("Noticed abort");
+                if (ran.get())
                     break;
-                } else {
-                    // Verify that the commit counter was NOT changed.
-                    assertEquals("commit counter changed?",
-                            commitCounterBefore, journal.getRootBlockView()
-                                    .getCommitCounter());
-                }
+
+                Thread.sleep(100);
+
             }
+
+            // this aggressively terminates the task.
+            assertTrue(future.cancel(false/* mayInterruptWhileRunning */));
+
+            // the task was cancelled.
+            assertTrue(future.isCancelled());
+
+            // verify that get() throws the expected exception.
+            try {
+
+                future.get();
+
+                fail("Expecting: " + CancellationException.class);
+
+            } catch (CancellationException ex) {
+
+                System.err.println("Ignoring expected exception: " + ex);
+
+            }
+
+            /*
+             * Verify that the commit counter was NOT changed.
+             */
+            assertEquals("commit counter changed?", commitCounterBefore,
+                    journal.getRootBlockView().getCommitCounter());
+
+        } finally {
+
+            journal.shutdown();
+
+            journal.deleteResources();
+
         }
-
-        // verify did abort.
-        assertEquals("Expecting abort", 1,
-                journal.getConcurrencyManager().writeService.getAbortCount());
-
-        /*
-         * Verify that both futures are complete and that both throw exceptions
-         * since neither task was allowed to commit.
-         * 
-         * Note: f1 completed successfully but the commit group was discarded
-         * when f2 threw an exception. Therefore f1 sees an inner RetryException
-         * while f2 sees the exception that it threw as its inner exception.
-         */
-        {
-            
-            try {f1.get();fail("Expecting exception.");}
-            catch(ExecutionException ex) {
-                assertTrue(isInnerCause(ex, RetryException.class));
-                log.warn("Expected exception: "+ex,ex);
-            }
-            try {f2.get();fail("Expecting exception.");}
-            catch(ExecutionException ex) {
-                log.warn("Expected exception: "+ex,ex);
-                assertTrue(isInnerCause(ex, PrivateException.class));
-            }
-        }
-        
-        journal.shutdown();
-
-        journal.destroyAllResources();
 
     }
+
+///*
+// * Note: This test no longer matches new semantics for the
+// * {@link WriteExecutorService}. A failed unisolated task will now return as
+// * soon as we rollback the indices to their last checkpoint (which we do just by
+// * closing the index).
+// * 
+// */
+//    /**
+//     * This task verifies that an abort will wait until all running tasks
+//     * complete (ie, join the "abort group") before aborting.
+//     * <p>
+//     * If the abort occurs while task(s) are still running then actions by those
+//     * tasks can break the concurrency control mechanisms. For example, writes
+//     * on unisolated indices by tasks in the abort group could be made restart
+//     * safe with the next commit. However, the lock system SHOULD still keep new
+//     * tasks from writing on resources locked by tasks that have not yet
+//     * terminated.
+//     */
+//    public void test_submit_interrupt03() throws InterruptedException, ExecutionException {
+//        
+//        Properties properties = getProperties();
+//        
+//        Journal journal = new Journal(properties);
+//        
+//        try {
+//
+//            final String[] resource = new String[] { "foo" };
+//
+//            {
+//                journal.registerIndex(resource[0]);
+//                journal.commit();
+//            }
+//
+//            final long commitCounterBefore = journal.getRootBlockView()
+//                    .getCommitCounter();
+//
+//            /*
+//             * 4 - done.
+//             */
+//            final AtomicInteger runState = new AtomicInteger(0);
+//
+//            final Lock lock = new ReentrantLock();
+//
+//            /**
+//             * Used to force an abort.
+//             */
+//            class PrivateException extends RuntimeException {
+//
+//                private static final long serialVersionUID = 1L;
+//
+//                PrivateException(String msg) {
+//                    super(msg);
+//                }
+//
+//            }
+//
+//            Future<Object> f1 = journal.submit(new AbstractTask(journal,
+//                    ITx.UNISOLATED, resource) {
+//
+//                /**
+//                 */
+//                protected Object doTask() throws Exception {
+//
+//                    runState.compareAndSet(0, 1);
+//
+//                    // low-level write so there is some data to be committed.
+//                    getJournal().write(getRandomData());
+//
+//                    // wait more before exiting.
+//                    {
+//                        final long begin = System.currentTimeMillis();
+//                        final long timeout = 5000; // ms
+//                        log.warn("Sleeping " + timeout + "ms");
+//                        try {
+//                            final long elapsed = System.currentTimeMillis()
+//                                    - begin;
+//                            Thread.sleep(timeout - elapsed/* ms */);
+//                        } catch (InterruptedException ex) {
+//                            log.warn(ex);
+//                        }
+//                    }
+//
+//                    lock.lock();
+//                    try {
+//                        runState.compareAndSet(1, 4);
+//                        log.warn("Done");
+//                    } finally {
+//                        lock.unlock();
+//                    }
+//
+//                    return null;
+//
+//                }
+//
+//            });
+//
+//            // force async abort of the commit group.
+//
+//            Future<Object> f2 = journal.submit(new AbstractTask(journal,
+//                    ITx.UNISOLATED, new String[] {}) {
+//
+//                protected Object doTask() throws Exception {
+//
+//                    log
+//                            .warn("Running task that will force abort of the commit group.");
+//
+//                    // low-level write.
+//                    getJournal().write(getRandomData());
+//
+//                    throw new PrivateException(
+//                            "Forcing abort of the commit group.");
+//
+//                }
+//
+//            });
+//
+//            // Verify that the commit counter was NOT changed.
+//            assertEquals("commit counter changed?", commitCounterBefore,
+//                    journal.getRootBlockView().getCommitCounter());
+//
+//            /*
+//             * Verify that the write service waits for the interrupted task to
+//             * join the abort group.
+//             */
+//            log.warn("Waiting for 1st task to finish");
+//            while (runState.get() < 4) {
+//
+//                lock.lock();
+//                try {
+//                    if (runState.get() < 4) {
+//                        // No abort yet.
+//                        assertEquals("Not expecting abort", 0, journal
+//                                .getConcurrencyManager().writeService
+//                                .getAbortCount());
+//                    }
+//                } finally {
+//                    lock.unlock();
+//                }
+//                Thread.sleep(20);
+//
+//            }
+//            log.warn("Reached runState=" + runState);
+//
+//            // wait for the abort or a timeout.
+//            {
+//                log.warn("Waiting for the abort.");
+//                final long begin = System.currentTimeMillis();
+//                while ((begin - System.currentTimeMillis()) < 1000) {
+//                    if (journal.getConcurrencyManager().writeService
+//                            .getAbortCount() > 0) {
+//                        log.warn("Noticed abort");
+//                        break;
+//                    } else {
+//                        // Verify that the commit counter was NOT changed.
+//                        assertEquals("commit counter changed?",
+//                                commitCounterBefore, journal.getRootBlockView()
+//                                        .getCommitCounter());
+//                    }
+//                }
+//            }
+//
+//            // verify did abort.
+//            assertEquals("Expecting abort", 1,
+//                    journal.getConcurrencyManager().writeService
+//                            .getAbortCount());
+//
+//            /*
+//             * Verify that both futures are complete and that both throw
+//             * exceptions since neither task was allowed to commit.
+//             * 
+//             * Note: f1 completed successfully but the commit group was
+//             * discarded when f2 threw an exception. Therefore f1 sees an inner
+//             * RetryException while f2 sees the exception that it threw as its
+//             * inner exception.
+//             */
+//            {
+//
+//                try {
+//                    f1.get();
+//                    fail("Expecting exception.");
+//                } catch (ExecutionException ex) {
+//                    assertTrue(isInnerCause(ex, RetryException.class));
+//                    log.warn("Expected exception: " + ex, ex);
+//                }
+//                try {
+//                    f2.get();
+//                    fail("Expecting exception.");
+//                } catch (ExecutionException ex) {
+//                    log.warn("Expected exception: " + ex, ex);
+//                    assertTrue(isInnerCause(ex, PrivateException.class));
+//                }
+//            }
+//
+//        } finally {
+//
+//            journal.shutdown();
+//
+//            journal.deleteResources();
+//
+//        }
+//
+//    }
 
     /**
      * Verify that an {@link AbstractTask} correctly rejects an attempt to
@@ -832,59 +908,559 @@ public class TestConcurrentJournal extends ProxyTestCase {
         
         Journal journal = new Journal(properties);
         
-        final String[] resource = new String[]{"foo"};
-        
-        /*
-         * Note: this task is stateless
-         */
-        final AbstractTask task = new AbstractTask(journal, 
-                ITx.UNISOLATED, resource) {
-
-            protected Object doTask() throws Exception {
-
-                return null;
-                
-            }
-
-        };
-
-        /*
-         * Note: We have to request the result of the task before re-submitting
-         * the task again since the duplicate instance is being silently dropped
-         * otherwise - I expect that there is a hash set involved somewhere such
-         * that duplicates can not exist in the queue.
-         */
-        journal.submit(task).get();
-
-        /*
-         * Submit the task again - it will fail.
-         */
         try {
 
+            final String[] resource = new String[] { "foo" };
+
+            /*
+             * Note: this task is stateless
+             */
+            final AbstractTask task = new AbstractTask(journal, ITx.UNISOLATED,
+                    resource) {
+
+                protected Object doTask() throws Exception {
+
+                    return null;
+
+                }
+
+            };
+
+            /*
+             * Note: We have to request the result of the task before
+             * re-submitting the task again since the duplicate instance is
+             * being silently dropped otherwise - I expect that there is a hash
+             * set involved somewhere such that duplicates can not exist in the
+             * queue.
+             */
             journal.submit(task).get();
-            
-            fail("Expecting: "+ResubmitException.class);
 
-        } catch(ExecutionException ex) {
-            
-            if(ex.getCause() instanceof ResubmitException) {
-                
-                System.err.println("Ignoring expected exception: "+ex);
-                
-            } else {
-                
-                fail("Expecting: "+ResubmitException.class);
-                
+            /*
+             * Submit the task again - it will fail.
+             */
+            try {
+
+                journal.submit(task).get();
+
+                fail("Expecting: " + ResubmitException.class);
+
+            } catch (ExecutionException ex) {
+
+                if (ex.getCause() instanceof ResubmitException) {
+
+                    System.err.println("Ignoring expected exception: " + ex);
+
+                } else {
+
+                    fail("Expecting: " + ResubmitException.class);
+
+                }
+
             }
-            
-        }
 
-        journal.shutdown();
-        
-        journal.destroyAllResources();
+        } finally {
+
+            journal.shutdown();
+
+            journal.deleteResources();
+
+        }
 
     }
 
+    /**
+     * Test verifies that an {@link ITx#UNISOLATED} task failure does not cause
+     * concurrent writers to abort. The test also verifies that the
+     * {@link Checkpoint} record for the named index is NOT updated since none
+     * of the tasks write anything on the index.
+     */
+    public void test_writeService001() throws Exception {
+        
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+
+        try {
+
+            final String name = "test";
+
+            // Note: checkpoint for the newly registered index.
+            final long checkpointAddr0;
+            {
+
+                journal.registerIndex(name);
+                
+                journal.commit();
+                
+                checkpointAddr0 = journal.getIndex(name).getCheckpoint()
+                        .getCheckpointAddr();
+                
+            }
+    
+            final WriteExecutorService writeService = journal
+            .getConcurrencyManager().getWriteService();
+                
+            // the list of tasks to be run.
+            final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
+
+            // NOP
+            tasks.add(new AbstractTask(journal, ITx.UNISOLATED, name) {
+                protected String getTaskName() {
+                    return "a";
+                }
+                protected Object doTask() throws Exception {
+                    assertEquals(checkpointAddr0, ((BTree) getIndex(name))
+                            .getCheckpoint().getCheckpointAddr());
+                    return null;
+                }
+            });
+
+            // throws exception.
+            tasks.add(new AbstractTask(journal, ITx.UNISOLATED, name) {
+                protected String getTaskName() {
+                    return "b";
+                }
+                protected Object doTask() throws Exception {
+                    assertEquals(checkpointAddr0, ((BTree) getIndex(name))
+                            .getCheckpoint().getCheckpointAddr());
+                    throw new ForcedAbortException();
+                }
+            });
+
+            // NOP
+            tasks.add(new AbstractTask(journal, ITx.UNISOLATED, name) {
+                protected String getTaskName() {
+                    return "c";
+                }
+                protected Object doTask() throws Exception {
+                    assertEquals(checkpointAddr0, ((BTree) getIndex(name))
+                            .getCheckpoint().getCheckpointAddr());
+                    return null;
+                }
+            });
+            
+            // the commit counter before we submit the tasks.
+            final long commitCounter0 = journal.getRootBlockView()
+                    .getCommitCounter();
+
+            // the group commit count before we submit the tasks.
+            final long groupCommitCount0 = writeService.getGroupCommitCount();
+
+            // the abort count before we submit the tasks.
+            final long abortCount0 = writeService.getAbortCount();
+            
+            // the #of failed tasks before we submit the tasks.
+            final long failedTaskCount0 = writeService.getFailedTaskCount();
+            
+            // the #of successfully tasks before we submit the tasks.
+            final long successTaskCount0 = writeService.getSuccessTaskCount();
+            
+            // the #of successfully committed tasks before we submit the tasks.
+            final long committedTaskCount0 = writeService.getCommittedTaskCount();
+            
+            // submit the tasks.
+            final List<Future<Object>> futures = journal.invokeAll( tasks );
+
+            /*
+             * verify the #of group commits (zero since nothing is written by
+             * any of these tasks).
+             * 
+             * The expectation is that the tasks that succeed make it into the
+             * same commit group while the task that throws an exception does
+             * not cause the commit group to be aborted.
+             * 
+             * Note: The tasks will make it into the same commit group iff the
+             * first task that completes is willing to wait for the others to
+             * join the commit group.
+             * 
+             * Note: The tasks have a dependency on the same resource so they
+             * will be serialized (executed in a strict sequence).
+             */
+            assertEquals("commitCounter", commitCounter0, journal
+                    .getRootBlockView().getCommitCounter());
+
+            // however, a group commit SHOULD have been performed.
+            assertEquals("groupCommitCount", groupCommitCount0 + 1, writeService
+                    .getGroupCommitCount());
+            
+            // NO aborts should have been performed.
+            assertEquals("aboutCount", abortCount0, writeService.getAbortCount());
+            
+            // ONE(1) tasks SHOULD have failed.
+            assertEquals("failedTaskCount", failedTaskCount0 + 1, writeService.
+                    getFailedTaskCount());
+
+            // TWO(2) tasks SHOULD have succeeded.
+            assertEquals("successTaskCount", successTaskCount0 + 2, writeService
+                    .getSuccessTaskCount());
+
+            // TWO(2) successfull tasks SHOULD have been committed.
+            assertEquals("committedTaskCount", committedTaskCount0 + 2, writeService
+                    .getCommittedTaskCount());
+
+            assertEquals( 3, futures.size());
+            
+            // tasks[0]
+            {
+                
+                Future f = futures.get(0);
+                
+                assertTrue(f.isDone());
+                
+                f.get(); // No exception expected.
+                
+            }
+            
+            // tasks[2]
+            {
+                
+                Future f = futures.get(2);
+                
+                assertTrue(f.isDone());
+                
+                f.get(); // No exception expected.
+                
+            }
+            
+            // tasks[1]
+            {
+                
+                Future f = futures.get(1);
+                
+                assertTrue(f.isDone());
+                
+                try {
+                    f.get();
+                    fail("Expecting exception");
+                } catch(ExecutionException ex) {
+                    assertTrue(InnerCause.isInnerCause(ex, ForcedAbortException.class));
+                }
+                
+            }
+
+            assertEquals(checkpointAddr0, journal.getIndex(name)
+                    .getCheckpoint().getCheckpointAddr());
+            
+        } finally {
+            
+            journal.closeAndDelete();
+            
+        }
+        
+    }
+
+    /**
+     * Test verifies that a write on an index will cause the index to be
+     * checkpointed when the task completes.
+     */
+    public void test_writeServiceCheckpointDirtyIndex()throws Exception {
+
+        Properties properties = getProperties();
+        
+        Journal journal = new Journal(properties);
+
+        try {
+        
+            final String name = "test";
+
+            // Note: checkpoint for the newly registered index.
+            final long checkpointAddr0;
+            {
+
+                journal.registerIndex(name);
+                
+                journal.commit();
+                
+                checkpointAddr0 = journal.getIndex(name).getCheckpoint()
+                        .getCheckpointAddr();
+            }
+
+            // Submit task that writes on the index and wait for the commit.
+            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,name){
+                protected Object doTask() throws Exception {
+                    BTree ndx = (BTree)getIndex(name);
+                    assertEquals(checkpointAddr0,ndx.getCheckpoint().getCheckpointAddr());
+                    ndx.insert(new byte[]{1}, new byte[]{1});
+                    return null;
+                }
+            }).get();
+            
+        } finally {
+            
+            journal.closeAndDelete();
+            
+        }
+        
+    }
+    
+    /**
+     * Test verifies that a task failure causes accessed indices to be rolled
+     * back to their last checkpoint.
+     * 
+     * FIXME write test where a task registers an index and then throws an
+     * exception. This will cause the index to have a checkpoint record that
+     * does not agree with {@link Name2Addr} for the last commit point. Verify
+     * that the index is not in fact available to another task that is executed
+     * after the failed task (it will be if we merely close the index and then
+     * re-open it since it will reopen from the last checkpoint NOT from the
+     * last commit point).
+     * 
+     * FIXME write test where a tasks (a), (b) and (c) are submitted with
+     * invokeAll() in that order and require a lock on the same index. Task (a)
+     * writes on an existing index and completes normally. The index SHOULD be
+     * checkpointed and task (b) SHOULD be able to read the data written in task
+     * (a) and SHOULD be run in the same commit group. Task (b) then throws an
+     * exception. Verify that the index is rolledback to the checkpoint for (a)
+     * (vs the last commit point) using task (c) which will read on the same
+     * index looking for the correct checkpoint record and data in the index.
+     * This test will fail if (b) is not reading from the checkpoint written by
+     * (a) or if (c) reads from the last commit point rather than the checkpoint
+     * written by (a).
+     * 
+     * FIXME write tests to verify that an {@link #abort()} causes all running
+     * tasks to be interrupted and have their write sets discarded (should it?
+     * Should an abort just be an shutdownNow() in response to some truely nasty
+     * problem?)
+     */
+    public void test_writeService002()throws Exception {
+
+        Properties properties = new Properties( getProperties() );
+        
+        /*
+         * Note: restricting the thread pool size does not give us the control
+         * that we need because it results in each task running as its own
+         * commit group.
+         */
+//        /*
+//         * Note: Force the write service to be single threaded so that we can
+//         * control the order in which the tasks start by the order in which they
+//         * are submitted.
+//         */
+//        properties.setProperty(Options.WRITE_SERVICE_CORE_POOL_SIZE,"1");
+//        properties.setProperty(Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE,"1");
+        
+        final Journal journal = new Journal(properties);
+
+        try {
+        
+            final String name = "test";
+
+            // Note: checkpoint for the newly registered index.
+            final long checkpointAddr0;
+            {
+                
+                // register
+                journal.registerIndex(name);
+                
+                // commit.
+                journal.commit();
+                
+                // note checkpoint for index.
+                checkpointAddr0 = journal.getIndex(name).getCheckpoint()
+                        .getCheckpointAddr();
+                
+            }
+
+            // Note: commit counter before we invoke the tasks.
+            final long commitCounter = journal.getRootBlockView()
+                    .getCommitCounter();
+
+            final WriteExecutorService writeService = journal
+            .getConcurrencyManager().getWriteService();
+    
+            // Note: group commit counter before we invoke the tasks.
+            final long groupCommitCount0 = writeService.getGroupCommitCount();
+
+            // Note: #of failed tasks before we submit the tasks.
+            final long failedTaskCount0 = writeService.getFailedTaskCount();
+            final long successTaskCount0 = writeService.getSuccessTaskCount();
+            final long committedTaskCount0 = writeService.getCommittedTaskCount();
+    
+            // Note: set by one of the tasks below.
+            final AtomicLong checkpointAddr2 = new AtomicLong(0L);
+
+            final AtomicReference<Future<Object>> futureB = new AtomicReference<Future<Object>>();
+            final AtomicReference<Future<Object>> futureC = new AtomicReference<Future<Object>>();
+            final AtomicReference<Future<Object>> futureD = new AtomicReference<Future<Object>>();
+            
+            /*
+             * Note: the setup for this test is a PITA. In order to exert full
+             * control over the order in which the tasks begin to execute we
+             * need to have each task submit the next itself. This is because it
+             * is possible for any of these tasks to be the first one to grab
+             * the exclusive lock on the necessary resource [name]. We can't
+             * solve this problem by restricting the #of threads that can run
+             * the tasks since that limits the size of the commit group. So we
+             * are stuck imposing serial execution using the behavior of the
+             * tasks themselves.
+             * 
+             * Create the task objects in the reverse order of their execution.
+             */
+            
+            // task (d) verifies expected rollback checkpoint was restored.
+            final AbstractTask d = new AbstractTask(journal,ITx.UNISOLATED,name){
+                protected String getTaskName() {return "d";}
+                protected Object doTask() throws Exception {
+                    // commit counter unchanged.
+                    assertEquals("commitCounter", commitCounter, getJournal()
+                            .getRootBlockView().getCommitCounter());
+                    if(checkpointAddr2.get()==0L) {
+                        fail("checkpointAddr2 was not set");
+                    }
+                    // lookup index.
+                    BTree ndx = (BTree)getIndex(name);
+                    final long newCheckpointAddr =ndx.getCheckpoint().getCheckpointAddr();
+                    // verify checkpoint != last committed checkpoint.
+                    assertNotSame(checkpointAddr0,newCheckpointAddr);
+                    // verify checkpoint == last rollback checkpoint.
+                    assertEquals(checkpointAddr2.get(),newCheckpointAddr);
+                    return null;
+                }
+            };
+
+            /*
+             * task (c) notes the last checkpoint, writes on the index, and then
+             * fails. This is designed to trigger rollback of the index to the
+             * last checkpoint, which is the checkpoint that we note at the
+             * start of this task.
+             */
+            final AbstractTask c = new AbstractTask(journal,ITx.UNISOLATED,name){
+                protected String getTaskName() {return "c";}
+                protected Object doTask() throws Exception {
+                    // commit counter unchanged.
+                    assertEquals("commitCounter", commitCounter, getJournal()
+                            .getRootBlockView().getCommitCounter());
+                    // lookup index.
+                    BTree ndx = (BTree)getIndex(name);
+                    // note the last checkpoint written.
+                    final long newCheckpointAddr = ndx.getCheckpoint().getCheckpointAddr();
+                    assertNotSame(0L,newCheckpointAddr);
+                    assertNotSame(checkpointAddr0,newCheckpointAddr);
+                    // make note of the checkpoint before we force an abort.
+                    assertTrue("checkpointAddr2 already set?",checkpointAddr2.compareAndSet(0L, newCheckpointAddr));
+                    // write another record on the index.
+                    ndx.insert(new byte[]{3}, new byte[]{3});
+                    // run task (d) next.
+                    assertTrue(futureD.compareAndSet(null,journal.submit(d)));
+                    // force task to about with dirty index.
+                    throw new ForcedAbortException();
+                }
+            };
+            
+            // task (b) writes another record on the index.
+            final AbstractTask b = new AbstractTask(journal,ITx.UNISOLATED,name){
+                protected String getTaskName() {return "b";}
+                protected Object doTask() throws Exception {
+                    // commit counter unchanged.
+                    assertEquals("commitCounter", commitCounter, getJournal()
+                            .getRootBlockView().getCommitCounter());
+                    // lookup index.
+                    BTree ndx = (BTree)getIndex(name);
+                    // verify checkpoint was updated.
+                    assertNotSame(checkpointAddr0,ndx.getCheckpoint().getCheckpointAddr());
+                    // write another record on the index.
+                    ndx.insert(new byte[]{2}, new byte[]{2});
+                    // run task (c) next.
+                    assertTrue(futureC.compareAndSet(null,journal.submit(c)));
+                    return null;
+                }
+            };
+                        
+            // task (a) writes on index.
+            final AbstractTask a = new AbstractTask(journal,ITx.UNISOLATED,name){
+                protected String getTaskName() {return "a";}
+                protected Object doTask() throws Exception {
+                    // commit counter unchanged.
+                    assertEquals("commitCounter", commitCounter, getJournal()
+                            .getRootBlockView().getCommitCounter());
+                    // group commit counter unchanged.
+                    assertEquals("groupCommitCounter", groupCommitCount0,
+                            writeService.getGroupCommitCount());
+                    // lookup index.
+                    BTree ndx = (BTree)getIndex(name);
+                    // verify same checkpoint.
+                    assertEquals(checkpointAddr0,ndx.getCheckpoint().getCheckpointAddr());
+                    // write record on the index.
+                    ndx.insert(new byte[]{1}, new byte[]{1});
+                    // run task (b) next.
+                    assertTrue(futureB.compareAndSet(null,journal.submit(b)));
+                    return null;
+                }
+            };
+            
+//            final List<AbstractTask> tasks = Arrays.asList(new AbstractTask[] {
+//                    a,b,c,d
+//            });
+//            
+//            final List<Future<Object>> futures = journal.invokeAll( tasks );
+
+            Future<Object> futureA = journal.submit( a );
+            
+            /*
+             * wait for (a). if all tasks are in the same commit group then all
+             * tasks will be done once we have the future for (a).
+             */
+            futureA.get(); // task (a)
+            
+            /*
+             * The expectation is that the tasks that succeed make it into the
+             * same commit group while the task that throws an exception does
+             * not cause the commit group to be aborted. Therefore there should
+             * be ONE (1) commit more than we we submitted the tasks.
+             * 
+             * Note: The tasks will make it into the same commit group iff the
+             * first task that completes is willing to wait for the others to
+             * join the commit group.
+             * 
+             * Note: The tasks have a dependency on the same resource so they
+             * will be serialized (executed in a strict sequence).
+             */
+            assertEquals("failedTaskCount", failedTaskCount0 + 1,
+                    writeService.getFailedTaskCount());
+            assertEquals("successTaskCount", successTaskCount0 + 3,
+                    writeService.getSuccessTaskCount());
+            assertEquals("committedTaskCount", committedTaskCount0 + 3,
+                    writeService.getCommittedTaskCount());
+            assertEquals("groupCommitCount", groupCommitCount0 + 1,
+                    writeService.getGroupCommitCount());
+            assertEquals("commitCounter", commitCounter + 1, journal
+                    .getRootBlockView().getCommitCounter());
+
+//            assertEquals( 4, futures.size());
+
+            futureB.get().get(); // task (b)
+            {
+                // task (c) did the abort.
+                Future f = futureC.get();
+                try {f.get(); fail("Expecting exception");}
+                catch(ExecutionException ex) {
+                    if(!InnerCause.isInnerCause(ex, ForcedAbortException.class)) {
+                        fail("Expecting "+ForcedAbortException.class+", not "+ex, ex);
+                    }
+                }
+            }
+            futureD.get().get(); // task (d)
+            
+        } finally {
+            
+            journal.closeAndDelete();
+            
+        }
+        
+    }
+    
+    /**
+     * A class used to force aborts on tasks and then recognize the abort by the
+     * {@link ForcedAbortException} from the uni
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class ForcedAbortException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+        
+    }
+    
     /**
      * Correctness test of task retry when another task causes a commit group to
      * be discarded.
@@ -1033,8 +1609,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
     
     /**
      * A stress test that runs concurrent unisolated readers and writers and
-     * verifies that readers able to transparently continue to read against the
-     * same state of the named indices if the backing {@link FileChannel} is
+     * verifies that readers are able to transparently continue to read against
+     * the same state of the named indices if the backing {@link FileChannel} is
      * closed by an interrupt as part of the abort protocol for the commit
      * group. In order for this test to succeed the backing {@link FileChannel}
      * must be transparently re-opened in a thread-safe manner if it is closed
@@ -1057,6 +1633,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         final Journal journal = new Journal(properties);
 
+        try {
+        
         // Note: This test requires a journal backed by stable storage.
 
         if (journal.isStable()) {
@@ -1191,7 +1769,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
         }
 
-        journal.closeAndDelete();
+        } finally {
+        
+            journal.closeAndDelete();
+            
+        }
 
     }
     

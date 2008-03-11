@@ -30,6 +30,7 @@ import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.WriteExecutorService.RetryException;
+import com.bigdata.service.DataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -222,6 +223,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
         /**
          * The delay between scheduled invocations of the {@link StatusTask}.
          * 
+         * @todo Who should be running the {@link StatusTask}? Perhaps the
+         *       {@link DataService}?
+         * 
          * @see #DEFAULT_STATUS_DELAY
          */
         public final static String STATUS_DELAY = "statusDelay";
@@ -246,6 +250,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * <p>
          * Note: Abrupt shutdown of the journal is always safe, but changes that
          * have not been committed will not be there on restart.
+         * 
+         * @todo who should define this parameter? It should effect all
+         *       shutdowns for a {@link Journal} or {@link DataService}.
          * 
          * @see #DEFAULT_SHUTDOWN_TIMEOUT
          */
@@ -906,8 +913,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
         // commitCounter and related stats.
         sb.append(
 //                  "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
-                    "ncommits="+ writeService.getCommitCount()
+                    "ncommits="+ writeService.getGroupCommitCount()
                 + ", naborts=" + writeService.getAbortCount()
+                + ", failedTasks="+writeService.getFailedTaskCount()
+                + ", successTasks="+writeService.getSuccessTaskCount()
+                + ", committedTasks="+writeService.getCommittedTaskCount()
                 + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
                 + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
                 + ", maxRunning="+ writeService.getMaxRunning()

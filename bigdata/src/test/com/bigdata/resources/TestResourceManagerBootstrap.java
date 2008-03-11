@@ -225,7 +225,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             journal.commit();
             
             // close out for further writes.
-            journal.close(journal.nextTimestamp());
+            journal.closeForWrites(journal.nextTimestamp());
             
             assertTrue(journalMetadata1.getCreateTime() > 0L);
             

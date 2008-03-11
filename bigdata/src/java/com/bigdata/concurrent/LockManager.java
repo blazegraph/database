@@ -42,7 +42,7 @@ import com.bigdata.cache.WeakValueCache;
 
 /**
  * This class coordinates a schedule among concurrent operations requiring
- * exclusive access to shared resource. Whenever possible, the result is a
+ * exclusive access to shared resources. Whenever possible, the result is a
  * concurrent schedule - that is, operations having non-overlapping lock
  * requirements run concurrently while operations that have lock contentions
  * are queued behind operations that currently have locks on the relevant

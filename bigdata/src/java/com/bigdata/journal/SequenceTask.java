@@ -29,39 +29,48 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
+import java.util.concurrent.Callable;
 
 /**
- * A task comprised of a sequence of operations. All operations MUST run on
- * the same journal and task service (read service, write service, or
- * transaction service). The individual results are combined into a
- * {@link List} in the order in which they are executed and the {@link List}
- * is returned to the caller.
+ * A task comprised of a sequence of operations. All operations MUST run on the
+ * same journal and task service (read service, write service, or transaction
+ * service). The individual results are combined into a {@link List} in the
+ * order in which they are executed and the {@link List} is returned to the
+ * caller.
  * <p>
  * Note: This class facilitates the definition of operations can be readily
- * composed through reuse of pre-defined operations. However, in all cases,
- * a similar effect can be obtained by extended {@link AbstractTask}
- * and coding the behavior directly in {@link #doTask()}.
+ * composed through reuse of pre-defined operations. However, in all cases, a
+ * similar effect can be obtained by extended {@link AbstractTask} and coding
+ * the behavior directly in {@link #doTask()}.
  * <p>
  * Some possible use cases are:
  * <ul>
  * 
  * <li> Compose an atomic operation comprised of unisolated writes on one or
- * more indices. The locks required by the composed operation will be the
- * sum of the locks required by the individual operations, thereby ensuring
- * that the operation has all necessary locks when it begins. For example,
- * this could be used to atomically create and populate index index.</li>
+ * more indices. The locks required by the composed operation will be the sum of
+ * the locks required by the individual operations, thereby ensuring that the
+ * operation has all necessary locks when it begins. For example, this could be
+ * used to atomically create and populate index index.</li>
  * 
- * <li>Compose an atomic operation comprised of unisolated reads on one or
- * more indices. Unisolated read operations do not require or obtain any
- * locks.</li>
+ * <li>Compose an atomic operation comprised of unisolated reads on one or more
+ * indices. Unisolated read operations do not require or obtain any locks.</li>
  * 
- * <li>Compose an atomic operation comprised of isolated operations on one
- * or more indices.</li>
+ * <li>Compose an atomic operation comprised of isolated operations on one or
+ * more indices.</li>
  * 
  * </ul>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated The problem with this class is that it creates an array of
+ *             {@link AbstractTask}s rather than a being a single
+ *             {@link AbstractTask} that runs a bunch of {@link ITask}s. Fixing
+ *             this will require re-working all of the {@link ITask}s to extend
+ *             some innocent abstract {@link BaseTask} rather than
+ *             {@link AbstractTask} itself. Another alternative is to modify the
+ *             {@link AbstractTask} constructor to accept an array of
+ *             {@link ITask} or {@link Callable} targets that it will run itself.
  */
 public class SequenceTask extends AbstractTask {
 
@@ -72,12 +81,6 @@ public class SequenceTask extends AbstractTask {
      */
     final protected Vector<Object> results;
 
-    /**
-     * @param journal
-     * @param startTime
-     * @param readOnly
-     * @param resource
-     */
     protected SequenceTask(IConcurrencyManager concurrencyManager,
             long startTime, String[] resource, AbstractTask[] tasks) {
 

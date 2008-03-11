@@ -98,82 +98,8 @@ public class RegisterIndexTask extends AbstractTask {
 
         }
 
-        /*
-         * Verify some aspects of the partition metadata.
-         */
-        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
-        if (pmd != null) {
-
-            if (pmd.getResources() == null) {
-
-                /*
-                 * A [null] for the resources field is a specific indication
-                 * that we need to specify the resource metadata for the live
-                 * journal at the time that the index partition is registered.
-                 * This indicator is used when the metadata service registers an
-                 * index partition remotely on a data service since it does not
-                 * (and can not) have access to the resource metadata for the
-                 * live journal as of the time that the index partition actually
-                 * gets registered on the data service.
-                 * 
-                 * The index partition split and join tasks do not have this
-                 * problem since they are run locally. However, an index
-                 * partition move operation also needs to do this.
-                 */
-
-                metadata.setPartitionMetadata(//
-                        new LocalPartitionMetadata(//
-                                pmd.getPartitionId(),//
-                                pmd.getLeftSeparatorKey(),//
-                                pmd.getRightSeparatorKey(),//
-                                new IResourceMetadata[] {//
-                                    // The live journal.
-                                    getJournal().getResourceMetadata() //
-                                },
-                                /*
-                                 * Note: Retains whatever history given by the
-                                 * caller.
-                                 */
-                                pmd.getHistory()+
-                                "register("+pmd.getPartitionId()+") "
-                                ));
-
-            } else {
-
-                if (pmd.getResources().length == 0) {
-
-                    throw new RuntimeException(
-                            "Missing resource description: name=" + name
-                                    + ", pmd=" + pmd);
-
-                }
-
-                if (!pmd.getResources()[0].isJournal()) {
-
-                    throw new RuntimeException(
-                            "Expecting resources[0] to be journal: name="
-                                    + name + ", pmd=" + pmd);
-
-                }
-
-                if (!pmd.getResources()[0].getUUID().equals(
-                        getJournal().getRootBlockView().getUUID())) {
-
-                    throw new RuntimeException(
-                            "Expecting resources[0] to be this journal but has wrong UUID: name="
-                                    + name + ", pmd=" + pmd);
-
-                }
-
-            }
-            
-        }
-        
-        // create index instance.
-        final BTree btree = BTree.create(getJournal(), metadata);
-
         // register the index.
-        getJournal().registerIndex(name, btree);
+        final BTree btree = getJournal().registerIndex(name, metadata);
 
         final UUID indexUUID = btree.getIndexMetadata().getIndexUUID();
 

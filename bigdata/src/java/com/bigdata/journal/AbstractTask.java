@@ -37,12 +37,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 
@@ -82,7 +85,7 @@ import com.bigdata.concurrent.LockManagerTask;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractTask implements Callable<Object> {
+public abstract class AbstractTask implements Callable<Object>, ITask {
 
     static protected final Logger log = Logger.getLogger(AbstractTask.class);
 
@@ -94,7 +97,7 @@ public abstract class AbstractTask implements Callable<Object> {
     /**
      * The object used to manage exclusive access to the unisolated indices.
      */
-    protected final IConcurrencyManager concurrencyManager;
+    protected final ConcurrencyManager concurrencyManager;
     
     /**
      * The object used to manage local transactions.
@@ -140,7 +143,7 @@ public abstract class AbstractTask implements Callable<Object> {
      *         
      * @see IResourceManager#getJournal(long)
      */
-    protected final AbstractJournal getJournal() {
+    public final AbstractJournal getJournal() {
 
         final AbstractJournal journal = resourceManager.getJournal(Math
                 .abs(timestamp));
@@ -233,7 +236,7 @@ public abstract class AbstractTask implements Callable<Object> {
      * 
      * @param concurrencyControl
      *            The object used to control access to the local resources.
-     * @param startTime
+     * @param timestamp
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
      *            <code> - tx </code> to read from the most recent commit point
@@ -247,7 +250,7 @@ public abstract class AbstractTask implements Callable<Object> {
      *            lock(s).
      */
     protected AbstractTask(IConcurrencyManager concurrencyManager,
-            long startTime, String[] resource) {
+            long timestamp, String[] resource) {
         
         if (concurrencyManager == null) {
 
@@ -280,9 +283,9 @@ public abstract class AbstractTask implements Callable<Object> {
 
         this.resourceManager = concurrencyManager.getResourceManager();
         
-        this.timestamp = startTime;
+        this.timestamp = timestamp;
 
-        this.isTransaction = startTime > ITx.UNISOLATED;
+        this.isTransaction = timestamp > ITx.UNISOLATED;
         
         this.resource = resource;
 
@@ -310,23 +313,23 @@ public abstract class AbstractTask implements Callable<Object> {
              * isolated write set.
              */
 
-            tx = transactionManager.getTx(startTime);
+            tx = transactionManager.getTx(timestamp);
 
             if (tx == null) {
 
-                throw new IllegalStateException("Unknown tx");
+                throw new IllegalStateException("Unknown tx: "+timestamp);
 
             }
 
             if (!tx.isActive()) {
 
-                throw new IllegalStateException("Tx not active");
+                throw new IllegalStateException("Tx not active: "+timestamp);
 
             }
 
             readOnly = tx.isReadOnly();
             
-        } else if (startTime < ITx.UNISOLATED) {
+        } else if (timestamp < ITx.UNISOLATED) {
 
             /*
              * A lightweight historical read.
@@ -496,7 +499,7 @@ public abstract class AbstractTask implements Callable<Object> {
         MDC.remove("resources");
         
     }
-
+    
     /**
      * Delegates the task behavior to {@link #doTask()}.
      * <p>
@@ -560,7 +563,8 @@ public abstract class AbstractTask implements Callable<Object> {
                  * Delegate handles handshaking for writable transactions.
                  */
 
-                Callable<Object> delegate = new InnerReadWriteTxServiceCallable(tx);
+                final Callable<Object> delegate = new InnerReadWriteTxServiceCallable(
+                        this, tx);
                 
                 return delegate.call();
 
@@ -618,14 +622,14 @@ public abstract class AbstractTask implements Callable<Object> {
 
         // resource(s) to lock (exclusive locks are used).
 
-        log.info("Unisolated write task: "+this);
+        log.info("Unisolated write task: "+this+", thread="+Thread.currentThread());
 
         // declare resource(s).
         lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
-        Callable<Object> delegate = new LockManagerTask<String>(
-                lockManager, resource, new InnerWriteServiceCallable());
+        Callable<Object> delegate = new LockManagerTask<String>(lockManager,
+                resource, new InnerWriteServiceCallable(this));
         
         final WriteExecutorService writeService = concurrencyManager.getWriteService();
 
@@ -637,7 +641,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
             final Object ret;
             
-            try {
+//            try {
 
                 /*
                  * Note: The lock(s) are only held during this call. By the time
@@ -661,32 +665,19 @@ public abstract class AbstractTask implements Callable<Object> {
                 
                 log.info("Task Ok: class="+this);
                 
-                /*
-                 * Note: I am choosing NOT to flush dirty indices to the store
-                 * after each task in case other tasks in the same commit group
-                 * want to write on the same index. Flushing an index makes its
-                 * nodes and leaves immutable, and that is not desirable if you
-                 * are going to write on it again soon.
-                 * 
-                 * Note: This trades off against checkpointing the indices after
-                 * each task which might make it possible to discard only part
-                 * of a commit group.
-                 */
-
-            } finally {
-
-                clearIndexCache();
-                
-            }
+//            } finally {
+//
+//                clearIndexCache();
+//                
+//            }
             
             /*
-             * Note: The WriteServiceExecutor will await a commit signal
-             * before the thread is allowed to complete. This ensures
-             * that the caller waits until a commit (or an abort).
+             * Note: The WriteServiceExecutor will await a commit signal before
+             * the thread is allowed to complete. This ensures that the caller
+             * waits until a commit (or an abort).
              * 
-             * Note: Waiting here does NOT prevent other tasks from
-             * gaining access to the same resources since the locks were
-             * released above.
+             * Note: Waiting here does NOT prevent other tasks from gaining
+             * access to the same resources since the locks were released above.
              */ 
 
             writeService.afterTask(this, null);
@@ -715,10 +706,81 @@ public abstract class AbstractTask implements Callable<Object> {
 
             throw new RuntimeException(t);
 
+        } finally {
+            
+            // discard hard references to accessed indices.
+            clearIndexCache();
+            
         }
 
     }
 
+    /**
+     * Delegates various behaviors visible to the application code using the
+     * {@link ITask} interface to the {@link AbstractTask} object.
+     * <p>
+     * Note: I was using an inner class for {@link InnerWriteServiceCallable}
+     * but I ran into trouble with scope for the [indexCache]. It was always
+     * winding up empty in the inner class, which clearly had its own distinct
+     * instance from the {@link AbstractTask} that was being executed. The
+     * {@link DelegateTask} lets me manage this more explicitly. (In hindsight
+     * the problem appears to be the {@link SequenceTask} which creates an array
+     * of {@link AbstractTask}s rather than a single {@link AbstractTask} with a
+     * series of {@link ITask}s that it executes as its target.)
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static abstract protected class DelegateTask implements ITask {
+        
+        final protected AbstractTask delegate;
+        
+        protected DelegateTask(AbstractTask delegate) {
+            
+            if(delegate == null) throw new IllegalArgumentException(); 
+            
+            this.delegate = delegate;
+            
+        }
+
+        public IResourceManager getResourceManager() {
+
+            return delegate.getResourceManager();
+        
+        }
+
+        public AbstractJournal getJournal() {
+
+            return delegate.getJournal();
+            
+        }
+
+        public String[] getResource() {
+
+            return delegate.getResource();
+            
+        }
+
+        public String getOnlyResource() {
+
+            return delegate.getOnlyResource();
+            
+        }
+
+        public IIndex getIndex(String name) {
+
+            return delegate.getIndex(name);
+            
+        }
+                
+        public String toString() {
+            
+            return getClass().getName()+"("+delegate.toString()+")";
+            
+        }
+        
+    }
+    
     /**
      * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
      * {@link IsolationEnum#ReadWrite} transactions.
@@ -770,11 +832,13 @@ public abstract class AbstractTask implements Callable<Object> {
      * last committed state of the index using {@link Name2Addr} - this is the
      * standard behavior in any case.
      */
-    class InnerReadWriteTxServiceCallable implements Callable<Object> {
+    static private class InnerReadWriteTxServiceCallable extends DelegateTask {
 
         final ITx tx;
         
-        InnerReadWriteTxServiceCallable(ITx tx) {
+        InnerReadWriteTxServiceCallable(AbstractTask delegate, ITx tx) {
+            
+            super( delegate );
             
             if (tx == null)
                 throw new IllegalArgumentException();
@@ -792,7 +856,7 @@ public abstract class AbstractTask implements Callable<Object> {
 
             try {
 
-                return doTask();
+                return delegate.doTask();
                 
             } finally {
                 
@@ -802,12 +866,12 @@ public abstract class AbstractTask implements Callable<Object> {
                  * start time of the ReadWrite transaction.
                  */
                 
-                clearIndexCache();
+                delegate.clearIndexCache();
                 
             }
             
         }
-        
+
     }
     
     /**
@@ -829,58 +893,235 @@ public abstract class AbstractTask implements Callable<Object> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class InnerWriteServiceCallable implements Callable<Object> {
+    static private class InnerWriteServiceCallable extends DelegateTask {
 
-        InnerWriteServiceCallable() {
+        InnerWriteServiceCallable(AbstractTask delegate) {
+            
+            super(delegate);
+            
         }
 
         /**
-         * 
+         * Note: Locks on the named indices are ONLY held during this call.
          */
         public Object call() throws Exception {
 
-            return doTask();
+            /*
+             * Get refernce to lock (this is just a reference - it is used
+             * below).
+             * 
+             * Note: this object is used to ensure that checkpoints and
+             * rollbacks are coordinated with the write service. In particular,
+             * this ensures that checkpoint and rollback operations do NOT
+             * overlap a group commit.
+             */
+            final Lock lock = delegate.concurrencyManager.getWriteService().lock;
+
+            try {
+
+                log.info("Running with resource lock(s): "+this);
+                
+                // invoke doTask() on AbstractTask with locks.
+                final Object ret = delegate.doTask();
+                
+                log.info("Did run with resource lock(s): "+this);
+                
+                lock.lock();
+                
+                try {
+                
+                    // success - checkpoint indices
+                    checkpointIndices();
+                    
+                } finally {
+                    
+                    lock.unlock();
+                    
+                }
+
+                return ret;
+                
+            } catch(Throwable t) {
+                
+                lock.lock();
+                
+                try {
+                
+                    // failure - discard partial writes.
+                    rollbackIndices();
+                    
+                } finally {
+                    
+                    lock.unlock();
+                    
+                }
+                
+                throw new RuntimeException(t);
+                
+            } finally {
+                
+                /*
+                 * Note: This is the ONLY place where it would be safe to turn
+                 * autoCommit back on for the indices in the [indexCache]. As
+                 * soon as we leave this method we have lost the exclusive lock
+                 * on the index and another task could be running on it before
+                 * we can do anything else.
+                 */
+                
+            }
+            
+        }
+
+        public IIndex registerIndex(String name) {
+            
+            return getJournal().registerIndex(name);
+            
+        }
+
+        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
+
+            return getJournal().registerIndex(name, indexMetadata);
+
+        }
+
+        public IIndex registerIndex(String name, BTree btree) {
+
+            return getJournal().registerIndex(name, btree);
+
+        }
+
+        public void dropIndex(String name) {
+
+            getJournal().dropIndex(name);
+
+        }
+        
+        /**
+         * Checkpoint each index accessed by the UNISOLATED task (this is necessary
+         * in order to have the writes become restart safe since autoCommit is
+         * disabled for UNISOLATED tasks). The task will participate in the next
+         * commit. Since the index(s) for the task have already been checkpointed,
+         * the commit will just record the address of that checkpoint record.
+         * <p>
+         * Note: This has the effect of flushing dirty indices to the store
+         * immediately when the task completes. However, the nodes and leaves are
+         * still in the cache on the index and will remain available if the index is
+         * reused.
+         */
+        private void checkpointIndices() {
+
+            log.info("Task accessed "+delegate.indexCache.size()+" indices: "+this);
+            
+            final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, IIndex> entry = itr.next();
+                
+                final String name = entry.getKey();
+                
+                final IIndex tmp = entry.getValue();
+
+                final BTree btree;
+                
+                if (tmp instanceof BTree) {
+
+                    btree = ((BTree) tmp);
+
+                } else {
+
+                    btree = ((BTree) ((FusedView) tmp).getSources()[0]);
+
+                }
+
+                final boolean needsCheckpoint = btree.needsCheckpoint();
+                
+                log.info("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
+                
+                if(needsCheckpoint) {
+                    
+                    /*
+                     * There are writes on the btree, so write a checkpoint
+                     * for it now that the task has completed successfully.
+                     */
+                    
+                    final long checkpointAddr = btree.writeCheckpoint();
+                    
+                    log.info("name=" + name + ", newcheckpointAddr="
+                            + btree.getStore().toString(checkpointAddr) + " : "
+                            + this);
+                    
+                }
+
+            }
+            
+        }
+        
+        /**
+         * If the index(s) is dirty then we close it. The next time the index is
+         * requested this will force the reload of the index from its last
+         * checkpoint address as recorded in the last commit record. While the index
+         * may have written data on the journal we just ignore it since it is
+         * inaccessible and will disappear when the journal
+         */
+        private void rollbackIndices() {
+
+            log.info("Rolling back "+delegate.indexCache.size()+" indices: "+this);
+            
+            final Iterator<Map.Entry<String,IIndex>> itr = delegate.indexCache.entrySet().iterator();
+
+            while (itr.hasNext()) {
+
+                final Map.Entry<String, IIndex> entry = itr.next();
+                
+                final String name = entry.getKey();
+                
+                final IIndex tmp = entry.getValue();
+
+                final BTree btree;
+                
+                if (tmp instanceof BTree) {
+
+                    btree = ((BTree) tmp);
+
+                } else {
+
+                    btree = ((BTree) ((FusedView) tmp).getSources()[0]);
+
+                }
+                
+                final boolean needsCheckpoint = btree.needsCheckpoint();
+                
+                log.debug("name="+name+", needsCheckpoint="+needsCheckpoint+" : "+this);
+                
+                if(needsCheckpoint) {
+                    
+                    /*
+                     * This is not the precisely correct rollback condition. The
+                     * issue is if the task itself checkpoints the index then the
+                     * rollback point will be moved forward to that checkpoint since
+                     * the btree will re-open from its last written checkpoint
+                     * record. The solution is to keep a transient map from index
+                     * name to the address of the rollback checkpoint. Changes to
+                     * that map should be made atomically for all indices that were
+                     * accessed by the UNISOLATED task using a scan of the
+                     * [indexCache]. This can be made atomic using a lock governing
+                     * access to the checkpoint rollback addresses.
+                     */
+                    
+                    log.info("Rolling back index: "+name+" : "+this);
+                    
+                    btree.close();
+                    
+                }
+
+            }
             
         }
 
     }
     
     /**
-     * Return an appropriate view of the named index for the operation.
-     * <p>
-     * When the task is isolated by a transaction, then the index will be
-     * isolated by the transaction using the appropriate
-     * {@link IsolationEnum isolation level}. If the transaction is read-only,
-     * then the index will not be writable.
-     * </p>
-     * <p>
-     * When the task is a read-only unisolated operation, the index will be
-     * read-only and will read from the most recent committed state of the store
-     * prior to the time at which the task began to execute. If multiple index
-     * views are requested they will all use the same committed state of the
-     * store.
-     * </p>
-     * <p>
-     * When the task is an unisolated write operation the index will be the
-     * unisolated writable (aka "live" or "current" index). Access to the
-     * unisolated writable indices is single-threaded. This constraint is
-     * enforced by a lock system using the named resources declared in the task
-     * constructor.
-     * </p>
-     * 
-     * @param name
-     *            The index name.
-     * 
-     * @return An appropriate view of the named index.
-     * 
-     * @exception NoSuchIndexException
-     *                if the named index does not exist at the time that the
-     *                operation is executed.
-     * 
-     * @exception IllegalStateException
-     *                if the named index is not one of the resources declared to
-     *                the constructor.
-     * 
      * @todo Make sure that we have tests for historical reads (including
      *       readOnly with timestamp == 0L), unisolated read-write tasks, and
      *       various kinds of transactions (timestamp > 0L). Also verify when
@@ -930,7 +1171,31 @@ public abstract class AbstractTask implements Callable<Object> {
         
         if (tmp == null) {
 
+            // Presume client has made a bad request.
             throw new NoSuchIndexException(name + ", timestamp=" + timestamp);
+
+        }
+        
+        /*
+         * We turn off auto-commit on the index for UNISOLATED writers. This is
+         * critical to prevent partial writes from being made restart safe when
+         * a task fails.
+         */
+        
+        if (timestamp == ITx.UNISOLATED) {
+
+            log.debug("Disabling autoCommit: "+name+" : "+this);
+            
+            if (tmp instanceof BTree) {
+
+                ((BTree) tmp).setAutoCommit(false);
+
+            } else {
+
+                ((BTree) ((FusedView) tmp).getSources()[0])
+                        .setAutoCommit(false);
+
+            }
 
         }
         
@@ -951,6 +1216,8 @@ public abstract class AbstractTask implements Callable<Object> {
      */
     private void clearIndexCache() {
 
+        log.info("Clearing hard reference cache: "+indexCache.size()+" indices accessed");
+        
         if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
             
             /*
@@ -962,15 +1229,15 @@ public abstract class AbstractTask implements Callable<Object> {
 
             while (itr.hasNext()) {
 
-                Map.Entry<String, IIndex> entry = itr.next();
+                final Map.Entry<String, IIndex> entry = itr.next();
 
-                String name = entry.getKey();
+                final String name = entry.getKey();
 
-                IIndex ndx = entry.getValue();
+                final IIndex ndx = entry.getValue();
 
                 ((ConcurrencyManager) concurrencyManager)
                         .addCounters(name, ndx);
-
+                
             }
         
         }

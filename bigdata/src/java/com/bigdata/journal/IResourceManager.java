@@ -30,6 +30,7 @@ package com.bigdata.journal;
 
 import java.io.File;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
@@ -39,7 +40,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.PostProcessOldJournalTask;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 
@@ -171,6 +174,12 @@ public interface IResourceManager {
      * 
      * @exception IllegalArgumentException
      *                if <i>name</i> is <code>null</code>
+     * 
+     * @exception StaleLocatorException
+     *                if the named index does not exist at the time the
+     *                operation is executed and the {@link IResourceManager} has
+     *                information which indicates that the index partition has
+     *                been split, joined or moved.
      */
 //    * 
 //    * @exception IllegalStateException
@@ -206,6 +215,17 @@ public interface IResourceManager {
     public String getStatistics();
     
     /**
+     * Return <code>true</code> if the {@link IResourceManager} determines
+     * that the pre-conditions for overflow of the
+     * {@link #getLiveJournal() live journal} have been met. In general, this
+     * means that the live journal is within some threshold of the configured
+     * {@link Options#MAXIMUM_EXTENT}.
+     * 
+     * @return <code>true</code> if overflow processing should occur.
+     */
+    public boolean shouldOverflow();
+    
+    /**
      * Overflow processing creates a new journal, migrates the named indices on
      * the current journal the new journal, and continues operations on the new
      * journal. Typically this involves updating the view of the named indices
@@ -216,22 +236,15 @@ public interface IResourceManager {
      * MUST NOT be presumed to survive this method. In particular, the old
      * journal MAY be closed out by this method and marked as read-only
      * henceforth.
+     * <p>
+     * Note: The caller MUST ensure that they have an exclusive lock on the
+     * {@link WriteExecutorService} such that no task is running with write
+     * access to the {@link #getLiveJournal() live journal}.
      * 
-     * @param forceOverflow
-     *            <code>true</code> iff the {@link Options#MAXIMUM_EXTENT}
-     *            pre-condition should be ignored (used to trigger overflow
-     *            without regard to the actual extent on the journal).
-     * @param exclusiveLock
-     *            <code>true</code> iff the current thread has an exclusive
-     *            lock on the journal (overflow processing WILL NOT occur until
-     *            the {@link WriteExecutorService} invokes this method with
-     *            <code>exclusiveLock := true</code>).
-     * 
-     * @return true iff the journal was replaced by a new journal.
-     * 
-     * @see #getLiveJournal()
+     * @return The {@link Future} for the task handling post-processing of the
+     *         old journal.
      */
-    public boolean overflow(boolean forceOverflow, boolean exclusiveLock);
+    public Future<Object> overflow();
     
     /**
      * Deletes all resources.
@@ -239,7 +252,7 @@ public interface IResourceManager {
      * @exception IllegalStateException
      *                if the {@link IResourceManager} is open.
      */
-    public void destroyAllResources();
+    public void deleteResources();
 
     /**
      * Notify the {@link IResourceManager} that resources having no data for the

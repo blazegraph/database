@@ -790,44 +790,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
     
-//    public boolean isOverflowAllowed() throws IOException {
-//
-//        setupLoggingContext();
-//
-//        try {
-//
-//            if (!(resourceManager instanceof ResourceManager)) {
-//
-//                throw new UnsupportedOperationException();
-//
-//            }
-//
-//            return ((ResourceManager)resourceManager).isOverflowAllowed();
-//                
-//        } finally {
-//
-//            clearLoggingContext();
-//
-//        }
-//
-//    }
-//    
-//    public long getJournalCreateTime() throws IOException {
-//
-//        setupLoggingContext();
-//
-//        try {
-//
-//            return resourceManager.getLiveJournal().getRootBlockView().getCreateTime();
-//                
-//        } finally {
-//
-//            clearLoggingContext();
-//
-//        }
-//
-//    }
-    
     /**
      * An interface that provides access to the federation.
      * 

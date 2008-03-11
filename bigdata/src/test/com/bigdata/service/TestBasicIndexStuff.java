@@ -38,6 +38,8 @@ import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.BatchLookup.BatchLookupConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Test of basic index operations.
@@ -66,11 +68,19 @@ public class TestBasicIndexStuff extends
      * operation for an index that is not registered on that data service.
      * <p>
      * Note: This test is very important. Clients depends on
-     * {@link NoSuchIndexException} being thrown when an index partition has
+     * {@link StaleLocatorException} being thrown when an index partition has
      * been split, joined or moved in order to automatically refresh their cache
      * information and reissue their request.
      * 
      * @throws Exception
+     * 
+     * FIXME Revisit this test. The {@link StaleLocatorException} should be
+     * thrown only if a registered index has been split, joined or moved. If an
+     * index simply does not exist or was dropped then
+     * {@link NoSuchIndexException} should be thrown. This means that this test
+     * will have to be written either directly in terms of states where a split,
+     * join or move has occurred or using the {@link ResourceManager} to fake
+     * the condition.
      */
     public void test_noSuchIndex() throws Exception {
        
@@ -90,10 +100,10 @@ public class TestBasicIndexStuff extends
             
         } catch (Exception ex) {
 
-            assert isInnerCause(ex, NoSuchIndexException.class);
+            assertTrue( isInnerCause(ex, StaleLocatorException.class));
 
             System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
             
         }
         
@@ -104,10 +114,10 @@ public class TestBasicIndexStuff extends
             
         } catch (Exception ex) {
 
-            assert isInnerCause(ex, NoSuchIndexException.class);
+            assertTrue( isInnerCause(ex, StaleLocatorException.class));
 
             System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
             
         }
         
@@ -118,10 +128,10 @@ public class TestBasicIndexStuff extends
             
         } catch (Exception ex) {
 
-            assert isInnerCause(ex, NoSuchIndexException.class);
+            assertTrue( isInnerCause(ex, StaleLocatorException.class));
 
             System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
             
         }
         
@@ -135,10 +145,10 @@ public class TestBasicIndexStuff extends
             
         } catch (Exception ex) {
 
-            assert isInnerCause(ex, NoSuchIndexException.class);
+            assertTrue( isInnerCause(ex, StaleLocatorException.class) );
 
             System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, NoSuchIndexException.class).printStackTrace(System.err);
+            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
             
         }
         

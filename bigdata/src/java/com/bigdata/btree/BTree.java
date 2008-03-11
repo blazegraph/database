@@ -327,11 +327,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
-     * The constructor sets this field initially based on a template for an
-     * empty {@link Checkpoint} record containing the address of the
-     * {@link IndexMetadata} for the index. Thereafter this reference is
-     * maintained as the {@link Checkpoint} record last written by
-     * {@link #writeCheckpoint()} or read by {@link #load(IRawStore, long)}.
+     * The constructor sets this field initially based on a {@link Checkpoint}
+     * record containing the only address of the {@link IndexMetadata} for the
+     * index. Thereafter this reference is maintained as the {@link Checkpoint}
+     * record last written by {@link #writeCheckpoint()} or read by
+     * {@link #load(IRawStore, long)}.
      */
     protected Checkpoint checkpoint = null;
     
@@ -429,25 +429,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
          */
         assert writeRetentionQueue.capacity() >= MINIMUM_WRITE_RETENTION_QUEUE_CAPACITY;
 
-        /*
-         * Setup the root leaf.
-         */
-        if (checkpoint.getRootAddr() == 0L) {
-
-            /*
-             * Create the root leaf.
-             */
-            newRootLeaf();
-            
-        } else {
-            
-            /*
-             * Read the root node of the btree.
-             */
-            reopen();
-            
-        }
-
+        reopen();
+        
     }
     
     /**
@@ -482,27 +465,27 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
     }
 
-    /**
-     * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
-     * update the metadata so we can clear the hard reference queue and release
-     * the hard reference to the root node. {@link #reopen()} is responsible for
-     * reloading the root node.
-     */
-    public void close() {
-
-        /*
-         * flush any dirty records, noting the address of the metadata record
-         * so that we can reload the store.
-         */
-        handleCommit();
-        
-        /*
-         * this will clear the hard reference cache, release the node serializer
-         * buffers, and release the hard reference to the root node.
-         */
-        super.close();
-        
-    }
+//    /**
+//     * Uses {@link #handleCommit()} to flush any dirty nodes to the store and
+//     * update the metadata so we can clear the hard reference queue and release
+//     * the hard reference to the root node. {@link #reopen()} is responsible for
+//     * reloading the root node.
+//     */
+//    public void close() {
+//
+//        /*
+//         * flush any dirty records, noting the address of the metadata record
+//         * so that we can reload the store.
+//         */
+//        handleCommit();
+//        
+//        /*
+//         * this will clear the hard reference cache, release the node serializer
+//         * buffers, and release the hard reference to the root node.
+//         */
+//        super.close();
+//        
+//    }
     
     /**
      * Reloads the root node iff it is <code>null</code> (indicating a closed
@@ -523,7 +506,24 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 
             synchronized(this) {
             
-                root = readNodeOrLeaf(checkpoint.getRootAddr());
+                /*
+                 * Setup the root leaf.
+                 */
+                if (checkpoint.getRootAddr() == 0L) {
+
+                    /*
+                     * Create the root leaf.
+                     */
+                    newRootLeaf();
+                    
+                } else {
+                    
+                    /*
+                     * Read the root node of the btree.
+                     */
+                    root = readNodeOrLeaf(checkpoint.getRootAddr());
+                    
+                }
                 
             }
 
@@ -561,6 +561,31 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
     }
     transient private boolean readOnly = false;
+    
+    /**
+     * Return <code>true</code> if the {@link BTree} will participate in
+     * commits requested via {@link #handleCommit()}.
+     */
+    final public boolean getAutoCommit() {
+        
+        return autoCommit;
+        
+    }
+
+    /**
+     * Sets the auto-commit flag (default <code>true</code>). When
+     * <code>false</code> the {@link BTree} will NOT write a checkpoint record
+     * in response to a {@link #handleCommit()} request.
+     * 
+     * @param autoCommit
+     *            The new value for the auto-commit flag.
+     */
+    final public void setAutoCommit(boolean autoCommit) {
+        
+        this.autoCommit = autoCommit;
+        
+    }
+    transient private boolean autoCommit = true;
     
     final public long getLastCommitTime() {
         
@@ -664,6 +689,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      */
     final public long writeCheckpoint() {
         
+        log.info("begin");
+        
         assertNotReadOnly();
         
         assert root != null; // i.e., isOpen().
@@ -687,6 +714,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             // note the address of the new metadata record.
             lastMetadataAddr = metadata.getMetadataAddr();
             
+            log.info("wrote updated metadata record");
+            
         }
         
         // create new checkpoint record.
@@ -694,6 +723,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
         // write it on the store.
         checkpoint.write(store);
+        
+        log.info("new checkpoint="+checkpoint);
         
         // return address of that checkpoint record.
         return checkpoint.getCheckpointAddr();
@@ -712,28 +743,28 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
     }
     
-    /**
-     * Return true iff the state of this B+Tree has been modified since the last
-     * {@link Checkpoint} record associated with the given address.
-     * 
-     * @param checkpointAddr
-     *            The historical metadata address for this B+Tree.
-     * 
-     * @return true iff the B+Tree has been modified since the identified
-     *         historical version.
-     * 
-     * @see #getCheckpoint()
-     * @see Checkpoint#getMetadataAddr()
-     * 
-     * @todo this test might not work with overflow() handling since the
-     *       {@link Checkpoint} addresses would be independent in each store
-     *       file.
-     */
-    public boolean modifiedSince(long checkpointAddr) {
-        
-        return needsCheckpoint() || checkpoint.getMetadataAddr() != checkpointAddr;
-        
-    }
+//    /**
+//     * Return true iff the state of this B+Tree has been modified since the last
+//     * {@link Checkpoint} record associated with the given address.
+//     * 
+//     * @param checkpointAddr
+//     *            The historical metadata address for this B+Tree.
+//     * 
+//     * @return true iff the B+Tree has been modified since the identified
+//     *         historical version.
+//     * 
+//     * @see #getCheckpoint()
+//     * @see Checkpoint#getMetadataAddr()
+//     * 
+//     * @todo this test might not work with overflow() handling since the
+//     *       {@link Checkpoint} addresses would be independent in each store
+//     *       file.
+//     */
+//    public boolean modifiedSince(long checkpointAddr) {
+//        
+//        return needsCheckpoint() || checkpoint.getCheckpointAddr() != checkpointAddr;
+//        
+//    }
 
     /**
      * Return true iff changes would be lost unless the B+Tree is flushed to the
@@ -810,24 +841,27 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
-     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes and
-     * leaves onto the store, writing a new metadata record, and returning the
-     * address of that metadata record.
+     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes
+     * and leaves onto the store, writing a new metadata record, and returning
+     * the address of that metadata record.
      * <p>
      * Note: In order to avoid needless writes the existing metadata record is
      * always returned if {@link #needsCheckpoint()} is <code>false</code>.
+     * <p>
+     * Note: The address of the existing {@link Checkpoint} record is always
+     * returned if {@link #getAutoCommit() autoCommit} is disabled.
      * 
      * @return The address of a {@link Checkpoint} record from which the btree
      *         may be reloaded.
      */
     public long handleCommit() {
 
-        if (needsCheckpoint()) {
+        if (autoCommit && needsCheckpoint()) {
 
             /*
-             * Flush the btree, write its metadata record, and return the
-             * address of that metadata record. The [metadata] reference is also
-             * updated.
+             * Flush the btree, write a checkpoint record, and return the
+             * address of that checkpoint record. The [checkpoint] reference is
+             * also updated.
              */
 
             return writeCheckpoint();
@@ -837,6 +871,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         /*
          * There have not been any writes on this btree or auto-commit is
          * disabled.
+         * 
+         * Note: if the application has explicitly invoked writeCheckpoint()
+         * then the returned address will be the address of that checkpoint
+         * record and the BTree will have a new checkpoint address made restart
+         * safe on the backing store.
          */
 
         return checkpoint.addrCheckpoint;
@@ -940,9 +979,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         
         if (metadata.getMetadataAddr() != 0L) {
 
-            /*
-             */
-            
             throw new IllegalStateException("Metadata record already in use");
             
         }
@@ -965,7 +1001,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         firstCheckpoint.write(store);
         
         /*
-         * Load the B+Tree from the store using that checkpoint record.
+         * Load the B+Tree from the store using that checkpoint record. There is
+         * no root so a new root leaf will be created when the B+Tree is opened.
          */
         return load(store, firstCheckpoint.getCheckpointAddr());
         
