@@ -583,6 +583,22 @@ abstract public class AbstractTestCase
     static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
             SPO[] expected, ISPOIterator actual) {
 
+        assertSameSPOsAnyOrder(store,expected,actual,false);
+    }
+    
+    /**
+     * Verify that the iterator visits the expected {@link SPO}s in any order
+     * without duplicates, optionally ignoring axioms.
+     * 
+     * @param store
+     *            Used to resolve term identifiers for messages.
+     * @param expected
+     * @param actual
+     * @param ignoreAxioms
+     */
+    static public void assertSameSPOsAnyOrder(AbstractTripleStore store,
+            SPO[] expected, ISPOIterator actual, boolean ignoreAxioms) {
+        
         try {
 
             Map<SPO, SPO> map = new TreeMap<SPO, SPO>(SPOComparator.INSTANCE);
@@ -598,6 +614,10 @@ abstract public class AbstractTestCase
             while (actual.hasNext()) {
 
                 SPO actualSPO = actual.next();
+                
+                if (ignoreAxioms && actualSPO.isAxiom()) {
+                    continue;
+                }
 
                 log.info("actual: " + actualSPO.toString(store));
 

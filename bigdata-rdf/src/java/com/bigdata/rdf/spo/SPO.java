@@ -42,7 +42,7 @@ import com.bigdata.rdf.util.RdfKeyBuilder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPO {
+public class SPO implements Comparable {
     
     private transient static final long NULL = IRawTripleStore.NULL;
     
@@ -335,9 +335,9 @@ public class SPO {
             String t = null;
             
             switch(type) {
-            case Explicit: t = "Explicit"; break;
-            case Inferred: t = "Inferred"; break;
-            case Axiom   : t = "Axiom   "; break;
+            case Explicit   : t = "Explicit   "; break;
+            case Inferred   : t = "Inferred   "; break;
+            case Axiom      : t = "Axiom      "; break;
             default: throw new AssertionError();
             }
             

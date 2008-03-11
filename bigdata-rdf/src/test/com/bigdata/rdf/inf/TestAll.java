@@ -128,6 +128,9 @@ public class TestAll extends TestCase {
         // test suite for owl:sameAs {2,3} (constained forward evaluation).
         suite.addTestSuite( TestBackchainOwlSameAs.class );
 
+        // test suite for owl:sameAs {2,3} (backward chaining).
+        suite.addTestSuite( TestBackchainOwlSameAsPropertiesIterator.class );
+
         /*
          * @todo do some rigerous tests of the forward chainer to make sure that
          * it is properly computing the RDFS entailments. There are tests of
