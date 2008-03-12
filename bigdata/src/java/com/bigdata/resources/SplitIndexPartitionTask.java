@@ -5,14 +5,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
+import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
@@ -47,12 +55,8 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SplitIndexPartitionTask extends AbstractTask {
+public class SplitIndexPartitionTask extends AbstractResourceManagerTask {
 
-    /**
-     * 
-     */
-    private final ResourceManager resourceManager;
     private final long lastCommitTime;
     
     /**
@@ -62,16 +66,11 @@ public class SplitIndexPartitionTask extends AbstractTask {
      * @param resource
      */
     protected SplitIndexPartitionTask(ResourceManager resourceManager,
-            IConcurrencyManager concurrencyManager, long lastCommitTime,
+            long lastCommitTime,
             String resource) {
 
-        super(concurrencyManager, -lastCommitTime, resource);
+        super(resourceManager, -lastCommitTime, resource);
 
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
-
-        this.resourceManager = resourceManager;
-        
         this.lastCommitTime = lastCommitTime;
 
     }
@@ -210,6 +209,9 @@ public class SplitIndexPartitionTask extends AbstractTask {
     @Override
     protected Object doTask() throws Exception {
 
+        if (resourceManager.isOverflowAllowed())
+            throw new IllegalStateException();
+
         final String name = getOnlyResource();
         
         final IIndex src = getIndex(name);
@@ -276,7 +278,7 @@ public class SplitIndexPartitionTask extends AbstractTask {
             final File outFile = resourceManager.getIndexSegmentFile(indexMetadata);
             
             final AbstractTask task = new BuildIndexSegmentTask(resourceManager,
-                    resourceManager.getConcurrencyManager(), lastCommitTime,
+                    lastCommitTime,
                     name, //
                     outFile,//
                     pmd.getLeftSeparatorKey(), //
@@ -286,7 +288,7 @@ public class SplitIndexPartitionTask extends AbstractTask {
             
         }
         
-        // submit and await completion.
+        // submit and await completion. @todo timeout config?
         final List<Future<Object>> futures = resourceManager.getConcurrencyManager().invokeAll(tasks);
         
         final BuildResult[] buildResults = new BuildResult[nsplits];
@@ -301,8 +303,272 @@ public class SplitIndexPartitionTask extends AbstractTask {
 
         log.info("Generated "+splits.length+" index segments: name="+name);
         
-        return new SplitResult(name,indexMetadata,splits,buildResults);
+        final SplitResult result = new SplitResult(name,indexMetadata,splits,buildResults);
+        
+        final AbstractTask task = new UpdateSplitIndexPartition(
+                resourceManager, result.name, result);
+
+        // submit atomic update task and wait for it to complete @todo config
+        // timeout?
+        concurrencyManager.submit(task).get();
+        
+        return result;
         
     }
 
+    /**
+     * The result of a {@link SplitIndexPartitionTask} including enough metadata
+     * to identify the index partitions to be created and the index partition to
+     * be deleted.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class SplitResult extends AbstractResult {
+
+        /**
+         * The array of {@link Split}s that describes the new key range for
+         * each new index partition created by splitting the old index
+         * partition.
+         */
+        public final Split[] splits;
+        
+        /**
+         * An array of the {@link BuildResult}s for each output split.
+         */
+        public final BuildResult[] buildResults;
+
+        /**
+         * @param name
+         *            The name under which the processed index partition was
+         *            registered (this is typically different from the name of
+         *            the scale-out index).
+         * @param indexMetadata
+         *            The index metadata object for the processed index as of
+         *            the timestamp of the view from which the
+         *            {@link IndexSegment} was generated.
+         * @param splits
+         *            Note: At this point we have the history as of the
+         *            lastCommitTime in N index segments. Also, since we
+         *            constain the resource manager to refuse another overflow
+         *            until we have handle the old journal, all new writes are
+         *            on the live index.
+         * @param buildResults
+         *            A {@link BuildResult} for each output split.
+         */
+        public SplitResult(String name, IndexMetadata indexMetadata,
+                Split[] splits, BuildResult[] buildResults) {
+
+            super( name, indexMetadata);
+
+            assert splits != null;
+            
+            assert buildResults != null;
+            
+            assert splits.length == buildResults.length;
+            
+            for(int i=0; i<splits.length; i++) {
+                
+                assert splits[i] != null;
+
+                assert splits[i].pmd != null;
+
+                assert splits[i].pmd instanceof LocalPartitionMetadata;
+
+                assert buildResults[i] != null;
+                
+            }
+            
+            this.splits = splits;
+            
+            this.buildResults = buildResults;
+
+        }
+
+    }
+    
+    /**
+     * An {@link ITx#UNISOLATED} operation that splits the live index using the
+     * same {@link Split} points, generating new index partitions with new
+     * partition identifiers. The old index partition is deleted as a
+     * post-condition. The new index partitions are registered as a
+     * post-condition. Any data that was accumulated in the live index on the
+     * live journal is copied into the appropriate new {@link BTree} for the new
+     * index partition on the live journal.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class UpdateSplitIndexPartition extends AbstractResourceManagerTask {
+        
+        protected final SplitResult splitResult;
+        
+        public UpdateSplitIndexPartition(
+                ResourceManager resourceManager, String resource,
+                SplitResult splitResult) {
+
+            super(resourceManager, ITx.UNISOLATED, resource);
+
+            if (splitResult == null)
+                throw new IllegalArgumentException();
+            
+            this.splitResult = splitResult;
+            
+        }
+
+        @Override
+        protected Object doTask() throws Exception {
+
+            // The name of the scale-out index.
+            final String scaleOutIndexName = splitResult.indexMetadata.getName();
+            
+            // the name of the source index.
+            final String name = getOnlyResource();
+            
+            // this is the live journal since this task is unisolated.
+            final AbstractJournal journal = getJournal();
+            
+            /*
+             * Note: the source index is the BTree on the live journal that has
+             * been absorbing writes since the last overflow.  This is NOT a fused
+             * view.  All we are doing is re-distributing the writes onto the new
+             * splits of the index partition.
+             */
+            final BTree src = (BTree) resourceManager.getIndexOnStore(name,
+                    ITx.UNISOLATED, journal); 
+            
+            /*
+             * Locators for the new index partitions.
+             */
+
+            final LocalPartitionMetadata oldpmd = (LocalPartitionMetadata) src
+                    .getIndexMetadata().getPartitionMetadata();
+
+            final Split[] splits = splitResult.splits;
+            
+            final PartitionLocator[] locators = new PartitionLocator[splits.length];
+
+            for (int i = 0; i < splits.length; i++) {
+
+                // new metadata record (cloned).
+                final IndexMetadata md = src.getIndexMetadata().clone();
+
+                final LocalPartitionMetadata pmd = (LocalPartitionMetadata) splits[i].pmd;
+
+                assert pmd.getResources() == null : "Not expecting resources for index segment: "
+                        + pmd;
+                
+                /*
+                 * form locator for the new index partition for this split..
+                 */
+                final PartitionLocator locator = new PartitionLocator(
+                        pmd.getPartitionId(),//
+                        /*
+                         * This is the set of failover services for this index
+                         * partition. The first element of the array is always
+                         * the data service on which this resource manager is
+                         * running. The remainder of elements in the array are
+                         * the failover services.
+                         * 
+                         * @todo The index partition data will be replicated at
+                         * the byte image level for the live journal.
+                         * 
+                         * @todo New index segment resources will be replicated
+                         * as well.
+                         * 
+                         * @todo Once the index partition data is fully
+                         * replicated we update the metadata index.
+                         */
+                        resourceManager.getDataServiceUUIDs(),//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey()//
+                        );
+                
+                locators[i] = locator;
+                
+                /*
+                 * Update the view definition.
+                 */
+                md.setPartitionMetadata(new LocalPartitionMetadata(
+                        pmd.getPartitionId(),//
+                        pmd.getLeftSeparatorKey(),//
+                        pmd.getRightSeparatorKey(),//
+                        new IResourceMetadata[] {//
+                            /*
+                             * Resources are (a) the new btree; and (b) the new
+                             * index segment.
+                             */
+                            journal.getResourceMetadata(),
+                            splitResult.buildResults[i].segmentMetadata
+                        },
+                        /* 
+                         * Note: history is record of the split.
+                         */
+                        pmd.getHistory()
+                        ));
+                
+                // create new btree.
+                final BTree btree = BTree.create(journal, md);
+
+                // the new partition identifier.
+                final int partitionId = pmd.getPartitionId();
+                
+                // name of the new index partition.
+                final String name2 = DataService.getIndexPartitionName(scaleOutIndexName, partitionId);
+                
+                // register it on the live journal.
+                journal.registerIndex(name2, btree);
+                
+                // lower bound (inclusive) for copy.
+                final byte[] fromKey = pmd.getLeftSeparatorKey();
+                
+                // upper bound (exclusive) for copy.
+                final byte[] toKey = pmd.getRightSeparatorKey();
+                
+                /*
+                 * Copy all data in this split from the source index.
+                 * 
+                 * Note: [overflow := false] since the btrees are on the same
+                 * backing store.
+                 */
+                final long ncopied = btree.rangeCopy(src, fromKey, toKey, false/*overflow*/);
+                
+                log.info("Copied " + ncopied
+                        + " index entries from the live index " + name
+                        + " onto " + name2);
+                
+            }
+
+            // drop the source index (the old index partition).
+            journal.dropIndex(name);
+            
+            // will notify tasks that index partition was split.
+            resourceManager.setIndexPartitionGone(name, "split");
+           
+            /*
+             * Notify the metadata service that the index partition has been
+             * split.
+             * 
+             * @todo Is it possible for the dataServiceUUIDs[] that we have
+             * locally to be out of sync with the one in the locator on the
+             * metadata service? If so, then the metadata service needs to
+             * ignore that field when validating the oldLocator that we form
+             * below.
+             */
+            resourceManager.getMetadataService().splitIndexPartition(
+                    src.getIndexMetadata().getName(),//
+                    new PartitionLocator(//
+                            oldpmd.getPartitionId(), //
+                            resourceManager.getDataServiceUUIDs(), //
+                            oldpmd.getLeftSeparatorKey(),//
+                            oldpmd.getRightSeparatorKey()//
+                            ),
+                    locators);
+            
+            return null;
+            
+        }
+        
+    }
+    
 }

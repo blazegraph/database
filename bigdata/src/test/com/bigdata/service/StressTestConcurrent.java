@@ -242,7 +242,7 @@ public class StressTestConcurrent extends
         DataService dataService = ((EmbeddedBigdataFederation)fed).getDataService(0);
         
         int nclients = 20;
-        long timeout = 30;
+        long timeout = 40;
         int ntrials = 10000;
         int keyLen = 4;
         int nops = 100;
@@ -477,6 +477,8 @@ public class StressTestConcurrent extends
         ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
 
         System.err.println(ret.toString(true/*newline*/));
+
+        System.out.println(ndx.getStatistics());
         
         return ret;
        

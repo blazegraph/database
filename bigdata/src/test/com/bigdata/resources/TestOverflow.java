@@ -31,7 +31,6 @@ package com.bigdata.resources;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
@@ -47,7 +46,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.resources.ResourceManager.Options;
 
 /**
  * Basic tests for {@link ResourceManager#overflow(boolean, boolean)}

@@ -83,9 +83,15 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      *         Thompson</a>
      * @version $Id$
      */
-    protected static class Header {
+    public static class Header {
 
-        public final String name;
+        private final String name;
+        
+        public String getName() {
+            
+            return name;
+            
+        }
 
         /**
          * An array of formats to be tested against the column values. The order
@@ -97,7 +103,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
          * would be interpreted as an integer if you tested the integer format
          * first.
          * 
-         * @todo consider using reglar expressions to select which formats to
+         * @todo consider using regular expressions to select which formats to
          *       apply (or which formats to ignore).
          * 
          * @todo verify that the entire text was matched by the format in order
@@ -249,11 +255,13 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     private boolean exhausted = false;
 
     private boolean skipCommentLines = true;
-
+    
     private boolean skipBlankLines = true;
 
     private boolean trimWhitespace = true;
 
+    private long tailDelayMillis = 0L;
+    
     /**
      * The header definitions (initially null).
      * 
@@ -292,7 +300,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
         return lineNo;
 
     }
-
+    
     public boolean setSkipCommentLines(boolean skipCommentLines) {
 
         boolean tmp = this.skipCommentLines;
@@ -341,6 +349,30 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
+    /**
+     * The #of milliseconds that the {@link CSVReader} should wait before
+     * attempting to read another line from the source (when reading from
+     * a pipe) -or- 0L if the {@link CSVReader} should NOT continue reading
+     * once it has reached the end of the input (default 0L). 
+     */
+    public long getTailDelayMillis() {
+        
+        return tailDelayMillis;
+        
+    }
+    
+    public long setTailDelayMillis(long tailDelayMillis) {
+        
+        if(tailDelayMillis<0) throw new IllegalArgumentException();
+        
+        long tmp = this.tailDelayMillis;
+        
+        this.tailDelayMillis = tailDelayMillis;
+        
+        return tmp;
+        
+    }
+    
     public boolean hasNext() {
 
         if(exhausted) return false;
@@ -355,6 +387,24 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
             while (true) {
 
+                while(tailDelayMillis!=0L && !r.ready()) {
+                    /*
+                     * Wait until more data is available.
+                     * 
+                     * @todo may have to wait until a newline is available, or
+                     * just incrementally buffer until we have a full line of
+                     * text.
+                     */
+                    try {
+                        Thread.sleep(tailDelayMillis);
+                    } catch (InterruptedException e) {
+                        // Interrupted - stop processing.
+                        log.warn(e.getMessage(),e);
+                        return false;
+                    }
+                    
+                }
+                
                 line = r.readLine();
 
                 if (line == null) {
@@ -421,8 +471,8 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     }
 
     /**
-     * Trim whitespace from each value iff {@link #getTrimWhitespace()} is
-     * true.
+     * Trim whitespace and optional quotes from each value iff
+     * {@link #getTrimWhitespace()} is true.
      * 
      * @param cols
      *            The column values.
@@ -440,7 +490,15 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
             if (col != null) {
 
-                cols[i] = col.trim();
+                col = col.trim();
+
+                if (col.startsWith("\"") && col.endsWith("\"")) {
+
+                    col = col.substring(1, col.length() - 1);
+
+                }
+
+                cols[i] = col;
 
             }
 
@@ -555,6 +613,15 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     }
 
     /**
+     * Return the current headers (cloned).
+     */
+    public Header[] getHeaders() {
+
+        return headers.clone();
+        
+    }
+    
+    /**
      * Explictly set the headers.
      * 
      * @param headers
@@ -562,8 +629,30 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      */
     public void setHeaders(Header[] headers) {
 
+        if(headers==null) throw new IllegalArgumentException();
+        
         this.headers = headers;
 
+    }
+    
+    /**
+     * Re-define the {@link Header} at the specified index.
+     * 
+     * @param index
+     *            The index in [0:#headers-1].
+     * @param header
+     *            The new {@link Header} definition.
+     */
+    public void setHeader(int index,Header header) {
+        
+        if (index < 0 || index > headers.length)
+            throw new IndexOutOfBoundsException();
+
+        if (header == null)
+            throw new IllegalArgumentException();
+        
+        headers[index] = header;
+        
     }
     
     /**

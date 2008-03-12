@@ -80,8 +80,10 @@ public class TestAll extends TestCase {
         // test ability to re-open an embedded federation.
         suite.addTestSuite( TestRestartSafe.class );
         
-        // test journal overflow scenarios.
+        // test journal overflow scenarios (split/join).
         suite.addTestSuite( TestOverflow.class );
+        // test journal overflow scenarios (move) 
+        suite.addTestSuite( TestIndexPartitionMove.class );
         
         /*
          * Stress test of concurrent clients writing on a single data service.
