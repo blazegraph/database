@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
@@ -158,6 +159,18 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     protected static final Logger log = Logger.getLogger(PostProcessOldJournalTask.class);
     
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
     /**
      * 
      */
@@ -491,10 +504,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         log.info("begin: lastCommitTime=" + lastCommitTime);
 
-        // the old journal.
-        final AbstractJournal oldJournal = resourceManager
-                .getJournal(lastCommitTime);
-        
         /*
          * Map of the under capacity index partitions for each scale-out index
          * having index partitions on the journal. Keys are the name of the
@@ -518,6 +527,10 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             int njoin = 0; // join task _candidate_.
             int nignored = 0; // #of index partitions that are NOT join candidates.
 
+            // the old journal.
+            final AbstractJournal oldJournal = resourceManager
+                    .getJournal(lastCommitTime);
+            
             final ITupleIterator itr = oldJournal.getName2Addr().rangeIterator(
                     null, null);
 
@@ -533,28 +546,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // the name of an index to consider.
                 final String name = entry.name;
 
-//                if(isUsed(name)) {
-//                    
-//                    log.info("Skipping name="+name+" - already used.");
-//                    
-//                    nskip++;
-//                    
-//                    ndone++;
-//                    
-//                    continue;
-//                    
-//                }
-
-                /* 
-                 * Open the historical view of that index at that time.
+                /*
+                 * Open the historical view of that index at that time (not just
+                 * the mutable BTree but the full view).
                  */
-                final IIndex view = resourceManager.getIndexOnStore(name,
-                        lastCommitTime, oldJournal);
+                final IIndex view = resourceManager.getIndex(name,
+                        -lastCommitTime);
 
                 if (view == null) {
 
                     throw new AssertionError(
-                            "Index not registered on old journal: " + name
+                            "Index not found? : name=" + name
                                     + ", lastCommitTime=" + lastCommitTime);
 
                 }
@@ -570,6 +572,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final LocalPartitionMetadata pmd = indexMetadata
                         .getPartitionMetadata();
 
+                log.info("Considering join: name="+name+", pmd="+pmd);
+                
                 if (splitHandler != null
                         && pmd.getRightSeparatorKey() != null
                         && splitHandler.shouldJoin(view)) {
@@ -981,7 +985,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             if(isUsed(name)) continue;
 
-            System.err.println("Considering move candidate: "+score);
+            log.info("Considering move candidate: "+score);
             
             if (score.drank > .3 && score.drank < .8) {
 
@@ -993,6 +997,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 final UUID targetDataServiceUUID = underUtilizedDataServiceUUIDs[nmove
                         % underUtilizedDataServiceUUIDs.length];
 
+                log.info("Will move "+name+" to dataService="+targetDataServiceUUID);
+                
                 final AbstractTask task = new MoveIndexPartitionTask(
                         resourceManager, resourceManager
                                 .getConcurrencyManager(), lastCommitTime, name,
@@ -1008,7 +1014,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
         
-        System.err.println("Will move "+nmove+" index partitions based on utilization.");
+        log.info("Will move "+nmove+" index partitions based on utilization.");
 
         return tasks;
 
@@ -1208,16 +1214,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     
                 }
 
-                /* 
-                 * Open the historical view of that index at that time.
+                /*
+                 * Open the historical view of that index at that time (not just
+                 * the mutable BTree but the full view).
                  */
-                final IIndex view = resourceManager.getIndexOnStore(name,
-                        lastCommitTime, oldJournal);
+                final IIndex view = resourceManager.getIndex(name,
+                        -lastCommitTime);
 
                 if (view == null) {
 
                     throw new AssertionError(
-                            "Index not registered on old journal: " + name
+                            "Index not found? : name" + name
                                     + ", lastCommitTime=" + lastCommitTime);
 
                 }
@@ -1345,7 +1352,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
      */
     
-    protected List<AbstractTask> runTasks(List<AbstractTask> inputTasks)
+    protected List<AbstractTask> runPrepTasks(List<AbstractTask> inputTasks)
             throws Exception {
 
         log.info("Will run " + inputTasks.size() + " tasks");
@@ -1505,7 +1512,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * 
      * @throws Exception
      */
-    protected void runUpdateTasks(List<AbstractTask> tasks) throws Exception {
+    protected void runAtomicUpdateTasks(List<AbstractTask> tasks) throws Exception {
 
         log.info("begin : will run "+tasks.size()+" update tasks");
 
@@ -1570,8 +1577,12 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     public Object call() throws Exception {
 
+        final long begin = System.currentTimeMillis();
+        
         try {
 
+            log.info("begin");
+            
             if (resourceManager.overflowAllowed.get()) {
 
             // overflow must be disabled while we run this task.
@@ -1589,12 +1600,32 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * to be able to tell when all stages have been completed so that we
              * can re-enable overflow on the journal.
              */
-
+            
+            if(INFO) {
+                
+                // The pre-condition views.
+                
+                log.info("\npre-condition views: overflowCounter="
+                        + resourceManager.overflowCounter.get() + "\n"
+                        + resourceManager.listIndexPartitions(-lastCommitTime));
+                
+            }
+            
             List<AbstractTask> tasks = chooseTasks();
 
-            List<AbstractTask> updateTasks = runTasks(tasks);
+            List<AbstractTask> updateTasks = runPrepTasks(tasks);
 
-            runUpdateTasks(updateTasks);
+            runAtomicUpdateTasks(updateTasks);
+
+            if(INFO) {
+                
+                // The post-condition views.
+                
+                log.info("\npost-condition views: overflowCounter="
+                        + resourceManager.overflowCounter.get() + "\n"
+                        + resourceManager.listIndexPartitions(ITx.UNISOLATED));
+                
+            }
 
             /*
              * Note: At this point we have the history as of the lastCommitTime
@@ -1606,7 +1637,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             final long overflowCounter = resourceManager.overflowCounter
                     .incrementAndGet();
 
-            log.info("Done: overflowCounter=" + overflowCounter);
+            final long elapsed = System.currentTimeMillis()-begin;
+            
+            log.info("Done: overflowCounter=" + overflowCounter+", elapsed="+elapsed+"ms");
             
             return null;
             
@@ -1641,5 +1674,5 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         }
 
     }
-
+    
 }

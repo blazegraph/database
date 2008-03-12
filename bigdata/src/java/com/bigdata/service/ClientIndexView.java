@@ -1098,6 +1098,8 @@ public class ClientIndexView implements IIndex {
             if (locator == null)
                 throw new IllegalArgumentException();
             
+            if(Thread.interrupted()) throw new InterruptedException();
+            
             // resolve service UUID to data service.
             final IDataService dataService = getDataService(locator);
 
@@ -1111,11 +1113,15 @@ public class ClientIndexView implements IIndex {
             
             try {
 
+                if(Thread.interrupted()) throw new InterruptedException();
+
                 submit(dataService, name);
                 
             } catch(Exception ex) {
                 
                 if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
+                                        
+                    if(Thread.interrupted()) throw new InterruptedException();
                     
                     log.warn("Locator stale (will retry) : name="+name+", stale locator="+locator+" : "+ex);
                     

@@ -309,7 +309,7 @@ public abstract class AbstractJournal implements IJournal {
     /*private*/ CommitRecordIndex _commitRecordIndex;
 
     /**
-     * True iff the journal was opened in a read-only mode.
+     * True iff the journal was opened in a read-only mode
      */
     private final boolean readOnly;
     
@@ -918,9 +918,6 @@ public abstract class AbstractJournal implements IJournal {
         assertOpen();
 
         log.info("");
-        
-//        // shutdown the write service. 
-//        writeService.shutdown();
 
         // close immediately.
         _close();
@@ -940,8 +937,6 @@ public abstract class AbstractJournal implements IJournal {
         assertOpen();
 
         log.info("");
-        
-//        writeService.shutdownNow();
 
         // close immediately.
         _close();
@@ -1208,7 +1203,8 @@ public abstract class AbstractJournal implements IJournal {
 
     public boolean isReadOnly() {
         
-        return readOnly;
+        // FIXME handling of read-only restrictions is not very good
+        return readOnly || getRootBlockView().getCloseTime() != 0L;
         
     }
     
@@ -1658,6 +1654,12 @@ public abstract class AbstractJournal implements IJournal {
 
         assertOpen();
 
+        if(isReadOnly()) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         return _bufferStrategy.write(data);
 
     }

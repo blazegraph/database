@@ -132,15 +132,17 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * to violate the concurrency control mechanisms, therefore you SHOULD NOT
      * use this unless you have a clear idea what you are about. You should be
      * able to write all application level tasks in terms of
-     * {@link #getIndex(String)} and operations on the returned index. Using
-     * {@link SequenceTask} you can combine application specific unisolated
-     * write tasks with tasks that add or drop indices into atomic operations.
+     * {@link #getIndex(String)} and operations on the returned index.
+     * <p>
+     * Note: For example, if you use the returned object to access a named index
+     * and modify the state of that named index, your changes WILL NOT be
+     * noticed by the checkpoint protocol in {@link InnerWriteServiceCallable}.
      * 
      * @return The corresponding journal for that timestamp -or-
      *         <code>null</code> if no journal has data for that timestamp,
      *         including when a historical journal with data for that timestamp
      *         has been deleted.
-     *         
+     * 
      * @see IResourceManager#getJournal(long)
      */
     public final AbstractJournal getJournal() {
@@ -518,8 +520,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * 
      * @throws {@link ResubmitException}
      *             if the task has already been submitted.
-     * @throws {@link RetryException}
-     *             if the task MAY be retried.
      * @throws {@link InterruptedException}
      *             can be thrown if the task is interrupted, for example while
      *             awaiting a lock, if the commit group is being discarded, or
@@ -810,14 +810,15 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * The txService must be a {@link WriteExecutorService} so that it will
      * correctly handle aborts and commits of writes on isolated indices.
      * 
-     * FIXME Modify the {@link WriteExecutorService} to use checkpoints on named
-     * indices after each task. This will not only allow us to abort individual
-     * tasks that fail (without discarding the commit group), it will also allow
-     * us to commit without waiting for long running tasks to complete (since
-     * they are executing they have an exclusive lock on the named indices so
-     * noone else can write while they are running). The same solution should be
-     * applied to the within transaction contention for isolated indices writing
-     * on the temporary store for the transaction.
+     * FIXME (already done, but not yet for transactions) Modify the
+     * {@link WriteExecutorService} to use checkpoints on named indices after
+     * each task. This will not only allow us to abort individual tasks that
+     * fail (without discarding the commit group), it will also allow us to
+     * commit without waiting for long running tasks to complete (since they are
+     * executing they have an exclusive lock on the named indices so noone else
+     * can write while they are running). The same solution should be applied to
+     * the within transaction contention for isolated indices writing on the
+     * temporary store for the transaction.
      * <p>
      * An index checkpoint simply flushes the index (and its metadata record) to
      * disk. This approach REQUIRES that we do NOT mark the index as requiring
@@ -1097,16 +1098,19 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                 if(needsCheckpoint) {
                     
                     /*
+                     * FIXME rollback semantics when task checkpoints indices.
+                     * 
                      * This is not the precisely correct rollback condition. The
-                     * issue is if the task itself checkpoints the index then the
-                     * rollback point will be moved forward to that checkpoint since
-                     * the btree will re-open from its last written checkpoint
-                     * record. The solution is to keep a transient map from index
-                     * name to the address of the rollback checkpoint. Changes to
-                     * that map should be made atomically for all indices that were
-                     * accessed by the UNISOLATED task using a scan of the
-                     * [indexCache]. This can be made atomic using a lock governing
-                     * access to the checkpoint rollback addresses.
+                     * issue is if the task itself checkpoints the index then
+                     * the rollback point will be moved forward to that
+                     * checkpoint since the btree will re-open from its last
+                     * written checkpoint record. The solution is to keep a
+                     * transient map from index name to the address of the
+                     * rollback checkpoint. Changes to that map should be made
+                     * atomically for all indices that were accessed by the
+                     * UNISOLATED task using a scan of the [indexCache]. This
+                     * can be made atomic using a lock governing access to the
+                     * checkpoint rollback addresses.
                      */
                     
                     log.info("Rolling back index: "+name+" : "+this);

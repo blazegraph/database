@@ -29,7 +29,6 @@ import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
-import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.service.DataService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -421,7 +420,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        log.info("");
+        log.info("begin");
 
         // time when shutdown begins.
         final long begin = System.currentTimeMillis();
@@ -498,12 +497,23 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
-        statusService.shutdown();
+        // shutdown the status service, but don't wait for it.
+        {
+
+            log.info("Shutting down the status service");
+
+            statusService.shutdown();
+            
+        }
 
         // final status message.
-        statusTask.run();
+//        statusTask.run();
 //        System.err.println(getStatistics());
     
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: elapsed="+elapsed+"ms : "+getStatistics());
+        
     }
 
     /**
@@ -518,7 +528,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        log.info("");
+        log.info("begin");
+        
+        final long begin = System.currentTimeMillis();
         
         txWriteService.shutdownNow();
 
@@ -529,8 +541,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
         statusService.shutdownNow();
 
         // final status message.
-        statusTask.run();
+//        statusTask.run();
 //        System.err.println(statusTask.status());
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: elapsed="+elapsed+"ms : "+getStatistics());
 
     }
 
@@ -773,9 +789,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final long initialDelay = 100;
             
             final long delay = Long.parseLong(properties.getProperty(
-                    ConcurrencyManager.Options.STATUS_DELAY, ConcurrencyManager.Options.DEFAULT_STATUS_DELAY));
+                    ConcurrencyManager.Options.STATUS_DELAY,
+                    ConcurrencyManager.Options.DEFAULT_STATUS_DELAY));
 
-            log.info(ConcurrencyManager.Options.STATUS_DELAY+"="+delay);
+            log.info(ConcurrencyManager.Options.STATUS_DELAY + "=" + delay);
             
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
@@ -838,6 +855,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     }
 
     /**
+     * Information on the {@link ConcurrencyManager}.
      * 
      * @todo format into a nicer tabular display.
      * @todo measure the maximum latency for a task to begin execution.
@@ -847,26 +865,12 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     public String getStatistics() {
 
-//        /*
-//         * The #of commits on the _store_ (vs the #of commits since the
-//         * write service was started).
-//         * 
-//         * Note: if the journal is already closed then this information is
-//         * not available.
-//         */
-//        long commitCounter = -1;
-//        try {
-//            commitCounter = getCommitRecord().getCommitCounter();
-//        } catch (Throwable t) {
-//            log.warn("Commit record not available: "+t);
-//            /* ignore */
-//        }
-        
         final long elapsed = System.currentTimeMillis() - serviceStartTime;
-        
-//        final long nextOffset = getBufferStrategy().getNextOffset();
 
         StringBuilder sb = new StringBuilder();
+        
+        // high level.
+        sb.append(getClass().getSimpleName()+" status: elapsed=" + elapsed+"\n");
         
         // txService (#active,#queued,#completed,poolSize)
         sb.append("transactions=("
@@ -910,11 +914,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 + ")\n"
                 );
         
-        // commitCounter and related stats.
-        sb.append(
-//                  "commitCounter="+(commitCounter == -1 ? "N/A" : ""+commitCounter)
-                    "ncommits="+ writeService.getGroupCommitCount()
+        // more detail on the write service.
+        sb.append(  "writeService"+
+                  ": ncommits="+ writeService.getGroupCommitCount()
                 + ", naborts=" + writeService.getAbortCount()
+                + ", noverflow="+writeService.getOverflowCount()
                 + ", failedTasks="+writeService.getFailedTaskCount()
                 + ", successTasks="+writeService.getSuccessTaskCount()
                 + ", committedTasks="+writeService.getCommittedTaskCount()
@@ -922,15 +926,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
                 + ", maxRunning="+ writeService.getMaxRunning()
                 + ", maxPoolSize="+ writeService.getMaxPoolSize()
-                + ", elapsed=" + elapsed
+                + ", paused=" + writeService.isPaused()
+                + ", terminated="+writeService.isTerminated()
+                + ", terminating="+writeService.isTerminating()
+                + ", isShutdown="+writeService.isShutdown()
+                + ", lock{locked="+writeService.lock.isLocked()+",queueLength="+writeService.lock.getQueueLength()+"}"
                 + "\n"
                 );
-
-//        if(getBufferStrategy() instanceof DiskOnlyStrategy) {
-//            
-//            sb.append(((DiskOnlyStrategy)getBufferStrategy()).getStatistics());
-//            
-//        }
         
         return sb.toString();
         
@@ -969,10 +971,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * <dd>An unisolated write task was attempting to commit the write set for
      * a transaction but validation failed. You may retry the entire
      * transaction.</dd>
-     * <dt>{@link RetryException}</dt>
-     * <dd>An unisolated write task was a member of a commit group in which
-     * some other write task failed. The entire commit group was discarded and
-     * all tasks in the group were interrupted. You MAY retry the task.</dd>
      * <dt>{@link InterruptedException}</dt>
      * <dd>A task was interrupted during execution and before the task had
      * completed normally. You MAY retry the task, but note that this exception

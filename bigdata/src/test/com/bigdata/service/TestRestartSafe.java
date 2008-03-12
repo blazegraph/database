@@ -200,7 +200,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * See setUp() in the parent class.
          */
         
-        client.terminate();
+        client.shutdownNow();
         
         client = null;
         

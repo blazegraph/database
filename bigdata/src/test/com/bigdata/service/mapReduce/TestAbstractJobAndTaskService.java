@@ -102,7 +102,7 @@ public class TestAbstractJobAndTaskService extends TestCase {
      
         if(bigdataClient!=null) {
 
-            bigdataClient.terminate();
+            bigdataClient.shutdownNow();
             
         }
         

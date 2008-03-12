@@ -359,8 +359,15 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
                     .submit(0/*fromIndex*/,nentries/*toIndex*/, keys, vals,
                             BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
             
-            assertEquals("rangeCount", groundTruth.getEntryCount(), fed
-                    .getIndex(name, ITx.UNISOLATED).rangeCount(null, null));
+            /*
+             * Problem is comparing entryCount on ground truth to rangeCount
+             * on scale-out index. Since duplicate keys can be generated the
+             * scale-out count can be larger than the ground truth count.
+             * Write a utility method based on an iterator that returns the
+             * real count for the scale-out index if I care.
+             */
+//            assertEquals("rangeCount", groundTruth.getEntryCount(), fed
+//                    .getIndex(name, ITx.UNISOLATED).rangeCount(null, null));
             
             nrounds++;
 
@@ -417,8 +424,8 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
                 
             }
             
-            System.err.println("Will delete " + ndelete + " entries from "
-                    + locator + " to trigger underflow");
+            System.err.println("Will delete " + ndelete + " of " + rangeCount
+                    + " entries from " + locator + " to trigger underflow");
             
             groundTruth.submit(0/*fromIndex*/,ndelete/*toIndex*/, keys, null/* vals */,
                     BatchRemoveConstructor.RETURN_NO_VALUES, null/*handler*/);
@@ -435,7 +442,7 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         final long overflowCounter2 = awaitOverflow(dataService0, overflowCounter1);
         
         /*
-         * Confirm index partitions were not joined.
+         * Confirm index partitions were NOT joined.
          * 
          * Note: Even though we have deleted index entries the #of index entries
          * in the partition WILL NOT be reduced until the next build task for
@@ -481,9 +488,8 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         }
 
         // wait until overflow processing is done.
-//        final long overflowCounter3 = 
-            awaitOverflow(dataService0, overflowCounter2);
-        
+        final long overflowCounter3 = awaitOverflow(dataService0, overflowCounter2);
+                
         /*
          * Confirm index partitions were joined.
          * 
@@ -505,229 +511,4 @@ public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
         
     }
     
-    /**
-     * Waits until the overflow counter has been incremented, indicating that
-     * overflow processing has occurred and that post-processing for the
-     * overflow event is complete.
-     * <p>
-     * Note: Normally you use bring the data service to the brink of the desired
-     * overflow event, note the current overflow counter using
-     * {@link IDataService#getOverflowCounter()}, use
-     * {@link IDataService#forceOverflow()} to set the forceOverflow flag, do
-     * one more write to trigger group commit and overflow processing, and then
-     * invoke this method to await the end of overflow post-processing.
-     * 
-     * @param dataService
-     *            The data service.
-     * 
-     * @param priorOverflowCounter
-     * 
-     * @return The new value of the overflow counter.
-     * 
-     * @throws IOException
-     */
-    protected long awaitOverflow(IDataService dataService,long priorOverflowCounter) throws IOException {
-        
-        log.info("Awaiting overflow: priorOverflowCounter="+priorOverflowCounter+", service=" + dataService);
-
-        final long begin = System.currentTimeMillis();
-
-        long newOverflowCounter;
-        
-        while ((newOverflowCounter = dataService.getOverflowCounter()) == priorOverflowCounter) {
-
-            try {
-                Thread.sleep(250/* ms */);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            System.err.println("Awaiting overflow: " + dataService);
-
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            if(elapsed > 2000) fail("No overflow after "+elapsed+"ms?");
-            
-        }
-
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        System.err.println("Overflow complete: elapsed=" + elapsed
-                + " ms : priorOverflowCounter=" + priorOverflowCounter
-                + ", newOverflowCounter=" + newOverflowCounter);
-
-        assertTrue(newOverflowCounter > priorOverflowCounter);
-
-        return newOverflowCounter;
-        
-    }
-    
-    /**
-     * Return the #of index partitions in a scale-out index.
-     * <p>
-     * Note: This uses an key range scan to count only the non-deleted index
-     * partition entries.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * 
-     * @return The #of index partitions.
-     * 
-     * @todo note that the {@link MetadataIndex} does not use delete markers so
-     *       a range count would be exact.
-     */
-    protected int getPartitionCount(String name) {
-        
-        final ITupleIterator itr = new RawDataServiceRangeIterator(
-                metadataService,//
-                MetadataService.getMetadataIndexName(name), //
-                ITx.READ_COMMITTED,//
-                true, // readConsistent
-                null, // fromKey
-                null, // toKey
-                0,    // capacity,
-                IRangeQuery.DEFAULT,// flags
-                null // filter
-                );
-
-        int n = 0;
-        
-        while(itr.hasNext()) {
-            
-            n++;
-         
-            log.info(SerializerUtil.deserialize(itr.next().getValue()));
-            
-        }
-        
-        return n;
-        
-    }
-    
-    /**
-     * Verifies the data in the two indices using a batch-oriented key range
-     * scan. Only the keys and values of non-deleted index entries are
-     * inspected.
-     * 
-     * @param expected
-     * @param actual
-     */
-    protected void assertSameEntryIterator(IIndex expected, IIndex actual) {
-        
-        ITupleIterator expectedItr = expected.rangeIterator(null,null);
-
-        ITupleIterator actualItr = actual.rangeIterator(null,null);
-        
-        long nvisited = 0L;
-        
-        while(expectedItr.hasNext()) {
-
-            assertTrue("Expecting another index entry: nvisited="+nvisited, actualItr.hasNext());
-            
-            ITuple expectedTuple = expectedItr.next();
-
-            ITuple actualTuple = actualItr.next();
-            
-            nvisited++;
-
-            if(!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple.getKey())) {
-                
-                fail("Wrong key: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getKey())
-                        + ", actual="
-                        + BytesUtil.toString(actualTuple.getKey()));
-                        
-            }
-            
-            if(!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple.getValue())) {
-                
-                fail("Wrong value: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getValue())
-                        + ", actual="
-                        + BytesUtil.toString(actualTuple.getValue()));
-                        
-            }
-            
-        }
-        
-        assertFalse("Not expecting more tuples", actualItr.hasNext());
-        
-    }
-
-    /**
-     * A key-value pair.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class KV implements Comparable<KV>{
-        
-        final byte[] key;
-        final byte[] val;
-        
-        public KV(byte[] key, byte[] val) {
-            
-            this.key = key;
-            
-            this.val = val;
-            
-        }
-
-        public int compareTo(KV arg0) {
-
-            return BytesUtil.compareBytes(key, arg0.key);
-            
-        }
-        
-    }
-    
-    /**
-     * Generate random key-value data in key order.
-     * <p>
-     * Note: The auto-split feature of the scale-out indices depends on the
-     * assumption that the data are presented in key order.
-     * <p>
-     * Note: This method MAY return entries having duplicate keys.
-     * 
-     * @param N
-     *            The #of key-value pairs to generate.
-     * 
-     * @return The random key-value data, sorted in ascending order by key.
-     * 
-     * @see ClientIndexView#submit(int, byte[][], byte[][],
-     *      com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor,
-     *      com.bigdata.btree.IResultHandler)
-     * 
-     * @todo parameter for random deletes, in which case we need to reframe the
-     *       batch operation since a batch insert won't work. Perhaps a
-     *       BatchWrite would be the thing.
-     * 
-     * @todo use null values ~5% of the time.
-     */
-    protected KV[] getRandomKeyValues(int N) {
-
-        final Random r = new Random();
-
-        final KV[] data = new KV[N];
-
-        for (int i = 0; i < N; i++) {
-
-            // @todo param governs chance of a key collision and maximum #of distinct keys.
-            final byte[] key = KeyBuilder.asSortKey(r.nextInt(100000));
-
-            // Note: #of bytes effects very little that we want to test so we keep it small.
-            final byte[] val = new byte[4];
-
-            r.nextBytes(val);
-            
-            data[i] = new KV(key,val);
-
-        }
-
-        Arrays.sort(data);
-        
-        return data;
-        
-    }
-
 }

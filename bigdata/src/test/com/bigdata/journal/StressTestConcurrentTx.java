@@ -45,10 +45,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ConcurrencyManager.Options;
-import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -241,7 +240,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         Iterator<Future<Long>> itr = results.iterator();
         
         int ninterrupt = 0; // #of tasks that throw InterruptedException.
-        int nretry = 0; // #of transactions that were part of a commit group that failed but MAY be retried.
+//        int nretry = 0; // #of transactions that were part of a commit group that failed but MAY be retried.
         int nfailed = 0; // #of transactions that failed validation (MUST BE zero if nclients==1).
         int naborted = 0; // #of transactions that choose to abort rather than commit.
         int ncommitted = 0; // #of transactions that successfully committed.
@@ -283,11 +282,11 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
                     log.info(getInnerCause(ex, ValidationError.class));
 
-                } else if(isInnerCause(ex,RetryException.class)){
-
-                    nretry++;
-                    
-                    log.info(getInnerCause(ex, RetryException.class));
+//                } else if(isInnerCause(ex,RetryException.class)){
+//
+//                    nretry++;
+//                    
+//                    log.info(getInnerCause(ex, RetryException.class));
                     
                 } else if(isInnerCause(ex,InterruptedException.class)){
 
@@ -327,7 +326,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         // these are the results.
         ret.put("ninterupt",""+ninterrupt);
-        ret.put("nretry",""+nretry);
+//        ret.put("nretry",""+nretry);
         ret.put("nfailed",""+nfailed);
         ret.put("naborted",""+naborted);
         ret.put("ncommitted",""+ncommitted);

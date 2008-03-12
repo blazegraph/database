@@ -69,7 +69,8 @@ public class UpdateSplitIndexPartition extends AbstractTask {
          * view.  All we are doing is re-distributing the writes onto the new
          * splits of the index partition.
          */
-        final BTree src = (BTree) resourceManager.getIndexOnStore(name, ITx.UNISOLATED, journal); 
+        final BTree src = (BTree) resourceManager.getIndexOnStore(name,
+                ITx.UNISOLATED, journal); 
         
         /*
          * Locators for the new index partitions.

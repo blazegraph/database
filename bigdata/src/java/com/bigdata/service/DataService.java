@@ -283,9 +283,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
     /**
      * Polite shutdown does not accept new requests and will shutdown once the
      * existing requests have been processed.
-     * <p>
-     * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
     public void shutdown() {
         
@@ -300,9 +297,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
     /**
      * Shutdown attempts to abort in-progress requests and shutdown as soon as
      * possible.
-     * <p>
-     * Note: The {@link IConcurrencyManager} is shutdown first, then the
-     * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
     public void shutdownNow() {
   

@@ -695,10 +695,29 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
 
+    /**
+     * Note: the {@link EmbeddedBigdataFederation} is {@link #shutdown()} when
+     * the client {@link #disconnect()}s.
+     */
     public void disconnect() {
 
         if (client == null)
             throw new IllegalStateException();
+        
+        shutdown();
+        
+    }
+
+    /**
+     * Normal shutdown of the services in the federation.
+     */
+    public void shutdown() {
+        
+        log.info("begin");
+        
+        assertOpen();
+        
+        client = null;
         
         for(int i=0; i<dataService.length; i++) {
             
@@ -709,9 +728,36 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         }
 
         metadataService.shutdown();
+        
+        log.info("done");
 
     }
+    
+    /**
+     * Immediate shutdown of the services in the embedded federation.
+     */
+    public void shutdownNow() {
+        
+        log.info("begin");
 
+        assertOpen();
+        
+        client = null;
+        
+        for(int i=0; i<dataService.length; i++) {
+            
+            DataService ds = this.dataService[i];
+            
+            ds.shutdownNow();
+            
+        }
+
+        metadataService.shutdownNow();
+
+        log.info("done");
+        
+    }
+    
     /**
      * A local (in process) metadata service.
      * 

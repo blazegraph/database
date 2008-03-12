@@ -3,8 +3,9 @@ package com.bigdata.resources;
 import java.util.Arrays;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.FusedView;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
@@ -121,16 +122,16 @@ public class UpdateBuildIndexPartition extends AbstractTask {
 
         /*
          * Open the unisolated B+Tree on the live journal that is absorbing
-         * writes. We are going to update its index metadata. Note that we do
-         * NOT open the index using AbstractTask#getIndex(String name) because
-         * we only want to mutable B+Tree and not the full view.
+         * writes. We are going to update its index metadata.
+         * 
+         * Note: I am using AbstractTask#getIndex(String name) so that the
+         * concurrency control logic will notice the changes to the BTree
+         * and cause it to be checkpointed if this task succeeds normally.
          */
+        final IIndex view = getIndex(getOnlyResource());
         
-        // the live journal.
-        final AbstractJournal journal = getJournal();
-
-        // live index
-        final BTree btree = journal.getIndex(getOnlyResource());
+        // The live B+Tree.
+        final BTree btree = (BTree)((FusedView)view).getSources()[0];
 
         assert btree != null : "Expecting index: "+getOnlyResource();
         
@@ -155,7 +156,7 @@ public class UpdateBuildIndexPartition extends AbstractTask {
                     + Arrays.toString(oldResources);
 
             assert oldResources[0].getUUID().equals(
-                    journal.getRootBlockView().getUUID()) : "Expecting live journal to the first resource: "
+                    getJournal().getRootBlockView().getUUID()) : "Expecting live journal to the first resource: "
                     + oldResources;
 
             /*
@@ -186,7 +187,7 @@ public class UpdateBuildIndexPartition extends AbstractTask {
 //                    .getCreateTime();
 
             // new index segment build from a view that did not include data from the live journal.
-            assert segmentMetadata.getCreateTime() < journal.getRootBlockView()
+            assert segmentMetadata.getCreateTime() < getJournal().getRootBlockView()
                     .getFirstCommitTime();
 
 //            if (oldResources.length == 3) {
@@ -205,7 +206,7 @@ public class UpdateBuildIndexPartition extends AbstractTask {
 
         // new view definition.
         final IResourceMetadata[] newResources = new IResourceMetadata[] {
-                journal.getResourceMetadata(), segmentMetadata };
+                getJournal().getResourceMetadata(), segmentMetadata };
 
         // describe the index partition.
         indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(//
@@ -220,9 +221,12 @@ public class UpdateBuildIndexPartition extends AbstractTask {
         // update the metadata associated with the btree.
         btree.setIndexMetadata(indexMetadata);
 
+        log.warn("Updated view: name=" + getOnlyResource() + ", pmd="
+                + indexMetadata.getPartitionMetadata());
+        
         // verify that the btree recognizes that it needs to be checkpointed.
         assert btree.needsCheckpoint();
-
+        
         return null;
 
     }

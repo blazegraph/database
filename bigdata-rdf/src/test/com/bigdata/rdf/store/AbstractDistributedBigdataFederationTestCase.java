@@ -157,7 +157,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
         
         if(client!=null) {
 
-            client.terminate();
+            client.shutdownNow();
 
             client = null;
             

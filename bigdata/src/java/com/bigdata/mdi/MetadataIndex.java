@@ -255,7 +255,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
      */
     public boolean needsCheckpoint() {
 
-        if(nextPartitionId != ((MetadataIndexCheckpoint)checkpoint).getNextPartitionId()) {
+        if(nextPartitionId != ((MetadataIndexCheckpoint)getCheckpoint()).getNextPartitionId()) {
             
             return true;
             

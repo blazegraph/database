@@ -129,11 +129,12 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     private EmbeddedBigdataFederation fed = null;
 
-    public void terminate() {
+    public void shutdown() {
 
         if(fed != null) {
 
-            threadPool.shutdownNow();
+            // allow client requests to finish normally.
+            threadPool.shutdown();
             
             try {
             
@@ -149,7 +150,24 @@ public class EmbeddedBigdataClient implements IBigdataClient {
                 
             }
             
-            fed.disconnect();
+            // normal shutdown of the embedded federation as well.
+            fed.shutdown();
+        
+            fed = null;
+            
+        }
+        
+    }
+
+    public void shutdownNow() {
+
+        if(fed != null) {
+
+            // stop client requests.
+            threadPool.shutdownNow();
+            
+            // immediate shutdown of the embedded federation as well.
+            fed.shutdownNow();
         
             fed = null;
             

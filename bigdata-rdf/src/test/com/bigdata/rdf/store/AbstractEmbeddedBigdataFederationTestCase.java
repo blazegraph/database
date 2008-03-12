@@ -87,7 +87,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
     
     public void tearDown() throws Exception {
         
-        client.terminate();
+        client.shutdownNow();
         
     }
     
