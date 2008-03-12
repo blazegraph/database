@@ -282,7 +282,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         
         if(client!=null) {
 
-            client.terminate();
+            client.shutdownNow();
 
             client = null;
             

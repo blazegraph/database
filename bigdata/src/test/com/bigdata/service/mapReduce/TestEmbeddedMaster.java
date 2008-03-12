@@ -113,7 +113,7 @@ public class TestEmbeddedMaster extends TestCase {
      */
     public void tearDown() throws Exception {
         
-        client.terminate();
+        client.shutdownNow();
         
         super.tearDown();
         

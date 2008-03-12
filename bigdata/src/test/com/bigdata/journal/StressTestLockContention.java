@@ -36,8 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.WriteExecutorService.RetryException;
-
 /**
  * Lock contention results when unisolated writers seek conflicting locks. In
  * all cases lock contention reduces the possible parallelism. However, in the
@@ -154,15 +152,16 @@ public class StressTestLockContention extends ProxyTestCase {
                     
                 } catch (ExecutionException ex) {
 
-                    if( isInnerCause(ex, RetryException.class)) {
-
-                        log.warn("RetryException: "+ex);
-
-                        nretry++;
-                     
-                        continue;
-                        
-                    } else if( isInnerCause(ex, RetryException.class)) {
+//                    if( isInnerCause(ex, RetryException.class)) {
+//
+//                        log.warn("RetryException: "+ex);
+//
+//                        nretry++;
+//                     
+//                        continue;
+//                        
+//                    } else 
+                        if( isInnerCause(ex, InterruptedException.class)) {
                         
                         log.warn("Interrupted: "+ex);
 

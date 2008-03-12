@@ -36,7 +36,7 @@ import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.journal.CommitRecordIndex.Entry;
 
 /**
- * Interface allowing clients to connect to {@link IBigdataFederation}s.
+ * Interface for clients of a {@link IBigdataFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -61,11 +61,20 @@ public interface IBigdataClient {
     public IBigdataFederation connect();
     
     /**
-     * Disconnects from any connected federation(s) and then terminate any
-     * background processing that is being performed on the behalf of the
-     * client.
+     * Normal shutdown allows any existing client requests to federation
+     * services to complete but does not schedule new requests, disconnects from
+     * the federation, and then terminates any background processing that is
+     * being performed on the behalf of the client (service discovery, etc).
      */
-    public void terminate();
+    public void shutdown();
+
+    /**
+     * Immediate shutdown terminates any client requests to federation services,
+     * disconnects from the federation, and then terminate any background
+     * processing that is being performed on the behalf of the client (service
+     * discovery, etc).
+     */
+    public void shutdownNow();
 
     /**
      * Return an array UUIDs for {@link IDataService}s.

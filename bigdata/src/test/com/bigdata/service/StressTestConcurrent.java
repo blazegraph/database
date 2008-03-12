@@ -53,6 +53,7 @@ import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
@@ -148,12 +149,18 @@ public class StressTestConcurrent extends
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
 
-        // make the initial and maximum extent small so that we trigger overflow a lot.
+        /*
+         * Note: if we make the initial and maximum extent small so that we
+         * trigger overflow a lot then we introduce a lot of overhead.
+         */
         properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
 
         // enable moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
+        
+        // disable overflow processing
+//        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         
 //        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
@@ -235,8 +242,8 @@ public class StressTestConcurrent extends
         DataService dataService = ((EmbeddedBigdataFederation)fed).getDataService(0);
         
         int nclients = 20;
-        long timeout = 20;
-        int ntrials = 1000;
+        long timeout = 30;
+        int ntrials = 10000;
         int keyLen = 4;
         int nops = 100;
         
@@ -311,6 +318,12 @@ public class StressTestConcurrent extends
      *       the #of data services available to the federation. report on the
      *       #of builds, splits, joins, and moves and the load on each data
      *       service over time.
+     * 
+     * FIXME Look into why this takes so long to complete sometimes (something
+     * is doubtless running in the background).
+     * 
+     * @todo test with and with overflow and measure performance both ways -
+     *       need a flag to disable overflow.
      */
     static public Result doConcurrentClientTest(IBigdataClient client,
             DataService dataService, int nclients, long timeout, int ntrials,
@@ -378,7 +391,7 @@ public class StressTestConcurrent extends
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("Examining task results: elapsed="+elapsed);
+        log.warn("Examining task results: elapsed="+elapsed);
         
         Iterator<Future<Void>> itr = results.iterator();
         
@@ -607,7 +620,8 @@ public class StressTestConcurrent extends
      *       journal maximum extent is required since the journal will otherwise
      *       overflow.
      * 
-     * @todo compute the bytes/second rate (read/written).
+     * @todo compute the bytes/second rate (read/written) (its in the counters
+     *       for the {@link DiskOnlyStrategy}).
      * 
      * FIXME Parameterize so that test with more than one named index in use. If
      * we are only writing on a single named index then groupCommmit will only

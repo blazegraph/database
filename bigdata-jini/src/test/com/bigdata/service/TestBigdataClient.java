@@ -225,7 +225,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         if (client != null) {
 
-            client.terminate();
+            client.shutdownNow();
 
             client = null;
 

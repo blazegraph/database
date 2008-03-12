@@ -258,6 +258,8 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
     }
 
     public boolean hasNext() {
+        
+        if(Thread.interrupted()) throw new RuntimeException( new InterruptedException() );
 
         if (exhausted) {
 
@@ -298,6 +300,8 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
                  * have a stale index partition locator. This can happen when
                  * index partitions are split, joined, or moved.
                  */
+                
+                if(Thread.interrupted()) throw new RuntimeException(new InterruptedException());
 
                 if (lastStaleLocator != null) {
 

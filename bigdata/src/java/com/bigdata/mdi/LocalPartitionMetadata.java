@@ -141,6 +141,11 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            more or less the form <code>foo(x,y,z)</code>. The history
      *            gets truncated when the {@link LocalPartitionMetadata} is
      *            serialized in order to prevent it from growing without bound.
+     * 
+     * FIXME All existing uses of this ctor are appending history, but they
+     * should prepend it so that truncation works out correctly. The history
+     * should be a reverse timeline.  It could be given more structure with
+     * a list of History objects.
      */
     public LocalPartitionMetadata(//
             int partitionId,//

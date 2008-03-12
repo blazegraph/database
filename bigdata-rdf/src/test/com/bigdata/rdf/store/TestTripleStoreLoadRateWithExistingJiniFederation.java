@@ -169,7 +169,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         }, ""/* baseURL */, RDFFormat.RDFXML/* fallback */,
                 false/* autoFlush */, nclients, clientNum);
         
-        client.terminate();
+        client.shutdownNow();
         
         System.out.println("Exiting normally.");
         

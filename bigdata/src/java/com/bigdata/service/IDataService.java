@@ -402,8 +402,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      *            visited by the iterator.
      * 
      * @exception InterruptedException
-     *                if the operation was interrupted (typically by
-     *                {@link #shutdownNow()}.
+     *                if the operation was interrupted.
      * @exception ExecutionException
      *                If the operation caused an error. See
      *                {@link ExecutionException#getCause()} for the underlying

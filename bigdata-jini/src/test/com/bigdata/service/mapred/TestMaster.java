@@ -245,7 +245,7 @@ public class TestMaster extends AbstractServerTestCase {
 
         if(client!=null) {
 
-            client.terminate();
+            client.shutdownNow();
 
             client = null;
             

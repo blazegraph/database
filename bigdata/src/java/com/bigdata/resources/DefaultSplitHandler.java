@@ -163,7 +163,11 @@ public class DefaultSplitHandler implements ISplitHandler {
 
         final long rangeCount = ndx.rangeCount(null, null);
         
-        return rangeCount <= getMinimumEntryCount();
+        final boolean shouldJoin = rangeCount <= getMinimumEntryCount();
+        
+        log.info("shouldJoin="+shouldJoin+" : rangeCount="+rangeCount+", minimumEntryCount="+getMinimumEntryCount());
+        
+        return shouldJoin;
         
     }
     
@@ -322,13 +326,16 @@ public class DefaultSplitHandler implements ISplitHandler {
         final long rangeCount = view.rangeCount(null, null);
 
         /*
-         * Recommend split if the range count exceeds the overcapacity
+         * Recommend split if the range count equals or exceeds the overcapacity
          * multiplier.
          */
 
-        if ((getOverCapacityMultiplier() * rangeCount) >= entryCountPerSplit) {
+        if (rangeCount >= (getOverCapacityMultiplier() * entryCountPerSplit)) {
 
-            log.info("Recommending split: rangeCount=" + rangeCount);
+            log.info("Recommending split: rangeCount(" + rangeCount
+                    + ") >= (entryCountPerSplit(" + entryCountPerSplit
+                    + ") * overCapacityMultiplier("
+                    + getOverCapacityMultiplier() + "))");
 
             return true;
 
@@ -408,7 +415,7 @@ public class DefaultSplitHandler implements ISplitHandler {
         
         log.info("Estimating " + numSplitsEstimate + " with sampleRate="
                 + getSampleRate() + " yeilding ~ " + numSamplesEstimate
-                + " samples with one sample every" + sampleEveryNTuples
+                + " samples with one sample every " + sampleEveryNTuples
                 + " tuples");
         
         final List<Sample> samples = new ArrayList<Sample>(numSamplesEstimate);

@@ -115,7 +115,7 @@ public class TestRemoteTaskRunner extends TestCase {
      
         if(bigdataClient!=null) {
 
-            bigdataClient.terminate();
+            bigdataClient.shutdownNow();
             
         }
         

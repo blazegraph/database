@@ -904,6 +904,11 @@ abstract public class ResourceManager implements IResourceManager {
     protected ExecutorService service;
 
     /**
+     * Flag set based on {@link Options#OVERFLOW_ENABLED}
+     */
+    private final boolean overflowEnabled;
+    
+    /**
      * A flag used to disable overflow of the live journal until asynchronous
      * post-processing of the old journal has been completed.
      * 
@@ -972,6 +977,18 @@ abstract public class ResourceManager implements IResourceManager {
          */
         public static final String DATA_DIR = "data.dir";
 
+        /**
+         * Boolean property determines whether or not
+         * {@link IResourceManager#overflow()} processing is enabled (default
+         * <code>true</code>). When disabled the journal will grow without
+         * bounds, {@link IndexSegment}s will never be generated and index
+         * partitions will not be split, joined nor moved away from this
+         * {@link ResourceManager}.
+         */
+        public static final String OVERFLOW_ENABLED = "overflowEnabled";
+
+        public static final String DEFAULT_OVERFLOW_ENABLED = "true";
+        
         /**
          * Index partitions having no more than this many entries as reported by
          * a range count will be copied to the new journal during synchronous
@@ -1126,6 +1143,18 @@ abstract public class ResourceManager implements IResourceManager {
 
         this.properties = properties;
 
+        // overflowEnabled
+        {
+            
+            overflowEnabled = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.OVERFLOW_ENABLED,
+                            Options.DEFAULT_OVERFLOW_ENABLED));
+
+            log.info(Options.OVERFLOW_ENABLED+"="+overflowEnabled);
+            
+        }
+        
         // index segment build threshold
         {
 
@@ -1694,7 +1723,7 @@ abstract public class ResourceManager implements IResourceManager {
 
     public void shutdown() {
 
-        log.info("Shutdown");
+        log.info("Begin");
         
         assertOpen();
         
@@ -1733,11 +1762,19 @@ abstract public class ResourceManager implements IResourceManager {
         closeStores();
         
         tmpStore.closeAndDelete();
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: elapsed="+elapsed+"ms");
         
     }
 
     public void shutdownNow() {
 
+        final long begin = System.currentTimeMillis();
+        
+        log.info("Begin");
+        
         assertOpen();
 
         service.shutdownNow();
@@ -1746,6 +1783,10 @@ abstract public class ResourceManager implements IResourceManager {
 
         tmpStore.closeAndDelete();
 
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: elapsed="+elapsed+"ms");
+        
     }
 
     private void closeStores() {
@@ -2535,6 +2576,67 @@ abstract public class ResourceManager implements IResourceManager {
     }
 
     /**
+     * Dump index metadata as of the timestamp.
+     * 
+     * @param timestamp
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>timestamp</i> is positive (a transaction identifier).
+     */
+    public String listIndexPartitions(long timestamp) {
+
+        if (timestamp > 0)
+            throw new IllegalArgumentException();
+        
+        StringBuilder sb = new StringBuilder();
+
+        final AbstractJournal journal = getJournal(timestamp);
+
+        sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
+
+        final ITupleIterator itr = journal.getName2Addr().rangeIterator(
+                null, null);
+        
+        while (itr.hasNext()) {
+
+            final ITuple tuple = itr.next();
+
+            final Entry entry = EntrySerializer.INSTANCE
+                    .deserialize(new DataInputBuffer(tuple.getValue()));
+
+            // the name of an index to consider.
+            final String name = entry.name;
+
+            /*
+             * Open the historical view of that index at that time (not just
+             * the mutable BTree but the full view).
+             */
+            final IIndex view = getIndex(name, timestamp);
+
+            if (view == null) {
+
+                throw new AssertionError(
+                        "Index not found? : name=" + name
+                                + ", timestamp=" + timestamp);
+
+            }
+
+            // index metadata for that index partition.
+            final IndexMetadata indexMetadata = view.getIndexMetadata();
+
+            // index partition metadata
+            final LocalPartitionMetadata pmd = indexMetadata
+                    .getPartitionMetadata();
+
+            sb.append("\nname="+name+", pmd="+pmd);
+    
+        }
+
+        return sb.toString();
+        
+    }
+
+    /**
      * An overflow condition is recognized when the journal is within some
      * declared percentage of {@link Options#MAXIMUM_EXTENT}.
      * 
@@ -2548,13 +2650,13 @@ abstract public class ResourceManager implements IResourceManager {
              * then re-open a transient journal.
              */
 
-            log.warn("Overflow processing not allowed for transient journals");
+            log.info("Overflow processing not allowed for transient journals");
 
             return false;
 
         }
 
-        if(!overflowAllowed.get()) {
+        if(!overflowEnabled || !overflowAllowed.get()) {
             
             /*
              * Note: overflow is disabled until we are done processing the old
@@ -2787,7 +2889,14 @@ abstract public class ResourceManager implements IResourceManager {
         final int maxNonZeroCopy = 100;
         final AbstractJournal oldJournal = getLiveJournal();
         final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
+        final long firstCommitTime;
         {
+
+            System.err.println("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
+                    + oldJournal.getFile()
+                    + "\npre-condition views: overflowCounter="
+                    + overflowCounter.get() + "\n"
+                    + listIndexPartitions(-lastCommitTime));
 
             int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
 
@@ -3029,9 +3138,15 @@ abstract public class ResourceManager implements IResourceManager {
             assert nindices == noverflow;
 
             // make the index declarations restart safe on the new journal.
-            newJournal.commit();
+            firstCommitTime = newJournal.commit();
 
         }
+
+        System.err.println("doOverflow(): firstCommitTime=" + firstCommitTime
+                + "\nfile=" + newJournal.getFile()
+                + "\npre-condition views: overflowCounter="
+                + overflowCounter.get() + "\n"
+                + listIndexPartitions(-firstCommitTime));
 
         /*
          * Close out the old journal.
@@ -3626,7 +3741,7 @@ abstract public class ResourceManager implements IResourceManager {
             return commitNow(nextTimestamp());
             
         }
-               
+
     }
     
     /**

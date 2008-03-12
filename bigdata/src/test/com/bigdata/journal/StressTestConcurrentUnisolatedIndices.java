@@ -47,7 +47,6 @@ import java.util.concurrent.TimeUnit;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.WriteExecutorService.RetryException;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -249,7 +248,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         Iterator<Future<Object>> itr = results.iterator();
         
         int nfailed = 0; // #of tasks that failed.
-        int nretry = 0; // #of tasks that threw RetryException
+//        int nretry = 0; // #of tasks that threw RetryException
         int ninterrupt = 0; // #of interrupted tasks.
         int ncommitted = 0; // #of tasks that successfully committed.
         int nuncommitted = 0; // #of tasks that did not complete in time.
@@ -289,9 +288,9 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                     
                     nfailed++;
                     
-                } else if(isInnerCause(ex, RetryException.class)) {
-                    
-                    nretry++;
+//                } else if(isInnerCause(ex, RetryException.class)) {
+//                    
+//                    nretry++;
                     
                 } else {
                 
@@ -322,7 +321,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         // these are the results.
         ret.put("nfailed",""+nfailed);
-        ret.put("nretry",""+nretry);
+//        ret.put("nretry",""+nretry);
         ret.put("ncommitted",""+ncommitted);
         ret.put("ninterrupt",""+ninterrupt);
         ret.put("nuncommitted", ""+nuncommitted);

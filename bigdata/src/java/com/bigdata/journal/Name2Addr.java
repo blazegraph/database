@@ -23,8 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -37,10 +39,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
@@ -360,7 +362,8 @@ public class Name2Addr extends BTree {
         }
         
         // deserialize entry.
-        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
+//        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
+        final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputStream(new ByteArrayInputStream(val)));
 
 //        /*
 //         * Reload the index from the store using the object cache to ensure a

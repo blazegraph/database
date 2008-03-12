@@ -385,7 +385,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
      * @param args
      *            The command line arguments.
      * 
-     * @see #terminate()
+     * @see #shutdownNow()
      */
     public BigdataClient(String[] args) {
 
@@ -440,7 +440,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
         } catch (IOException ex) {
 
-            terminate();
+            shutdownNow();
 
             throw new RuntimeException("Lookup service discovery error: " + ex,
                     ex);
@@ -458,7 +458,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             
         } catch(IOException ex) {
             
-            terminate();
+            shutdownNow();
             
             throw new RuntimeException("Could not initiate service discovery manager", ex);
             
@@ -506,7 +506,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
         } catch (RemoteException ex) {
             
-            terminate();
+            shutdownNow();
             
             throw new RuntimeException(
                     "Could not setup DataService LookupCache", ex);
@@ -531,7 +531,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
 
         } catch (Exception ex) {
 
-            terminate();
+            shutdownNow();
             
             throw new RuntimeException("Configuration error: "+ex, ex);
             
@@ -558,11 +558,16 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         
     }
 
-    public void terminate() {
+    public void shutdown() {
 
+        log.info("begin");
+
+        final long begin = System.currentTimeMillis();
+        
         if( fed != null ) {
 
-            threadPool.shutdownNow();
+            // allow client requests to finish normally.
+            threadPool.shutdown();
             
             try {
             
@@ -584,10 +589,45 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
             fed = null;
             
         }
+
+        terminateDiscoveryProcesses();
+
+        final long elapsed = System.currentTimeMillis() - begin;
         
-        /*
-         * Stop various discovery processes.
-         */
+        log.info("Done: elapsed="+elapsed+"ms");
+        
+    }
+    
+    public void shutdownNow() {
+
+        log.info("begin");
+        
+        final long begin = System.currentTimeMillis();
+        
+        if( fed != null ) {
+
+            // stop client requests.
+            threadPool.shutdownNow();
+            
+            // disconnect from the federation.
+            fed.disconnect();
+         
+            fed = null;
+            
+        }
+
+        terminateDiscoveryProcesses();
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: elapsed="+elapsed+"ms");
+
+    }
+
+    /**
+     * Stop various discovery processes.
+     */
+    private void terminateDiscoveryProcesses() {
          
 //        if (metadataServiceLookupCache != null) {
 //
@@ -622,7 +662,7 @@ public class BigdataClient implements IBigdataClient {//implements DiscoveryList
         }
 
     }
-
+    
     /**
      * Connect to a bigdata federation. If the client is already connected, then
      * the existing connection is returned.

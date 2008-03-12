@@ -119,19 +119,6 @@ import com.bigdata.util.InnerCause;
  * processing.
  * </p>
  * 
- * @todo The thread pool is essentially used as a queue to force tasks which
- *       have completed to await the commit. Consider placing a limit on the #of
- *       running threads when the thread pool is very large in case (a) a large
- *       #of threads would otherwise begin to execute tasks concurrently; and
- *       (b) the processor allocation strategy causes all threads to perform
- *       very slowly.
- * 
- * @todo The commit could be run by a scheduled service, but I am not sure if
- *       this is an improvement. In any case, keep the logic on hand to
- *       immediately run a commit for a task if the write service is otherwise
- *       empty (so that we will have minimum latency) or if the maximum latency
- *       for a task would be exceeded.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -175,7 +162,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
 
     /** true iff nothing new should start. */
-    private boolean pauseCount;
+    private boolean paused;
 
     /**
      * Lock used for {@link Condition}s and to coordinate index checkpoints and
@@ -235,6 +222,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long failedTaskCount = 0;
     private long successTaskCount = 0;
     private long committedTaskCount = 0;
+    private long noverflow = 0;
 
     /**
      * The maximum #of threads in the pool.
@@ -331,6 +319,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
     
     /**
+     * The #of times synchronous overflow processing has been performed.
+     */
+    public long getOverflowCount() {
+    
+        return noverflow;
+        
+    }
+    
+    /**
      * <code>true</code> iff the pause flag is set such that the write service
      * will queue up new tasks without allowing them to execute.
      * 
@@ -339,7 +336,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     public boolean isPaused() {
         
-        return pauseCount;
+        return paused;
         
     }
     
@@ -355,7 +352,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            pauseCount = true;
+            paused = true;
             
         } finally {
             
@@ -376,7 +373,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
         
-            pauseCount = false;
+            paused = false;
             
             unpaused.signalAll();
             
@@ -407,7 +404,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            while (pauseCount)
+            while (paused)
                 unpaused.await();
 
         } catch (InterruptedException ie) {
@@ -480,26 +477,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param t
      *            The exception thrown -or- <code>null</code> if the task
      *            completed successfully.
-     * 
-     * @exception RetryException
-     *                if the task should be retried.
-     * 
-     * @todo we should automatically re-submit the task rather than throwing a
-     *       {@link RetryException}. Each try should incrementing a counter. If
-     *       ntries exceeds a threashold (e.g., 3), then we should throw a
-     *       "RetryCountExceeded" instead of re-submitting the task.
-     *       <p>
-     *       Test this by intermixing in some tasks that cause the commit group
-     *       to fail with other tasks that should run to completion. Once the
-     *       bad tasks are out of the way the good ones should execute fine.
-     *       <p>
-     *       We could also keep a maximum latency on the task and abort it if
-     *       the latency is exceeded (regardless of the retry count).
-     *       <p>
-     *       Do NOT resubmit if the write service is being shutdown.
-     * 
-     * FIXME Should I get rid of {@link RetryException} since we no longer will
-     * abort tasks just because some other task has failed?
      */
     protected void afterTask(ITask r, Throwable t) {
         
@@ -547,19 +524,22 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * The task executed fine, but the commit group was aborted.
                      * 
                      * @todo what circumstances can cause this other than the
-                     * journal being shutdown while tasks are running, running
-                     * out of disk space or hard IO failures, etc?
+                     * journal being shutdown (interrupted) while tasks are
+                     * running, running out of disk space or hard IO failures,
+                     * etc? That is, are there any conditions from which the
+                     * write service could recover or are they all terminal
+                     * conditions?
                      */
                     
                     final AbstractJournal journal = resourceManager.getLiveJournal();
                     
                     if(journal.isOpen()) {
 
-                        throw new RetryException();
+                        throw new RuntimeException("Commit failed: "+r);
                         
                     } else {
                         
-                        throw new IllegalStateException("Journal is closed");
+                        throw new IllegalStateException("Journal is closed: "+r);
                         
                     }
                     
@@ -585,7 +565,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * warning.
                      */
                     
-                    log.info("Validation failed: task=" + r, t);
+                    log.info("Validation failed: task=" + r);//, t);
 
                 } else if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 
@@ -596,7 +576,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * out an InterruptedException.
                      */
                     
-                    log.info("Task interrupted: task=" + r, t);
+                    log.warn("Task interrupted: task=" + r);//, t);
 
                 } else if(InnerCause.isInnerCause(t, StaleLocatorException.class)) {
 
@@ -610,7 +590,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * appropriate index partition.
                      */
  
-                    log.info("Stale locator: task=" + r, t);
+                    log.info("Stale locator: task=" + r);//, t);
 
                 } else {
 
@@ -618,7 +598,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * The task throw some other kind of exception.
                      */
                     
-                    log.warn("Task failed: task=" + r, t);
+                    log.warn("Task failed: task=" + r);//, t);
 
                 }
 
@@ -680,35 +660,19 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         log.debug("begin");
 
-//        lock.lock();
         assert lock.isHeldByCurrentThread();
 
         /*
          * If an abort is in progress then throw an exception.
-         * 
-         * @todo there is probably no longer a reason to throw an exception for
-         * this condition. Instead, we just need to wait for the abort to
-         * finish. However, abort() is now a very rare thing - it is executed
-         * IFF commit() fails, so I need to consider what kinds of problems
-         * could cause commit() to fail (e.g., no more disk space, disk failure,
-         * etc) and whether or not it makes sense to continue processing.
          */
         if( abort.get() ) {
 
-//            try {
-            
                 log.info("Abort in progress.");
             
-                // abort() will no longer await this task's completion.
+                // signal so that abort() will no longer await this task's completion.
                 waiting.signal();
                 
-                throw new RetryException("Abort in progress.");
-                
-//            } finally {
-//                
-//                lock.unlock();
-//                
-//            }
+                throw new RuntimeException("Aborted.");
             
         }
         
@@ -765,6 +729,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                     log.warn("Task interrupted awaiting group commit.");
 
+                    // Set the interrupt flag again.
+                    Thread.currentThread().interrupt();
+                    
                     return false;
                     
                 }
@@ -882,7 +849,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             }
             
             log.info("Commit Ok");
-
+            
+            // overflow iff necessary.
+            overflow();
+            
             return true;
             
         } catch(Throwable t) {
@@ -938,27 +908,32 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         try {
 
-            log.info("Will overflow");
+            log.info("Will do overflow");
 
             assert lock.isHeldByCurrentThread();
 
             assert !isPaused();
         
-            log.info("Pausing write service");
+            try {
 
-            if(!awaitPaused()) {
+                awaitPaused();
+
+            } catch (InterruptedException ex) {
+
+                log.warn("Interrupted awaiting paused write service");
                 
-                log.error("Could not pause the write service");
-                
-                resume();
-                
+                // set the interrupt flag again.
+                Thread.currentThread().interrupt();
+
                 return;
                 
             }
-
+            
             log.info("Doing overflow");
             
             resourceManager.overflow();
+            
+            noverflow++;
 
             log.info("Did overflow");
 
@@ -980,23 +955,22 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     
     /**
      * Pause the {@link WriteExecutorService} and wait until there are no more
-     * tasks running. Regardless of the result, the caller MUST ensure that the
-     * processing is {@link #resume() resumed} before returning control to their
-     * caller.
-     * 
-     * @return <code>true</code> if the {@link WriteExecutorService} is paused
-     *         and no tasks are running (e.g., an exclusive lock on the write
-     *         service as a whole).
+     * tasks running (eg, an exclusive lock on the write service as a whole).
+     * <p>
+     * On a successful return the write service will be paused and no tasks will
+     * be running. After a successful return the caller MUST ensure that the
+     * processing is {@link #resume() resumed} before relinquishing control.
      */
-    private boolean awaitPaused() {
+    private void awaitPaused() throws InterruptedException {
 
         assert lock.isHeldByCurrentThread();
 
+        assert ! isPaused(); 
+        
         // notify the write service that new tasks MAY NOT run.
         pause();
 
         // wait for active tasks to complete.
-
         int n;
         while ((n = nrunning.get()) > 0) {
 
@@ -1012,41 +986,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             } catch (InterruptedException ex) {
 
-//                /*
-//                 * The current thread was interrupted waiting for the active
-//                 * tasks to complete. At this point:
-//                 *  
-//                 *  - All write sets are still pending commit.
-//                 *  
-//                 *  - All write tasks that are awaiting commit are still
-//                 * awaiting commit.
-//                 * 
-//                 * We now abort, causing all tasks to be aborted.
-//                 */
-//
-//                log.warn("Interrupted - discarding commit group.");
-//
-//                try {
-//
-//                    abort();
-//
-//                } catch (Throwable t) {
-//
-//                    log.warn("Problem during abort?: " + t, t);
-//
-//                }
-                
                 log.warn("Interrupted awaiting pause.");
 
-                return false;
+                // resume processing.
+                resume();
 
+                throw ex;
+                
             }
 
         }
         
         log.info("Write service is paused (nothing running).");
-        
-        return true;
 
     }
     
@@ -1080,31 +1031,29 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     private boolean commit() {
 
+        assert lock.isHeldByCurrentThread();
+
+        final AbstractJournal journal = resourceManager.getLiveJournal();
+
+        /*
+         * Note: if the journal was closed asynchronously then do not
+         * attempt to commit the write set.
+         */
+
+        if(!journal.isOpen()) {
+
+            log.warn("Journal not open?");
+
+            resetState();
+            
+            return false;
+            
+        }
+
         try {
 
-            assert lock.isHeldByCurrentThread();
-
-//            assert nrunning.get() == 0;
-
-            // commit the store.
-
             /*
-             * Note: if the journal was closed asynchronously then do not
-             * attempt to abort the write set.
-             */
-
-            final AbstractJournal journal = resourceManager.getLiveJournal();
-
-            if(!journal.isOpen()) {
-
-                log.warn("Journal not open?");
-                
-                return false;
-                
-            }
-
-            /*
-             * Commit the write set.
+             * Atomic commit for the store.
              * 
              * Note: Since everything has already been checkpointed, the commit
              * is essentially a checkpoint of the Name2Addr map, writing an
@@ -1125,22 +1074,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             ngroupCommits++;
             
             if(INFO) log.info("commit: #writes="+nwrites+", timestamp="+timestamp);
-
-            // overflow iff necessary (does not throw anything).
-            overflow();
             
             return true;
 
         } catch (Throwable t) {
 
             /*
-             * Abandon the write sets if something goes wrong.
-             * 
-             * Note: We do NOT rethrow the exception since that would cause the
-             * scheduled group commit Runnable to no longer be executed!
+             * Something went wrong in the commit itself.
              */
 
-            log.error("Commit failed - abandoning write sets: " + t, t);
+            log.error("Commit failed - will abort: " + t, t);
 
             abort();
 
@@ -1151,12 +1094,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             resetState();
 
         }
-        
+
     }
 
     /**
      * Abort. Interrupt all running tasks, await the termination of those tasks,
-     * and then abandon the pending write set.
+     * and then abandon the pending write sets.
+     * <p>
+     * Note: This discards the set of rollback checkpoint records for the
+     * unisolated indices such that tasks which start after this abort will
+     * re-load the index from the last commit point, not the last checkpoint.
+     * This is accomplished by the {@link AbstractJournal#abort()} protocol. It
+     * discards its committers (including {@link Name2Addr}) and the
+     * canonicalizing mapping for indices from their checkpoint addresses,
+     * forcing the reload on demand of indices from the store.
      * <p>
      * Note: This method does NOT throw anything. All exceptions are caught and
      * handled.
@@ -1172,19 +1123,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * <ul>
      * <li>nrunning, nwrites, active...</li>
      * </ul>
-     * 
-     * @todo rather than interrupting them, it would be better to let a
-     *       condition they are awaiting be satisified (until commit OR abort)
-     *       and let them throw out a reason exception indicating a discarded
-     *       commit group.
-     * 
-     * FIXME We MUST discard the set of rollback checkpoint records for the
-     * unisolated indices such that tasks which start after this abort will
-     * re-load the index from the last commit point, not the last checkpoint.
-     * This is accomplished by the {@link AbstractJournal#abort()} protocol. It
-     * discards its committers (including {@link Name2Addr}) and the
-     * canonicalizing mapping for indices from their checkpoint addresses,
-     * forcing the reload on demand of indices from the store.
      */
     private void abort() {
 
@@ -1196,15 +1134,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         }
 
-        awaitPaused();
+        assert lock.isHeldByCurrentThread();
+
+        // Note: set true iff this thread gets interrupted.
+        boolean interrupted = false;
         
         try {
 
-            assert lock.isHeldByCurrentThread();
-
             /*
-             * Interrupt all workers awaiting [commit] - they will throw an
-             * exception that will reach the caller.
+             * Interrupt all active tasks - they will throw an exception that
+             * will reach the caller.
              */
             
             log.info("Interrupting tasks awaiting commit.");
@@ -1265,6 +1204,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      */
 
                     log.warn("Interrupted awaiting running tasks - continuing.");
+
+                    interrupted = true;
                     
                 }
                 
@@ -1314,9 +1255,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             abort.set(false);
             
+            // includes resume()
+            
             resetState();
-
-            resume();
+            
+        }
+        
+        if(interrupted) {
+            
+            // Set the interrupt flag now that we are done with the abort.
+            Thread.currentThread().interrupt();
             
         }
         
@@ -1357,30 +1305,30 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     }
 
-    /**
-     * An instance of this exception is thrown if a task successfully completed
-     * but did not commit owing to a problem with some other task executing
-     * concurrently in the {@link WriteExecutorService}. The task MAY be
-     * retried.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class RetryException extends RuntimeException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 2129883896957364071L;
-
-        public RetryException() {
-            super();
-        }
-
-        public RetryException(String msg) {
-            super(msg);
-        }
-        
-    }
+//    /**
+//     * An instance of this exception is thrown if a task successfully completed
+//     * but did not commit owing to a problem with some other task executing
+//     * concurrently in the {@link WriteExecutorService}. The task MAY be
+//     * retried.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    public static class RetryException extends RuntimeException {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 2129883896957364071L;
+//
+//        public RetryException() {
+//            super();
+//        }
+//
+//        public RetryException(String msg) {
+//            super(msg);
+//        }
+//        
+//    }
 
 }

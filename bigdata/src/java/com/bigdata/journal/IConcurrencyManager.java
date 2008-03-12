@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.journal.ConcurrencyManager.Options;
-import com.bigdata.journal.WriteExecutorService.RetryException;
 
 /**
  * Interface for managing concurrent access to resources (indices).
@@ -116,10 +115,6 @@ public interface IConcurrencyManager {
      * <dd>An unisolated write task was attempting to commit the write set for
      * a transaction but validation failed. You may retry the entire
      * transaction.</dd>
-     * <dt>{@link RetryException}</dt>
-     * <dd>An unisolated write task was a member of a commit group in which
-     * some other write task failed. The entire commit group was discarded and
-     * all tasks in the group were interrupted. You MAY retry the task.</dd>
      * <dt>{@link InterruptedException}</dt>
      * <dd>A task was interrupted during execution and before the task had
      * completed normally. You MAY retry the task, but note that this exception

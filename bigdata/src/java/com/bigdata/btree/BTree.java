@@ -333,7 +333,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * record last written by {@link #writeCheckpoint()} or read by
      * {@link #load(IRawStore, long)}.
      */
-    protected Checkpoint checkpoint = null;
+    private Checkpoint checkpoint = null;
     
 //    /**
 //     * The root of the btree. This is initially a leaf until the leaf is split,
@@ -377,7 +377,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * The last address from which the {@link IndexMetadata} record was read or
      * on which it was written.
      */
-    private long lastMetadataAddr;
+//    private long lastMetadataAddr;
     
     /**
      * Load a {@link BTree} from the store using a {@link Checkpoint} record.
@@ -420,8 +420,8 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         this.nentries = checkpoint.getEntryCount();
         this.counter = new AtomicLong( checkpoint.getCounter() );
         
-        // save the address from which the index metadata record was read.
-        this.lastMetadataAddr = metadata.getMetadataAddr();
+//        // save the address from which the index metadata record was read.
+//        this.lastMetadataAddr = metadata.getMetadataAddr();
         
         /*
          * Note: the mutable BTree has a limit here so that split() will always
@@ -711,10 +711,11 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
             // write the metadata record.
             metadata.write(store);
             
-            // note the address of the new metadata record.
-            lastMetadataAddr = metadata.getMetadataAddr();
+//            // note the address of the new metadata record.
+//            lastMetadataAddr = metadata.getMetadataAddr();
             
             log.info("wrote updated metadata record");
+            log.warn("wrote updated metadata record: pmd="+metadata.getPartitionMetadata());// @todo remove this log msg.
             
         }
         
@@ -773,38 +774,79 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * Note: In order to avoid needless checkpoints this method will return
      * <code>false</code> if:
      * <ul>
-     * <li> the metadata record address has not changed -AND-
+     * <li> the metadata record is persistent -AND-
      * <ul>
      * <li> EITHER the root is <code>null</code>, indicating that the index
-     * is closed (flushing the index to disk and updating the metadata record is
-     * part of the close protocol so we know that the metadata address is
-     * current in this case);</li>
+     * is closed (in which case there are no buffered writes);</li>
      * <li> OR the root of the btree is NOT dirty, the persistent address of the
-     * root of the btree is the same as the address record of the root in the
-     * metadata record, and the {@link #counter} value agrees with the counter
-     * on the metadata record.</li>
+     * root of the btree agrees with {@link Checkpoint#getRootAddr()}, and the
+     * {@link #counter} value agrees {@link Checkpoint#getCounter()}.</li>
      * </ul>
      * </li>
      * </ul>
      * 
      * @return <code>true</code> true iff changes would be lost unless the
-     *         B+Tree was flushed to the backing store using {@link #writeCheckpoint()}.
+     *         B+Tree was flushed to the backing store using
+     *         {@link #writeCheckpoint()}.
      */
     public boolean needsCheckpoint() {
 
-        if (metadata.getMetadataAddr() == lastMetadataAddr && //
-                (root == null || //
-                        ( !root.dirty //
-                        && checkpoint.getRootAddr() == root.identity //
-                        && checkpoint.getCounter() == counter.get())
-                )
-        ) {
+        if(metadata.getMetadataAddr() == 0L) {
             
-            return false;
+            // The index metadata record was replaced.
+            
+            return true;
+            
+        }
+        
+        if(checkpoint.getCounter() != counter.get()) {
+            
+            // The counter has been modified.
+            
+            return true;
+            
+        }
+        
+        if(root != null ) {
+            
+            if (root.isDirty()) {
+
+                // The root node is dirty.
+
+                return true;
+
+            }
+            
+            if(checkpoint.getRootAddr() != root.identity) {
+        
+                // The root node has a different persistent identity.
+                
+                return true;
+                
+            }
             
         }
 
-        return true;
+        /*
+         * No apparant change in persistent state so we do NOT need to do a
+         * checkpoint.
+         */
+        
+        return false;
+        
+//        if (metadata.getMetadataAddr() != 0L && //
+//                (root == null || //
+//                        ( !root.dirty //
+//                        && checkpoint.getRootAddr() == root.identity //
+//                        && checkpoint.getCounter() == counter.get())
+//                )
+//        ) {
+//            
+//            return false;
+//            
+//        }
+//
+//        return true;
      
     }
     
@@ -821,8 +863,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * @throws IllegalArgumentException
      *             if the new value is <code>null</code>
      * @throws IllegalArgumentException
-     *             if the new metadata record has already been written on the
-     *             store - see {@link IndexMetadata#getMetadataAddr()}
+     *             if the new {@link IndexMetadata} record has already been
+     *             written on the store - see
+     *             {@link IndexMetadata#getMetadataAddr()}
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
@@ -837,6 +880,9 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         assertNotReadOnly();
 
         this.metadata = indexMetadata;
+        
+        // gets us on the commit list for Name2Addr.
+        fireDirtyEvent();
         
     }
     
