@@ -45,7 +45,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.MoveIndexPartitionTask.MoveResult;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
@@ -803,9 +802,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         log.info("Will JOIN: " + Arrays.toString(resources));
                         
                         final AbstractTask task = new JoinIndexPartitionTask(
-                                    resourceManager, resourceManager
-                                            .getConcurrencyManager(),
-                                    lastCommitTime, resources);
+                                    resourceManager, lastCommitTime, resources);
 
                         // add to set of tasks to be run.
                         tasks.add(task);
@@ -828,10 +825,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                                         .getPartitionId());
 
                         final AbstractTask task = new MoveIndexPartitionTask(
-                                resourceManager, resourceManager
-                                        .getConcurrencyManager(),
-                                lastCommitTime, sourceIndexName,
-                                targetDataServiceUUID);
+                                resourceManager, lastCommitTime,
+                                sourceIndexName, targetDataServiceUUID);
 
                         tasks.add(task);
                         
@@ -1000,8 +995,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 log.info("Will move "+name+" to dataService="+targetDataServiceUUID);
                 
                 final AbstractTask task = new MoveIndexPartitionTask(
-                        resourceManager, resourceManager
-                                .getConcurrencyManager(), lastCommitTime, name,
+                        resourceManager, lastCommitTime, name,
                         targetDataServiceUUID);
 
                 tasks.add(task);
@@ -1244,7 +1238,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     final AbstractTask task = new SplitIndexPartitionTask(
                             resourceManager,//
-                            resourceManager.getConcurrencyManager(), //
                             lastCommitTime,//
                             name//
                             );
@@ -1290,8 +1283,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                             .getIndexSegmentFile(indexMetadata);
 
                     final AbstractTask task = new BuildIndexSegmentTask(
-                            resourceManager, resourceManager
-                                    .getConcurrencyManager(), lastCommitTime,
+                            resourceManager, lastCommitTime,
                             name, outFile);
 
                     log.info("index build: " + name);
@@ -1352,220 +1344,217 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
      */
     
-    protected List<AbstractTask> runPrepTasks(List<AbstractTask> inputTasks)
-            throws Exception {
-
-        log.info("Will run " + inputTasks.size() + " tasks");
-
-        /*
-         * Submit all tasks, awaiting their completion.
-         * 
-         * Note: We will wait only up to a specified timeout limit for
-         * post-processing to complete normally.
-         * 
-         * @todo config param for timeout.
-         */
-        final List<Future<Object>> futures = resourceManager
-                .getConcurrencyManager().invokeAll(inputTasks, 2 * 60,
-                        TimeUnit.SECONDS);
-
-        final List<AbstractTask> updateTasks = new ArrayList<AbstractTask>(
-                inputTasks.size());
-
-        // verify that all tasks completed successfully.
-        for (Future<Object> f : futures) {
-
-            /*
-             * Note: We trap exceptions, log them, and ignore them.
-             * 
-             * Note: All of the operations (build, split, join, move) are safe
-             * in the following sense. If the operation does not succeed then
-             * the current state of the index remains on the old journal. Since
-             * failure of the operation results in a failure to update the view
-             * on the new journal (because we do not queue the task that updates
-             * the view), the outcome is that the index view will remain as it
-             * was defined during overflow.
-             * 
-             * However, if these errors persist then they will become a problem.
-             * First, the #of resources in an index view will grow without
-             * bound. Second, the index view will have dependencies on older and
-             * older journals with the consequence that old journal can not be
-             * released on the local file system so the disk space will grow
-             * without bounds as well.
-             */
-
-            AbstractResult tmp;
-            try {
-
-                /*
-                 * Don't wait long - we gave tasks a chance to complete above.
-                 * 
-                 * @todo I am choosing not to interrupt tasks which have not
-                 * completed since interrupts during IO operations will cause a
-                 * FileChannel backing the journal or index segment to be
-                 * closed, which is a pain. However, this means that the task
-                 * will continue to consume CPU resources until it completes,
-                 * which is also a pain.
-                 */
-                tmp = (AbstractResult) f.get(100,TimeUnit.MILLISECONDS);
-                
-            } catch(Throwable t) {
-            
-                log.error("Post-processing task failed", t);
-                
-                continue;
-                
-            }
-
-            assert tmp != null;
-            
-            if (tmp instanceof BuildResult) {
-
-                /*
-                 * We ran an index segment build and we update the index
-                 * partition metadata now.
-                 */
-
-                final BuildResult result = (BuildResult) tmp;
-
-                // task will update the index partition view definition.
-                final AbstractTask task = new UpdateBuildIndexPartition(
-                        resourceManager, resourceManager
-                                .getConcurrencyManager(), result.name, result);
-
-                // add to set of tasks to be run.
-                updateTasks.add(task);
-
-            } else if (tmp instanceof SplitResult) {
-
-                /*
-                 * Now run an UNISOLATED operation that splits the live index
-                 * using the same split points, generating new index partitions
-                 * with new partition identifiers. The old index partition is
-                 * deleted as a post-condition. The new index partitions are
-                 * registered as a post-condition.
-                 */
-
-                final SplitResult result = (SplitResult) tmp;
-
-                final AbstractTask task = new UpdateSplitIndexPartition(
-                        resourceManager, resourceManager
-                                .getConcurrencyManager(), result.name,
-                        result);
-
-                // add to set of tasks to be run.
-                updateTasks.add(task);
-
-            } else if (tmp instanceof JoinResult) {
-
-                final JoinResult result = (JoinResult) tmp;
-
-                // The array of index names on which we will need an exclusive
-                // lock.
-                final String[] names = new String[result.oldnames.length + 1];
-
-                names[0] = result.name;
-
-                System.arraycopy(result.oldnames, 0, names, 1,
-                        result.oldnames.length);
-
-                // The task to make the atomic updates on the live journal and
-                // the metadata index.
-                final AbstractTask task = new UpdateJoinIndexPartition(
-                        resourceManager, resourceManager
-                                .getConcurrencyManager(), names, result);
-
-                // add to set of tasks to be run.
-                updateTasks.add(task);
-
-            } else if(tmp instanceof MoveResult) {
-
-                final MoveResult result = (MoveResult) tmp;
-
-                AbstractTask task = new UpdateMoveIndexPartitionTask(
-                        resourceManager, resourceManager
-                                .getConcurrencyManager(), result.name, result);
-
-                // add to set of tasks to be run.
-                updateTasks.add(task);
-                
-            } else {
-
-                throw new AssertionError("Unexpected result type: " + tmp.toString());
-
-            }
-
-        }
-
-        log.info("end - ran " + inputTasks.size()
-                + " tasks, generated " + updateTasks.size() + " update tasks");
-
-        return updateTasks;
-
-    }
-
-    /**
-     * Run tasks that will cause the live index partition definition to be
-     * either updated (for a build task) or replaced (for an index split task).
-     * These tasks are also responsible for updating the appropriate
-     * {@link MetadataIndex} as required.
-     * 
-     * @throws Exception
-     */
-    protected void runAtomicUpdateTasks(List<AbstractTask> tasks) throws Exception {
-
-        log.info("begin : will run "+tasks.size()+" update tasks");
-
-        /*
-         * Submit all tasks, awaiting their completion.
-         * 
-         * Note: The update tasks should be relatively fast, excepting possibly
-         * moves of a hot index partition since there could be a lot of buffered
-         * writes.
-         * 
-         * @todo config param for timeout.
-         */
-        final List<Future<Object>> futures = resourceManager
-                .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
-
-        // verify that all tasks completed successfully.
-        for (Future<Object> f : futures) {
-
-            /*
-             * Note: An error here, like an error in the build/split/join/move
-             * tasks above, MAY be ignored. The consequences are exactly like
-             * those above. The index partition will remain coherent and valid
-             * but its view will continue to have a dependency on the old
-             * journal until a post-processing task for that index partition
-             * succeeds.
-             */
-            try {
-
-                /*
-                 * Note: Don't wait long - we already gave the tasks a chance to
-                 * complete up above.
-                 * 
-                 * @todo Verify that no problems can arise if we allow
-                 * post-processing to complete while update tasks are still
-                 * executing. Ideally the atomic update operations will either
-                 * succeed fully or fail, and failure will mean that the view
-                 * was not changed.
-                 */
-                f.get(100,TimeUnit.MILLISECONDS);
-                
-            } catch(Throwable t) {
-            
-                log.error("Update task failed", t);
-                
-                continue;
-                
-            }
-
-        }
-
-        log.info("end");
-
-    }
+//    protected List<AbstractTask> runPrepTasks(List<AbstractTask> inputTasks)
+//            throws Exception {
+//
+//        log.info("Will run " + inputTasks.size() + " tasks");
+//
+//        /*
+//         * Submit all tasks, awaiting their completion.
+//         * 
+//         * Note: We will wait only up to a specified timeout limit for
+//         * post-processing to complete normally.
+//         * 
+//         * @todo config param for timeout.
+//         */
+//        final List<Future<Object>> futures = resourceManager
+//                .getConcurrencyManager().invokeAll(inputTasks, 2 * 60,
+//                        TimeUnit.SECONDS);
+//
+//        final List<AbstractTask> updateTasks = new ArrayList<AbstractTask>(
+//                inputTasks.size());
+//
+//        // verify that all tasks completed successfully.
+//        for (Future<Object> f : futures) {
+//
+//            /*
+//             * Note: We trap exceptions, log them, and ignore them.
+//             * 
+//             * Note: All of the operations (build, split, join, move) are safe
+//             * in the following sense. If the operation does not succeed then
+//             * the current state of the index remains on the old journal. Since
+//             * failure of the operation results in a failure to update the view
+//             * on the new journal (because we do not queue the task that updates
+//             * the view), the outcome is that the index view will remain as it
+//             * was defined during overflow.
+//             * 
+//             * However, if these errors persist then they will become a problem.
+//             * First, the #of resources in an index view will grow without
+//             * bound. Second, the index view will have dependencies on older and
+//             * older journals with the consequence that old journal can not be
+//             * released on the local file system so the disk space will grow
+//             * without bounds as well.
+//             */
+//
+//            AbstractResult tmp;
+//            try {
+//
+//                /*
+//                 * Don't wait long - we gave tasks a chance to complete above.
+//                 * 
+//                 * @todo I am choosing not to interrupt tasks which have not
+//                 * completed since interrupts during IO operations will cause a
+//                 * FileChannel backing the journal or index segment to be
+//                 * closed, which is a pain. However, this means that the task
+//                 * will continue to consume CPU resources until it completes,
+//                 * which is also a pain.
+//                 */
+//                tmp = (AbstractResult) f.get(100,TimeUnit.MILLISECONDS);
+//                
+//            } catch(Throwable t) {
+//            
+//                log.error("Post-processing task failed", t);
+//                
+//                continue;
+//                
+//            }
+//
+//            assert tmp != null;
+//            
+//            if (tmp instanceof BuildResult) {
+//
+//                /*
+//                 * We ran an index segment build and we update the index
+//                 * partition metadata now.
+//                 */
+//
+//                final BuildResult result = (BuildResult) tmp;
+//
+//                // task will update the index partition view definition.
+//                final AbstractTask task = new AtomicUpdate(
+//                        resourceManager, resourceManager
+//                                .getConcurrencyManager(), result.name, result);
+//
+//                // add to set of tasks to be run.
+//                updateTasks.add(task);
+//
+//            } else if (tmp instanceof SplitResult) {
+//
+//                /*
+//                 * Now run an UNISOLATED operation that splits the live index
+//                 * using the same split points, generating new index partitions
+//                 * with new partition identifiers. The old index partition is
+//                 * deleted as a post-condition. The new index partitions are
+//                 * registered as a post-condition.
+//                 */
+//
+//                final SplitResult result = (SplitResult) tmp;
+//
+//                final AbstractTask task = new UpdateSplitIndexPartition(
+//                        resourceManager, result.name,
+//                        result);
+//
+//                // add to set of tasks to be run.
+//                updateTasks.add(task);
+//
+//            } else if (tmp instanceof JoinResult) {
+//
+//                final JoinResult result = (JoinResult) tmp;
+//
+//                // The array of index names on which we will need an exclusive
+//                // lock.
+//                final String[] names = new String[result.oldnames.length + 1];
+//
+//                names[0] = result.name;
+//
+//                System.arraycopy(result.oldnames, 0, names, 1,
+//                        result.oldnames.length);
+//
+//                // The task to make the atomic updates on the live journal and
+//                // the metadata index.
+//                final AbstractTask task = new UpdateJoinIndexPartition(
+//                        resourceManager, names, result);
+//
+//                // add to set of tasks to be run.
+//                updateTasks.add(task);
+//
+//            } else if(tmp instanceof MoveResult) {
+//
+//                final MoveResult result = (MoveResult) tmp;
+//
+//                AbstractTask task = new UpdateMoveIndexPartitionTask(
+//                        resourceManager, result.name, result);
+//
+//                // add to set of tasks to be run.
+//                updateTasks.add(task);
+//                
+//            } else {
+//
+//                throw new AssertionError("Unexpected result type: " + tmp.toString());
+//
+//            }
+//
+//        }
+//
+//        log.info("end - ran " + inputTasks.size()
+//                + " tasks, generated " + updateTasks.size() + " update tasks");
+//
+//        return updateTasks;
+//
+//    }
+//
+//    /**
+//     * Run tasks that will cause the live index partition definition to be
+//     * either updated (for a build task) or replaced (for an index split task).
+//     * These tasks are also responsible for updating the appropriate
+//     * {@link MetadataIndex} as required.
+//     * 
+//     * @throws Exception
+//     */
+//    protected void runAtomicUpdateTasks(List<AbstractTask> tasks) throws Exception {
+//
+//        log.info("begin : will run "+tasks.size()+" update tasks");
+//
+//        /*
+//         * Submit all tasks, awaiting their completion.
+//         * 
+//         * Note: The update tasks should be relatively fast, excepting possibly
+//         * moves of a hot index partition since there could be a lot of buffered
+//         * writes.
+//         * 
+//         * @todo config param for timeout.
+//         */
+//        final List<Future<Object>> futures = resourceManager
+//                .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
+//
+//        // verify that all tasks completed successfully.
+//        for (Future<Object> f : futures) {
+//
+//            /*
+//             * Note: An error here, like an error in the build/split/join/move
+//             * tasks above, MAY be ignored. The consequences are exactly like
+//             * those above. The index partition will remain coherent and valid
+//             * but its view will continue to have a dependency on the old
+//             * journal until a post-processing task for that index partition
+//             * succeeds.
+//             */
+//            try {
+//
+//                /*
+//                 * Note: Don't wait long - we already gave the tasks a chance to
+//                 * complete up above.
+//                 * 
+//                 * @todo Verify that no problems can arise if we allow
+//                 * post-processing to complete while update tasks are still
+//                 * executing. Ideally the atomic update operations will either
+//                 * succeed fully or fail, and failure will mean that the view
+//                 * was not changed.
+//                 */
+//                f.get(100,TimeUnit.MILLISECONDS);
+//                
+//            } catch(Throwable t) {
+//            
+//                log.error("Update task failed", t);
+//                
+//                continue;
+//                
+//            }
+//
+//        }
+//
+//        log.info("end");
+//
+//    }
 
     /**
      * @return The return value is always null.
@@ -1577,29 +1566,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      */
     public Object call() throws Exception {
 
+        if (resourceManager.overflowAllowed.get()) {
+
+            // overflow must be disabled while we run this task.
+            throw new AssertionError();
+
+        }
+
         final long begin = System.currentTimeMillis();
         
         try {
 
             log.info("begin");
             
-            if (resourceManager.overflowAllowed.get()) {
-
-            // overflow must be disabled while we run this task.
-                throw new AssertionError();
-
-            }
-
             tmpStore = new TemporaryRawStore();
-
-            /*
-             * @todo this stages the tasks which provides parallelism within
-             * each stage but not between the stages - each stage will run as
-             * long as the longest running task in that stage. Consider whether
-             * it would be better to use a finer grained parallelism but we need
-             * to be able to tell when all stages have been completed so that we
-             * can re-enable overflow on the journal.
-             */
             
             if(INFO) {
                 
@@ -1612,11 +1592,68 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             }
             
             List<AbstractTask> tasks = chooseTasks();
+            
+//            latch.start( tasks.size() );            
 
-            List<AbstractTask> updateTasks = runPrepTasks(tasks);
+//            List<AbstractTask> updateTasks = runPrepTasks(tasks);
+//
+//            runAtomicUpdateTasks(updateTasks);
 
-            runAtomicUpdateTasks(updateTasks);
+            // runTasks()
+            {
+                log.info("begin : will run "+tasks.size()+" update tasks");
 
+                /*
+                 * Submit all tasks, awaiting their completion.
+                 * 
+                 * Note: The update tasks should be relatively fast, excepting possibly
+                 * moves of a hot index partition since there could be a lot of buffered
+                 * writes.
+                 * 
+                 * @todo config param for timeout.
+                 */
+                final List<Future<Object>> futures = resourceManager
+                        .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
+
+                // verify that all tasks completed successfully.
+                for (Future<Object> f : futures) {
+
+                    /*
+                     * Note: An error here, like an error in the build/split/join/move
+                     * tasks above, MAY be ignored. The consequences are exactly like
+                     * those above. The index partition will remain coherent and valid
+                     * but its view will continue to have a dependency on the old
+                     * journal until a post-processing task for that index partition
+                     * succeeds.
+                     */
+                    try {
+
+                        /*
+                         * Note: Don't wait long - we already gave the tasks a chance to
+                         * complete up above.
+                         * 
+                         * @todo Verify that no problems can arise if we allow
+                         * post-processing to complete while update tasks are still
+                         * executing. Ideally the atomic update operations will either
+                         * succeed fully or fail, and failure will mean that the view
+                         * was not changed.
+                         */
+                        f.get(100,TimeUnit.MILLISECONDS);
+                        
+                    } catch(Throwable t) {
+                    
+                        log.error("Update task failed", t);
+                        
+                        continue;
+                        
+                    }
+
+                }
+
+                log.info("end");
+
+            }
+            
             if(INFO) {
                 
                 // The post-condition views.

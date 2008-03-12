@@ -54,6 +54,8 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.resources.BuildIndexSegmentTask.AtomicUpdate;
+import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.
@@ -219,8 +221,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             // task to run.
             final AbstractTask task = new BuildIndexSegmentTask(
-                    resourceManager, concurrencyManager, lastCommitTime, name,
-                    outFile);
+                    resourceManager, lastCommitTime, name, outFile);
 
             // submit task and await result (metadata describing the new index
             // segment).
@@ -255,7 +256,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // run task that re-defines the index partition view.
         {
 
-            AbstractTask task = new UpdateBuildIndexPartition(resourceManager,
+            AbstractTask task = new AtomicUpdate(resourceManager,
                     concurrencyManager, name, result);
 
             // run task, await completion.

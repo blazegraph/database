@@ -349,7 +349,7 @@ abstract public class MetadataService extends DataService implements
      * Task assigns the next partition identifier for a registered scale-out
      * index in a restart-safe manner.
      */
-    protected class NextPartitionIdTask extends AbstractTask {
+    static protected class NextPartitionIdTask extends AbstractTask {
 
         /**
          * @param concurrencyManager
@@ -389,7 +389,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class SplitIndexPartitionTask extends AbstractTask {
+    static protected class SplitIndexPartitionTask extends AbstractTask {
 
         protected final PartitionLocator oldLocator;
         protected final PartitionLocator newLocators[];
@@ -564,7 +564,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class JoinIndexPartitionTask extends AbstractTask {
+    static protected class JoinIndexPartitionTask extends AbstractTask {
 
         protected final PartitionLocator oldLocators[];
         protected final PartitionLocator newLocator;
@@ -682,7 +682,7 @@ abstract public class MetadataService extends DataService implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class MoveIndexPartitionTask extends AbstractTask {
+    static protected class MoveIndexPartitionTask extends AbstractTask {
 
         protected final PartitionLocator oldLocator;
         protected final PartitionLocator newLocator;

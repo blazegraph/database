@@ -90,6 +90,7 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.resources.BuildIndexSegmentTask.BuildResult;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedBigdataFederation;

@@ -241,7 +241,7 @@ public class TestCSVReader extends TestCase2 {
         
         for(int i=0; i<headers.length; i++) {
             
-            map.put(headers[i].name,vals[i]);
+            map.put(headers[i].getName(),vals[i]);
             
         }
         

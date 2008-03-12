@@ -114,10 +114,6 @@ import com.bigdata.sparse.SparseRowStore;
  * FIXME test when index would be copied to the new journal rather than
  * resulting in an index segment build.
  * 
- * FIXME test index partition move based on utilization. We will have to
- * satisify the various pre-conditions for a move. A mock (or extended) service
- * can be used to specify the move target.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
