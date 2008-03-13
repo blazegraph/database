@@ -211,6 +211,36 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     boolean aborted = false;
     
     /**
+     * The time at which this task was created.
+     */
+    public long nanoTime_createTask;
+    
+    /**
+     * The time at which this task was assigned to a worker thread for
+     * execution.
+     */
+    public long nanoTime_assignedWorker;
+
+    /**
+     * The time at which this task began to do its work. If the task needs to
+     * acquire exclusive resource locks, then this timestamp is set once those
+     * locks have been acquired. Otherwise this timestamp will be very close to
+     * the {@link #nanoTime_assignedWorker}.
+     */
+    public long nanoTime_beginWork;
+    
+    /**
+     * The time at which this task finished its work. Tasks with write sets must
+     * still do abort processing or await the next commit group.
+     */
+    public long nanoTime_finishedWork;
+    
+    /**
+     * The time at which the task was done. 
+     */
+    public long nanoTime_allDone;
+    
+    /**
      * Convenience constructor variant for one named resource.
      * 
      * @param concurrencyControl
@@ -359,6 +389,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         }
 
+        nanoTime_createTask = System.nanoTime();
+        
     }
 
     /**
@@ -531,13 +563,15 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      */
     final public Object call() throws Exception {
 
-        if (!submitted.compareAndSet(false, true)) {
+        nanoTime_assignedWorker = System.nanoTime();
 
-            throw new ResubmitException(toString());
-            
-        }
-        
         try {
+            
+            if (!submitted.compareAndSet(false, true)) {
+
+                throw new ResubmitException(toString());
+                
+            }
             
             if (isTransaction) {
 
@@ -547,9 +581,13 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                     try {
 
+                        nanoTime_beginWork = System.nanoTime();
+                        
                         return doTask();
 
                     } finally {
+
+                        nanoTime_finishedWork = System.nanoTime();
                         
                         // release hard references to named read-only indices.
                         
@@ -574,10 +612,14 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
                 try {
 
+                    nanoTime_beginWork = System.nanoTime();
+                    
                     return doTask();
                     
                 } finally {
                     
+                    nanoTime_finishedWork = System.nanoTime();
+
                     // release hard references to the named read-only indices.
                     
                     clearIndexCache();
@@ -601,6 +643,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
         } finally {
 
+            nanoTime_allDone = System.currentTimeMillis();
+            
             log.info("done: "+this);
 
         }
@@ -857,10 +901,14 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             try {
 
+                delegate.nanoTime_beginWork = System.nanoTime();
+                
                 return delegate.doTask();
                 
             } finally {
-                
+
+                delegate.nanoTime_finishedWork = System.nanoTime();
+
                 /*
                  * Release hard references to the named indices. The backing
                  * indices are reading from the ground state identified by the
@@ -907,8 +955,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
          */
         public Object call() throws Exception {
 
+            delegate.nanoTime_beginWork = System.nanoTime();
+
             /*
-             * Get refernce to lock (this is just a reference - it is used
+             * Get reference to lock (this is just a reference - it is used
              * below).
              * 
              * Note: this object is used to ensure that checkpoints and
@@ -969,6 +1019,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
                  * we can do anything else.
                  */
                 
+                delegate.nanoTime_finishedWork = System.nanoTime();
+
             }
             
         }

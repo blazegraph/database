@@ -547,7 +547,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
                 dataService[i] = new EmbeddedDataService(serviceUUID, p) {
                   
-                    protected IMetadataService getMetadataService() {
+                    public IMetadataService getMetadataService() {
                         
                         return metadataService;
                         
@@ -858,7 +858,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         }
 
         @Override
-        protected IMetadataService getMetadataService() {
+        public IMetadataService getMetadataService() {
 
             return this;
             
