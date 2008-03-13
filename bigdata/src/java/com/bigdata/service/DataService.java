@@ -30,11 +30,13 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -45,11 +47,11 @@ import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
@@ -69,7 +71,7 @@ import com.bigdata.util.MillisecondTimestampFactory;
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
  * started using the {@link DataServer} class. Operations are submitted using an
- * {@link IConcurrentManager#submit(AbstractTask)} and will run with the
+ * {@link IConcurrentManager#submitAndGetResult(AbstractTask)} and will run with the
  * appropriate concurrency controls as imposed by that method.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -150,6 +152,68 @@ abstract public class DataService implements IDataService, IWritePipeline,
     }
     
     /**
+     * Note: U means {@link ITx#UNISOLATED}, RC means
+     * {@link ITx#READ_COMMITTED}, Tx means a fully isolated read or read write
+     * transaction, and HR means a historical read without isolation (no read
+     * locks and no coordination with a centralized time service).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo counters for index statistics requests?
+     * 
+     * @todo tx commit/abort requests.
+     * 
+     * @todo counters from the {@link ResourceManager}.
+     * 
+     * @todo counters from the {@link ConcurrencyManager}.
+     *       <p>
+     *       include #of tasks submitted, #of tasks failed, #of tasks suceeded,
+     *       min, max, and average latency to execution for Unisolated and all
+     *       other classes, average task duration for all timestamp classes,
+     *       min, max, and avg latency from work done to commit. commit
+     *       counters, etc.
+     * 
+     * @todo counters from the {@link ILocalTransactionManager}.
+     * 
+     * @todo counters from {@link DiskOnlyStrategy}
+     */
+    private static class Counters {
+        
+        /** #of register requests. */
+        long registerIndexCount, registerIndexNanos;
+        
+        /** #of drop index requests. */
+        long dropIndexCount, dropIndexNanos;
+        
+        /** #of index metadata requests. */
+        long getIndexMetadataCount, getIndexMetadataNanos;
+        
+        /** #of submit procedure requests. */
+        long submitCount, submitNanos;
+        long submitUCount, submitUNanos;
+        long submitRCCount, submitRCNanos;
+        long submitTxCount, submitTxNanos;
+        long submitHRCount, submitHRNanos;
+        
+        /** #of range iterator requests. */
+        long rangeIteratorCount, rangeIteratorNanos;
+        long rangeIteratorUCount, rangeIteratorUNanos;
+        long rangeIteratorRCCount, rangeIteratorRCNanos;
+        long rangeIteratorTxCount, rangeIteratorTxNanos;
+        long rangeIteratorHRCount, rangeIteratorHRNanos;
+        
+        /** #of block read requests. */
+        long readBlockCount, readBlockNanos;
+        
+        /** #of synchronous overflow events. */
+        long overflowCount, overflowNanos;
+        
+    }
+    
+    final Counters counters = new Counters();
+    
+    /**
      * FIXME Discover the {@link ITransactionManager} service and use it as the
      * source of timestamps! Make sure that the {@link IBigdataClient} and
      * {@link IBigdataFederation} implementations likewise discover the
@@ -193,7 +257,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
     /**
      * The {@link MetadataService}.
      */
-    abstract protected IMetadataService getMetadataService();
+    abstract public IMetadataService getMetadataService();
     
     /**
      * Returns the {@link IResourceManager}.
@@ -461,6 +525,42 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
 
+    /**
+     * Core implementation submits the task to the {@link IConcurrencyManager}
+     * and collects various metrics on task execution.
+     * 
+     * @param task
+     *            A task.
+     *            
+     * @return The value returned by {@link AbstractTask#call()}.
+     */
+    protected Object submitAndGetResult(AbstractTask task) throws InterruptedException,
+            ExecutionException {
+
+        try {
+
+            counters.submitCount++;
+            
+            Object result = concurrencyManager.submit(task).get();
+            
+            return result;
+
+        } catch (InterruptedException ex) {
+
+            throw ex;
+
+        } catch (ExecutionException ex) {
+
+            throw ex;
+
+        } finally {
+
+            counters.submitNanos += task.nanoTime_allDone;
+            
+        }
+
+    }
+    
     public void registerIndex(String name, IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException {
 
@@ -474,7 +574,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             final AbstractTask task = new RegisterIndexTask(concurrencyManager,
                     name, metadata);
             
-            concurrencyManager.submit(task).get();
+            submitAndGetResult(task);
         
         } finally {
             
@@ -494,7 +594,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             final AbstractTask task = new DropIndexTask(concurrencyManager,
                     name);
             
-            concurrencyManager.submit(task).get();
+            submitAndGetResult(task);
 
         } finally {
             
@@ -583,14 +683,14 @@ abstract public class DataService implements IDataService, IWritePipeline,
             final AbstractTask task = new IndexProcedureTask(
                     concurrencyManager, startTime, name, proc);
             
-            if(proc instanceof IDataServiceIndexProcedure) {
+            if(proc instanceof AbstractDataServiceIndexProcedure) {
                 
-                ((IDataServiceIndexProcedure)proc).setMetadataService( getMetadataService() );
+                ((AbstractDataServiceIndexProcedure)proc).setDataService( this );
                 
             }
             
             // await its completion.
-            return concurrencyManager.submit(task).get();
+            return submitAndGetResult(task);
         
         } finally {
             
@@ -616,7 +716,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
                     flags, filter);
     
             // submit the task and wait for it to complete.
-            return (ResultSet) concurrencyManager.submit(task).get();
+            return (ResultSet) submitAndGetResult(task);
         
         } finally {
             
@@ -630,6 +730,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * @todo this operation should be able to abort an
      *       {@link IBlock#inputStream() read} that takes too long or if there
      *       is a need to delete the resource.
+     * 
+     * @todo this should be run on the read service.
+     * 
+     * @todo coordinate close out of stores.
      */
     public IBlock readBlock(IResourceMetadata resource, final long addr) {
 
@@ -785,20 +889,53 @@ abstract public class DataService implements IDataService, IWritePipeline,
     }
     
     /**
-     * An interface that provides access to the federation.
+     * Abstract base class for index procedures that require access to the
+     * {@link IDataService} and or the federation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @todo register index and drop index could be rewritten as submitted
+     *       procedures derived from this class. This would simplify the
+     *       {@link IDataService} API and metrics collection further. The
+     *       implementations would have to be distinct from
+     *       {@link RegisterIndexTask} and {@link DropIndexTask} since those
+     *       extend {@link AbstractTask} - that class does not implement
+     *       {@link IIndexProcedure} and can not be sent across the wire.
      */
-    public static interface IDataServiceIndexProcedure extends ISimpleIndexProcedure {
+    public static abstract class AbstractDataServiceIndexProcedure implements IIndexProcedure {
         
+        private transient DataService dataService;
+
         /**
          * Invoked before the task is executed to given the procedure a
-         * reference to the {@link IMetadataService} for the federation. Among
-         * other things this can be used to resolve a data service {@link UUID}
-         * to an {@link IDataService}.
+         * reference to the {@link IDataService} on which it is executing.
          */
-        public void setMetadataService(IMetadataService metadataService);
+        final public void setDataService(DataService dataService) {
+
+            if (dataService == null)
+                throw new IllegalArgumentException();
+
+            if (this.dataService != null)
+                throw new IllegalStateException();
+
+            log.info("Set dataService: " + dataService);
+
+            this.dataService = dataService;
+
+        }
+
+        /**
+         * The {@link DataService} on which the procedure is executing.
+         */
+        final public DataService getDataService() {
+
+            if (dataService == null)
+                throw new IllegalStateException();
+
+            return dataService;
+            
+        }
         
     }
     

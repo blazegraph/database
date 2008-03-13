@@ -112,7 +112,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         dataService = new EmbeddedDataService(UUID.randomUUID(),properties) {
 
             @Override
-            protected IMetadataService getMetadataService() {
+            public IMetadataService getMetadataService() {
 
                 throw new UnsupportedOperationException();
                 

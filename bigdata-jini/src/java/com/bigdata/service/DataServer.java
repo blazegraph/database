@@ -328,7 +328,7 @@ public class DataServer extends AbstractServer {
         }
 
         @Override
-        protected IMetadataService getMetadataService() {
+        public IMetadataService getMetadataService() {
 
             /*
              * @todo handle one metadata service. right now registering more

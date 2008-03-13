@@ -79,7 +79,7 @@ import com.bigdata.util.ChecksumUtility;
  * use this method to access the mutable {@link BTree} then YOU are responsible
  * for avoiding concurrent writes on the returned object.
  * <p>
- * See {@link IConcurrentManager#submit(AbstractTask)} for a thread-safe API
+ * See {@link IConcurrentManager#submitAndGetResult(AbstractTask)} for a thread-safe API
  * that provides suitable concurrency control for both isolated and unisolated
  * operations on named indices. Note that the use of the thread-safe API does
  * NOT protect against applications that directly access the mutable
@@ -106,7 +106,7 @@ import com.bigdata.util.ChecksumUtility;
  * each transaction is written on a distinct {@link TemporaryStore}. However,
  * without additional concurrency controls, each transaction is NOT thread-safe
  * and MUST NOT be executed by more than one concurrent thread. Again, see
- * {@link IConcurrentManager#submit(AbstractTask)} for a high-concurrency API
+ * {@link IConcurrentManager#submitAndGetResult(AbstractTask)} for a high-concurrency API
  * for both isolated operations (transactions) and unisolated operations. Note
  * that the {@link TemporaryStore} backing a transaction will spill
  * automatically from memory onto disk if the write set of the transaction grows

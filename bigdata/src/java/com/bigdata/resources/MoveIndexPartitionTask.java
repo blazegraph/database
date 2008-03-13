@@ -52,7 +52,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.RawDataServiceRangeIterator;
-import com.bigdata.service.DataService.IDataServiceIndexProcedure;
+import com.bigdata.service.DataService.AbstractDataServiceIndexProcedure;
 
 /**
  * Historical read task is used to copy a view of an index partition as of the
@@ -254,7 +254,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class CopyIndexPartitionProcedure implements IDataServiceIndexProcedure {
+    public static class CopyIndexPartitionProcedure extends AbstractDataServiceIndexProcedure {
 
         /**
          * 
@@ -264,9 +264,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
         private UUID[] sourceDataServiceUUIDs;
         private String sourceIndexName;
         private long lastCommitTime;
-        
-        private transient IMetadataService metadataService;
-        
+
         /**
          * De-serialization ctor.
          */
@@ -336,8 +334,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             final BTree dst = (BTree)ndx;
             
             // @todo handle failover / read from secondaries.
-            assert metadataService != null : "MetadataService was not set";
-            IDataService sourceDataService;
+            final IMetadataService metadataService = getDataService().getMetadataService();
+            assert metadataService != null;
+            final IDataService sourceDataService;
             try {
                 sourceDataService = metadataService.getDataService(sourceDataServiceUUIDs[0]);
             } catch (IOException e) {
@@ -389,17 +388,6 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                     + sourceIndexName);
             
             return ncopied;
-            
-        }
-
-        public void setMetadataService(IMetadataService metadataService) {
-
-            if (metadataService == null)
-                throw new IllegalArgumentException();
-            
-            log.info("Set metadata service: "+metadataService);
-            
-            this.metadataService = metadataService;
             
         }
 
