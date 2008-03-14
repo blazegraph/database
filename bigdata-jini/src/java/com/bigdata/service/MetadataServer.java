@@ -391,7 +391,7 @@ public class MetadataServer extends DataServer {
 
         }
 
-        protected IMetadataService getMetadataService() {
+        public IMetadataService getMetadataService() {
 
             return this;
             

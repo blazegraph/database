@@ -613,7 +613,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     }
 
     /**
-     * Return the current headers (cloned).
+     * Return the current headers (by reference).
      */
     public Header[] getHeaders() {
 
