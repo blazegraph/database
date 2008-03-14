@@ -93,69 +93,92 @@ abstract public class AbstractStatisticsCollector {
      * @version $Id$
      */
     public interface IRequiredHostCounters {
-        
-        public final String ps = ICounterSet.pathSeparator; 
+
+        public final String ps = ICounterSet.pathSeparator;
 
         /*
          * counter set definitions (hierarchy).
          */
-        
+
         /**
          * The namespace for counters dealing with memory (RAM).
          */
-         String Memory = "Memory";
+        String Memory = "Memory";
 
         /**
          * The namespace for counters dealing with processor(s) (CPU).
          */
-         String Processor = "Processor";
-        
+        String Processor = "Processor";
+
         /**
          * The namespace for counters dealing with logical aggregations of disk.
          */
-         String LogicalDisk = "LogicalDisk";
-        
+        String LogicalDisk = "LogicalDisk";
+
         /**
          * The namespace for counters dealing with physical disks.
          */
-         String PhysicalDisk = "PhysicalDisk";
+        String PhysicalDisk = "PhysicalDisk";
+
+        /**
+         * The namespace for counters describing the host platform. These are
+         * essentially "unchanging" counters.
+         */
+        String Platform = "Platform";
 
         /*
          * counter definitions.
          */
-        
+
         /** Major page faults per second. */
-         String Memory_PageFaultsPerSecond = Memory + ps
+        String Memory_PageFaultsPerSecond = Memory + ps
                 + "Page Faults Per Second";
 
         /** Percentage of the time the processor is not idle. */
-         String Processor_PercentProcessorTime = Processor + ps
+        String Processor_PercentProcessorTime = Processor + ps
                 + "% Processor Time";
 
         /** Percentage of the disk space that is free (unused). */
-         String LogicalDisk_PercentFreeSpace = LogicalDisk + ps
-                + "% Free Space";
+        String LogicalDisk_PercentFreeSpace = LogicalDisk + ps + "% Free Space";
 
         /** Disk bytes read per second for the host. */
-         String PhysicalDisk_BytesReadPerSec = PhysicalDisk + ps
+        String PhysicalDisk_BytesReadPerSec = PhysicalDisk + ps
                 + "Bytes Read Per Second";
 
         /** Disk bytes written per second for the host. */
-         String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
+        String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
                 + "Bytes Written Per Second";
+
+        /**
+         * The name of the operating system running on the platform as reported
+         * by {@link System#getProperty(String)} for the <code>os.name</code>
+         * property.
+         */
+        String Platform_OperatingSystemName = Platform + ps
+                + "Operating System Name";
+
+        /**
+         * The version of the operating system running on the platform as
+         * reported by {@link System#getProperty(String)} for the
+         * <code>os.version</code> property.
+         */
+        String Platform_OperatingSystemVersion = Platform + ps
+                + "Operating System Version";
+
+        /**
+         * System architecture as reported by {@link System#getProperty(String)}
+         * for the <code>os.arch</code> property.
+         */
+        String Platform_Architecture = Platform + ps + "Architecture";
 
     };
  
     /**
      * Additional counters that hosts can report.
      * 
-     * @todo could report os, architecture, #of cpus, #of disks, amount of ram
-     *       (the more or less static host information).
      * @todo pageFaultsPerSec (majflt/s)
      * 
      * @todo os diskCache (dis|en)abled
-     * @todo #cpus
-     * @todo architecture
      * @todo #disks
      * @todo disk descriptions
      * @todo disk space, space avail, hardware disk cache (dis|en)abled.
@@ -171,32 +194,11 @@ abstract public class AbstractStatisticsCollector {
         /** #of disk write operations per second. */
         String PhysicalDisk_WritesPerSec = PhysicalDisk+ps+"Writes Per Second";
         
-        /**
-         * The namespace for counters describing the host platform. These are
-         * essentially "unchanging" counters.
-         * 
-         * @todo it would be nice if they were reported only once rather than
-         *       every 60 seconds.
-         * 
-         * @todo these could be moved into their respective categories (Memory,
-         *       Processor, OperatingSystem).
-         */
-        String Platform = "Platform";
-
         /** CPU family information. */
         String Platform_ProcessorInfo = Platform+ps+"Processor Info";
 
         /** The #of processors. */
         String Platform_NumProcessors = Platform+ps+"Number of Processors";
-        
-        /** System architecture <code>os.arch</code> */
-        String Platform_Architecture = Platform+ps+"Architecture";
-
-        /** The name of the operating system running on the platform <code>os.name</code>. */
-        String Platform_OperatingSystemName = Platform+ps+"Operating System Name";
-
-        /** The version of the operating system running on the platform <code>os.version</code>. */
-        String Platform_OperatingSystemVersion = Platform+ps+"Operating System Version";
         
         /** The total amount of memory available to the host. */
         String Memory_Available = Memory+ps+"Total bytes available";
@@ -393,6 +395,31 @@ abstract public class AbstractStatisticsCollector {
      */
     abstract protected void stop();
 
+    /**
+     * Installs a {@link Runtime#addShutdownHook(Thread)} that executes
+     * {@link #stop()}.
+     * <p>
+     * Note: The runtime shutdown hook appears to be a robust way to handle ^C
+     * by providing a clean service termination. However, under eclipse (at
+     * least when running under Windows) you may find that the shutdown hook
+     * does not run when you terminate a Java application and that typedef
+     * process build up in the Task Manager as a result. This should not be the
+     * case during normal deployment.
+     */
+    protected void installShutdownHook() {
+     
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+        
+            public void run() {
+                
+                AbstractStatisticsCollector.this.stop();
+                
+            }
+            
+        });
+
+    }
+
 //    /**
 //     * Report on the last 60 seconds.
 //     */
@@ -539,9 +566,6 @@ abstract public class AbstractStatisticsCollector {
      * Note: The names of counters under Windows are NOT case-sensitive.
      * 
      * @todo configuration for properties to be collected.
-     * 
-     * @todo make sure that [typeperf] is getting killed properly during stop()
-     *       or if the application quits.
      * 
      * @see http://technet2.microsoft.com/windowsserver/en/library/45b6fbfc-9fcd-4e58-b070-1ace9ca93f2e1033.mspx?mfr=true,
      *      for a description of the <code>typeperf</code> command.
@@ -753,24 +777,7 @@ abstract public class AbstractStatisticsCollector {
          */
         public void start() {
 
-            /*
-             * The runtime shutdown hook appears to be a robust way to handle ^C by
-             * providing a clean service termination.
-             */
-            {
-             
-                final AbstractStatisticsCollector f = this;
-                
-                Runtime.getRuntime().addShutdownHook(new Thread() {
-                
-                    public void run() {
-                        
-                        f.stop();
-                        
-                    }
-                    
-                });
-            }
+            installShutdownHook();
 
             // log the command that we will execute.
             final List<String> command = new LinkedList<String>();
@@ -841,6 +848,8 @@ abstract public class AbstractStatisticsCollector {
 
         @Override
         protected void stop() {
+
+            System.err.println("Destroying collector");            
 
             // interrupt the
             readService.shutdownNow();
