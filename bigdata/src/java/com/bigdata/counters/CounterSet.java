@@ -261,7 +261,7 @@ public class CounterSet implements ICounterSet {
             throw new IllegalArgumentException();
         
         if (counters.containsKey(name))
-            throw new IllegalStateException();
+            throw new IllegalStateException("Counter exists: path="+path+", name="+name);
         
         ICounter counter = new Counter(this,name) {
             

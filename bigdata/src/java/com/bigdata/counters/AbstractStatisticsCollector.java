@@ -46,13 +46,13 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 import com.bigdata.util.CSVReader;
 import com.bigdata.util.CSVReader.Header;
@@ -198,8 +198,8 @@ abstract public class AbstractStatisticsCollector {
         /** The version of the operating system running on the platform <code>os.version</code>. */
         String Platform_OperatingSystemVersion = Platform+ps+"Operating System Version";
         
-        /** The total amount of memory available. */
-        String Memory_Available = Memory+ps+"Total available memory";
+        /** The total amount of memory available to the host. */
+        String Memory_Available = Memory+ps+"Total bytes available";
 
     }
 
@@ -208,8 +208,14 @@ abstract public class AbstractStatisticsCollector {
      */
     protected Map<String,Object[]> counters = new HashMap<String,Object[]>();
     
+    /** {@link InetAddress#getHostName()} for this host. */
     final protected String hostname;
+
+    /** {@link InetAddress#getCanonicalHostName()} for this host. */
     final protected String fullyQualifiedHostName;
+
+    /** The path prefix under which all counters for this host are found. */
+    final protected String hostPathPrefix;
 
     protected AbstractStatisticsCollector() {
     
@@ -224,11 +230,69 @@ abstract public class AbstractStatisticsCollector {
             throw new AssertionError(e);
             
         }
-        
-        System.err.println("hostname: "+hostname);
-        System.err.println("FQDN    : "+fullyQualifiedHostName);
+
+        hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
+                + ICounterSet.pathSeparator;
+
+        System.err.println("hostname  : "+hostname);
+        System.err.println("FQDN      : "+fullyQualifiedHostName);
+        System.err.println("hostPrefix: "+hostPathPrefix);
 
         countersRoot = new CounterSet(fullyQualifiedHostName);
+
+        // os.arch
+        countersRoot.addCounterByPath(hostPathPrefix
+                + IHostCounters.Platform_Architecture,
+                new IInstrument<String>() {
+                    public String getValue() {
+                        return System.getProperty("os.arch");
+                    }
+                });
+        
+        // os.name
+        countersRoot.addCounterByPath(hostPathPrefix
+                + IHostCounters.Platform_OperatingSystemName,
+                new IInstrument<String>() {
+                    public String getValue() {
+                        return System.getProperty("os.name");
+                    }
+                });
+        
+        // os.version
+        countersRoot.addCounterByPath(hostPathPrefix
+                + IHostCounters.Platform_OperatingSystemVersion,
+                new IInstrument<String>() {
+                    public String getValue() {
+                        return System.getProperty("os.version");
+                    }
+                });
+        
+        // #of processors.
+        countersRoot.addCounterByPath(hostPathPrefix
+                + IHostCounters.Platform_NumProcessors,
+                new IInstrument<Integer>() {
+                    public Integer getValue() {
+                        return SystemUtil.numProcessors();
+                    }
+                });
+        
+        // processor info
+        countersRoot.addCounterByPath(hostPathPrefix
+                + IHostCounters.Platform_ProcessorInfo,
+                new IInstrument<String>() {
+                    public String getValue() {
+                        return SystemUtil.cpuInfo();
+                    }
+                });
+        
+//        // @todo this is per-process, not per host so move it to the service api and add host mem reporting here.
+//        countersRoot.addCounterByPath(hostPathPrefix
+//                + IHostCounters.Memory_Available,
+//                new IInstrument<Long>() {
+//                    public Long getValue() {
+//                        return Runtime.getRuntime().maxMemory();
+//                    }
+//                });
         
     }
     
@@ -329,36 +393,36 @@ abstract public class AbstractStatisticsCollector {
      */
     abstract protected void stop();
 
-    /**
-     * Report on the last 60 seconds.
-     */
-    public Map<String,Double> getAverages() {
-        
-        Map<String,Double> averages = new TreeMap<String,Double>();
-        
-        for(Map.Entry<String,Object[]> entry : counters.entrySet() ) {
-            
-            String counter = entry.getKey();
-            
-            Object[] samples = entry.getValue();
-
-            Double average = getAverage(samples);
-
-            if(average == null) {
-                
-                log.debug("Not a number: "+counter);
-             
-                continue;
-                
-            }
-            
-            averages.put(counter, average);
-            
-        }
-
-        return averages;
-        
-    }
+//    /**
+//     * Report on the last 60 seconds.
+//     */
+//    public Map<String,Double> getAverages() {
+//        
+//        Map<String,Double> averages = new TreeMap<String,Double>();
+//        
+//        for(Map.Entry<String,Object[]> entry : counters.entrySet() ) {
+//            
+//            String counter = entry.getKey();
+//            
+//            Object[] samples = entry.getValue();
+//
+//            Double average = getAverage(samples);
+//
+//            if(average == null) {
+//                
+//                log.debug("Not a number: "+counter);
+//             
+//                continue;
+//                
+//            }
+//            
+//            averages.put(counter, average);
+//            
+//        }
+//
+//        return averages;
+//        
+//    }
 
     /**
      * Return the ring buffer of samples for the named counter.
@@ -372,8 +436,7 @@ abstract public class AbstractStatisticsCollector {
      */
     public Object[] getSamples(String name) {
         
-        // Note: force to lowercase for consistency.
-        return counters.get(name.toLowerCase());
+        return counters.get(name);
         
     }
     
@@ -386,13 +449,13 @@ abstract public class AbstractStatisticsCollector {
      * @return The average -or- <code>null</code> if the samples are not
      *         numbers (no average is reported for dates, strings, etc).
      */
-    public Double getAverage(Object[] samples) {
+    public String getAverage(Object[] samples) {
         
         if (samples == null) {
 
             // No samples yet.
             
-            return 0d;
+            return "N/A";
             
         }
         
@@ -425,7 +488,7 @@ abstract public class AbstractStatisticsCollector {
             
         }
         
-        return (Double)(total/n);
+        return ""+(Double)(total/n);
         
     }
     
@@ -434,21 +497,21 @@ abstract public class AbstractStatisticsCollector {
      */
     public String getStatistics() {
         
-        return getAverages().toString();
+//        return getAverages().toString();
         
-//        StringBuilder sb = new StringBuilder();
-//        
-//        Iterator<ICounter> itr = countersRoot.getCounters(null/*filter*/);
-//        
-//        while(itr.hasNext()) {
-//            
-//            ICounter c = itr.next();
-//            
-//            System.err.println(c.getName()+"="+c.getValue());
-//            
-//        }
-//        
-//        return sb.toString();
+        StringBuilder sb = new StringBuilder();
+        
+        Iterator<ICounter> itr = countersRoot.getCounters(null/*filter*/);
+        
+        while(itr.hasNext()) {
+            
+            ICounter c = itr.next();
+            
+            sb.append("\n"+c.getPath()+"="+c.getValue());
+            
+        }
+        
+        return sb.toString();
         
     }
 
@@ -555,29 +618,126 @@ abstract public class AbstractStatisticsCollector {
 
             /**
              * Return the average of the samples for the counter with that name.
+             * <p>
+             * Note: We rename the headers when the {@link CSVReader} starts
+             * such that it reports the Windows counters under the names
+             * declared by {@link IRequiredHostCounters} and friends (prefixed
+             * with the
+             * {@link AbstractStatisticsCollector#fullyQualifiedHostName}).
+             * This is exactly how the counters are declared in
+             * {@link AbstractStatisticsCollector#countersRoot}. This means we
+             * can pass {@link AbstractStatisticsCollector#getSamples(String)}
+             * the name of a counter defined by {@link IRequiredHostCounters}
+             * and it will return the samples for that counter (assuming that
+             * they are being collected).
              */
             public String getValue() {
 
-                /*
-                 * Note: We need to prefix the hostname (not fully qualified) to
-                 * the counter name in order to get the name under which the
-                 * counter value will be reported.
-                 * 
-                 * @todo this is doubtless sensitive to how the host is configured
-                 * so look into how to figure out the correct prefix, e.g., from
-                 * the parsed headers which are in the _SAME_ order as we declare
-                 * the counters.
-                 */
-                String name = "\\\\" + hostname + "\\" + counterNameForWindows;
+                // path for the counter.
+                final String name = hostPathPrefix + getPath();
                 
                 Object[] samples = getSamples( name );
                 
-                return "" + getAverage( samples );
+                return getAverage( samples );
 
             }
             
         }
                 
+        final String physicalDisk = IRequiredHostCounters.PhysicalDisk;
+        
+        /**
+         * Declare the Windows counters to be collected.
+         */
+        // String prefix = "\\Process(javaw#"+getPID()+")\\";
+        final List<WindowsCounterDecl> names = Arrays
+                .asList(new WindowsCounterDecl[] {
+                        
+                new WindowsCounterDecl("\\Memory\\Pages/Sec",
+                                IRequiredHostCounters.Memory_PageFaultsPerSecond),
+
+                new WindowsCounterDecl(
+                                "\\Processor(_Total)\\% Processor Time",
+                                IRequiredHostCounters.Processor_PercentProcessorTime),
+
+                new WindowsCounterDecl(
+                                "\\LogicalDisk(_Total)\\% Free Space",
+                                IRequiredHostCounters.LogicalDisk_PercentFreeSpace),
+
+                /*
+                 * These are system wide counters for the network interface.
+                 * There are also counters for the network queue length,
+                 * packets discarded, and packet errors that might be
+                 * interesting. (I can't find _Total versions declared for
+                 * these counters so I am not including them but the
+                 * counters for the specific interfaces could be enabled and
+                 * then aggregated, eg:
+                 * 
+                 * \NetworkInterface(*)\Bytes Send/Sec
+                 */
+                // "\\Network Interface(_Total)\\Bytes Received/Sec",
+                // "\\Network Interface(_Total)\\Bytes Sent/Sec",
+                // "\\Network Interface(_Total)\\Bytes Total/Sec",
+
+                /*
+                 * System wide counters for DISK IO.
+                 */
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Queue Length",
+                        physicalDisk+ICounterSet.pathSeparator+
+                        "Avg. Disk Queue Length"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\% Idle Time",
+                        physicalDisk+ICounterSet.pathSeparator+ "% Idle Time"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\% Disk Time",
+                        physicalDisk+ICounterSet.pathSeparator+ "% Disk Time"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\% Disk Read Time",
+                        physicalDisk+ICounterSet.pathSeparator+ "% Disk Read Time"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\% Disk Write Time",
+                        physicalDisk+ICounterSet.pathSeparator+ "% Disk Write Time"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Disk Read Bytes/Sec",
+                        IRequiredHostCounters.PhysicalDisk_BytesReadPerSec),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Disk Write Bytes/Sec",
+                        IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Disk Reads/Sec",
+                        IHostCounters.PhysicalDisk_ReadsPerSec),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Disk Writes/Sec",
+                        IHostCounters.PhysicalDisk_WritesPerSec),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
+                        physicalDisk+ICounterSet.pathSeparator+
+                        "Avg. Disk Bytes per Read"),
+                new WindowsCounterDecl(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
+                        physicalDisk+ICounterSet.pathSeparator+
+                        "Avg. Disk Bytes per Write"),
+//"\\PhysicalDisk(_Total)\\Disk Writes/sec",
+//"\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
+//"\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
+
+        // /*
+        // * The names of the process specific counters that
+        // * we want.
+        // *
+        // * Note: The IO counters here are aggregated across
+        // * disk and network usage by the process.
+        // */
+        // prefix+"% Processor Time",
+        // prefix+"IO Read Bytes/sec",
+        // prefix+"IO Read Operations/sec",
+        // prefix+"IO Write Bytes/sec",
+        // prefix+"IO Write Operations/sec",
+
+
+        });
+
         /**
          * Note: While this approach seems fine to obtain the system wide
          * counters under Windows it runs into problems when you attempt to
@@ -593,100 +753,24 @@ abstract public class AbstractStatisticsCollector {
          */
         public void start() {
 
-            final String physicalDisk = IRequiredHostCounters.PhysicalDisk;
-            
             /*
-             * Declare the Windows counters to be collected.
+             * The runtime shutdown hook appears to be a robust way to handle ^C by
+             * providing a clean service termination.
              */
-            
-            // String prefix = "\\Process(javaw#"+getPID()+")\\";
-            final List<WindowsCounterDecl> names = Arrays
-                    .asList(new WindowsCounterDecl[] {
-                            
-                    new WindowsCounterDecl("\\Memory\\Pages/Sec",
-                                    IRequiredHostCounters.Memory_PageFaultsPerSecond),
-
-                    new WindowsCounterDecl(
-                                    "\\Processor(_Total)\\% Processor Time",
-                                    IRequiredHostCounters.Processor_PercentProcessorTime),
-
-                    new WindowsCounterDecl(
-                                    "\\LogicalDisk(_Total)\\% Free Space",
-                                    IRequiredHostCounters.LogicalDisk_PercentFreeSpace),
-
-                    /*
-                     * These are system wide counters for the network interface.
-                     * There are also counters for the network queue length,
-                     * packets discarded, and packet errors that might be
-                     * interesting. (I can't find _Total versions declared for
-                     * these counters so I am not including them but the
-                     * counters for the specific interfaces could be enabled and
-                     * then aggregated, eg:
-                     * 
-                     * \NetworkInterface(*)\Bytes Send/Sec
-                     */
-                    // "\\Network Interface(_Total)\\Bytes Received/Sec",
-                    // "\\Network Interface(_Total)\\Bytes Sent/Sec",
-                    // "\\Network Interface(_Total)\\Bytes Total/Sec",
-
-                    /*
-                     * System wide counters for DISK IO.
-                     */
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Queue Length",
-                            physicalDisk+ICounterSet.pathSeparator+
-                            "Avg. Disk Queue Length"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\% Idle Time",
-                            physicalDisk+ICounterSet.pathSeparator+ "% Idle Time"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\% Disk Time",
-                            physicalDisk+ICounterSet.pathSeparator+ "% Disk Time"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\% Disk Read Time",
-                            physicalDisk+ICounterSet.pathSeparator+ "% Disk Read Time"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\% Disk Write Time",
-                            physicalDisk+ICounterSet.pathSeparator+ "% Disk Write Time"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Disk Read Bytes/Sec",
-                            IRequiredHostCounters.PhysicalDisk_BytesReadPerSec),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Disk Write Bytes/Sec",
-                            IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Disk Reads/Sec",
-                            IHostCounters.PhysicalDisk_ReadsPerSec),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Disk Writes/Sec",
-                            IHostCounters.PhysicalDisk_WritesPerSec),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
-                            physicalDisk+ICounterSet.pathSeparator+
-                            "Avg. Disk Bytes per Read"),
-                    new WindowsCounterDecl(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
-                            physicalDisk+ICounterSet.pathSeparator+
-                            "Avg. Disk Bytes per Write"),
-// "\\PhysicalDisk(_Total)\\Disk Writes/sec",
-// "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
-// "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
-
-            // /*
-            // * The names of the process specific counters that
-            // * we want.
-            // *
-            // * Note: The IO counters here are aggregated across
-            // * disk and network usage by the process.
-            // */
-            // prefix+"% Processor Time",
-            // prefix+"IO Read Bytes/sec",
-            // prefix+"IO Read Operations/sec",
-            // prefix+"IO Write Bytes/sec",
-            // prefix+"IO Write Operations/sec",
-
-    
-            });
+            {
+             
+                final AbstractStatisticsCollector f = this;
+                
+                Runtime.getRuntime().addShutdownHook(new Thread() {
+                
+                    public void run() {
+                        
+                        f.stop();
+                        
+                    }
+                    
+                });
+            }
 
             // log the command that we will execute.
             final List<String> command = new LinkedList<String>();
@@ -716,9 +800,8 @@ abstract public class AbstractStatisticsCollector {
                     command.add("\""+decl.getCounterNameForWindows()+"\"");
 
                     // add into our counter hierarchy.
-                    countersRoot.addCounterByPath(ICounterSet.pathSeparator
-                            + fullyQualifiedHostName
-                            + ICounterSet.pathSeparator + decl.getPath(), decl);
+                    countersRoot.addCounterByPath(hostPathPrefix
+                            + decl.getPath(), decl);
 
                 }
                 
@@ -827,8 +910,10 @@ abstract public class AbstractStatisticsCollector {
                 // read headers from the file.
                 csvReader.readHeaders();
 
-                // replace the first header definition so that we get clean
-                // timestamps.
+                /*
+                 * replace the first header definition so that we get clean
+                 * timestamps.
+                 */
                 csvReader.setHeader(0, new Header("Timestamp") {
                     public Object parseValue(String text) {
 
@@ -842,13 +927,31 @@ abstract public class AbstractStatisticsCollector {
                     }
                 });
 
+                /*
+                 * replace other headers so that data are named by our counter
+                 * names.
+                 */
+                {
+                    int i = 1;
+
+                    for (WindowsCounterDecl decl : names) {
+
+                        String path = hostPathPrefix + decl.getPath();
+                        
+                        log.info("setHeader[i="+i+"]="+path);
+                        
+                        csvReader.setHeader(i++, new Header(path));
+
+                    }
+                    
+                }
+                
                 // setup the samples.
                 {
 
                     for (Header h : csvReader.getHeaders()) {
-
-                        // note: force to lower case for consistency.
-                        counters.put(h.getName().toLowerCase(), new Object[60]);
+                        
+                        counters.put(h.getName(), new Object[60]);
 
                     }
 
@@ -897,24 +1000,24 @@ abstract public class AbstractStatisticsCollector {
 
             Thread.sleep(2 * 1000/*ms*/);
             
-            {
-                
-                Iterator<ICounter> itr = client.countersRoot
-                        .getCounters(null/* filter */);
-
-                while (itr.hasNext()) {
-
-                    ICounter c = itr.next();
-
-                    String path = c.getPath();
-                    
-                    String value = ""+c.getValue();
-                    
-                    System.err.println(path + "=" + value);
-
-                }
-
-            }
+//            {
+//                
+//                Iterator<ICounter> itr = client.countersRoot
+//                        .getCounters(null/* filter */);
+//
+//                while (itr.hasNext()) {
+//
+//                    ICounter c = itr.next();
+//
+//                    String path = c.getPath();
+//                    
+//                    String value = ""+c.getValue();
+//                    
+//                    System.err.println(path + "=" + value);
+//
+//                }
+//
+//            }
 
             Thread.sleep(60 * 1000/*ms*/);
 
