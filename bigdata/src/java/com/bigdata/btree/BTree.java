@@ -715,7 +715,6 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
 //            lastMetadataAddr = metadata.getMetadataAddr();
             
             log.info("wrote updated metadata record");
-            log.warn("wrote updated metadata record: pmd="+metadata.getPartitionMetadata());// @todo remove this log msg.
             
         }
         

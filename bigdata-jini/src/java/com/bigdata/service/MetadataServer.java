@@ -273,7 +273,7 @@ public class MetadataServer extends DataServer {
             if (serviceUUID == null) {
 
                 serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-                
+
             }
             
             return serviceUUID;

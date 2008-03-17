@@ -166,7 +166,11 @@ public class SerializerUtil {
      */
     static final public Object deserialize(ByteBuffer buf) {
 
-        if (buf.hasArray()) {
+        /*
+         * FIXME Try w/ and w/o this. It appears that reading from the backing
+         * array can cause problems but I am not convinced of that yet.
+         */
+        if (true && buf.hasArray()) {
 
             int off = buf.arrayOffset();
 

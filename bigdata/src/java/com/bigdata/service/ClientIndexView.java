@@ -42,12 +42,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.btree.AbstractIndexProcedureConstructor;
 import com.bigdata.btree.IParallelizableIndexProcedure;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
@@ -69,7 +69,6 @@ import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -341,7 +340,7 @@ public class ClientIndexView implements IIndex {
             String _name = MetadataService.getMetadataIndexName(name);
             
             sb.append("\n" + _name + " : "
-                    + getMetadataService().getStatistics(_name,timestamp));
+                    + getMetadataService().getStatistics(_name));
 
         } catch (Exception ex) {
 
@@ -373,7 +372,7 @@ public class ClientIndexView implements IIndex {
                 String _stats;
                 try {
                     
-                    _stats = getDataService(pmd).getStatistics( _name, timestamp );
+                    _stats = getDataService(pmd).getStatistics( _name);
                 
                 } catch (Exception e) {
                     
@@ -905,8 +904,10 @@ public class ClientIndexView implements IIndex {
      *       tuples in each split, as well as the total #of tuples.
      */
     protected void runParallel(ArrayList<Callable<Void>> tasks) {
+
+        final long begin = System.currentTimeMillis();
         
-        log.info("Running "+tasks.size()+" tasks in parallel");
+        log.info("Running "+tasks.size()+" tasks in parallel: "+tasks.get(0).toString());
         
         final ExecutorService service = getThreadPool();
         
@@ -953,6 +954,9 @@ public class ClientIndexView implements IIndex {
                     + tasks.size() + ", nfailed=" + nfailed);
             
         }
+
+        log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
+                + (System.currentTimeMillis() - begin));
 
     }
 
@@ -1123,7 +1127,7 @@ public class ClientIndexView implements IIndex {
                                         
                     if(Thread.interrupted()) throw new InterruptedException();
                     
-                    log.warn("Locator stale (will retry) : name="+name+", stale locator="+locator+" : "+ex);
+                    log.info("Locator stale (will retry) : name="+name+", stale locator="+locator+" : "+ex);
                     
                     retry();
                     
@@ -1228,7 +1232,7 @@ public class ClientIndexView implements IIndex {
 
             final PartitionLocator locator = getMetadataIndex().find(key);
 
-            log.warn("Retrying: proc=" + proc.getClass().getName()
+            log.info("Retrying: proc=" + proc.getClass().getName()
                     + ", locator=" + locator + ", ntries=" + ntries);
 
             submit(locator);

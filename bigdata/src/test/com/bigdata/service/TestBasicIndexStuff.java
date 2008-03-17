@@ -107,19 +107,19 @@ public class TestBasicIndexStuff extends
             
         }
         
-        // obtaining index statistics
-        try {
-
-            dataService0.getStatistics(name, ITx.UNISOLATED);
-            
-        } catch (Exception ex) {
-
-            assertTrue( isInnerCause(ex, StaleLocatorException.class));
-
-            System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
-            
-        }
+//        // obtaining index statistics
+//        try {
+//
+//            dataService0.getStatistics(name);
+//            
+//        } catch (Exception ex) {
+//
+//            assertTrue( isInnerCause(ex, StaleLocatorException.class));
+//
+//            System.err.print("Ignoring expected exception: ");
+//            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
+//            
+//        }
         
         // running a procedure
         try {

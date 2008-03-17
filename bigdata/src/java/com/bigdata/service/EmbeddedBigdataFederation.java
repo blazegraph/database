@@ -49,6 +49,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.util.InnerCause;
 
 /**
  * An implementation that uses an embedded database rather than a distributed
@@ -681,12 +682,14 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
             assert mdmd != null;
             
-        } catch (NoSuchIndexException ex) {
-            
-            return null;
-
         } catch (Exception ex) {
 
+            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
+                
+                return null;
+                
+            }
+            
             throw new RuntimeException(ex);
 
         }

@@ -38,6 +38,7 @@ import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IDataService;
@@ -61,6 +62,17 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
 
+    /**
+     * Options understood by the {@link Journal}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends com.bigdata.journal.Options,
+            com.bigdata.journal.ConcurrencyManager.Options {
+
+    }
+    
     /**
      * @param properties
      *            See {@link com.bigdata.journal.Options}.
@@ -96,6 +108,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return super.getStatistics() + localTransactionManager.getStatistics();
         
     }
+        
+    synchronized public CounterSet getCounters() {
+        
+        if(counters==null) {
+
+            counters = super.getCounters();
+            
+            counters.attach(concurrencyManager.getCounters());
+            counters.attach(localTransactionManager.getCounters());
+            
+        }
+        
+        return counters;
+        
+    }
+    private CounterSet counters;
     
     /*
      * IResourceManager

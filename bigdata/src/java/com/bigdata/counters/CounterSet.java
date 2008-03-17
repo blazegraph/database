@@ -31,6 +31,7 @@ package com.bigdata.counters;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -43,52 +44,74 @@ import cutthecrap.utils.striterators.Sorter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * A set of counters arranged in a hierarchy.
+ * A set of counters arranged in a hierarchy, much like a file system. Each node
+ * has a name and a path. The name is a local and immutable label. The path is
+ * the {separator, name} sequence reading down from the root to a given node.
+ * The "root" is the top-most node in the hierarchy - it always has an empty
+ * name and its path is <code>/</code>. The direct children of a root are
+ * typically fully qualified host names. E.g., <code>/www.bigdata.com</code>.
+ * <p>
+ * Nodes are always created as children of an existing root. Once created, any
+ * non-root node may be attached as a child of any other node, including a root
+ * node, as long as cycles would not be formed. When a node is attached as a
+ * child of another node, the path of the child and all of its children are
+ * updated recursively. E.g., if <code>/Memory</code> is attached to
+ * <code>/www.bigdata.com</code> then its path becomes
+ * <code>/www.bigdata.com/Memory</code>.
+ * <p>
+ * Children are either {@link CounterSet}s or individual {@link Counter}s.
+ * Counter sets and counters are declared in the namespace and their names must
+ * be distinct.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo provide for efficient serialization of a set of counters of
- *       interest. E.g., by sorted into order and using prefix compression or
- *       by using hamming compression on the components of the path name.
+ * @todo each counter value should carry a timestamp which should be part of any
+ *       interchange format. this will let us know if a counter is not getting
+ *       updated. e.g., a lastModifiedTime. milliseconds precision is fine here
+ *       since the counters are not meant to support high resolution sampling.
+ * 
+ * @todo the syntax "." and ".." are not recognized.
+ * 
+ * @todo provide for efficient serialization of a set of counters of interest.
+ *       E.g., by sorted into order and using prefix compression or by using
+ *       hamming compression on the components of the path name.
  */
 public class CounterSet implements ICounterSet {
 
     static protected final Logger log = Logger.getLogger(CounterSet.class);
 
-    private String path;
+//    private String pathx;
     private final String name;
     private CounterSet parent;
-    private final Map<String,ICounterSet> children = new ConcurrentHashMap<String,ICounterSet>();
-    private final Map<String,ICounter> counters = new ConcurrentHashMap<String,ICounter>(); 
+    private final Map<String,ICounterNode> children = new ConcurrentHashMap<String,ICounterNode>();
+//    private final Map<String,ICounter> counters = new ConcurrentHashMap<String,ICounter>(); 
     
     /**
-     * Ctor for top-level.
+     * Ctor for a root node.
      */
     public CounterSet() {
 
-        this("");
+        this("",null);
 
     }
 
-    /**
-     * Ctor for a child {@link CounterSet}.
-     */
-    public CounterSet(String name) {
-
-        this(name, null);
-
-    }
+//    /**
+//     * Ctor for a child {@link CounterSet}.
+//     */
+//    private CounterSet(String name) {
+//
+//        this(name, null);
+//
+//    }
 
     /**
      * Used to add a child.
      * 
      * @param name
      *            The name of the child.
-     * @param parent
-     *            The reference to the parent.
      */
-    private CounterSet(String name, CounterSet parent) {
+    private CounterSet(String name,CounterSet parent) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -97,28 +120,53 @@ public class CounterSet implements ICounterSet {
         
         this.parent = parent;
         
-        this.path = (parent != null ? parent.computePath() : pathSeparator)
-                + name;
+//        this.path = computePath();
         
     }
     
-    private String computePath() {
-
-        final ICounterSet[] a = getPathComponents(); 
-
-        final StringBuilder sb = new StringBuilder();
-
-        for(ICounterSet x : a) {
-            
-            sb.append(pathSeparator);
-            
-            sb.append(x.getName());
-            
-        }
-        
-        return sb.toString();
-
-    }
+//    /**
+//     * Updates the {@link #path} on this {@link CounterSet} and then recursively
+//     * on all of its children.
+//     */
+//    private void updatePath() {
+//
+//        this.path = computePath();
+//        
+//        Iterator itr = children.values().iterator();
+//        
+//        while(itr.hasNext()) {
+//            
+//            CounterSet child = (CounterSet)itr.next();
+//            
+//            child.updatePath();
+//            
+//        }
+//        
+//    }
+//    
+//    private String computePath() {
+//
+//        if (parent == null || parent.isAbsoluteRoot()) {
+//
+//            return pathSeparator + name;
+//            
+//        }
+//        
+//        final ICounterSet[] a = getPathComponents(); 
+//
+//        final StringBuilder sb = new StringBuilder();
+//
+//        for(ICounterSet x : a) {
+//            
+//            sb.append(pathSeparator);
+//            
+//            sb.append(x.getName());
+//            
+//        }
+//        
+//        return sb.toString();
+//
+//    }
     
     public boolean isLeaf() {
         
@@ -126,7 +174,7 @@ public class CounterSet implements ICounterSet {
         
     }
 
-    public ICounterSet getRoot() {
+    public CounterSet getRoot() {
 
         CounterSet t = this;
 
@@ -198,34 +246,82 @@ public class CounterSet implements ICounterSet {
     
     public String getPath() {
 
-        return path;
+        if (parent == null) {
+         
+            /*
+             * Handles: "/", where this is an absolute root.
+             */
+            
+            return pathSeparator;
+            
+        }
+
+        if (parent.parent == null) {
+
+            /*
+             * Handles: "/foo".
+             */
+            
+            return parent.getPath() + name;
+            
+        }
+
+        /*
+         * Handles "/foo/bar", etc.
+         */
+
+        return parent.getPath() + pathSeparator + name;
         
     }
     
     /**
-     * Add a set of counters as a child of this set of counters.
+     * Attaches a {@link CounterSet} as a child of this node. If <i>child</i>
+     * is a root, then all children of the <i>child</i> are attached instead.
+     * If a {@link CounterSet} already exists then its children are attached. If
+     * a {@link Counter}s already exists then it is overwritten.
      * 
-     * @param child
+     * @param src
      *            The child counter set.
      * 
      * @throws IllegalArgumentException
      *             if <i>child</i> is <code>null</code>
      * @throws IllegalStateException
-     *             if <i>child</i> is aleady attached to some
-     *             {@link CounterSet}.
-     * @throws IllegalStateException
-     *             if there is already a child by the same name.
+     *             if <i>child</i> is either this node or any parent of this
+     *             node since a cycle would be formed.
      */
-    synchronized public CounterSet addCounterSet(CounterSet child) {
+    synchronized public void attach(ICounterNode src) {
+        
+        // FIXME detect cycles.
 
+        if(src.isRoot()) {
+            
+            /*
+             * If the child is a root then we attach its children.
+             */
+            Iterator<ICounterNode> itr = ((CounterSet) src).children.values()
+                    .iterator();
+
+            while (itr.hasNext()) {
+
+                ICounterNode child2 = itr.next();
+
+                attach2(child2);
+
+            }
+
+        } else {
+
+            attach2(src);
+            
+        }
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    private void attach2(ICounterNode child) {
+        
         if (child == null)
             throw new IllegalArgumentException();
-
-        if (child.getParent() != null) {
-
-            throw new IllegalStateException("child has parent");
-
-        }
 
         if (children.containsKey(child.getName())) {
 
@@ -234,53 +330,42 @@ public class CounterSet implements ICounterSet {
         }
         
         synchronized(child) {
-            
-            children.put(child.getName(), child);
-            
-            child.parent = this;
-            
-            /*
-             * update the path on the child to reflect its location in the
-             * hierarchy. the counters on the child use a dynamic path so that
-             * is not a problem.
-             */
-            child.path = child.computePath();
-            
-        }
-        
-        return child;
-        
-    }
 
-    synchronized public ICounter addCounter(String name, final IInstrument instrument) {
-        
-        if (name== null)
-            throw new IllegalArgumentException();
-
-        if (instrument == null)
-            throw new IllegalArgumentException();
-        
-        if (counters.containsKey(name))
-            throw new IllegalStateException("Counter exists: path="+path+", name="+name);
-        
-        ICounter counter = new Counter(this,name) {
+            final String name = child.getName();
             
-            public Object getValue() {
+            final CounterSet oldParent = (CounterSet)child.getParent();
+            
+            assert oldParent != null;
+            
+            if (oldParent.children.remove(name) == null) {
                 
-                return instrument.getValue();
+                throw new AssertionError();
                 
             }
             
-        };
-        
-        log.info("parent="+this+", name="+name);
-        
-        counters.put(name, counter);
-        
-        return counter;
+            if(child.isCounterSet()) {
+                
+                ((CounterSet)child).parent = this;
+                
+            } else {
+                
+                ((Counter)child).parent = this;
+                
+            }
+            
+            children.put(name, child);
+            
+//            /*
+//             * update the path on the child (and recursively on its children) to
+//             * reflect its location in the hierarchy. the counters on the child
+//             * use a dynamic path so that is not a problem.
+//             */
+//            child.updatePath();
+            
+        }
         
     }
-    
+
     /**
      * Visits counters belonging directly to this set of counters and
      * matching the optional filter.
@@ -295,7 +380,8 @@ public class CounterSet implements ICounterSet {
     @SuppressWarnings("unchecked")
     public Iterator<ICounter> counterIterator(final Pattern filter) {
         
-        IStriterator src = new Striterator(counters.values().iterator());
+        IStriterator src = new Striterator(children.values().iterator())
+                .addTypeFilter(ICounter.class);
         
         if (filter != null) {
 
@@ -308,10 +394,16 @@ public class CounterSet implements ICounterSet {
                 @Override
                 protected boolean isValid(Object val) {
 
-                    ICounter counter = (ICounter) val;
+                    final ICounter counter = (ICounter) val;
 
-                    return filter.matcher(counter.getPath()).matches();
+                    final String path = counter.getPath();
+                    
+                    Matcher matcher = filter.matcher(path);
+                    
+                    boolean matched = matcher.matches();
 
+                    return matched;
+                    
                 }
 
             });
@@ -363,7 +455,7 @@ public class CounterSet implements ICounterSet {
                     @Override
                     public int compare(Object arg0, Object arg1) {
                         
-                        return ((CounterSet)arg0).name.compareTo(((CounterSet)arg1).name);
+                        return ((ICounterNode)arg0).getName().compareTo(((ICounterNode)arg1).getName());
                         
                     }
                     
@@ -403,7 +495,8 @@ public class CounterSet implements ICounterSet {
          * recursive application of the post-order iterator.
          */
 
-        return new Striterator(counterSetIterator()).addFilter(new Expander() {
+        return new Striterator(counterSetIterator()).addTypeFilter(
+                ICounterSet.class).addFilter(new Expander() {
 
             private static final long serialVersionUID = 1L;
 
@@ -416,63 +509,141 @@ public class CounterSet implements ICounterSet {
                  * A child of this node.
                  */
 
-                CounterSet child = (CounterSet) childObj;
+                ICounterSet child = (ICounterSet) childObj;
 
-                if (!child.isLeaf()) {
+//                if (child instanceof ICounterSet) {
 
                     /*
                      * The child has children.
                      */
 
-                    Striterator itr = new Striterator(child
+                    Striterator itr = new Striterator(((CounterSet) child)
                             .postOrderIterator1());
 
                     // append this node in post-order position.
                     itr.append(new SingleValueIterator(child));
 
                     return itr;
+//
+//                } else {
+//
+//                    /*
+//                     * The child is a leaf.
+//                     */
+//
+//                    // visit the leaf itself.
+//                    return new SingleValueIterator(child);
 
-                } else {
-
-                    /*
-                     * The child is a leaf.
-                     */
-
-                    // visit the leaf itself.
-                    return new SingleValueIterator(child);
-
-                }
+//                }
             }
         });
 
     }
 
-    public ICounter getCounterByName(String name) {
-        
-        return counters.get(name);
+//    public ICounterSet getCounterSetByName(String name) {
+//        
+//        if (name == null)
+//            throw new IllegalArgumentException();
+//        
+//        ICounterNode node = children.get(name);
+//        
+//        if( node instanceof ICounterSet) {
+//            
+//            return (ICounterSet) node;
+//            
+//        }
+//        
+//        return null;
+//        
+//    }
+    
+    public ICounterNode getChild(String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+
+        return children.get(name);
         
     }
 
-    public ICounterSet getParentByPath(String path) {
-        
-        if (path == null)
+//    public ICounterSet getCounterSetByPath(String path) {
+//
+//        ICounterNode node = getPath(path);
+//        
+//        if(node instanceof ICounterSet) {
+//            
+//            return (ICounterSet)node;
+//            
+//        }
+//        
+//        return null;
+//        
+//    }
+    
+    public ICounterNode getPath(String path) {
+       
+        if (path == null) {
+
             throw new IllegalArgumentException();
-        
-        if(path.startsWith(pathSeparator) && parent != null) {
-            
-            return getRoot().getParentByPath(path);
             
         }
         
+        if(path.length()==0) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+
+        if(path.equals(pathSeparator)) {
+            
+            // Handles: "/"
+            
+            return getRoot();
+            
+        }
+        
+        /*
+         * Normalize to a path relative to the node on which we evaluate the
+         * path. If the path is absolute, then we drop off the leading '/' and
+         * evaluate against the root (so the path is now relative to the root).
+         * Otherwise the path is already relative to this node and we evaluate
+         * it here.
+         */
+        if (path.startsWith(pathSeparator)) {
+
+            // drop off the leading '/'
+            path = path.substring(1);
+
+            // start at the root
+            if (parent != null)
+                return getRoot().getPath(path);
+
+        }
+
+        /*
+         * Split path into node name components. The path is known to be
+         * relative (see above) so there is never a leading '/'.
+         */
         final String[] a = path.split(pathSeparator);
         
-        if(a.length==0) throw new IllegalArgumentException();
-        
-        ICounterSet t = this;
-        
-        for(int i=1; i<a.length-1; i++) {
-        
-            t = t.getCounterSetByName(a[i]);
+//        assert a.length > 0 : "path="+path;
+//        
+//        // empty path is this node.
+//        if(a.length==0) return this;
+
+        /*
+         * This is a root and we are going to desend by name a node at a time.
+         * a[0] is the name of the first path component to be matched.
+         */
+
+        ICounterNode t = this;
+
+        // the remaining path components.
+        for (int i = 0; i < a.length; i++) {
+            
+            final String name = a[i];
+            
+            t = t.getChild( name );
             
             if(t == null) return null;
             
@@ -491,90 +662,155 @@ public class CounterSet implements ICounterSet {
      * 
      * @return The {@link CounterSet} described by the path.
      */
-    public CounterSet makePath(String path) {
+    synchronized public CounterSet makePath(String path) {
         
-        if (path == null)
+        if (path == null) {
+
             throw new IllegalArgumentException();
+            
+        }
         
-        if(path.startsWith(pathSeparator) && parent != null) {
+        if(path.length()==0) {
             
-            return ((CounterSet)getRoot()).makePath(path);
+            throw new IllegalArgumentException();
             
+        }
+        
+        if (path.equals(pathSeparator)) {
+         
+            // Handles: "/"
+            
+            return getRoot();
+            
+        }
+        
+        /*
+         * Normalize to a path relative to the node on which we evaluate the
+         * path. If the path is absolute, then we drop off the leading '/' and
+         * evaluate against the root (so the path is now relative to the root).
+         * Otherwise the path is already relative to this node and we evaluate
+         * it here.
+         */
+        if (path.startsWith(pathSeparator)) {
+
+            // drop off the leading '/'
+            path = path.substring(1);
+
+            // start at the root
+            if (parent != null)
+                return getRoot().makePath(path);
+
         }
         
         final String[] a = path.split(pathSeparator);
         
-        if(a.length==0) throw new IllegalArgumentException();
+//        assert a.length > 0 : "path="+path;
+//        
+//        // empty path is this node.
+//        if(a.length==0) return this;
         
-        if (!a[1].equals(name)) {
-
-            throw new IllegalArgumentException("Wrong root name: root=" + name
-                    + ", but given root is: " + a[1]);
-
-        }
+        CounterSet p = this;
         
-        CounterSet parent = this;
-        
-        for (int i = 2; i < a.length; i++) {
+        for (int i = 0; i < a.length; i++) {
         
             String name = a[i];
             
-            CounterSet t = (CounterSet) parent.getCounterSetByName(name);
-            
-            if(t == null) {
+            ICounterNode t = p.children.get(name);
 
-                t = parent.addCounterSet(new CounterSet(name));
+            if (t == null) {
+
+                // node does not exist, so create it now.
+                
+                t = new CounterSet(name, p);
+
+                p.children.put(name, t);
+
+            } else if (t instanceof ICounter) {
+
+                // path names a counter.
+                
+                throw new IllegalArgumentException("path identifies a counter");
                 
             }
-            
-            parent = t;
-            
+
+            p = (CounterSet) t;
+
+
         }
         
-        return parent;
+        return p;
         
     }
     
-    public ICounter getCounterByPath(String path) {
-
-        ICounterSet t = getParentByPath( path );
-        
-        if(t == null) return null;
-
-        final String[] a = path.split(pathSeparator);
-        
-        return t.getCounterByName(a[a.length-1]);
-        
-    }
+//    public ICounter getCounterByPath(String path) {
+//
+//        ICounterSet t = getCounterSetByPath( path );
+//        
+//        if(t == null) return null;
+//
+//        final String[] a = path.split(pathSeparator);
+//        
+//        return t.get(a[a.length-1]);
+//        
+//    }
     
-    synchronized public ICounter addCounterByPath(String path, final IInstrument instrument) {
+    /**
+     * Add a counter.
+     * 
+     * @param path
+     *            The path of the counter (absolute or relative).
+     * 
+     * @param instrument
+     *            The object that is used to take the measurements from which
+     *            the counter's value will be determined.
+     */
+    synchronized public ICounter addCounter(String path, final IInstrument instrument) {
 
-        if(path==null) throw new IllegalArgumentException();
+        if (path == null)
+            throw new IllegalArgumentException();
         
         final int indexOf = path.lastIndexOf(pathSeparator);
         
         if (indexOf == -1) {
             
-            return ((CounterSet)getRoot()).addCounter(path, instrument);
+            return addCounter2(path, instrument);
             
         }
         
-        final String name = path.substring(indexOf+1,path.length());
+        final String name = path.substring(indexOf + 1, path.length());
+
+        final String ppath = path.substring(0, indexOf);
+
+        final CounterSet parent = (CounterSet) makePath(ppath);
         
-        final String ppath = path.substring(0,indexOf);
-        
-        CounterSet parent = (CounterSet)makePath(ppath);
-        
-        return parent.addCounter(name, instrument);
+        return parent.addCounter2(name, instrument);
         
     }
     
-    public ICounterSet getCounterSetByName(String name) {
-        
+    @SuppressWarnings("unchecked")
+    private ICounter addCounter2(String name,
+            final IInstrument instrument) {
+
         if (name == null)
             throw new IllegalArgumentException();
+
+        if (instrument == null)
+            throw new IllegalArgumentException();
         
-        return children.get(name);
+        if (children.containsKey(name)) {
+
+            throw new IllegalStateException("Exists: path=" + getPath()
+                    + ", name=" + name);
+            
+        }
+        
+        final ICounter counter = new Counter(this, name, instrument);
+        
+        log.info("parent="+getPath()+", name="+name);
+        
+        children.put(name, counter);
+        
+        return counter;
         
     }
     
@@ -589,11 +825,41 @@ public class CounterSet implements ICounterSet {
         return parent == null;
         
     }
-    
+
     public String toString() {
-        
-        return path;
+
+        return toString(null/*filter*/);
         
     }
     
+    public String toString(Pattern filter) {
+
+        StringBuilder sb = new StringBuilder();
+        
+        Iterator<ICounter> itr = getCounters(filter);
+
+        while (itr.hasNext()) {
+
+            ICounter c = itr.next();
+
+            sb.append("\n" + c.getPath() + "=" + c.getValue());
+
+        }
+
+        return sb.toString();
+        
+    }
+
+    final public boolean isCounterSet() {
+        
+        return true;
+        
+    }
+
+    final public boolean isCounter() {
+        
+        return false;
+        
+    }
+
 }

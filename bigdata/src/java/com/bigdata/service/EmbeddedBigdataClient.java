@@ -131,6 +131,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     public void shutdown() {
 
+        log.info("");
+
         if(fed != null) {
 
             // allow client requests to finish normally.
@@ -161,6 +163,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     public void shutdownNow() {
 
+        log.info("");
+        
         if(fed != null) {
 
             // stop client requests.

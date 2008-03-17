@@ -30,23 +30,30 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounter;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -67,6 +74,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -142,13 +150,41 @@ abstract public class DataService implements IDataService, IWritePipeline,
     public static final Logger log = Logger.getLogger(DataService.class);
 
     /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+    
+    /**
      * Options understood by the {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options,
+            com.bigdata.journal.ConcurrencyManager.Options,
+            com.bigdata.resources.ResourceManager.Options
+            // @todo local tx manager options?
+            {
+     
+        /**
+         * The delay between scheduled invocations of the {@link StatusTask}.
+         * 
+         * @see #DEFAULT_STATUS_DELAY
+         */
+        public final static String STATUS_DELAY = "statusDelay";
         
+        /**
+         * The default {@link #STATUS_DELAY}.
+         */
+        public final static String DEFAULT_STATUS_DELAY = "10000";
+    
     }
     
     /**
@@ -160,11 +196,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo counters for index statistics requests?
-     * 
      * @todo tx commit/abort requests.
      * 
-     * @todo counters from the {@link ResourceManager}.
+     * @todo counters from the {@link ResourceManager}. overflowCount,
+     *       overflowNanos;
      * 
      * @todo counters from the {@link ConcurrencyManager}.
      *       <p>
@@ -178,41 +213,37 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * 
      * @todo counters from {@link DiskOnlyStrategy}
      */
-    private static class Counters {
+    private static class ReadBlockCounters {
         
-        /** #of register requests. */
-        long registerIndexCount, registerIndexNanos;
+//        /**
+//         * Submit tasks counters. Note that getIndexMetadata, registerIndex,
+//         * dropIndex, submit(procedure), and rangeIterator are all represented
+//         * by these counters.
+//         */
+//        long submitCount, submitErrorCount, submitNanos;
+//        long submitUCount, submitUNanos;
+//        long submitRCCount, submitRCNanos;
+//        long submitTxCount, submitTxNanos;
+//        long submitHRCount, submitHRNanos;
         
-        /** #of drop index requests. */
-        long dropIndexCount, dropIndexNanos;
-        
-        /** #of index metadata requests. */
-        long getIndexMetadataCount, getIndexMetadataNanos;
-        
-        /** #of submit procedure requests. */
-        long submitCount, submitNanos;
-        long submitUCount, submitUNanos;
-        long submitRCCount, submitRCNanos;
-        long submitTxCount, submitTxNanos;
-        long submitHRCount, submitHRNanos;
-        
-        /** #of range iterator requests. */
-        long rangeIteratorCount, rangeIteratorNanos;
-        long rangeIteratorUCount, rangeIteratorUNanos;
-        long rangeIteratorRCCount, rangeIteratorRCNanos;
-        long rangeIteratorTxCount, rangeIteratorTxNanos;
-        long rangeIteratorHRCount, rangeIteratorHRNanos;
+//        /** #of range iterator requests. */
+//        long rangeIteratorCount, rangeIteratorNanos;
+//        long rangeIteratorUCount, rangeIteratorUNanos;
+//        long rangeIteratorRCCount, rangeIteratorRCNanos;
+//        long rangeIteratorTxCount, rangeIteratorTxNanos;
+//        long rangeIteratorHRCount, rangeIteratorHRNanos;
         
         /** #of block read requests. */
-        long readBlockCount, readBlockNanos;
+        long readBlockCount, readBlockErrorCount, readBlockBytes, readBlockNanos;
         
-        /** #of synchronous overflow events. */
-        long overflowCount, overflowNanos;
+        public ReadBlockCounters() {
+        
+        }
         
     }
     
-    final Counters counters = new Counters();
-    
+    final ReadBlockCounters counters = new ReadBlockCounters();
+
     /**
      * FIXME Discover the {@link ITransactionManager} service and use it as the
      * source of timestamps! Make sure that the {@link IBigdataClient} and
@@ -222,9 +253,21 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
     
-    final protected IResourceManager resourceManager;
+    final protected ResourceManager resourceManager;
     final protected ConcurrencyManager concurrencyManager;
     final protected AbstractLocalTransactionManager localTransactionManager;
+    final protected AbstractStatisticsCollector statisticsCollector;
+
+    /**
+     * Runs a {@link StatusTask} printing out periodic service status
+     * information (counters).
+     */
+    final protected ScheduledExecutorService statusService;
+    
+    /**
+     * Used to emit a final status message during shutdown.
+     */
+    final private StatusTask statusTask;
 
     /**
      * The object used to manage the local resources.
@@ -262,7 +305,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
     /**
      * Returns the {@link IResourceManager}.
      * 
-     * @param properties Properties to configure that object.
+     * @param properties
+     *            Properties to configure that object.
      * 
      * @return The {@link IResourceManager}.
      */
@@ -313,7 +357,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     public DataService(Properties properties) {
         
-        resourceManager = newResourceManager(properties);
+        resourceManager = (ResourceManager) newResourceManager(properties);
         
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
 
@@ -341,7 +385,40 @@ abstract public class DataService implements IDataService, IWritePipeline,
             ((ResourceManager)resourceManager).start();
             
         }
+
+        // setup to collect statistics about this host.
+        {
+            
+            statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
+            
+            statisticsCollector.start();
+            
+        }
         
+        // setup scheduled runnable for periodic status messages.
+        {
+
+            final long initialDelay = 100;
+            
+            final long delay = Long.parseLong(properties.getProperty(
+                    Options.STATUS_DELAY,
+                    Options.DEFAULT_STATUS_DELAY));
+
+            log.info(Options.STATUS_DELAY + "=" + delay);
+            
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            statusService = Executors
+            .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                    .defaultThreadFactory());
+            
+            statusTask = new StatusTask();
+            
+            statusService.scheduleWithFixedDelay(statusTask, initialDelay,
+                    delay, unit);
+
+        }
+
     }
 
     /**
@@ -356,6 +433,12 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         resourceManager.shutdown();
         
+        statusService.shutdown();
+        
+        statisticsCollector.stop();
+        
+        log.info(getCounters().toString());
+
     }
     
     /**
@@ -370,6 +453,12 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         resourceManager.shutdownNow();
 
+        statusService.shutdownNow();
+
+        statisticsCollector.stop();
+        
+        log.info(getCounters().toString());
+        
     }
 
     /**
@@ -379,6 +468,99 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     public abstract UUID getServiceUUID() throws IOException;
     
+    /**
+     * Return the {@link ICounterSet} hierarchy used to report on the activity
+     * of this service. The counters are automatically setup first time this
+     * method is called.
+     * <p>
+     * The prefix for the counter hierarchy will be
+     * <code>hostname/service/serviceUUID</code>. This method therefore has a
+     * dependency on {@link #getServiceUUID()} and must be invoked after the
+     * <code>serviceUUID</code> is known. The timing of that event depends on
+     * whether the service is embedded or using a distributed services framework
+     * such as <code>jini</code>.
+     * <p>
+     * <dl>
+     * <dt>resourceManager</dt>
+     * <dd></dd>
+     * <dt>concurrencyManager</dt>
+     * <dd></dd>
+     * <dt>transactionManager</dt>
+     * <dd></dd>
+     * </dl>
+     * Subclasses MAY extend this method to report additional {@link ICounter}s.
+     * 
+     * @todo attached and detach counters for the live journal during overflow?
+     */
+    synchronized public ICounterSet getCounters() {
+     
+        if (countersRoot == null) {
+
+            final UUID serviceUUID;
+            try {
+                serviceUUID = getServiceUUID();
+            } catch(IOException ex) {
+                throw new RuntimeException(ex);
+            }
+            
+            countersRoot = statisticsCollector.getCounters();
+            
+            final String ps = ICounterSet.pathSeparator;
+            
+            final String pathPrefix = countersRoot.getPath() + ps + "service"
+                    + ps + serviceUUID + ps;
+
+            final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
+
+            // Service info.
+            {
+
+                CounterSet tmp = serviceRoot.makePath("Info");
+
+                tmp.addCounter("Service Type", new Instrument<String>() {
+                    public String getValue() {
+                        return DataService.this.getClass().getName();
+                    }
+                });
+                
+            }
+
+            serviceRoot.makePath("Resource Manager").attach(
+                    resourceManager.getCounters());
+
+            serviceRoot.makePath("Concurrency Manager").attach(
+                    concurrencyManager.getCounters());
+
+            serviceRoot.makePath("Transaction Manager").attach(
+                    localTransactionManager.getCounters());
+
+            // block API.
+            {
+            
+                CounterSet tmp = serviceRoot.makePath("Block API");
+
+                tmp.addCounter("Blocks Read", new Instrument<Long>() {
+                    public Long getValue() {
+                        return counters.readBlockCount;
+                    }
+                });
+
+                tmp.addCounter("Blocks Read Per Second",
+                        new Instrument<String>() {
+                            public String getValue() {
+                                return nanosToPerSec(counters.readBlockCount,
+                                        counters.readBlockNanos);
+                            }
+                        });
+                
+            }
+        }
+        
+        return countersRoot;
+        
+    }
+    private CounterSet countersRoot;    
+
     /*
      * ITxCommitProtocol.
      */
@@ -456,24 +638,68 @@ abstract public class DataService implements IDataService, IWritePipeline,
     
     public String getStatistics() throws IOException {
         
-        StringBuilder sb = new StringBuilder();
+        return getCounters().toString();
         
-        sb.append("dataService: uuid=" + getServiceUUID());
+    }
 
-        sb.append("\nResourceManager:");
+    /**
+     * Writes out periodic status information.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public class StatusTask implements Runnable {
 
-        sb.append(resourceManager.getStatistics());
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final protected Logger log = Logger.getLogger(StatusTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        public StatusTask() {
+        }
         
-        sb.append("\nConcurrencyManager:");
+        public void run() {
 
-        sb.append(concurrencyManager.getStatistics());
+            try {
 
-        sb.append("\nLocalTransactionManager:");
+                // FIXME parameterize or remove?
+                
+                Pattern filter = null;
+                
+                //filter = Pattern.compile(".*Unisolated.*");
+                //
+                filter = Pattern.compile(".*Unisolated Write Service/#.*");
+//                Unisolated Write Service/#completed
+                
+                final String s = getCounters().toString(filter);
 
-        sb.append(localTransactionManager.getStatistics());
-        
-        return sb.toString();
-        
+                // System.err.println( s );
+
+                if (INFO)
+                    log.info(s);
+
+            } catch (Throwable t) {
+
+                /*
+                 * Note: Don't throw anything since I don't want to
+                 * have the status task suppressed!
+                 */
+                
+                log.warn("Problem in status thread?", t);
+
+            }
+
+        }
+
     }
 
     /**
@@ -525,41 +751,45 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
 
-    /**
-     * Core implementation submits the task to the {@link IConcurrencyManager}
-     * and collects various metrics on task execution.
-     * 
-     * @param task
-     *            A task.
-     *            
-     * @return The value returned by {@link AbstractTask#call()}.
-     */
-    protected Object submitAndGetResult(AbstractTask task) throws InterruptedException,
-            ExecutionException {
-
-        try {
-
-            counters.submitCount++;
-            
-            Object result = concurrencyManager.submit(task).get();
-            
-            return result;
-
-        } catch (InterruptedException ex) {
-
-            throw ex;
-
-        } catch (ExecutionException ex) {
-
-            throw ex;
-
-        } finally {
-
-            counters.submitNanos += task.nanoTime_allDone;
-            
-        }
-
-    }
+//    /**
+//     * Core implementation submits the task to the {@link IConcurrencyManager}
+//     * and collects various metrics on task execution.
+//     * 
+//     * @param task
+//     *            A task.
+//     *            
+//     * @return The value returned by {@link AbstractTask#call()}.
+//     */
+//    protected Object submitAndGetResult(AbstractTask task) throws InterruptedException,
+//            ExecutionException {
+//
+//        try {
+//
+//            counters.submitCount++;
+//            
+//            Object result = concurrencyManager.submit(task).get();
+//            
+//            return result;
+//
+//        } catch (InterruptedException ex) {
+//
+//            counters.submitErrorCount++;
+//            
+//            throw ex;
+//
+//        } catch (ExecutionException ex) {
+//
+//            counters.submitErrorCount++;
+//
+//            throw ex;
+//
+//        } finally {
+//
+//            counters.submitNanos += task.nanoTime_allDone;
+//            
+//        }
+//
+//    }
     
     public void registerIndex(String name, IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException {
@@ -574,7 +804,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             final AbstractTask task = new RegisterIndexTask(concurrencyManager,
                     name, metadata);
             
-            submitAndGetResult(task);
+            concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -594,7 +824,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             final AbstractTask task = new DropIndexTask(concurrencyManager,
                     name);
             
-            submitAndGetResult(task);
+            concurrencyManager.submit(task).get();
 
         } finally {
             
@@ -604,45 +834,56 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
     }
    
-    public IndexMetadata getIndexMetadata(String name,long timestamp) throws IOException {
+    public IndexMetadata getIndexMetadata(String name, long timestamp)
+            throws IOException, InterruptedException, ExecutionException {
 
         setupLoggingContext();
-        
+
         try {
 
-            /*
-             * Note: This does not use concurrency controls but we are 
-             * performing a purely read-only operation.
-             */
-            final IIndex ndx = resourceManager.getIndex(name,timestamp);
-            
-            if(ndx == null) {
+            final AbstractTask task = new AbstractTask(concurrencyManager, timestamp,
+                    name) {
+
+                protected Object doTask() throws Exception {
+                    
+                    return getIndex(getOnlyResource()).getIndexMetadata();
+                    
+                }
                 
-                throw new NoSuchIndexException(name);
-                
-            }
-            
-            return ndx.getIndexMetadata()/*.clone()?*/;
-            
+            };
+
+            return (IndexMetadata) concurrencyManager.submit(task).get();
+
         } finally {
-            
+
             clearLoggingContext();
-            
+
         }
         
     }
 
-    public String getStatistics(String name, long timestamp) throws IOException {
+    /**
+     * This returns the counters for the index as reported by
+     * {@link ConcurrencyManager#getCounters(String)}.
+     * 
+     * FIXME Those counters are reset by each journal overflow event. It would
+     * be very nice to be able to report the counters over the life of an index
+     * partition (at least since the data service was started). This would
+     * require noticing when the index partition was dropped. Also, the only
+     * counters that we keep from task to task are the counters for the
+     * {@link ITx#UNISOLATED} and {@link ITx#READ_COMMITTED} views of named
+     * indices. We should be able to report counters/costs for historical reads
+     * and transactions as well.
+     * 
+     * @todo replace with serialized {@link ICounterSet}.
+     */
+    public String getStatistics(String name) throws IOException {
 
         setupLoggingContext();
         
         try {
 
-            /*
-             * Note: This does not use concurrency controls but we are 
-             * performing a purely read-only operation.
-             */
-            String statistics = resourceManager.getStatistics(name, timestamp);
+            String statistics = concurrencyManager.getCounters(name).toString();
             
             if(statistics == null) {
                 
@@ -690,7 +931,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             }
             
             // await its completion.
-            return submitAndGetResult(task);
+            return concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -716,7 +957,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
                     flags, filter);
     
             // submit the task and wait for it to complete.
-            return (ResultSet) submitAndGetResult(task);
+            return (ResultSet) concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -734,6 +975,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * @todo this should be run on the read service.
      * 
      * @todo coordinate close out of stores.
+     * 
+     * @todo efficient (stream-based) read from the journal (IBlockStore API).
+     *       This is a fully buffered read and will cause heap churn.
      */
     public IBlock readBlock(IResourceMetadata resource, final long addr) {
 
@@ -745,6 +989,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         setupLoggingContext();
 
+        final long begin = System.nanoTime();
+        
         try {
             
             final IRawStore store = resourceManager.openStore(resource.getUUID());
@@ -753,31 +999,39 @@ abstract public class DataService implements IDataService, IWritePipeline,
     
                 log.warn("Resource not available: " + resource);
     
+                counters.readBlockErrorCount++;
+
                 throw new IllegalStateException("Resource not available");
     
             }
     
-            // @todo efficient (stream-based) read from the journal (IBlockStore
-            // API).  This is a fully buffered read and will cause heap churn.
-    
+            final int byteCount = store.getByteCount(addr);
+            
             return new IBlock() {
     
                 public long getAddress() {
+                    
                     return addr;
+                    
                 }
     
                 // @todo reuse buffers
                 public InputStream inputStream() {
     
+                    // this is when it actually reads the data.
                     ByteBuffer buf = store.read(addr);
-    
+
+                    // #of bytes buffered.
+                    counters.readBlockBytes += byteCount;
+
+                    // caller will read from this object.
                     return new ByteBufferInputStream(buf);
     
                 }
     
                 public int length() {
     
-                    return store.getByteCount(addr);
+                    return byteCount;
     
                 }
     
@@ -785,6 +1039,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
         } finally {
             
+            counters.readBlockCount++;
+
+            counters.readBlockNanos = System.nanoTime() - begin;
+
             clearLoggingContext();
             
         }

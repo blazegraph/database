@@ -47,7 +47,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.journal.ConcurrencyManager.Options;
+import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
@@ -340,7 +340,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface TestOptions extends ConcurrencyManager.Options {
+    public static interface TestOptions extends Options {
         
         /**
          * The timeout for the test (seconds).

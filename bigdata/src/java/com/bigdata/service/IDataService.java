@@ -342,7 +342,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * 
      * @throws IOException
      */
-    public String getStatistics(String name, long timestamp)
+    public String getStatistics(String name)
             throws IOException, InterruptedException, ExecutionException;
         
     /**

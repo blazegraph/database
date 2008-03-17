@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ICounterSet {
+public interface ICounterSet extends ICounterNode {
 
     /**
      * Separator for path name components.
@@ -56,82 +56,78 @@ public interface ICounterSet {
      */
     public Iterator<ICounter> getCounters(Pattern filter);
     
+    
+//    /**
+//     * Return the {@link ICounterSet} under which the counter with the specified
+//     * path would exist.
+//     * 
+//     * @param path
+//     *            The path of the counter.
+//     * 
+//     * @return The parent to under which a counter having that path would be
+//     *         found -or- <code>null</code> if there is no such parent.
+//     */
+//    public ICounterSet getCounterSetByPath(String path);
+    
+//    /**
+//     * Return the matching {@link ICounter} object by path from anywhere in the
+//     * spanned hierarchy.
+//     * 
+//     * @param path
+//     *            The counter path. The path MAY be relative to this
+//     *            {@link ICounterSet}.
+//     * 
+//     * @return The {@link ICounter} object.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the path is <code>null</code>
+//     * @throws IllegalArgumentException
+//     *             if the path is an empty string.
+//     */
+//    public ICounter getCounterByPath(String path);
+//
+//    /**
+//     * Return the named directly attached {@link ICounterSet}.
+//     * 
+//     * @param name
+//     *            The name of the directly attached {@link ICounterSet}.
+//     *            
+//     * @return The directly attached {@link ICounterSet} -or- <code>null</code>
+//     *         iff there is no such {@link ICounterSet} attached as a direct
+//     *         child.
+//     */
+//    public ICounterSet getCounterSetByName(String name);
+    
     /**
-     * Return the directly attached {@link Counter} object by name.
-     * 
-     * @param name
-     *            The counter name.
-     *            
-     * @return The {@link Counter} object.
-     */
-    public ICounter getCounterByName(String name);
-
-    /**
-     * Return the {@link ICounterSet} under which the counter with the specified
-     * path would exist.
+     * Adds any necessary {@link ICounterSet}s described in the path (ala
+     * mkdirs).
      * 
      * @param path
-     *            The path of the counter.
+     *            The path (may be relative or absolute).
      * 
-     * @return The parent to under which a counter having that path would be
-     *         found -or- <code>null</code> if there is no such parent.
+     * @return The {@link ICounterSet} described by the path.
+     * 
+     * @throws IllegalArgumentException
+     *             if the path is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the path is an empty string.
      */
-    public ICounterSet getParentByPath(String path);
+    public ICounterSet makePath(String path);
     
     /**
-     * Return the matching {@link ICounter} object by path from anywhere in the
-     * spanned hierarchy.
-     * 
-     * @param path
-     *            The counter path. The path MAY be relative to this
-     *            {@link ICounterSet}.
-     * 
-     * @return The {@link ICounter} object.
+     * A human readable representation of all counters in the hierarchy together
+     * with their current value.
      */
-    public ICounter getCounterByPath(String path);
+    public String toString();
 
     /**
-     * The immediate parent in the hierarchy -or- <code>null</code> iff this
-     * is the root of the hierarchy.
-     */
-    public ICounterSet getParent();
-
-    /**
-     * Return the named directly attached {@link ICounterSet}.
+     * A human readable representation of all counters in the hierarchy together
+     * with their current value.
      * 
-     * @param name
-     *            The name of the directly attached {@link ICounterSet}.
-     *            
-     * @return The directly attached {@link ICounterSet} -or- <code>null</code>
-     *         iff there is no such {@link ICounterSet} attached as a direct
-     *         child.
+     * @param filter
+     *            An optional filter that will be used to select only specific
+     *            counters.
      */
-    public ICounterSet getCounterSetByName(String name);
-    
-    /**
-     * Name of this set of counters (does not include the path from the root).
-     */
-    public String getName();
-    
-    /**
-     * Complete path from the root inclusive of the name of this set of
-     * counters.
-     */
-    public String getPath();
-    
-    /**
-     * The root set of counters.
-     */
-    public ICounterSet getRoot();
-    
-    /**
-     * <code>true</code> iff there are no children.
-     */
-    public boolean isLeaf();
-    
-    /**
-     * <code>true</code> iff this is the root of the hierarchy.
-     */
-    public boolean isRoot();
-    
+    public String toString(Pattern filter);
+
 }

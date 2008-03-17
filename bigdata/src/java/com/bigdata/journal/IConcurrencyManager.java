@@ -36,6 +36,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ConcurrencyManager.Options;
 
 /**
@@ -76,11 +77,9 @@ public interface IConcurrencyManager {
     public void shutdownNow();
 
     /**
-     * Return statistics about the {@link ConcurrencyManager}.
-     * 
-     * @todo use XML or Object to send data.
+     * Return declared counters.
      */
-    public String getStatistics();
+    public ICounterSet getCounters();
     
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
