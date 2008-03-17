@@ -48,6 +48,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
+import com.bigdata.journal.ConcurrencyManager.TaskCounters;
 
 /**
  * Abstract base class for tasks that may be submitted to an
@@ -211,9 +212,19 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     boolean aborted = false;
     
     /**
-     * The time at which this task was created.
+     * The {@link AbstractTask} increments various counters of interest to the
+     * {@link ConcurrencyManager} using this object.
      */
-    public long nanoTime_createTask;
+    final TaskCounters counters;
+    
+    /*
+     * Timing data for this task.
+     */
+    
+    /**
+     * The time at which this task was submitted to the {@link ConcurrencyManager}.
+     */
+    public long nanoTime_submitTask;
     
     /**
      * The time at which this task was assigned to a worker thread for
@@ -361,6 +372,8 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             readOnly = tx.isReadOnly();
             
+            counters = this.concurrencyManager.countersTX;
+            
         } else if (timestamp < ITx.UNISOLATED) {
 
             /*
@@ -376,6 +389,9 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             tx = null;
             
             readOnly = true;
+
+            counters = (timestamp == ITx.READ_COMMITTED) ? this.concurrencyManager.countersRC
+                    : this.concurrencyManager.countersHR;
             
         } else {
 
@@ -387,10 +403,10 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             readOnly = false;
 
+            counters = this.concurrencyManager.countersU;
+            
         }
 
-        nanoTime_createTask = System.nanoTime();
-        
     }
 
     /**
@@ -562,6 +578,44 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * @todo document other exceptions that can be thrown here.
      */
     final public Object call() throws Exception {
+        
+        try {
+
+            /*
+             * Increment by the amount of time that the task waited on the queue
+             * before it began to execute.
+             */
+            counters.workerNanoLatency += (System.nanoTime() - nanoTime_submitTask);
+            
+            Object ret = call2();
+
+            counters.successCount++;
+
+            return ret;
+
+        } catch(Exception e) {
+            
+            /*
+             * Note: covers RuntimeException, just not Throwable and the Error
+             * hierarchy (which you are not supposed to catch).
+             */
+            
+            counters.failCount++;
+            
+            throw e;
+            
+        } finally {
+
+            counters.taskCount++;
+            
+            // increment by the amount of time that the task was executing.
+            counters.workerNanoTime += (nanoTime_finishedWork - nanoTime_beginWork);
+            
+        }
+
+    }
+
+    final private Object call2() throws Exception {
 
         nanoTime_assignedWorker = System.nanoTime();
 
@@ -648,7 +702,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             log.info("done: "+this);
 
         }
-        
+
     }
     
     /**
@@ -672,7 +726,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
         lockManager.addResource(resource);
 
         // delegate will handle lock acquisition and invoke doTask().
-        Callable<Object> delegate = new LockManagerTask<String>(lockManager,
+        LockManagerTask<String> delegate = new LockManagerTask<String>(lockManager,
                 resource, new InnerWriteServiceCallable(this));
         
         final WriteExecutorService writeService = concurrencyManager.getWriteService();
@@ -685,36 +739,41 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             final Object ret;
             
-//            try {
+            /*
+             * Note: The lock(s) are only held during this call. By the time the
+             * call returns any lock(s) have been released. Locks MUST be
+             * released as soon as the task is done writing so that it does NOT
+             * hold locks while it is awaiting commit. This make it possible for
+             * other operations to write on the same index in the same commit
+             * group.
+             */
 
-                /*
-                 * Note: The lock(s) are only held during this call. By the time
-                 * the call returns any lock(s) have been released. Locks MUST
-                 * be released as soon as the task is done writing so that it
-                 * does NOT hold locks while it is awaiting commit. This make it
-                 * possible for other operations to write on the same index in
-                 * the same commit group.
-                 */
+            try {
 
                 ret = delegate.call();
-
-                if(Thread.interrupted()) {
-                    
-                    throw new InterruptedException();
-                    
-                }
-
-                // set flag.
-                ran = true;
                 
-                log.info("Task Ok: class="+this);
+            } finally {
                 
-//            } finally {
-//
-//                clearIndexCache();
-//                
-//            }
-            
+                /*
+                 * Increment by the amount of time that the task was waiting to
+                 * acquire its lock(s).
+                 */
+
+                counters.workerLockLatency += delegate.getLockLatency();
+                
+            }
+
+            if (Thread.interrupted()) {
+
+                throw new InterruptedException();
+
+            }
+
+            // set flag.
+            ran = true;
+
+            log.info("Task Ok: class=" + this);
+                      
             /*
              * Note: The WriteServiceExecutor will await a commit signal before
              * the thread is allowed to complete. This ensures that the caller

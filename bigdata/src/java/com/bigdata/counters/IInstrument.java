@@ -29,6 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters;
 
 /**
+ * Interface used to construct a counter that reports on an instrumented value.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -37,5 +39,4 @@ public interface IInstrument<T> {
     /** Obtain a sample. */
     public T getValue();
     
-
 }

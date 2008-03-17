@@ -64,6 +64,8 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -931,6 +933,43 @@ abstract public class ResourceManager implements IResourceManager {
     public boolean isOverflowAllowed() {
         
         return overflowAllowed.get();
+        
+    }
+    
+    private CounterSet countersRoot;
+    
+    /**
+     * Return the {@link CounterSet}.
+     */
+    synchronized public CounterSet getCounters() {
+        
+        if (countersRoot == null) {
+
+            countersRoot = new CounterSet();
+
+            countersRoot.addCounter("Overflow Count", new Instrument<Long>(){
+                public Long getValue() {return overflowCounter.get();}
+            });
+
+            countersRoot.addCounter("Overflow Allowed", new Instrument<Boolean>(){
+                public Boolean getValue() {return overflowAllowed.get();}
+            });
+
+            countersRoot.addCounter("Minimum Release Age", new Instrument<Long>(){
+                public Long getValue() {return minReleaseAge;}
+            });
+
+            countersRoot.addCounter("Release Time", new Instrument<Long>(){
+                public Long getValue() {return releaseTime;}
+            });
+
+            countersRoot.addCounter("Effective Release Time", new Instrument<Long>(){
+                public Long getValue() {return lastEffectiveReleaseTime;}
+            });
+
+        }
+        
+        return countersRoot;
         
     }
     
@@ -3143,7 +3182,7 @@ abstract public class ResourceManager implements IResourceManager {
 
         }
 
-        System.err.println("doOverflow(): firstCommitTime=" + firstCommitTime
+        log.warn("\ndoOverflow(): firstCommitTime=" + firstCommitTime
                 + "\nfile=" + newJournal.getFile()
                 + "\npre-condition views: overflowCounter="
                 + overflowCounter.get() + "\n"
@@ -3151,6 +3190,10 @@ abstract public class ResourceManager implements IResourceManager {
 
         /*
          * Close out the old journal.
+         * 
+         * FIXME This MUST NOT "close" the old journal or we can trash
+         * concurrent readers. Note that we only have an exclusive lock on the
+         * writeService, NOT the readService or the txWriteService.
          */
         {
             
@@ -3540,34 +3583,43 @@ abstract public class ResourceManager implements IResourceManager {
      */
     protected long getEffectiveReleaseTime() {
 
-        if(minReleaseAge==0L) {
-            
+        final long effectiveReleaseTime;
+        
+        if (minReleaseAge == 0L) {
+
             log.info("Immortal database - resoureces will NOT be released");
 
-            return 0L;
-            
-        }
-        
-        final long t1 = nextTimestamp() - minReleaseAge;
-
-        final long t;
-        if (releaseTime == 0L) {
-
-            log.warn("Release time has not been set.");
-            
-            t = t1;
+            effectiveReleaseTime = 0L;
             
         } else {
-            
-            final long t2 = getEarliestDependencyTimestamp(releaseTime);
+        
+            final long t1 = nextTimestamp() - minReleaseAge;
 
-            t = Math.min(t1, t2);
-            
+            final long t;
+            if (releaseTime == 0L) {
+
+                log.warn("Release time has not been set.");
+
+                t = t1;
+
+            } else {
+
+                final long t2 = getEarliestDependencyTimestamp(releaseTime);
+
+                t = Math.min(t1, t2);
+
+            }
+        
+            effectiveReleaseTime = t;
+        
         }
-
-        return t;
+        
+        lastEffectiveReleaseTime = effectiveReleaseTime;
+        
+        return effectiveReleaseTime;
         
     }
+    private long lastEffectiveReleaseTime;
     
     /**
      * Finds the journal covering the specified timestamp, lookups up the commit

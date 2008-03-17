@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.ConcurrencyManager.Options;
+import com.bigdata.journal.Journal.Options;
 
 /**
  * Test suite for {@link RegisterIndexTask} and {@link DropIndexTask}.
@@ -123,8 +123,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
             journal.shutdown();
 
-            properties.setProperty(ConcurrencyManager.Options.CREATE_TEMP_FILE,"false");
-            properties.setProperty(ConcurrencyManager.Options.FILE,journal.getFile().toString());
+            properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+            properties.setProperty(Options.FILE,journal.getFile().toString());
 
             journal = new Journal(properties);
             

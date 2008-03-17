@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -29,7 +28,13 @@ import com.bigdata.btree.Counters;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.Instrument.InstrumentDelta;
+import com.bigdata.counters.Instrument.InstrumentInstantaneousAverage;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataService.StatusTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -120,7 +125,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options {
+    public static interface Options {
     
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool
@@ -220,21 +225,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
         public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
         
         /**
-         * The delay between scheduled invocations of the {@link StatusTask}.
-         * 
-         * @todo Who should be running the {@link StatusTask}? Perhaps the
-         *       {@link DataService}?
-         * 
-         * @see #DEFAULT_STATUS_DELAY
-         */
-        public final static String STATUS_DELAY = "statusDelay";
-        
-        /**
-         * The default {@link #STATUS_DELAY}.
-         */
-        public final static String DEFAULT_STATUS_DELAY = "10000";
-    
-        /**
          * The maximum time in milliseconds that
          * {@link ConcurrencyManager#shutdown()} will wait termination of the
          * various services -or- ZERO (0) to wait forever (default is to wait
@@ -303,7 +293,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Once the transaction has acquired those writable indices it then runs its
      * commit phrase as an unisolated operation on the {@link #writeService}.
      */
-    final protected ExecutorService txWriteService;
+    final protected ThreadPoolExecutor txWriteService;
 
     /**
      * Pool of threads for handling concurrent unisolated read operations on
@@ -321,7 +311,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * historical commit records (which may span more than one logical
      * journal) until the reader terminates.
      */
-    final protected ExecutorService readService;
+    final protected ThreadPoolExecutor readService;
 
     /**
      * Pool of threads for handling concurrent unisolated write operations on
@@ -335,17 +325,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * gaining an exclusive lock on the unisolated named index.
      */
     final protected WriteExecutorService writeService;
-
-    /**
-     * Runs a {@link StatusTask} printing out periodic service status
-     * information (counters).
-     */
-    final protected ScheduledExecutorService statusService;
-    
-    /**
-     * Used to emit a final status message during shutdown.
-     */
-    final private StatusTask statusTask;
 
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -496,23 +475,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
             log.warn("Interrupted awaiting write service termination.", ex);
             
         }
-
-        // shutdown the status service, but don't wait for it.
-        {
-
-            log.info("Shutting down the status service");
-
-            statusService.shutdown();
-            
-        }
-
-        // final status message.
-//        statusTask.run();
-//        System.err.println(getStatistics());
     
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms : "+getStatistics());
+        log.info("Done: elapsed="+elapsed+"ms");
         
     }
 
@@ -538,15 +504,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         writeService.shutdownNow();
 
-        statusService.shutdownNow();
-
-        // final status message.
-//        statusTask.run();
-//        System.err.println(statusTask.status());
-
         final long elapsed = System.currentTimeMillis() - begin;
         
-        log.info("Done: elapsed="+elapsed+"ms : "+getStatistics());
+        log.info("Done: elapsed="+elapsed+"ms");
 
     }
 
@@ -647,12 +607,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
         }
 
         // setup thread pool for concurrent transactions.
-        txWriteService = Executors.newFixedThreadPool(txServicePoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
+        txWriteService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+                txServicePoolSize, DaemonThreadFactory.defaultThreadFactory());
 
         // setup thread pool for unisolated read operations.
-        readService = Executors.newFixedThreadPool(readServicePoolSize,
-                DaemonThreadFactory.defaultThreadFactory());
+        readService = (ThreadPoolExecutor) Executors
+                .newFixedThreadPool(readServicePoolSize, DaemonThreadFactory
+                        .defaultThreadFactory());
 
         // setup thread pool for unisolated write operations.
         {
@@ -783,158 +744,245 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
         
-        // setup scheduled runnable for periodic status messages.
-        {
-
-            final long initialDelay = 100;
-            
-            final long delay = Long.parseLong(properties.getProperty(
-                    ConcurrencyManager.Options.STATUS_DELAY,
-                    ConcurrencyManager.Options.DEFAULT_STATUS_DELAY));
-
-            log.info(ConcurrencyManager.Options.STATUS_DELAY + "=" + delay);
-            
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            statusService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
-            
-            statusTask = newStatusTask();
-            
-            statusService.scheduleWithFixedDelay(statusTask, initialDelay,
-                    delay, unit);
-
-        }
-
     }
 
+    private CounterSet countersRoot;
+    
     /**
-     * Factory allows subclasses to extend the {@link StatusTask}.
+     * Return the {@link CounterSet}.
      */
-    protected StatusTask newStatusTask() {
-
-        assertOpen();
+    synchronized public CounterSet getCounters() {
         
-        return new StatusTask();
+        if (countersRoot == null){
 
-    }
+            countersRoot = new CounterSet();
 
-    /**
-     * Writes out periodic status information.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
-    public class StatusTask implements Runnable {
-
-        /**
-         * Note: The logger is named for this class, but since it is an inner
-         * class the name uses a "$" delimiter (vs a ".") between the outer and
-         * the inner class names.
-         */
-        protected final Logger log = Logger.getLogger(StatusTask.class);
-
-        public StatusTask() {
+            // elapsed time since the service started (milliseconds).
+            countersRoot.addCounter("elapsed", new Instrument<Long>(){
+                public Long getValue() {
+                    return System.currentTimeMillis() - serviceStartTime;
+                }
+            });
             
-//            System.err.println("class="+this.getClass().getName());
+            /*
+             * task statistics by class.
+             */
+            {
+
+                countersRoot.makePath("/Tasks/Unisolated").attach(countersU
+                        .createCounters());
+
+                countersRoot.makePath("/Tasks/ReadCommitted").attach(countersRC
+                        .createCounters());
+
+                countersRoot.makePath("/Tasks/Historical Read").attach(countersHR
+                        .createCounters());
+
+                countersRoot.makePath("/Tasks/Transaction").attach(countersTX
+                        .createCounters());
+
+            }
+            // readService
+            {
+                
+                final CounterSet tmp = countersRoot.makePath("Read Service");
+                
+                final ThreadPoolExecutor service = readService;
+            
+                tmp.addCounter("#active",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getActiveCount();
+                            }
+                        });
+                
+                tmp.addCounter("#queued",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getQueue().size();
+                            }
+                        });
+
+                tmp.addCounter("#completed",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getCompletedTaskCount();
+                            }
+                        });
+                
+                tmp.addCounter("poolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getPoolSize();
+                            }
+                        });
+
+                tmp.addCounter("largestPoolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getLargestPoolSize();
+                            }
+                        });
+
+            }
+
+            // txWriteService
+            {
+                
+                final CounterSet tmp = countersRoot.makePath("Transaction Write Service");
+                
+                final ThreadPoolExecutor service = txWriteService;
+            
+                tmp.addCounter("#active",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getActiveCount();
+                            }
+                        });
+                
+                tmp.addCounter("#queued",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getQueue().size();
+                            }
+                        });
+
+                tmp.addCounter("#completed",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getCompletedTaskCount();
+                            }
+                        });
+                
+                tmp.addCounter("poolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getPoolSize();
+                            }
+                        });
+
+                tmp.addCounter("largestPoolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getLargestPoolSize();
+                            }
+                        });
+
+            }
+            
+            // writeService
+            {
+                
+                final CounterSet tmp = countersRoot.makePath("Unisolated Write Service");
+                
+                final WriteExecutorService service = writeService;
+            
+                tmp.addCounter("#active",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getActiveCount();
+                            }
+                        });
+                
+                tmp.addCounter("#queued",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getQueue().size();
+                            }
+                        });
+
+                tmp.addCounter("#completed",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getCompletedTaskCount();
+                            }
+                        });
+                
+                tmp.addCounter("poolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getPoolSize();
+                            }
+                        });
+
+                tmp.addCounter("largestPoolSize",
+                        new Instrument<Integer>() {
+                            public Integer getValue() {
+                                return service.getLargestPoolSize();
+                            }
+                        });
+
+                /*
+                 * data only available for the write service.
+                 */
+                tmp.addCounter("#commits",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getGroupCommitCount();
+                            }
+                        });
+
+                tmp.addCounter("#aborts",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getAbortCount();
+                            }
+                        });
+
+                tmp.addCounter("overflowCount",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getOverflowCount();
+                            }
+                        });
+
+                tmp.addCounter("failedTaskCount",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getFailedTaskCount();
+                            }
+                        });
+
+                tmp.addCounter("successTaskCount",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getSuccessTaskCount();
+                            }
+                        });
+
+                tmp.addCounter("committedTaskCount",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getCommittedTaskCount();
+                            }
+                        });
+
+                tmp.addCounter("maxLatencyUntilCommit",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getMaxLatencyUntilCommit();
+                            }
+                        });
+
+                tmp.addCounter("maxCommitLatency",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getMaxCommitLatency();
+                            }
+                        });
+
+                tmp.addCounter("maxRunning",
+                        new Instrument<Long>() {
+                            public Long getValue() {
+                                return service.getMaxRunning();
+                            }
+                        });
+
+            }
             
         }
         
-        public void run() {
-
-            final String s = getStatistics();
-            
-//            System.err.println( s );
-            
-            log.info( s );
-            
-        }
-
-    }
-
-    /**
-     * Information on the {@link ConcurrencyManager}.
-     * 
-     * @todo format into a nicer tabular display.
-     * @todo measure the maximum latency for a task to begin execution.
-     * @todo measure the #of tasks that are retried.
-     * @todo measure the maximum latency for a task from submit to commit.
-     * @todo report averages also, not just maximums.
-     */
-    public String getStatistics() {
-
-        final long elapsed = System.currentTimeMillis() - serviceStartTime;
-
-        StringBuilder sb = new StringBuilder();
-        
-        // high level.
-        sb.append(getClass().getSimpleName()+" status: elapsed=" + elapsed+"\n");
-        
-        // txService (#active,#queued,#completed,poolSize)
-        sb.append("transactions=("
-                + ((ThreadPoolExecutor) txWriteService).getQueue().size()
-                + ","
-                + ((ThreadPoolExecutor) txWriteService).getActiveCount()
-                + ","
-                + ((ThreadPoolExecutor) txWriteService)
-                        .getCompletedTaskCount()
-                + ","
-                + ((ThreadPoolExecutor) txWriteService)
-                        .getPoolSize()
-                + ")\n");
-        
-        // readService (#active,#queued,#completed,poolSize)
-        sb.append(
-                "readers=("
-                + ((ThreadPoolExecutor) readService).getQueue().size()
-                + ","
-                + ((ThreadPoolExecutor) readService).getActiveCount()
-                + ","
-                + ((ThreadPoolExecutor) readService)
-                        .getCompletedTaskCount()
-                + ","
-                + ((ThreadPoolExecutor) readService)
-                        .getPoolSize()
-                + ")\n"
-                );
-        
-        // writeService (#active,#queued,#completed,poolSize)
-        sb.append("writers=("
-                + ((ThreadPoolExecutor) writeService).getQueue().size()
-                + ","
-                + ((ThreadPoolExecutor) writeService).getActiveCount()
-                + ","
-                + ((ThreadPoolExecutor) writeService)
-                        .getCompletedTaskCount()
-                + ","
-                + ((ThreadPoolExecutor) writeService)
-                        .getPoolSize()
-                + ")\n"
-                );
-        
-        // more detail on the write service.
-        sb.append(  "writeService"+
-                  ": ncommits="+ writeService.getGroupCommitCount()
-                + ", naborts=" + writeService.getAbortCount()
-                + ", noverflow="+writeService.getOverflowCount()
-                + ", failedTasks="+writeService.getFailedTaskCount()
-                + ", successTasks="+writeService.getSuccessTaskCount()
-                + ", committedTasks="+writeService.getCommittedTaskCount()
-                + ", maxLatencyUntilCommit="+ writeService.getMaxLatencyUntilCommit()
-                + ", maxCommitLatency="+ writeService.getMaxCommitLatency()
-                + ", maxRunning="+ writeService.getMaxRunning()
-                + ", maxPoolSize="+ writeService.getMaxPoolSize()
-                + ", paused=" + writeService.isPaused()
-                + ", terminated="+writeService.isTerminated()
-                + ", terminating="+writeService.isTerminating()
-                + ", isShutdown="+writeService.isShutdown()
-                + ", lock{locked="+writeService.lock.isLocked()+",queueLength="+writeService.lock.getQueueLength()+"}"
-                + "\n"
-                );
-        
-        return sb.toString();
+        return countersRoot;
         
     }
 
@@ -993,14 +1041,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *                queue has a limited capacity and is full)
      * @exception NullPointerException
      *                if task null
-     * 
-     * @todo we may need to define our own subclasses for the read and tx
-     *       services as well in order to collect metrics on task latency (from
-     *       submit to completion).
      */
     public Future<Object> submit(AbstractTask task) {
 
         assertOpen();
+        
+        // Note that time the task was submitted for execution.
+        task.nanoTime_submitTask = System.nanoTime();
         
         if( task.readOnly ) {
 
@@ -1330,10 +1377,202 @@ public class ConcurrencyManager implements IConcurrencyManager {
         
     }
 
+    /*
+     * Per task counters.
+     */
+
+    /**
+     * Class captures various data about the execution of tasks. These data are
+     * collected by the {@link ConcurrencyManager} in four groups corresponding
+     * to {@link ITx#UNISOLATED}, {@link ITx#READ_COMMITTED}, read historical,
+     * and transaction tasks.
+     */
+    static public class TaskCounters {
+
+        /** #of tasks executed. */
+        public long taskCount;
+        
+        /** #of tasks that failed. */
+        public long failCount;
+
+        /** #of tasks that succeeded. */
+        public long successCount;
+        
+        /**
+         * Cumulative elapsed time while tasks await assignment to a worker
+         * thread.
+         * <p>
+         * Note: Since this is aggregated over concurrent tasks the reported
+         * elapsed time MAY exceed the actual elapsed time during which those
+         * tasks were executed.
+         */
+        public long workerNanoLatency;
+
+        /**
+         * Cumulative elapsed time consumed by tasks while assigned to a worker
+         * thread.
+         * <p>
+         * Note: Since this is aggregated over concurrent tasks the reported
+         * elapsed time MAY exceed the actual elapsed time during which those
+         * tasks were executed.
+         */
+        public long workerNanoTime;
+
+        /**
+         * Cumulative elapsed time consumed by tasks while waiting for an
+         * resource lock.
+         * <p>
+         * Note: this value will only be non-zero for {@link ITx#UNISOLATED}
+         * tasks since they are the only tasks that wait for locks.
+         */
+        public long workerLockLatency;
+        
+        /** Ctor */
+        public TaskCounters() {
+            
+        }
+        
+        /**
+         * Adds counters to this set.
+         */
+        public void add(TaskCounters c) {
+            
+            taskCount += c.taskCount;
+            
+            failCount += c.failCount;
+            
+            successCount += c.successCount;
+            
+            workerNanoTime += c.workerNanoTime;
+            
+            workerNanoLatency += c.workerNanoLatency;
+
+            workerLockLatency += c.workerLockLatency;
+                
+        }
+        
+        /**
+         * Creates an {@link CounterSet} that reports on the counters in this
+         * {@link TaskCounters} object.
+         * 
+         * @return The new {@link CounterSet}.
+         */
+        public CounterSet createCounters() {
+
+            CounterSet root = new CounterSet();
+
+            /*
+             * direct reporting counters.
+             */
+            
+            root.addCounter("taskCount", new Instrument<Long>() {
+                public Long getValue() {
+                    return taskCount;
+                }
+            });
+
+            root.addCounter("failCount", new Instrument<Long>() {
+                public Long getValue() {
+                    return failCount;
+                }
+            });
+
+            root.addCounter("successCount", new Instrument<Long>() {
+                public Long getValue() {
+                    return successCount;
+                }
+            });
+
+            /*
+             * counter per second.
+             */
+            
+            root.addCounter("Average Tasks Per Second", new InstrumentDelta() {
+                protected long sample() {
+                    return taskCount;
+                }
+            });
+
+            /*
+             * The sample period.
+             * 
+             * @todo this is one second. A longer sample period is going to
+             * produce more stable results, e.g., 60 seconds, but you have to be
+             * running the service for at least that long to get your first
+             * sample.
+             */
+            final long samplePeriod = 1;
+            final TimeUnit samplePeriodUnits = TimeUnit.SECONDS;
+            
+            // Scaling factor converts nanoseconds to milliseconds.
+            final double scalingFactor = 1d / TimeUnit.NANOSECONDS.convert(1,
+                    TimeUnit.MILLISECONDS);
+            
+            /*
+             * Instantaneous average latency in milliseconds until a task begins
+             * to execute in a given sample period.
+             */
+            root.addCounter("Average Task Latency", new InstrumentInstantaneousAverage(
+                    samplePeriod, samplePeriodUnits, scalingFactor) {
+                protected long sampleEventCounter() {return taskCount;}
+                protected long sampleCumulativeEventTime() {return workerNanoLatency;}
+            });
+
+            /*
+             * Instantaneous average latency in milliseconds of the time that a
+             * task is waiting for exclusive locks (zero unless the task is
+             * unisolated).
+             */
+            root.addCounter("Average Lock Latency", new InstrumentInstantaneousAverage(
+                    samplePeriod, samplePeriodUnits, scalingFactor) {
+                protected long sampleEventCounter() {return taskCount;}
+                protected long sampleCumulativeEventTime() {return workerLockLatency;}
+            });
+
+            /*
+             * Instantaneous average latency in milliseconds of the time that a
+             * task is assigned to a worker thread.
+             */
+            root.addCounter("Average Task Time", new InstrumentInstantaneousAverage(
+                    samplePeriod, samplePeriodUnits, scalingFactor) {
+                protected long sampleEventCounter() {return taskCount;}
+                protected long sampleCumulativeEventTime() {return workerNanoTime;}
+            });
+
+            return root;
+
+        }
+        
+    }
+
+    /** Counters for {@link ITx#UNISOLATED} tasks. */
+    public TaskCounters countersU  = new TaskCounters();
+    
+    /** Counters for {@link ITx#READ_COMMITTED} tasks. */
+    public TaskCounters countersRC = new TaskCounters();
+    
+    /** Counters for transactions tasks. */
+    public TaskCounters countersTX = new TaskCounters();
+    
+    /** Counters for historical read tasks. */
+    public TaskCounters countersHR = new TaskCounters();
+    
+    /*
+     * Per index counters.
+     */
+    
     private Map<String/* name */, Counters> indexCounters = new HashMap<String, Counters>();
 
     private Counters totalCounters = new Counters();
     
+    /**
+     * Return the aggregated counters for all named indices accessed by an
+     * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
+     * {@link ITx#READ_COMMITTED} isolation since the {@link #resetCounters()}
+     * was last invoked (typically at the last journal overflow event).
+     * 
+     * @see ResourceManager#overflow()
+     */
     public Counters getTotalCounters() {
         
         synchronized(totalCounters) {
@@ -1343,7 +1582,33 @@ public class ConcurrencyManager implements IConcurrencyManager {
         }
         
     }
-    
+
+    /**
+     * Return the aggregated counters for the named index as accessed by an
+     * {@link AbstractTask} with either {@link ITx#UNISOLATED} or
+     * {@link ITx#READ_COMMITTED} isolation.
+     * <p>
+     * Note: The per-index counters are reset by {@link #resetCounters()}
+     * 
+     * @param name
+     *            The name of the index.
+     *            
+     * @return The counters for that index -or- <code>null</code> if the index
+     *         has not been accessed by an {@link AbstractTask} with either
+     *         {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation
+     *         since the counters were last reset.
+     */
+    public Counters getCounters(String name) {
+        
+        return indexCounters.get(name);
+        
+    }
+
+    /**
+     * Return and then reset the total and per-index counters for each named
+     * indices accessed by an {@link AbstractTask} with either
+     * {@link ITx#UNISOLATED} or {@link ITx#READ_COMMITTED} isolation.
+     */
     public Map<String/* name */, Counters> resetCounters() {
 
         final Map<String,Counters> tmp;

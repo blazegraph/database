@@ -29,23 +29,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters;
 
 /**
- * @todo resolve tension between a counter, a variable, a sample, a
- *       sampling period, a sampling rate, whether and when samples
- *       are cleared, etc.
+ * Interface for a sampled counter.
  *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <T>
  */
-public interface ICounter<T> extends IInstrument<T> {
+public interface ICounter<T> extends ICounterNode, IInstrument<T> {
+ 
+    public IInstrument<T> getInstrument();
     
-    /** The parent under which this counter is located. */
-    public ICounterSet getParent();
-    
-    /** The counter name. */
-    public String getName();
-
-    /** The fully qualified name for the counter. */
-    public String getPath();
-
 }

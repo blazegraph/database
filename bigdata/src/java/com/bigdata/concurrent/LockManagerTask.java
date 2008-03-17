@@ -95,6 +95,17 @@ public class LockManagerTask<R extends Comparable<R>> implements
     }
 
     /**
+     * The amount of the that the task waited to acquire its locks (in
+     * nanoseconds).
+     */
+    public long getLockLatency() {
+        
+        return nanoTime_lockLatency;
+        
+    }
+    private long nanoTime_lockLatency;
+    
+    /**
      * The maximum #of times that the task will attempt to acquire its locks
      * (positive integer).
      */
@@ -153,7 +164,8 @@ public class LockManagerTask<R extends Comparable<R>> implements
 
         }
 
-        if(target==null) throw new NullPointerException();
+        if (target == null)
+            throw new NullPointerException();
         
         this.lockManager = lockManager;
 
@@ -233,6 +245,8 @@ public class LockManagerTask<R extends Comparable<R>> implements
      */
     final public Object call() throws Exception {
 
+        final long nanoTime_beforeLock = System.nanoTime();
+        
         // start.
         lockManager.didStart(this);
 
@@ -274,6 +288,13 @@ public class LockManagerTask<R extends Comparable<R>> implements
             // rethrow (masquerade the exception).
             throw new RuntimeException(t);
 
+        } finally {
+
+            /*
+             * The amount of time that the task waited to acquire its locks.
+             */
+            nanoTime_lockLatency = System.nanoTime() - nanoTime_beforeLock;
+            
         }
 
         /*

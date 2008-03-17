@@ -58,7 +58,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.DefaultSplitHandler;
-import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.DataService.Options;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
@@ -158,6 +158,9 @@ public class StressTestConcurrent extends
 
         // enable moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
+        
+        // @todo return to default.
+        properties.setProperty(Options.STATUS_DELAY,"3000");
         
         // disable overflow processing
 //        properties.setProperty(Options.OVERFLOW_ENABLED,"false");

@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -41,7 +42,6 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.AbstractStatisticsCollector.IRequiredHostCounters;
-import com.bigdata.counters.AbstractStatisticsCollector.StatisticsCollectorForWindows;
 import com.bigdata.journal.IJournal;
 
 /**
@@ -54,7 +54,11 @@ import com.bigdata.journal.IJournal;
  *       they have for their platform(s) that seems to best support
  *       decision-making and can apply rules for their platforms, environment,
  *       and applications which provide the best overall QOS.
- * 
+ *       <p>
+ *       Clients should have WARN and URGENT notices, perhaps posting the
+ *       counters on which they base their decisions.  The client-side rules for
+ *       those alerts should be configurable/pluggable/declarative.
+ *       
  * @see http://www.google.com/search?hl=en&q=load+balancing+jini
  * 
  * @todo begin simply, with what we can and need to collect in order to identify
@@ -103,49 +107,6 @@ import com.bigdata.journal.IJournal;
  * @todo performance testing links: Grinder, etc.
  *       <p>
  *       http://www.opensourcetesting.org/performance.php
- * 
- * iostat
- * 
- * <pre>
- *         Linux 2.6.18-1.2798.fc6 (dp-aether1.dpp2.org)   03/03/2008
- *         
- *         avg-cpu:  %user   %nice %system %iowait  %steal   %idle
- *                    5.01    0.00    1.88    0.61    0.00   92.50
- *         
- *         Device:            tps   Blk_read/s   Blk_wrtn/s   Blk_read   Blk_wrtn
- *         sda              18.89       209.75       135.41  995990159  642992550
- *         sdb               0.00         0.00         0.00       1272          0
- *         dm-0             32.68       209.71       135.37  995771418  642807736
- *         dm-1              0.01         0.05         0.04     215048     184776
- * </pre>
- * 
- * vmstat
- * 
- * <pre>
- *         [root@dp-aether1 src]# vmstat
- *         procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
- *          r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
- *          0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
- * </pre>
- * 
- * pidstat -p 17324 1 (-u is cpi, -r is memory stats, -d gives IO statistics
- * with kernels 2.6.20 and up; number is the interval in seconds)
- * 
- * <pre>
- *         Linux 2.6.18-1.2798.fc6 (dp-aether1.dpp2.org)   03/03/2008
- *         
- *         09:00:13 AM       PID   %user %system    %CPU   CPU  Command
- *         09:00:13 AM     17324    0.01    0.00    0.02     2  java
- * </pre>
- * 
- * pidstat -r -p 9096 1
- * 
- * <pre>
- *   Linux 2.6.18-1.2798.fc6 (dp-aether3.dpp2.org)   03/12/2008
- *   
- *   04:04:13 PM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
- *   04:04:14 PM      9096      0.00      0.00   11212   4888   0.13  sshd
- * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -301,19 +262,9 @@ public interface IStatisticsService {
        
         AbstractStatisticsCollector collector;
         
-        public StatisticsClient() {
-            
-            // @todo choose by OS.
-            String osName = System.getProperty( "os.name" );
-            String osVersion = System.getProperty( "os.version" );
-            
-//            if(host is windows) {
+        public StatisticsClient(Properties properties) {
 
-            collector = new StatisticsCollectorForWindows();
-            
-//            } else if (...) {
-//                
-//            }
+            collector = AbstractStatisticsCollector.newInstance( properties );
             
         }
         

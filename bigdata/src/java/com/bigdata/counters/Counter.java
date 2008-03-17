@@ -37,16 +37,16 @@ package com.bigdata.counters;
  * 
  * @param <T>
  *            The data type for the counter value.
- * 
- * @todo declare units, description.
- * @todo unit conversions.
  */
-public abstract class Counter<T> implements ICounter {
+final class Counter<T> implements ICounter {
     
-    private final ICounterSet parent;
+    ICounterSet parent;
+    
     private final String name;
     
-    public Counter(ICounterSet parent, String name) {
+    private final IInstrument<T> instrument;
+    
+    Counter(ICounterSet parent, String name, IInstrument<T> instrument) {
         
         if (parent == null)
             throw new IllegalArgumentException();
@@ -54,9 +54,14 @@ public abstract class Counter<T> implements ICounter {
         if (name == null)
             throw new IllegalArgumentException();
         
+        if (instrument == null)
+            throw new IllegalArgumentException();
+        
         this.parent = parent;
         
         this.name = name;
+        
+        this.instrument = instrument;
         
     }
 
@@ -76,10 +81,14 @@ public abstract class Counter<T> implements ICounter {
         
         if(parent.isRoot()) {
             
+            /*
+             * Handles: "/foo", where "foo" is this counter.
+             */
             return parent.getPath()+name;
             
         }
         
+        // Handles all other cases.
         return parent.getPath() + ICounterSet.pathSeparator + name;
         
     }
@@ -87,6 +96,69 @@ public abstract class Counter<T> implements ICounter {
     public String toString() {
         
         return getPath();
+        
+    }
+
+    public ICounterSet getRoot() {
+
+        return parent.getRoot();
+        
+    }
+
+    public boolean isRoot() {
+
+        return false;
+        
+    }
+
+    /**
+     * Invokes {@link Instrument#getValue()}
+     */
+    public Object getValue() {
+        
+        return instrument.getValue();
+        
+    }
+    
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isCounterSet() {
+        
+        return false;
+        
+    }
+
+    /**
+     * Returns <code>true</code>
+     */
+    final public boolean isCounter() {
+        
+        return true;
+        
+    }
+
+    /**
+     * Always returns <code>null</code> since there are no children.
+     */
+    public ICounterNode getChild(String name) {
+        
+        return null;
+        
+    }
+
+    /**
+     * Always returns <code>null</code> since there are no children.
+     */
+    public ICounterNode getPath(String path) {
+
+        return null;
+        
+    }
+    
+    public IInstrument<T> getInstrument() {
+        
+        return instrument;
         
     }
     

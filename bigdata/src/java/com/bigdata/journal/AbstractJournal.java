@@ -53,6 +53,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
@@ -948,10 +949,7 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * Statistics describing the journal including IO, indices, etc.
      * 
-     * @todo expose getStatistics on all buffer strategies.
-     * 
-     * @todo use an object or XML to send this data around with an eye to
-     *       telemetry for the distributed database.
+     * @deprecated by {@link #getCounters()}
      */
     public String getStatistics() {
 
@@ -993,6 +991,21 @@ public abstract class AbstractJournal implements IJournal {
         return sb.toString();
         
     }
+    
+    synchronized public CounterSet getCounters() {
+        
+        if(counters==null) {
+
+            counters = new CounterSet();
+         
+            // FIXME setup various counters from getStatistics()
+            
+        }
+        
+        return counters;
+        
+    }
+    private CounterSet counters;
     
     public File getFile() {
         

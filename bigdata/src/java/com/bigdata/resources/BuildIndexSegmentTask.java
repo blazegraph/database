@@ -367,7 +367,7 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
             // update the metadata associated with the btree.
             btree.setIndexMetadata(indexMetadata);
 
-            log.warn("Updated view: name=" + getOnlyResource() + ", pmd="
+            log.info("Updated view: name=" + getOnlyResource() + ", pmd="
                     + indexMetadata.getPartitionMetadata());
             
             // verify that the btree recognizes that it needs to be checkpointed.

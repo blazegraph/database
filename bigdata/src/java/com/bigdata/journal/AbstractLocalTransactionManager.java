@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutionException;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.InnerCause;
 
@@ -468,9 +470,15 @@ abstract public class AbstractLocalTransactionManager implements
 
     public String getStatistics() {
         
-        return "#active=" + activeTx.size() +
-             ", #prepared="+ preparedTx.size()
-             ;
+        if (countersRoot != null) {
+
+            return countersRoot.toString();
+
+        } else {
+
+            return "N/A";
+            
+        }
         
     }
     
@@ -525,6 +533,31 @@ abstract public class AbstractLocalTransactionManager implements
     public void shutdownNow() {
 
         // Note: currently a NOP.
+        
+    }
+    
+    private CounterSet countersRoot;
+    
+    /**
+     * Return the {@link CounterSet}.
+     */
+    synchronized public CounterSet getCounters() {
+        
+        if (countersRoot == null) {
+
+            countersRoot = new CounterSet();
+
+            countersRoot.addCounter("#active",new Instrument<Integer>(){
+                public Integer getValue() {return activeTx.size();}
+            });
+
+            countersRoot.addCounter("#prepared",new Instrument<Integer>(){
+                public Integer getValue() {return preparedTx.size();}
+            });
+
+        }
+        
+        return countersRoot;
         
     }
     

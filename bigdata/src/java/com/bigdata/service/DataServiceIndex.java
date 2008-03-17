@@ -148,7 +148,7 @@ public class DataServiceIndex implements IIndex {
 
             return dataService.getIndexMetadata(name,timestamp);
 
-        } catch (IOException ex) {
+        } catch (Exception ex) {
 
             throw new RuntimeException(ex);
 
@@ -160,7 +160,7 @@ public class DataServiceIndex implements IIndex {
 
         try {
 
-            return dataService.getStatistics(name,timestamp);
+            return dataService.getStatistics(name);
 
         } catch (IOException ex) {
 

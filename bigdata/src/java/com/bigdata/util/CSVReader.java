@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.text.DateFormat;
+import java.text.DecimalFormat;
 import java.text.Format;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -143,6 +144,19 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
                     NumberFormat.getNumberInstance(),
 
+                    /*
+                     * Note: There are no factory methods for formats that
+                     * handle exponents. I've put a few in here, but there may
+                     * very well be other examples that will still not be parsed
+                     * correctly.
+                     */
+                    
+                    // scientific 
+                    new DecimalFormat("0.###E0"),
+
+                    // engineering
+                    new DecimalFormat("##0.#####E0"),
+
                     NumberFormat.getIntegerInstance(),
 
             };
@@ -191,6 +205,10 @@ public class CSVReader implements Iterator<Map<String, Object>> {
                     } else
                         throw new AssertionError();
 
+                } catch (NumberFormatException ex) {
+                    
+                    // ignore.
+                    
                 } catch (ParseException ex) {
 
                     // ignore.
@@ -387,7 +405,12 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
             while (true) {
 
-                while(tailDelayMillis!=0L && !r.ready()) {
+                if(Thread.currentThread().isInterrupted()) {
+                    log.warn("Interrupted");
+                    return false;
+                }
+                
+                while (tailDelayMillis != 0L && !r.ready()) {
                     /*
                      * Wait until more data is available.
                      * 
@@ -399,7 +422,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
                         Thread.sleep(tailDelayMillis);
                     } catch (InterruptedException e) {
                         // Interrupted - stop processing.
-                        log.warn(e.getMessage(),e);
+                        log.warn(e.getMessage());
                         return false;
                     }
                     
