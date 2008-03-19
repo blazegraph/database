@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.resources;
 
-import java.io.IOException;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
@@ -336,12 +335,9 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
             // @todo handle failover / read from secondaries.
             final IMetadataService metadataService = getDataService().getMetadataService();
             assert metadataService != null;
-            final IDataService sourceDataService;
-            try {
-                sourceDataService = metadataService.getDataService(sourceDataServiceUUIDs[0]);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            final IDataService sourceDataService = getDataService()
+                    .getDataService(sourceDataServiceUUIDs[0]);
+            assert sourceDataService != null;
             
             // iterator reading from the source index partition.
             final ITupleIterator itr = new RawDataServiceRangeIterator(

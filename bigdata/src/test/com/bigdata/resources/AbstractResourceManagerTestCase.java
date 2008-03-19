@@ -47,11 +47,11 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.mdi.IResourceMetadata;
-import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -156,6 +156,12 @@ public class AbstractResourceManagerTestCase extends
         resourceManager = new ResourceManager(properties) {
 
             final private UUID dataServiceUUID = UUID.randomUUID();
+            
+            public ILoadBalancerService getLoadBalancerService() {
+
+                throw new UnsupportedOperationException();
+                
+            }
             
             public IMetadataService getMetadataService() {
 
@@ -267,20 +273,7 @@ public class AbstractResourceManagerTestCase extends
     protected static class MockMetadataService implements IMetadataService {
 
         private AtomicInteger partitionId = new AtomicInteger(0);
-        
-        public UUID getUnderUtilizedDataService() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public UUID[] getUnderUtilizedDataServices(int limit, UUID exclude) throws IOException {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public IDataService getDataService(UUID serviceUUID) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
+       
         public int nextPartitionId(String name) throws IOException, InterruptedException, ExecutionException {
             return partitionId.incrementAndGet();
         }
@@ -294,10 +287,6 @@ public class AbstractResourceManagerTestCase extends
         }
 
         public UUID getServiceUUID() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public JournalMetadata getJournalMetadata() throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -368,12 +357,6 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public String getStatistics(String name, long timestamp) throws IOException {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-
         public PartitionLocator get(String name, long timestamp, byte[] key) throws InterruptedException, ExecutionException, IOException {
             // TODO Auto-generated method stub
             return null;
@@ -395,16 +378,6 @@ public class AbstractResourceManagerTestCase extends
             throw new UnsupportedOperationException();
             
         }
-
-//        public boolean isOverflowAllowed() throws IOException {
-//            // TODO Auto-generated method stub
-//            return false;
-//        }
-//
-//        public long getJournalCreateTime() throws IOException {
-//            // TODO Auto-generated method stub
-//            return 0;
-//        }
 
     }
     

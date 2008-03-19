@@ -42,6 +42,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -641,6 +642,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata) {
         
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * @throws UnsupportedOperationException
+     *             always.
+     */
+    public ILoadBalancerService getLoadBalancerService() {
+
         throw new UnsupportedOperationException();
         
     }

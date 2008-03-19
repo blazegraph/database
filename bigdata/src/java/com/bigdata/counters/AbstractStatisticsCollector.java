@@ -490,47 +490,27 @@ abstract public class AbstractStatisticsCollector {
             // os.arch
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_Architecture,
-                    new IInstrument<String>() {
-                        public String getValue() {
-                            return System.getProperty("os.arch");
-                        }
-                    });
+                    new OneShotInstrument<String>(System.getProperty("os.arch")));
             
             // os.name
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_OperatingSystemName,
-                    new IInstrument<String>() {
-                        public String getValue() {
-                            return System.getProperty("os.name");
-                        }
-                    });
+                    new OneShotInstrument<String>(System.getProperty("os.name")));
             
             // os.version
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_OperatingSystemVersion,
-                    new IInstrument<String>() {
-                        public String getValue() {
-                            return System.getProperty("os.version");
-                        }
-                    });
+                    new OneShotInstrument<String>(System.getProperty("os.version")));
             
             // #of processors.
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_NumProcessors,
-                    new IInstrument<Integer>() {
-                        public Integer getValue() {
-                            return SystemUtil.numProcessors();
-                        }
-                    });
+                    new OneShotInstrument<Integer>(SystemUtil.numProcessors()));
             
             // processor info
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_ProcessorInfo,
-                    new IInstrument<String>() {
-                        public String getValue() {
-                            return SystemUtil.cpuInfo();
-                        }
-                    });
+                    new OneShotInstrument<String>(SystemUtil.cpuInfo()));
             
             /*
              * @todo this is per-process, not per host so move it to the service
@@ -597,81 +577,6 @@ abstract public class AbstractStatisticsCollector {
 
     }
 
-//    /**
-//     * Return the ring buffer of samples for the named counter.
-//     * 
-//     * @param name
-//     *            The counter name.
-//     * 
-//     * @return The samples. The samples are loosly typed, but in general all
-//     *         samples of the same counter SHOULD have the same data type
-//     *         (Date, Long, Double, etc).
-//     */
-//    public Object[] getSamples(String name) {
-//        
-//        return counters.get(name);
-//        
-//    }
-//    
-//    /**
-//     * Map containing 60 seconds of data for each counter.
-//     */
-//    protected Map<String,Object[]> counters = new HashMap<String,Object[]>();
-//        
-//    /**
-//     * Computes the average of the samples for some counter.
-//     * 
-//     * @param samples
-//     *            The samples.
-//     * 
-//     * @return The average -or- <code>N/A</code> if the samples are not
-//     *         numbers (no average is reported for dates, strings, etc).
-//     */
-//    public String getAverage(Object[] samples) {
-//        
-//        if (samples == null) {
-//
-//            // No samples yet.
-//            
-//            return "N/A";
-//            
-//        }
-//        
-//        double total = 0.0;
-//
-//        int n = 0;
-//        
-//        for(int i=0; i<samples.length; i++) {
-//            
-//            Object sample = samples[i];
-//            
-//            if(sample==null) continue;
-//            
-//            if(sample instanceof Long) {
-//
-//                total += (Long)sample;
-//                
-//            } else if(sample instanceof Double) {
-//
-//                total += (Double) sample;
-//                
-//            } else {
-//                
-//                // Not a number.
-//                return "Not numeric?";
-//                
-//            }
-//            
-//            n++;
-//            
-//        }
-//        
-//        if(n==0) return "N/A";
-//        
-//        return ""+(Double)(total/n);
-//        
-//    }
-    
     protected abstract class AbstractProcessReader implements Runnable {
         
         InputStream is;
@@ -1054,13 +959,13 @@ abstract public class AbstractStatisticsCollector {
      *            
      * @return The #of bytes.
      */
-    static public String kb2b(String kb) {
+    static public Double kb2b(String kb) {
 
         double d = Double.parseDouble(kb);
         
         double x = d * Bytes.kilobyte32;
         
-        return ""+x;
+        return x;
         
     }
 

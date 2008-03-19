@@ -266,13 +266,18 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * The unique identifier for this data service.
      * 
      * @return The unique data service identifier.
+     * 
+     * @throws IOException
+     *             since you can use this method with RMI.
      */
-    public UUID getServiceUUID() throws IOException;
+    public abstract UUID getServiceUUID() throws IOException;
     
     /**
      * Statistics describing the data service, including IO, indices, etc.
      * 
      * @throws IOException
+     * 
+     * @todo xml serialization of counters?  allow filter?
      */
     public String getStatistics() throws IOException;
     
@@ -341,6 +346,8 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      * @return Statistics about the named index.
      * 
      * @throws IOException
+     * 
+     * @todo xml serialization of counters?  allow filter?
      */
     public String getStatistics(String name)
             throws IOException, InterruptedException, ExecutionException;

@@ -104,6 +104,11 @@ public interface IBigdataClient {
     public IDataService getDataService(UUID serviceUUID);
 
     /**
+     * Return the load balancer service (or a proxy for that service).
+     */
+    public ILoadBalancerService getLoadBalancerService();
+
+    /**
      * Return the metadata service.
      * <p>
      * Note: Whether the returned object is a proxy or the service
@@ -113,7 +118,7 @@ public interface IBigdataClient {
      * @return The metadata service.
      */
     public IMetadataService getMetadataService();
-        
+     
     /**
      * A thread pool that may be used by clients to parallelize operations
      * against the federation. This thread pool is automatically used by the

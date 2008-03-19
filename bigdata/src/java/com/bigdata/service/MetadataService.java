@@ -47,7 +47,6 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexExistsException;
 import com.bigdata.journal.NoSuchIndexException;
-import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
@@ -815,10 +814,10 @@ abstract public class MetadataService extends DataService implements
 
             super(concurrencyManager, ITx.UNISOLATED, metadataIndexName);
 
-            if(metadata==null)
+            if (metadata == null)
                 throw new IllegalArgumentException();
-            
-            if(separatorKeys==null) 
+
+            if (separatorKeys == null)
                 throw new IllegalArgumentException();
 
             if (separatorKeys.length == 0)
@@ -833,24 +832,23 @@ abstract public class MetadataService extends DataService implements
                     throw new IllegalArgumentException();
 
             } else {
-                
+
                 /*
                  * Auto-assign the index partitions to data services.
                  */
-                
-                dataServiceUUIDs = new UUID[separatorKeys.length];
-                
-                for( int i=0; i<separatorKeys.length; i++) {
-                    
-                    try {
 
-                        dataServiceUUIDs[i] = getUnderUtilizedDataService();
+                try {
+
+                    // discover under-utilized data service UUIDs.
+                    dataServiceUUIDs = getLoadBalancerService().getUnderUtilizedDataServices(
+                            separatorKeys.length, // minCount
+                            separatorKeys.length, // maxCount
+                            null// exclude
+                            );
                     
-                    } catch(IOException ex) {
-                        
-                        throw new RuntimeException(ex);
-                        
-                    }
+                } catch(Exception ex) {
+                    
+                    throw new RuntimeException(ex);
                     
                 }
                 
@@ -904,25 +902,16 @@ abstract public class MetadataService extends DataService implements
 
                 }
 
-                try {
+                IDataService dataService = getDataService(uuid);
 
-                    IDataService dataService = getDataService(uuid);
+                if (dataService == null) {
 
-                    if (dataService == null) {
-                        
-                        throw new IllegalArgumentException(
-                                "Unknown data service: uuid=" + uuid);
-                        
-                    }
-                    
-                    dataServices[i] = dataService;
-
-                } catch (IOException ex) {
-                    
-                    throw new RuntimeException(
-                            "Could not resolve data service: UUID=" + uuid, ex);
+                    throw new IllegalArgumentException(
+                            "Unknown data service: uuid=" + uuid);
 
                 }
+
+                dataServices[i] = dataService;
 
             }
             

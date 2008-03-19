@@ -6,6 +6,7 @@ import java.io.LineNumberReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -43,12 +44,16 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class InstrumentForWPC implements IInstrument {
+    class InstrumentForWPC implements IInstrument<Double> {
 
         private final String counterNameForWindows;
 
         private final String path;
+        
+        private long lastModifiedTime;
 
+        private Double value = 0d;
+        
         /**
          * The name of the source counter on a Windows platform.
          */
@@ -93,8 +98,6 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
         }
 
         /**
-         * Return the average of the samples for the counter with that name.
-         * <p>
          * Note: We rename the headers when the {@link CSVReader} starts such
          * that it reports the Windows counters under the names declared by
          * {@link IRequiredHostCounters} and friends (prefixed with the
@@ -102,22 +105,41 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
          * is exactly how the counters are declared in
          * {@link AbstractStatisticsCollector#getCounters()}.
          */
-        public String getValue() {
+        public Double getValue() {
 
              return value;
 
         }
 
-        public void setValue(String value) {
+        public long lastModified() {
+            
+            return lastModifiedTime;
+            
+        }
 
+        /**
+         * Note: parses value to {@link Double}.
+         * 
+         * @param value
+         * 
+         * @param timestamp
+         */
+        public void setValue(String value, long timestamp) {
+
+            setValue( Double.parseDouble(value), timestamp );
+
+        }
+
+        public void setValue(Double value, long timestamp) {
+           
             if (value == null)
                 throw new IllegalArgumentException();
 
             this.value = value;
+            
+            this.lastModifiedTime = timestamp;
 
         }
-
-        private String value = "N/A";
 
     }
 
@@ -136,95 +158,92 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
             decls = Arrays
                     .asList(new InstrumentForWPC[] {
 
-                    new InstrumentForWPC(
-                            "\\Memory\\Pages/Sec",
-                            p
-                                    + IRequiredHostCounters.Memory_PageFaultsPerSecond),
+                new InstrumentForWPC(
+                        "\\Memory\\Pages/Sec",
+                        p + IRequiredHostCounters.Memory_PageFaultsPerSecond),
 
-                    new InstrumentForWPC(
-                            "\\Processor(_Total)\\% Processor Time",
-                            p
-                                    + IRequiredHostCounters.CPU_PercentProcessorTime),
+                new InstrumentForWPC(
+                        "\\Processor(_Total)\\% Processor Time",
+                        p + IRequiredHostCounters.CPU_PercentProcessorTime),
 
-                    new InstrumentForWPC(
-                            "\\LogicalDisk(_Total)\\% Free Space",
-                            p
-                                    + IRequiredHostCounters.LogicalDisk_PercentFreeSpace),
+                new InstrumentForWPC(
+                        "\\LogicalDisk(_Total)\\% Free Space",
+                        p + IRequiredHostCounters.LogicalDisk_PercentFreeSpace),
 
-                    /*
-                     * These are system wide counters for the network
-                     * interface. There are also counters for the
-                     * network queue length, packets discarded, and
-                     * packet errors that might be interesting. (I can't
-                     * find _Total versions declared for these counters
-                     * so I am not including them but the counters for
-                     * the specific interfaces could be enabled and then
-                     * aggregated, eg:
-                     * 
-                     * \NetworkInterface(*)\Bytes Send/Sec
-                     */
-                    // "\\Network Interface(_Total)\\Bytes
-                    // Received/Sec",
-                    // "\\Network Interface(_Total)\\Bytes Sent/Sec",
-                    // "\\Network Interface(_Total)\\Bytes Total/Sec",
-                                    
-                    /*
-                     * System wide counters for DISK IO.
-                     */
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Queue Length",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "Avg. Disk Queue Length"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\% Idle Time",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "% Idle Time"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\% Disk Time",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "% Disk Time"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\% Disk Read Time",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "% Disk Read Time"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\% Disk Write Time",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "% Disk Write Time"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Disk Read Bytes/Sec",
-                            p
-                                    + IRequiredHostCounters.PhysicalDisk_BytesReadPerSec),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Disk Write Bytes/Sec",
-                            p
-                                    + IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Disk Reads/Sec",
-                            p + IHostCounters.PhysicalDisk_ReadsPerSec),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Disk Writes/Sec",
-                            p + IHostCounters.PhysicalDisk_WritesPerSec),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "Avg. Disk Bytes per Read"),
-                    new InstrumentForWPC(
-                            "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
-                            p + IRequiredHostCounters.PhysicalDisk
-                                    + ICounterSet.pathSeparator
-                                    + "Avg. Disk Bytes per Write"),
-                    // "\\PhysicalDisk(_Total)\\Disk Writes/sec",
-                    // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
-                    // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
+                /*
+                 * These are system wide counters for the network
+                 * interface. There are also counters for the
+                 * network queue length, packets discarded, and
+                 * packet errors that might be interesting. (I can't
+                 * find _Total versions declared for these counters
+                 * so I am not including them but the counters for
+                 * the specific interfaces could be enabled and then
+                 * aggregated, eg:
+                 * 
+                 * \NetworkInterface(*)\Bytes Send/Sec
+                 */
+                // "\\Network Interface(_Total)\\Bytes
+                // Received/Sec",
+                // "\\Network Interface(_Total)\\Bytes Sent/Sec",
+                // "\\Network Interface(_Total)\\Bytes Total/Sec",
+                                
+                /*
+                 * System wide counters for DISK IO.
+                 */
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Queue Length",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "Avg. Disk Queue Length"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\% Idle Time",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "% Idle Time"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\% Disk Time",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "% Disk Time"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\% Disk Read Time",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "% Disk Read Time"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\% Disk Write Time",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "% Disk Write Time"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Disk Read Bytes/Sec",
+                        p
+                                + IRequiredHostCounters.PhysicalDisk_BytesReadPerSec),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Disk Write Bytes/Sec",
+                        p
+                                + IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Disk Reads/Sec",
+                        p + IHostCounters.PhysicalDisk_ReadsPerSec),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Disk Writes/Sec",
+                        p + IHostCounters.PhysicalDisk_WritesPerSec),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "Avg. Disk Bytes per Read"),
+                new InstrumentForWPC(
+                        "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
+                        p + IRequiredHostCounters.PhysicalDisk
+                                + ICounterSet.pathSeparator
+                                + "Avg. Disk Bytes per Write"),
+                // "\\PhysicalDisk(_Total)\\Disk Writes/sec",
+                // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
+                // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
 
-                    });
+                });
 
             for (InstrumentForWPC inst : decls) {
 
@@ -318,6 +337,10 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
      */
     private class ProcessReader extends AbstractProcessReader {
 
+        /**
+         * Used to parse the timestamp associated with each row of the
+         * [typeperf] output.
+         */
         private final SimpleDateFormat f;
 
         ProcessReader() {
@@ -431,30 +454,33 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
 
                 final Map<String, Object> row = csvReader.next();
 
+                final long timestamp = ((Date)row.get("Timestamp")).getTime();
+                
                 for (Map.Entry<String, Object> entry : row.entrySet()) {
 
                     final String path = entry.getKey();
 
+                    if(path.equals("Timestamp")) continue;
+                    
                     final String value = "" + entry.getValue();
 
                     log.debug(path + "=" + value);
 
-                    ICounter c = (ICounter) getCounters().getPath(path);
+                    final ICounter c = (ICounter) getCounters().getPath(path);
 
                     if (c == null) {
 
-                        AbstractStatisticsCollector.log
-                                .warn("Could not find counter: " + path);
+                        log.warn("Could not find counter: " + path);
 
                         continue;
 
                     }
 
-                    InstrumentForWPC decl = (InstrumentForWPC) c
+                    final InstrumentForWPC decl = (InstrumentForWPC) c
                             .getInstrument();
 
                     // update the value on the counter.
-                    decl.setValue(value);
+                    decl.setValue(value, timestamp);
 
                 }
 

@@ -3,11 +3,16 @@ package com.bigdata.counters;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Collection of host performance data using the <code>sysstat</code> suite.
@@ -34,6 +39,30 @@ public class StatisticsCollectorForLinux extends
      * The process identifier for this process (the JVM).
      */
     final protected int pid;
+    
+    /**
+     * Used to parse the timestamp associated with each row of the
+     * [pidstat] output.
+     */
+    static protected final SimpleDateFormat f;
+
+    static {
+        
+        f = new SimpleDateFormat("hh:mm:ss aa");
+
+        System.err.println("Format: " + f.format(new Date()));
+
+        try {
+
+            System.err.println("Parsed: " + f.parse("06:35:15 AM"));
+
+        } catch (ParseException e) {
+
+            log.error("Could not parse?");
+
+        }
+        
+    }
     
     /**
      * The Linux {@link KernelVersion}.
@@ -268,11 +297,66 @@ public class StatisticsCollectorForLinux extends
     public static class SarCpuUtilizationCollector extends AbstractProcessCollector {
 
         /**
+         * Inner class integrating the current values with the {@link Counter}
+         * hierarchy.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        class I<T> implements IInstrument<T> {
+            
+            private final String path;
+            
+            public String getPath() {
+                
+                return path;
+                
+            }
+            
+            public I(String path) {
+                
+                assert path != null;
+                
+                this.path = path;
+                
+            }
+            
+            public T getValue() {
+             
+                return (T) vals.get(path);
+                
+            }
+
+            public long lastModified() {
+
+                return lastModified;
+                
+            }
+
+            /**
+             * @throws UnsupportedOperationException
+             *             always.
+             */
+            public void setValue(T value, long timestamp) {
+               
+                throw new UnsupportedOperationException();
+                
+            }
+
+        }
+
+        /**
          * Map containing the current values for the configured counters. The
          * keys are paths into the {@link CounterSet}. The values are the data
          * most recently read from <code>sar</code>.
          */
-        private Map<String,String> vals = new HashMap<String, String>();
+        private Map<String,Object> vals = new HashMap<String, Object>();
+        
+        /**
+         * The timestamp associated with the most recently collected values.
+         */
+        private long lastModified = System.currentTimeMillis();
         
         public SarCpuUtilizationCollector(int interval,
                 KernelVersion kernelVersion) {
@@ -294,6 +378,44 @@ public class StatisticsCollectorForLinux extends
             return command;
             
         }
+
+        /**
+         * Extended to declare the counters that we will collect using
+         * <code>sar</code>.
+         */
+        public CounterSet getCounters() {
+            
+            CounterSet root = super.getCounters();
+            
+            if(inst == null) {
+            
+                inst = new LinkedList<I>();
+                
+                /*
+                 * Note: Counters are all declared as Double to facilitate
+                 * aggregation.
+                 */
+
+                inst.add(new I<Double>(IRequiredHostCounters.CPU_PercentProcessorTime));
+                
+                inst.add(new I<Double>(IHostCounters.CPU_PercentUserTime));
+                inst.add(new I<Double>(IHostCounters.CPU_PercentSystemTime));
+                inst.add(new I<Double>(IHostCounters.CPU_PercentIOWait));
+                
+            }
+            
+            for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
+                
+                I i = itr.next();
+                
+                root.addCounter(i.getPath(), i);
+                
+            }
+            
+            return root;
+            
+        }
+        private List<I> inst = null;
 
         /**
          * Extended to force <code>sar</code> to use a consistent timestamp
@@ -376,6 +498,14 @@ public class StatisticsCollectorForLinux extends
 //                    *   04:14:45 PM     CPU     %user     %nice   %system   %iowait    %steal     %idle
 //                    *   04:14:46 PM     all      0.00      0.00      0.00      0.00      0.00    100.00
  
+                    final String s = data.substring(0, 11);
+                    try {
+                        lastModified = f.parse(s).getTime();
+                    } catch (ParseException e) {
+                        log.warn("Could not parse time: [" + s + "] : " + e);
+                        lastModified = System.currentTimeMillis(); // should be pretty close.
+                    }
+                                    
                     final String user = data.substring(20, 30);
 //                    final String nice = data.substring(30, 40);
                     final String system = data.substring(40, 50);
@@ -383,15 +513,15 @@ public class StatisticsCollectorForLinux extends
 //                    final String steal = data.substring(60, 70);
                     final String idle = data.substring(70, 80);
 
-                    vals.put(IHostCounters.CPU_PercentUserTime, user);
+                    vals.put(IHostCounters.CPU_PercentUserTime, Double.parseDouble(user));
                     
-                    vals.put(IHostCounters.CPU_PercentSystemTime, system);
+                    vals.put(IHostCounters.CPU_PercentSystemTime, Double.parseDouble(system));
 
-                    vals.put(IHostCounters.CPU_PercentIOWait, iowait);
+                    vals.put(IHostCounters.CPU_PercentIOWait, Double.parseDouble(iowait));
 
-                    vals.put(IRequiredHostCounters.CPU_PercentProcessorTime, ""
-                            + (100d - Double.parseDouble(idle)));
-                
+                    vals.put(IRequiredHostCounters.CPU_PercentProcessorTime, 
+                            (100d - Double.parseDouble(idle)));
+                    
                 }
                 
             }
@@ -423,13 +553,70 @@ public class StatisticsCollectorForLinux extends
          * supported based on the {@link KernelVersion}.
          */
         protected final boolean perProcessIOData;
+
+        /**
+         * Inner class integrating the current values with the {@link Counter}
+         * hierarchy.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        class I<T> implements IInstrument<T> {
+            
+            private final String path;
+            
+            public String getPath() {
+                
+                return path;
+                
+            }
+            
+            public I(String path) {
+                
+                assert path != null;
+                
+                this.path = path;
+                
+            }
+            
+            public T getValue() {
+             
+                return (T) vals.get(path);
+                
+            }
+
+            public long lastModified() {
+
+                return lastModified;
+                
+            }
+
+            /**
+             * @throws UnsupportedOperationException
+             *             always.
+             */
+            public void setValue(T value, long timestamp) {
+               
+                throw new UnsupportedOperationException();
+                
+            }
+
+        }
+
+        /**
+         * Updated each time a new row of data is read from the process and
+         * reported as the last modified time for counters based on that
+         * process.
+         */
+        private long lastModified = System.currentTimeMillis();
         
         /**
          * Map containing the current values for the configured counters. The
          * keys are paths into the {@link CounterSet}. The values are the data
          * most recently read from <code>pidstat</code>.
          */
-        private Map<String,String> vals = new HashMap<String, String>();
+        private Map<String,Object> vals = new HashMap<String, Object>();
 
         /**
          * 
@@ -482,40 +669,6 @@ public class StatisticsCollectorForLinux extends
         }
         
         /**
-         * Class integrating the current values with the {@link Counter}
-         * hierarchy.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        class I extends Instrument<String> {
-            
-            private final String path;
-            
-            public String getPath() {
-                
-                return path;
-                
-            }
-            
-            public I(String path) {
-                
-                assert path != null;
-                
-                this.path = path;
-                
-            }
-            
-            public String getValue() {
-             
-                return vals.get(path);
-                
-            }
-
-        }
-
-        /**
          * Extended to declare the counters that we will collect using
          * <code>pidstat</code>.
          */
@@ -527,12 +680,26 @@ public class StatisticsCollectorForLinux extends
             
                 inst = new LinkedList<I>();
                 
-                inst.add(new I(IRequiredHostCounters.CPU_PercentProcessorTime));
+                /*
+                 * Note: Counters are all declared as Double to facilitate
+                 * aggregation.
+                 */
                 
-                inst.add(new I(IProcessCounters.CPU_PercentUserTime));
+                inst.add(new I<Double>(IRequiredHostCounters.CPU_PercentProcessorTime));
                 
-                inst.add(new I(IProcessCounters.CPU_PercentSystemTime));
+                inst.add(new I<Double>(IProcessCounters.CPU_PercentUserTime));
                 
+                inst.add(new I<Double>(IProcessCounters.CPU_PercentSystemTime));
+                
+                inst.add(new I<Double>(IProcessCounters.Memory_minorFaultsPerSec));
+                inst.add(new I<Double>(IProcessCounters.Memory_majorFaultsPerSec));
+                inst.add(new I<Double>(IProcessCounters.Memory_virtualSize));
+                inst.add(new I<Double>(IProcessCounters.Memory_residentSetSize));
+                inst.add(new I<Double>(IProcessCounters.Memory_percentMemorySize));
+
+                inst.add(new I<Double>(IProcessCounters.PhysicalDisk_BytesReadPerSec));
+                inst.add(new I<Double>(IProcessCounters.PhysicalDisk_BytesWrittenPerSec));
+
             }
             
             for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
@@ -598,7 +765,7 @@ public class StatisticsCollectorForLinux extends
             public PIDStatReader(ActiveProcess activeProcess) {
                 
                 super(activeProcess);
-            
+
             }
             
             /**
@@ -637,10 +804,18 @@ public class StatisticsCollectorForLinux extends
 
                 // header.
                 final String header = readLine();
-                
+
                 // data.
                 final String data = readLine();
                 
+                final String s = data.substring(0, 11);
+                try {
+                    lastModified = f.parse(s).getTime();
+                } catch (ParseException e) {
+                    log.warn("Could not parse time: [" + s + "] : " + e);
+                    lastModified = System.currentTimeMillis(); // should be pretty close.
+                }
+                                
                 if(header.contains("%CPU")) {
                     
                     /*
@@ -656,11 +831,14 @@ public class StatisticsCollectorForLinux extends
                     
                     log.info("\n%user="+user+", %system="+system+", %cpu="+cpu+"\ndata");
                     
-                    vals.put(IProcessCounters.CPU_PercentProcessorTime, cpu);
+                    vals.put(IProcessCounters.CPU_PercentProcessorTime,
+                                Double.parseDouble(cpu));
 
-                    vals.put(IProcessCounters.CPU_PercentUserTime, user);
-                    
-                    vals.put(IProcessCounters.CPU_PercentSystemTime, system);
+                    vals.put(IProcessCounters.CPU_PercentUserTime,
+                            Double.parseDouble(user));
+
+                    vals.put(IProcessCounters.CPU_PercentSystemTime,
+                            Double.parseDouble(system));
                     
                 } else if(header.contains("RSS")) {
                     
@@ -685,11 +863,20 @@ public class StatisticsCollectorForLinux extends
                                 + residentSetSize + ", percentMemory="
                                 + percentMemory + "\n"+header+"\n"+data);
                     
-                    vals.put(IProcessCounters.Memory_minorFaultsPerSec, minorFaultsPerSec);
-                    vals.put(IProcessCounters.CPU_PercentUserTime, majorFaultsPerSec);
-                    vals.put(IProcessCounters.Memory_virtualSize, AbstractStatisticsCollector.kb2b(virtualSize));
-                    vals.put(IProcessCounters.Memory_residentSetSize, AbstractStatisticsCollector.kb2b(residentSetSize));
-                    vals.put(IProcessCounters.Memory_percentMemorySize, percentMemory);
+                    vals.put(IProcessCounters.Memory_minorFaultsPerSec,
+                            Double.parseDouble(minorFaultsPerSec));
+                    
+                    vals.put(IProcessCounters.Memory_majorFaultsPerSec,
+                            Double.parseDouble(majorFaultsPerSec));
+                    
+                    vals.put(IProcessCounters.Memory_virtualSize, 
+                            Double.parseDouble(virtualSize));
+                    
+                    vals.put(IProcessCounters.Memory_residentSetSize,
+                            Double.parseDouble(residentSetSize));
+                    
+                    vals.put(IProcessCounters.Memory_percentMemorySize, 
+                            Double.parseDouble(percentMemory));
 
                 } else if(perProcessIOData && header.contains("kB_rd/s")) {
 
@@ -706,8 +893,11 @@ public class StatisticsCollectorForLinux extends
                     log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
                                 + kBwrS + "\n" + header + "\n" + data);
 
-                    vals.put(IProcessCounters.Memory_minorFaultsPerSec, AbstractStatisticsCollector.kb2b(kBrdS));
-                    vals.put(IProcessCounters.CPU_PercentUserTime, AbstractStatisticsCollector.kb2b(kBwrS));
+                    vals.put(IProcessCounters.PhysicalDisk_BytesReadPerSec,
+                            Double.parseDouble(kBrdS) * Bytes.kilobyte32);
+                    
+                    vals.put(IProcessCounters.PhysicalDisk_BytesWrittenPerSec,
+                            Double.parseDouble(kBrdS) * Bytes.kilobyte32);
                     
                 } else {
                     

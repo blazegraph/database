@@ -28,10 +28,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 
+import javax.xml.parsers.ParserConfigurationException;
+
 import junit.framework.TestCase;
+
+import org.xml.sax.SAXException;
+
+import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 
 /**
  * Unit tests for {@link CounterSet}.
@@ -180,8 +191,8 @@ public class TestCounters extends TestCase {
         CounterSet tmp = new CounterSet();
         
         tmp.addCounter("foo", new Instrument<String>() {
-            public String getValue() {
-                return "foo";
+            public void sample() {
+                setValue("foo");
             }
         });
 
@@ -199,10 +210,8 @@ public class TestCounters extends TestCase {
         
         {
             
-            ICounter tmp = root.addCounter("a", new IInstrument<Double>() {
-                public Double getValue() {
-                    return null;
-                }
+            ICounter tmp = root.addCounter("a", new Instrument<Double>() {
+                public void sample() {}
             });
 
             assertNotNull(root.getChild("a"));
@@ -247,10 +256,8 @@ public class TestCounters extends TestCase {
             
         }
 
-        root.addCounter("b", new IInstrument<Double>() {
-            public Double getValue() {
-                return null;
-            }
+        root.addCounter("b", new Instrument<Double>() {
+            public void sample() {}
         });
 
         // test with pattern filter.
@@ -301,8 +308,8 @@ public class TestCounters extends TestCase {
 
         assertNotNull(root.getChild("cpu"));
         
-        cpu.addCounter("a", new IInstrument<Double>() {
-            public Double getValue() {return null;}
+        cpu.addCounter("a", new Instrument<Double>() {
+            public void sample() {}
         });
         
         assertNotNull(cpu.getChild("a"));
@@ -344,7 +351,158 @@ public class TestCounters extends TestCase {
             assertFalse( itr.hasNext() );
             
         }
+        
+    }
 
+    /**
+     * Test that empty path components are not allowed.
+     */
+    public void test_emptyPathComponentsNotAllowed() {
+
+        final CounterSet countersRoot = new CounterSet();
+
+        final String badpath = ICounterSet.pathSeparator
+                + ICounterSet.pathSeparator + "foo";
+        
+        try {
+            
+            countersRoot.makePath(badpath);
+            
+            fail("Expecting: " + IllegalArgumentException.class);
+
+        } catch (IllegalArgumentException ex) {
+            
+            System.err.println("Ignoring expected exception: " + ex);
+            
+        }
+
+        try {
+            
+            countersRoot.getPath(badpath);
+            
+            fail("Expecting: " + IllegalArgumentException.class);
+
+        } catch (IllegalArgumentException ex) {
+            
+            System.err.println("Ignoring expected exception: " + ex);
+            
+        }
+
+        
+    }
+    
+    /**
+     * Test of XML (de-)serialization.
+     * 
+     * @throws IOException
+     * @throws SAXException
+     * @throws ParserConfigurationException
+     */
+    public void test_xml() throws IOException, ParserConfigurationException, SAXException {
+        
+        final CounterSet root = new CounterSet();
+        
+        final ICounter elapsed = root.addCounter("elapsed", new Instrument<Long>() {
+            public void sample(){
+                setValue(System.currentTimeMillis());
+                }
+            });
+
+        final CounterSet cpu = root.makePath("www.bigdata.com/cpu");
+
+        final ICounter availableProcessors = cpu.addCounter("availableProcessors", new Instrument<Integer>() {
+            public void sample(){
+                setValue(Runtime.getRuntime().availableProcessors());
+                }
+            });
+
+        final CounterSet memory = root.makePath("www.bigdata.com/memory");
+
+        final ICounter maxMemory = memory.addCounter("maxMemory", new Instrument<Long>() {
+            public void sample(){
+                setValue(Runtime.getRuntime().maxMemory());
+                }
+            });
+
+        CounterSet disk = root.makePath("www.bigdata.com/disk");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+        // write out as XML.
+        root.asXML(baos, "UTF-8", null/*filter*/);
+        
+        byte[] data = baos.toByteArray();
+        
+        Reader r = new InputStreamReader(new ByteArrayInputStream(data),"UTF-8");
+        
+        StringBuilder sb = new StringBuilder();
+        
+        while(true) {
+            
+            int ch = r.read();
+            
+            if(ch==-1) break;
+            
+            sb.append((char)ch);
+            
+        }
+        
+        System.err.println(sb.toString());
+    
+        {
+            
+            CounterSet tmp = new CounterSet();
+            
+            IInstrumentFactory instrumentFactory = new IInstrumentFactory() {
+
+                public IInstrument newInstance(Class type) {
+
+                    if (type == Double.class) {
+                        return new Instrument<Double>() {
+                            protected void sample() {
+                            }
+                        };
+                    } else if (type == Long.class) {
+                        return new Instrument<Long>() {
+                            protected void sample() {
+                            }
+                        };
+                    } else {
+                        throw new UnsupportedOperationException("type=" + type);
+                    }
+
+                }
+                
+            };
+            
+            Pattern filter = null;
+            
+            tmp.readXML(new ByteArrayInputStream(data), instrumentFactory, filter);
+            
+            System.err.println("Read back:\n"+tmp.toString());
+            
+            /*
+             * verify the counters that we had declared.
+             * 
+             * Note: This is a mess - I have to tunnel in to do the comparisons.
+             * 
+             * @todo also vet the other counters.
+             */
+            
+            assertNotNull(tmp.getPath(availableProcessors.getPath()));
+
+            assertEquals(availableProcessors.lastModified(), ((ICounter) tmp
+                    .getPath(availableProcessors.getPath())).lastModified());
+
+            assertEquals(//
+                    ((Integer)((Instrument) availableProcessors.getInstrument())
+                            .getCurrentValue()).intValue(),//
+                            ((Long)((Instrument) ((ICounter) tmp
+                            .getPath(availableProcessors.getPath()))
+                            .getInstrument()).getCurrentValue()).intValue());
+            
+        }
+        
     }
     
 }

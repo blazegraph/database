@@ -907,12 +907,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
             // request under utilized data services (RMI).
 
+            final UUID excludeUUID = resourceManager.getDataServiceUUID();
+            
             underUtilizedDataServiceUUIDs = resourceManager
-                    .getMetadataService()
-                    .getUnderUtilizedDataServices(0/* limit */,
-                            resourceManager.getDataServiceUUID());
+                    .getLoadBalancerService()
+                    .getUnderUtilizedDataServices(//
+                            0, // minCount - no lower bound.
+                            0, // maxCount - no upper bound.
+                            excludeUUID // exclude this data service.
+                            );
 
-        } catch (IOException ex) {
+        } catch (Exception ex) {
 
             log.warn("Could not obtain target service UUIDs: ", ex);
 

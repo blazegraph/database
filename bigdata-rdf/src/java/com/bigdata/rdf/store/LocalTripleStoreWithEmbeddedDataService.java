@@ -41,14 +41,24 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 
 /**
  * A thread-safe variant that supports concurrent data load and query (the
  * {@link ScaleOutTripleStore} also supports concurrent data load and query).
+ * 
+ * @deprecated Replaced by {@link LocalTripleStoreWithEmbeddedDataService}. The
+ *             latter provides all of the concurrency controls of the
+ *             {@link DataService} without RMI overhead and also supports
+ *             dynamically partitioned key-range indices. Index partitioning can
+ *             be disabled using
+ *             {@link ResourceManager.Options#OVERFLOW_ENABLED}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -113,6 +123,20 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
             @Override
             public IMetadataService getMetadataService() {
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            @Override
+            public ILoadBalancerService getLoadBalancerService() {
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            @Override
+            public IDataService getDataService(UUID serviceUUID) {
 
                 throw new UnsupportedOperationException();
                 

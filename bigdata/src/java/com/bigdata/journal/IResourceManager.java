@@ -40,10 +40,10 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.resources.PostProcessOldJournalTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 
 /**
@@ -283,6 +283,13 @@ public interface IResourceManager {
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata);
 
+    /**
+     * Return the {@link ILoadBalancerService} that is used to identify under-utilized
+     * {@link IDataService}s (move targets) and over-utilized
+     * {@link IDataService}s (move sources).
+     */
+    public ILoadBalancerService getLoadBalancerService();
+    
     /**
      * Return the {@link IMetadataService} that will be used to assign partition
      * identifiers and which will be notified when index partitions are splits,

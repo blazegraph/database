@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service.mapred;
 
-import java.io.IOException;
 import java.text.Format;
 import java.text.NumberFormat;
 import java.util.Arrays;
@@ -38,7 +37,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.mapred.MapService.EmbeddedMapService;
 import com.bigdata.service.mapred.ReduceService.EmbeddedReduceService;
 
@@ -464,25 +462,28 @@ public abstract class AbstractMaster {
     }
     
     /**
-     * Setup intermediate indices on the data services (one per reduce
-     * task). The same data service MAY be used for more than one reduce
-     * task.
+     * Setup intermediate indices on the data services (one per reduce task).
+     * The same data service MAY be used for more than one reduce task.
      * 
-     * @todo in order for the map and reduce tasks to have automatic
-     *       failover they need to query the metadata service if the given
-     *       data service fails and find the replacement data service (this
-     *       presumes that a media redundency chain is in effect).
+     * @todo in order for the map and reduce tasks to have automatic failover
+     *       they need to query the metadata service if the given data service
+     *       fails and find the replacement data service (this presumes that a
+     *       media redundency chain is in effect).
+     * 
+     * FIXME replace with local writes and then replicate/move the data to the
+     * reduce hosts.
      */
     protected void setUpDataStores() {
 
         dataServices = new UUID[reduceTasks.length];
         {
-            IMetadataService metadataService = client.getMetadataService();
+//            IMetadataService metadataService = client.getMetadataService();
             for (int i = 0; i < reduceTasks.length; i++) {
                 try {
-                    dataServices[i] = metadataService.getUnderUtilizedDataService();
-                } catch (IOException e) {
-                    log.warn("Metadata service not available: " + e);
+                    // @todo should not do RMI inside of this loop.
+                    dataServices[i] = client.getLoadBalancerService().getUnderUtilizedDataService();
+                } catch (Exception e) {
+                    log.warn("Load balancer: " + e);
                 }
                 try {
                     // the index name (local on the data service).

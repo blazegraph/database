@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -54,6 +55,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -70,6 +72,7 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
@@ -169,7 +172,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     public static interface Options extends com.bigdata.journal.Options,
             com.bigdata.journal.ConcurrencyManager.Options,
-            com.bigdata.resources.ResourceManager.Options
+            com.bigdata.resources.ResourceManager.Options,
+            com.bigdata.counters.AbstractStatisticsCollector.Options
             // @todo local tx manager options?
             {
      
@@ -198,9 +202,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * 
      * @todo tx commit/abort requests.
      * 
-     * @todo counters from the {@link ResourceManager}. overflowCount,
-     *       overflowNanos;
-     * 
      * @todo counters from the {@link ConcurrencyManager}.
      *       <p>
      *       include #of tasks submitted, #of tasks failed, #of tasks suceeded,
@@ -213,25 +214,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * 
      * @todo counters from {@link DiskOnlyStrategy}
      */
-    private static class ReadBlockCounters {
-        
-//        /**
-//         * Submit tasks counters. Note that getIndexMetadata, registerIndex,
-//         * dropIndex, submit(procedure), and rangeIterator are all represented
-//         * by these counters.
-//         */
-//        long submitCount, submitErrorCount, submitNanos;
-//        long submitUCount, submitUNanos;
-//        long submitRCCount, submitRCNanos;
-//        long submitTxCount, submitTxNanos;
-//        long submitHRCount, submitHRNanos;
-        
-//        /** #of range iterator requests. */
-//        long rangeIteratorCount, rangeIteratorNanos;
-//        long rangeIteratorUCount, rangeIteratorUNanos;
-//        long rangeIteratorRCCount, rangeIteratorRCNanos;
-//        long rangeIteratorTxCount, rangeIteratorTxNanos;
-//        long rangeIteratorHRCount, rangeIteratorHRNanos;
+    protected static class ReadBlockCounters {
         
         /** #of block read requests. */
         long readBlockCount, readBlockErrorCount, readBlockBytes, readBlockNanos;
@@ -242,7 +225,10 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
     
-    final ReadBlockCounters counters = new ReadBlockCounters();
+    /**
+     * Counters for the block read API.
+     */
+    final protected ReadBlockCounters counters = new ReadBlockCounters();
 
     /**
      * FIXME Discover the {@link ITransactionManager} service and use it as the
@@ -264,11 +250,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     final protected ScheduledExecutorService statusService;
     
-    /**
-     * Used to emit a final status message during shutdown.
-     */
-    final private StatusTask statusTask;
-
     /**
      * The object used to manage the local resources.
      */
@@ -296,11 +277,35 @@ abstract public class DataService implements IDataService, IWritePipeline,
         return localTransactionManager; 
         
     }
+
+    /**
+     * Lookup an {@link IDataService} by its service {@link UUID}.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     * 
+     * @return The {@link IDataService} -or- <code>null</code> if the service
+     *         {@link UUID} does not identify a known service.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>serviceUUID</i> is <code>null</code>.
+     * @throws RuntimeException
+     *             if <i>serviceUUID</i> identifies a service that is not an
+     *             {@link IDataService} (including when it identifies an
+     *             {@link IMetadataService} - this method MAY NOT be used to
+     *             lookup metadata services by their service UUID).
+     */
+    abstract public IDataService getDataService(UUID serviceUUID);
     
     /**
-     * The {@link MetadataService}.
+     * The {@link IMetadataService}.
      */
     abstract public IMetadataService getMetadataService();
+
+    /**
+     * The {@link ILoadBalancerService}. 
+     */
+    abstract public ILoadBalancerService getLoadBalancerService();
     
     /**
      * Returns the {@link IResourceManager}.
@@ -318,6 +323,18 @@ abstract public class DataService implements IDataService, IWritePipeline,
                 
                 return DataService.this.getMetadataService();
                                 
+            }
+            
+            public ILoadBalancerService getLoadBalancerService() {
+
+                return DataService.this.getLoadBalancerService();
+                
+            }
+
+            public IDataService getDataService(UUID serviceUUID) {
+                
+                return DataService.this.getDataService(serviceUUID);
+                
             }
             
             public UUID getDataServiceUUID() {
@@ -412,10 +429,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
             
-            statusTask = new StatusTask();
-            
-            statusService.scheduleWithFixedDelay(statusTask, initialDelay,
-                    delay, unit);
+            statusService.scheduleWithFixedDelay(new StatusTask(),
+                    initialDelay, delay, unit);
 
         }
 
@@ -437,16 +452,17 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
         statisticsCollector.stop();
         
-        log.info(getCounters().toString());
+//        if (INFO)
+//            log.info(getCounters().toString());
 
     }
-    
+
     /**
      * Shutdown attempts to abort in-progress requests and shutdown as soon as
      * possible.
      */
     public void shutdownNow() {
-  
+
         concurrencyManager.shutdownNow();
 
         localTransactionManager.shutdownNow();
@@ -456,17 +472,11 @@ abstract public class DataService implements IDataService, IWritePipeline,
         statusService.shutdownNow();
 
         statisticsCollector.stop();
-        
-        log.info(getCounters().toString());
+
+//        if (INFO)
+//            log.info(getCounters().toString());
         
     }
-
-    /**
-     * The unique identifier for this data service.
-     * 
-     * @return The unique data service identifier.
-     */
-    public abstract UUID getServiceUUID() throws IOException;
     
     /**
      * Return the {@link ICounterSet} hierarchy used to report on the activity
@@ -490,7 +500,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * </dl>
      * Subclasses MAY extend this method to report additional {@link ICounter}s.
      * 
-     * @todo attached and detach counters for the live journal during overflow?
+     * FIXME attached and detach counters for the live journal during overflow
+     * so that we can report the disk usage? (We get this from performance
+     * counters anyway so maybe this does not matter.)
      */
     synchronized public ICounterSet getCounters() {
      
@@ -498,17 +510,20 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
             final UUID serviceUUID;
             try {
+                // Note: this is a local method call.
                 serviceUUID = getServiceUUID();
             } catch(IOException ex) {
                 throw new RuntimeException(ex);
             }
             
-            countersRoot = statisticsCollector.getCounters();
+            countersRoot = new CounterSet();
+            
+            countersRoot.attach( statisticsCollector.getCounters() );
             
             final String ps = ICounterSet.pathSeparator;
             
-            final String pathPrefix = countersRoot.getPath() + ps + "service"
-                    + ps + serviceUUID + ps;
+            final String pathPrefix = countersRoot.getPath() + "service" + ps
+                    + serviceUUID + ps;
 
             final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
 
@@ -517,11 +532,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
                 CounterSet tmp = serviceRoot.makePath("Info");
 
-                tmp.addCounter("Service Type", new Instrument<String>() {
-                    public String getValue() {
-                        return DataService.this.getClass().getName();
-                    }
-                });
+                tmp.addCounter("Service Type", new OneShotInstrument<String>(
+                    DataService.this.getClass().getName()));
                 
             }
 
@@ -540,16 +552,30 @@ abstract public class DataService implements IDataService, IWritePipeline,
                 CounterSet tmp = serviceRoot.makePath("Block API");
 
                 tmp.addCounter("Blocks Read", new Instrument<Long>() {
-                    public Long getValue() {
-                        return counters.readBlockCount;
+                    public void sample() {
+                        setValue(counters.readBlockCount);
                     }
                 });
 
                 tmp.addCounter("Blocks Read Per Second",
-                        new Instrument<String>() {
-                            public String getValue() {
-                                return nanosToPerSec(counters.readBlockCount,
-                                        counters.readBlockNanos);
+                        new Instrument<Double>() {
+                            public void sample() {
+
+                                // @todo encapsulate this logic.
+                                
+                                long secs = TimeUnit.SECONDS.convert(
+                                        counters.readBlockNanos,
+                                        TimeUnit.NANOSECONDS);
+
+                                final double v;
+
+                                if (secs == 0L)
+                                    v = 0d;
+                                else
+                                    v = counters.readBlockCount / secs;
+
+                                setValue(v);
+                                
                             }
                         });
                 
@@ -666,9 +692,47 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         public StatusTask() {
         }
-        
+
+        /**
+         * Note: Don't throw anything here since we don't want to have the task
+         * suppressed!
+         */
         public void run() {
 
+            /*
+             * Send performance counters to the load balancer.
+             */
+            try {
+
+                final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+                
+                if (loadBalancerService != null) {
+                    
+                    /*
+                     * @todo this is probably worth compressing as there will be a
+                     * lot of redundency.
+                     * 
+                     * @todo allow filter on what gets sent to the load balancer?
+                     */
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(
+                            Bytes.kilobyte32 * 2);
+                    
+                    getCounters().asXML(baos,"UTF-8",null/* filter */);
+                    
+                    loadBalancerService.notify("Hello", baos.toByteArray());
+                    
+                } else {
+                    
+                    log.warn("Could not discover load balancer service");
+                    
+                }
+                
+            } catch(Exception ex) {
+                
+                log.error(ex.getMessage(),ex);
+                
+            }
+            
             try {
 
                 // FIXME parameterize or remove?
@@ -689,11 +753,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
             } catch (Throwable t) {
 
-                /*
-                 * Note: Don't throw anything since I don't want to
-                 * have the status task suppressed!
-                 */
-                
                 log.warn("Problem in status thread?", t);
 
             }
@@ -750,46 +809,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
         MDC.remove("serviceUUID");
         
     }
-
-//    /**
-//     * Core implementation submits the task to the {@link IConcurrencyManager}
-//     * and collects various metrics on task execution.
-//     * 
-//     * @param task
-//     *            A task.
-//     *            
-//     * @return The value returned by {@link AbstractTask#call()}.
-//     */
-//    protected Object submitAndGetResult(AbstractTask task) throws InterruptedException,
-//            ExecutionException {
-//
-//        try {
-//
-//            counters.submitCount++;
-//            
-//            Object result = concurrencyManager.submit(task).get();
-//            
-//            return result;
-//
-//        } catch (InterruptedException ex) {
-//
-//            counters.submitErrorCount++;
-//            
-//            throw ex;
-//
-//        } catch (ExecutionException ex) {
-//
-//            counters.submitErrorCount++;
-//
-//            throw ex;
-//
-//        } finally {
-//
-//            counters.submitNanos += task.nanoTime_allDone;
-//            
-//        }
-//
-//    }
     
     public void registerIndex(String name, IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException {
