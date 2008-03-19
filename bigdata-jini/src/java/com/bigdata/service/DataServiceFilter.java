@@ -44,6 +44,8 @@ public class DataServiceFilter implements ServiceItemFilter {
 
     public static final transient ServiceItemFilter INSTANCE = new DataServiceFilter();
     
+    private DataServiceFilter(){}
+    
     public boolean check(ServiceItem item) {
 
         if(item.service==null) {

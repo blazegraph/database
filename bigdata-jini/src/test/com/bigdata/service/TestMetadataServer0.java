@@ -207,20 +207,26 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
             dataService0ID = getServiceID(dataServer0);
 
             /*
-             * verify that both data services were discovered by the metadata
-             * server.
+             * verify that both data services and the metadata service itself
+             * were discovered by the metadata server.
              */
 
             System.err.println("Sleeping");
 
             Thread.sleep(500);
 
-            assertNotNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService0ID));
+            assertNotNull(metadataServer0.dataServicesClient.serviceMap
+                    .getServiceItemByID(dataService0ID));
 
-            assertNotNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService1ID));
+            assertNotNull(metadataServer0.dataServicesClient.serviceMap
+                    .getServiceItemByID(dataService1ID));
 
-            assertEquals("#dataServices", 2, metadataServer0.
-                    dataServiceMap.getServiceCount());
+            assertNotNull(metadataServer0.dataServicesClient.serviceMap
+                    .getServiceItemByID(metadataServiceID));
+
+            assertEquals("#dataServices", 3,
+                    metadataServer0.dataServicesClient.serviceMap
+                            .getServiceCount());
 
         } finally {
 
@@ -236,14 +242,18 @@ public class TestMetadataServer0 extends AbstractServerTestCase {
 
                 Thread.sleep(500);
 
-                assertEquals("#dataServices", 1, metadataServer0
-                        .dataServiceMap.getServiceCount());
+                assertEquals("#dataServices", 2, metadataServer0
+                        .dataServicesClient.serviceMap.getServiceCount());
 
-                assertNull(metadataServer0.dataServiceMap.getServiceItemByID(dataService0ID));
+                assertNull(metadataServer0.dataServicesClient.serviceMap
+                        .getServiceItemByID(dataService0ID));
 
-                assertNotNull(metadataServer0
-                        .dataServiceMap.getServiceItemByID(dataService1ID));
+                assertNotNull(metadataServer0.dataServicesClient.serviceMap
+                        .getServiceItemByID(dataService1ID));
 
+                assertNotNull(metadataServer0.dataServicesClient.serviceMap
+                        .getServiceItemByID(metadataServiceID));
+                
             }
 
         }

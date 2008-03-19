@@ -43,6 +43,8 @@ public class MetadataServiceFilter implements ServiceItemFilter {
 
     public static final transient ServiceItemFilter INSTANCE = new MetadataServiceFilter();
     
+    private MetadataServiceFilter(){}
+    
     public boolean check(ServiceItem item) {
 
         if(item.service==null) {

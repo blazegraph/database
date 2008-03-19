@@ -58,45 +58,6 @@ public interface IMetadataService extends IDataService, Remote {
      */
     
     /**
-     * Return the identifier of an under utilized data service.
-     * 
-     * @todo probably will be moved to {@link IStatisticsService} 
-     */
-//    * @param exclude Optional {@link UUID} to be excluded from consideration.
-//    * 
-    public UUID getUnderUtilizedDataService() throws IOException;
-
-    /**
-     * Return up to <i>limit</i> data service UUIDs that are currently
-     * underutilized.
-     * 
-     * @param limit
-     *            The maximum# of data service UUIDs to return.
-     * @param exclude
-     *            The optional {@link UUID} of a data service to be excluded
-     *            from the returned set.
-     * 
-     * @return Up to <i>limit</i> under-utilized data services -or-
-     *         <code>null</code> IFF no data services are recommended at this
-     *         time as needing additional load.
-     */
-    public UUID[] getUnderUtilizedDataServices(int limit, UUID exclude) throws IOException;
-    
-    /**
-     * Return the proxy for a {@link IDataService} from the local cache.
-     * 
-     * @param serviceUUID
-     *            The {@link UUID} for the {@link DataService}.
-     * 
-     * @return The proxy or <code>null</code> if the {@link UUID} does not
-     *         identify a known {@link DataService}.
-     * 
-     * @throws IOException
-     */
-    public IDataService getDataService(UUID serviceUUID)
-            throws IOException;
-
-    /**
      * Return the next unique partition identifier to be assigned to the named
      * scale-out index.
      * 

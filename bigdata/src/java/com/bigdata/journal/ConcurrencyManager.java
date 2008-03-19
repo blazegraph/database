@@ -30,8 +30,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.Instrument.InstrumentDelta;
-import com.bigdata.counters.Instrument.InstrumentInstantaneousAverage;
+import com.bigdata.counters.InstrumentDelta;
+import com.bigdata.counters.InstrumentInstantaneousAverage;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.StatusTask;
@@ -759,8 +759,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // elapsed time since the service started (milliseconds).
             countersRoot.addCounter("elapsed", new Instrument<Long>(){
-                public Long getValue() {
-                    return System.currentTimeMillis() - serviceStartTime;
+                public void sample() {
+                    setValue(System.currentTimeMillis() - serviceStartTime);
                 }
             });
             
@@ -791,36 +791,36 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
                 tmp.addCounter("#active",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getActiveCount();
+                            public void sample() {
+                                setValue(service.getActiveCount());
                             }
                         });
                 
                 tmp.addCounter("#queued",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getQueue().size();
+                            public void sample() {
+                                setValue(service.getQueue().size());
                             }
                         });
 
                 tmp.addCounter("#completed",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getCompletedTaskCount();
+                            public void sample() {
+                                setValue(service.getCompletedTaskCount());
                             }
                         });
                 
                 tmp.addCounter("poolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getPoolSize();
+                            public void sample() {
+                                setValue(service.getPoolSize());
                             }
                         });
 
                 tmp.addCounter("largestPoolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getLargestPoolSize();
+                            public void sample() {
+                                setValue(service.getLargestPoolSize());
                             }
                         });
 
@@ -835,36 +835,36 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
                 tmp.addCounter("#active",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getActiveCount();
+                            public void sample() {
+                                setValue(service.getActiveCount());
                             }
                         });
                 
                 tmp.addCounter("#queued",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getQueue().size();
+                            public void sample() {
+                                setValue(service.getQueue().size());
                             }
                         });
 
                 tmp.addCounter("#completed",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getCompletedTaskCount();
+                            public void sample() {
+                                setValue(service.getCompletedTaskCount());
                             }
                         });
                 
                 tmp.addCounter("poolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getPoolSize();
+                            public void sample() {
+                                setValue(service.getPoolSize());
                             }
                         });
 
                 tmp.addCounter("largestPoolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getLargestPoolSize();
+                            public void sample(){
+                                setValue(service.getLargestPoolSize());
                             }
                         });
 
@@ -879,36 +879,36 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
                 tmp.addCounter("#active",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getActiveCount();
+                            public void sample() {
+                                setValue(service.getActiveCount());
                             }
                         });
                 
                 tmp.addCounter("#queued",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getQueue().size();
+                            public void sample() {
+                                setValue(service.getQueue().size());
                             }
                         });
 
                 tmp.addCounter("#completed",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getCompletedTaskCount();
+                            public void sample() {
+                                setValue(service.getCompletedTaskCount());
                             }
                         });
                 
                 tmp.addCounter("poolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getPoolSize();
+                            public void sample() {
+                                setValue(service.getPoolSize());
                             }
                         });
 
                 tmp.addCounter("largestPoolSize",
                         new Instrument<Integer>() {
-                            public Integer getValue() {
-                                return service.getLargestPoolSize();
+                            public void sample() {
+                                setValue(service.getLargestPoolSize());
                             }
                         });
 
@@ -917,64 +917,64 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  */
                 tmp.addCounter("#commits",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getGroupCommitCount();
+                            public void sample() {
+                                setValue(service.getGroupCommitCount());
                             }
                         });
 
                 tmp.addCounter("#aborts",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getAbortCount();
+                            public void sample() {
+                                setValue(service.getAbortCount());
                             }
                         });
 
                 tmp.addCounter("overflowCount",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getOverflowCount();
+                            public void sample() {
+                                setValue(service.getOverflowCount());
                             }
                         });
 
                 tmp.addCounter("failedTaskCount",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getFailedTaskCount();
+                            public void sample() {
+                                setValue(service.getFailedTaskCount());
                             }
                         });
 
                 tmp.addCounter("successTaskCount",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getSuccessTaskCount();
+                            public void sample() {
+                                setValue(service.getSuccessTaskCount());
                             }
                         });
 
                 tmp.addCounter("committedTaskCount",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getCommittedTaskCount();
+                            public void sample() {
+                                setValue(service.getCommittedTaskCount());
                             }
                         });
 
                 tmp.addCounter("maxLatencyUntilCommit",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getMaxLatencyUntilCommit();
+                            public void sample() {
+                                setValue(service.getMaxLatencyUntilCommit());
                             }
                         });
 
                 tmp.addCounter("maxCommitLatency",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getMaxCommitLatency();
+                            public void sample() {
+                                setValue(service.getMaxCommitLatency());
                             }
                         });
 
                 tmp.addCounter("maxRunning",
                         new Instrument<Long>() {
-                            public Long getValue() {
-                                return service.getMaxRunning();
+                            public void sample() {
+                                setValue(service.getMaxRunning());
                             }
                         });
 
@@ -1466,20 +1466,20 @@ public class ConcurrencyManager implements IConcurrencyManager {
              */
             
             root.addCounter("taskCount", new Instrument<Long>() {
-                public Long getValue() {
-                    return taskCount;
+                public void sample() {
+                    setValue(taskCount);
                 }
             });
 
             root.addCounter("failCount", new Instrument<Long>() {
-                public Long getValue() {
-                    return failCount;
+                public void sample() {
+                    setValue(failCount);
                 }
             });
 
             root.addCounter("successCount", new Instrument<Long>() {
-                public Long getValue() {
-                    return successCount;
+                public void sample() {
+                    setValue(successCount);
                 }
             });
 

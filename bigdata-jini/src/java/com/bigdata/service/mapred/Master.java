@@ -38,6 +38,8 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
 import com.bigdata.service.BigdataClient;
+import com.bigdata.service.DataServicesClient;
+import com.bigdata.service.LoadBalancerClient;
 
 /**
  * <p>
@@ -105,6 +107,10 @@ public class Master extends AbstractMaster {
 
         private ServiceItemFilter reduceServiceFilter = null;
 
+        /**
+         * @todo refactor discovery and lookup per {@link DataServicesClient}
+         *       and {@link LoadBalancerClient}.
+         */
         public MapReduceServiceDiscoveryManager(BigdataClient client) {
 
             /*

@@ -53,6 +53,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.util.MillisecondTimestampFactory;
 
@@ -732,6 +733,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             super(properties);
 
+        }
+
+        public ILoadBalancerService getLoadBalancerService() {
+
+            throw new UnsupportedOperationException();
+            
         }
 
         public IMetadataService getMetadataService() {

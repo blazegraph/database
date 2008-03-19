@@ -42,7 +42,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.JiniUtil;
 
 /**
- * Used to manage a {@link MapService}.
+ * Used to start and manage a {@link MapService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

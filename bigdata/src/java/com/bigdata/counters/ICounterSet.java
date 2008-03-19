@@ -28,8 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.regex.Pattern;
+
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.xml.sax.SAXException;
 
 /**
  * A collection of named {@link Counter}s.
@@ -56,48 +63,6 @@ public interface ICounterSet extends ICounterNode {
      */
     public Iterator<ICounter> getCounters(Pattern filter);
     
-    
-//    /**
-//     * Return the {@link ICounterSet} under which the counter with the specified
-//     * path would exist.
-//     * 
-//     * @param path
-//     *            The path of the counter.
-//     * 
-//     * @return The parent to under which a counter having that path would be
-//     *         found -or- <code>null</code> if there is no such parent.
-//     */
-//    public ICounterSet getCounterSetByPath(String path);
-    
-//    /**
-//     * Return the matching {@link ICounter} object by path from anywhere in the
-//     * spanned hierarchy.
-//     * 
-//     * @param path
-//     *            The counter path. The path MAY be relative to this
-//     *            {@link ICounterSet}.
-//     * 
-//     * @return The {@link ICounter} object.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if the path is <code>null</code>
-//     * @throws IllegalArgumentException
-//     *             if the path is an empty string.
-//     */
-//    public ICounter getCounterByPath(String path);
-//
-//    /**
-//     * Return the named directly attached {@link ICounterSet}.
-//     * 
-//     * @param name
-//     *            The name of the directly attached {@link ICounterSet}.
-//     *            
-//     * @return The directly attached {@link ICounterSet} -or- <code>null</code>
-//     *         iff there is no such {@link ICounterSet} attached as a direct
-//     *         child.
-//     */
-//    public ICounterSet getCounterSetByName(String name);
-    
     /**
      * Adds any necessary {@link ICounterSet}s described in the path (ala
      * mkdirs).
@@ -121,7 +86,7 @@ public interface ICounterSet extends ICounterNode {
     public String toString();
 
     /**
-     * A human readable representation of all counters in the hierarchy together
+     * A human readable representation of the counters in the hierarchy together
      * with their current value.
      * 
      * @param filter
@@ -129,5 +94,48 @@ public interface ICounterSet extends ICounterNode {
      *            counters.
      */
     public String toString(Pattern filter);
+
+    /**
+     * Write an XML reprentation of the counters in the hierarchy together with
+     * their current value.
+     * 
+     * @param os
+     *            The sink on which the representation will be written.
+     * @param encoding
+     *            The character set encoding that will be used, e.g.,
+     *            <code>UTF-8</code>.
+     * @param filter
+     *            An optional filter that will be used to select only specific
+     *            counters.
+     */
+    public void asXML(OutputStream os, String encoding, Pattern filter) throws IOException;
+
+    /**
+     * A factory for {@link IInstrument}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface IInstrumentFactory {
+        
+        public IInstrument newInstance(Class type);
+        
+    }
+    
+    /**
+     * Reads counters into this hierarchy.
+     * 
+     * @param os
+     *            The source from which the data will be read.
+     * @param instrumentFactory
+     *            Used to create counters on an as needed basis.
+     * @param filter
+     *            An optional filter, when specified only counters matching the
+     *            filter will be processed.
+     * @throws IOException
+     */
+    public void readXML(InputStream is, IInstrumentFactory instrumentFactory,
+            Pattern filter) throws IOException, ParserConfigurationException,
+            SAXException;
 
 }

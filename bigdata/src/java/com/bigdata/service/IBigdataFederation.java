@@ -49,6 +49,11 @@ public interface IBigdataFederation {
     public static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
     /**
+     * Return the load balancer service (or a proxy for that service).
+     */
+    public ILoadBalancerService getLoadBalancerService();
+    
+    /**
      * Return the metadata service (or a proxy for the metadata service).
      */
     public IMetadataService getMetadataService();

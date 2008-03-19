@@ -133,6 +133,14 @@ public class BigdataFederation implements IBigdataFederation {
         
     }
 
+    public ILoadBalancerService getLoadBalancerService() {
+        
+        assertOpen();
+        
+        return client.getLoadBalancerService();
+        
+    }
+    
     public IMetadataService getMetadataService() {
 
         assertOpen();
@@ -157,7 +165,7 @@ public class BigdataFederation implements IBigdataFederation {
             
             try {
             
-                dataServiceUUID = getMetadataService()
+                dataServiceUUID = getLoadBalancerService()
                         .getUnderUtilizedDataService();
 
             } catch (Exception ex) {

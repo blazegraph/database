@@ -212,12 +212,6 @@ public class EmbeddedBigdataClient implements IBigdataClient {
         
     }
 
-    /**
-     * Return the (in process) data service.
-     * 
-     * @param serviceUUID
-     *            The data service identifier.
-     */
     public IDataService getDataService(UUID serviceUUID) {
 
         assertConnected();
@@ -226,14 +220,19 @@ public class EmbeddedBigdataClient implements IBigdataClient {
         
     }
 
-    /**
-     * The (in process) metadata service.
-     */
     public IMetadataService getMetadataService() {
 
         assertConnected();
         
         return fed.getMetadataService();
+        
+    }
+
+    public ILoadBalancerService getLoadBalancerService() {
+        
+        assertConnected();
+        
+        return fed.getLoadBalancerService();
         
     }
 

@@ -27,29 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.MDC;
-
 import net.jini.config.Configuration;
-import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceItem;
-import net.jini.core.lookup.ServiceTemplate;
 import net.jini.export.ServerContext;
 import net.jini.io.context.ClientHost;
 import net.jini.io.context.ClientSubject;
-import net.jini.lease.LeaseRenewalManager;
-import net.jini.lookup.LookupCache;
-import net.jini.lookup.ServiceDiscoveryManager;
-import net.jini.lookup.ServiceItemFilter;
+
+import org.apache.log4j.MDC;
 
 /**
  * A metadata server.
@@ -75,63 +65,12 @@ import net.jini.lookup.ServiceItemFilter;
  */
 public class MetadataServer extends DataServer {
 
-    private ServiceDiscoveryManager serviceDiscoveryManager = null;
-    private LookupCache dataServiceLookupCache = null;
-    
-    /**
-     * Provides direct cached lookup of {@link DataService}s by their
-     * {@link ServiceID}.
-     */
-    public ServiceCache dataServiceMap = new ServiceCache();
-
-    protected LookupCache getDataServiceLookupCache() {
-        
-        return dataServiceLookupCache;
-        
-    }
-    
     /**
      * @param args
      */
     public MetadataServer(String[] args) {
        
         super(args);
-        
-        /*
-         * Setup a helper class that will be notified as services join or leave
-         * the various registrars to which the metadata server is listening.
-         */
-        try {
-
-            serviceDiscoveryManager = new ServiceDiscoveryManager(getDiscoveryManagement(),
-                    new LeaseRenewalManager());
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(
-                    "Could not initiate service discovery manager", ex);
-            
-        }
-
-        /*
-         * Setup a LookupCache that will be populated with all services that match a
-         * filter. This is used to keep track of all data services registered
-         * with any service registrar to which the metadata server is listening.
-         */
-        try {
-            
-            ServiceTemplate template = new ServiceTemplate(null,
-                    new Class[] { IDataService.class }, null);
-
-            dataServiceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    template, new DataServiceFilter() /* filter */,
-                    dataServiceMap/* ServiceDiscoveryListener */);
-
-        } catch (RemoteException ex) {
-            
-            throw new RuntimeException("Could not setup LookupCache", ex);
-            
-        }
              
     }
 
@@ -172,15 +111,11 @@ public class MetadataServer extends DataServer {
         
     }
     
-    protected void terminateServiceManagementThreads() {
-        
-        dataServiceLookupCache.terminate();
-        
-        serviceDiscoveryManager.terminate();
-        
-        super.terminateServiceManagementThreads();
-
-    }
+//    protected void terminate() {
+//        
+//        super.terminate();
+//
+//    }
 
     /**
      * Adds jini administration interfaces to the basic {@link MetadataService}.
@@ -280,86 +215,15 @@ public class MetadataServer extends DataServer {
             
         }
 
-        /**
-         * Return the UUID of an under utilized data service.
-         * 
-         * @todo this is just an arbitrary instance and does not consider
-         *       utilization.
-         */
-        public UUID getUnderUtilizedDataService() throws IOException {
-
-            ServiceItem item = server.dataServiceLookupCache.lookup(null);
-
-            // @todo if item is null...
-            log.info(item.toString());
-
-            return JiniUtil.serviceID2UUID(item.serviceID);
+        public ILoadBalancerService getLoadBalancerService() {
+            
+            return server.loadBalancerClient.getLoadBalancerService();
             
         }
 
-        /**
-         * @todo this does not pay attention to utilization and there is no
-         *       guarentee that it is reporting the available data services in a
-         *       round-robin fashion.  This method probably needs to be moved to
-         *       a service that is specialized in load balancing the hosts and
-         *       services in the federation.
-         */
-        public UUID[] getUnderUtilizedDataServices(int limit, final UUID exclude) throws IOException {
+        public IDataService getDataService(UUID serviceUUID) {
 
-            ServiceItemFilter filter = exclude != null ? new ServiceItemFilter() {
-
-                public boolean check(ServiceItem arg0) {
-
-                    if (exclude != null
-                            && JiniUtil.serviceID2UUID(arg0.serviceID).equals(
-                                    exclude)) {
-
-                        return false;
-
-                    }
-                    
-                    return true;
-
-                }
-
-            }
-                    : null;
-            
-            ServiceItem[] items = server.dataServiceLookupCache.lookup(filter,
-                    limit);
-
-            final List<UUID> a = new ArrayList<UUID>(limit);
-            
-            for(int i=0; i<items.length; i++) {
-                
-                UUID uuid = JiniUtil.serviceID2UUID(items[i].serviceID);
-                
-                a.add(uuid);
-                
-            }
-            
-            return a.toArray(new UUID[a.size()]);
-            
-        }
-
-        public IDataService getDataService(UUID serviceUUID) throws IOException {
-
-            if (serviceUUID == null)
-                throw new IllegalArgumentException();
-
-            final ServiceItem serviceItem = server.dataServiceMap
-                    .getServiceItemByID(JiniUtil.uuid2ServiceID(serviceUUID));
-
-            if (serviceItem == null) {
-
-                log.warn("No such dataService: uuid=" + serviceUUID);
-
-                return null;
-
-            }
-
-            // return the data service.
-            return (IDataService) serviceItem.service;
+            return server.dataServicesClient.getDataService(serviceUUID);
             
         }
         

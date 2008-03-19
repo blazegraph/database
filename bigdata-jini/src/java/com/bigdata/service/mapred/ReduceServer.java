@@ -42,7 +42,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.JiniUtil;
 
 /**
- * Used to manage a {@link ReduceService}.
+ * Used to start and manage a {@link ReduceService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -31,13 +31,12 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
+import java.net.Inet4Address;
+import java.net.UnknownHostException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
@@ -84,6 +83,11 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
     private final File dataDir;
     
     /**
+     * The (in process) {@link LoadBalancerService}.
+     */
+    private LoadBalancerService loadBalancer;
+    
+    /**
      * The (in process) {@link MetadataService}.
      */
     private MetadataService metadataService;
@@ -105,6 +109,15 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         
     }
 
+    /**
+     * The (in process) {@link LoadBalancerService}.
+     */
+    public ILoadBalancerService getLoadBalancerService() {
+        
+        return loadBalancer;
+        
+    }
+    
     /**
      * The (in process) {@link MetadataService}.
      */
@@ -234,6 +247,12 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         final boolean createTempFile = Boolean.parseBoolean(properties
                 .getProperty(Options.CREATE_TEMP_FILE,
                         ""+Options.DEFAULT_CREATE_TEMP_FILE));
+
+        /*
+         * Start the load balancer.
+         */
+        loadBalancer = new EmbeddedLoadBalancerService(this, UUID
+                .randomUUID(), properties);
 
         /*
          * The directory in which the data files will reside.
@@ -368,7 +387,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                 ndataServices = createFederation(properties,isTransient);
 
             } else {
-                
+
                 /*
                  * Reload services from disk.
                  */
@@ -439,7 +458,38 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             }
             
         }
+        
+        /*
+         * Have the data services join the load balancer.
+         */
+        {
 
+            final String hostname;
+            try {
+                hostname = Inet4Address.getLocalHost().getCanonicalHostName();
+            } catch (UnknownHostException e1) {
+                // should never happen for the local host.
+                throw new AssertionError();
+            }
+            
+            for(IDataService ds : this.dataService ) {
+
+                try {
+
+                    loadBalancer.join(ds.getServiceUUID(), hostname);
+                    
+                } catch (IOException e) {
+                    
+                    // Should never be thrown for an embedded service.
+                    
+                    log.warn(e.getMessage(),e);
+                    
+                }
+
+            }
+            
+        }
+        
     }
 
     /**
@@ -554,6 +604,18 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
                         
                     }
                     
+                    public ILoadBalancerService getLoadBalancerService() {
+                        
+                        return loadBalancer;
+                        
+                    }
+
+                    public IDataService getDataService(UUID serviceUUID) {
+                        
+                        return dataServiceByUUID.get(serviceUUID);
+                        
+                    }
+                    
                 };
 
                 dataServiceByUUID.put(serviceUUID, dataService[i]);
@@ -609,8 +671,7 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
             try {
             
-                dataServiceUUID = getMetadataService()
-                        .getUnderUtilizedDataService();
+                dataServiceUUID = loadBalancer.getUnderUtilizedDataService();
 
             } catch (Exception ex) {
 
@@ -726,11 +787,31 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
             DataService ds = this.dataService[i];
             
+            try {
+
+                // notify leave event.
+                loadBalancer.leave(ds.getServiceUUID());
+                
+            } catch (IOException e) {
+                
+                // Should never be thrown for an embedded service.
+                log.warn(e.getMessage(),e);
+                
+            }
+            
             ds.shutdown();
             
         }
 
         metadataService.shutdown();
+        
+        if (loadBalancer != null) {
+
+            loadBalancer.shutdown();
+
+            loadBalancer = null;
+            
+        }
         
         log.info("done");
 
@@ -751,12 +832,32 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
             DataService ds = this.dataService[i];
             
+            try {
+
+                // notify leave event.
+                loadBalancer.leave(ds.getServiceUUID());
+                
+            } catch (IOException e) {
+                
+                // Should never be thrown for an embedded service.
+                log.warn(e.getMessage(),e);
+                
+            }
+            
             ds.shutdownNow();
             
         }
 
         metadataService.shutdownNow();
 
+        if (loadBalancer != null) {
+
+            loadBalancer.shutdownNow();
+
+            loadBalancer = null;
+            
+        }
+        
         log.info("done");
         
     }
@@ -770,7 +871,6 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
     public static class EmbeddedMetadataService extends MetadataService {
 
         final private UUID serviceUUID;
-        private int nextDataService;
         private EmbeddedBigdataFederation federation;
         
         public EmbeddedMetadataService(EmbeddedBigdataFederation federation,
@@ -796,65 +896,8 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
         }
 
-        /**
-         * @todo this is just an arbitrary instance and does not consider
-         *       utilization.
-         */
-        public UUID getUnderUtilizedDataService() throws IOException {
-
-            /*
-             * Assigns the next data service using a round-robin approach.
-             */
-
-            int i = nextDataService;
-
-            nextDataService = (nextDataService + 1) % federation.ndataServices;
-
-            return federation.dataService[i].getServiceUUID();
-            
-        }
-
-        public UUID[] getUnderUtilizedDataServices(int limit, UUID exclude) throws IOException {
-
-            if(limit==0) {
-                
-                limit = federation.ndataServices;
-                
-            } else {
-            
-                limit = Math.min(limit, federation.ndataServices);
-                
-            }
-            
-            final List<UUID> a = new ArrayList<UUID>(limit);
-            
-            for(int i=0; i<federation.ndataServices; i++) {
-                
-                int index = _index.incrementAndGet();
-                
-                UUID uuid = federation.dataService[index % federation.ndataServices].getServiceUUID();
-                
-                if(exclude != null && exclude.equals(uuid)) {
-                    
-                    continue;
-                    
-                }
-                
-                a.add(uuid);
-                
-            }
-            
-            return a.toArray(new UUID[a.size()]);
-            
-        }
-        
-        /**
-         * Used to make {@link #getUnderUtilizedDataServices(int, UUID)} a
-         * thread-safe round-robin policy.
-         */
-        private AtomicInteger _index = new AtomicInteger(0);
-
-        public IDataService getDataService(UUID dataService) throws IOException {
+        @Override
+        public IDataService getDataService(UUID dataService) {
 
             return federation.getDataService(dataService);
             
@@ -867,6 +910,64 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
         }
         
+        @Override
+        public ILoadBalancerService getLoadBalancerService() {
+            
+            return federation.loadBalancer;
+            
+        }
+
     }
-    
+
+    /**
+     * Embedded {@link LoadBalancerService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class EmbeddedLoadBalancerService extends LoadBalancerService {
+
+        final private UUID serviceUUID;
+        private EmbeddedBigdataFederation federation;
+        
+        public EmbeddedLoadBalancerService(EmbeddedBigdataFederation federation,
+                UUID serviceUUID,
+                Properties properties) {
+            
+            super( properties );
+            
+            if (federation == null)
+                throw new IllegalArgumentException();
+
+            if (serviceUUID == null)
+                throw new IllegalArgumentException();
+
+            this.federation = federation;
+            
+            this.serviceUUID = serviceUUID;
+            
+        }
+
+        public UUID getServiceUUID() {
+            
+            return serviceUUID;
+            
+        }
+
+        protected String getClientHostname() {
+            
+            try {
+                
+                return Inet4Address.getLocalHost().getCanonicalHostName();
+                
+            } catch (UnknownHostException e) {
+                
+                return "localhost";
+                
+            }
+            
+        }
+        
+    }
+
 }

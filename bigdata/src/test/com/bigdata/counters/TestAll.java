@@ -63,6 +63,8 @@ public class TestAll extends TestCase {
        
         suite.addTestSuite(TestCounters.class);
 
+        suite.addTestSuite(TestHistoryInstrument.class);
+
         return suite;
         
     }

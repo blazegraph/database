@@ -114,9 +114,27 @@ final class Counter<T> implements ICounter {
     /**
      * Invokes {@link Instrument#getValue()}
      */
-    public Object getValue() {
+    public T getValue() {
         
         return instrument.getValue();
+        
+    }
+    
+    /**
+     * Invokes {@link Instrument#setValue(Object, long)}.
+     */
+    public void setValue(Object value, long timestamp) {
+        
+        instrument.setValue((T)value, timestamp);
+        
+    }
+    
+    /**
+     * Invokes {@link Instrument#lastModified()}
+     */
+    public long lastModified() {
+        
+        return instrument.lastModified();
         
     }
     

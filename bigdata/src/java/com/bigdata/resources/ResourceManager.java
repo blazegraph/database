@@ -948,23 +948,23 @@ abstract public class ResourceManager implements IResourceManager {
             countersRoot = new CounterSet();
 
             countersRoot.addCounter("Overflow Count", new Instrument<Long>(){
-                public Long getValue() {return overflowCounter.get();}
+                public void sample() {setValue(overflowCounter.get());}
             });
 
             countersRoot.addCounter("Overflow Allowed", new Instrument<Boolean>(){
-                public Boolean getValue() {return overflowAllowed.get();}
+                public void sample() {setValue(overflowAllowed.get());}
             });
 
             countersRoot.addCounter("Minimum Release Age", new Instrument<Long>(){
-                public Long getValue() {return minReleaseAge;}
+                public void sample() {setValue(minReleaseAge);}
             });
 
             countersRoot.addCounter("Release Time", new Instrument<Long>(){
-                public Long getValue() {return releaseTime;}
+                public void sample() {setValue(releaseTime);}
             });
 
             countersRoot.addCounter("Effective Release Time", new Instrument<Long>(){
-                public Long getValue() {return lastEffectiveReleaseTime;}
+                public void sample() {setValue(lastEffectiveReleaseTime);}
             });
 
         }
@@ -3932,20 +3932,6 @@ abstract public class ResourceManager implements IResourceManager {
         sb.append("ResourceManager: dataService="+getDataServiceUUID()+", dataDir="+dataDir);
         
         return sb.toString();
-        
-    }
-    
-    public IDataService getDataService(UUID serviceUUID) {
-        
-        try {
-
-            return getMetadataService().getDataService(serviceUUID);
-            
-        } catch (IOException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
         
     }
     

@@ -612,7 +612,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
         try {
 
-            terminateServiceManagementThreads();
+            terminate();
         
             /*
              * Hand-shaking with the NonActivableServiceDescriptor.
@@ -648,7 +648,10 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
     }
 
-    protected void terminateServiceManagementThreads() {
+    /**
+     * Terminates service management threads.
+     */
+    protected void terminate() {
         
         log.info("Terminating service management threads.");
 

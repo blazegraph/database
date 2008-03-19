@@ -39,4 +39,20 @@ public interface IInstrument<T> {
     /** Obtain a sample. */
     public T getValue();
     
+    /** Obtain the timestamp for the last collected sample. */
+    public long lastModified();
+
+    /**
+     * Set the current value.
+     * 
+     * @param value
+     *            The sampled value.
+     * @param timestamp
+     *            The timestamp for that sample.
+     * 
+     * @throws UnsupportedOperationException
+     *             if this operation is not allowed.
+     */
+    public void setValue(T value,long timestamp);
+    
 }

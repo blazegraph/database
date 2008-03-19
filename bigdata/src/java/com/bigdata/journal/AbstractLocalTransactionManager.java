@@ -547,12 +547,16 @@ abstract public class AbstractLocalTransactionManager implements
 
             countersRoot = new CounterSet();
 
-            countersRoot.addCounter("#active",new Instrument<Integer>(){
-                public Integer getValue() {return activeTx.size();}
+            countersRoot.addCounter("#active", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(activeTx.size());
+                }
             });
 
-            countersRoot.addCounter("#prepared",new Instrument<Integer>(){
-                public Integer getValue() {return preparedTx.size();}
+            countersRoot.addCounter("#prepared", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(preparedTx.size());
+                }
             });
 
         }
