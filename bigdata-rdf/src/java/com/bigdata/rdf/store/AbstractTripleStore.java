@@ -69,6 +69,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.ResultSet;
+import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -89,6 +91,7 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.spo.EmptySPOIterator;
 import com.bigdata.rdf.spo.IChunkedIterator;
 import com.bigdata.rdf.spo.ISPOFilter;
 import com.bigdata.rdf.spo.ISPOIterator;
@@ -2943,6 +2946,134 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
     }
     
+    /**
+     * Filter the supplied set of SPO objects for whether they are "present" or
+     * "not present" in the database, depending on the value of the supplied
+     * boolean variable.
+     * <p>
+     * Note: This is different from using an ISPOFilter, as the point tests
+     * for existence in this method will be done in bulk using 
+     * {@link IIndex#submit(int, int, byte[][], byte[][], com.bigdata.btree.AbstractIndexProcedureConstructor, IResultHandler)}.
+     * 
+     * @param stmts 
+     *          the statements to test
+     * @param numStmts 
+     *          the number of statements to test
+     * @param present 
+     *          if true, filter for statements that exist in the db, otherwise
+     *          filter for statements that do not exist
+     * 
+     * @return an iteration over the filtered set of statements
+     */
+    public ISPOIterator bulkFilterStatements(SPO[] stmts, int numStmts, boolean present ) {
+        
+        if( numStmts == 0 ) return new EmptySPOIterator(KeyOrder.SPO);
+
+        return bulkFilterStatements(new SPOArrayIterator(stmts,numStmts), present);
+        
+    }
+
+    /**
+     * Filter the supplied set of SPO objects for whether they are "present" or
+     * "not present" in the database, depending on the value of the supplied
+     * boolean variable.
+     * <p>
+     * Note: This is different from using an ISPOFilter, as the point tests
+     * for existence in this method will be done in bulk using 
+     * {@link IIndex#submit(int, int, byte[][], byte[][], com.bigdata.btree.AbstractIndexProcedureConstructor, IResultHandler)}.
+     * 
+     * @param itr
+     *          an iterator over the set of statements to test
+     * @param present
+     *          if true, filter for statements that exist in the db, otherwise
+     *          filter for statements that do not exist
+     * 
+     * @return an iteration over the filtered set of statements
+     */
+    public ISPOIterator bulkFilterStatements(ISPOIterator itr, boolean present) {
+
+        try {
+        
+            IIndex index = getSPOIndex();
+            RdfKeyBuilder keyBuilder = new RdfKeyBuilder(new KeyBuilder());
+            
+            SPO[] stmts = new SPO[0];
+            int numStmts = 0;
+            
+            /*
+             * Note: We process the iterator a "chunk" at a time. If the
+             * iterator is backed by an SPO[] then it will all be processed in
+             * one "chunk".
+             */
+
+            while (itr.hasNext()) {
+                
+                // get the next chunk
+                final SPO[] chunk = itr.nextChunk(KeyOrder.SPO);
+                
+                // create an array of keys for the chunk
+                final byte[][] keys = new byte[chunk.length][];
+                for(int i = 0; i < chunk.length; i++) {
+                    keys[i] = keyBuilder.statement2Key(KeyOrder.SPO, chunk[i]);
+                }
+                
+                // create an IResultHandler that can aggregate ResultBitBuffer objects
+                final IResultHandler<ResultBitBuffer, ResultBitBuffer> resultHandler = 
+                    new IResultHandler<ResultBitBuffer, ResultBitBuffer>() {
+                    
+                    private boolean[] results = new boolean[keys.length];
+                    
+                    public void aggregate(ResultBitBuffer result, Split split) {
+                        synchronized(results) {
+                            System.arraycopy(result.getResult(), 0, results, split.fromIndex, split.ntuples);
+                        }
+                    }
+                    
+                    public ResultBitBuffer getResult() {
+                        return new ResultBitBuffer(results.length, results);
+                    }
+                };
+                
+                // submit the batch contains procedure to the SPO index
+                index.submit
+                    (0/*fromIndex*/,keys.length/*toIndex*/, keys, null/*vals*/,
+                     BatchContainsConstructor.INSTANCE, resultHandler
+                     );
+                
+                // get the array of existence test results
+                boolean[] contains = resultHandler.getResult().getResult();
+                
+                // filter in or out, depending on the present variable
+                int chunkSize = chunk.length;
+                int j = 0;
+                for(int i = 0; i < chunk.length; i++) {
+                    if(contains[i]==present) {
+                        chunk[j] = chunk[i];
+                        j++;
+                    } else {
+                        chunkSize--;
+                    }
+                }
+                
+                // aggegate this chunk's results to the return value
+                SPO[] temp = new SPO[numStmts+chunkSize];
+                System.arraycopy(stmts, 0, temp, 0, numStmts);
+                System.arraycopy(chunk, 0, temp, numStmts, chunkSize);
+                stmts = temp;
+                numStmts += chunkSize;
+                
+            }
+
+            return new SPOArrayIterator(stmts,numStmts);
+            
+        } finally {
+
+            itr.close();
+
+        }
+
+    }
+    
     public int addStatements(SPO[] stmts, int numStmts ) {
        
         if( numStmts == 0 ) return 0;
@@ -3195,11 +3326,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                 tasks.add(new IndexWriter(false/* clone */, KeyOrder.SPO,
                         filter));
 
-                tasks.add(new IndexWriter(true/* clone */, KeyOrder.POS,
-                        filter));
-
-                tasks.add(new IndexWriter(true/* clone */, KeyOrder.OSP,
-                        filter));
+                if(!oneAccessPath) {
+                    tasks.add(new IndexWriter(true/* clone */, KeyOrder.POS,
+                            filter));
+    
+                    tasks.add(new IndexWriter(true/* clone */, KeyOrder.OSP,
+                            filter));
+                }
 
 //                if(numStmts>1000) {
 //
@@ -3217,8 +3350,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     futures = writeService.invokeAll(tasks);
 
                     elapsed_SPO = futures.get(0).get();
-                    elapsed_POS = futures.get(1).get();
-                    elapsed_OSP = futures.get(2).get();
+                    if(!oneAccessPath) {
+                        elapsed_POS = futures.get(1).get();
+                        elapsed_OSP = futures.get(2).get();
+                    } else {
+                        elapsed_POS = 0;
+                        elapsed_OSP = 0;
+                    }
 
                 } catch (InterruptedException ex) {
 
