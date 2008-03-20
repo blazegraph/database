@@ -34,7 +34,6 @@ import com.bigdata.counters.InstrumentDelta;
 import com.bigdata.counters.InstrumentInstantaneousAverage;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
-import com.bigdata.service.DataService.StatusTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -74,13 +73,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * The underlying {@link BTree} is NOT thread-safe. Therefore writers MUST
  * predeclare their locks, which allows us to avoid deadlocks altogether. This
  * is also used to schedule the commit phrase of transactions. </dd>
- * 
- * <dt>{@link #commitService}</dt>
- * <dd>Schedules periodic group commits. </dd>
- * 
- * <dt>{@link #statusService}</dt>
- * <dd>Periodically {@link StatusTask#log}s counters.</dd>
- * </dl>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

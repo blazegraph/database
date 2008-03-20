@@ -57,12 +57,14 @@ public interface ILoadBalancerService extends Remote {
      * 
      * @param msg
      *            A message.
+     * @param serviceUUID
+     *            The service {@link UUID} on which the client is reporting.
      * @param data
      *            The serialized performance counter data.
-     *            
+     * 
      * @throws IOException
      */
-    public void notify(String msg, byte[] data) throws IOException;
+    public void notify(String msg, UUID serviceUUID, byte[] data) throws IOException;
 
     /**
      * A warning issued by a client when it is in danger of depleting its
@@ -70,10 +72,12 @@ public interface ILoadBalancerService extends Remote {
      * 
      * @param msg
      *            A message.
+     * @param serviceUUID
+     *            The service {@link UUID} on which the client is reporting.
      * 
      * @throws IOException
      */
-    public void warn(String msg) throws IOException;
+    public void warn(String msg,UUID serviceUUID) throws IOException;
 
     /**
      * An urgent warning issue by a client when it is in immediate danger of
@@ -82,10 +86,12 @@ public interface ILoadBalancerService extends Remote {
      * 
      * @param msg
      *            A message.
+     * @param serviceUUID
+     *            The service {@link UUID} on which the client is reporting.
      * 
      * @throws IOException
      */
-    public void urgent(String msg) throws IOException;
+    public void urgent(String msg,UUID serviceUUID) throws IOException;
 
     /**
      * Return the {@link UUID} of an under-utilized data service. If there is no
@@ -145,6 +151,37 @@ public interface ILoadBalancerService extends Remote {
     public UUID[] getUnderUtilizedDataServices(int minCount, int maxCount,
             UUID exclude) throws IOException, TimeoutException, InterruptedException;
     
+    /**
+     * Return <code>true</code> if the service is considered to be "highly
+     * utilized".
+     * <p>
+     * Note: This is used mainly to decide when a service should attempt to shed
+     * index partitions. This implementation SHOULD reflect the relative rank of
+     * the service among all services as well as its absolute load.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     * 
+     * @return <code>true</code> if the service is considered to be "highly
+     *         utilized".
+     * 
+     * @throws IOException
+     */
+    public boolean isHighlyUtilizedDataService(UUID serviceUUID) throws IOException;
+    
+    /**
+     * Return <code>true</code> if the service is considered to be
+     * "under-utilized".
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     * 
+     * @return <code>true</code> if the service is considered to be "under-utilized".
+     * 
+     * @throws IOException
+     */
+    public boolean isUnderUtilizedDataService(UUID serviceUUID) throws IOException;
+
 //    /**
 //     * Return the identifier(s) of under-utilized service(s).
 //     * 

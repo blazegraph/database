@@ -1,7 +1,6 @@
 package com.bigdata.resources;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,7 +46,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IMetadataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 
 /**
@@ -117,10 +116,6 @@ import com.bigdata.service.MetadataService;
  *       "compacting merge" but "merge" sounds too close to "join" for me and
  *       those labels are too long.
  * 
- * @todo Work out high-level alerting for resource exhaustion and failure to
- *       maintain QOS on individual machines, indices, and across the
- *       federation.
- * 
  * @todo consider side-effects of post-processing tasks (build, split, join, or
  *       move ) on a distributed index rebuild operation. It is possible that
  *       the new index partitions may have been defined (but not yet registered
@@ -132,11 +127,6 @@ import com.bigdata.service.MetadataService;
  *       partition which does not yet have all of its state on hand. There may
  *       need to be some flag to note when the index partition goes live so that
  *       we never select it for the rebuild until it is complete.
- * 
- * @todo the client (or the data services?) should send as async message every N
- *       seconds providing a histogram of the partitions they have touched (this
- *       could be input to the load balanced as well as info about the partition
- *       use that would inform load balancing decisions).
  * 
  * @todo if an index partition is moved (or split or joined) while an active
  *       transaction has a write set for that index partition on a data service
@@ -856,19 +846,43 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     protected List<AbstractTask> chooseIndexPartitionMoves() {
         
         /*
-         * Set true if this node/data service is highly utilized. We will
-         * consider moves IFF this is a highly utilized service.
+         * Figure out if this data service is considered to be highly utilized.
+         * We will consider moves IFF this is a highly utilized service.
          * 
-         * FIXME set highlyUtilizedService based on recent load for this host
-         * and service. If the host is at 80% or more load and the service is at
-         * 1/#servicesOnHost % or more load then the host is highly utilized.
-         * 
-         * An under-utilized host is one where the host is at 50% or less load.
-         * An under-utilized service on that host is one where the service is
-         * ....
+         * Note: We consult the load balancer service on this since it is able
+         * to put the load of this service into perspective by also considering
+         * the load on the other services in the federation.
          */
-        final boolean highlyUtilizedService = true;
 
+        // lookup the load balancer service.
+        final ILoadBalancerService loadBalancerService = resourceManager
+                .getLoadBalancerService();
+
+        if (loadBalancerService == null) {
+
+            log.warn("Could not discover the load balancer service");
+
+            return EMPTY_LIST;
+            
+        }
+
+        // inquire if this service is highly utilized.
+        final boolean highlyUtilizedService;
+        try {
+
+            final UUID serviceUUID = resourceManager.getDataServiceUUID();
+            
+            highlyUtilizedService = loadBalancerService
+                    .isHighlyUtilizedDataService(serviceUUID);
+
+        } catch (Exception ex) {
+
+            log.warn("Could not determine if this data service is highly utilized");
+            
+            return EMPTY_LIST;
+            
+        }
+        
         /*
          * The minimum #of active index partitions on a data service. We will
          * consider moving index partitions iff this threshold is exceeeded.
@@ -1023,16 +1037,17 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * Examine each named index on the old journal and decide what, if anything,
      * to do with that index. These indices are key range partitions of named
      * scale-out indices. The {@link LocalPartitionMetadata} describes the key
-     * rage partition and identifies the historical resources required to
+     * range partition and identifies the historical resources required to
      * present a coherent view of that index partition.
      * <p>
      * 
      * <h2> Build </h2>
      * 
-     * A build is performed when there are buffered writes, when they buffered
+     * A build is performed when there are buffered writes, when the buffered
      * writes were not simply copied onto the new journal during the atomic
      * overflow operation, and when the index partition is neither overcapacity
-     * nor undercapacity.
+     * (split) nor undercapacity (joined). Also, we do not do a build if the
+     * index partitions will be moved.
      * 
      * <h2> Split </h2>
      * 
@@ -1040,18 +1055,19 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * The split operation will inspect the index partition in more detail when
      * it runs. If the index partition does not, in fact, have sufficient
      * capacity to warrant a split then a build will be performed instead (the
-     * build is treated more or less as a one-to-one split). An index partition
-     * which is WAY overcapacity can be split into more than 2 new index
-     * partitions.
+     * build is treated more or less as a one-to-one split, but we do not assign
+     * a new partition identifier). An index partition which is WAY overcapacity
+     * can be split into more than 2 new index partitions.
      * 
      * <h2> Join </h2>
      * 
-     * A join is considered when an index partition is undercapacity. Since the
-     * rightSeparatorKey for an index partition is also the key under which the
-     * rightSibling would be found, we use the rightSeparatorKey to lookup the
-     * rightSibling of an index partition in the {@link MetadataIndex}. If that
-     * rightSibling is local (same {@link ResourceManager}) then we will JOIN
-     * the index partitions. Otherwise we will MOVE the undercapacity index
+     * A join is considered when an index partition is undercapacity. Joins
+     * require both an undercapacity index partition and its rightSibling. Since
+     * the rightSeparatorKey for an index partition is also the key under which
+     * the rightSibling would be found, we use the rightSeparatorKey to lookup
+     * the rightSibling of an index partition in the {@link MetadataIndex}. If
+     * that rightSibling is local (same {@link ResourceManager}) then we will
+     * JOIN the index partitions. Otherwise we will MOVE the undercapacity index
      * partition to the {@link IDataService} on which its rightSibling was
      * found.
      * 
@@ -1061,91 +1077,59 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * DISK resources more even across the federation and prevent hosts or data
      * services from being either under- or over-utilized. Index partition moves
      * are necessary when a scale-out index is relatively new in to distribute
-     * the index over more than a single data service. Index partition moves are
-     * is important when a host is overloaded, especially when it is approaching
-     * resource exhaustion. However, index partition moves DO NOT release ANY
-     * DISK space on a host since only the current state of the index partition
-     * is moved, not its historical states (which are on a mixture of journals
-     * and index segments). When a host is close to exhausting its DISK space
-     * temporary files should be purge and the resource manager may aggressively
-     * release old resources, even at the expense of forcing transactions to
-     * abort.
-     * 
+     * the index over more than a single data service. Likewise, index partition
+     * moves are important when a host is overloaded, especially when it is
+     * approaching resource exhaustion. However, index partition moves DO NOT
+     * release DISK space on a host since only the current state of the index
+     * partition is moved, not its historical states (which are on a mixture of
+     * journals and index segments).
      * <p>
-     * 
-     * We generally choose to move "warm" or "hot" index partitions. Cold index
+     * We can choose which index partitions to move fairly liberally. Cold index
      * partitions are not consuming any CPU/RAM/IO resources and moving them to
      * another host will not effect the utilization of either the source or the
-     * target host. Moving "warm" index partitions is preferrable since it will
-     * introduce less latency when we suspect writes on the index partition for
-     * the atomic cutover to the new data service.
-     * 
+     * target host. Moving an index partition which is "hot for write" can
+     * impose a noticable latency because the "hot for write" partition will
+     * have absorbed more writes on the journal while we are moving the data
+     * from the old view and we will need to move those writes as well. When we
+     * move those writes the index will be unavailable for write until it
+     * appears on the target data service. Therefore we generally choose to move
+     * "warm" index partitions since it will introduce less latency when we
+     * temporarily suspend writes on the index partition.
      * <p>
+     * Indices typically have many commit points, and any one of them could
+     * become "hot for read". However, moving an index partition is not going to
+     * reduce the load on the old node for historical reads since we only move
+     * the current state of the index, not its history. Nodes that are hot for
+     * historical reads spots should be handled by increasing its replication
+     * count and reading from the secondary data services. Note that
+     * {@link ITx#READ_COMMITTED} and {@link ITx#UNISOLATED} both count against
+     * the "live" index - read-committed reads always track the most recent
+     * state of the index partition and would be moved if the index partition
+     * was moved.
+     * <p>
+     * Bottom line: if a node is hot for historical read then increase the
+     * replication count and read from failover services. If a node is hot for
+     * read-committed and unisolated operations then move one or more of the
+     * warm read-committed/unisolated index partitions to a node with less
+     * utilization.
+     * <p>
+     * Index partitions that get a lot of action are NOT candidates for moves
+     * unless the node itself is either overutilized, about to exhaust its DISK,
+     * or other nodes are at very low utilization. We always prefer to move the
+     * "warm" index partitions instead.
      * 
-     * @todo If this is a high utilization node and there are low utilization
-     *       nodes then we move some index partitions to those nodes in order to
-     *       improve the distribution of resources across the federation. it's
-     *       probably best to shed "warm" index partitions since we will have to
-     *       suspend writes on the index partition during the atomic stage of
-     *       the move. we need access to some outside context in order to make
-     *       this decision.
-     *       <p>
-     *       Note utilization should be defined in terms of transient system
-     *       resources : CPU, IO (DISK and NET), RAM. Running out of DISK space
-     *       causes an urgent condition and can lead to node failure and it
-     *       makes sense to shed all indices that are "hot for write" from a
-     *       node that is low on disk space, but DISK space does not otherwise
-     *       determine node utilization. These system resources should probably
-     *       be measured with counters (Windows) or systat (linux) as it is
-     *       otherwise difficult to measure these things from Java. This data
-     *       needs to get reported to a centralized service which can then be
-     *       queried to identify underutilized data services - that method is on
-     *       the {@link IMetadataService} right now but could be its own service
-     *       since reporting needs to be done to that service as well.
-     *       <p>
-     *       When a federation is newly deployed on a cluster, or when new
-     *       hardware is made available, node utilization discrepancies should
-     *       become immediately apparent and index partitions should be moved on
-     *       the next overflow. This will help to distribute the load over the
-     *       available hardware.
-     *       <p>
-     *       We can choose which index partitions to move fairly liberally, but
-     *       moving an index partition which is "hot for write" will impose a
-     *       noticable latency while moving ones that are "hot for read" will
-     *       not - this is because the "hot for write" partition will have
-     *       absorbed more writes on the journal while we are moving the data
-     *       from the old view and we will need to move those writes as well.
-     *       When we move those writes the index will be unavailable for write
-     *       until it appears on the target data service.
-     *       <p>
-     *       Indices typically have many commit points, and any one of them
-     *       could become hot for read. However, moving an index partition is
-     *       not going to reduce the load on the old node for those historical
-     *       reads since we only move the current state of the index, not its
-     *       history. Nodes that are hot for historical reads spots should be
-     *       handled by increasing its replication count and reading from the
-     *       secondary data services. Note that {@link ITx#READ_COMMITTED} and
-     *       {@link ITx#UNISOLATED} should both count against the "live" index -
-     *       read-committed reads always track the most recent state of the
-     *       index and would be moved if the index was moved.
-     *       <p>
-     *       Bottom line: if a node is hot for historical read then increase the
-     *       replication count and read from failover services. if a node is hot
-     *       for read-committed and unisolated operations then move one or more
-     *       of the hot read-committed/unisolated index partitions to a node
-     *       with less utilization.
-     *       <p>
-     *       Index partitions that get a lot of action are NOT candidates for
-     *       moves unless the node itself is either overutilized or other nodes
-     *       are at very low utilization.
+     * <h2> DISK exhaustion </h2>
      * 
-     * @todo A host with enough CPU/RAM/IO/DISK can support more than one data
-     *       service thereby using more than 2G of RAM (a limit on 32 bit
-     *       hosts). In this case it is important that we can move index
-     *       partitions between those data services or the additional resources
-     *       will not be fully exploited. We do this by looking at not just host
-     *       utilization but also at process utilization, where the process is a
-     *       data service.
+     * Running out of DISK space causes an urgent condition and can lead to
+     * failure or all services on the same host. Therefore, when a host is near
+     * to exhausting its DISK space it (a) MUST notify the
+     * {@link ILoadBalancerService}; (b) temporary files SHOULD be purged; it
+     * MAY choose to shed indices that are "hot for write" since that will slow
+     * down the rate at which the disk space is consumed; and (d) the resource
+     * manager MAY aggressively release old resources, even at the expense of
+     * forcing transactions to abort.
+     * 
+     * FIXME codify the suggestions when nearing DISK exhaustion into code.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
 
@@ -1322,245 +1306,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     }
 
-    /*
-     * Do a build since we will not do a join.
-     *
-
-        // name under which the index partition is registered.
-        final String name = DataService.getIndexPartitionName(
-                scaleOutIndexName, pmd.getPartitionId());
-
-        // metadata for that index partition.
-        final IndexMetadata indexMetadata = oldJournal
-                .getIndex(name).getIndexMetadata();
-
-        // the file to be generated.
-        final File outFile = resourceManager
-                .getIndexSegmentFile(indexMetadata);
-
-        // the build task.
-        final AbstractTask task = new BuildIndexSegmentTask(
-                resourceManager, resourceManager
-                        .getConcurrencyManager(),
-                lastCommitTime, name, outFile);
-
-        // add to set of tasks to be run.
-        tasks.add(task);
-
-     */
-    
-//    protected List<AbstractTask> runPrepTasks(List<AbstractTask> inputTasks)
-//            throws Exception {
-//
-//        log.info("Will run " + inputTasks.size() + " tasks");
-//
-//        /*
-//         * Submit all tasks, awaiting their completion.
-//         * 
-//         * Note: We will wait only up to a specified timeout limit for
-//         * post-processing to complete normally.
-//         * 
-//         * @todo config param for timeout.
-//         */
-//        final List<Future<Object>> futures = resourceManager
-//                .getConcurrencyManager().invokeAll(inputTasks, 2 * 60,
-//                        TimeUnit.SECONDS);
-//
-//        final List<AbstractTask> updateTasks = new ArrayList<AbstractTask>(
-//                inputTasks.size());
-//
-//        // verify that all tasks completed successfully.
-//        for (Future<Object> f : futures) {
-//
-//            /*
-//             * Note: We trap exceptions, log them, and ignore them.
-//             * 
-//             * Note: All of the operations (build, split, join, move) are safe
-//             * in the following sense. If the operation does not succeed then
-//             * the current state of the index remains on the old journal. Since
-//             * failure of the operation results in a failure to update the view
-//             * on the new journal (because we do not queue the task that updates
-//             * the view), the outcome is that the index view will remain as it
-//             * was defined during overflow.
-//             * 
-//             * However, if these errors persist then they will become a problem.
-//             * First, the #of resources in an index view will grow without
-//             * bound. Second, the index view will have dependencies on older and
-//             * older journals with the consequence that old journal can not be
-//             * released on the local file system so the disk space will grow
-//             * without bounds as well.
-//             */
-//
-//            AbstractResult tmp;
-//            try {
-//
-//                /*
-//                 * Don't wait long - we gave tasks a chance to complete above.
-//                 * 
-//                 * @todo I am choosing not to interrupt tasks which have not
-//                 * completed since interrupts during IO operations will cause a
-//                 * FileChannel backing the journal or index segment to be
-//                 * closed, which is a pain. However, this means that the task
-//                 * will continue to consume CPU resources until it completes,
-//                 * which is also a pain.
-//                 */
-//                tmp = (AbstractResult) f.get(100,TimeUnit.MILLISECONDS);
-//                
-//            } catch(Throwable t) {
-//            
-//                log.error("Post-processing task failed", t);
-//                
-//                continue;
-//                
-//            }
-//
-//            assert tmp != null;
-//            
-//            if (tmp instanceof BuildResult) {
-//
-//                /*
-//                 * We ran an index segment build and we update the index
-//                 * partition metadata now.
-//                 */
-//
-//                final BuildResult result = (BuildResult) tmp;
-//
-//                // task will update the index partition view definition.
-//                final AbstractTask task = new AtomicUpdate(
-//                        resourceManager, resourceManager
-//                                .getConcurrencyManager(), result.name, result);
-//
-//                // add to set of tasks to be run.
-//                updateTasks.add(task);
-//
-//            } else if (tmp instanceof SplitResult) {
-//
-//                /*
-//                 * Now run an UNISOLATED operation that splits the live index
-//                 * using the same split points, generating new index partitions
-//                 * with new partition identifiers. The old index partition is
-//                 * deleted as a post-condition. The new index partitions are
-//                 * registered as a post-condition.
-//                 */
-//
-//                final SplitResult result = (SplitResult) tmp;
-//
-//                final AbstractTask task = new UpdateSplitIndexPartition(
-//                        resourceManager, result.name,
-//                        result);
-//
-//                // add to set of tasks to be run.
-//                updateTasks.add(task);
-//
-//            } else if (tmp instanceof JoinResult) {
-//
-//                final JoinResult result = (JoinResult) tmp;
-//
-//                // The array of index names on which we will need an exclusive
-//                // lock.
-//                final String[] names = new String[result.oldnames.length + 1];
-//
-//                names[0] = result.name;
-//
-//                System.arraycopy(result.oldnames, 0, names, 1,
-//                        result.oldnames.length);
-//
-//                // The task to make the atomic updates on the live journal and
-//                // the metadata index.
-//                final AbstractTask task = new UpdateJoinIndexPartition(
-//                        resourceManager, names, result);
-//
-//                // add to set of tasks to be run.
-//                updateTasks.add(task);
-//
-//            } else if(tmp instanceof MoveResult) {
-//
-//                final MoveResult result = (MoveResult) tmp;
-//
-//                AbstractTask task = new UpdateMoveIndexPartitionTask(
-//                        resourceManager, result.name, result);
-//
-//                // add to set of tasks to be run.
-//                updateTasks.add(task);
-//                
-//            } else {
-//
-//                throw new AssertionError("Unexpected result type: " + tmp.toString());
-//
-//            }
-//
-//        }
-//
-//        log.info("end - ran " + inputTasks.size()
-//                + " tasks, generated " + updateTasks.size() + " update tasks");
-//
-//        return updateTasks;
-//
-//    }
-//
-//    /**
-//     * Run tasks that will cause the live index partition definition to be
-//     * either updated (for a build task) or replaced (for an index split task).
-//     * These tasks are also responsible for updating the appropriate
-//     * {@link MetadataIndex} as required.
-//     * 
-//     * @throws Exception
-//     */
-//    protected void runAtomicUpdateTasks(List<AbstractTask> tasks) throws Exception {
-//
-//        log.info("begin : will run "+tasks.size()+" update tasks");
-//
-//        /*
-//         * Submit all tasks, awaiting their completion.
-//         * 
-//         * Note: The update tasks should be relatively fast, excepting possibly
-//         * moves of a hot index partition since there could be a lot of buffered
-//         * writes.
-//         * 
-//         * @todo config param for timeout.
-//         */
-//        final List<Future<Object>> futures = resourceManager
-//                .getConcurrencyManager().invokeAll(tasks, 60*1, TimeUnit.SECONDS);
-//
-//        // verify that all tasks completed successfully.
-//        for (Future<Object> f : futures) {
-//
-//            /*
-//             * Note: An error here, like an error in the build/split/join/move
-//             * tasks above, MAY be ignored. The consequences are exactly like
-//             * those above. The index partition will remain coherent and valid
-//             * but its view will continue to have a dependency on the old
-//             * journal until a post-processing task for that index partition
-//             * succeeds.
-//             */
-//            try {
-//
-//                /*
-//                 * Note: Don't wait long - we already gave the tasks a chance to
-//                 * complete up above.
-//                 * 
-//                 * @todo Verify that no problems can arise if we allow
-//                 * post-processing to complete while update tasks are still
-//                 * executing. Ideally the atomic update operations will either
-//                 * succeed fully or fail, and failure will mean that the view
-//                 * was not changed.
-//                 */
-//                f.get(100,TimeUnit.MILLISECONDS);
-//                
-//            } catch(Throwable t) {
-//            
-//                log.error("Update task failed", t);
-//                
-//                continue;
-//                
-//            }
-//
-//        }
-//
-//        log.info("end");
-//
-//    }
-
     /**
      * @return The return value is always null.
      * 
@@ -1598,12 +1343,6 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             
             List<AbstractTask> tasks = chooseTasks();
             
-//            latch.start( tasks.size() );            
-
-//            List<AbstractTask> updateTasks = runPrepTasks(tasks);
-//
-//            runAtomicUpdateTasks(updateTasks);
-
             // runTasks()
             {
                 log.info("begin : will run "+tasks.size()+" update tasks");
