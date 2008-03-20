@@ -56,6 +56,7 @@ import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.AbstractStatisticsCollector.IProcessCounters;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
@@ -182,12 +183,50 @@ abstract public class DataService implements IDataService, IWritePipeline,
          * 
          * @see #DEFAULT_STATUS_DELAY
          */
-        public final static String STATUS_DELAY = "statusDelay";
+        String STATUS_DELAY = "statusDelay";
         
         /**
          * The default {@link #STATUS_DELAY}.
          */
-        public final static String DEFAULT_STATUS_DELAY = "10000";
+        String DEFAULT_STATUS_DELAY = "10000";
+    
+        /**
+         * An optional regular expression that will be used to filter the
+         * performance counters reported by the {@link StatusTask}. Some
+         * examples are:
+         * <dl>
+         * <dt>.*Unisolated.*</dt>
+         * <dd>All counters dealing with unisolated operations.</dd>
+         * <dt>.*Unisolated Write Service/#.*</dt>
+         * <dd>All counters for the unisolated write service.</dd>
+         * </dl>
+         * <p>
+         * Note: if the regular expression can not be compiled then an error
+         * message will be logged and ALL counters will be logged by the
+         * {@link StatusTask} (the filter will default to <code>null</code> in
+         * the case of an error).
+         * 
+         * @see #DEFAULT_STATUS_FILTER
+         */
+        String STATUS_FILTER = "statusFilter";
+        
+        /**
+         * @todo work up a more interesting default filter.
+         */
+        String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
+        
+        /**
+         * The delay between scheduled invocations of the {@link ReportTask} (60
+         * seconds).
+         * 
+         * @see #DEFAULT_REPORT_DELAY
+         */
+        String REPORT_DELAY = "reportDelay";
+        
+        /**
+         * The default {@link #REPORT_DELAY}.
+         */
+        String DEFAULT_REPORT_DELAY = ""+(60*1000);
     
     }
     
@@ -228,7 +267,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
     /**
      * Counters for the block read API.
      */
-    final protected ReadBlockCounters counters = new ReadBlockCounters();
+    final protected ReadBlockCounters readBlockApiCounters = new ReadBlockCounters();
 
     /**
      * FIXME Discover the {@link ITransactionManager} service and use it as the
@@ -249,6 +288,12 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * information (counters).
      */
     final protected ScheduledExecutorService statusService;
+    
+    /**
+     * Runs a {@link ReportTask} communicating performance counters on a
+     * periodic basis to the {@link ILoadBalancerService}.
+     */
+    final protected ScheduledExecutorService reportService;
     
     /**
      * The object used to manage the local resources.
@@ -403,13 +448,30 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
         }
 
-        // setup to collect statistics about this host.
+        // setup to collect statistics and report about this host.
         {
             
             statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
             
             statisticsCollector.start();
+
+            final long initialDelay = 100;
             
+            final long delay = Long.parseLong(properties.getProperty(
+                    Options.REPORT_DELAY,
+                    Options.DEFAULT_REPORT_DELAY));
+
+            log.info(Options.REPORT_DELAY + "=" + delay);
+            
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            reportService = Executors
+            .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                    .defaultThreadFactory());
+            
+            reportService.scheduleWithFixedDelay(new ReportTask(),
+                    initialDelay, delay, unit);
+
         }
         
         // setup scheduled runnable for periodic status messages.
@@ -422,6 +484,11 @@ abstract public class DataService implements IDataService, IWritePipeline,
                     Options.DEFAULT_STATUS_DELAY));
 
             log.info(Options.STATUS_DELAY + "=" + delay);
+           
+            final String regex = properties.getProperty(Options.STATUS_FILTER,
+                    Options.DEFAULT_STATUS_FILTER);
+           
+            log.info(Options.STATUS_FILTER + "=" + regex);
             
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
@@ -429,7 +496,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
             
-            statusService.scheduleWithFixedDelay(new StatusTask(),
+            statusService.scheduleWithFixedDelay(new StatusTask(regex),
                     initialDelay, delay, unit);
 
         }
@@ -500,6 +567,13 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * </dl>
      * Subclasses MAY extend this method to report additional {@link ICounter}s.
      * 
+     * @todo add some counters for the #of journals stored by the
+     *       {@link ResourceManager}? #of index segments stored by the
+     *       {@link ResourceManager}? ???
+     * 
+     * @todo Add some counters providing a histogram of the index partitions
+     *       that have touched or that are "hot"?
+     * 
      * FIXME attached and detach counters for the live journal during overflow
      * so that we can report the disk usage? (We get this from performance
      * counters anyway so maybe this does not matter.)
@@ -522,7 +596,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
             final String ps = ICounterSet.pathSeparator;
             
-            final String pathPrefix = countersRoot.getPath() + "service" + ps
+            final String hostname = statisticsCollector.fullyQualifiedHostName;
+                       
+            final String pathPrefix = ps + hostname + ps + "service" + ps
                     + serviceUUID + ps;
 
             final CounterSet serviceRoot = countersRoot.makePath(pathPrefix);
@@ -537,6 +613,31 @@ abstract public class DataService implements IDataService, IWritePipeline,
                 
             }
 
+            // Service per-process memory data
+            {
+
+                countersRoot.addCounter(pathPrefix
+                        + IProcessCounters.Memory_runtimeMaxMemory,
+                        new OneShotInstrument<Long>(Runtime.getRuntime().maxMemory()));
+
+                countersRoot.addCounter(pathPrefix
+                        + IProcessCounters.Memory_runtimeFreeMemory,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(Runtime.getRuntime().freeMemory());
+                            }
+                        });
+
+                countersRoot.addCounter(pathPrefix
+                        + IProcessCounters.Memory_runtimeTotalMemory,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(Runtime.getRuntime().totalMemory());
+                            }
+                        });
+
+            }
+            
             serviceRoot.makePath("Resource Manager").attach(
                     resourceManager.getCounters());
 
@@ -553,7 +654,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
                 tmp.addCounter("Blocks Read", new Instrument<Long>() {
                     public void sample() {
-                        setValue(counters.readBlockCount);
+                        setValue(readBlockApiCounters.readBlockCount);
                     }
                 });
 
@@ -564,7 +665,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
                                 // @todo encapsulate this logic.
                                 
                                 long secs = TimeUnit.SECONDS.convert(
-                                        counters.readBlockNanos,
+                                        readBlockApiCounters.readBlockNanos,
                                         TimeUnit.NANOSECONDS);
 
                                 final double v;
@@ -572,7 +673,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
                                 if (secs == 0L)
                                     v = 0d;
                                 else
-                                    v = counters.readBlockCount / secs;
+                                    v = readBlockApiCounters.readBlockCount / secs;
 
                                 setValue(v);
                                 
@@ -690,7 +791,41 @@ abstract public class DataService implements IDataService, IWritePipeline,
         final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
                 .toInt();
 
-        public StatusTask() {
+        protected final Pattern filter;
+
+        /**
+         * 
+         * @param regex
+         *            An optional regular expression. When non-<code>null</code>
+         *            and non-empty this will be compiled into a filter for
+         *            {@link ICounterSet#toString(Pattern)}.
+         */
+        public StatusTask(String regex) {
+
+            Pattern filter;
+            
+            if(regex!=null && regex.trim().length()>0) {
+            
+                try {
+
+                    filter = Pattern.compile(regex);
+                    
+                } catch(Exception ex) {
+                    
+                    log.error("Could not compile regex: ["+regex+"]", ex);
+                    
+                    filter = null;
+                    
+                }
+                
+            } else {
+                
+                filter = null;
+                
+            }
+            
+            this.filter = filter;
+
         }
 
         /**
@@ -699,63 +834,116 @@ abstract public class DataService implements IDataService, IWritePipeline,
          */
         public void run() {
 
-            /*
-             * Send performance counters to the load balancer.
-             */
             try {
-
-                final ILoadBalancerService loadBalancerService = getLoadBalancerService();
-                
-                if (loadBalancerService != null) {
-                    
-                    /*
-                     * @todo this is probably worth compressing as there will be a
-                     * lot of redundency.
-                     * 
-                     * @todo allow filter on what gets sent to the load balancer?
-                     */
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream(
-                            Bytes.kilobyte32 * 2);
-                    
-                    getCounters().asXML(baos,"UTF-8",null/* filter */);
-                    
-                    loadBalancerService.notify("Hello", baos.toByteArray());
-                    
-                } else {
-                    
-                    log.warn("Could not discover load balancer service");
-                    
-                }
-                
-            } catch(Exception ex) {
-                
-                log.error(ex.getMessage(),ex);
-                
-            }
-            
-            try {
-
-                // FIXME parameterize or remove?
-                
-                Pattern filter = null;
-                
-                //filter = Pattern.compile(".*Unisolated.*");
-                //
-                filter = Pattern.compile(".*Unisolated Write Service/#.*");
-//                Unisolated Write Service/#completed
-                
-                final String s = getCounters().toString(filter);
-
-                // System.err.println( s );
 
                 if (INFO)
-                    log.info(s);
-
+                    log.info(getStatus());
+                
             } catch (Throwable t) {
 
-                log.warn("Problem in status thread?", t);
+                log.warn("Problem in status task?", t);
 
             }
+
+        }
+        
+        protected String getStatus() {
+
+            final String s = getCounters().toString(filter);
+
+            return s;
+            
+        }
+        
+    }
+
+    /**
+     * Periodically send performance counter data to the
+     * {@link ILoadBalancerService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class ReportTask implements Runnable {
+
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final protected Logger log = Logger.getLogger(ReportTask.class);
+
+        /**
+         * True iff the {@link #log} level is INFO or less.
+         */
+        final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+                .toInt();
+
+        public ReportTask() {
+        }
+
+        /**
+         * Note: Don't throw anything here since we don't want to have the task
+         * suppressed!
+         */
+        public void run() {
+
+            try {
+
+                reportPerformanceCounters();
+                
+            } catch (Throwable t) {
+
+                log.warn("Problem in report task?", t);
+
+            }
+
+        }
+        
+        /**
+         * Send performance counters to the load balancer.
+         * 
+         * @throws IOException 
+         */
+        protected void reportPerformanceCounters() throws IOException {
+
+            // Note: This _is_ a local method call.
+
+            final UUID serviceUUID = getServiceUUID();
+
+            // Will be null until assigned by the service registrar.
+
+            if (serviceUUID == null) {
+
+                log.info("Service UUID not assigned yet.");
+
+                return;
+
+            }
+
+            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+
+            if (loadBalancerService == null) {
+
+                log.warn("Could not discover load balancer service.");
+
+                return;
+
+            }
+
+            /*
+             * @todo this is probably worth compressing as there will be a lot
+             * of redundency.
+             * 
+             * @todo allow filter on what gets sent to the load balancer?
+             */
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(
+                    Bytes.kilobyte32 * 2);
+
+            getCounters().asXML(baos, "UTF-8", null/* filter */);
+
+            loadBalancerService
+                    .notify("Hello", serviceUUID, baos.toByteArray());
 
         }
 
@@ -1018,7 +1206,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
     
                 log.warn("Resource not available: " + resource);
     
-                counters.readBlockErrorCount++;
+                readBlockApiCounters.readBlockErrorCount++;
 
                 throw new IllegalStateException("Resource not available");
     
@@ -1041,7 +1229,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
                     ByteBuffer buf = store.read(addr);
 
                     // #of bytes buffered.
-                    counters.readBlockBytes += byteCount;
+                    readBlockApiCounters.readBlockBytes += byteCount;
 
                     // caller will read from this object.
                     return new ByteBufferInputStream(buf);
@@ -1058,9 +1246,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
         } finally {
             
-            counters.readBlockCount++;
+            readBlockApiCounters.readBlockCount++;
 
-            counters.readBlockNanos = System.nanoTime() - begin;
+            readBlockApiCounters.readBlockNanos = System.nanoTime() - begin;
 
             clearLoggingContext();
             

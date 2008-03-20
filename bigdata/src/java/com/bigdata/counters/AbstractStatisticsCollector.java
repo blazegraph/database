@@ -67,6 +67,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo a varient of counters can appear on both a per-host and a per-process
  *       basis. review carefully for correct use.
  * 
+ * FIXME make sure that all "%" counters are normalized to [0.0:1.0]. it would
+ * be useful to have declared ranges for some counters for this purpose
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -174,7 +177,7 @@ abstract public class AbstractStatisticsCollector {
          * LogicalDisk
          */
         
-        /** Percentage of the disk space that is free (unused). */
+        /** Percentage of the disk space that is free (unused) [0.0:1.0]. */
         String LogicalDisk_PercentFreeSpace = LogicalDisk + ps + "% Free Space";
 
         /*
@@ -322,6 +325,25 @@ abstract public class AbstractStatisticsCollector {
          */
         String Memory_percentMemorySize = Memory + ps + "Percent Memory Size";
 
+        /**
+         * The value reported by {@link Runtime#maxMemory()} (the maximum amount
+         * of memory that the JVM will attempt to use). This should be a
+         * {@link OneShotInstrument}.
+         */
+        String Memory_runtimeMaxMemory = Memory + ps + "Runtime Max Memory";
+        
+        /**
+         * The value reported by {@link Runtime#freeMemory()} (the amount of
+         * free memory in the JVM)).
+         */
+        String Memory_runtimeFreeMemory = Memory + ps + "Runtime Free Memory";
+        
+        /**
+         * The value reported by {@link Runtime#totalMemory()} (the amount of
+         * total memory in the JVM, which may vary over time).
+         */
+        String Memory_runtimeTotalMemory = Memory + ps + "Runtime Total Memory";
+        
         /*
          * IO
          */
@@ -511,18 +533,6 @@ abstract public class AbstractStatisticsCollector {
             countersRoot.addCounter(hostPathPrefix
                     + IHostCounters.Info_ProcessorInfo,
                     new OneShotInstrument<String>(SystemUtil.cpuInfo()));
-            
-            /*
-             * @todo this is per-process, not per host so move it to the service
-             * api and add host mem reporting here.
-             */
-//            countersRoot.addCounterByPath(hostPathPrefix
-//                    + IHostCounters.Memory_Available,
-//                    new IInstrument<Long>() {
-//                        public Long getValue() {
-//                            return Runtime.getRuntime().maxMemory();
-//                        }
-//                    });
             
         }
         
@@ -921,7 +931,8 @@ abstract public class AbstractStatisticsCollector {
         // write counters before we start the client
         System.out.println(client.getCounters().toString());
         
-        System.err.println("Starting performance counter collection: interval="+client.interval+", count="+count);
+        System.err.println("Starting performance counter collection: interval="
+                + client.interval + ", count=" + count);
         
         client.start();
 

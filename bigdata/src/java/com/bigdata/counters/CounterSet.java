@@ -78,6 +78,9 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo The CounterSet should perhaps obtain a lock on the node(s) to be
+ *       modified rather than the root for better concurrency.
+ * 
  * @todo the syntax "." and ".." are not recognized.
  */
 public class CounterSet implements ICounterSet {
