@@ -2448,10 +2448,6 @@ abstract public class ResourceManager implements IResourceManager {
     
     /**
      * Note: logic duplicated by {@link Journal#getIndex(String, long)}
-     * 
-     * @todo consider throwing {@link StaleLocatorException} from here and
-     *       removing {@link #getIndexPartitionGone(String)} from
-     *       {@link IResourceManager}
      */
     public IIndex getIndex(String name, long timestamp) {
         

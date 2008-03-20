@@ -296,9 +296,11 @@ public class PartitionedRangeQueryIterator implements ITupleIterator {
             if(InnerCause.isInnerCause(ex, StaleLocatorException.class)) {
                 
                 /*
-                 * Handle StaleLocatorException. This exception indicates that we
-                 * have a stale index partition locator. This can happen when
-                 * index partitions are split, joined, or moved.
+                 * Handle StaleLocatorException. This exception indicates that
+                 * we have a stale index partition locator. This can happen when
+                 * index partitions are split, joined, or moved. It can only
+                 * happen for UNISOLATED or READ_COMMITTED operations since we
+                 * never change historical locators.
                  */
                 
                 if(Thread.interrupted()) throw new RuntimeException(new InterruptedException());

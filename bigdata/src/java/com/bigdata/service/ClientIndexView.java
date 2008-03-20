@@ -1113,6 +1113,7 @@ public class ClientIndexView implements IIndex {
                     split.pmd.getPartitionId() // the index partition identifier.
                     );
 
+            if(INFO)
             log.info("Submitting task="+this+" on "+dataService);
             
             try {
@@ -1127,7 +1128,8 @@ public class ClientIndexView implements IIndex {
                                         
                     if(Thread.interrupted()) throw new InterruptedException();
                     
-                    log.info("Locator stale (will retry) : name="+name+", stale locator="+locator+" : "+ex);
+                    if(INFO)
+                    log.info("Locator stale (will retry) : name="+name+", stale locator="+locator);
                     
                     retry();
                     
@@ -1232,6 +1234,7 @@ public class ClientIndexView implements IIndex {
 
             final PartitionLocator locator = getMetadataIndex().find(key);
 
+            if(INFO)
             log.info("Retrying: proc=" + proc.getClass().getName()
                     + ", locator=" + locator + ", ntries=" + ntries);
 

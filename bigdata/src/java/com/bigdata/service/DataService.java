@@ -213,7 +213,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
         /**
          * @todo work up a more interesting default filter.
          */
-        String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
+        // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
+        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/#.*";        
         
         /**
          * The delay between scheduled invocations of the {@link ReportTask} (60
@@ -455,8 +456,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
             statisticsCollector.start();
 
-            final long initialDelay = 100;
-            
             final long delay = Long.parseLong(properties.getProperty(
                     Options.REPORT_DELAY,
                     Options.DEFAULT_REPORT_DELAY));
@@ -465,6 +464,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
             final TimeUnit unit = TimeUnit.MILLISECONDS;
 
+            // wait the normal amount of time before reporting in the first time.
+            final long initialDelay = delay;
+            
             reportService = Executors
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
@@ -516,7 +518,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
         resourceManager.shutdown();
         
         statusService.shutdown();
-        
+
+        reportService.shutdown();
+
         statisticsCollector.stop();
         
 //        if (INFO)
@@ -537,6 +541,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
         resourceManager.shutdownNow();
 
         statusService.shutdownNow();
+
+        reportService.shutdownNow();
 
         statisticsCollector.stop();
 

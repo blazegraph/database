@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
+import java.util.Random;
+
 import junit.framework.TestCase2;
 
 
@@ -40,8 +42,16 @@ public class TestHistoryInstrument extends TestCase2 {
     // 60 seconds.
     final long t60 = 60*1000;
     
-    // time zero.
-    final long t0 = System.currentTimeMillis();
+    /**
+     * Time zero is an arbitrary time occurring on an exact _hour_ boundary.
+     * This constraint is imposed so that we can consistently test overflow
+     * behavior. Overflow SHOULD occur immediately _before_ you add the sample
+     * which would cause the sample recorded [capacity * period] units ago to be
+     * overwritten (even if the sample in danger of being overwritten is a
+     * <code>null</code>. If we accept a truely random starting time then it
+     * is harder to setup the unit tests to test overflow handling.
+     */
+    final long t0 = new Random().nextInt(100)*1000L*60*60;
     
     /**
      * 
@@ -107,25 +117,22 @@ public class TestHistoryInstrument extends TestCase2 {
         
         /*
          * a history buffer with 2 samples each spaced 60 seconds apart.
-         * 
          */
         final History<Double> h = new History<Double>(new Double[2], t60);
 
         assertEquals(0,h.size());
         assertEquals(2,h.capacity());
-
-        log.info("\n"+h.toString());
         
         /*
          * a history buffer with 2 samples each spaced two minutes apart.
-         * 
          */
         final History<Double> h2 = new History<Double>(3,h);
 
         assertEquals(0,h2.size());
         assertEquals(3,h2.capacity());
 
-        log.info("\n"+h2.toString());
+        log.info("\nh="+h.toString());
+        log.info("\nh2="+h2.toString());
 
         /*
          * feed in data.
@@ -134,38 +141,42 @@ public class TestHistoryInstrument extends TestCase2 {
         // add the first sample.
         h.add(t0,12d);
 
+        log.info("\nh="+h.toString());
+        log.info("\nh2="+h2.toString());
+
         assertEquals(1,h.size());
+        assertEquals(0,h2.size());
         
         assertEquals(12d,h.getAverage().doubleValue());
-
-        log.info("\n"+h.toString());
 
         // add a 2nd sample.
         h.add(t0+t60,6d);
 
+        log.info("\nh="+h.toString());
+        log.info("\nh2="+h2.toString());
+
         assertEquals(2,h.size());
+        assertEquals(0,h2.size());
         
         assertEquals(((6d+12d)/2d),h.getAverage().doubleValue());
-
-        log.info("\n"+h.toString());
         
         /*
          * add a 3rd sample, this should cause the first buffer to overflow.
          */
+        
         h.add(t0+t60+t60,9d);
 
         assertEquals(2,h.size());
-        
-        assertEquals(((6d+9d)/2d),h.getAverage().doubleValue());
-
-        log.info("\n"+h.toString());
-
         assertEquals(1,h2.size());
         
+        log.info("\nh="+h.toString());
+        log.info("\nh2="+h2.toString());
+
+        // check average in the base buffer.
+        assertEquals(((6d+9d)/2d),h.getAverage().doubleValue());
+
         // overflow should propagate the average before adding the new sample.
         assertEquals((12d+6d)/2d,h2.getAverage().doubleValue());
-        
-        log.info("\n"+h2.toString());
 
     }
     
@@ -188,23 +199,26 @@ public class TestHistoryInstrument extends TestCase2 {
 
         /*
          * Fill the entire buffer with per-minute samples and verify that we
-         * overflow to the per hour samples buffer only on the last minute.
+         * overflow to the per hour samples buffer when we add the 61st sample.
          */
+        int nsamples = 1; // e.g., the 1st sample.
         for(int i=0; i<60; i++) {
             
             h.minutes.add(t0+i*t60, (double)i);
             
             assertEquals(i+1,h.minutes.size());
 
-            if(i+1==60) {
+            if (nsamples == 61) {
 
-                assertEquals(1,h.hours.size());
+                assertEquals("nsamples="+nsamples,1,h.hours.size());
                 
             } else {
                 
-                assertEquals(0,h.hours.size());
+                assertEquals("nsamples="+nsamples,0,h.hours.size());
                 
             }
+            
+            nsamples++;
             
         }
         

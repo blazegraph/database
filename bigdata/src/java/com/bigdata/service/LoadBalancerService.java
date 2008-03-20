@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
@@ -31,6 +30,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.AbstractStatisticsCollector.IHostCounters;
+import com.bigdata.counters.AbstractStatisticsCollector.IRequiredHostCounters;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -136,13 +136,15 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 abstract public class LoadBalancerService implements ILoadBalancerService,
         IServiceShutdown {
 
+    public Logger log = Logger.getLogger(LoadBalancerService.class);
+
     /**
      * Service join timeout in milliseconds - used when we need to wait for a
      * service to join before we can recommend an under-utilized service.
      * 
      * @todo config
      */
-    final long timeout = 3 * 1000;
+    final protected long JOIN_TIMEOUT = 3 * 1000;
 
     /**
      * Lock is used to control access to data structures that are not
@@ -156,17 +158,30 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     final protected Condition joined = lock.newCondition();
 
     /**
+     * The active hosts (one or more services).
+     * 
      * @todo get rid of hosts that are no longer active. e.g., we no longer
      *       receive {@link #notify(String, byte[])} events from the host and
-     *       the host can not be pinged.
+     *       the host can not be pinged. this will require tracking the #of
+     *       services on the host which we do not do directly right now.
      */
-    protected Map<String/*hostname*/,HostScore> hosts = new ConcurrentHashMap<String,HostScore>();
+    protected ConcurrentHashMap<String/* hostname */, HostScore> activeHosts = new ConcurrentHashMap<String, HostScore>();
 
     /**
-     * The set of known services and some metadata about those services.
+     * The set of active services.
      */
-    protected Map<UUID/* serviceUUID */, ServiceScore> services = new ConcurrentHashMap<UUID, ServiceScore>();
+    protected ConcurrentHashMap<UUID/* serviceUUID */, ServiceScore> activeServices = new ConcurrentHashMap<UUID, ServiceScore>();
 
+    /**
+     * Scores for the hosts in ascending order (least utilized to most
+     * utilized).
+     * <p>
+     * This array is initially <code>null</code> and gets updated periodically
+     * by the {@link UpdateTask}. The main consumer of this information is the
+     * logic in {@link UpdateTask} that computes the service utilization.
+     */
+    protected AtomicReference<HostScore[]> hostScores = new AtomicReference<HostScore[]>(null);
+    
     /**
      * Scores for the services in ascending order (least utilized to most
      * utilized).
@@ -175,12 +190,10 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * by the {@link UpdateTask}. The methods that report service utilization
      * and under-utilized services are all based on the data in this array.
      * Since services can leave at any time, that logic MUST also test for
-     * existence of the service in {@link #services} before assuming that the
+     * existence of the service in {@link #activeServices} before assuming that the
      * service is still live.
-     * 
-     * @todo do we need a HostScore also?
      */
-    protected AtomicReference<ServiceScore[]> scores = new AtomicReference<ServiceScore[]>(null);
+    protected AtomicReference<ServiceScore[]> serviceScores = new AtomicReference<ServiceScore[]>(null);
     
     /**
      * Aggregated performance counters for all hosts and services. The services
@@ -189,18 +202,52 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
     protected CounterSet counters = new CounterSet();
 
     /**
-     * Per-host metadata.
+     * Per-host metadata and a score for that host which gets updated
+     * periodically by {@link UpdateTask}.
+     * 
+     * @todo We carry some additional metadata for hosts that bears on the
+     *       question of whether or not the host might be subject to non-linear
+     *       performance degredation. The most important bits of information are
+     *       whether or not the host is swapping heavily, since that will bring
+     *       performance to a standstill, and whether or not the host is about
+     *       to run out of disk space, since that can cause all services on the
+     *       host to suddenly fail.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo do we need per-host scoring?  I expect so.
      */
-    protected class HostScore {
+    static protected class HostScore implements Comparable<HostScore> {
 
         public final String hostname;
 
+        /** The raw score computed for that service. */
+        public final double rawScore;
+        /** The normalized score computed for that service. */
+        public double score;
+        /** The rank in [0:#scored].  This is an index into the Scores[]. */
+        public int rank = -1;
+        /** The normalized double precision rank in [0.0:1.0]. */
+        public double drank = -1d;
+        
+        /**
+         * Constructor variant used when you do not have performance counters
+         * for the host and could not compute its rawScore.
+         * 
+         * @param hostname
+         */
         public HostScore(String hostname) {
+            
+            this(hostname,0d);
+            
+        }
+        
+        /**
+         * Constructor variant used when you have computed the rawStore.
+         * 
+         * @param hostname
+         * @param rawScore
+         */
+        public HostScore(String hostname, double rawScore) {
             
             assert hostname != null;
             
@@ -208,8 +255,38 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             
             this.hostname = hostname;
             
+            this.rawScore = rawScore;
+            
         }
         
+        public String toString() {
+            
+            return "HostScore{hostname=" + hostname + ", rawScore=" + rawScore
+                    + ", score=" + score + ", rank=" + rank + ", drank="
+                    + drank + "}";
+            
+        }
+        
+        /**
+         * Places elements into order by ascending {@link #rawScore}. The
+         * {@link #hostname} is used to break any ties.
+         */
+        public int compareTo(HostScore arg0) {
+            
+            if(rawScore < arg0.rawScore) {
+                
+                return -1;
+                
+            } else if(rawScore> arg0.rawScore ) {
+                
+                return 1;
+                
+            }
+            
+            return hostname.compareTo(arg0.hostname);
+            
+        }
+
     }
     
     /**
@@ -219,7 +296,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class ServiceScore implements Comparable<ServiceScore> {
+    static protected class ServiceScore implements Comparable<ServiceScore> {
         
         public final String hostname;
         
@@ -335,7 +412,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
          * 
          * @see AbstractStatisticsCollector.Options#INTERVAL
          */
-        public final static String UPDATE_DELAY = "statusDelay";
+        public final static String UPDATE_DELAY = "updateDelay";
         
         /**
          * The default {@link #UPDATE_DELAY}.
@@ -443,6 +520,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
                 .toInt();
 
+        /** @todo configure how much history to use for averages. */
+        final int TEN_MINUTES = 10;
+        
         public UpdateTask() {
         }
         
@@ -454,149 +534,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             try {
 
-                if(services.isEmpty()) {
-                    
-                    log.warn("No active services");
-                    
-                    LoadBalancerService.this.scores.set( null );
-                    
-                    return;
-                    
-                }
+                updateHostScores();
                 
-                /*
-                 * Update scores for the active services.
-                 */
-
-                final Vector<ServiceScore> scores = new Vector<ServiceScore>();
-                
-                // For each host
-                final Iterator<ICounterSet> itrh = counters.counterSetIterator();
-                
-                while(itrh.hasNext()) {
-                    
-                    final CounterSet hostCounterSet = (CounterSet) itrh.next();
-                    
-                    // Note: name on hostCounterSet is the fully qualified hostname.
-                    final String hostname = hostCounterSet.getName();
-                    
-                    final CounterSet servicesCounterSet = (CounterSet)hostCounterSet.getPath("service");
-                    
-                    if(servicesCounterSet==null) {
-                        
-                        log.warn("No services? hostname="+hostname);
-                        
-                        continue;
-                        
-                    }
-                    
-                    // For each service.
-                    final Iterator<ICounterSet> itrs = hostCounterSet.counterSetIterator();
-                    
-                    while(itrs.hasNext()) {
-
-                        final CounterSet serviceCounterSet = (CounterSet) itrh.next();
-
-                        // Note: name on serviceCounterSet is the serviceUUID.
-                        final UUID serviceUUID = UUID.fromString(serviceCounterSet.getName());
-                        
-                        if(!services.containsKey(serviceUUID)) {
-                            
-                            // Note: path includes the hostname.
-                            log.info("Service is not active: "+serviceCounterSet.getPath());
-                            
-                            continue;
-                            
-                        }
-
-                        /*
-                         * Compute the score for that service.
-                         */
-                        ServiceScore score;
-                        try {
-
-                            score = computeScore(hostname, serviceUUID,
-                                    hostCounterSet, serviceCounterSet);
-
-                        } catch (Exception ex) {
-
-                            log.error("Problem computing service score: "
-                                    + serviceCounterSet.getPath(), ex);
-
-                            /*
-                             * Keep the old score if we were not able to compute
-                             * a new score.
-                             * 
-                             * Note: if the returned value is null then the
-                             * service asynchronously was removed from the set
-                             * of active services.
-                             */
-                            score = services.get(serviceUUID);
-                            
-                            if (score == null) {
-                                
-                                log.info("Service leave during update task: "
-                                        + serviceCounterSet.getPath());
-                                
-                                continue;
-                                
-                            }
-
-                        }
-
-                        /*
-                         * Add to collection of scores.
-                         */
-                        scores.add(score);
-
-                    }
-
-                }
-
-                if (scores.isEmpty()) {
-
-                    log.warn("No performance counters for services, but "
-                            + services.size() + " active services");
-                    
-                    LoadBalancerService.this.scores.set( null );
-                    
-                    return;
-                    
-                }
-                
-                // scores as an array.
-                final ServiceScore[] a = scores.toArray(new ServiceScore[] {});
-
-                // sort scores into ascending order (least utilized to most
-                // utilized).
-                Arrays.sort(a);
-
-                /*
-                 * compute normalized score, rank, and drank.
-                 */
-                for (int i = 0; i < a.length; i++) {
-                    
-                    final ServiceScore score = a[i];
-                    
-                    score.rank = i;
-                    
-                    score.drank = ((double)i)/a.length;
-                   
-                    // update score in global map.
-                    services.put(score.serviceUUID, score);
-
-                    log.info(score.toString()); //@todo debug?
-
-                }
-                
-                log.info("The most active index was: " + a[a.length - 1]);
-
-                log.info("The least active index was: " + a[0]);
-                
-                // Atomic replace of the old scores.
-                LoadBalancerService.this.scores.set( a );
-
-                log.info("Updated scores for "+a.length+" services");
+                updateServiceScores();
                 
             } catch (Throwable t) {
 
@@ -607,66 +547,477 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         }
 
         /**
-         * Compute the score for a service.
+         * (Re-)compute the utilization score for each active host.
+         */
+        protected void updateHostScores() {
+
+            if(activeHosts.isEmpty()) {
+                
+                log.warn("No active hosts");
+                
+                return;
+                
+            }
+
+            /*
+             * Update scores for the active hosts.
+             */
+
+            final Vector<HostScore> scores = new Vector<HostScore>();
+            
+            // For each host
+            final Iterator<ICounterSet> itrh = counters.counterSetIterator();
+            
+            while(itrh.hasNext()) {
+                
+                final CounterSet hostCounterSet = (CounterSet) itrh.next();
+                
+                // Note: name on hostCounterSet is the fully qualified hostname.
+                final String hostname = hostCounterSet.getName();
+                
+                if(!activeHosts.containsKey(hostname)) {
+
+                    // Host is not active.
+                    log.info("Host is not active: "+hostname);
+                    
+                    continue;
+                    
+                }
+                
+                /*
+                 * Compute the score for that host.
+                 */
+                HostScore score;
+                try {
+
+                    score = computeScore(hostname, hostCounterSet);
+
+                } catch (Exception ex) {
+
+                    log.error("Problem computing host score: " + hostname, ex);
+
+                    /*
+                     * Keep the old score if we were not able to compute a new
+                     * score.
+                     * 
+                     * Note: if the returned value is null then the host was
+                     * asynchronously removed from the set of active hosts.
+                     */
+                    score = activeHosts.get(hostname);
+
+                    if (score == null) {
+
+                        log.info("Host gone during update task: " + hostname);
+
+                        continue;
+
+                    }
+
+                }
+
+                /*
+                 * Add to collection of scores.
+                 */
+                scores.add(score);
+
+            }
+
+            if (scores.isEmpty()) {
+
+                log.warn("No performance counters for hosts, but "
+                        + activeHosts.size() + " active hosts");
+                
+                LoadBalancerService.this.hostScores.set( null );
+                
+                return;
+                
+            }
+            
+            // scores as an array.
+            final HostScore[] a = scores.toArray(new HostScore[] {});
+
+            // sort scores into ascending order (least utilized to most
+            // utilized).
+            Arrays.sort(a);
+
+            /*
+             * compute normalized score, rank, and drank.
+             */
+            for (int i = 0; i < a.length; i++) {
+                
+                final HostScore score = a[i];
+                
+                score.rank = i;
+                
+                score.drank = ((double)i)/a.length;
+               
+                // update score in global map.
+                activeHosts.put(score.hostname, score);
+
+                log.info(score.toString()); //@todo debug?
+
+            }
+            
+            log.info("The most active host was: " + a[a.length - 1]);
+
+            log.info("The least active host was: " + a[0]);
+            
+            // Atomic replace of the old scores.
+            LoadBalancerService.this.hostScores.set( a );
+
+            log.info("Updated scores for "+a.length+" hosts");
+
+        }
+
+        /**
+         * (Re-)compute the utilization score for each active service.
+         */
+        protected void updateServiceScores() {
+            
+            if(activeServices.isEmpty()) {
+                
+                log.warn("No active services");
+                
+                LoadBalancerService.this.serviceScores.set( null );
+                
+                return;
+                
+            }
+            
+            /*
+             * Update scores for the active services.
+             */
+
+            final Vector<ServiceScore> scores = new Vector<ServiceScore>();
+            
+            // For each host
+            final Iterator<ICounterSet> itrh = counters.counterSetIterator();
+            
+            while(itrh.hasNext()) {
+                
+                final CounterSet hostCounterSet = (CounterSet) itrh.next();
+                
+                // Note: name on hostCounterSet is the fully qualified hostname.
+                final String hostname = hostCounterSet.getName();
+
+                // Pre-computed score for the host on which the service is running.
+                final HostScore hostScore = activeHosts.get(hostname);
+
+                if (hostScore == null) {
+
+                    // Host is not active.
+                    log.info("Host is not active: " + hostname);
+                    
+                    continue;
+                    
+                }
+
+                final CounterSet servicesCounterSet = (CounterSet) hostCounterSet
+                        .getPath("service");
+
+                if (servicesCounterSet == null) {
+
+                    log.warn("No services? hostname=" + hostname);
+
+                    continue;
+
+                }
+
+                // For each service.
+                final Iterator<ICounterSet> itrs = servicesCounterSet
+                        .counterSetIterator();
+                
+                while(itrs.hasNext()) {
+
+                    final CounterSet serviceCounterSet = (CounterSet) itrs.next();
+
+                    // Note: name on serviceCounterSet is the serviceUUID.
+                    final String serviceName = serviceCounterSet.getName();
+                    final UUID serviceUUID;
+                    try {
+                        serviceUUID = UUID.fromString(serviceName);
+                    } catch(Exception ex) {
+                        log.error("Could not parse service name as UUID?\n"
+                                + "hostname=" + hostname
+                                + ", serviceCounterSet.path="
+                                + serviceCounterSet.getPath()
+                                + ", serviceCounterSet.name="
+                                + serviceCounterSet.getName(), ex);
+                        continue;
+                    }
+                    
+                    if(!activeServices.containsKey(serviceUUID)) {
+
+                        /*
+                         * @todo I am seeing some services reported here as not active???
+                         */
+                        
+                        log.info("Service is not active: "+serviceCounterSet.getPath());
+                        
+                        continue;
+                        
+                    }
+
+                    /*
+                     * Compute the score for that service.
+                     */
+                    ServiceScore score;
+                    try {
+
+                        score = computeScore(hostScore, serviceUUID,
+                                hostCounterSet, serviceCounterSet);
+
+                    } catch (Exception ex) {
+
+                        log.error("Problem computing service score: "
+                                + serviceCounterSet.getPath(), ex);
+
+                        /*
+                         * Keep the old score if we were not able to compute
+                         * a new score.
+                         * 
+                         * Note: if the returned value is null then the
+                         * service asynchronously was removed from the set
+                         * of active services.
+                         */
+                        score = activeServices.get(serviceUUID);
+                        
+                        if (score == null) {
+                            
+                            log.info("Service leave during update task: "
+                                    + serviceCounterSet.getPath());
+                            
+                            continue;
+                            
+                        }
+
+                    }
+
+                    /*
+                     * Add to collection of scores.
+                     */
+                    scores.add(score);
+
+                }
+
+            }
+
+            if (scores.isEmpty()) {
+
+                log.warn("No performance counters for services, but "
+                        + activeServices.size() + " active services");
+                
+                LoadBalancerService.this.serviceScores.set( null );
+                
+                return;
+                
+            }
+            
+            // scores as an array.
+            final ServiceScore[] a = scores.toArray(new ServiceScore[] {});
+
+            // sort scores into ascending order (least utilized to most
+            // utilized).
+            Arrays.sort(a);
+
+            /*
+             * compute normalized score, rank, and drank.
+             */
+            for (int i = 0; i < a.length; i++) {
+                
+                final ServiceScore score = a[i];
+                
+                score.rank = i;
+                
+                score.drank = ((double)i)/a.length;
+               
+                // update score in global map.
+                activeServices.put(score.serviceUUID, score);
+
+                log.info(score.toString()); //@todo debug?
+
+            }
+            
+            log.info("The most active service was: " + a[a.length - 1]);
+
+            log.info("The least active service was: " + a[0]);
+            
+            // Atomic replace of the old scores.
+            LoadBalancerService.this.serviceScores.set( a );
+
+            log.info("Updated scores for "+a.length+" services");
+
+        }
+        
+        /**
+         * Compute the score for a host.
+         * <p>
+         * The host scores MUST reflect critical resource exhaustion, especially
+         * DISK free space, which can take down all services on the host, and
+         * SWAPPING, which can bring the effective throughput of the host to a
+         * halt. All other resources fail soft, by causing the response time to
+         * increase.
+         * <p>
+         * Note: DISK exhaustion can lead to immediate failure of all services
+         * on the same host. A host that is nearing DISK exhaustion SHOULD get
+         * heavily dinged and an admin SHOULD be alerted.
+         * <p>
+         * The correct response for heavy swapping is to alert an admin to
+         * shutdown one or more processes on that host. <strong>If you do not
+         * have failover provisioned for your data services then don't shutdown
+         * data services or you WILL loose data!</strong>
          * 
          * @param hostname
          *            The fully qualified hostname.
-         * @param serviceUUID
-         *            The service {@link UUID}.
          * @param hostCounterSet
          *            The performance counters for that host.
          * @param serviceCounterSet
          *            The performance counters for that service.
-         * @return
+         *            
+         * @return The computed host score.
          */
-        protected ServiceScore computeScore(String hostname, UUID serviceUUID,
-                ICounterSet hostCounterSet, ICounterSet serviceCounterSet) {
+        protected HostScore computeScore(String hostname,
+                ICounterSet hostCounterSet) {
 
             /*
-             * FIXME compute the score!
+             * Is the host swapping heavily?
              * 
-             * Note: utilization is defined in terms of transient system
-             * resources : CPU, IO (DISK and NET), RAM.
+             * @todo if heavy swapping persists then lower the score even
+             * further.
+             */
+            final double majorFaultsPerSec = getCurrentValue(hostCounterSet,
+                    IRequiredHostCounters.Memory_majorFaultsPerSecond, 0d);
+            
+            /*
+             * Is the host out of disk?
              * 
-             * @todo compute per-host scores first so that we can just reuse
-             * those scores here. the host scores could also carry a flag if
-             * there is a critical resource issue, e.g., running out of disk,
-             * with that host. The other critical issue is swapping, which will
-             * suck down performance for the whole host and where the correct
-             * response is to alert an admin to shutdown one or more processes
-             * on that host (whoops! if you don't have failover - you need to
-             * configure the data services to use less RAM in that case or halt
-             * some non-federation processes). All other resources fail soft, by
-             * causing the response time to increase.
+             * @todo Really needs to check on each partition on which we have a
+             * data service.
+             */
+            final double percentDiskFreeSpace = getCurrentValue(hostCounterSet,
+                    IRequiredHostCounters.LogicalDisk_PercentFreeSpace, .5d);
+
+            /*
+             * The percent of the time that the CPUs are idle.
+             */
+            double percentProcessorIdle = 1d - getAverageValueForMinutes(
+                    hostCounterSet, IHostCounters.CPU_PercentProcessorTime,
+                    .5d, TEN_MINUTES);
+
+            /*
+             * The percent of the time that the CPUs are idle when there is
+             * an outstanding IO request.
+             */
+            double percentIOWait = getAverageValueForMinutes(hostCounterSet,
+                    IHostCounters.CPU_PercentIOWait, .1d, TEN_MINUTES);
+
+            /*
+             * @todo This reflects the disk IO utilization primarily through
+             * induced IOWAIT. Play around with other forumulas too.
+             */
+            double rawScore = (1d / (1 + percentProcessorIdle + percentIOWait * 10d));
+
+            log.info("rawScore(" + rawScore
+                    + ") = (1d / (1 + percentProcessorIdle("
+                    + percentProcessorIdle + ") + percentIOWait("
+                    + percentIOWait + ") * 10d)");
+            
+            if(majorFaultsPerSec>50) {
+                
+                // much higher utilization if the host is swapping heavily.
+                rawScore *= 10;
+                
+                log.warn("host is swapping heavily: "+hostname+", pages/sec="+majorFaultsPerSec);
+                
+            } else if (majorFaultsPerSec>10) {
+                
+                // higher utilization if the host is swapping.
+                rawScore *= 2d;
+
+                log.warn("host is swapping: "+hostname+", pages/sec="+majorFaultsPerSec);
+                
+            }
+
+            if(percentDiskFreeSpace<.05) {
+
+                // much higher utilization if the host is very short on disk.
+                rawScore *= 10d;
+                
+                log.warn("host is very short on disk: "+hostname+", freeSpace="+percentDiskFreeSpace*100+"%");
+                
+            } else if (percentDiskFreeSpace < .10) {
+
+                // higher utilization if the host is short on disk.
+                rawScore *= 2d;
+
+                log.warn("host is short on disk: "+hostname+", freeSpace="+percentDiskFreeSpace*100+"%");
+
+            }
+            
+            final HostScore hostScore = new HostScore(hostname,rawScore);
+            
+            return hostScore;
+            
+        }
+        
+        /**
+         * Compute the score for a service.
+         * <p>
+         * Note: utilization is defined in terms of transient system resources :
+         * CPU, IO (DISK and NET), RAM. A host with enough CPU/RAM/IO/DISK can
+         * support more than one data service. Therefore it is important to look
+         * at not just host utilization but also at process utilization.
+         * 
+         * @param hostScore
+         *            The pre-computed score for the host on which the service
+         *            is running.
+         * @param serviceUUID
+         *            The service {@link UUID}.
+         * @param hostCounterSet
+         *            The performance counters for that host (in case you need
+         *            anything that is not already in the {@link HostScore}).
+         * @param serviceCounterSet
+         *            The performance counters for that service.
+         * 
+         * @return The computed score for that service.
+         */
+        protected ServiceScore computeScore(HostScore hostScore, UUID serviceUUID,
+                ICounterSet hostCounterSet, ICounterSet serviceCounterSet) {
+
+            assert hostScore != null;
+            assert serviceUUID != null;
+            assert hostCounterSet != null;
+            assert serviceCounterSet != null;
+            
+            // verify that the host score has been normalized.
+            assert hostScore.rank != -1 : hostScore.toString();
+            
+            /*
+             * This is based only on the #of active unisolated operations on a
+             * data service, which is perhaps a resonable first order estimate
+             * of the load of the data service. The larger #active is the
+             * heavier the utilization of the data service.
              * 
-             * Note: DISK exhaustion is the basis for WARN or URGENT alerts
-             * since it can lead to immediate failure of all services on the
-             * same host. Still, we need to consider DISK exhaustion if only to
-             * mark those services so that they do not get marked as
-             * under-utilized.
+             * @todo There is a lot more that can be considered and under linux
+             * we have access to per-process counters for CPU, DISK, and MEMORY.
              * 
-             * A host with enough CPU/RAM/IO/DISK can support more than one data
-             * service thereby using more than 2G of RAM (a limit on 32 bit
-             * hosts). In this case it is important that we can move index
-             * partitions between those data services or the additional
-             * resources will not be fully exploited. We do this by looking at
-             * not just host utilization but also at process utilization, where
-             * the process is a data service.
+             * FIXME I am seeing nactive as zero when I would expect a non-zero
+             * value. The problem is that it is an instantaneous count and the
+             * counter that I'm interested in would be a total count of active
+             * tasks on the unisolated service sampled to give the #of active
+             * tasks during the sample period.
              */
 
-            double percentDiskFreeSpace = getCurrentValue(hostCounterSet,
-                    IHostCounters.LogicalDisk_PercentFreeSpace, .5d);
-            
-            double percentProcessorTime = getLastHourAverageValue(
-                    hostCounterSet, IHostCounters.CPU_PercentProcessorTime, .5d);
+            final double nactive = getAverageValueForMinutes(hostCounterSet,
+                    "Concurrency Manager/Unisolated Write Service/#active", 0d,
+                    TEN_MINUTES);
 
-            double percentIOWait= getLastHourAverageValue(
-                    hostCounterSet, IHostCounters.CPU_PercentIOWait, .1d);
+            double rawScore = (nactive+1) * (hostScore.score+1);
 
-            double rawScore = percentProcessorTime;
+            log.info("rawScore("+rawScore+") = (nactive("+nactive+")+1) * (hostScore("+hostScore.score+")+1)");
             
-            final ServiceScore score = new ServiceScore(hostname, serviceUUID,
-                    rawScore);
+            final ServiceScore score = new ServiceScore(hostScore.hostname,
+                    serviceUUID, rawScore);
             
             return score;
             
@@ -699,10 +1050,19 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             }
 
         }
-        
-        // @todo variant that gives the last N minutes in HistoryInstrument.
-        protected double getLastHourAverageValue(ICounterSet counterSet, String path,
-                double defaultValue) {
+
+        /**
+         * Return the average of the counter having the given path over the last
+         * <i>minutes</i> minutes.
+         * 
+         * @param counterSet
+         * @param path
+         * @param defaultValue
+         * @param minutes
+         * @return
+         */
+        protected double getAverageValueForMinutes(ICounterSet counterSet, String path,
+                double defaultValue, int minutes) {
 
             assert counterSet != null;
             assert path != null;
@@ -716,7 +1076,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
                 HistoryInstrument inst = (HistoryInstrument)c.getInstrument();
                 
-                double val = (Double) inst.minutes.getAverage();
+                double val = (Double) inst.minutes.getAverage(minutes);
 
                 return val;
 
@@ -755,7 +1115,16 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         
         try {
 
-            if(services.containsKey(serviceUUID)) {
+            if(activeHosts.putIfAbsent(hostname, new HostScore(hostname))==null) {
+
+                log.info("New host joined: hostname="+hostname);
+                
+            }
+            
+            /*
+             * Add to set of known services.
+             */
+            if(activeServices.putIfAbsent(serviceUUID, new ServiceScore(hostname, serviceUUID))!=null) {
              
                 log.warn("Already joined: serviceUUID="+serviceUUID+", hostname="+hostname);
                 
@@ -763,17 +1132,12 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                 
             }
 
-            log.info("New service joined: serviceUUID="+serviceUUID+", hostname="+hostname);
+            log.info("New service joined: hostname="+hostname+", serviceUUID="+serviceUUID);
             
             /*
              * Create history in counters - path is /host/serviceUUID.
              */
             counters.makePath(hostname+ICounterSet.pathSeparator+serviceUUID);
-            
-            /*
-             * Add to set of known services.
-             */
-            services.put(serviceUUID, new ServiceScore(hostname, serviceUUID));
 
             joined.signal();
             
@@ -799,7 +1163,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
         try {
 
-            final ServiceScore info = services.get(serviceUUID);
+            final ServiceScore info = activeServices.get(serviceUUID);
 
             if (info == null) {
 
@@ -821,7 +1185,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
              */
 //            root.deletePath(path);
             
-            services.remove(serviceUUID);
+            activeServices.remove(serviceUUID);
             
         } finally {
             
@@ -937,7 +1301,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
         try {
 
-            final ServiceScore[] scores = this.scores.get();
+            final ServiceScore[] scores = this.serviceScores.get();
 
             // No scores yet?
             if (scores == null) {
@@ -948,7 +1312,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             }
 
-            final ServiceScore score = services.get(serviceUUID);
+            final ServiceScore score = activeServices.get(serviceUUID);
 
             if (score == null) {
 
@@ -974,7 +1338,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         
         try {
 
-            final ServiceScore[] scores = this.scores.get();
+            final ServiceScore[] scores = this.serviceScores.get();
 
             // No scores yet?
             if (scores == null) {
@@ -985,7 +1349,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             }
 
-            final ServiceScore score = services.get(serviceUUID);
+            final ServiceScore score = activeServices.get(serviceUUID);
 
             if (score == null) {
 
@@ -1080,7 +1444,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             
             lock.lock();
 
-            final ServiceScore[] scores = this.scores.get();
+            final ServiceScore[] scores = this.serviceScores.get();
 
             try {
 
@@ -1137,7 +1501,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                         
                         if(exclude.equals(serviceUUID)) continue;
                         
-                        if(!services.containsKey(serviceUUID)) continue;
+                        if(!activeServices.containsKey(serviceUUID)) continue;
                         
                         if(knownGood==null) knownGood = serviceUUID;
                         
@@ -1183,7 +1547,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
     /**
      * Computes the under-utilized services in the case where where <i>minCount</i>
-     * is non-zero and we do not have pre-computed {@link #scores} on hand. If
+     * is non-zero and we do not have pre-computed {@link #serviceScores} on hand. If
      * there are also no active services, then this awaits the join of at least
      * one service. Once it has at least one service that is not the optionally
      * <i>exclude</i>d service, it returns the "under-utilized" services.
@@ -1206,11 +1570,11 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (elapsed > timeout)
+            if (elapsed > JOIN_TIMEOUT)
                 throw new TimeoutException();
 
             // all services that we know about right now.
-            final UUID[] knownServiceUUIDs = services.keySet().toArray(
+            final UUID[] knownServiceUUIDs = activeServices.keySet().toArray(
                     new UUID[] {});
 
             if (knownServiceUUIDs.length == 0) {
@@ -1240,7 +1604,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
                 }
 
-                if (!services.containsKey(knownServiceUUIDs[i])) {
+                if (!activeServices.containsKey(knownServiceUUIDs[i])) {
 
                     knownServiceUUIDs[i] = null;
 
@@ -1321,7 +1685,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (elapsed > timeout)
+            if (elapsed > JOIN_TIMEOUT)
                 throw new TimeoutException();
 
             /*
@@ -1344,7 +1708,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
                     continue;
 
                 // not active?
-                if (!services.containsKey(score.serviceUUID))
+                if (!activeServices.containsKey(score.serviceUUID))
                     continue;
                 
                 if (isUnderUtilizedDataService(score,scores)) {

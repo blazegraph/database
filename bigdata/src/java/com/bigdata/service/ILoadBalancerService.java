@@ -44,11 +44,6 @@ import org.apache.log4j.Logger;
  */
 public interface ILoadBalancerService extends Remote {
     
-    /**
-     * Logger used by {@link ILoadBalancerService} implementations to log messages.
-     */
-    public Logger log = Logger.getLogger(ILoadBalancerService.class);
-
     public UUID getServiceUUID() throws IOException;
 
     /**
