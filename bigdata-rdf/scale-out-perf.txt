@@ -421,7 +421,27 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 
     - BTree
 
-	   Going to work converting values to byte[]s throughout the
+      - bug sometimes demonstrated by com.bigdata.service.StressTestConcurrent_stressTest1.  The parent
+        of the split is being marked as "clean" when the code assumes that it should be dirty. This sort
+        of thing tends to involve touches driving evictions resulting in a node asynchronously being made
+        persistent (and hence not dirty).  Verify that there are no concurrent readers executing by mistake
+        against the live index (e.g., read_committed reads must not read on the live index). This could be
+        related to the change in the group commit policy as well since that changes when we record a commit
+        point for an index.
+      
+		Caused by: java.lang.AssertionError
+			at com.bigdata.btree.Node.insertChild(Node.java:1515)
+			at com.bigdata.btree.Leaf.split(Leaf.java:665)
+			at com.bigdata.btree.Leaf.insert(Leaf.java:472)
+			at com.bigdata.btree.Node.insert(Node.java:637)
+			at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:995)
+			at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:940)
+			at com.bigdata.btree.AbstractBTree.rangeCopy(AbstractBTree.java:1477)
+			at com.bigdata.resources.SplitIndexPartitionTask$UpdateSplitIndexPartition.doTask(SplitIndexPartitionTask.java:534)
+			at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1035)
+			... 9 more
+			
+	 - done. Going to work converting values to byte[]s throughout the
 	   api, exposing versionCounter and deletion marker metadata
 	   via the ITuple and IEntryIterator interface and moving
 	   their data into the leaf, copying data into/out of leafs
@@ -432,9 +452,9 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 	   also set the stage for a compacting btree node or leaf data
 	   structure which should help with long-term GC problems.
 
-	 - Update UnisolatedBTree, IsolatedBTree.
+	 - done. Update UnisolatedBTree, IsolatedBTree.
 
-	 - Update the fused views for these classes.  There is a
+	 - done. Update the fused views for these classes.  There is a
            single unifying model: the IsolatedBTree should be a fused
            view of the read-only historical state of an index
            partition and the btree on which the write set is isolated.
@@ -444,8 +464,17 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            The rangeIterator for the fused view will examine the
            version metadata.
 
-         - support copy in/out of key, val, and optional metadata
-           including version counter and deleted marker in lookup(),
+		   I can keep the simple btree api and extend the semantics on
+		   the abstract btree, node and leaf directly and then roll
+		   them into the rest of the system incrementally.
+	
+		   This will also make it easy to convert the values stored
+		   under the keys to byte[]s since they are no longer going to
+		   be wrapped by Value objects.
+	
+		   That will make it easier to align the serialization?
+
+     - Support copy in/out of keys and vals in lookup(),
            insert(), remove(), and rangeIterator so that we can (a) be
            more efficient in handling keys and vals by copying; (b)
            handle keys and vals that are byte aligned or bit aligned
@@ -454,83 +483,19 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            version counter and deletion marker for fused views of
            indices with isolation.
 
-	   I can keep the simple btree api and extend the semantics on
-	   the abstract btree, node and leaf directly and then roll
-	   them into the rest of the system incrementally.
-
-	   This will also make it easy to convert the values stored
-	   under the keys to byte[]s since they are no longer going to
-	   be wrapped by Value objects.
-
-	   That will make it easier to align the serialization?
-
-	 - Write test suites for fused view processing with isolatable
-           indices, especially focusing on the fused iterator view.
-           Define VERSION to report the version counter and deletion
-           marker metadata out to the ITuple and the rangeIterator.
-
-	 - change version counters to long (commit timestamps).
-
-	 - Life nodes and leaves require a random access API for
-           copying keys and values out of a node or leaf.  This could
-           be getTuple(byte[] key), which would be the basis for
-           lookup( byte[] key ).  Note that serialization can get by
-           with a sequential access or an array[] reference access,
-           but not if we want to directly read from the serialized
-           record as our immutable node/leaf data structure.  The
-           changes here are to ILeafData, Leaf, INodeData, Node,
-           ITuple, IKeySerializer, IValueSerializer, and
-           IDataSerializer.
+	 - done. change version counters to long (commit timestamps).
 
     - Tune serialization:
 
-	 - Test WrappedKeySerializer allowing the use of the
-           FastRDFKeyCompression class to serialize the keys of the
-           statement indices.  Make sure that we can do this for all
-           of the stores (temp, local, embedded data service, and
-           scale-out federation).  This will require the key and value
-           serializers to get passed along when creating both local
-           and remote indices.
-	   
 	 - Test use of FastRDFValueCompression to write the values for
 	   the statement indices.
-
-	 - Adapt the ResultSet for the remote rangeIterator to use the
-           key and value serializer for the index.
-
-	 - Note: if the btree will internally use an order preserving
-           compression technique (ala hu-tucker) then it may make
-           sense to use special key and value serializers when
-           transferring data to/from an index procedures or the range
-           iterator since order preserving compression is never
-           required in those situations.
-
-	 - Make sure that the InputBitStream and the OutputBitStream
-           are drawing on a pool of byte[]s for their internal buffers
-           so that we are not challenging the heap by creating and
-           destroying a lot of those objects (actually, they are not
-           using an internal buffer so MAKE SURE that the are reading
-           / writing on streams backed by a byte[] or a highly
-           buffered socket (in the case of RMI)).
-
-	 - See more items to be done in
-           AbstractKeyArrayIndexProcedure, IDataSerializer, and
-           UnisolatedBTree (MUST wrap up the caller's value serializer
-           in one that handles version counters and deletion markers).
-           Make sure to run TestScaleOutTripleStoreWithJiniFederation
-           for testing since that is the only thing that forces
-           serialization of the index procedures.
 
 	 - Look at how to do prefix coding using the mg4j and fast
            classes.  That could be used as the default key
            serialization and only overridden in special cases like RDF
            where we can do even better with less effort.
-
-	 - Compare fast rdf key/val compression against the
-           KeyBufferSerializer and ByteArrayValueSerializer for some
-           data sets.  How do they stack up?
-
-	   Summary: the "fast" rdf serializers definately write (and
+           
+	   (old summary, revisit now since significant code changes): the "fast" rdf serializers definately write (and
 	   read) less data resulting in a smaller store and less IO.
 	   However, they are also without a doubt SLOWER.
 
@@ -584,14 +549,14 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
     - Distributed file repository
 
-         - handle overflow of blocks to the index segments.
+         - handle overflow of blocks to the index segments during MOVE
 
 	 - provide streaming socket api on data service for reading
-           blocks.
+           blocks (low level in the DiskOnlyStrategy - if in the write cache
+           then return directly else return buffered input stream reading on
+           the disk file and interrupt if journal is closed).
 
 	 - range delete
-
-	 - full text indexing.
 
 	 - logical row scan for headers of documents in a key range.
 
@@ -690,88 +655,3 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
 **  Maven 2.x build and subversion for bigdata.
 
-----------------------------------------
-data service and index summary from U1000 run on server1;
-
-dataService: uuid=247d3d39-da6a-4efa-bdce-6a71e8184e9c
-file=DataServer1.jnl, mode=rw, nextOffset=14,093,839,353, extent=14,103,058,240
-store(read): #read=27,343,227, bytesRead=10,106,155,083, secs=6,246.804, bytesPerSec=1,617,812, maxRecordSize=1,240
-store(write): #write=48,176,437, bytesWritten=14,093,839,353, secs=3,753.166, bytesPerSec=3,755,187, maxRecordSize=1,360
-cache(read): 3.49% (#cache=954172, #disk=26389055, total=27343227, secs=36.737)
-cache(write): 100.00% (#cache=48176437, #disk=1507, total=48177944, secs=162.082)
-disk(read): #read=26389055, bytesRead=9,734,685,002, bytesPerRead=382, secs=6,009.483s, bytesPerSec=1,619,887, secs/read=0.000
-disk(write): #write=1507, bytesWritten=14,093,839,353, bytesPerWrite=9,352,249, secs=83.214s, bytesPerSec=169,368,756, secs/write=0.055
-disk(other): #force=702, #extend=420, #reopen=0, #rootBlocks=282
-
-index: name=SPO#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=2083276, #leaves=16688384, #(nodes+leaves)=18771660, #distinctOnQueue=347, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=8, #roots joined=0, #nodes split=2083268, #nodes joined=0, #leaves split=16688383, #leaves joined=0, #nodes copyOnWrite=29823, #leaves copyOnWrite=40949
-read (57208 nodes, 185336 leaves, 60,115,396 bytes, readSeconds=111.840, bytes/sec=537,511, deserializeSeconds=35.335, deserialized/sec=6,864)
-wrote (2113099 nodes, 16729333 leaves, 3,658,662,336 bytes, writeSeconds=3,575.106, bytes/sec=1,023,372, serializeSeconds=250.521, serialized/sec=75,213)
-
-index: name=terms#0 : #entries=32885169, branchingFactor=16, height=7, #nodes=422886, #leaves=3694872, #(nodes+leaves)=4117758, #distinctOnQueue=406, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=68619359, #bloomRejects=0, #insert=32885169, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=7, #roots joined=0, #nodes split=422879, #nodes joined=0, #leaves split=3694871, #leaves joined=0, #nodes copyOnWrite=14296674, #leaves copyOnWrite=10917466
-read (15074708 nodes, 12025975 leaves, 10,046,039,687 bytes, readSeconds=6,340.230, bytes/sec=1,584,491, deserializeSeconds=940.333, deserialized/sec=28,820)
-wrote (14719560 nodes, 14612338 leaves, 10,434,620,707 bytes, writeSeconds=270.662, bytes/sec=38,552,222, serializeSeconds=368.982, serialized/sec=79,494)
-
-dataService: uuid=cfabe608-7d0c-4c4f-9369-9889897eedbf
-file=DataServer0.jnl, mode=rw, nextOffset=12,038,914,891, extent=12,056,279,856
-store(read): #read=22,121,027, bytesRead=4,849,375,933, secs=899.838, bytesPerSec=5,389,163, maxRecordSize=1,122
-store(write): #write=62,317,229, bytesWritten=12,038,914,891, secs=830.813, bytesPerSec=14,490,520, maxRecordSize=1,331
-cache(read): 22.79% (#cache=5040340, #disk=17080687, total=22121027, secs=24.666)
-cache(write): 100.00% (#cache=62317229, #disk=1430, total=62318659, secs=178.284)
-disk(read): #read=17080687, bytesRead=3,726,012,880, bytesPerRead=283, secs=671.521s, bytesPerSec=5,548,621, secs/read=0.000
-disk(write): #write=1430, bytesWritten=12,038,914,891, bytesPerWrite=8,418,821, secs=76.801s, bytesPerSec=156,754,405, secs/write=0.054
-disk(other): #force=870, #extend=359, #reopen=0, #rootBlocks=511
-
-index: name=ids#0 : #entries=32885169, branchingFactor=16, height=7, #nodes=513066, #leaves=4110154, #(nodes+leaves)=4623220, #distinctOnQueue=368, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=68619359, #bloomRejects=0, #insert=32885169, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=7, #roots joined=0, #nodes split=513059, #nodes joined=0, #leaves split=4110153, #leaves joined=0, #nodes copyOnWrite=8262, #leaves copyOnWrite=1640
-read (121221 nodes, 559385 leaves, 285,491,447 bytes, readSeconds=147.523, bytes/sec=1,935,238, deserializeSeconds=43.001, deserialized/sec=15,828)
-wrote (521328 nodes, 4111794 leaves, 2,457,704,285 bytes, writeSeconds=70.132, bytes/sec=35,044,032, serializeSeconds=62.168, serialized/sec=74,526)
-
-index: name=just#0 : #entries=0, branchingFactor=16, height=0, #nodes=0, #leaves=1, #(nodes+leaves)=1, #distinctOnQueue=1, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=0, #bloomRejects=0, #insert=0, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=0, #roots joined=0, #nodes split=0, #nodes joined=0, #leaves split=0, #leaves joined=0, #nodes copyOnWrite=0, #leaves copyOnWrite=0
-read (0 nodes, 0 leaves, 0 bytes, readSeconds=0.000, bytes/sec=N/A, deserializeSeconds=0.000, deserialized/sec=N/A)
-wrote (0 nodes, 1 leaves, 19 bytes, writeSeconds=0.000, bytes/sec=2,843,035, serializeSeconds=0.000, serialized/sec=108,202)
-
-index: name=OSP#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=1986381, #leaves=16233732, #(nodes+leaves)=18220113, #distinctOnQueue=341, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=8, #roots joined=0, #nodes split=1986373, #nodes joined=0, #leaves split=16233731, #leaves joined=0, #nodes copyOnWrite=6432620, #leaves copyOnWrite=2837848
-read (6426941 nodes, 3001831 leaves, 2,106,210,577 bytes, readSeconds=321.601, bytes/sec=6,549,135, deserializeSeconds=285.973, deserialized/sec=32,971)
-wrote (8419001 nodes, 19071580 leaves, 5,056,956,115 bytes, writeSeconds=484.195, bytes/sec=10,444,042, serializeSeconds=267.202, serialized/sec=102,883)
-
-index: name=POS#0 : #entries=133573856, branchingFactor=16, height=8, #nodes=1987343, #leaves=16281722, #(nodes+leaves)=18269065, #distinctOnQueue=340, queueCapacity=500, isolatable=true, class=com.bigdata.service.UnisolatedBTreePartition
-#find=268489573, #bloomRejects=0, #insert=133573856, #remove=0, #indexOf=0, #getKey=0, #getValue=0
-#roots split=8, #roots joined=0, #nodes split=1987335, #nodes joined=0, #leaves split=16281721, #leaves joined=0, #nodes copyOnWrite=8051852, #leaves copyOnWrite=3868642
-read (8023614 nodes, 3988035 leaves, 2,457,673,909 bytes, readSeconds=488.999, bytes/sec=5,025,928, deserializeSeconds=343.401, deserialized/sec=34,979)
-wrote (10039195 nodes, 20150364 leaves, 4,523,095,721 bytes, writeSeconds=382.653, bytes/sec=11,820,344, serializeSeconds=280.918, serialized/sec=107,468)
-----------------------------------------
-
-Problem: The proxy generated when running a local test case does not
-report the IMetadataService interface BUT it does implement that
-interface.  This does NOT appear to be true when the proxy is
-generated within another JVM (on the same machine, server1).  This is
-resulting in a failure to locate the metadata service.  The data
-services are discoverable since their interface is the one that the
-proxy always discloses (jini's "guess" as to the most interesting
-interface).
-
-laptop (TestBigdataClient):
-
-net.jini.core.lookup.ServiceItem[serviceID=a36732bf-e6f6-4fae-b853-d7e0ae141e1d,
-service=Proxy[IDataService,BasicInvocationHandler[BasicObjectEndpoint[8ed84860-ace3-44b3-90da-cc94dade6fa7,TcpEndpoint[192.168.1.102:3084]]]],
-attributeSets=[net.jini.lookup.entry.Name(name=MetadataService0)
-net.jini.lookup.entry.ServiceInfo(name=bigdata,manufacturer=SYSTAP,LLC,vendor=SYSTAP,LLC,version=0.1-beta,model=MetadataService,serialNumber=serial#)
-
-server1: fails to recognize the metadata service as implementing IMetadataService!?!
-
-DEBUG: 21490 task
-com.bigdata.service.MetadataServiceFilter.check(MetadataServiceFilter.java:64):
-Ignoring:
-net.jini.core.lookup.ServiceItem[serviceID=2e302d56-cbc4-491c-b458-d6d37b1f22cf,
-service=Proxy[IDataService,BasicInvocationHandler[BasicObjectEndpoint[dde6f758-7aca-4212-a683-5c1782611741,TcpEndpoint[192.168.20.26:54438]]]],
-attributeSets=[net.jini.lookup.entry.Name(name=MetadataService0)
-net.jini.lookup.entry.ServiceInfo(name=bigdata,manufacturer=SYSTAP,LLC,vendor=SYSTAP,LLC,version=0.1-beta,model=MetadataService,serialNumber=serial#)]]

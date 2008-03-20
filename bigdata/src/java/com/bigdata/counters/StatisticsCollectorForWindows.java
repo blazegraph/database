@@ -50,6 +50,8 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
 
         private final String path;
         
+        private final double scale;
+        
         private long lastModifiedTime;
 
         private Double value = 0d;
@@ -82,8 +84,13 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
          * @param path
          *            The path of the corresponding {@link ICounter} under which
          *            the collected performance counter data will be reported.
+         * @param scale
+         *            The counter value will be multiplied through by the scale.
+         *            This is used to adjust counters that are reporting in some
+         *            other unit. E.g., KB/sec vs bytes/sec or percent in
+         *            [0:100] vs percent in [0.0:1.0].
          */
-        public InstrumentForWPC(String counterNameForWindows, String path) {
+        public InstrumentForWPC(String counterNameForWindows, String path, double scale) {
 
             if (counterNameForWindows == null)
                 throw new IllegalArgumentException();
@@ -95,6 +102,8 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
 
             this.path = path;
 
+            this.scale = scale;
+            
         }
 
         /**
@@ -118,7 +127,7 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
         }
 
         /**
-         * Note: parses value to {@link Double}.
+         * Note: parses value to {@link Double} and adjusts by {@link #scale}.
          * 
          * @param value
          * 
@@ -126,7 +135,11 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
          */
         public void setValue(String value, long timestamp) {
 
-            setValue( Double.parseDouble(value), timestamp );
+            double v = Double.parseDouble(value);
+            
+            v *= scale;
+            
+            setValue( v, timestamp );
 
         }
 
@@ -160,25 +173,23 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
 
                 new InstrumentForWPC(
                         "\\Memory\\Pages/Sec",
-                        p + IRequiredHostCounters.Memory_PageFaultsPerSecond),
+                        p + IRequiredHostCounters.Memory_majorFaultsPerSecond, 1d),
 
                 new InstrumentForWPC(
                         "\\Processor(_Total)\\% Processor Time",
-                        p + IRequiredHostCounters.CPU_PercentProcessorTime),
+                        p + IRequiredHostCounters.CPU_PercentProcessorTime, .01d),
 
                 new InstrumentForWPC(
                         "\\LogicalDisk(_Total)\\% Free Space",
-                        p + IRequiredHostCounters.LogicalDisk_PercentFreeSpace),
+                        p + IRequiredHostCounters.LogicalDisk_PercentFreeSpace, .01d),
 
                 /*
-                 * These are system wide counters for the network
-                 * interface. There are also counters for the
-                 * network queue length, packets discarded, and
-                 * packet errors that might be interesting. (I can't
-                 * find _Total versions declared for these counters
-                 * so I am not including them but the counters for
-                 * the specific interfaces could be enabled and then
-                 * aggregated, eg:
+                 * These are system wide counters for the network interface.
+                 * There are also counters for the network queue length, packets
+                 * discarded, and packet errors that might be interesting. (I
+                 * can't find _Total versions declared for these counters so I
+                 * am not including them but the counters for the specific
+                 * interfaces could be enabled and then aggregated, eg:
                  * 
                  * \NetworkInterface(*)\Bytes Send/Sec
                  */
@@ -194,51 +205,49 @@ public class StatisticsCollectorForWindows extends AbstractProcessCollector {
                         "\\PhysicalDisk(_Total)\\Avg. Disk Queue Length",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "Avg. Disk Queue Length"),
+                                + "Avg. Disk Queue Length", 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\% Idle Time",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "% Idle Time"),
+                                + "% Idle Time", .01d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\% Disk Time",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "% Disk Time"),
+                                + "% Disk Time", .01d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\% Disk Read Time",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "% Disk Read Time"),
+                                + "% Disk Read Time", .01d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\% Disk Write Time",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "% Disk Write Time"),
+                                + "% Disk Write Time", .01d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Disk Read Bytes/Sec",
-                        p
-                                + IRequiredHostCounters.PhysicalDisk_BytesReadPerSec),
+                        p+ IRequiredHostCounters.PhysicalDisk_BytesReadPerSec, 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Disk Write Bytes/Sec",
-                        p
-                                + IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec),
+                        p+ IRequiredHostCounters.PhysicalDisk_BytesWrittenPerSec, 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Disk Reads/Sec",
-                        p + IHostCounters.PhysicalDisk_ReadsPerSec),
+                        p + IHostCounters.PhysicalDisk_ReadsPerSec, 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Disk Writes/Sec",
-                        p + IHostCounters.PhysicalDisk_WritesPerSec),
+                        p + IHostCounters.PhysicalDisk_WritesPerSec, 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "Avg. Disk Bytes per Read"),
+                                + "Avg. Disk Bytes per Read", 1d),
                 new InstrumentForWPC(
                         "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",
                         p + IRequiredHostCounters.PhysicalDisk
                                 + ICounterSet.pathSeparator
-                                + "Avg. Disk Bytes per Write"),
+                                + "Avg. Disk Bytes per Write", 1d),
                 // "\\PhysicalDisk(_Total)\\Disk Writes/sec",
                 // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Read",
                 // "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write",

@@ -159,9 +159,18 @@ public class StressTestConcurrent extends
         // enable moves.
         properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
         
-        // @todo return to default.
-        properties.setProperty(Options.STATUS_DELAY,"3000");
+        // @todo return to default (10000 ms)
+        properties.setProperty(Options.STATUS_DELAY,"10000");
+
+        // performance counter sampling interval.
+        properties.setProperty(Options.INTERVAL,"5000");
         
+        // performance counter reporting interval (should be the same as the sampling interval).
+        properties.setProperty(Options.REPORT_DELAY,"5000");
+
+        // load balancer update delay
+        properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
+
         // disable overflow processing
 //        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         

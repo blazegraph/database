@@ -321,10 +321,33 @@ public class History<T> {
      * @return The average -or- <code>null</code> if the samples are not
      *         numbers (no average is reported for dates, strings, etc).
      * 
-     * @todo could report the most frequent value for non-numeric data or a
-     *       list of the distinct values.
+     * @todo could report the most frequent value for non-numeric data or a list
+     *       of the distinct values.
      */
-    synchronized public T getAverage() {
+    public T getAverage() {
+
+        return getAverage(capacity);
+        
+    }
+    
+    /**
+     * Compute the average of the samples over the last N reporting periods.
+     * 
+     * @param nperiods
+     *            The #of reporting periods over which the average is to be
+     *            computed. E.g., last 10 minutes. The reporting periods have to
+     *            be read from the logicalSlot for 10 minutes ago up through the
+     *            current logicalSlot.
+     * 
+     * @return The average over the last N reporting periods.
+     * 
+     * @throws IllegalArgumentException
+     *             If you request data that is older (in reporting periods) that
+     *             is stored within the history. E.g., you can not ask for more
+     *             than a 60 minute average if the reporting period is minutes
+     *             and the capacity is 60.
+     */
+    synchronized public T getAverage(int nperiods) {
 
         if (!isNumeric()) {
 
@@ -336,27 +359,67 @@ public class History<T> {
 
         }
 
+        if (nperiods < 1 || nperiods > capacity) {
+            
+            throw new IllegalArgumentException("Must be in [0:" + capacity
+                    + "], not " + nperiods);
+            
+        }
+        
+        if(this.lastLogicalSlot == -1) {
+            
+            // No data.
+            
+            return valueOf(0d);
+            
+        }
+        
+        // total of the non-null values.
         double total = 0d;
 
+        // #of non-null values.
         int n = 0;
 
-        // tally non-null samples.
-        for (int i = 0; i < capacity; i++) {
+        final long currentLogicalSlot = timestamps[(int)lastLogicalSlot % capacity]
+                / period;
 
-            if (data[i] == null)
+        final long firstLogicalSlot = lastLogicalSlot - nperiods + 1;
+
+        // tally non-null samples within the reporting period.
+        for (long ls = firstLogicalSlot; ls <= currentLogicalSlot; ls++) {
+
+            final int physicalSlot = (int) (ls % capacity);
+
+            if (data[physicalSlot] == null)
                 continue;
 
-            total += ((Number) data[i]).doubleValue();
+            total += ((Number) data[physicalSlot]).doubleValue();
 
             n++;
+            
+            assert n <= capacity;
 
         }
 
+// for (int i = 0; i < capacity; i++) {
+//
+//            if (data[i] == null)
+//                continue;
+//
+//            total += ((Number) data[i]).doubleValue();
+//
+//            n++;
+//
+//        }
+
         /*
-         * Note: assertion could be violated if concurrent modifications
-         * were allowed.
+         * Note: assertion could be violated if concurrent modifications were
+         * allowed.
+         * 
+         * FIXME i've seen this assertion but things appear to be synchronized
+         * so look into this further for possible fenceposts!
          */
-        assert n == size : "size=" + size + ", but n=" + n;
+//        assert n == size : "size=" + size + ", but n=" + n;
 
         if (n == 0) {
 
@@ -663,6 +726,15 @@ public class History<T> {
     /**
      * The last logical slot in the buffer in which a sample was written and
      * <code>-1</code> until the first sample has been written.
+     * <p>
+     * The [logicalSlot] is a strictly increasing index corresponding to the #of
+     * elapsed periods since the epoch (when timestamp was 0).
+     * <p>
+     * The [physicalSlot] is the index at which the new sample will be placed in
+     * the buffer. This is always interpreted as logically greater than the last
+     * sample (we have already asserted that the timestamp is greater than
+     * lastModified), even if the actual index is less than or equal to the
+     * current index.
      */
     private long lastLogicalSlot = -1;
 

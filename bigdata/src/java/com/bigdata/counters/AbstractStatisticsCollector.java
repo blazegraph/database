@@ -169,8 +169,12 @@ abstract public class AbstractStatisticsCollector {
          * Memory
          */
         
-        /** Major page faults per second. */
-        String Memory_PageFaultsPerSecond = Memory + ps
+        /**
+         * Faults which required loading a page from disk.
+         * 
+         * FIXME not collected for linux right now.
+         */
+        String Memory_majorFaultsPerSecond = Memory + ps
                 + "Page Faults Per Second";
 
         /*
@@ -191,7 +195,6 @@ abstract public class AbstractStatisticsCollector {
         /** Disk bytes written per second for the host. */
         String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
                 + "Bytes Written Per Second";
-
 
     };
  
@@ -250,6 +253,12 @@ abstract public class AbstractStatisticsCollector {
 
         /** The total amount of memory available to the host. */
         String Memory_Available = Memory + ps + "Total bytes available";
+
+        /**
+         * Faults that did not require loading a page from disk.
+         */
+        String Memory_minorFaultsPerSec = Memory + ps
+                + "Minor Faults per Second";
 
         /*
          * PhysicalDisk

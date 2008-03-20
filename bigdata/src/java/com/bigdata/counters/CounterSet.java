@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -376,9 +377,9 @@ public class CounterSet implements ICounterSet {
     @SuppressWarnings("unchecked")
     public Iterator<ICounter> counterIterator(final Pattern filter) {
         
-        IStriterator src = new Striterator(children.values().iterator())
-                .addTypeFilter(ICounter.class);
-        
+        final IStriterator src = new Striterator(directChildIterator(
+                true/* sorted */, ICounter.class));
+
         if (filter != null) {
 
             src.addFilter(
@@ -434,30 +435,74 @@ public class CounterSet implements ICounterSet {
     }
     
     /**
+     * Iterator visits all directly attached children.
+     * 
+     * @param sorted
+     *            When <code>true</code> the children will be visited in order
+     *            by their name.
+     * 
+     * @param type
+     *            An optional type filter - specify either {@link ICounterSet}
+     *            or {@link ICounter} you want to be visited by the iterator.
+     *            When <code>null</code> all directly attached children
+     *            (counters and counter sets) are visited.
+     */
+    public Iterator directChildIterator(boolean sorted,
+            Class<? extends ICounterNode> type) {
+        
+        /*
+         * Note: In order to avoid concurrent modification problems under
+         * traversal I am currently creating a snapshot of the set of child
+         * references and then using the sorterator over that stable snapshot.
+         * 
+         * @todo consider using linked list or insertion sort rather than hash
+         * map and runtime sort.
+         */
+        final ICounterNode[] a;
+        
+        synchronized(this) {
+            
+            a = (ICounterNode[])children.values().toArray(new ICounterNode[]{});
+            
+        }
+        
+        final IStriterator itr = new Striterator( Arrays.asList(a).iterator() );
+        
+        if (type != null) {
+            
+            itr.addTypeFilter(type);
+           
+        }
+        
+        if (sorted) {
+
+            itr.addFilter(new Sorter() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public int compare(Object arg0, Object arg1) {
+
+                    return ((ICounterNode) arg0).getName().compareTo(
+                            ((ICounterNode) arg1).getName());
+
+                }
+
+            });
+            
+        }
+        
+        return itr;
+        
+    }
+    
+    /**
      * Iterator visits the directly attached {@link ICounterSet} children.
      */
     @SuppressWarnings("unchecked")
     public Iterator<ICounterSet> counterSetIterator() {
 
-        /*
-         * @todo consider using linked list or insertion sort rather than hash
-         * map and runtime sort.
-         */
-        IStriterator itr = new Striterator(children.values().iterator())
-                .addFilter(new Sorter(){
-
-                    private static final long serialVersionUID = 1L;
-
-                    @Override
-                    public int compare(Object arg0, Object arg1) {
-                        
-                        return ((ICounterNode)arg0).getName().compareTo(((ICounterNode)arg1).getName());
-                        
-                    }
-                    
-                });
-        
-        return itr;
+        return directChildIterator(true/*sorted*/,ICounterSet.class);
         
     }
 
@@ -1100,8 +1145,12 @@ public class CounterSet implements ICounterSet {
                 // atomic makePath + counter create iff necessary.
                 synchronized (root) {
 
-                    node = root
-                            .getPath(path + ICounterSet.pathSeparator + name);
+                    /*
+                     * Note: use just the name when the path is '/' to avoid
+                     * forming a path that begins '//'.
+                     */
+                    node = root.getPath(path.equals(pathSeparator) ? name : path
+                            + ICounterSet.pathSeparator + name);
 
                     if (node == null) {
 
