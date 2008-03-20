@@ -52,7 +52,11 @@ public enum StatementEnum {
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred((byte)2);
+    Inferred((byte)2),
+    /**
+	 * For debugging.
+ 	 */
+    Backchained((byte)4);
 
     private final byte code;
     
@@ -112,6 +116,8 @@ public enum StatementEnum {
         case 1: return Axiom;
         
         case 2: return Inferred;
+        
+        case 4: return Backchained;
         
         default:
             throw new RuntimeException("Unexpected byte: " + b);

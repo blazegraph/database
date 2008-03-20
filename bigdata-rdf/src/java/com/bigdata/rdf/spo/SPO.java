@@ -335,9 +335,10 @@ public class SPO implements Comparable {
             String t = null;
             
             switch(type) {
-            case Explicit   : t = "Explicit   "; break;
-            case Inferred   : t = "Inferred   "; break;
-            case Axiom      : t = "Axiom      "; break;
+            case Explicit    : t = "Explicit    "; break;
+            case Inferred    : t = "Inferred    "; break;
+            case Axiom       : t = "Axiom       "; break;
+            case Backchained : t = "Backchained "; break;
             default: throw new AssertionError();
             }
             

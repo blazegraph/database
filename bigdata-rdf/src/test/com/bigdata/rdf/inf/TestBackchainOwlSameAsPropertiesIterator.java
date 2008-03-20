@@ -22,13 +22,11 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 30, 2007
+ * Created on March 11, 2008
  */
 
 package com.bigdata.rdf.inf;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
@@ -45,15 +43,11 @@ import com.bigdata.rdf.store.IAccessPath;
 /**
  * Test suite for {@link BackchainTypeResourceIterator}.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
 public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceEngineTestCase {
 
-    static {
-        Logger.getLogger("com.bigdata").setLevel(Level.ERROR);
-    }
-    
     /**
      * 
      */
@@ -80,8 +74,6 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
         try {
 
             InferenceEngine inf = store.getInferenceEngine();
-            
-            
             
             final URI A = new URIImpl("http://www.bigdata.com/A");
             final URI B = new URIImpl("http://www.bigdata.com/B");
@@ -155,7 +147,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                                 StatementEnum.Inferred)
                     },
                     
-                    itr
+                    itr,
+                    true // ignore axioms
                     
                 );
                 
@@ -183,7 +176,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                                 StatementEnum.Inferred)
                     },
                     
-                    itr
+                    itr,
+                    true // ignore axioms
                     
                 );
                 
@@ -217,7 +211,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                                 StatementEnum.Explicit)
                     },
                     
-                    itr
+                    itr,
+                    true // ignore axioms
                     
                 );
                 
@@ -245,7 +240,8 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                                 StatementEnum.Inferred)
                     },
                     
-                    itr
+                    itr,
+                    true // ignore axioms
                     
                 );
                 
@@ -274,7 +270,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                     },
                     
                     itr,
-                    true /*ignore the axioms*/
+                    true // ignore axioms
                     
                 );
                 
@@ -301,7 +297,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                     },
                     
                     itr,
-                    true /*ignore the axioms*/
+                    true // ignore axioms
                     
                 );
                 
@@ -334,7 +330,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                     },
                     
                     itr,
-                    true /*ignore the axioms*/
+                    true // ignore axioms
                     
                 );
                 
@@ -391,7 +387,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                     },
                     
                     itr,
-                    true /*ignore the axioms*/
+                    true // ignore axioms
                     
                 );
                 
