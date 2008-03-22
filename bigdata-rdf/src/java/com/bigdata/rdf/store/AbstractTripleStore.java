@@ -3024,9 +3024,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
                     private boolean[] results = new boolean[keys.length];
                     
                     public void aggregate(ResultBitBuffer result, Split split) {
-                        synchronized(results) {
-                            System.arraycopy(result.getResult(), 0, results, split.fromIndex, split.ntuples);
-                        }
+                        System.arraycopy(result.getResult(), 0, results, split.fromIndex, split.ntuples);
                     }
                     
                     public ResultBitBuffer getResult() {
