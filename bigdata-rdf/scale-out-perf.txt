@@ -564,34 +564,9 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
       - Download, prepare, extract.
 
-    - Full text indexing
-
-    - Quad store.
-
-    - Metadata index
-    
-      - Merge (evict view onto index segment with history policy IFF
-        sparse row store, since that is the only data model with the
-        necessary timestamps on the data - version counters are NOT
-        sufficient for this purpose).
-
-      - Overflow (generate index segment from btree and update view defn).
-
-      - Snap (generate new view by creating a new btree and making the
-        old one "immutable").
-
-      - Split (generate N partitions from one partition)
-
-      - Join (generate 1 partition from 2 partitions).
-
-      - Move (move partition to another data service).
-
     - Tune network IO
 
       - AddTerms and AddIds
-
-      - Have the keys and values converted to a compressed byte[]
-        before serialization (or deserialize the a compressed byte[]).
 
       - Modify the procedure logic to abstract a 'next key/val'
         iterator using a shared buffer for de-compression in order to
@@ -603,16 +578,10 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
       - tokenization needs to be specified for RDF Value types for the
         purposes of compression.  In fact, we are guarenteed that
-        values a NOT duplicated in a given batch so tokenization needs
-        to uncover common symbols.  This is easy for URIs but less so
-        for literals and impossible for BNodes (which do not really
-        need to be in the lexicon anyway).
-
-      - Make sure that ResultSet, batch operations, and remote
-        procedures all benefit from these tuning steps.  These should
-        all be implemented as procedures (at least the batch btree api
-        and submit) for simplicity of the API and the serialization
-        support mechanisms.
+        values are NOT duplicated in a given batch so tokenization
+        needs to uncover common symbols.  This is easy for URIs but
+        less so for literals and impossible for BNodes (which do not
+        really need to be in the lexicon anyway).
 
     - Try jini federation using only the terms index to assign
       consistent term identifiers, bulk loading into local SPO-only
@@ -661,8 +630,19 @@ Short term tasks:
    - Compute average response time and throughput as 1/average
      response time. and measure on the client as well so that we can
      compute the RMI overhead,
-   
-   - full text indexing for kb
+
+   - closeForWrites()
+
+      - MUST NOT close the journal or concurrent readers will get
+        hosed since they are NOT suspended during synchronous overflow
+        processing.
+
+      - There is very little logic to enforce read-only semantics on a
+        journal at this time.
+
+   - Full text indexing for KB.
+
+   - Quad store.
 
    - SemTech08 submission?
 
@@ -688,31 +668,6 @@ Short term tasks:
         concurrent loads).
 
       - bigdata file system workload
-
-   - ClassCastException during BuildIndexSegmentTask$AtomicUpdate.
-     This was being thrown due to a pre-condition assumptions.  The
-     assumption was that the source view would include at least two
-     sources - the B+Tree on the new journal and at least a B+Tree on
-     the old journal as well.  I am going to assume for now that there
-     are valid pre-conditions where those assumptions do not hold and
-     rely on a ground truth correctness suite to validate the overflow
-     processing.
-
-============================================================
-
-KeyAfterPartition problem:
-
-DEBUG: 40673  0cfe918c-8677-4878-917e-3a8610e15725   pool-1-thread-248 com.bigdata.btree.BatchInsert.apply(BatchInsert.java:180): keys: data(n=10)={
-data[0]=[128, 0, 5, 127],
-data[1]=[128, 0, 5, 128],
-data[2]=[128, 0, 5, 217],
-data[3]=[128, 0, 6, 40],
-data[4]=[128, 0, 6, 112],
-data[5]=[128, 0, 6, 150],
-data[6]=[128, 0, 6, 231],
-data[7]=[128, 0, 6, 254],
-data[8]=[128, 0, 7, 35],
-data[9]=[128, 0, 7, 62]}
 
 ============================================================
 
@@ -754,3 +709,29 @@ java.lang.AssertionError: ndone=8, but #used=9
 	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
 	at java.lang.Thread.run()V(Unknown Source)
+
+============================================================
+
+  - De-serialization errors:
+
+java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
+	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
+	at com.bigdata.btree.BTree.load(BTree.java:1079)
+	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:2016)
+	at com.bigdata.journal.AbstractJournal.getName2Addr(AbstractJournal.java:292)
+	at com.bigdata.resources.ResourceManager.listIndexPartitions(ResourceManager.java:2644)
+	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1407)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+Caused by: java.io.StreamCorruptedException: invalid stream header
+	at java.io.ObjectInputStream.readStreamHeader()V(Unknown Source)
+	at java.io.ObjectInputStream.<init>(Ljava.io.InputStream;)V(Unknown Source)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:120)
+	... 12 more
+
+============================================================
