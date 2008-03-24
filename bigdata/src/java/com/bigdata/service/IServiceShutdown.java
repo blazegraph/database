@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.Journal;
+
 /**
  * Local API for service shutdown.
  * 
@@ -56,5 +60,27 @@ public interface IServiceShutdown {
      * @return Once the service has shutdown.
      */
     public void shutdownNow();
-    
+
+    /**
+     * The maximum time in milliseconds that {@link #shutdown()} should wait
+     * termination of the various services -or- ZERO (0) to wait forever
+     * (default is to wait forever).
+     * <p>
+     * Note: since services will continue to execute tasks that are already
+     * running but SHOULD NOT accept queued tasks once shutdown begins, this
+     * primarily effects whether or not tasks that are already executing will be
+     * allowed to run until completion.
+     * <p>
+     * Note: You can use {@link #shutdownNow()} to terminate the service
+     * immediately.
+     * 
+     * @see #DEFAULT_SHUTDOWN_TIMEOUT
+     */
+    public final static String SHUTDOWN_TIMEOUT = "shutdownTimeout";
+
+    /**
+     * The default timeout (0).
+     */
+    public final static String DEFAULT_SHUTDOWN_TIMEOUT = "0";
+        
 }

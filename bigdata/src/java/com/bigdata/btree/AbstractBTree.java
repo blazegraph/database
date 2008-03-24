@@ -44,6 +44,7 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -203,10 +204,10 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * unless the {@link AbstractBTree} is placed onto a
      * {@link HardReferenceQueue} maintained by the application.
      * <p>
-     * Note: <em>DO NOT MODIFY THIS FIELD DIRECTLY</em> -- The journal is
-     * responsible for setting up the {@link HardReferenceQueue}, updating this
-     * field, and {@link #close() closing} {@link AbstractBTree}s that are not
-     * in use.
+     * Note: <em>DO NOT MODIFY THIS FIELD DIRECTLY</em> -- The
+     * {@link IResourceManager} is responsible for setting up the
+     * {@link HardReferenceQueue}, updating this field, and
+     * {@link #close() closing} {@link AbstractBTree}s that are not in use.
      */
     public int referenceCount = 0;
 

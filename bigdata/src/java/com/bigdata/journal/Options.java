@@ -94,6 +94,23 @@ public interface Options {
     public static final String BUFFER_MODE = "bufferMode";
 
     /**
+     * The capacity of the LRU cache for the "live" {@link Name2Addr} object
+     * (default 20). The {@link Name2Addr} class maintains the mapping between
+     * the name of an index and its address as of any given commit point. The
+     * capacity of the {@link Name2Addr}'s cache indirectly controls how many
+     * <strong>clean</strong> indices the journal will hold open. The effect is
+     * indirect owning to the semantics of weak references and the control of
+     * the JVM over when they are cleared. Dirty indices will be held open until
+     * the next commit/abort regardless since a hard reference is placed on the
+     * commit list.
+     * 
+     * @see #DEFAULT_NAME2ADDR_CACHE_CAPACITY
+     * 
+     * @see Name2Addr
+     */
+    String NAME2ADDR_CACHE_CAPACITY = "name2AddrCacheCapacity";
+    
+    /**
      * <code>useDirectBuffers</code> - A boolean property whose value controls
      * whether a direct (native) or heap-based {@link ByteBuffer} will be
      * allocated by the selected {@link BufferMode}. Note that this only
@@ -408,6 +425,11 @@ public interface Options {
      * The default for the {@link #BRANCHING_FACTOR} option.
      */
     public final static String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
+
+    /**
+     * The default for the {@link #NAME2ADDR_CACHE_CAPACITY} option.
+     */
+    String DEFAULT_NAME2ADDR_CACHE_CAPACITY = "20";
     
     /**
      * The recommended extension for journal files.

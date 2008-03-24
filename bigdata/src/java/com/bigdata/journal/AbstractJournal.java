@@ -80,7 +80,7 @@ import com.bigdata.util.ChecksumUtility;
  * use this method to access the mutable {@link BTree} then YOU are responsible
  * for avoiding concurrent writes on the returned object.
  * <p>
- * See {@link IConcurrentManager#submitAndGetResult(AbstractTask)} for a thread-safe API
+ * See {@link IConcurrencyManager#submit(AbstractTask)} for a thread-safe API
  * that provides suitable concurrency control for both isolated and unisolated
  * operations on named indices. Note that the use of the thread-safe API does
  * NOT protect against applications that directly access the mutable
@@ -107,7 +107,7 @@ import com.bigdata.util.ChecksumUtility;
  * each transaction is written on a distinct {@link TemporaryStore}. However,
  * without additional concurrency controls, each transaction is NOT thread-safe
  * and MUST NOT be executed by more than one concurrent thread. Again, see
- * {@link IConcurrentManager#submitAndGetResult(AbstractTask)} for a high-concurrency API
+ * {@link IConcurrencyManager#submit(AbstractTask)} for a high-concurrency API
  * for both isolated operations (transactions) and unisolated operations. Note
  * that the {@link TemporaryStore} backing a transaction will spill
  * automatically from memory onto disk if the write set of the transaction grows
@@ -138,16 +138,10 @@ import com.bigdata.util.ChecksumUtility;
  * metadata, indices, and distributed split cache and hot cache support.</li>
  * <li> Scale-out database, including:
  * <ul>
+ * <li> Resource reclaimation. </li>
  * <li> Media replication for data service failover </li>
- * <li> Automatic management of partitioned indices. Note that the split point
- * must be choosen with some awareness of the application keys in order to
- * provide an atomic row update guarentee when using keys formed as {
- * primaryKey, columnName, timestamp }.</li>
  * <li> Transaction service (low-latency with failover instances that keep track
  * of the current transaction metadata).</li>
- * <li> Metadata index services (one per named index with failover).
- * Implemented, but uses static partitioning.</li>
- * <li> Resource reclaimation. </li>
  * </ul>
  * </ol>
  * 
@@ -271,6 +265,14 @@ public abstract class AbstractJournal implements IJournal {
      * @see #getName2Addr()
      */
     /*private*/Name2Addr name2Addr; // Note: used by some unit tests.
+
+    /**
+     * The configured capacity for the LRU backing the index cache maintained by
+     * the "live" {@link Name2Addr} object.
+     * 
+     * @see Options#NAME2ADDR_CACHE_CAPACITY
+     */
+    private final int name2addrCacheCapacity;
     
     /**
      * A read-only view of the {@link Name2Addr} object mapping index names to
@@ -441,6 +443,23 @@ public abstract class AbstractJournal implements IJournal {
         log.info(Options.BUFFER_MODE + "=" + bufferMode);
 
 //        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
+
+        /*
+         * name2addrCacheCapacity
+         */
+        {
+        
+            name2addrCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.NAME2ADDR_CACHE_CAPACITY,
+                    Options.DEFAULT_NAME2ADDR_CACHE_CAPACITY));
+
+            log.info(Options.NAME2ADDR_CACHE_CAPACITY+"="+name2addrCacheCapacity);
+
+            if (name2addrCacheCapacity <= 0)
+                throw new RuntimeException(Options.NAME2ADDR_CACHE_CAPACITY
+                        + " must be non-negative");
+            
+        }
         
         /*
          * "useDirectBuffers"
@@ -1777,6 +1796,8 @@ public abstract class AbstractJournal implements IJournal {
      * @param addr
      *            The root address of the btree -or- 0L iff the btree has not
      *            been defined yet.
+     * 
+     * @see Options#NAME2ADDR_CACHE_CAPACITY
      */
     private void setupName2AddrBTree(long addr) {
 
@@ -1808,6 +1829,8 @@ public abstract class AbstractJournal implements IJournal {
 
         }
 
+        name2Addr.setupCache(name2addrCacheCapacity);
+        
         // register for commit notices.
         setCommitter(ROOT_NAME2ADDR, name2Addr);
 

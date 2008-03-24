@@ -63,6 +63,11 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     private static final long serialVersionUID = -1511361004851335936L;
     
     /**
+     * The maximum length of the history string (1024 bytes).
+     */
+    final int maxHistoryLength = Bytes.kilobyte32;
+    
+    /**
      * The unique partition identifier.
      */
     private int partitionId;
@@ -98,6 +103,34 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *       some code.
      */
     private String history;
+    
+    /**
+     * If the history string exceeds {@link #maxHistoryLength} characters then
+     * truncates it to the last {@link #maxHistoryLength}-3 characters,
+     * prepends "...", and returns the result. Otherwise returns the entire
+     * history string.
+     */
+    protected String getTruncatedHistory() {
+        
+        String history = this.history;
+        
+        if(history.length() > maxHistoryLength) {
+
+            /*
+             * Truncate the history.
+             */
+
+            final int len = history.length();
+            
+            final int fromIndex = len - maxHistoryLength - 3;
+
+            history = "..." + history.substring(fromIndex, len);
+            
+        }
+
+        return history;
+        
+    }
     
     /**
      * De-serialization constructor.
@@ -141,11 +174,6 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            more or less the form <code>foo(x,y,z)</code>. The history
      *            gets truncated when the {@link LocalPartitionMetadata} is
      *            serialized in order to prevent it from growing without bound.
-     * 
-     * FIXME All existing uses of this ctor are appending history, but they
-     * should prepend it so that truncation works out correctly. The history
-     * should be a reverse timeline.  It could be given more structure with
-     * a list of History objects.
      */
     public LocalPartitionMetadata(//
             int partitionId,//
@@ -452,8 +480,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         }
 
-        out.writeUTF(history.substring(0,Math.min(history.length(), 4*Bytes.kilobyte32)));
-        
+        out.writeUTF(getTruncatedHistory());
+                
         /*
          * Note: we serialize using the IResourceMetadata interface so that we
          * can handle different subclasses and then special case the

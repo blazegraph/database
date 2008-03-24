@@ -77,37 +77,17 @@ public class Name2Addr extends BTree {
      * <p>
      * Map from the name of an index to a weak reference for the corresponding
      * "live" version of the named index. Entries will be cleared from this map
-     * if they are weakly reachable. In order to prevent dirty indices from
-     * being cleared, we register an {@link IDirtyListener}. When it is
-     * informed that an index is dirty it places a hard reference to that index
-     * into the {@link #commitList}.
+     * after they have become only weakly reachable. In order to prevent dirty
+     * indices from being cleared, we register an {@link IDirtyListener}. When
+     * it is informed that an index is dirty it places a hard reference to that
+     * index into the {@link #commitList}.
      * <p>
      * Note: The capacity of the backing hard reference LRU effects how many
      * _clean_ indices can be held in the cache. Dirty indices remain strongly
      * reachable owing to their existence in the {@link #commitList}.
      */
-    private final WeakValueCache<String, BTree> indexCache;
+    private WeakValueCache<String, BTree> indexCache = null;
 
-    /**
-     * The capacity of the inner {@link LRUCache} for the {@link WeakValueCache}.
-     * 
-     * @todo make the capacity of the backing LRU a configuration option for the
-     *       journal. It indirectly effects how many writable indices the
-     *       journal will hold open (the effect is indirect owning to the
-     *       semantics of weak references and the control of the JVM over when
-     *       they are cleared). The capacity will be most important as a tuning
-     *       parameter for a data service on which several hot indices are
-     *       multiplexed absorbing writes. In this scenario a low capacity could
-     *       starve the data service forcing frequent reloading of indices from
-     *       the store rather than reuse of the existing mutable index.
-     *       <p>
-     *       Note: This is complicated since we re-load the {@link Name2Addr}
-     *       index from the store using a fixed API unless we persist the size
-     *       of the cache in the index metadata, but really you want to be able
-     *       to change it each time you start the journal.
-     */
-    protected final int LRU_CAPACITY = 10;
-    
     /**
      * Holds hard references for the dirty indices along with the index name.
      * This collection prevents dirty indices from being cleared from the
@@ -220,15 +200,6 @@ public class Name2Addr extends BTree {
         
     }
     
-//    public Name2Addr(IRawStore store) {
-//
-//        super(store, DEFAULT_BRANCHING_FACTOR, UUID.randomUUID());
-//
-//        // Note: code shared by both constructors.
-//        indexCache = new WeakValueCache<String, IIndex>(new LRUCache<String, IIndex>(LRU_CAPACITY));
-//
-//    }
-
     /**
      * Load from the store (de-serialization constructor).
      * 
@@ -236,17 +207,44 @@ public class Name2Addr extends BTree {
      *            The backing store.
      * @param checkpoint
      *            The {@link Checkpoint} record.
-     * @param metadataId
+     * @param metadata
      *            The metadata record for the index.
      */
     public Name2Addr(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
 
         super(store, checkpoint, metadata);
         
-        indexCache = new WeakValueCache<String, BTree>(new LRUCache<String, BTree>(LRU_CAPACITY));
-
     }
 
+    /**
+     * Setup the {@link #indexCache}.
+     * <p>
+     * Note: This cache is <code>null</code> unless initialized and is ONLY
+     * used by the "live" version of the {@link Name2Addr} index. The only
+     * method that creates or loads the "live" {@link Name2Addr} index is
+     * {@link AbstractJournal#setupName2AddrBTree()}.
+     * 
+     * @param cacheCapacity
+     *            The capacity of the inner {@link LRUCache} for the
+     *            {@link WeakValueCache}.
+     * 
+     * @see Options#NAME2ADDR_CACHE_CAPACITY
+     */
+    synchronized protected void setupCache(int cacheCapacity) {
+        
+        if (indexCache != null) {
+
+            // Cache was already configured.
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        indexCache = new WeakValueCache<String, BTree>(
+                new LRUCache<String, BTree>(cacheCapacity));
+        
+    }
+    
     /**
      * True iff the index is on the commit list.
      * 
