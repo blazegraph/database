@@ -1625,9 +1625,36 @@ public class ClientIndexView implements IIndex {
                      * returned by the binarySearch is the exclusive upper bound
                      * for the split. The key at that index is excluded from the
                      * split - it will be the first key in the next split.
+                     * 
+                     * Note: There is a special case when the keys[] includes
+                     * duplicates of the key that corresponds to the
+                     * rightSeparator. This causes a problem where the
+                     * binarySearch returns the index of ONE of the keys that is
+                     * equal to the rightSeparator key and we need to back up
+                     * until we have found the FIRST ONE.
+                     * 
+                     * Note: The behavior of the binarySearch is effectively
+                     * under-defined here and sometimes it will return the index
+                     * of the first key EQ to the rightSeparator while at other
+                     * times it will return the index of the second or greater
+                     * key that is EQ to the rightSeparatoer.
                      */
                     
-                    assert BytesUtil.bytesEqual(keys[pos], rightSeparatorKey);
+                    while (pos > currentIndex) {
+                        
+                        if (BytesUtil.bytesEqual(keys[pos - 1],
+                                rightSeparatorKey)) {
+
+                            // keep backing up.
+                            pos--;
+
+                            continue;
+
+                        }
+                        
+                        break;
+                        
+                    }
 
                     log.debug("Exact match on rightSeparator: pos=" + pos
                             + ", key=" + BytesUtil.toString(keys[pos]));
@@ -1649,7 +1676,14 @@ public class ClientIndexView implements IIndex {
 
                 }
 
-                assert validSplit( locator, currentIndex, pos, keys );
+                /*
+                 * Note: this test can be enabled if you are having problems
+                 * with KeyAfterPartition or KeyBeforePartition. It will go
+                 * through more effort to validate the constraints on the split.
+                 * However, due to the additional byte[] comparisons, this
+                 * SHOULD be disabled except when tracking a bug.
+                 */
+//                assert validSplit( locator, currentIndex, pos, keys );
 
                 splits.add(new Split(locator, currentIndex, pos));
 
@@ -1671,9 +1705,6 @@ public class ClientIndexView implements IIndex {
      * @param toIndex
      * @param keys
      * @return
-     * 
-     * FIXME Make sure that asserts for this method are disabled when not
-     * tracing a problem with KeyBeforePartition or KeyAfterPartition.
      */
     private boolean validSplit(PartitionLocator locator, int fromIndex,
             int toIndex, byte[][] keys) {

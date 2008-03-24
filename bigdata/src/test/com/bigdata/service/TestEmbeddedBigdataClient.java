@@ -243,7 +243,37 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             assertEquals(new Split(pmd1, 2, 5), splits.get(1));
             
         }
+
+        /*
+         * Variant in which there are duplicates of the key that corresponds to
+         * the rightSeparator for the 1st index partition. This causes a problem
+         * where the binarySearch returns the index of ONE of the keys that is
+         * equal to the rightSeparator key and we need to back up until we have
+         * found the FIRST ONE. While not every example with duplicate keys
+         * equal to the rightSeparator will trigger the problem, this example
+         * will.
+         */
+        {
+            
+            final byte[][] keys = new byte[][] {//
+            new byte[]{1}, // [0]
+            new byte[]{5}, // [1]
+            new byte[]{5}, // [2]
+            new byte[]{5}, // [3]
+            new byte[]{9}  // [4]
+            };
+            
+            List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
         
+            assertNotNull(splits);
+            
+            assertEquals("#splits", 2, splits.size());
+
+            assertEquals(new Split(pmd0, 0, 1), splits.get(0));
+            assertEquals(new Split(pmd1, 1, 5), splits.get(1));
+            
+        }
+
         /*
          * Setup data and test splitKeys().
          * 
@@ -273,7 +303,7 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             assertEquals(new Split(pmd1, 3, 5), splits.get(1));
             
         }
-        
+                
     }
 
     public void test_addDropIndex_twoPartitions() throws IOException {
