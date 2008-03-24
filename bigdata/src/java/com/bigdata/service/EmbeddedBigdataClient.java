@@ -30,11 +30,6 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A client for an embedded federation (the client and the data services all run
@@ -45,79 +40,22 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedBigdataClient implements IBigdataClient {
+public class EmbeddedBigdataClient extends AbstractBigdataClient {
 
-    protected final Properties properties;
-
-    /*
-     * IBigdataClient state.
-     */
-    private final ExecutorService threadPool;
-    private final int defaultRangeQueryCapacity;
-    private final boolean batchApiOnly;
-
-    /*
-     * IBigdataClient API.
-     */
-
-    public ExecutorService getThreadPool() {
-        
-        assertConnected();
-        
-        return threadPool;
-        
-    }
-
-    public int getDefaultRangeQueryCapacity() {
-        
-        return defaultRangeQueryCapacity;
-        
-    }
-    
-    public boolean getBatchApiOnly() {
-        
-        return batchApiOnly;
-        
-    }
-    
-    protected void assertConnected() {
-        
-        if (fed == null)
-            throw new IllegalStateException("Not connected");
-        
-    }
-    
     /**
      * 
-     * @param properties See {@link EmbeddedBigdataFederation.Options}.
+     * @param properties
+     *            See {@link EmbeddedBigdataFederation.Options}.
      */
     public EmbeddedBigdataClient(Properties properties) {
-        
-        if (properties == null)
-            throw new IllegalArgumentException();
 
-        this.properties = properties;
+        super(properties);
         
-        final int nthreads = Integer.parseInt(properties.getProperty(
-                Options.CLIENT_THREAD_POOL_SIZE,
-                Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
-        
-        threadPool = Executors.newFixedThreadPool(nthreads, DaemonThreadFactory
-                .defaultThreadFactory());
-
-        defaultRangeQueryCapacity = Integer.parseInt(properties.getProperty(
-                Options.CLIENT_RANGE_QUERY_CAPACITY,
-                Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
-        
-        batchApiOnly = Boolean.valueOf(properties.getProperty(
-                Options.CLIENT_BATCH_API_ONLY,
-                Options.DEFAULT_CLIENT_BATCH_API_ONLY));
-
     }
     
     public IBigdataFederation connect() {
 
-            if (fed == null) {
+        if (fed == null) {
 
             fed = new EmbeddedBigdataFederation(this, properties);
 
@@ -127,34 +65,16 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     }
 
-    private EmbeddedBigdataFederation fed = null;
-
     public void shutdown() {
 
-        log.info("");
+        super.shutdown();
 
         if(fed != null) {
-
-            // allow client requests to finish normally.
-            threadPool.shutdown();
-            
-            try {
-            
-                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    
-                    log.warn("Timeout awaiting thread pool termination.");
-                    
-                }
-   
-            } catch (InterruptedException e) {
-                
-                log.warn("Interrupted awaiting thread pool termination.", e);
-                
-            }
             
             // normal shutdown of the embedded federation as well.
-            fed.shutdown();
+            ((EmbeddedBigdataFederation)fed).shutdown();
         
+            // clear reference now that the client is disconnected.
             fed = null;
             
         }
@@ -163,15 +83,12 @@ public class EmbeddedBigdataClient implements IBigdataClient {
 
     public void shutdownNow() {
 
-        log.info("");
+        super.shutdownNow();
         
         if(fed != null) {
 
-            // stop client requests.
-            threadPool.shutdownNow();
-            
             // immediate shutdown of the embedded federation as well.
-            fed.shutdownNow();
+            ((EmbeddedBigdataFederation)fed).shutdownNow();
         
             fed = null;
             
@@ -185,6 +102,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
     public UUID[] getDataServiceUUIDs(int maxCount) {
 
         assertConnected();
+        
+        final EmbeddedBigdataFederation fed = ((EmbeddedBigdataFederation)this.fed);
         
         if (maxCount < 0)
             throw new IllegalArgumentException();
@@ -215,6 +134,8 @@ public class EmbeddedBigdataClient implements IBigdataClient {
     public IDataService getDataService(UUID serviceUUID) {
 
         assertConnected();
+
+        final EmbeddedBigdataFederation fed = ((EmbeddedBigdataFederation)this.fed);
 
         return fed.getDataService(serviceUUID);
         

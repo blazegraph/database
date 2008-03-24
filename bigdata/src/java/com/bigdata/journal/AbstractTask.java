@@ -403,7 +403,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             
             readOnly = false;
 
-            counters = this.concurrencyManager.countersU;
+            counters = this.concurrencyManager.countersUN;
             
         }
 

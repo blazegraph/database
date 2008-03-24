@@ -29,10 +29,12 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -40,9 +42,10 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -55,9 +58,11 @@ import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.QueueLengthTask;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService.Options;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -254,7 +259,7 @@ public class StressTestConcurrent extends
         DataService dataService = ((EmbeddedBigdataFederation)fed).getDataService(0);
         
         int nclients = 20;
-        long timeout = 40;
+        long timeout = 200; // 20 or 40
         int ntrials = 10000;
         int keyLen = 4;
         int nops = 100;
@@ -331,15 +336,16 @@ public class StressTestConcurrent extends
      *       #of builds, splits, joins, and moves and the load on each data
      *       service over time.
      * 
-     * FIXME Look into why this takes so long to complete sometimes (something
-     * is doubtless running in the background).
-     * 
-     * @todo test with and with overflow and measure performance both ways -
-     *       need a flag to disable overflow.
+     * @todo test with and without overflow and measure performance both ways.
+     *       in order to get a sense of the burden imposed by overflow we
+     *       probably need to run the journal out to its real size, so that
+     *       might only be testable on a cluster using a suitable workload,
+     *       e.g., as part of performance analysis.
      */
-    static public Result doConcurrentClientTest(IBigdataClient client,
-            DataService dataService, int nclients, long timeout, int ntrials,
-            int keyLen, int nops) throws InterruptedException, IOException {
+    static public Result doConcurrentClientTest(final IBigdataClient client,
+            final DataService dataService, final int nclients,
+            final long timeout, final int ntrials, final int keyLen,
+            final int nops) throws InterruptedException, IOException {
         
         // name of the scale-out index for the test.
         final String name = "testIndex";
@@ -382,8 +388,27 @@ public class StressTestConcurrent extends
         assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
                 .getIndexUUID());
         
-        ExecutorService executorService = Executors.newFixedThreadPool(
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(
                 nclients, DaemonThreadFactory.defaultThreadFactory());
+
+        // will log the behavior of this queue.
+        {        
+        
+            ScheduledExecutorService sampleService = Executors
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
+
+            final long initialDelay = 0; // initial delay in ms.
+            final long delay = 1000; // delay in ms.
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            QueueLengthTask queueLengthTask = new QueueLengthTask(
+                    "testExecutorService", executorService);
+
+            sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,
+                    delay, unit);
+            
+        }
         
         Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>(); 
 
@@ -412,6 +437,7 @@ public class StressTestConcurrent extends
         int nuncommitted = 0; // #of operations that did not complete in time.
         int ntimeout = 0;
         int ninterrupted = 0;
+        LinkedList<Exception> failures = new LinkedList<Exception>();
         
         while(itr.hasNext()) {
 
@@ -443,8 +469,10 @@ public class StressTestConcurrent extends
                 } else {
                 
                     // Other kinds of exceptions are errors.
+
+                    log.error("Not expecting: "+ex.getMessage());
                     
-                    fail("Not expecting: "+ex, ex);
+                    failures.add(ex);
                     
                 }
                 
@@ -480,6 +508,8 @@ public class StressTestConcurrent extends
 //        ret.put("nops", ""+nops);
 //        ret.put("ntx", ""+ntrials);
         
+        final long groupCommitCount = dataService.getConcurrencyManager().getWriteService().getGroupCommitCount();
+        
         ret.put("ncommitted",""+ncommitted);
         ret.put("nfailed",""+nfailed);
         ret.put("nuncommitted", ""+nuncommitted);
@@ -487,10 +517,22 @@ public class StressTestConcurrent extends
         ret.put("ninterrupted", ""+ninterrupted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
+        ret.put("groupCommitCount", ""+groupCommitCount);
+        ret.put("avgCommitGroupSize", ""+(ncommitted/groupCommitCount));
+        ret.put("#overflow", ""+((ResourceManager)dataService.getResourceManager()).getOverflowCount());
+        ret.put("failures", ""+(failures.size()));
 
         System.err.println(ret.toString(true/*newline*/));
 
         System.out.println(ndx.getStatistics());
+        
+        if(!failures.isEmpty()) {
+            
+            System.err.println("failures:\n"+Arrays.toString(failures.toArray()));
+            
+            fail("There were "+failures.size()+" failed tasks for unexpected causes");
+            
+        }
         
         return ret;
        

@@ -619,8 +619,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
              * there are any negative consequences to this.
              */
 
-            log
-                    .info("Releasing resource locks: resources=" + resources);
+            log.info("Releasing resource locks: resources=" + resources);
 
             Iterator<R> itr = resources.iterator();
 
@@ -643,8 +642,7 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
                 } catch (Throwable t) {
 
-                    log
-                            .warn("Could not release lock", t);
+                    log.warn("Could not release lock", t);
 
                     // Note: release the rest of the locks anyway.
 
@@ -652,7 +650,11 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
                 }
 
+                log.info("Released lock: "+resource);
+
             }
+
+            log.info("Released resource locks: resources=" + resources);
 
         } catch (Throwable t) {
 
@@ -743,6 +745,8 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      *            be used to update the {@link TxDag}.
      */
     void didAbort(Callable<Object> task, Throwable t, boolean waiting) {
+
+        log.info("Begin: nended=" + nended);
 
         nerror.incrementAndGet();
 

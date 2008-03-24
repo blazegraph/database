@@ -353,8 +353,8 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         return 
         "{ partitionId="+getPartitionId()+
-        ", leftSeparator="+Arrays.toString(getLeftSeparatorKey())+
-        ", rightSeparator="+(getRightSeparatorKey()==null?"null":Arrays.toString(getRightSeparatorKey()))+
+        ", leftSeparator="+BytesUtil.toString(getLeftSeparatorKey())+
+        ", rightSeparator="+(getRightSeparatorKey()==null?"null":BytesUtil.toString(getRightSeparatorKey()))+
         ", resourceMetadata="+Arrays.toString(getResources())+
         ", history="+getHistory()+
         "}"

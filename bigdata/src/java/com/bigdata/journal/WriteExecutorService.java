@@ -139,8 +139,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-//    private final ConcurrencyManager concurrencyManager;
-    
     private final IResourceManager resourceManager;
     
     public WriteExecutorService(IResourceManager resourceManager,
@@ -591,11 +589,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      */
  
                     log.info("Stale locator: task=" + r);//, t);
-
+                    
+                    log.info(this.toString(), t); // FIXME comment out once working.
+                    
                 } else {
 
                     /*
-                     * The task throw some other kind of exception.
+                     * The task threw some other kind of exception.
                      */
                     
                     log.warn("Task failed: task=" + r);//, t);
@@ -603,13 +603,102 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 }
 
             }
-        
+                    
         } finally {
-            
+        
+            // Remove since thread is no longer running the task.
+            ITask tmp = active.remove(Thread.currentThread());
+
             lock.unlock();
+            
+            assert tmp == r : "Expecting "+r+", but was "+tmp;
             
         }
 
+    }
+    
+    /**
+     * A snapshot of the executor state.
+     */
+    public String toString() {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("WriteExecutorService");
+
+        sb.append("{ paused="+paused);
+        
+        sb.append(", nrunning="+nrunning);
+        
+        sb.append(", activeTaskSetSize="+active.size());
+
+        sb.append(", nwrites="+nwrites);
+        
+        sb.append(", groupCommitFlag="+groupCommit);
+
+        sb.append(", abortFlag="+abort);
+
+        sb.append(", lockHeldByCurrentThread="+lock.isHeldByCurrentThread());
+        
+        sb.append(", lockHoldCount="+lock.getHoldCount());
+
+        sb.append(", lockQueueLength="+lock.getQueueLength());
+
+        if (lock.isHeldByCurrentThread()) {
+
+            // these all require that we are holding the lock.
+            
+            sb.append(", lockWaitQueueLength(unpaused)="
+                    + lock.getWaitQueueLength(unpaused));
+
+            sb.append(", lockWaitQueueLength(waiting)="
+                    + lock.getWaitQueueLength(waiting));
+
+            sb.append(", lockWaitQueueLength(commit)="
+                    + lock.getWaitQueueLength(commit));
+
+        }
+
+        /*
+         * from super class.
+         */
+        
+        sb.append(", activeCount="+getActiveCount());
+
+        sb.append(", queueSize="+getQueue().size());
+        
+        sb.append(", poolSize="+getPoolSize());
+        
+        sb.append(", largestPoolSize="+getLargestPoolSize());
+        
+        /*
+         * various stats.
+         */
+        
+        sb.append(", maxPoolSize="+maxPoolSize);
+        
+        sb.append(", maxRunning="+maxRunning);
+        
+        sb.append(", maxCommitLatency="+maxCommitLatency);
+        
+        sb.append(", maxLatencyUntilCommit="+maxLatencyUntilCommit);
+        
+        sb.append(", groupCommitCount="+ngroupCommits);
+
+        sb.append(", abortCount="+naborts);
+        
+        sb.append(", failedTaskCount="+failedTaskCount);
+        
+        sb.append(", successTaskCount="+successTaskCount);
+        
+        sb.append(", committedTaskCount="+committedTaskCount);
+        
+        sb.append(", overflowCount="+noverflow);
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
     }
     
     /**
@@ -662,17 +751,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         assert lock.isHeldByCurrentThread();
 
+        // the task that invoked this method.
+        final ITask r = active.get(Thread.currentThread());
+        
         /*
          * If an abort is in progress then throw an exception.
          */
         if( abort.get() ) {
 
-                log.info("Abort in progress.");
+            log.info("Abort in progress.");
+        
+            // signal so that abort() will no longer await this task's completion.
+            waiting.signal();
             
-                // signal so that abort() will no longer await this task's completion.
-                waiting.signal();
-                
-                throw new RuntimeException("Aborted.");
+            throw new RuntimeException("Aborted.");
             
         }
         
@@ -727,7 +819,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                     // The task was aborted.
 
-                    log.warn("Task interrupted awaiting group commit.");
+                    log.warn("Task interrupted awaiting group commit: "+r);
 
                     // Set the interrupt flag again.
                     Thread.currentThread().interrupt();
@@ -744,7 +836,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         }
 
-        log.info("This thread will run group commit: "+Thread.currentThread());
+        log.info("This thread will run group commit: "+Thread.currentThread()+" : "+r);
         
         try {
 
@@ -1036,8 +1128,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         final AbstractJournal journal = resourceManager.getLiveJournal();
 
         /*
-         * Note: if the journal was closed asynchronously then do not
-         * attempt to commit the write set.
+         * Note: if the journal was closed asynchronously then do not attempt to
+         * commit the write set.
+         * 
+         * Note: the journal MUST be open unless shutdownNow() was used on the
+         * journal / data service.  shutdownNow() will cause the journal to be
+         * immediately closed, even while there are existing tasks running on
+         * the various concurrency services, including this write service.
+         * 
+         * @todo why not an abort() here?
          */
 
         if(!journal.isOpen()) {
@@ -1169,7 +1268,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     ninterrupted++;
                     
                 }
-
+                
             }
 
             log.info("Interrupted "+ninterrupted+" tasks.");
@@ -1288,8 +1387,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // no write tasks are awaiting commit.
             nwrites.set(0);
 
-            // clear the set of active tasks.
-            active.clear();
+//            // clear the set of active tasks.
+//            active.clear();
 
             // signal tasks awaiting [commit].
             commit.signalAll();

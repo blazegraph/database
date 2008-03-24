@@ -237,10 +237,10 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
         
             assertNotNull(splits);
             
-            assertEquals("#splits",2,splits.size());
-            
-            assertEquals(new Split(pmd0,0,2),splits.get(0));
-            assertEquals(new Split(pmd1,2,5),splits.get(1));
+            assertEquals("#splits", 2, splits.size());
+
+            assertEquals(new Split(pmd0, 0, 2), splits.get(0));
+            assertEquals(new Split(pmd1, 2, 5), splits.get(1));
             
         }
         
@@ -266,11 +266,11 @@ public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederation
             List<Split> splits = ndx.splitKeys( 0, keys.length, keys);
         
             assertNotNull(splits);
-            
-            assertEquals("#splits",2,splits.size());
-            
-            assertEquals(new Split(pmd0,0,3),splits.get(0));
-            assertEquals(new Split(pmd1,3,5),splits.get(1));
+
+            assertEquals("#splits", 2, splits.size());
+
+            assertEquals(new Split(pmd0, 0, 3), splits.get(0));
+            assertEquals(new Split(pmd1, 3, 5), splits.get(1));
             
         }
         

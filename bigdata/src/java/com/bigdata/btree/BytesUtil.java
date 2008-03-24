@@ -539,6 +539,41 @@ public class BytesUtil {
     private static transient String NULL = "null";
     
     /**
+     * Formats the data into a {@link String}.
+     * 
+     * @param data
+     *            An array of unsigned byte arrays.
+     */
+    static public String toString(byte[][] data) {
+       
+        StringBuilder sb = new StringBuilder();
+        
+        final int n = data.length;
+        
+        sb.append("data(n=" + n + ")={");
+
+        for (int i = 0; i < n; i++) {
+
+            final byte[] a = data[i];
+            
+            sb.append("\n");
+
+            sb.append("data[" + i + "]=");
+
+            sb.append(BytesUtil.toString(a));
+
+            if (i + 1 < n)
+                sb.append(",");
+            
+        }
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
+    /**
      * Binary search on an array whose members are variable length unsigned
      * byte[]s.
      * 

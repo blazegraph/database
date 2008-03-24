@@ -130,9 +130,9 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
                 
                 throw new IllegalArgumentException(
                         "Separator keys are out of order: left="
-                                + Arrays.toString(leftSeparatorKey)
+                                + BytesUtil.toString(leftSeparatorKey)
                                 + ", right="
-                                + Arrays.toString(rightSeparatorKey));
+                                + BytesUtil.toString(rightSeparatorKey));
                 
             }
             

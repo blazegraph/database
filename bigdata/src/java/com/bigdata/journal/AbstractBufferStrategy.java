@@ -435,7 +435,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("\nTransferred " + count
+        log.info("\nTransferred " + count
                 + " bytes from disk channel to disk channel (offset="
                 + toPosition + ") in " + nwrites + " writes and " + elapsed
                 + "ms");

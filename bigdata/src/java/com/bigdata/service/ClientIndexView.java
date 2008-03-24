@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -69,6 +70,7 @@ import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -105,6 +107,12 @@ import com.bigdata.util.InnerCause;
  * an index partition is split, joined, or moved - the historical states always
  * remain behind).
  * </p>
+ * 
+ * FIXME Add counters and report to the load balancer (a version for clients).
+ * average responseTime, average queueLength, latency due to RMI (by also
+ * obtaining the response time of the data service itself), #of procedures run
+ * and the execution time for those procedures; #of splits; #of tuples in each
+ * split; total #of tuples.
  * 
  * @todo If the index was dropped then that should cause the operation to abort
  *       (only possible for read committed or unisolated operations).
@@ -173,12 +181,6 @@ public class ClientIndexView implements IIndex {
      */
     protected static final String NON_BATCH_API = "Non-batch API";
 
-    /**
-     * The maximum #of tasks that may be submitted in parallel for a single user
-     * request.
-     */
-    private final int MAX_PARALLEL_TASKS = 100;
-    
     /**
      * This may be used to disable the non-batch API, which is quite convenient
      * for locating code that needs to be re-written to use
@@ -250,6 +252,43 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
+     * 
+     * @see #getRecursionDepth()
+     */
+    private ThreadLocal<AtomicInteger> recursionDepth = new ThreadLocal<AtomicInteger>() {
+        protected synchronized AtomicInteger initialValue() {
+            return new AtomicInteger();
+        }
+    };
+
+    /**
+     * Return a {@link ThreadLocal} {@link AtomicInteger} whose value is the
+     * recursion depth of the current {@link Thread}. This is initially zero
+     * when the task is submitted by the application. The value incremented when
+     * a task results in a {@link StaleLocatorException} and is decremented when
+     * returning from the recursive handling of the
+     * {@link StaleLocatorException}.
+     * <p>
+     * The recursion depth is used:
+     * <ol>
+     * <li>to limit the #of retries due to {@link StaleLocatorException}s for
+     * a split of a task submitted by the application</li>
+     * <li> to force execution of retried tasks in the caller's thread.</li>
+     * </ol>
+     * The latter point is critical - if the retry tasks are run in the client
+     * {@link #getThreadPool() thread pool} then all threads in the pool can
+     * rapidly become busy awaiting retry tasks with the result that the client
+     * is essentially deadlocked.
+     * 
+     * @return The recursion depth.
+     */
+    protected AtomicInteger getRecursionDepth() {
+
+        return recursionDepth.get();
+        
+    }
+    
+    /**
      * Create a view on a scale-out index.
      * 
      * @param fed
@@ -316,10 +355,12 @@ public class ClientIndexView implements IIndex {
     }
 
     /**
-     * Note: Since scale-out indices can be so large this method will only
-     * report on index partitions that are in the client's cache. It will not
-     * attempt to re-locate index partitions that have been split, joined, or
-     * moved.
+     * @todo Since scale-out indices can be very large this method should report
+     *       only on index partitions that are in the client's cache, hot on the
+     *       data service, etc. It does not attempt to re-locate index
+     *       partitions that have been split, joined, or moved.
+     * 
+     * @todo update javadoc, convert to XML counter representation.
      * 
      * @todo report on both the metadata index and the individual index
      *       partitions. If we parallelize the index partition reporting then we
@@ -374,6 +415,12 @@ public class ClientIndexView implements IIndex {
                     
                     _stats = getDataService(pmd).getStatistics( _name);
                 
+                } catch (NoSuchIndexException e) {
+                    
+                    log.info("Index not found on data service, presumed moved: "+_name);
+
+                    continue;
+                    
                 } catch (Exception e) {
                     
                     _stats = "Could not obtain index partition statistics: "+e.toString();
@@ -729,7 +776,7 @@ public class ClientIndexView implements IIndex {
 
         // max #of tasks to queue at once.
         final int maxTasks = Math.min(((ThreadPoolExecutor) getThreadPool())
-                .getCorePoolSize(), MAX_PARALLEL_TASKS);
+                .getCorePoolSize(), fed.getClient().getMaxParallelTasksPerRequest());
 
         // scan spanned index partition locators in key order.
         final ITupleIterator itr = locatorScan(fromKey, toKey);
@@ -769,24 +816,8 @@ public class ClientIndexView implements IIndex {
                 
             }
 
-            if (parallel) {
+            runTasks(parallel, tasks );
 
-                /*
-                 * Map procedure across the index partitions in parallel.
-                 */
-                
-                runParallel(tasks);
-                
-            } else {
-
-                /*
-                 * Map procedure across the index partitions in sequence.
-                 */
-
-                runSequence(tasks);
-                
-            }
-            
             // next index partition(s)                     
         
         }
@@ -802,6 +833,11 @@ public class ClientIndexView implements IIndex {
      * index partitions spanned by its keys. If the <i>ctor</i> creates
      * instances of {@link IParallelizableIndexProcedure} then the procedure
      * will be mapped in parallel against the relevant index partitions.
+     * <p>
+     * Note: Unlike mapping an index procedure across a key range, this method
+     * is unable to introduce a truely enourmous burden on the client's task
+     * queue since the #of tasks arising is equal to the #of splits and bounded
+     * by <code>n := toIndex - fromIndex</code>.
      * 
      * @return The aggregated result of applying the procedure to the relevant
      *         index partitions.
@@ -824,11 +860,6 @@ public class ClientIndexView implements IIndex {
         /*
          * Break down the data into a series of "splits", each of which will be
          * applied to a different index partition.
-         * 
-         * Note: Unlike mapping an index procedure across a key range, this
-         * method is unable to introduce a truely enourmous burden on the
-         * client's task queue since the #of tasks arising is equal to the #of
-         * splits and bounded by [n].
          */
 
         final List<Split> splits = splitKeys(fromIndex, toIndex, keys);
@@ -872,7 +903,42 @@ public class ClientIndexView implements IIndex {
                 + " will run on " + nsplits + " index partitions in "
                 + (parallel ? "parallel" : "sequence"));
         
-        if (parallel) {
+        runTasks(parallel, tasks);
+        
+    }
+
+    /**
+     * Runs a set of tasks.
+     * <p>
+     * Note: If {@link #getRecursionDepth()} evaluates to a value larger than
+     * zero then the task(s) will be forced to execute in the caller's thread.
+     * <p>
+     * {@link StaleLocatorException}s are handled by the recursive application
+     * of <code>submit()</code>. These recursively submitted tasks are forced
+     * to run in the caller's thread by incrementing the
+     * {@link #getRecursionDepth()} counter. This is done to prevent the thread
+     * pool from becoming deadlocked as threads wait on threads handling stale
+     * locator retries. The deadlock situation arises as soon as all threads in
+     * the thread pool are waiting on stale locator retries as there are no
+     * threads remaining to process those retries.
+     * 
+     * @param parallel
+     *            <code>true</code> iff the tasks MAY be run in parallel.
+     * @param tasks
+     *            The tasks to be executed.
+     */
+    protected void runTasks(final boolean parallel,
+            final ArrayList<Callable<Void>> tasks) {
+
+        if (getRecursionDepth().get() > 0) {
+
+            /*
+             * Force sequential execution of the tasks in the caller's thread.
+             */
+
+            runInCallersThread(tasks);
+
+        } else if (parallel) {
 
             /*
              * Map procedure across the index partitions in parallel.
@@ -881,7 +947,7 @@ public class ClientIndexView implements IIndex {
             runParallel(tasks);
 
         } else {
-            
+
             /*
              * sequential execution against of each split in turn.
              */
@@ -891,17 +957,13 @@ public class ClientIndexView implements IIndex {
         }
 
     }
-
+    
     /**
      * Maps a set of {@link DataServiceProcedureTask} tasks across the index
      * partitions in parallel.
      * 
      * @param tasks
      *            The tasks.
-     * 
-     * @todo add counters for the #of procedures run and the execution time for
-     *       those procedures. add counters for the #of splits and the #of
-     *       tuples in each split, as well as the total #of tuples.
      */
     protected void runParallel(ArrayList<Callable<Void>> tasks) {
 
@@ -968,12 +1030,8 @@ public class ClientIndexView implements IIndex {
      * 
      * @param tasks
      *            The tasks.
-     * 
-     * @todo add counters for the #of procedures run and the execution time for
-     *       those procedures. add counters for the #of splits and the #of
-     *       tuples in each split, as well as the total #of tuples.
      */
-    protected void runSequence(List<Callable<Void>> tasks) {
+    protected void runSequence(ArrayList<Callable<Void>> tasks) {
 
         log.info("Running "+tasks.size()+" tasks in sequence");
 
@@ -1001,6 +1059,39 @@ public class ClientIndexView implements IIndex {
 
             }
 
+        }
+
+    }
+    
+    /**
+     * Executes the tasks in the caller's thread.
+     * 
+     * @param tasks
+     *            The tasks.
+     */
+    protected void runInCallersThread(ArrayList<Callable<Void>> tasks) {
+        
+        log.info("Running " + tasks.size()
+                + " tasks in caller's thread: recursionDepth="
+                + getRecursionDepth().get());
+
+        final Iterator<Callable<Void>> itr = tasks.iterator();
+
+        while (itr.hasNext()) {
+
+            final AbstractDataServiceProcedureTask task = (AbstractDataServiceProcedureTask) itr
+                    .next();
+
+            try {
+
+                task.call();
+                
+            } catch (Exception e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
         }
 
     }
@@ -1201,7 +1292,6 @@ public class ClientIndexView implements IIndex {
 
         protected final byte[] key;
         
-        private int MAX_RETRIES = 3;
         private int ntries = 1;
         
         /**
@@ -1229,14 +1319,25 @@ public class ClientIndexView implements IIndex {
         @Override
         protected void retry() throws Exception {
             
-            if (ntries++ > MAX_RETRIES)
-                throw new RuntimeException("Retry count exceeded: ntries="+ntries);
+            if (ntries++ > fed.getClient().getMaxStaleLocatorRetries()) {
+
+                throw new RuntimeException("Retry count exceeded: ntries="
+                        + ntries);
+
+            }
 
             final PartitionLocator locator = getMetadataIndex().find(key);
 
             if(INFO)
             log.info("Retrying: proc=" + proc.getClass().getName()
                     + ", locator=" + locator + ", ntries=" + ntries);
+
+            /*
+             * Note: In this case we do not recursively submit to the outer
+             * interface on the client since all we need to do is fetch the
+             * current locator for the key and re-submit the request to the data
+             * service identified by that locator.
+             */
 
             submit(locator);
             
@@ -1290,10 +1391,33 @@ public class ClientIndexView implements IIndex {
         @Override
         protected void retry() throws Exception {
 
-            //@todo place limit on #of recursive retries.
+            /*
+             * Note: recursive retries MUST run in the same thread in order to
+             * avoid deadlock of the client's thread pool. The recursive depth
+             * is used to enforce this constrain.
+             */
+
+            final int depth = getRecursionDepth().incrementAndGet();
+
+            try {
             
-            ClientIndexView.this.submit(fromKey, toKey,
+                if (depth > fed.getClient().getMaxStaleLocatorRetries()) {
+
+                    throw new RuntimeException("Retry count exceeded: ntries="
+                            + depth);
+                    
+                }
+                
+                ClientIndexView.this.submit(fromKey, toKey,
                     (IKeyRangeIndexProcedure) proc, resultHandler);
+            
+            } finally {
+                
+                final int tmp = getRecursionDepth().decrementAndGet();
+                
+                assert tmp >= 0 : "depth="+depth+", tmp="+tmp;
+                
+            }
             
         }
         
@@ -1358,10 +1482,33 @@ public class ClientIndexView implements IIndex {
         @Override
         protected void retry() throws Exception {
 
-            //@todo place limit on #of recursive retries.
+            /*
+             * Note: recursive retries MUST run in the same thread in order to
+             * avoid deadlock of the client's thread pool. The recursive depth
+             * is used to enforce this constrain.
+             */
 
-            ClientIndexView.this.submit(split.fromIndex, split.toIndex, keys,
-                    vals, ctor, resultHandler);
+            final int depth = getRecursionDepth().incrementAndGet();
+
+            try {
+            
+                if (depth > fed.getClient().getMaxStaleLocatorRetries()) {
+
+                    throw new RuntimeException("Retry count exceeded: ntries="
+                            + depth);
+                    
+                }
+                
+                ClientIndexView.this.submit(split.fromIndex, split.toIndex, keys,
+                        vals, ctor, resultHandler);
+                
+            } finally {
+                
+                final int tmp = getRecursionDepth().decrementAndGet();
+                
+                assert tmp >= 0 : "depth="+depth+", tmp="+tmp;
+                
+            }
             
         }
         
@@ -1451,6 +1598,8 @@ public class ClientIndexView implements IIndex {
                  * key.
                  */
 
+                assert validSplit( locator, currentIndex, toIndex, keys );
+                
                 splits.add(new Split(locator, currentIndex, toIndex));
 
                 // done.
@@ -1461,18 +1610,46 @@ public class ClientIndexView implements IIndex {
                 /*
                  * Otherwise this partition has an upper bound, so figure out
                  * the index of the last key that would go into this partition.
+                 * 
+                 * We do this by searching for the rightSeparator of the index
+                 * partition itself.
                  */
+                
                 int pos = BytesUtil.binarySearch(keys, currentIndex, toIndex
                         - currentIndex, rightSeparatorKey);
 
-                if (pos < 0) {
+                if (pos >= 0) {
 
+                    /*
+                     * There is a hit on the rightSeparator key. The index
+                     * returned by the binarySearch is the exclusive upper bound
+                     * for the split. The key at that index is excluded from the
+                     * split - it will be the first key in the next split.
+                     */
+                    
+                    assert BytesUtil.bytesEqual(keys[pos], rightSeparatorKey);
+
+                    log.debug("Exact match on rightSeparator: pos=" + pos
+                            + ", key=" + BytesUtil.toString(keys[pos]));
+
+                } else if (pos < 0) {
+
+                    /*
+                     * There is a miss on the rightSeparator key (it is not
+                     * present in the keys that are being split). In this case
+                     * the binary search returns the insertion point. We then
+                     * compute the exclusive upper bound from the insertion
+                     * point.
+                     */
+                    
                     pos = -pos - 1;
+
+                    assert pos > currentIndex && pos <= toIndex : "Expected pos in ["
+                        + currentIndex + ":" + toIndex + ") but pos=" + pos;
 
                 }
 
-                assert pos > currentIndex && pos <= toIndex : "Expected pos in ["
-                        + currentIndex + ":" + toIndex + ") but pos=" + pos;
+                assert validSplit( locator, currentIndex, pos, keys );
 
                 splits.add(new Split(locator, currentIndex, pos));
 
@@ -1486,6 +1663,75 @@ public class ClientIndexView implements IIndex {
 
     }
 
+    /**
+     * Paranoia testing for generated splits.
+     * 
+     * @param locator
+     * @param fromIndex
+     * @param toIndex
+     * @param keys
+     * @return
+     * 
+     * FIXME Make sure that asserts for this method are disabled when not
+     * tracing a problem with KeyBeforePartition or KeyAfterPartition.
+     */
+    private boolean validSplit(PartitionLocator locator, int fromIndex,
+            int toIndex, byte[][] keys) {
+
+        assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
+                + toIndex;
+
+        assert fromIndex >= 0 : "fromIndex=" + fromIndex;
+
+        assert toIndex <= keys.length : "toIndex=" + toIndex + ", keys.length="
+                + keys.length;
+
+        // begin with the left separator on the index partition.
+        byte[] lastKey = locator.getLeftSeparatorKey();
+        
+        assert lastKey != null;
+
+        for (int i = fromIndex; i < toIndex; i++) {
+
+            final byte[] key = keys[i];
+
+            assert key != null;
+
+            if (lastKey != null) {
+
+                final int ret = BytesUtil.compareBytes(lastKey, key);
+
+                assert ret <= 0 : "keys out of order: i=" + i + ", lastKey="
+                        + BytesUtil.toString(lastKey) + ", key="
+                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
+                
+            }
+            
+            lastKey = key;
+            
+        }
+
+        // Note: Must be strictly LT the rightSeparator key (when present).
+        {
+
+            final byte[] key = locator.getRightSeparatorKey();
+
+            if (key != null) {
+
+                int ret = BytesUtil.compareBytes(lastKey, key);
+
+                assert ret < 0 : "keys out of order: lastKey="
+                        + BytesUtil.toString(lastKey) + ", rightSeparator="
+                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
+
+            }
+            
+        }
+        
+        return true;
+        
+    }
+    
     /**
      * Resolve the data service to which the index partition is mapped.
      * 
