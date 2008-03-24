@@ -63,6 +63,7 @@ import net.jini.lookup.ServiceIDListener;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.admin.StorageLocationAdmin;
 import com.sun.jini.start.LifeCycle;
@@ -295,6 +296,9 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     private AbstractServer(String[] args, LifeCycle lifeCycle ) {
         
+        // show the copyright banner during statup.
+        Banner.banner();
+
         if (lifeCycle == null)
             throw new IllegalArgumentException();
         

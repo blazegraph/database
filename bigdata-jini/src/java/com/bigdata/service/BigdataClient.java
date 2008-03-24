@@ -44,6 +44,7 @@ import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
 
+import com.bigdata.Banner;
 import com.bigdata.btree.IIndex;
 
 /**
@@ -193,6 +194,9 @@ public class BigdataClient extends AbstractBigdataClient {
      *             service discovery, etc.
      */
     public static BigdataClient newInstance(String[] args) {
+
+        // show the copyright banner during statup.
+        Banner.banner();
 
         setSecurityManager();
 

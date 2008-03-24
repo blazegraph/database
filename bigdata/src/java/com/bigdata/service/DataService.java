@@ -45,6 +45,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.Banner;
 import com.bigdata.btree.Counters;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
@@ -421,6 +422,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     public DataService(Properties properties) {
         
+        // show the copyright banner during statup.
+        Banner.banner();
+
         resourceManager = (ResourceManager) newResourceManager(properties);
         
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
