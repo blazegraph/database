@@ -913,28 +913,26 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * The txService must be a {@link WriteExecutorService} so that it will
      * correctly handle aborts and commits of writes on isolated indices.
      * 
-     * FIXME (already done, but not yet for transactions) Modify the
-     * {@link WriteExecutorService} to use checkpoints on named indices after
-     * each task. This will not only allow us to abort individual tasks that
-     * fail (without discarding the commit group), it will also allow us to
-     * commit without waiting for long running tasks to complete (since they are
-     * executing they have an exclusive lock on the named indices so noone else
-     * can write while they are running). The same solution should be applied to
-     * the within transaction contention for isolated indices writing on the
-     * temporary store for the transaction.
+     * FIXME The transaction write service needs to be paused during synchronous
+     * overflow handling and buffered transaction write sets need to be split
+     * and moved with their index partitions since validation depends on an
+     * unisolated operation comparing the local write set for an index partition
+     * with the local index partition.
      * <p>
-     * An index checkpoint simply flushes the index (and its metadata record) to
-     * disk. This approach REQUIRES that we do NOT mark the index as requiring
-     * commit until the task has completed successfully, so there MUST be an
-     * explicit signal from the
-     * {@link WriteExecutorService#afterTask(AbstractTask, Throwable)} to
-     * {@link Name2Addr} signaling that the index is (a) dirty, and (b) should
-     * be put onto the commitList. At that point the task waits and it will
-     * participate in the next commit group. Once the index gets onto the
-     * {@link Name2Addr} commitList and is committed, it will automatically be
-     * available for subsequent tasks. If a task fails, then we just re-load the
-     * last committed state of the index using {@link Name2Addr} - this is the
-     * standard behavior in any case.
+     * The {@link AbstractJournal#closeForWrites(long)} method should be
+     * reworked as "sealStore(long)" or something of that nature whose semantics
+     * are a restart safe conversion of the store into a read-only store with
+     * the specified closeTime. The method should drive through the buffer
+     * strategy and release any write cache since write are no longer allowed.
+     * The file channel could be converted to read-only, but that it not
+     * necessary and it would effect concurrent readers. The method should be
+     * safe for concurrent reads so that we do not need to pause the historical
+     * read service during synchronous overflow.
+     * <p>
+     * When a historical resource is released it is closed (if open) and the
+     * backing file is deleted. This will cause any active readers to throw an
+     * exception, most probably indicating that the store or the file channel is
+     * "not open".
      */
     static private class InnerReadWriteTxServiceCallable extends DelegateTask {
 

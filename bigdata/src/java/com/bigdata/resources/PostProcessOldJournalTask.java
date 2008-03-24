@@ -1161,6 +1161,13 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          */
         tasks.addAll(chooseIndexPartitionMoves());
         
+        /*
+         * Review all index partitions on the old journal as of the last commit
+         * time and verify for each one that we have either already assigned a
+         * post-processing task to handle it, that we assign one now, or that no
+         * post-processing is required (this last case occurs when the view
+         * state was copied onto the new journal).
+         */
         {
 
             // counters : must sum to ndone as post-condition.
@@ -1296,7 +1303,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     + nsplit;
 
             // verify all indices were handled in one way or another.
-            assert ndone == used.size() : "ndone="+ndone+", but #used="+used.size();
+            assert ndone == used.size() : "ndone="+ndone+", but #used="+used.size()+" : "+used.toString();
             
         }
 

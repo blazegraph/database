@@ -606,8 +606,7 @@ public class MoveIndexPartitionTask extends AbstractResourceManagerTask {
                 if(ndx.getIndexMetadata().getOverflowHandler()!=null) {
 
                     /*
-                     * FIXME Must apply overflowHandler - see
-                     * AbstractBTree#rangeCopy.
+                     * FIXME Must apply overflowHandler - see AbstractBTree#rangeCopy.
                      * 
                      * Probably the easiest way to handle this is to do an
                      * UNISOLATED build on the view, or to combine an build on the

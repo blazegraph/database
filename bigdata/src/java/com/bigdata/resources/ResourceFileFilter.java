@@ -30,14 +30,14 @@ public class ResourceFileFilter implements FileFilter {
     /**
      * 
      */
-    private final ResourceManager resourceManager;
+    private final StoreFileManager resourceManager;
 
     protected static final Logger log = Logger.getLogger(ResourceFileFilter.class);
     
     /**
      * @param resourceManager
      */
-    public ResourceFileFilter(ResourceManager resourceManager) {
+    public ResourceFileFilter(StoreFileManager resourceManager) {
 
         if (resourceManager == null)
             throw new IllegalArgumentException();

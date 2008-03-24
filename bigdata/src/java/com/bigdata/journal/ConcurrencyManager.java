@@ -35,6 +35,7 @@ import com.bigdata.counters.InstrumentDelta;
 import com.bigdata.counters.InstrumentInstantaneousAverage;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
+import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -118,7 +119,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options {
+    public static interface Options extends IServiceShutdown {
     
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool
@@ -216,34 +217,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
          * The default maximum depth of the write service queue (1000).
          */
         public static final String DEFAULT_WRITE_SERVICE_QUEUE_CAPACITY = "1000";
-        
-        /**
-         * The maximum time in milliseconds that
-         * {@link ConcurrencyManager#shutdown()} will wait termination of the
-         * various services -or- ZERO (0) to wait forever (default is to wait
-         * forever).
-         * <p>
-         * Note: The journal will no longer accept begin to execute queued tasks
-         * once shutdown begins so this primarily effects whether or not tasks
-         * that are already executing will be allowed to run until completion.
-         * <p>
-         * Note: You can use {@link ConcurrencyManager#shutdownNow()} to
-         * terminate the journal immediately.
-         * <p>
-         * Note: Abrupt shutdown of the journal is always safe, but changes that
-         * have not been committed will not be there on restart.
-         * 
-         * @todo who should define this parameter? It should effect all
-         *       shutdowns for a {@link Journal} or {@link DataService}.
-         * 
-         * @see #DEFAULT_SHUTDOWN_TIMEOUT
-         */
-        public final static String SHUTDOWN_TIMEOUT = "shutdownTimeout";
-
-        /**
-         * The default timeout for {@link IConcurrencyManager#shutdown()}.
-         */
-        public final static String DEFAULT_SHUTDOWN_TIMEOUT = "0";
         
     }
 
