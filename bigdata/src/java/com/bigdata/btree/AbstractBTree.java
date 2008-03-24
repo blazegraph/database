@@ -37,6 +37,7 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
@@ -372,6 +373,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
             IAddressSerializer addrSer,//
             IndexMetadata metadata//
             ) {
+
+        // show the copyright banner during statup.
+        Banner.banner();
 
         assert store != null;
 
