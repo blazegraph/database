@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.journal.CommitRecordIndex.Entry;
+import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Interface for clients of a {@link IBigdataFederation}.
@@ -142,6 +143,21 @@ public interface IBigdataClient {
     public boolean getBatchApiOnly();
     
     /**
+     * The maximum #of retries when an operation results in a {@link StaleLocatorException}.
+     * 
+     * @see Options#CLIENT_MAX_STALE_LOCATOR_RETRIES
+     */
+    public int getMaxStaleLocatorRetries();
+
+    /**
+     * The maximum #of tasks that may be submitted in parallel for a single user
+     * request.
+     * 
+     * @see Options#CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST
+     */
+    public int getMaxParallelTasksPerRequest();
+
+    /**
      * Configuration options for {@link IBigdataClient}s.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -154,21 +170,49 @@ public interface IBigdataClient {
          * This thread pool is used to parallelize all requests issued by the
          * client and also to limit the maximum parallelism of the client with
          * respect to requests made of the federation.
-         * 
-         * @todo review this default.
          */
-        public static final String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
+        String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
         
-        public static final String DEFAULT_CLIENT_THREAD_POOL_SIZE = "20";
+        String DEFAULT_CLIENT_THREAD_POOL_SIZE = "20";
 
+        /**
+         * The maximum #of times that a client will retry an operation which
+         * resulted in a {@link StaleLocatorException} (default 3).
+         * <p>
+         * Note: The {@link StaleLocatorException} is thrown when a split, join,
+         * or move results in one or more new index partitions that replace the
+         * index partition addressed by the client. A retry will normally
+         * succeed. A limit is placed on the #of retries in order to force
+         * abnormal sequences to terminate.
+         */
+        String CLIENT_MAX_STALE_LOCATOR_RETRIES = "client.maxStaleLocatorRetries";
+        
+        String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "3";
+
+        /**
+         * The maximum #of tasks that will be created and submitted in parallel
+         * for a single application request (100). Multiple tasks are created
+         * for an application request whenever that request spans more than a
+         * single index partition. This limit prevents operations which span a
+         * very large #of index partitions from creating and submitting all of
+         * their tasks at once and thereby effectively blocking other client
+         * operations until the tasks have completed. Instead, this application
+         * request generates at most this many tasks at a time and new tasks
+         * will not be created for that request until the previous set of tasks
+         * for the request have completed.
+         */
+        String CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "client.maxParallelTasksPerRequest";
+        
+        String DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "100";
+        
         /**
          * The default capacity used when a client issues a range query request (50000).
          * 
          * @todo allow override on a per index basis as part of the index metadata?
          */
-        public static final String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
+        String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
 
-        public static final String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "50000";
+        String DEFAULT_CLIENT_RANGE_QUERY_CAPACITY = "50000";
 
         /**
          * A boolean property which controls whether or not the non-batch API
@@ -177,9 +221,9 @@ public interface IBigdataClient {
          * code that needs to be re-written to use {@link IIndexProcedure}s in
          * order to obtain high performance.
          */
-        public static final String CLIENT_BATCH_API_ONLY = "client.batchOnly";
+        String CLIENT_BATCH_API_ONLY = "client.batchOnly";
 
-        public static final String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
+        String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
         
     };
     

@@ -173,7 +173,7 @@ public class MapServer extends AbstractServer {
         public IBigdataClient getBigdataClient() {
             
             // @todo this assumes the default federation.
-            return new BigdataClient(new String[]{});
+            return BigdataClient.newInstance(new String[]{});
             
         }
 

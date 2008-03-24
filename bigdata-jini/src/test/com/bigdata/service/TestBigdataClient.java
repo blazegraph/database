@@ -151,7 +151,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }.start();
 
-        client = new BigdataClient(
+        client = BigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });

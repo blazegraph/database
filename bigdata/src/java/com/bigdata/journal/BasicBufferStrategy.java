@@ -311,7 +311,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
         userExtent = newUserExtent;
         
-        System.err.println("Buffer: newCapacity=" + cf.format(newCapacity));
+        log.info("Buffer: newCapacity=" + cf.format(newCapacity));
 
     }
     
@@ -358,7 +358,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("\nTransferred " + count
+        log.info("\nTransferred " + count
                 + " bytes from memory to disk at offset=" + toPosition + " in "
                 + elapsed + "ms");
 

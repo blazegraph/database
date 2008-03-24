@@ -179,7 +179,7 @@ public class TestMaster extends AbstractServerTestCase {
             
         }.start();
 
-        client = new BigdataClient(
+        client = BigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
                         });
 

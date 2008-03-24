@@ -125,7 +125,8 @@ public class DataServicesClient {
     public DataServicesClient(DiscoveryManagement discoveryManagement,
             boolean cacheDataServices, boolean cacheMetadataServices) {
 
-        if(discoveryManagement==null) throw new IllegalArgumentException();
+        if (discoveryManagement == null)
+            throw new IllegalArgumentException();
         
         this.cacheDataServices = cacheDataServices;
         

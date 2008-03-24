@@ -1163,6 +1163,7 @@ public class IndexSegmentBuilder {
         // the #of leaves written so far.
         nleavesWritten++;
         
+        if(INFO)
         System.err.print("."); // wrote a leaf.
 
         /*
@@ -1209,7 +1210,8 @@ public class IndexSegmentBuilder {
 
         // the #of nodes written so far.
         nnodesWritten++;
-        
+
+        if(INFO)
         System.err.print("x"); // wrote a node.
 
         /*

@@ -111,13 +111,21 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // The source view.
         final IIndex src = getIndex(name);
 
+        if (src instanceof BTree) {
+
+            // pre-condition.
+            log.warn("View is only a B+Tree: name=" + name
+                    + ", pmd=" + src.getIndexMetadata().getPartitionMetadata());
+            
+        }
+        
         // Build the index segment.
         final BuildResult result = resourceManager.buildIndexSegment(name, src,
                 outFile, lastCommitTime, fromKey, toKey);
 
         // task will update the index partition view definition.
         final AbstractTask task = new AtomicUpdate(resourceManager,
-                concurrencyManager, result.name, result);
+                concurrencyManager, name, result);
 
         // submit task and wait for it to complete @todo config timeout?
         concurrencyManager.submit(task).get();
@@ -171,22 +179,24 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
     
     /**
      * Task updates the definition of an index partition such that the specified
-     * index segment is used in place of any older index segments and any journal
-     * last commitTime is less than or equal to the createTime of the new index
-     * segment.
+     * index segment is used in place of any older index segments and any
+     * journal last commitTime is less than or equal to the createTime of the
+     * new index segment.
      * <p>
      * The use case for this task is that you have just done an overflow on a
-     * journal, placing empty indices on the new journal and defining their views to
-     * read from the new index and the old journal. Then you built an index segment
-     * from the last committed state of the index on the old journal. Finally you
-     * use this task to update the view on the new journal such that the index now
-     * reads from the new index segment rather than the old journal.
+     * journal, placing empty indices on the new journal and defining their
+     * views to read from the new index and the old journal. Then you built an
+     * index segment from the last committed state of the index on the old
+     * journal. Finally you use this task to update the view on the new journal
+     * such that the index now reads from the new index segment rather than the
+     * old journal.
      * <p>
-     * Note: this implementation only works with a full compacting merge scenario.
-     * It does NOT handle the case when multiple index segments are required to
-     * complete the index partition view. the presumption is that the new index
-     * segment was built from the fused view as of the last committed state on the
-     * old journal, not just from the {@link BTree} on the old journal.
+     * Note: this implementation only works with a full compacting merge
+     * scenario. It does NOT handle the case when multiple index segments are
+     * required to complete the index partition view. the presumption is that
+     * the new index segment was built from the fused view as of the last
+     * committed state on the old journal, not just from the {@link BTree} on
+     * the old journal.
      * <h2>Pre-conditions</h2>
      * 
      * <ol>
@@ -195,23 +205,25 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      * <ol>
      * 
      * <li>the live journal</li>
-     * <li>the previous journal</li>
-     * <li>an index segment having data for some times earlier than the old journal
-     * (optional) </li>
+     * <li>the previous journal (optional)</li>
+     * <li>an index segment having data for some times earlier than the old
+     * journal (optional) </li>
      * </ol>
      * </li>
      * 
      * <li> The createTime on the live journal MUST be GT the createTime on the
      * previous journal (it MUST be newer).</li>
      * 
-     * <li> The createTime of the new index segment MUST be LTE the firstCommitTime
-     * on the live journal. (The new index segment should have been built from a
-     * view that did not read on the live journal. In fact, the createTime on the
-     * new index segment should be exactly the lastCommitTime on the oldJournal.)</li>
+     * <li> The createTime of the new index segment MUST be LTE the
+     * firstCommitTime on the live journal. (The new index segment should have
+     * been built from a view that did not read on the live journal. In fact,
+     * the createTime on the new index segment should be exactly the
+     * lastCommitTime on the oldJournal.)</li>
      * 
-     * <li> The optional index segment in the view MUST have a createTime LTE to the
-     * createTime of the previous journal. (That is, it must have been from a prior
-     * overflow operation and does not include any data from the prior journal.)
+     * <li> The optional index segment in the view MUST have a createTime LTE to
+     * the createTime of the previous journal. (That is, it must have been from
+     * a prior overflow operation and does not include any data from the prior
+     * journal.)
      * </ol>
      * 
      * <h2>Post-conditions</h2>
@@ -222,11 +234,12 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
      * <li>the new index segment</li>
      * </ol>
      * 
-     * @todo modify to support view consisting of more than one historical component
-     *       so that we can do incremental builds (just the buffered writes) as well
-     *       as full builds (the index view).  Incremental build index segments need
-     *       to be marked as such in the {@link BuildResult} and would only replace
-     *       the old journal rather than all historical entries in the view.
+     * @todo modify to support view consisting of more than one historical
+     *       component so that we can do incremental builds (just the buffered
+     *       writes) as well as full builds (the index view). Incremental build
+     *       index segments need to be marked as such in the {@link BuildResult}
+     *       and would only replace the old journal rather than all historical
+     *       entries in the view.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -275,9 +288,17 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
              * and cause it to be checkpointed if this task succeeds normally.
              */
             final IIndex view = getIndex(getOnlyResource());
+
+            if(view instanceof BTree) {
+                
+                log.warn("View is only a B+Tree: name="
+                        + buildResult.name + ", pmd="
+                        + view.getIndexMetadata().getPartitionMetadata());
+                
+            }
             
             // The live B+Tree.
-            final BTree btree = (BTree)((FusedView)view).getSources()[0];
+            final BTree btree = (BTree)(view instanceof FusedView?((FusedView)view).getSources()[0]:view);
 
             assert btree != null : "Expecting index: "+getOnlyResource();
             

@@ -152,6 +152,8 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
 
         final byte[][] ret = (returnOldValues ? new byte[n][] : null);
         
+//        try {
+        
         while (i < n) {
 
             final byte[] key = getKey(i);
@@ -169,6 +171,21 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
             i++;
             
         }
+        
+//        } catch(RuntimeException ex) {
+//        
+//            // remove this debugging try...catch code.
+//            if(DEBUG && ex.getMessage().contains("KeyAfterPartition")) {
+//                
+//                log.debug("keys: "+toString(keys));
+//                
+////                System.exit(1);
+//                
+//            }
+//            
+//            throw ex;
+//            
+//        }
         
         if (returnOldValues) {
             

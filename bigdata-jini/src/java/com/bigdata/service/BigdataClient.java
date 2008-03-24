@@ -35,13 +35,9 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
 import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
@@ -49,7 +45,6 @@ import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -88,17 +83,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       a bigdata federation, and whether and how a single client could connect
  *       to more than one bigdata federation. the {@link DataServicesClient}
  *       will need to be parameterized to filter for only the federation of
- *       interest.
- * 
- * @todo refactor the concept of the jini bigdata client from the concept of a
- *       bigdata client that discovers and talks to remote services.
+ *       interest.  See {@link IBigdataClient#connect()}.
  * 
  * @see ClientIndexView
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataClient implements IBigdataClient {
+public class BigdataClient extends AbstractBigdataClient {
 
     /**
      * The label in the {@link Configuration} file for the client configuration
@@ -106,8 +98,6 @@ public class BigdataClient implements IBigdataClient {
      */
     protected final static transient String CLIENT_LABEL = "ClientDescription";
 
-    private Configuration config;
-    
     private DataServicesClient dataServicesClient;
 
     private LoadBalancerClient loadBalancerClient;
@@ -120,47 +110,6 @@ public class BigdataClient implements IBigdataClient {
         
     }
     
-    /*
-     * IBigdataClient state.
-     */
-    private final ThreadPoolExecutor threadPool;
-    private final int defaultRangeQueryCapacity;
-    private final boolean batchApiOnly;
-
-    /*
-     * IBigdataClient API.
-     */
-
-    public ThreadPoolExecutor getThreadPool() {
-        
-        assertConnected();
-        
-        return threadPool;
-        
-    }
-
-    public int getDefaultRangeQueryCapacity() {
-        
-        return defaultRangeQueryCapacity;
-        
-    }
-    
-    public boolean getBatchApiOnly() {
-        
-        return batchApiOnly;
-        
-    }
-    
-    protected void assertConnected() {
-        
-        if (fed == null) {
-
-            throw new IllegalStateException("Not connected");
-            
-        }
-        
-    }
-
     public ILoadBalancerService getLoadBalancerService() {
         
         return loadBalancerClient.getLoadBalancerService();
@@ -201,7 +150,7 @@ public class BigdataClient implements IBigdataClient {
      * <code>java.rmi.server.codebase</code> property specified for the VM
      * running the service.
      */
-    protected void setSecurityManager() {
+    static protected void setSecurityManager() {
 
         SecurityManager sm = System.getSecurityManager();
         
@@ -219,33 +168,50 @@ public class BigdataClient implements IBigdataClient {
 
     }
     
+    protected BigdataClient(Properties properties) {
+
+        super(properties);
+        
+    }
+    
     /**
      * Client startup reads {@link Configuration} data from the file(s) named by
-     * <i>args</i>, starts the client, attempts to discover one or more
+     * <i>args</i>, reads the <i>properties</i> file named in the
+     * {@value #CLIENT_LABEL} section of the {@link Configuration} file, creates
+     * and starts a new client, initiaties discovery for one or more service
      * registrars and establishes a lookup cache for {@link MetadataService}s
      * and {@link DataService}s.
      * 
      * @param args
      *            The command line arguments.
      * 
-     * @see #shutdownNow()
+     * @return The new client.
+     * 
+     * @throws RuntimeException
+     *             if there is a problem: reading the jini configuration for the
+     *             client; reading the properties for the client; starting
+     *             service discovery, etc.
      */
-    public BigdataClient(String[] args) {
+    public static BigdataClient newInstance(String[] args) {
 
         setSecurityManager();
 
-        LookupLocator[] lookupLocators = null;
-        String[] groups = null;
-
+        /*
+         * First read all the configuration data and the properties file.
+         */
+        final String[] groups;
+        final LookupLocator[] lookupLocators;
+        final Properties properties;
         try {
 
-            config = ConfigurationProvider.getInstance(args);
+            // Obtain the configuration object.
+            final Configuration config = ConfigurationProvider
+                    .getInstance(args);
 
             /*
              * Extract how the client will discover services from the
              * Configuration.
              */
-
             groups = (String[]) config.getEntry(CLIENT_LABEL, "groups",
                     String[].class, LookupDiscovery.ALL_GROUPS/* default */);
 
@@ -255,17 +221,42 @@ public class BigdataClient implements IBigdataClient {
              * is no default for the lookupLocators. The default "ALL_GROUPS"
              * means that the lookupLocators are ignored.
              */
-            
+
             lookupLocators = (LookupLocator[]) config
                     .getEntry(CLIENT_LABEL, "unicastLocators",
                             LookupLocator[].class, null/* default */);
 
-        } catch (ConfigurationException ex) {
+            /*
+             * Extract the name of the properties file used to configure the
+             * bigdata client.
+             */
+            final File propertyFile = (File) config.getEntry(CLIENT_LABEL,
+                    "propertyFile", File.class);
 
-            throw new RuntimeException("Configuration error: " + ex, ex);
-            
+            /*
+             * Read the properties file.
+             */
+            properties = getProperties(propertyFile);
+
+        } catch (Exception ex) {
+
+            /*
+             * Note: No asynchronous processes have been started so we just wrap
+             * the exception and throw it out.
+             */
+
+            throw new RuntimeException(ex);
+
         }
         
+        /*
+         * Now create the bigdata client object.
+         * 
+         * Note: once the client has been created we need to invoke
+         * shutdownNow() on it if there is a problem.
+         */
+        final BigdataClient client = new BigdataClient(properties);
+
         try {
 
             /*
@@ -275,95 +266,61 @@ public class BigdataClient implements IBigdataClient {
              * an alternative, you can use LookupDiscovery, which always does
              * multicast discovery.
              */
-            discoveryManager = new LookupDiscoveryManager(
-                    groups, lookupLocators, null /*DiscoveryListener*/
+            client.discoveryManager = new LookupDiscoveryManager(groups,
+                    lookupLocators, null /* DiscoveryListener */
             );
-            
-//            discoveryManager = new LookupDiscovery(groups);
 
-        } catch (IOException ex) {
-
-            shutdownNow();
-
-            throw new RuntimeException("Lookup service discovery error: " + ex,
-                    ex);
-
-        }
-
-        /*
-         * Start discovery for data and metadata services.
-         */
-        dataServicesClient = new DataServicesClient(discoveryManager);
-        
-        /*
-         * Read the properties file used to configure the client.
-         */
-        final Properties properties = new Properties();
-        try {
-
-            File propertyFile = (File) config.getEntry(CLIENT_LABEL,
-                    "propertyFile", File.class);
-
-            InputStream is = new BufferedInputStream(new FileInputStream(
-                    propertyFile));
-
-            properties.load(is);
-
-            is.close();
+            /*
+             * Start discovery for data and metadata services.
+             */
+            client.dataServicesClient = new DataServicesClient(
+                    client.discoveryManager);
 
         } catch (Exception ex) {
 
-            shutdownNow();
-            
-            throw new RuntimeException("Configuration error: "+ex, ex);
-            
+            log.fatal("Could not start client: " + ex.getMessage(), ex);
+
+            client.shutdownNow();
+
         }
 
-        /*
-         * Client configuration.
-         */
-        
-        final int nthreads = Integer.parseInt(properties.getProperty(
-                Options.CLIENT_THREAD_POOL_SIZE,
-                Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
-        
-        threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                nthreads, DaemonThreadFactory.defaultThreadFactory());
-
-        defaultRangeQueryCapacity = Integer.parseInt(properties.getProperty(
-                Options.CLIENT_RANGE_QUERY_CAPACITY,
-                Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
-        
-        batchApiOnly = Boolean.valueOf(properties.getProperty(
-                Options.CLIENT_BATCH_API_ONLY,
-                Options.DEFAULT_CLIENT_BATCH_API_ONLY));
+        return client;
         
     }
 
-    public void shutdown() {
+    /**
+     * Read and return the content of the properties file.
+     * 
+     * @param propertyFile
+     *            The properties file.
+     * 
+     * @throws IOException
+     */
+    protected static Properties getProperties(File propertyFile)
+            throws IOException {
 
-        log.info("begin");
+        final Properties properties = new Properties();
+
+        InputStream is = new BufferedInputStream(new FileInputStream(
+                propertyFile));
+
+        properties.load(is);
+
+        is.close();
+
+        return properties;
+
+    }
+    
+    public void shutdown() {
 
         final long begin = System.currentTimeMillis();
         
-        if( fed != null ) {
+        log.info("begin");
 
-            // allow client requests to finish normally.
-            threadPool.shutdown();
-            
-            try {
-            
-                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    
-                    log.warn("Timeout awaiting thread pool termination.");
-                    
-                }
-   
-            } catch (InterruptedException e) {
-                
-                log.warn("Interrupted awaiting thread pool termination.", e);
-                
-            }
+        super.shutdown();
+        
+        if( fed != null ) {
 
             // disconnect from the federation.
             fed.disconnect();
@@ -382,14 +339,13 @@ public class BigdataClient implements IBigdataClient {
     
     public void shutdownNow() {
 
-        log.info("begin");
-        
         final long begin = System.currentTimeMillis();
         
+        log.info("begin");
+        
+        super.shutdownNow();
+        
         if( fed != null ) {
-
-            // stop client requests.
-            threadPool.shutdownNow();
             
             // disconnect from the federation.
             fed.disconnect();
@@ -446,7 +402,6 @@ public class BigdataClient implements IBigdataClient {
         return fed;
 
     }
-    private IBigdataFederation fed = null;
     
     /**
      * Await the availability of an {@link IMetadataService} and the specified

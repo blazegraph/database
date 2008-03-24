@@ -45,6 +45,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
+import com.bigdata.btree.Counters;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITupleFilter;
@@ -214,7 +215,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
          * @todo work up a more interesting default filter.
          */
         // String DEFAULT_STATUS_FILTER = ".*Unisolated.*";
-        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/#.*";        
+        String DEFAULT_STATUS_FILTER = ".*Unisolated Write Service/(#.*|averageQueueLength)";        
         
         /**
          * The delay between scheduled invocations of the {@link ReportTask} (60
@@ -768,7 +769,13 @@ abstract public class DataService implements IDataService, IWritePipeline,
         return name + "#" + partitionId;
 
     }
-    
+
+    /**
+     * FIXME Make this an XML Serialization of performance counters describing
+     * the data service, so the return type should be a byte[] or a String iff
+     * we write onto a StringWriter... It is currently the toString()
+     * serialization of the counters.
+     */
     public String getStatistics() throws IOException {
         
         return getCounters().toString();
@@ -1088,7 +1095,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * indices. We should be able to report counters/costs for historical reads
      * and transactions as well.
      * 
-     * @todo replace with serialized {@link ICounterSet}.
+     * FIXME replace with serialized {@link ICounterSet} XML.
      */
     public String getStatistics(String name) throws IOException {
 
@@ -1096,13 +1103,15 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
         try {
 
-            String statistics = concurrencyManager.getCounters(name).toString();
+            Counters counters = concurrencyManager.getCounters(name);
             
-            if(statistics == null) {
+            if(counters == null) {
                 
                 throw new NoSuchIndexException(name);
                 
             }
+            
+            String statistics = counters.toString();
             
             return statistics;
             
@@ -1349,7 +1358,7 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
             }
 
-            return ((ResourceManager)resourceManager).overflowCounter.get();
+            return resourceManager.getOverflowCount();
 
         } finally {
 

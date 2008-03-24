@@ -645,12 +645,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * 
      * @param key
      *            The key.
+     * 
      * @param allowUpperBound
-     *            <code>true</code> iff the key represents an exclusive upper
-     *            bound and thus must be allowed to be LTE to the right
-     *            separator key for the index partition. For example, this would
-     *            be <code>true</code> for the <i>toKey</i> parameter on
-     *            rangeCount or rangeIterator methods.
+     *            <code>true</code> iff the <i>key</i> represents an
+     *            inclusive upper bound and thus must be allowed to be LTE to
+     *            the right separator key for the index partition. For example,
+     *            this would be <code>true</code> for the <i>toKey</i>
+     *            parameter on rangeCount or rangeIterator methods.
      * 
      * @return <code>true</code> always.
      * 
@@ -680,7 +681,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
         if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
 
-            throw new RuntimeException("KeyBeforePartition: key="+BytesUtil.toString(key)+", pmd="+pmd);
+            throw new RuntimeException("KeyBeforePartition: key="
+                    + BytesUtil.toString(key) + ", pmd=" + pmd
+                    + ", storeFile=" + getStore().getFile());
 
         }
 
@@ -697,8 +700,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                 } else {
                     
                     throw new RuntimeException("KeyAfterPartition: key="
-                            + BytesUtil.toString(key) + ", exclusive="
-                            + allowUpperBound + ", pmd=" + pmd);
+                            + BytesUtil.toString(key) + ", allowUpperBound="
+                            + allowUpperBound + ", pmd=" + pmd + ", storeFile="
+                            + getStore().getFile());
                 }
 
             } else {
@@ -710,8 +714,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
                 } else {
                     
                     throw new RuntimeException("KeyAfterPartition: key="
-                            + BytesUtil.toString(key) + ", exclusive="
-                            + allowUpperBound + ", pmd=" + pmd);
+                            + BytesUtil.toString(key) + ", allowUpperBound="
+                            + allowUpperBound + ", pmd=" + pmd + ", storeFile="
+                            + getStore().getFile());
                 }
                 
             }

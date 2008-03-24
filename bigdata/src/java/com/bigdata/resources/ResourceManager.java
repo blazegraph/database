@@ -924,7 +924,18 @@ abstract public class ResourceManager implements IResourceManager {
      * time the entire overflow operation is complete, including any
      * post-processing of the old journal.
      */
-    public final AtomicLong overflowCounter = new AtomicLong(0L);
+    protected final AtomicLong overflowCounter = new AtomicLong(0L);
+    
+    /**
+     * #of overflows that have taken place. This counter is incremented each
+     * time the entire overflow operation is complete, including any
+     * post-processing of the old journal.
+     */
+    public long getOverflowCount() {
+    
+        return overflowCounter.get();
+        
+    }
     
     /**
      * <code>true</code> unless an overflow event is currently being
@@ -2928,10 +2939,10 @@ abstract public class ResourceManager implements IResourceManager {
         final long firstCommitTime;
         {
 
-            System.err.println("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
+            log.warn("doOverflow(): lastCommitTime=" + lastCommitTime + "\nfile="
                     + oldJournal.getFile()
                     + "\npre-condition views: overflowCounter="
-                    + overflowCounter.get() + "\n"
+                    + getOverflowCount() + "\n"
                     + listIndexPartitions(-lastCommitTime));
 
             int nindices = (int) oldJournal.getName2Addr().rangeCount(null,null);
@@ -3180,8 +3191,8 @@ abstract public class ResourceManager implements IResourceManager {
 
         log.warn("\ndoOverflow(): firstCommitTime=" + firstCommitTime
                 + "\nfile=" + newJournal.getFile()
-                + "\npre-condition views: overflowCounter="
-                + overflowCounter.get() + "\n"
+                + "\npost-condition views: overflowCounter="
+                + getOverflowCount() + "\n"
                 + listIndexPartitions(-firstCommitTime));
 
         /*

@@ -993,29 +993,27 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
             assert hostScore.rank != -1 : hostScore.toString();
             
             /*
-             * This is based only on the #of active unisolated operations on a
-             * data service, which is perhaps a resonable first order estimate
-             * of the load of the data service. The larger #active is the
-             * heavier the utilization of the data service.
+             * This is based only on the average queue length of the unisolated
+             * write service on the data service, which is perhaps a reasonable
+             * first order estimate of the load of the data service. The longer
+             * the average queue length the heavier the utilization of the data
+             * service.
              * 
              * @todo There is a lot more that can be considered and under linux
              * we have access to per-process counters for CPU, DISK, and MEMORY.
-             * 
-             * FIXME I am seeing nactive as zero when I would expect a non-zero
-             * value. The problem is that it is an instantaneous count and the
-             * counter that I'm interested in would be a total count of active
-             * tasks on the unisolated service sampled to give the #of active
-             * tasks during the sample period.
              */
 
-            final double nactive = getAverageValueForMinutes(hostCounterSet,
-                    "Concurrency Manager/Unisolated Write Service/#active", 0d,
-                    TEN_MINUTES);
+            final double averageQueueLength = getAverageValueForMinutes(
+                    hostCounterSet,
+                    "Concurrency Manager/Unisolated Write Service/averageQueueLength",
+                    0d, TEN_MINUTES);
 
-            double rawScore = (nactive+1) * (hostScore.score+1);
+            double rawScore = (averageQueueLength + 1) * (hostScore.score + 1);
 
-            log.info("rawScore("+rawScore+") = (nactive("+nactive+")+1) * (hostScore("+hostScore.score+")+1)");
-            
+            log.info("rawScore(" + rawScore + ") = (averageQueueLength("
+                    + averageQueueLength + ")+1) * (hostScore("
+                    + hostScore.score + ")+1)");
+
             final ServiceScore score = new ServiceScore(hostScore.hostname,
                     serviceUUID, rawScore);
             

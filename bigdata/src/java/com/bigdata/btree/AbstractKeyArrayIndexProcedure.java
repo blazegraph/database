@@ -39,6 +39,8 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 
@@ -72,6 +74,20 @@ import com.bigdata.btree.IIndexProcedure.IKeyArrayIndexProcedure;
 abstract public class AbstractKeyArrayIndexProcedure implements
         IKeyArrayIndexProcedure, Externalizable {
 
+    protected static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
+    
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * The object used to (de-)serialize the keys when they are sent to the
      * remote service.
@@ -104,8 +120,10 @@ abstract public class AbstractKeyArrayIndexProcedure implements
 
     /**
      * The keys.
+     * 
+     * @todo make private again.
      */
-    private IRandomAccessByteArray keys;
+    protected IRandomAccessByteArray keys;
 
     /**
      * The values.
@@ -257,6 +275,42 @@ abstract public class AbstractKeyArrayIndexProcedure implements
     protected IDataSerializer getValSerializer() {
         
         return valSer;
+        
+    }
+
+    /**
+     * Formats the data into a {@link String}.
+     * 
+     * @param data An array of unsigned byte arrays.
+     * 
+     * @return
+     */
+    protected String toString(IRandomAccessByteArray keys) {
+       
+        StringBuilder sb = new StringBuilder();
+        
+        final int n = keys.getKeyCount();
+        
+        sb.append("data(n=" + n + ")={");
+
+        for (int i = 0; i < n; i++) {
+
+            final byte[] a = keys.getKey(i);
+            
+            sb.append("\n");
+
+            sb.append("data[" + i + "]=");
+
+            sb.append(BytesUtil.toString(a));
+
+            if (i + 1 < n)
+                sb.append(",");
+            
+        }
+        
+        sb.append("}");
+        
+        return sb.toString();
         
     }
     
