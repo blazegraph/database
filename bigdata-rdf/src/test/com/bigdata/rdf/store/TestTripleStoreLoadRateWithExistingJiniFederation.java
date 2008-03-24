@@ -134,7 +134,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         /**
          * Starts in {@link #setUp()}.
          */
-        BigdataClient client = new BigdataClient(
+        BigdataClient client = BigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });

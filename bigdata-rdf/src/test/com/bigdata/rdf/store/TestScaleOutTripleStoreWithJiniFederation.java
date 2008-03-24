@@ -255,7 +255,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
       log.warn("Starting client.");
 
-      client = new BigdataClient(
+      client = BigdataClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });

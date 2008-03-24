@@ -655,3 +655,102 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
 **  Maven 2.x build and subversion for bigdata.
 
+
+Short term tasks:
+
+   - Compute average response time and throughput as 1/average
+     response time. and measure on the client as well so that we can
+     compute the RMI overhead,
+   
+   - full text indexing for kb
+
+   - SemTech08 submission?
+
+   - close out index resources (and journals) in resource manager so
+     that we do not always grow the memory demand.
+
+   - test counter reporting under linux.
+
+   - stress testing with index partition moves, not just split/join.
+
+   - correctness testing for scale-out.
+
+   - streaming io for block read/write.  note that asynch IO for the
+     disk only strategy will not have an impact if we are doing
+     commits whose size fits within a single write cache (10M by
+     default).
+
+   - write performance test drivers and run on cluster.
+
+      - rdf concurrent data load.
+
+      - rdf concurrent query (rdf lubm is not designed to test with
+        concurrent loads).
+
+      - bigdata file system workload
+
+   - ClassCastException during BuildIndexSegmentTask$AtomicUpdate.
+     This was being thrown due to a pre-condition assumptions.  The
+     assumption was that the source view would include at least two
+     sources - the B+Tree on the new journal and at least a B+Tree on
+     the old journal as well.  I am going to assume for now that there
+     are valid pre-conditions where those assumptions do not hold and
+     rely on a ground truth correctness suite to validate the overflow
+     processing.
+
+============================================================
+
+KeyAfterPartition problem:
+
+DEBUG: 40673  0cfe918c-8677-4878-917e-3a8610e15725   pool-1-thread-248 com.bigdata.btree.BatchInsert.apply(BatchInsert.java:180): keys: data(n=10)={
+data[0]=[128, 0, 5, 127],
+data[1]=[128, 0, 5, 128],
+data[2]=[128, 0, 5, 217],
+data[3]=[128, 0, 6, 40],
+data[4]=[128, 0, 6, 112],
+data[5]=[128, 0, 6, 150],
+data[6]=[128, 0, 6, 231],
+data[7]=[128, 0, 6, 254],
+data[8]=[128, 0, 7, 35],
+data[9]=[128, 0, 7, 62]}
+
+============================================================
+
+@7:42PM Sunday - for a lot of different negative array indices.
+WARN : 40000  4293f5be-63ea-42a8-b4be-31a5026b122f   pool-1-thread-12 com.bigdata.counters.CounterSet$MyHandler.endElement(CounterSet.java:1197): Could not set counter value: path=/dpp2-wrkst13.dpp2.org/service/32c7601d-79d3-4a8e-b3b3-2a29e9174ef8/Concurrency Manager/Tasks/Unisolated, name=Average Task Latency : java.lang.ArrayIndexOutOfBoundsException: -4
+java.lang.ArrayIndexOutOfBoundsException: -4
+	at com.bigdata.counters.History.getAverage(History.java:383)
+	at com.bigdata.counters.History.getAverage(History.java:329)
+	at com.bigdata.counters.History.add(History.java:582)
+	at com.bigdata.counters.HistoryInstrument.add(HistoryInstrument.java:111)
+	at com.bigdata.counters.HistoryInstrument.setValue(HistoryInstrument.java:117)
+	at com.bigdata.counters.Counter.setValue(Counter.java:128)
+	at com.bigdata.counters.CounterSet$MyHandler.endElement(CounterSet.java:1188)
+	at com.sun.org.apache.xerces.internal.parsers.AbstractSAXParser.endElement(AbstractSAXParser.java:633)
+	at com.sun.org.apache.xerces.internal.impl.XMLNSDocumentScannerImpl.scanEndElement(XMLNSDocumentScannerImpl.java:719)
+	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl$FragmentContentDispatcher.dispatch(XMLDocumentFragmentScannerImpl.java:1685)
+	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl.scanDocument(XMLDocumentFragmentScannerImpl.java:368)
+	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:834)
+	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
+	at com.sun.org.apache.xerces.internal.parsers.XMLParser.parse(XMLParser.java:148)
+	at com.sun.org.apache.xerces.internal.parsers.AbstractSAXParser.parse(AbstractSAXParser.java:1242)
+	at javax.xml.parsers.SAXParser.parse(SAXParser.java:375)
+	at javax.xml.parsers.SAXParser.parse(SAXParser.java:176)
+	at com.bigdata.counters.CounterSet.readXML(CounterSet.java:1002)
+	at com.bigdata.service.LoadBalancerService.notify(LoadBalancerService.java:1244)
+	at com.bigdata.service.DataService$ReportTask.reportPerformanceCounters(DataService.java:959)
+	at com.bigdata.service.DataService$ReportTask.run(DataService.java:906)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:417)
+
+
+============================================================
+
+- ERROR: 39296     pool-1-thread-142 com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1436): java.lang.AssertionError: ndone=8, but #used=9
+java.lang.AssertionError: ndone=8, but #used=9
+	at com.bigdata.resources.PostProcessOldJournalTask.chooseTasks(PostProcessOldJournalTask.java:1299)
+	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1344)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)

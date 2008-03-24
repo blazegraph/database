@@ -134,7 +134,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           
       }.start();
 
-      client = new BigdataClient(
+      client = BigdataClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
