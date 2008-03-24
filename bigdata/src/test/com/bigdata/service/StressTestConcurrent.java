@@ -259,7 +259,7 @@ public class StressTestConcurrent extends
         DataService dataService = ((EmbeddedBigdataFederation)fed).getDataService(0);
         
         int nclients = 20;
-        long timeout = 200; // 20 or 40
+        long timeout = 20; // 20 or 40
         int ntrials = 10000;
         int keyLen = 4;
         int nops = 100;
