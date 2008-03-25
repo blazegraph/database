@@ -598,11 +598,11 @@ abstract public class AbstractStatisticsCollector {
 
     protected abstract class AbstractProcessReader implements Runnable {
         
-        InputStream is;
+        protected InputStream is;
         
         public void start(InputStream is) {
         
-            assert is != null;
+            if(is==null) throw new IllegalArgumentException();
             
             this.is = is;
             
@@ -612,9 +612,17 @@ abstract public class AbstractStatisticsCollector {
     
     protected abstract class ProcessReaderHelper extends AbstractProcessReader {
         
-        protected final LineNumberReader r;
+        protected LineNumberReader r = null;
         
         public ProcessReaderHelper() {
+            
+        }
+        
+        public void start(InputStream is) {
+
+            if( r != null) throw new IllegalStateException();
+            
+            super.start( is );
             
             r = new LineNumberReader( new InputStreamReader( is ));
             
