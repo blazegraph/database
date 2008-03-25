@@ -916,20 +916,45 @@ abstract public class AbstractStatisticsCollector {
      * collections by default and will write the updated counters on stdout
      * every {@link Options#INTERVAL} seconds.
      * <p>
-     * Parameters may be specified using <code>-D</code>. See {@link Options}.
+     * Parameters also may be specified using <code>-D</code>. See
+     * {@link Options}.
      * 
-     * @param args
-     *            <i>count</i> The #of collections to be made. Default is 10.
-     *            Specify zero (0) to run until halted.
+     * @param args [
+     *            <i>interval</i> [<i>count</i>]]
+     *            <p>
+     *            <i>interval</i> is the collection interval in seconds and
+     *            defaults to {@link Options#DEFAULT_INTERVAL}.
+     *            <p>
+     *            <i>count</i> is the #of collections to be made and defaults
+     *            to <code>10</code>. Specify zero (0) to run until halted.
      * 
      * @throws InterruptedException
-     * 
+     * @throws RuntimeException
+     *             if the arguments are not valid.
      * @throws UnsupportedOperationException
      *             if no implementation is available for your operating system.
      */
     public static void main(String[] args) throws InterruptedException {
 
-        final int count = (args.length == 0 ? 10 : Integer.parseInt(args[0]));
+        final int DEFAULT_COUNT = 10;
+        final int nargs = args.length;
+        final int interval;
+        final int count;
+        if (nargs == 0) {
+            interval = Integer.parseInt(Options.DEFAULT_INTERVAL);
+            count = DEFAULT_COUNT;
+        } else if (nargs == 1) {
+            interval = Integer.parseInt(args[0]);
+            count = DEFAULT_COUNT;
+        } else if (nargs == 2) {
+            interval = Integer.parseInt(args[0]);
+            count = Integer.parseInt(args[1]);
+        } else {
+            throw new RuntimeException("usage: [interval [count]]");
+        }
+        
+        if (interval <= 0)
+            throw new RuntimeException("interval must be positive");
         
         if (count < 0)
             throw new RuntimeException("count must be non-negative");
