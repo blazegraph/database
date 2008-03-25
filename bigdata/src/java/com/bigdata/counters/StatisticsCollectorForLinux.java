@@ -467,6 +467,9 @@ public class StatisticsCollectorForLinux extends
             
             protected ActiveProcess getActiveProcess() {
                 
+                if (activeProcess == null)
+                    throw new IllegalStateException();
+                
                 return activeProcess;
                 
             }
@@ -778,6 +781,9 @@ public class StatisticsCollectorForLinux extends
 
             protected ActiveProcess getActiveProcess() {
                 
+                if (activeProcess == null)
+                    throw new IllegalStateException();
+
                 return activeProcess;
                 
             }
