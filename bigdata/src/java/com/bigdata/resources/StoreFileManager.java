@@ -334,6 +334,16 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 //     * their read lock using {@link #releaseStoreLock(UUID)}. The ...
 //     */
 //    private final Map<UUID, ReentrantReadWriteLock> locks = new ConcurrentHashMap<UUID, ReentrantReadWriteLock>();
+//    
+//    /**
+//     * Lock is used to coordinate close out of stores. The lock is acquired by
+//     * the {@link CloseUnusedStoresTask} before it does any work and released
+//     * when it is done. Likewise, {@link #openStore(UUID)} uses this lock to
+//     * ensure (a) that concurrent requests for the same store are serialized;
+//     * and (b) to ensure that a store which is being requested is not
+//     * concurrently closed by the {@link CloseUnusedStoresTask}.
+//     */
+//    private ReentrantLock lock = new ReentrantLock();
     
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
@@ -347,16 +357,6 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
      */
     private ScheduledExecutorService closeStoreService;
 
-    /**
-     * Lock is used to coordinate close out of stores. The lock is acquired by
-     * the {@link CloseUnusedStoresTask} before it does any work and released
-     * when it is done. Likewise, {@link #openStore(UUID)} uses this lock to
-     * ensure (a) that concurrent requests for the same store are serialized;
-     * and (b) to ensure that a store which is being requested is not
-     * concurrently closed by the {@link CloseUnusedStoresTask}.
-     */
-    private ReentrantLock lock = new ReentrantLock();
-    
     /**
      * Task closes any stores (journals or index segments) that have not been
      * recently accessed.
@@ -1308,7 +1308,7 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
      * @throws RuntimeException
      *             if something goes wrong.
      */
-    public IRawStore openStore(UUID uuid) {
+    synchronized public IRawStore openStore(UUID uuid) {
 
         if (uuid == null) {
 
@@ -1316,9 +1316,9 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 
         }
 
-        lock.lock();
-        
-        try {
+//        lock.lock();
+//        
+//        try {
         
         /*
          * Check to see if the given resource is already open.
@@ -1486,11 +1486,11 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
         // return the reference to the open store.
         return store;
 
-        } finally {
-            
-            lock.unlock();
-            
-        }
+//        } finally {
+//            
+//            lock.unlock();
+//            
+//        }
         
     }
 
