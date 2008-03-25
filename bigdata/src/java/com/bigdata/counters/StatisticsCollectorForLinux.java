@@ -867,7 +867,7 @@ public class StatisticsCollectorForLinux extends
                     final String system  = data.substring(30-1,38-1).trim();
                     final String cpu     = data.substring(38-1,46-1).trim();
                     
-                    log.info("\n%user="+user+", %system="+system+", %cpu="+cpu+"\n"+data);
+                    log.info("\n%user="+user+", %system="+system+", %cpu="+cpu+"\n"+header+"\n"+data);
                     
                     vals.put(IProcessCounters.CPU_PercentProcessorTime,
                                 Double.parseDouble(cpu));
