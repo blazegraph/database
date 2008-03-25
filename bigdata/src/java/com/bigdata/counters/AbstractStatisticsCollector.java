@@ -596,10 +596,19 @@ abstract public class AbstractStatisticsCollector {
 
     }
 
+    /**
+     * A {@link Runnable} that reads the output of an {@link ActiveProcess}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
     protected abstract class AbstractProcessReader implements Runnable {
         
         protected InputStream is;
-        
+
+        /**
+         * @todo consider moving this parameter out of start().
+         */
         public void start(InputStream is) {
         
             if(is==null) throw new IllegalArgumentException();
@@ -716,10 +725,16 @@ abstract public class AbstractStatisticsCollector {
         protected InputStream is = null;
 
         protected Future readerFuture;
-        
+
+        /**
+         * 
+         * @param command
+         *            The command to be executed. See
+         *            {@link ProcessBuilder#command(List)}.
+         * @param collector
+         */
         public ActiveProcess(List<String> command,
-                AbstractProcessCollector collector,
-                AbstractProcessReader processReader) {
+                AbstractProcessCollector collector) {
 
             if (command == null)
                 throw new IllegalArgumentException();
@@ -730,9 +745,6 @@ abstract public class AbstractStatisticsCollector {
             if (collector == null)
                 throw new IllegalArgumentException();
 
-            if (processReader == null)
-                throw new IllegalArgumentException();
-            
             // log the command that will be run.
             {
                 
@@ -747,7 +759,7 @@ abstract public class AbstractStatisticsCollector {
                 log.info("command:\n" + sb);
 
             }
-            
+                        
             try {
 
                 ProcessBuilder tmp = new ProcessBuilder(command);
@@ -762,6 +774,28 @@ abstract public class AbstractStatisticsCollector {
 
             }
 
+            /*
+             * Note: Process is running but the reader on the process output has
+             * not been started yet!
+             */
+            
+        }
+
+        /**
+         * Attaches the reader to the process, which was started by the ctor and
+         * is already running.
+         * 
+         * @param processReader
+         *            The reader.
+         */
+        public void start(AbstractProcessReader processReader) {
+            
+            if (processReader == null)
+                throw new IllegalArgumentException();
+
+            if (readerFuture != null)
+                throw new IllegalStateException();
+
             is = process.getInputStream();
 
             /*
@@ -769,18 +803,24 @@ abstract public class AbstractStatisticsCollector {
              * more than some #of tries. if the process dies then we will not
              * have any data for this host.
              */
-            
+
             processReader.start(is);
-            
+
             readerFuture = readService.submit(processReader);
 
         }
-        
+
+        /**
+         * Stops the process
+         */
         public void stop() {
-            
+
+            if (readerFuture == null)
+                throw new IllegalStateException();
+
             // attempt to cancel the reader.
-            readerFuture.cancel(true/*mayInterruptIfRunning*/);
-            
+            readerFuture.cancel(true/* mayInterruptIfRunning */);
+
             // shutdown the thread running the reader.
             readService.shutdownNow();
 
@@ -794,6 +834,8 @@ abstract public class AbstractStatisticsCollector {
                 is = null;
 
             }
+
+            readerFuture = null;
 
         }
         
@@ -843,11 +885,22 @@ abstract public class AbstractStatisticsCollector {
             
         }
         
+        /**
+         * FIXME The initialization logic is broken here. The ProcessReader is
+         * being setup before the {@link ActiveProcess} has been created which
+         * leads to an attempt to read from a null InputStream/Reader in
+         * {@link ProcessReaderHelper#readLine()}. Consider using a start() on
+         * the {@link ActiveProcess} rather than having it start in its ctor and
+         * then only requesting the {@link AbstractProcessReader} once the
+         * process is running.
+         */
         public void start() {
 
             super.start();
 
-            activeProcess = new ActiveProcess(getCommand(), this, getProcessReader());
+            activeProcess = new ActiveProcess(getCommand(), this);
+            
+            activeProcess.start(getProcessReader());
 
         }
 
