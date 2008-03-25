@@ -710,8 +710,22 @@ abstract public class AbstractStatisticsCollector {
 
         protected Future readerFuture;
         
-        public ActiveProcess(List<String> command, AbstractProcessCollector collector, AbstractProcessReader processReader) {
-                    
+        public ActiveProcess(List<String> command,
+                AbstractProcessCollector collector,
+                AbstractProcessReader processReader) {
+
+            if (command == null)
+                throw new IllegalArgumentException();
+
+            if (command.isEmpty())
+                throw new IllegalArgumentException();
+
+            if (collector == null)
+                throw new IllegalArgumentException();
+
+            if (processReader == null)
+                throw new IllegalArgumentException();
+            
             // log the command that will be run.
             {
                 
