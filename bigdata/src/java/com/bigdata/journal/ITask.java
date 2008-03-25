@@ -59,15 +59,13 @@ public interface ITask extends Callable<Object> {
      * to violate the concurrency control mechanisms, therefore you SHOULD NOT
      * use this unless you have a clear idea what you are about. You should be
      * able to write all application level tasks in terms of
-     * {@link #getIndex(String)} and operations on the returned index. Using
-     * {@link SequenceTask} you can combine application specific unisolated
-     * write tasks with tasks that add or drop indices into atomic operations.
+     * {@link #getIndex(String)} and operations on the returned index.
      * 
      * @return The corresponding journal for that timestamp -or-
      *         <code>null</code> if no journal has data for that timestamp,
      *         including when a historical journal with data for that timestamp
      *         has been deleted.
-     *         
+     * 
      * @see IResourceManager#getJournal(long)
      */
     public AbstractJournal getJournal();

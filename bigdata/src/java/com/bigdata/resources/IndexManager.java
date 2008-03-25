@@ -197,6 +197,10 @@ abstract public class IndexManager extends StoreFileManager {
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
+    public interface Options extends StoreFileManager.Options {
+        
+    }
+    
     /**
      * This cache is used to provide remote clients with an unambiguous
      * indication that an index partition has been rather than simply not
@@ -226,7 +230,7 @@ abstract public class IndexManager extends StoreFileManager {
      * @return The reason (split, join, or move) -or- <code>null</code> iff
      *         the index partition is not known to be gone.
      */
-    protected String getIndexPartitionGone(String name) {
+    private String getIndexPartitionGone(String name) {
     
         synchronized(staleIndexCache) {
         
@@ -266,24 +270,6 @@ abstract public class IndexManager extends StoreFileManager {
     protected IndexManager(Properties properties) {
         
         super(properties);
-        
-    }
-    
-    public void start() {
-
-        super.start();
-        
-    }
-
-    public void shutdown() {
-        
-        super.shutdown();
-        
-    }
-    
-    public void shutdownNow() {
-        
-        super.shutdownNow();
         
     }
     

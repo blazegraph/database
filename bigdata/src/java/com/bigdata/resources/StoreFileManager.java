@@ -37,6 +37,12 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -44,13 +50,17 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.concurrent.LockManager;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
+import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
@@ -61,7 +71,9 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Class encapsulates logic for managing the store files (journals and index
@@ -79,7 +91,7 @@ import com.bigdata.service.MetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class StoreFileManager extends ResourceEvents {
+abstract public class StoreFileManager extends ResourceEvents implements IResourceManager {
 
     /**
      * Logger.
@@ -104,7 +116,7 @@ abstract public class StoreFileManager extends ResourceEvents {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options, IServiceShutdown.Options {
         
         /**
          * <code>data.dir</code> - The property whose value is the name of the
@@ -132,13 +144,6 @@ abstract public class StoreFileManager extends ResourceEvents {
          * <p>
          * Note: Each {@link DataService} or {@link MetadataService} MUST have
          * its own {@link #DATA_DIR}.
-         * 
-         * @todo When copying a resource from a remote {@link DataService} make
-         *       sure that it gets placed according to the scheme defined here.
-         * 
-         * @todo Perhaps there is no need for the "file" in the
-         *       {@link IResourceMetadata} since it appears that we need to
-         *       maintain a map from UUID to local file system files in anycase.
          */
         String DATA_DIR = "data.dir";
 
@@ -295,9 +300,117 @@ abstract public class StoreFileManager extends ResourceEvents {
     private final Map<UUID, File> resourceFiles = new HashMap<UUID, File>();
 
     /**
-     * A map from the resource description to the open resource.
+     * A map from the resource {@link UUID} to the open {@link IRawStore}
+     * reference.
+     * <p>
+     * Note: This is exposed to the {@link OverflowManager} since it needs to
+     * insert the newly created journal during overflow.
      */
     protected final Map<UUID, IRawStore> openStores = new HashMap<UUID, IRawStore>();
+    
+//    /**
+//     * A map from the resource {@link UUID} to the {@link Long} timestamp when
+//     * the resource was last used.  This is updated each time the store is requested
+//     * using {@link #openStore(UUID)} or {@link #getJournal(long)}.
+//     */
+//    protected final Map<UUID, Long/*timestamp*/> lastUsed = new ConcurrentHashMap<UUID,Long>();
+//    
+//    /**
+//     * A collection of {@link ReentrantReadWriteLock} locks with one lock for
+//     * each {@link UUID} identifying a {@link IRawStore} resource managed by
+//     * this class. The locks are designed to allow concurrent processes to
+//     * request "read" locks on the store.
+//     * <p>
+//     * The semantics of the "read" lock for the {@link StoreFileManager} are
+//     * that {@link #openStore(UUID)} is willing to return a reference to the
+//     * store to the caller.
+//     * <p>
+//     * When the {@link CloseUnusedStoresTask} identifies a store which has not
+//     * been "recently" used it will try and acquire a "write" lock on the store.
+//     * If it is able to obtain that write lock then it assumes that no thread is
+//     * using the store and will proceed to {@link IRawStore#close()} the store.
+//     * <p>
+//     * To support this, {@link #openStore(UUID)} callers MUST eventually release
+//     * their read lock using {@link #releaseStoreLock(UUID)}. The ...
+//     */
+//    private final Map<UUID, ReentrantReadWriteLock> locks = new ConcurrentHashMap<UUID, ReentrantReadWriteLock>();
+    
+    /**
+     * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
+     * 
+     * @see IServiceShutdown.Options#SHUTDOWN_TIMEOUT
+     */
+    final private long shutdownTimeout;
+
+    /**
+     * A service that periodically runs the {@link CloseUnusedStoresTask}.
+     */
+    private ScheduledExecutorService closeStoreService;
+
+    /**
+     * Lock is used to coordinate close out of stores. The lock is acquired by
+     * the {@link CloseUnusedStoresTask} before it does any work and released
+     * when it is done. Likewise, {@link #openStore(UUID)} uses this lock to
+     * ensure (a) that concurrent requests for the same store are serialized;
+     * and (b) to ensure that a store which is being requested is not
+     * concurrently closed by the {@link CloseUnusedStoresTask}.
+     */
+    private ReentrantLock lock = new ReentrantLock();
+    
+    /**
+     * Task closes any stores (journals or index segments) that have not been
+     * recently accessed.
+     * <p>
+     * Note: Each {@link AbstractJournal} manages its own index resources. In
+     * this class all we do is close out journals that have not been used
+     * recently.
+     * <p>
+     * Note: Each {@link IndexSegmentFileStore} contains a single
+     * {@link IndexSegment}. Rather than closing the
+     * {@link IndexSegmentFileStore} we can just close the {@link IndexSegment}
+     * itself. This releases essentially all resources for that
+     * {@link IndexSegment}, including the file handle, the node and leave
+     * cache, and the optional fully buffered image of the nodes in the index
+     * segment.
+     * <p>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class CloseUnusedStoresTask implements Runnable {
+
+        /**
+         * Note: Don't throw anything here since we don't want to have the task
+         * suppressed!
+         */
+        public void run() {
+
+            try {
+            
+                closeStores();
+                
+            } catch(Exception ex) {
+                
+                log.warn(ex.getMessage(),ex);
+                
+            }
+            
+        }
+        
+        /**
+         * Closes out store files that have not been recently accessed.
+         * 
+         * @throws Exception
+         * 
+         * @todo never close the live journal.
+         */
+        protected void closeStores() throws Exception {
+           
+            log.warn("Close out of unused stores is not implemented yet!");
+            
+        }
+        
+    }
     
     /**
      * The properties given to the ctor.
@@ -354,6 +467,24 @@ abstract public class StoreFileManager extends ResourceEvents {
 
         this.properties = properties;
         
+        // shutdownTimeout
+        {
+
+            shutdownTimeout = Long
+                    .parseLong(properties.getProperty(Options.SHUTDOWN_TIMEOUT,
+                            Options.DEFAULT_SHUTDOWN_TIMEOUT));
+
+            if (shutdownTimeout < 0) {
+
+                throw new RuntimeException("The '" + Options.SHUTDOWN_TIMEOUT
+                        + "' must be non-negative.");
+
+            }
+
+            log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
+
+        }
+
         // minimum release age
         {
 
@@ -544,13 +675,20 @@ abstract public class StoreFileManager extends ResourceEvents {
         
     }
 
-    public void start() {
-        
-        if (open) {
-            
-            throw new IllegalStateException();
-            
-        }
+    /**
+     * Starts up the {@link StoreFileManager}.
+     * <p>
+     * Note: Implementations of this method MUST be <code>synchronized</code>.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link IConcurrencyManager} has not been set.
+     * 
+     * @throws IllegalStateException
+     *             if the the {@link ResourceManager} is already running.
+     */
+    synchronized public void start() {
+
+        assertNotOpen();
         
         // verify concurrency manager has been set.
         getConcurrencyManager();
@@ -696,14 +834,70 @@ abstract public class StoreFileManager extends ResourceEvents {
             }
 
         }
-        
+
+        /*
+         * Start service which will close out unused stores.
+         */
+        {
+
+            // @todo config initialDelay and delay.
+            final long initialDelay = 10000; // initial delay in ms.
+            final long delay = 5000; // delay in ms.
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            closeStoreService = Executors
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
+
+            closeStoreService.scheduleWithFixedDelay(new CloseUnusedStoresTask(),
+                    initialDelay, delay, unit);
+
+        }
+
         open = true;
         
     }
     
     public void shutdown() {
 
+        final long begin = System.currentTimeMillis();
+        
         assertOpen();
+
+        // closeStoreService shutdown
+        {
+
+            /*
+             * Note: when the timeout is zero we approximate "forever" using
+             * Long.MAX_VALUE.
+             */
+
+            final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
+                    : this.shutdownTimeout;
+
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            closeStoreService.shutdown();
+
+            try {
+
+                log.info("Awaiting service termination");
+
+                long elapsed = System.currentTimeMillis() - begin;
+
+                if (!closeStoreService.awaitTermination(shutdownTimeout - elapsed, unit)) {
+
+                    log.warn("Service termination: timeout");
+
+                }
+
+            } catch (InterruptedException ex) {
+
+                log.warn("Interrupted awaiting service termination.", ex);
+
+            }
+
+        }
         
         closeStores();
 
@@ -717,6 +911,8 @@ abstract public class StoreFileManager extends ResourceEvents {
 
         assertOpen();
 
+        closeStoreService.shutdownNow();
+        
         closeStores();
 
         tmpStore.closeAndDelete();
@@ -866,7 +1062,10 @@ abstract public class StoreFileManager extends ResourceEvents {
         
     }
 
-    protected void closeStores() {
+    /**
+     * Closes ALL open store files.
+     */
+    private void closeStores() {
         
         open = false;
 
@@ -893,6 +1092,9 @@ abstract public class StoreFileManager extends ResourceEvents {
 
     }
 
+    /**
+     * The #of index segments on hand.
+     */
     public int getIndexSegmentCount() {
         
         return indexSegmentIndex.getEntryCount();
@@ -902,7 +1104,9 @@ abstract public class StoreFileManager extends ResourceEvents {
     /**
      * Notify the resource manager of a new resource. The resource is added to
      * {@link #resourceFiles} and to either {@link #journalIndex} or
-     * {@link #indexSegmentIndex} as appropriate.
+     * {@link #indexSegmentIndex} as appropriate.  As a post-condition, you can
+     * use {@link #openStore(UUID)} to open the resource using the {@link UUID} 
+     * specified by {@link IResourceMetadata#getUUID()}.
      * 
      * @param resourceMetadata
      *            The metadata describing that resource.
@@ -977,8 +1181,7 @@ abstract public class StoreFileManager extends ResourceEvents {
             
         }
         
-    }
-    
+    }    
 
     /**
      * Returns a filter that is used to recognize files that are managed by this
@@ -1024,9 +1227,6 @@ abstract public class StoreFileManager extends ResourceEvents {
         }
 
         public long nextTimestamp() {
-            
-//            return StoreFileManager.this.getConcurrencyManager()
-//                    .getTransactionManager().nextTimestamp();
             
             return StoreFileManager.this.nextTimestamp();
             
@@ -1108,7 +1308,7 @@ abstract public class StoreFileManager extends ResourceEvents {
      * @throws RuntimeException
      *             if something goes wrong.
      */
-    synchronized public IRawStore openStore(UUID uuid) {
+    public IRawStore openStore(UUID uuid) {
 
         if (uuid == null) {
 
@@ -1116,6 +1316,10 @@ abstract public class StoreFileManager extends ResourceEvents {
 
         }
 
+        lock.lock();
+        
+        try {
+        
         /*
          * Check to see if the given resource is already open.
          * 
@@ -1282,8 +1486,17 @@ abstract public class StoreFileManager extends ResourceEvents {
         // return the reference to the open store.
         return store;
 
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
     }
 
+    /**
+     * Report the next timestamp assigned by the {@link ILocalTransactionManager}.
+     */
     protected long nextTimestamp() {
         
         return getConcurrencyManager().getTransactionManager().nextTimestamp();

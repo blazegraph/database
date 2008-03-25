@@ -380,7 +380,7 @@ public class History<T> {
         // #of non-null values.
         int n = 0;
 
-        final long currentLogicalSlot = timestamps[(int)lastLogicalSlot % capacity]
+        final long currentLogicalSlot = timestamps[(int)(lastLogicalSlot % capacity)]
                 / period;
 
         final long firstLogicalSlot = lastLogicalSlot - nperiods + 1;
