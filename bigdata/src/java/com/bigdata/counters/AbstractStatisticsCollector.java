@@ -958,9 +958,18 @@ abstract public class AbstractStatisticsCollector {
         
         if (count < 0)
             throw new RuntimeException("count must be non-negative");
+
+        Properties properties = new Properties(System.getProperties());
+        
+        if (nargs != 0) {
+            
+            // Override the interval property from the command line.
+            properties.setProperty(Options.INTERVAL,""+interval);
+            
+        }
         
         final AbstractStatisticsCollector client = AbstractStatisticsCollector
-                .newInstance(System.getProperties());
+                .newInstance( properties );
 
         // write counters before we start the client
         System.out.println(client.getCounters().toString());
