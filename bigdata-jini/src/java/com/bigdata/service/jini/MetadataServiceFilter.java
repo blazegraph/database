@@ -22,12 +22,14 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.service.IMetadataService;
 
 /**
  * Filter only matches a service item where the {@link IMetadataService} is

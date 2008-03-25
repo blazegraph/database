@@ -22,10 +22,10 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 22, 2007
+ * Created on Mar 24, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.net.InetAddress;
 import java.rmi.Remote;
@@ -41,63 +41,49 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
+
 /**
- * The bigdata data server.
+ * A metadata server.
  * <p>
- * The {@link DataServer} starts the {@link DataService}. The server and
- * service are configured using a {@link Configuration} file whose name is
- * passed to the {@link DataServer#DataServer(String[])} constructor or
- * {@link #main(String[])}.
+ * The metadata server is used to manage the life cycles of scale-out indices
+ * and exposes proxies for read and write operations on indices to clients.
+ * Clients use index proxies, which automatically direct reads and writes to the
+ * {@link IDataService} on which specific index partitions are located.
  * <p>
+ * On startup, the metadata service discovers active data services configured in
+ * the same group. While running, it tracks when data services start and stop so
+ * that it can (re-)allocate index partitions as necessary.
  * 
- * @see src/resources/config for sample configurations.
+ * @todo aggregate host load data and service RPC events and report them
+ *       periodically so that we can track load and make load balancing
+ *       decisions.
  * 
- * @todo identify the minimum set of permissions required to run a
- *       {@link DataServer}.
+ * @todo should destroy destroy the service instance or the persistent state as
+ *       well? Locally, or as replicated?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServer extends AbstractServer {
+public class MetadataServer extends DataServer {
 
     /**
-     * Handles discovery of the {@link DataService}s and
-     * {@link MetadataService}s.
-     */
-    protected DataServicesClient dataServicesClient = null;
-
-    /**
-     * Handles discovery of the {@link ILoadBalancerService}.
-     */
-    protected LoadBalancerClient loadBalancerClient = null;
-    
-    /**
-     * Creates a new {@link DataServer}.
-     * 
      * @param args
-     *            The name of the {@link Configuration} file for the service.
      */
-    public DataServer(String[] args) {
-
+    public MetadataServer(String[] args) {
+       
         super(args);
-        
-        dataServicesClient = new DataServicesClient(getDiscoveryManagement());
-
-        loadBalancerClient = new LoadBalancerClient(getDiscoveryManagement());
-        
+             
     }
-    
-//    public DataServer(String[] args, LifeCycle lifeCycle) {
-//        
-//        super( args, lifeCycle );
-//        
-//    }
 
     /**
-     * Starts a new {@link DataServer}.  This can be done programmatically
+     * Starts a new {@link MetadataServer}.  This can be done programmatically
      * by executing
      * <pre>
-     *    new DataServer(args).run();
+     *    new MetadataServer(args).run();
      * </pre>
      * within a {@link Thread}.
      * 
@@ -106,7 +92,7 @@ public class DataServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new DataServer(args) {
+        new MetadataServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -125,76 +111,51 @@ public class DataServer extends AbstractServer {
     }
     
     protected Remote newService(Properties properties) {
-        
-        return new AdministrableDataService(this,properties);
+
+        return new AdministrableMetadataService(this,properties);
         
     }
     
-    protected void terminate() {
-
-        if (dataServicesClient != null) {
-
-            dataServicesClient.terminate();
-
-        }
-        
-        if (loadBalancerClient != null) {
-
-            loadBalancerClient.terminate();
-            
-        }
-        
-        super.terminate();
-
-    }
-    
-    /**
-     * Extends the behavior to close and delete the journal in use by the data
-     * service.
-     */
-    public void destroy() {
-
-        DataService service = (DataService)impl;
-        
-        super.destroy();
-        
-        // destroy all resources.
-        service.getResourceManager().deleteResources();
-
-    }
+//    protected void terminate() {
+//        
+//        super.terminate();
+//
+//    }
 
     /**
-     * Adds jini administration interfaces to the basic {@link DataService}.
+     * Adds jini administration interfaces to the basic {@link MetadataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableDataService extends DataService implements
-            RemoteAdministrable, RemoteDestroyAdmin {
+    protected static class AdministrableMetadataService extends MetadataService
+            implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
         
-        protected DataServer server;
+        protected MetadataServer server;
         private UUID serviceUUID;
-        
-        public AdministrableDataService(DataServer server,Properties properties) {
-            
+
+        /**
+         * @param properties
+         */
+        public AdministrableMetadataService(MetadataServer server, Properties properties) {
+
             super(properties);
             
             this.server = server;
             
         }
-        
+
         public Object getAdmin() throws RemoteException {
 
             log.info(""+getServiceUUID());
 
             return server.proxy;
-            
+
         }
-        
+
         /**
          * Adds the following parameters to the {@link MDC}
          * <dl>
-         * 
          * <dt>hostname
          * <dt>
          * <dd>The hostname or IP address of this server.</dd>
@@ -202,7 +163,6 @@ public class DataServer extends AbstractServer {
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
-         * 
          * </dl>
          * 
          * Note: {@link InetAddress#getHostName()} is used. This method makes a
@@ -248,6 +208,30 @@ public class DataServer extends AbstractServer {
             
         }
         
+        public UUID getServiceUUID() {
+
+            if (serviceUUID == null) {
+
+                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+
+            }
+            
+            return serviceUUID;
+            
+        }
+
+        public ILoadBalancerService getLoadBalancerService() {
+            
+            return server.loadBalancerClient.getLoadBalancerService();
+            
+        }
+
+        public IDataService getDataService(UUID serviceUUID) {
+
+            return server.dataServicesClient.getDataService(serviceUUID);
+            
+        }
+        
         /*
          * DestroyAdmin
          */
@@ -276,104 +260,11 @@ public class DataServer extends AbstractServer {
 
         }
 
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-
-            return serviceUUID;
-            
-        }
-
-        public IDataService getDataService(UUID serviceUUID) {
-
-            return server.dataServicesClient.getDataService(serviceUUID);
-            
-        }
-
         public IMetadataService getMetadataService() {
 
-            return server.dataServicesClient.getMetadataService();
+            return this;
             
         }
-
-        public ILoadBalancerService getLoadBalancerService() {
-            
-            return server.loadBalancerClient.getLoadBalancerService();
-            
-        }
-        
-// /*
-// * JoinAdmin
-// */
-//        
-// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
-//            
-// log.info("");
-//            
-//        }
-//
-//        public void addLookupGroups(String[] arg0) throws RemoteException {
-//
-//            log.info("");
-//
-//        }
-//
-//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//
-//            log.info("");
-//            
-//        }
-//
-//        public Entry[] getLookupAttributes() throws RemoteException {
-//
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public String[] getLookupGroups() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public LookupLocator[] getLookupLocators() throws RemoteException {
-//         
-//            log.info("");
-//
-//            return null;
-//        }
-//
-//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
-//         
-//            log.info("");
-//            
-//        }
-//
-//        public void removeLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//
-//        }
-//
-//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupGroups(String[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
-//
-//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
-//            log.info("");
-//            
-//        }
         
     }
 

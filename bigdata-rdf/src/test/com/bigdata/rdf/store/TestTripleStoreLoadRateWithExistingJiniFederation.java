@@ -33,7 +33,7 @@ import java.io.FilenameFilter;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.service.BigdataClient;
+import com.bigdata.service.jini.BigdataClient;
 
 /**
  * Class designed to connect to an existing bigdata federation using jini and

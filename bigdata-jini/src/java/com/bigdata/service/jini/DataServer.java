@@ -1,8 +1,33 @@
-package com.bigdata.service;
+/**
 
-import java.net.Inet4Address;
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Mar 22, 2007
+ */
+
+package com.bigdata.service.jini;
+
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
@@ -16,27 +41,41 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
+
 /**
- * The load balancer server.
+ * The bigdata data server.
  * <p>
- * The {@link LoadBalancerServer} starts the {@link LoadBalancerService}. The
- * server and service are configured using a {@link Configuration} file whose
- * name is passed to the {@link LoadBalancerServer#LoadBalancerServer(String[])}
- * constructor or {@link #main(String[])}.
+ * The {@link DataServer} starts the {@link DataService}. The server and
+ * service are configured using a {@link Configuration} file whose name is
+ * passed to the {@link DataServer#DataServer(String[])} constructor or
+ * {@link #main(String[])}.
  * <p>
  * 
  * @see src/resources/config for sample configurations.
  * 
+ * @todo identify the minimum set of permissions required to run a
+ *       {@link DataServer}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LoadBalancerServer extends AbstractServer {
+public class DataServer extends AbstractServer {
 
     /**
      * Handles discovery of the {@link DataService}s and
      * {@link MetadataService}s.
      */
     protected DataServicesClient dataServicesClient = null;
+
+    /**
+     * Handles discovery of the {@link ILoadBalancerService}.
+     */
+    protected LoadBalancerClient loadBalancerClient = null;
     
     /**
      * Creates a new {@link DataServer}.
@@ -44,11 +83,13 @@ public class LoadBalancerServer extends AbstractServer {
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public LoadBalancerServer(String[] args) {
+    public DataServer(String[] args) {
 
         super(args);
         
         dataServicesClient = new DataServicesClient(getDiscoveryManagement());
+
+        loadBalancerClient = new LoadBalancerClient(getDiscoveryManagement());
         
     }
     
@@ -59,13 +100,11 @@ public class LoadBalancerServer extends AbstractServer {
 //    }
 
     /**
-     * Starts a new {@link LoadBalancerServer}. This can be done
-     * programmatically by executing
-     * 
+     * Starts a new {@link DataServer}.  This can be done programmatically
+     * by executing
      * <pre>
-     * new LoadBalancerServer(args).run();
+     *    new DataServer(args).run();
      * </pre>
-     * 
      * within a {@link Thread}.
      * 
      * @param args
@@ -73,7 +112,7 @@ public class LoadBalancerServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new LoadBalancerServer(args) {
+        new DataServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -93,7 +132,7 @@ public class LoadBalancerServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
         
-        return new AdministrableLoadBalancer(this,properties);
+        return new AdministrableDataService(this,properties);
         
     }
     
@@ -105,23 +144,44 @@ public class LoadBalancerServer extends AbstractServer {
 
         }
         
+        if (loadBalancerClient != null) {
+
+            loadBalancerClient.terminate();
+            
+        }
+        
         super.terminate();
 
     }
     
     /**
-     * Adds jini administration interfaces to the basic {@link LoadBalancerService}.
+     * Extends the behavior to close and delete the journal in use by the data
+     * service.
+     */
+    public void destroy() {
+
+        DataService service = (DataService)impl;
+        
+        super.destroy();
+        
+        // destroy all resources.
+        service.getResourceManager().deleteResources();
+
+    }
+
+    /**
+     * Adds jini administration interfaces to the basic {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AdministrableLoadBalancer extends LoadBalancerService implements
+    public static class AdministrableDataService extends DataService implements
             RemoteAdministrable, RemoteDestroyAdmin {
         
-        protected LoadBalancerServer server;
+        protected DataServer server;
         private UUID serviceUUID;
         
-        public AdministrableLoadBalancer(LoadBalancerServer server,Properties properties) {
+        public AdministrableDataService(DataServer server,Properties properties) {
             
             super(properties);
             
@@ -206,7 +266,7 @@ public class LoadBalancerServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info("" + getServiceUUID());
+            log.info(""+getServiceUUID());
 
             new Thread() {
 
@@ -233,49 +293,25 @@ public class LoadBalancerServer extends AbstractServer {
             return serviceUUID;
             
         }
+
+        public IDataService getDataService(UUID serviceUUID) {
+
+            return server.dataServicesClient.getDataService(serviceUUID);
+            
+        }
+
+        public IMetadataService getMetadataService() {
+
+            return server.dataServicesClient.getMetadataService();
+            
+        }
+
+        public ILoadBalancerService getLoadBalancerService() {
+            
+            return server.loadBalancerClient.getLoadBalancerService();
+            
+        }
         
-        /**
-        * Note: {@link InetAddress#getHostName()} is used. This method makes a
-        * one-time best effort attempt to resolve the host name from the
-        * {@link InetAddress}.
-        * 
-        * @todo we could pass the class {@link ClientSubject} to obtain the
-        *       authenticated identity of the client (if any) for an incoming
-        *       remote call.
-        */
-       protected String getClientHostname() {
-
-           InetAddress clientAddr;
-           
-           try {
-               
-                clientAddr = ((ClientHost) ServerContext
-                       .getServerContextElement(ClientHost.class))
-                       .getClientHost();
-               
-           } catch (ServerNotActiveException e) {
-               
-               /*
-                * This exception gets thrown if the client has made a direct
-                * (vs RMI) call.
-                */
-               
-               try {
-                   
-                   clientAddr = Inet4Address.getLocalHost();
-                   
-               } catch (UnknownHostException ex) {
-                   
-                   return "localhost";
-                   
-               }
-               
-           }
-
-           return clientAddr.getCanonicalHostName();
-           
-       }
-       
 // /*
 // * JoinAdmin
 // */

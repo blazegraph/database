@@ -119,7 +119,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends IServiceShutdown {
+    public static interface Options extends IServiceShutdown.Options {
     
         /**
          * <code>txServicePoolSize</code> - The #of threads in the pool
@@ -697,21 +697,20 @@ public class ConcurrencyManager implements IConcurrencyManager {
             {
 
                 /*
-                 * Note: this means that any operation that writes on unisolated
-                 * indices MUST specify in advance those index(s) on which it
-                 * will write.
-                 */
-
-                final boolean predeclareLocks = true;
-
-                /*
-                 * Create the lock manager. The capacity is only used if we need to
-                 * detect deadlocks if we are NOT pre-declaring locks. When we
-                 * pre-declare locks deadlocks are NOT possible.
+                 * Create the lock manager. Since we pre-declare locks,
+                 * deadlocks are NOT possible and the capacity parameter is
+                 * unused.
+                 * 
+                 * Note: pre-declaring locks means that any operation that
+                 * writes on unisolated indices MUST specify in advance those
+                 * index(s) on which it will write.  This is enforced by the
+                 * AbstractTask API.
                  */
 
                 lockManager = new LockManager<String>(
-                        writeServiceMaximumPoolSize, predeclareLocks);
+                        writeServiceMaximumPoolSize, // capacity
+                        true // predeclareLocks
+                        );
 
             }
             

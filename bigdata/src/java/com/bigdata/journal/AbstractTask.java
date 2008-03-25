@@ -821,15 +821,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     /**
      * Delegates various behaviors visible to the application code using the
      * {@link ITask} interface to the {@link AbstractTask} object.
-     * <p>
-     * Note: I was using an inner class for {@link InnerWriteServiceCallable}
-     * but I ran into trouble with scope for the [indexCache]. It was always
-     * winding up empty in the inner class, which clearly had its own distinct
-     * instance from the {@link AbstractTask} that was being executed. The
-     * {@link DelegateTask} lets me manage this more explicitly. (In hindsight
-     * the problem appears to be the {@link SequenceTask} which creates an array
-     * of {@link AbstractTask}s rather than a single {@link AbstractTask} with a
-     * series of {@link ITask}s that it executes as its target.)
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

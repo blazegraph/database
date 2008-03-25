@@ -32,6 +32,7 @@ import java.text.NumberFormat;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IndexSegment;
@@ -81,6 +82,10 @@ import com.bigdata.rawstore.Bytes;
  * focused, which is fine. We also have the {@link CounterSet}s which allow us
  * to report statistics regarding classes of events.
  * 
+ * @todo use {@link MDC} to put metadata into the logging context {thread, host,
+ *       dataService, global index name, local index name (includes the index
+ *       partition), etc}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -88,6 +93,10 @@ public class ResourceEvents {
 
     /**
      * Logger.
+     * 
+     * @todo change the logger configuration to write on a JMS queue or JINI
+     *       discovered service in order to aggregate results from multiple
+     *       hosts in a scale-out solution.
      */
     protected static final Logger log = Logger.getLogger(ResourceEvents.class);
 

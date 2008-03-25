@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Jun 19, 2006
  */
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;

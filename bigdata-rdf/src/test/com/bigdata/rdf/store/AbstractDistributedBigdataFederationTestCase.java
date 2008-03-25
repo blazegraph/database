@@ -29,9 +29,9 @@ package com.bigdata.rdf.store;
 
 import junit.framework.TestCase;
 
-import com.bigdata.service.BigdataClient;
-import com.bigdata.service.DataServer;
-import com.bigdata.service.MetadataServer;
+import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.MetadataServer;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data

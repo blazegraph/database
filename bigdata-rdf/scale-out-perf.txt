@@ -642,6 +642,14 @@ Short term tasks:
 
    - Full text indexing for KB.
 
+   - Change tx timestamps to negative and use positive timestamps for
+     historical reads.  Changes to AbstractTask, ITx,
+     ITransactionManager, StoreFileManager, IsolationEnum, and the
+     post-processing tasks.  This will greatly simplify thinking about
+     historical read operations since they will simply use the actual
+     commit time while transactions will use a free (-timestamp) value
+     selected by the transaction manager.
+
    - Quad store.
 
    - SemTech08 submission?

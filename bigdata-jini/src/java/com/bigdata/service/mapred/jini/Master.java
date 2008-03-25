@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 17, 2007
  */
 
-package com.bigdata.service.mapred;
+package com.bigdata.service.mapred.jini;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
@@ -37,9 +37,13 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import com.bigdata.service.BigdataClient;
-import com.bigdata.service.DataServicesClient;
-import com.bigdata.service.LoadBalancerClient;
+import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.DataServicesClient;
+import com.bigdata.service.jini.LoadBalancerClient;
+import com.bigdata.service.mapred.AbstractMaster;
+import com.bigdata.service.mapred.IMapService;
+import com.bigdata.service.mapred.IReduceService;
+import com.bigdata.service.mapred.MapReduceJob;
 
 /**
  * <p>

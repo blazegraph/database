@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 18, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
@@ -40,6 +40,9 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.LoadBalancerService;
 
 /**
  * Class handles discovery of an {@link ILoadBalancerService}.  Clients are responsible

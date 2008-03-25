@@ -52,10 +52,15 @@ import com.bigdata.rawstore.IRawStore;
  * bigdata federation - it is in effect a proxy object for the distributed set
  * of services that comprise the federation.
  * 
- * FIXME This should be in the core bigdata module since it has nothing to do
- * with jini. It might be tightly coupled with the {@link BigdataClient} but the
- * problem then is with the {@link BigdataClient} which needs to be refactored
- * to isolated the jini services facet from the {@link IBigdataClient} API.
+ * @todo Explore a variety of cached and uncached strategies for the metadata
+ *       index. An uncached strategy is currently used. However, caching may be
+ *       necessary for some kinds of application profiles, especially as the #of
+ *       index partitions grows. If an application performs only unisolated and
+ *       read-committed operations, then a single metadata index cache can be
+ *       shared by the client for all operations against a given scale-out
+ *       index. On the other hand, a client that uses transactions or performs
+ *       historical reads will need to have a view of the metadata index as of
+ *       the timestamp associated with the transaction or historical read.
  * 
  * @todo support failover metadata service discovery.
  * 
@@ -68,7 +73,7 @@ public class BigdataFederation implements IBigdataFederation {
      * The client - cleared to <code>null</code> when the client
      * {@link #disconnect()}s from the federation.
      */
-    private BigdataClient client;
+    private IBigdataClient client;
 
     /**
      * A temporary store used to cache various data in the client.
@@ -96,7 +101,7 @@ public class BigdataFederation implements IBigdataFederation {
 
     }
 
-    public BigdataFederation(BigdataClient client) {
+    public BigdataFederation(IBigdataClient client) {
 
         if (client == null)
             throw new IllegalArgumentException();
@@ -334,7 +339,7 @@ public class BigdataFederation implements IBigdataFederation {
 
             if (tmp == null) {
 
-                tmp = cacheMetadataIndex(name, timestamp,mdmd);
+                tmp = cacheMetadataIndex(name, timestamp, mdmd);
 
                 if (tmp == null) {
 

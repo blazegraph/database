@@ -263,12 +263,12 @@ public abstract class AbstractMaster {
     /**
      * The map services.
      */
-    IJobAndTaskService<MapJobMetadata, AbstractMapTask>[] mapServices;
+    protected IJobAndTaskService<MapJobMetadata, AbstractMapTask>[] mapServices;
     
     /**
      * The reduce services.
      */
-    IJobAndTaskService<ReduceJobMetadata,AbstractReduceTask>[]reduceServices;
+    protected IJobAndTaskService<ReduceJobMetadata,AbstractReduceTask>[]reduceServices;
     
     /**
      * The UUID assigned to each reduce task.

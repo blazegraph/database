@@ -25,7 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 20, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
+
+import com.bigdata.service.IDataService;
+import com.bigdata.service.jini.DataServer;
 
 import net.jini.core.lookup.ServiceID;
 

@@ -25,19 +25,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 26, 2007
  */
 
-package com.bigdata.service.mapred;
+package com.bigdata.service.mapred.jini;
 
-import com.bigdata.service.AbstractServerTestCase;
-import com.bigdata.service.BigdataClient;
-import com.bigdata.service.DataServer;
-import com.bigdata.service.MetadataServer;
+import com.bigdata.service.jini.AbstractServerTestCase;
+import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.MapReduceJob;
-import com.bigdata.service.mapred.MapServer;
-import com.bigdata.service.mapred.Master;
-import com.bigdata.service.mapred.ReduceServer;
-import com.bigdata.service.mapred.Master.MapReduceServiceDiscoveryManager;
+import com.bigdata.service.mapred.jini.MapServer;
+import com.bigdata.service.mapred.jini.Master;
+import com.bigdata.service.mapred.jini.ReduceServer;
+import com.bigdata.service.mapred.jini.Master.MapReduceServiceDiscoveryManager;
 import com.bigdata.service.mapred.jobs.CountKeywordJob;
 
 /**

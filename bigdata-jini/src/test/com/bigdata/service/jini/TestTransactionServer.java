@@ -25,11 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 1, 2006
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import junit.framework.TestCase;
 
 import com.bigdata.journal.IsolationEnum;
+import com.bigdata.service.OldTransactionServer;
 
 /**
  * Test suite for semantics of the {@link OldTransactionServer}.

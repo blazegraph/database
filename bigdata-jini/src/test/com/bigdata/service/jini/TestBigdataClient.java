@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 23, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.Serializable;
 import java.util.Random;
@@ -38,6 +38,14 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.jini.MetadataServer;
 
 /**
  * Test suite for the {@link BigdataClient}.

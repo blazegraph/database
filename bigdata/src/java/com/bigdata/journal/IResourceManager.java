@@ -45,6 +45,7 @@ import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IServiceShutdown;
 
 /**
  * Interface manging the resources on which indices are stored. The resources
@@ -60,29 +61,8 @@ import com.bigdata.service.IMetadataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo update javadoc.
  */
-public interface IResourceManager {
-
-    /**
-     * Normal shutdown.
-     * <p>
-     * Note: Implementations MUST {@link IConcurrencyManager#shutdown()} the
-     * {@link IConcurrencyManager} coordinating access to the resources before
-     * shutting down the {@link IResourceManager}.
-     */
-    public void shutdown();
-
-    /**
-     * Immediate shutdown.
-     */
-    public void shutdownNow();
-
-    /**
-     * The journal on which writes are made.  This is updated by {@link #overflow()}.
-     */
-    public AbstractJournal getLiveJournal();
+public interface IResourceManager extends IServiceShutdown {
 
     /**
      * The directory for temporary files.
@@ -98,6 +78,11 @@ public interface IResourceManager {
      */
     public File getDataDir();
     
+    /**
+     * The journal on which writes are made.  This is updated by {@link #overflow()}.
+     */
+    public AbstractJournal getLiveJournal();
+
     /**
      * Return the reference to the journal which has the most current data for
      * the given timestamp. If necessary, the journal will be opened.
@@ -215,8 +200,7 @@ public interface IResourceManager {
     public String getStatistics();
     
     /**
-     * Return <code>true</code> if the {@link IResourceManager} determines
-     * that the pre-conditions for overflow of the
+     * Return <code>true</code> if the pre-conditions for overflow of the
      * {@link #getLiveJournal() live journal} have been met. In general, this
      * means that the live journal is within some threshold of the configured
      * {@link Options#MAXIMUM_EXTENT}.

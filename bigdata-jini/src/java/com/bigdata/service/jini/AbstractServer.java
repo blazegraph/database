@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 18, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -64,6 +64,7 @@ import net.jini.lookup.ServiceIDListener;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.service.IServiceShutdown;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.admin.StorageLocationAdmin;
 import com.sun.jini.start.LifeCycle;

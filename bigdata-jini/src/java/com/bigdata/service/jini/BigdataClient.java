@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 24, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -46,6 +46,16 @@ import net.jini.discovery.LookupDiscoveryManager;
 
 import com.bigdata.Banner;
 import com.bigdata.btree.IIndex;
+import com.bigdata.service.AbstractBigdataClient;
+import com.bigdata.service.BigdataFederation;
+import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.MetadataService;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 21, 2007
  */
 
-package com.bigdata.service.mapred;
+package com.bigdata.service.mapred.jini;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -36,36 +36,37 @@ import org.apache.log4j.MDC;
 
 import net.jini.config.Configuration;
 
-import com.bigdata.service.AbstractServer;
-import com.bigdata.service.BigdataClient;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.JiniUtil;
+import com.bigdata.service.jini.AbstractServer;
+import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.mapred.ReduceService;
 
 /**
- * Used to start and manage a {@link MapService}.
+ * Used to start and manage a {@link ReduceService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MapServer extends AbstractServer {
+public class ReduceServer extends AbstractServer {
 
     /**
-     * Creates a new {@link MapServer}.
+     * Creates a new {@link ReduceServer}.
      * 
      * @param args
      *            The name of the {@link Configuration} file for the service.
      */
-    public MapServer(String[] args) {
+    public ReduceServer(String[] args) {
 
         super(args);
         
     }
 
     /**
-     * Starts a new {@link MapServer}.  This can be done programmatically
+     * Starts a new {@link ReduceServer}.  This can be done programmatically
      * by executing
      * <pre>
-     *    new MapServer(args).run();
+     *    new ReduceServer(args).run();
      * </pre>
      * within a {@link Thread}.
      * 
@@ -74,7 +75,7 @@ public class MapServer extends AbstractServer {
      */
     public static void main(String[] args) {
         
-        new MapServer(args) {
+        new ReduceServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -94,27 +95,27 @@ public class MapServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
         
-        return new AdministrableMapService(this,properties);
+        return new AdministrableReduceService(this,properties);
         
     }
 
     /**
-     * Adds jini administration interfaces to the basic {@link MapService}.
+     * Adds jini administration interfaces to the basic {@link ReduceService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
      * @todo extend the {@link MDC} logging context.
      */
-    public static class AdministrableMapService
-        extends MapService
+    public static class AdministrableReduceService
+        extends ReduceService
         implements RemoteAdministrable, RemoteDestroyAdmin
     {
         
         protected AbstractServer server;
         private UUID serviceUUID;
         
-        public AdministrableMapService(AbstractServer server,Properties properties) {
+        public AdministrableReduceService(AbstractServer server,Properties properties) {
             
             super(properties);
             
@@ -169,12 +170,12 @@ public class MapServer extends AbstractServer {
             return serviceUUID;
             
         }
-
+        
         public IBigdataClient getBigdataClient() {
-            
+        
             // @todo this assumes the default federation.
             return BigdataClient.newInstance(new String[]{});
-            
+
         }
 
     }

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 22, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +46,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.MetadataService;
+import com.bigdata.service.jini.AbstractServer;
 import com.sun.jini.tool.ClassServer;
 
 /**

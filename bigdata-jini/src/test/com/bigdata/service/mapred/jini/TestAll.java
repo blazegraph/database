@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 10, 2007
  */
 
-package com.bigdata.service.mapred;
+package com.bigdata.service.mapred.jini;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

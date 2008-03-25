@@ -62,25 +62,35 @@ public interface IServiceShutdown {
     public void shutdownNow();
 
     /**
-     * The maximum time in milliseconds that {@link #shutdown()} should wait
-     * termination of the various services -or- ZERO (0) to wait forever
-     * (default is to wait forever).
-     * <p>
-     * Note: since services will continue to execute tasks that are already
-     * running but SHOULD NOT accept queued tasks once shutdown begins, this
-     * primarily effects whether or not tasks that are already executing will be
-     * allowed to run until completion.
-     * <p>
-     * Note: You can use {@link #shutdownNow()} to terminate the service
-     * immediately.
+     * Options for {@link IServiceShutdown} implementations.
      * 
-     * @see #DEFAULT_SHUTDOWN_TIMEOUT
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    public final static String SHUTDOWN_TIMEOUT = "shutdownTimeout";
+    public interface Options {
 
-    /**
-     * The default timeout (0).
-     */
-    public final static String DEFAULT_SHUTDOWN_TIMEOUT = "0";
-        
+        /**
+         * The maximum time in milliseconds that {@link #shutdown()} should wait
+         * termination of the various services -or- ZERO (0) to wait forever
+         * (default is to wait forever).
+         * <p>
+         * Note: since services will continue to execute tasks that are already
+         * running but SHOULD NOT accept queued tasks once shutdown begins, this
+         * primarily effects whether or not tasks that are already executing
+         * will be allowed to run until completion.
+         * <p>
+         * Note: You can use {@link #shutdownNow()} to terminate the service
+         * immediately.
+         * 
+         * @see #DEFAULT_SHUTDOWN_TIMEOUT
+         */
+        String SHUTDOWN_TIMEOUT = "shutdownTimeout";
+
+        /**
+         * The default timeout (0).
+         */
+        String DEFAULT_SHUTDOWN_TIMEOUT = "0";
+
+    }
+
 }
