@@ -618,6 +618,8 @@ abstract public class AbstractStatisticsCollector {
         
         public ProcessReaderHelper(ActiveProcess activeProcess) {
         
+            if(activeProcess==null) throw new IllegalArgumentException();
+            
             this.activeProcess = activeProcess;
             
             r = new LineNumberReader( new InputStreamReader( is ));
