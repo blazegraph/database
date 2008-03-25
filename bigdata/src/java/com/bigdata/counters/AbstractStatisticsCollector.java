@@ -612,19 +612,18 @@ abstract public class AbstractStatisticsCollector {
     
     protected abstract class ProcessReaderHelper extends AbstractProcessReader {
         
-        protected final ActiveProcess activeProcess;
-        
         protected final LineNumberReader r;
         
-        public ProcessReaderHelper(ActiveProcess activeProcess) {
-        
-            if(activeProcess==null) throw new IllegalArgumentException();
-            
-            this.activeProcess = activeProcess;
+        public ProcessReaderHelper() {
             
             r = new LineNumberReader( new InputStreamReader( is ));
             
         }
+
+        /**
+         * Override to return the {@link ActiveProcess}.
+         */
+        abstract protected ActiveProcess getActiveProcess();
         
         /**
          * Returns the next line and blocks if a line is not available.
@@ -642,7 +641,7 @@ abstract public class AbstractStatisticsCollector {
          */
         public String readLine() throws IOException, InterruptedException {
             
-            while(activeProcess.isAlive()) {
+            while(getActiveProcess().isAlive()) {
                 
                 if(Thread.currentThread().isInterrupted()) {
                     
