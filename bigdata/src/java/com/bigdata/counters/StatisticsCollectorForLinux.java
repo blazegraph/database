@@ -19,6 +19,8 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
  * 
+ * FIXME verify scaling for all collected counters.
+ * 
  * @todo configuration parameters to locate the sysstat utilities (normally installed
  * into /usr/bin).
  * 
@@ -520,6 +522,8 @@ public class StatisticsCollectorForLinux extends
                         
                     }
 
+                    log.debug("data: "+data);
+                    
 //                    *   04:14:45 PM     CPU     %user     %nice   %system   %iowait    %steal     %idle
 //                    *   04:14:46 PM     all      0.00      0.00      0.00      0.00      0.00    100.00
  
@@ -531,12 +535,12 @@ public class StatisticsCollectorForLinux extends
                         lastModified = System.currentTimeMillis(); // should be pretty close.
                     }
                                     
-                    final String user = data.substring(20, 30);
-//                    final String nice = data.substring(30, 40);
-                    final String system = data.substring(40, 50);
-                    final String iowait = data.substring(50, 60);
-//                    final String steal = data.substring(60, 70);
-                    final String idle = data.substring(70, 80);
+                    final String user = data.substring(20-1, 30-1);
+//                    final String nice = data.substring(30-1, 40-1);
+                    final String system = data.substring(40-1, 50-1);
+                    final String iowait = data.substring(50-1, 60-1);
+//                    final String steal = data.substring(60-1, 70-1);
+                    final String idle = data.substring(70-1, 80-1);
 
                     vals.put(IHostCounters.CPU_PercentUserTime, Double.parseDouble(user));
                     
@@ -859,9 +863,9 @@ public class StatisticsCollectorForLinux extends
                     // 06:35:15 AM       PID   %user %system    %CPU   CPU  Command
                     // 06:35:15 AM       501    0.00    0.01    0.00     1  kjournald
                     
-                    final String user    = data.substring(22,30).trim();
-                    final String system  = data.substring(30,38).trim();
-                    final String cpu     = data.substring(38,46).trim();
+                    final String user    = data.substring(22-1,30-1).trim();
+                    final String system  = data.substring(30-1,38-1).trim();
+                    final String cpu     = data.substring(38-1,46-1).trim();
                     
                     log.info("\n%user="+user+", %system="+system+", %cpu="+cpu+"\ndata");
                     
@@ -883,11 +887,11 @@ public class StatisticsCollectorForLinux extends
 //                      *       06:35:15 AM       PID  minflt/s  majflt/s     VSZ    RSS   %MEM  Command
 //                      *       06:35:15 AM       501      0.00      0.00       0      0   0.00  kjournald
                   
-                    final String minorFaultsPerSec = data.substring(22,32).trim();
-                    final String majorFaultsPerSec = data.substring(32,42).trim();
-                    final String virtualSize       = data.substring(42,50).trim();
-                    final String residentSetSize   = data.substring(50,57).trim();
-                    final String percentMemory     = data.substring(57,64).trim();
+                    final String minorFaultsPerSec = data.substring(22-1,32-1).trim();
+                    final String majorFaultsPerSec = data.substring(32-1,42-1).trim();
+                    final String virtualSize       = data.substring(42-1,50-1).trim();
+                    final String residentSetSize   = data.substring(50-1,57-1).trim();
+                    final String percentMemory     = data.substring(57-1,64-1).trim();
 
                     log.info("\nminorFaultsPerSec="
                                 + minorFaultsPerSec
@@ -921,8 +925,8 @@ public class StatisticsCollectorForLinux extends
 //                        *         06:35:15 AM       PID   kB_rd/s   kB_wr/s kB_ccwr/s  Command
 //                        *         06:35:15 AM       501      0.00      1.13      0.00  kjournald
 
-                    final String kBrdS = data.substring(22, 32).trim();
-                    final String kBwrS = data.substring(32, 42).trim();
+                    final String kBrdS = data.substring(22-1, 32-1).trim();
+                    final String kBwrS = data.substring(32-1, 42-1).trim();
 
                     log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
                                 + kBwrS + "\n" + header + "\n" + data);
