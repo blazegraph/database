@@ -19,17 +19,17 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
  * 
- * @todo configuration parameters to locate the sysstat utilities (normally
- *       installed into /usr/bin).
+ * @todo configuration parameters to locate the sysstat utilities (normally installed
+ * into /usr/bin).
  * 
  * @todo do a vmstat or sar collector to gain more information about the overall
  *       host performance
  * 
  * <pre>
- *   vmstat
- *   procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
- *    r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
- *    0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
+ *  vmstat
+ *  procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
+ *   r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ *   0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -440,7 +440,7 @@ public class StatisticsCollectorForLinux extends
 
         public AbstractProcessReader getProcessReader() {
             
-            return new SarReader(activeProcess);
+            return new SarReader();
             
         }
 
@@ -464,10 +464,16 @@ public class StatisticsCollectorForLinux extends
          * @version $Id$
          */
         private class SarReader extends ProcessReaderHelper {
+            
+            protected ActiveProcess getActiveProcess() {
+                
+                return activeProcess;
+                
+            }
 
-            public SarReader(ActiveProcess activeProcess) {
+            public SarReader() {
 
-                super(activeProcess);
+                super();
                 
             }
 
@@ -635,18 +641,18 @@ public class StatisticsCollectorForLinux extends
          * @param kernelVersion
          *            The Linux {@link KernelVersion}.
          */
-        public PIDStatCollector(int pid, int interval,StatisticsCollectorForLinux.KernelVersion kernelVersion) {
+        public PIDStatCollector(int pid, int interval,
+                StatisticsCollectorForLinux.KernelVersion kernelVersion) {
 
             super(interval);
 
             this.pid = pid;
-            
+
             perProcessIOData = kernelVersion.version >= 2
-                    && kernelVersion.major >= 6
-                    && kernelVersion.minor >= 20;
-            
+                    && kernelVersion.major >= 6 && kernelVersion.minor >= 20;
+
         }
-        
+
         @Override
         public List<String> getCommand() {
             
@@ -739,7 +745,7 @@ public class StatisticsCollectorForLinux extends
         @Override
         public AbstractProcessReader getProcessReader() {
 
-            return new PIDStatReader(activeProcess);
+            return new PIDStatReader();
             
         }
     
@@ -770,9 +776,15 @@ public class StatisticsCollectorForLinux extends
          */
         protected class PIDStatReader extends ProcessReaderHelper {
 
-            public PIDStatReader(ActiveProcess activeProcess) {
+            protected ActiveProcess getActiveProcess() {
                 
-                super(activeProcess);
+                return activeProcess;
+                
+            }
+
+            public PIDStatReader() {
+                
+                super();
 
             }
             
