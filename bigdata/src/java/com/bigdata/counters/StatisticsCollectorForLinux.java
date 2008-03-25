@@ -89,6 +89,8 @@ public class StatisticsCollectorForLinux extends
 
     public void start() {
 
+        log.info("starting collectors");
+        
         super.start();
         
         sar1.start();
@@ -99,6 +101,8 @@ public class StatisticsCollectorForLinux extends
 
     public void stop() {
 
+        log.info("stopping collectors");
+        
         super.stop();
         
         sar1.stop();
@@ -496,6 +500,8 @@ public class StatisticsCollectorForLinux extends
 
                     // header.
                     final String header = readLine();
+                    
+                    log.debug("header: "+header);
 
                 }
                 
@@ -507,7 +513,9 @@ public class StatisticsCollectorForLinux extends
                     if(data.trim().length()==0) {
                         
                         String header = readLine();
-                        
+
+                        log.debug("header: "+header);
+
                         continue;
                         
                     }
