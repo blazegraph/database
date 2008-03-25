@@ -602,7 +602,7 @@ abstract public class AbstractStatisticsCollector {
         
         public void start(InputStream is) {
         
-            assert is!=null;
+            assert is != null;
             
             this.is = is;
             
