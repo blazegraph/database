@@ -19,14 +19,17 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
  * 
+ * @todo configuration parameters to locate the sysstat utilities (normally
+ *       installed into /usr/bin).
+ * 
  * @todo do a vmstat or sar collector to gain more information about the overall
  *       host performance
  * 
  * <pre>
- *  vmstat
- *  procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
- *   r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
- *   0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
+ *   vmstat
+ *   procs -----------memory---------- ---swap-- -----io---- --system-- -----cpu------
+ *    r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ *    0  0  19088 1099996 210388 2130812    0    0    26    17    0    0  5  2 92  1  0
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -36,16 +39,10 @@ public class StatisticsCollectorForLinux extends
         AbstractStatisticsCollector {
 
     /**
-     * The process identifier for this process (the JVM).
-     */
-    final protected int pid;
-    
-    /**
      * Used to parse the timestamp associated with each row of the
      * [pidstat] output.
      */
     static protected final SimpleDateFormat f;
-
     static {
         
         f = new SimpleDateFormat("hh:mm:ss aa");
@@ -65,9 +62,24 @@ public class StatisticsCollectorForLinux extends
     }
     
     /**
+     * The process identifier for this process (the JVM).
+     */
+    static protected int pid;
+    static {
+
+        pid = getLinuxPIDWithBash();
+
+    }
+    
+    /**
      * The Linux {@link KernelVersion}.
      */
-    final StatisticsCollectorForLinux.KernelVersion kernelVersion;
+    static protected StatisticsCollectorForLinux.KernelVersion kernelVersion;
+    static {
+
+        kernelVersion = KernelVersion.get();
+
+    }
 
     /** reports on the host CPU utilization. */
     StatisticsCollectorForLinux.SarCpuUtilizationCollector sar1;
@@ -198,7 +210,7 @@ public class StatisticsCollectorForLinux extends
      * @throws RuntimeException
      *             if anything goes wrong.
      */
-    public int getLinuxPIDWithBash() {
+    static public int getLinuxPIDWithBash() {
 
         final List<String> commands = new LinkedList<String>();
 
@@ -259,10 +271,6 @@ public class StatisticsCollectorForLinux extends
     public StatisticsCollectorForLinux(int interval) {
 
         super(interval);
-
-        this.pid = getLinuxPIDWithBash();
-
-        this.kernelVersion = KernelVersion.get();
 
         // host wide collection
         sar1 = new SarCpuUtilizationCollector(interval,kernelVersion);
@@ -369,7 +377,7 @@ public class StatisticsCollectorForLinux extends
 
             List<String> command = new LinkedList<String>();
             
-            command.add("sar");
+            command.add("/usr/bin/sar");
 
             command.add("-u"); // CPU stats
             
@@ -644,7 +652,7 @@ public class StatisticsCollectorForLinux extends
             
             List<String> command = new LinkedList<String>();
             
-            command.add("pidstat");
+            command.add("/usr/bin/pidstat");
 
             command.add("-p");
             command.add(""+pid);
