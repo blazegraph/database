@@ -372,6 +372,7 @@
 	    <groupId>org.openrdf</groupId>
 	    <artifactId>sesame-onejar</artifactId>
         <jar>openrdf-sesame-2.0-onejar.jar</jar>
+        <url>http://sourceforge.net/projects/sesame/</url>
 	</dependency> 
 	<!--
     <dependency>
