@@ -246,7 +246,7 @@ public class PIDStatCollector extends AbstractProcessCollector {
              * to [0:1] using a scaling factor.
              */
             
-            final String p = hostPathPrefix + processName + ps;
+            final String p = processName + ps;
 
             inst.add(new I(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
