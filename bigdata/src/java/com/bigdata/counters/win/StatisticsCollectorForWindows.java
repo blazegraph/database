@@ -1,4 +1,4 @@
-package com.bigdata.counters;
+package com.bigdata.counters.win;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -11,7 +11,15 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounter;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessCollector;
+import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessReader;
+import com.bigdata.counters.AbstractStatisticsCollector.IHostCounters;
+import com.bigdata.counters.AbstractStatisticsCollector.IRequiredHostCounters;
 import com.bigdata.util.CSVReader;
 import com.bigdata.util.CSVReader.Header;
 

@@ -50,6 +50,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.counters.linux.StatisticsCollectorForLinux;
+import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -616,7 +618,7 @@ abstract public class AbstractStatisticsCollector {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected abstract class AbstractProcessReader implements Runnable {
+    public abstract class AbstractProcessReader implements Runnable {
         
         /**
          * The {@link InputStream} from which the output of the process will be
@@ -642,7 +644,7 @@ abstract public class AbstractStatisticsCollector {
 
     }
 
-    protected abstract class ProcessReaderHelper extends AbstractProcessReader {
+    public abstract class ProcessReaderHelper extends AbstractProcessReader {
 
         /**
          * The {@link Reader} from which the output of the process will be read.

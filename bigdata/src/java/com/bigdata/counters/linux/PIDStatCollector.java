@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 26, 2008
  */
 
-package com.bigdata.counters;
+package com.bigdata.counters.linux;
 
 import java.io.IOException;
 import java.text.ParseException;
@@ -39,8 +39,10 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessCollector;
-import com.bigdata.counters.StatisticsCollectorForLinux.KernelVersion;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -81,16 +83,16 @@ public class PIDStatCollector extends AbstractProcessCollector {
     protected final boolean perProcessIOData;
 
     /**
-     * Inner class integrating the current values with the {@link Counter}
+     * Inner class integrating the current values with the {@link ICounterSet}
      * hierarchy.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    class I<T> implements IInstrument<T> {
+    class I implements IInstrument<Double> {
         
-        private final String path;
+        protected final String path;
+        protected final double scale;
         
         public String getPath() {
             
@@ -98,17 +100,23 @@ public class PIDStatCollector extends AbstractProcessCollector {
             
         }
         
-        public I(String path) {
+        public I(String path, double scale) {
             
             assert path != null;
             
             this.path = path;
             
+            this.scale = scale;
+            
         }
         
-        public T getValue() {
+        public Double getValue() {
          
-            return (T) vals.get(path);
+            double d = (Double) vals.get(path);
+            
+            d *= scale;
+            
+            return d;
             
         }
 
@@ -122,7 +130,7 @@ public class PIDStatCollector extends AbstractProcessCollector {
          * @throws UnsupportedOperationException
          *             always.
          */
-        public void setValue(T value, long timestamp) {
+        public void setValue(Double value, long timestamp) {
            
             throw new UnsupportedOperationException();
             
@@ -154,7 +162,7 @@ public class PIDStatCollector extends AbstractProcessCollector {
      *            The Linux {@link KernelVersion}.
      */
     public PIDStatCollector(int pid, int interval,
-            StatisticsCollectorForLinux.KernelVersion kernelVersion) {
+            KernelVersion kernelVersion) {
 
         super(interval);
 
@@ -208,23 +216,30 @@ public class PIDStatCollector extends AbstractProcessCollector {
             
             /*
              * Note: Counters are all declared as Double to facilitate
-             * aggregation.
+             * aggregation and scaling.
+             * 
+             * Note: pidstat reports percentages as [0:100] so we normalize them
+             * to [0:1] using a scaling factor.
              */
             
-            inst.add(new I<Double>(IRequiredHostCounters.CPU_PercentProcessorTime));
+            inst.add(new I(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new I<Double>(IProcessCounters.CPU_PercentUserTime));
+            inst.add(new I(IProcessCounters.CPU_PercentUserTime,.01d));
             
-            inst.add(new I<Double>(IProcessCounters.CPU_PercentSystemTime));
+            inst.add(new I(IProcessCounters.CPU_PercentSystemTime,.01d));
             
-            inst.add(new I<Double>(IProcessCounters.Memory_minorFaultsPerSec));
-            inst.add(new I<Double>(IProcessCounters.Memory_majorFaultsPerSec));
-            inst.add(new I<Double>(IProcessCounters.Memory_virtualSize));
-            inst.add(new I<Double>(IProcessCounters.Memory_residentSetSize));
-            inst.add(new I<Double>(IProcessCounters.Memory_percentMemorySize));
+            inst.add(new I(IProcessCounters.Memory_minorFaultsPerSec,1d));
+            inst.add(new I(IProcessCounters.Memory_majorFaultsPerSec,1d));
+            inst.add(new I(IProcessCounters.Memory_virtualSize,1d));
+            inst.add(new I(IProcessCounters.Memory_residentSetSize,1d));
+            inst.add(new I(IProcessCounters.Memory_percentMemorySize,.01d));
 
-            inst.add(new I<Double>(IProcessCounters.PhysicalDisk_BytesReadPerSec));
-            inst.add(new I<Double>(IProcessCounters.PhysicalDisk_BytesWrittenPerSec));
+            /*
+             * Note: pidstat reports in kb/sec so we normalize to bytes/second
+             * using a scaling factor.
+             */
+            inst.add(new I(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
+            inst.add(new I(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
 
         }
         
@@ -435,10 +450,10 @@ public class PIDStatCollector extends AbstractProcessCollector {
                             + kBwrS + "\n" + header + "\n" + data);
 
                 vals.put(IProcessCounters.PhysicalDisk_BytesReadPerSec,
-                        Double.parseDouble(kBrdS) * Bytes.kilobyte32);
+                        Double.parseDouble(kBrdS));
                 
                 vals.put(IProcessCounters.PhysicalDisk_BytesWrittenPerSec,
-                        Double.parseDouble(kBrdS) * Bytes.kilobyte32);
+                        Double.parseDouble(kBrdS));
                 
             } else {
                 

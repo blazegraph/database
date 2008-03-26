@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 26, 2008
  */
 
-package com.bigdata.counters;
+package com.bigdata.counters.linux;
 
 import java.text.ParseException;
 import java.util.HashMap;
@@ -38,8 +38,10 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessCollector;
-import com.bigdata.counters.StatisticsCollectorForLinux.KernelVersion;
 
 /**
  * Collects statistics on the CPU utilization for the entire host using
@@ -81,16 +83,16 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
             .toInt();
 
     /**
-     * Inner class integrating the current values with the {@link Counter}
+     * Inner class integrating the current values with the {@link ICounterSet}
      * hierarchy.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
      */
-    class I<T> implements IInstrument<T> {
+    abstract class I<T> implements IInstrument<T> {
         
-        private final String path;
+        protected final String path;
         
         public String getPath() {
             
@@ -103,12 +105,6 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
             assert path != null;
             
             this.path = path;
-            
-        }
-        
-        public T getValue() {
-         
-            return (T) vals.get(path);
             
         }
 
@@ -128,6 +124,37 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
             
         }
 
+    }
+    
+    /**
+     * Double precision counter with scaling factor.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    class DI extends I<Double> {
+
+        protected final double scale;
+        
+        DI(String path, double scale) {
+            
+            super( path );
+            
+            this.scale = scale;
+            
+        }
+        
+        
+        public Double getValue() {
+         
+            double d = (Double) vals.get(path);
+            
+            d *= scale;
+            
+            return d;
+            
+        }
+        
     }
 
     /**
@@ -183,13 +210,16 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
             /*
              * Note: Counters are all declared as Double to facilitate
              * aggregation.
+             * 
+             * Note: sar reports percentages in [0:100] so we convert them to
+             * [0:1] using a scaling factor.
              */
 
-            inst.add(new I<Double>(IRequiredHostCounters.CPU_PercentProcessorTime));
+            inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new I<Double>(IHostCounters.CPU_PercentUserTime));
-            inst.add(new I<Double>(IHostCounters.CPU_PercentSystemTime));
-            inst.add(new I<Double>(IHostCounters.CPU_PercentIOWait));
+            inst.add(new DI(IHostCounters.CPU_PercentUserTime,.01d));
+            inst.add(new DI(IHostCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new DI(IHostCounters.CPU_PercentIOWait,.01d));
             
         }
         
