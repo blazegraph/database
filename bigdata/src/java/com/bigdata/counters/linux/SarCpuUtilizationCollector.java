@@ -39,10 +39,15 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.AbstractProcessCollector;
+import com.bigdata.counters.AbstractProcessReader;
 import com.bigdata.counters.ActiveProcess;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IInstrument;
+import com.bigdata.counters.IRequiredHostCounters;
+import com.bigdata.counters.ProcessReaderHelper;
 
 /**
  * Collects statistics on the CPU utilization for the entire host using
@@ -66,7 +71,8 @@ import com.bigdata.counters.IInstrument;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SarCpuUtilizationCollector extends AbstractProcessCollector {
+public class SarCpuUtilizationCollector extends AbstractProcessCollector
+        implements ICounterHierarchy, IRequiredHostCounters, IHostCounters {
 
     static protected final Logger log = Logger
             .getLogger(SarCpuUtilizationCollector.class);
@@ -197,15 +203,14 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
     }
 
     /**
-     * Extended to declare the counters that we will collect using
-     * <code>sar</code>.
+     * Declares the counters that we will collect using <code>sar</code>.
      */
-    public CounterSet getCounters() {
+    synchronized public CounterSet getCounters() {
         
-        CounterSet root = super.getCounters();
+        if(root == null) {
         
-        if(inst == null) {
-        
+            root = new CounterSet();
+            
             inst = new LinkedList<I>();
             
             /*
@@ -222,13 +227,13 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
             inst.add(new DI(IHostCounters.CPU_PercentSystemTime,.01d));
             inst.add(new DI(IHostCounters.CPU_PercentIOWait,.01d));
             
-        }
-        
-        for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
-            
-            I i = itr.next();
-            
-            root.addCounter(i.getPath(), i);
+            for(Iterator<I> itr = inst.iterator(); itr.hasNext(); ) {
+                
+                I i = itr.next();
+                
+                root.addCounter(i.getPath(), i);
+                
+            }
             
         }
         
@@ -236,7 +241,8 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
         
     }
     private List<I> inst = null;
-
+    private CounterSet root = null;
+   
     /**
      * Extended to force <code>sar</code> to use a consistent timestamp
      * format regardless of locale by setting

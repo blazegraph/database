@@ -37,7 +37,6 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessReader;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

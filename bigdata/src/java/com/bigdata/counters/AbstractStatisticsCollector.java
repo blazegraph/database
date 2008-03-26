@@ -28,15 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.LineNumberReader;
-import java.io.Reader;
-import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
@@ -63,16 +54,10 @@ import com.bigdata.rawstore.Bytes;
  * An effort has been made to align the core set of counters for both Windows
  * and Un*x platforms so as to support the declared counters on all platforms.
  * 
- * @todo a varient of counters can appear on both a per-host and a per-process
- *       basis. review carefully for correct use.
- * 
- * FIXME make sure that all "%" counters are normalized to [0.0:1.0]. it would
- * be useful to have declared ranges for some counters for this purpose
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractStatisticsCollector {
+abstract public class AbstractStatisticsCollector implements IStatisticsCollector {
 
     protected static final String ps = ICounterSet.pathSeparator;
     
@@ -90,299 +75,6 @@ abstract public class AbstractStatisticsCollector {
      */
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
-
-    /**
-     * Various namespaces for per-host and per-process counters.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface ICounterHierarchy {
-
-        /**
-         * The namespace for counters describing the host platform. These are
-         * essentially "unchanging" counters.
-         */
-        String Info = "Info";
-        
-        /**
-         * The namespace for counters dealing with processor(s) (CPU).
-         */
-        String CPU = "CPU";
-        
-        /**
-         * The namespace for counters dealing with memory (RAM).
-         */
-        String Memory = "Memory";
-
-        /**
-         * The namespace for counters dealing with logical aggregations of disk.
-         */
-        String LogicalDisk = "LogicalDisk";
-
-        /**
-         * The namespace for counters dealing with physical disks.
-         */
-        String PhysicalDisk = "PhysicalDisk";
-
-    }
-
-    /**
-     * The set of core (required) counters that must be reported for all
-     * platforms. The items declared on this interface are relative path names
-     * for {@link ICounterSet}s and {@link ICounter}s. The root for the path
-     * is generally the fully qualified domain name of a host (as reported by
-     * {@link InetAddress#getCanonicalHostName()}, a federation, or a service.
-     * <p>
-     * Note: it is good practice to keep these three namespaces distinct so that
-     * you can aggregate counters readily without these different contexts.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface IRequiredHostCounters extends ICounterHierarchy {
-
-        /*
-         * INFO
-         */
-        
-        /**
-         * The name of the operating system running on the platform as reported
-         * by {@link System#getProperty(String)} for the <code>os.name</code>
-         * property.
-         */
-        String Info_OperatingSystemName = Info + ps
-                + "Operating System Name";
-
-        /**
-         * The version of the operating system running on the platform as
-         * reported by {@link System#getProperty(String)} for the
-         * <code>os.version</code> property.
-         */
-        String Info_OperatingSystemVersion = Info + ps
-                + "Operating System Version";
-
-        /**
-         * System architecture as reported by {@link System#getProperty(String)}
-         * for the <code>os.arch</code> property.
-         */
-        String Info_Architecture = Info + ps + "Architecture";
-
-        /*
-         * CPU
-         */
-        
-        /** Percentage of the time the processor is not idle. */
-        String CPU_PercentProcessorTime = CPU + ps
-                + "% Processor Time";
-
-        /*
-         * Memory
-         */
-        
-        /**
-         * Faults which required loading a page from disk.
-         * 
-         * FIXME not collected for linux right now.
-         */
-        String Memory_majorFaultsPerSecond = Memory + ps
-                + "Page Faults Per Second";
-
-        /*
-         * LogicalDisk
-         */
-        
-        /** Percentage of the disk space that is free (unused) [0.0:1.0]. */
-        String LogicalDisk_PercentFreeSpace = LogicalDisk + ps + "% Free Space";
-
-        /*
-         * PhysicalDisk
-         */
-        
-        /** Disk bytes read per second for the host. */
-        String PhysicalDisk_BytesReadPerSec = PhysicalDisk + ps
-                + "Bytes Read Per Second";
-
-        /** Disk bytes written per second for the host. */
-        String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
-                + "Bytes Written Per Second";
-
-    };
- 
-    /**
-     * Additional counters that hosts can report.
-     * 
-     * @todo pageFaultsPerSec (majflt/s)
-     * 
-     * @todo os diskCache (dis|en)abled
-     * @todo #disks
-     * @todo disk descriptions
-     * @todo disk space, space avail, hardware disk cache (dis|en)abled.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface IHostCounters extends IRequiredHostCounters {
-        
-        /*
-         * Info
-         */
-        
-        /** CPU family information. */
-        String Info_ProcessorInfo = Info+ps+"Processor Info";
-
-        /** The #of processors. */
-        String Info_NumProcessors = Info+ps+"Number of Processors";
-        
-        /*
-         * CPU
-         */
-
-        /**
-         * Percentage of the time the processor is not idle that it is executing
-         * at the user level (normalized to 100% in single CPU and SMP
-         * environments).
-         */
-        String CPU_PercentUserTime = CPU + ps + "% User Time";
-
-        /**
-         * Percentage of the time the processor is not idle that it is executing
-         * at the system (aka kernel) level (normalized to 100% in single CPU
-         * and SMP environments).
-         */
-        String CPU_PercentSystemTime = CPU + ps + "% System Time";
-
-        /**
-         * Percentage of the time the CPU(s) were idle while the system had an
-         * outstanding IO.
-         */
-        String CPU_PercentIOWait = CPU + ps + "% IO Wait";
-
-        /*
-         * Memory
-         */
-
-        /** The total amount of memory available to the host. */
-        String Memory_Available = Memory + ps + "Total bytes available";
-
-        /**
-         * Faults that did not require loading a page from disk.
-         */
-        String Memory_minorFaultsPerSec = Memory + ps
-                + "Minor Faults per Second";
-
-        /*
-         * PhysicalDisk
-         */
-
-        /** #of disk read operations per second. */
-        String PhysicalDisk_ReadsPerSec = PhysicalDisk + ps
-                + "Reads Per Second";
-
-        /** #of disk write operations per second. */
-        String PhysicalDisk_WritesPerSec = PhysicalDisk + ps
-                + "Writes Per Second";
-
-    }
-
-    /**
-     * Counters defined on a per-process basis.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public interface IProcessCounters extends ICounterHierarchy {
-
-        /*
-         * CPU
-         */
-
-        /**
-         * Percentage of the time the processor is not idle that it is executing
-         * at the user level (normalized to 100% in single CPU and SMP
-         * environments).
-         */
-        String CPU_PercentUserTime = CPU + ps + "% User Time";
-
-        /**
-         * Percentage of the time the processor is not idle that it is executing
-         * at the system (aka kernel) level (normalized to 100% in single CPU
-         * and SMP environments).
-         */
-        String CPU_PercentSystemTime = CPU + ps + "% System Time";
-
-        /** Percentage of the time the processor is not idle. */
-        String CPU_PercentProcessorTime = CPU + ps + "% Processor Time";
-
-        /*
-         * Memory
-         */
-
-        /**
-         * Faults that did not require loading a page from disk.
-         */
-        String Memory_minorFaultsPerSec = Memory + ps
-                + "Minor Faults per Second";
-
-        /**
-         * Faults which required loading a page from disk.
-         */
-        String Memory_majorFaultsPerSec = Memory + ps
-                + "Major Faults per Second";
-
-        /**
-         * The virtual memory usage of the process in bytes.
-         */
-        String Memory_virtualSize = Memory + ps + "Virtual Size";
-
-        /**
-         * The non-swapped physical memory used by the process in bytes.
-         */
-        String Memory_residentSetSize = Memory + ps + "Resident Set Size";
-
-        /**
-         * The percentage of the phsyical memory used by the process.
-         */
-        String Memory_percentMemorySize = Memory + ps + "Percent Memory Size";
-
-        /**
-         * The value reported by {@link Runtime#maxMemory()} (the maximum amount
-         * of memory that the JVM will attempt to use). This should be a
-         * {@link OneShotInstrument}.
-         */
-        String Memory_runtimeMaxMemory = Memory + ps + "Runtime Max Memory";
-        
-        /**
-         * The value reported by {@link Runtime#freeMemory()} (the amount of
-         * free memory in the JVM)).
-         */
-        String Memory_runtimeFreeMemory = Memory + ps + "Runtime Free Memory";
-        
-        /**
-         * The value reported by {@link Runtime#totalMemory()} (the amount of
-         * total memory in the JVM, which may vary over time).
-         */
-        String Memory_runtimeTotalMemory = Memory + ps + "Runtime Total Memory";
-        
-        /*
-         * IO
-         */
-        
-        /**
-         * The rate at which the process is reading data from disk in bytes per
-         * second.
-         */
-        String PhysicalDisk_BytesReadPerSec = PhysicalDisk + ps
-                + "Bytes Read per Second";
-
-        /**
-         * The rate at which the process is writing data on the disk in bytes
-         * per second (cached writes may be reported in this quantity).
-         */
-        String PhysicalDisk_BytesWrittenPerSec = PhysicalDisk + ps
-                + "Bytes Written per Second";
-
-    }
 
     /** {@link InetAddress#getHostName()} for this host. */
     final public String hostname;
@@ -436,79 +128,48 @@ abstract public class AbstractStatisticsCollector {
 
     }
     
-    /**
-     * Return the load average for the last minute if available and -1
-     * otherwise.
-     * <p>
-     * Note: The load average is available on 1.6+ JVMs.
-     * 
-     * @see OperatingSystemMXBean
-     */
-    public double getSystemLoadAverage()
-    {
-        
-//        double version = Double.parseDouble(System.getProperty("java.vm.version"));
-//      if(version>=1.6) {
-        
-        double loadAverage = -1;
-        
-        final OperatingSystemMXBean mbean = ManagementFactory
-                .getOperatingSystemMXBean();
-        
-        /*
-         * Use reflection since method is only available as of 1.6
-         */
-        Method method;
-        try {
-            method = mbean.getClass().getMethod("getSystemLoadAverage",
-                    new Class[] {});
-            loadAverage = (Double) method.invoke(mbean, new Object[] {});
-        } catch (SecurityException e) {
-            log.warn(e.getMessage(), e);
-        } catch (NoSuchMethodException e) {
-            // Note: method is only defined since 1.6
-            log.warn(e.getMessage(), e);
-        } catch (IllegalAccessException e) {
-            log.warn(e.getMessage(), e);
-        } catch (InvocationTargetException e) {
-            log.warn(e.getMessage(), e);
-        }
-
-        return loadAverage;
-
-    }
-    
 //    /**
-//     * Return the JVM PID.
+//     * Return the load average for the last minute if available and -1
+//     * otherwise.
+//     * <p>
+//     * Note: The load average is available on 1.6+ JVMs.
 //     * 
-//     * @throws UnsupportedOperationException
-//     *             if the pid can not be extracted.
-//     * 
-//     * @see RuntimeMXBean#getName(), A web search will show that this is
-//     *      generally of the form "pid@host".  However this is definately
-//     *      NOT guarenteed by the javadoc.
+//     * @see OperatingSystemMXBean
 //     */
-//    public int getPID() {
+//    public double getSystemLoadAverage()
+//    {
 //        
-//        String name = ManagementFactory.getRuntimeMXBean().getName();
+////        double version = Double.parseDouble(System.getProperty("java.vm.version"));
+////      if(version>=1.6) {
 //        
-//        Matcher matcher = pidPattern.matcher(name);
+//        double loadAverage = -1;
 //        
-//        if(!matcher.matches()) {
-//            
-//            throw new UnsupportedOperationException("Could not extract pid from ["+name+"]");
-//            
+//        final OperatingSystemMXBean mbean = ManagementFactory
+//                .getOperatingSystemMXBean();
+//        
+//        /*
+//         * Use reflection since method is only available as of 1.6
+//         */
+//        Method method;
+//        try {
+//            method = mbean.getClass().getMethod("getSystemLoadAverage",
+//                    new Class[] {});
+//            loadAverage = (Double) method.invoke(mbean, new Object[] {});
+//        } catch (SecurityException e) {
+//            log.warn(e.getMessage(), e);
+//        } catch (NoSuchMethodException e) {
+//            // Note: method is only defined since 1.6
+//            log.warn(e.getMessage(), e);
+//        } catch (IllegalAccessException e) {
+//            log.warn(e.getMessage(), e);
+//        } catch (InvocationTargetException e) {
+//            log.warn(e.getMessage(), e);
 //        }
-//        
-//        final int pid = Integer.parseInt(matcher.group(1));
-//        
-//        log.info("pid="+pid);
-//        
-//        return pid;
-//        
+//
+//        return loadAverage;
+//
 //    }
-//    private final Pattern pidPattern = Pattern.compile("^([0-9]+)@");
-
+    
     /**
      * {@link CounterSet} hierarchy.
      */
@@ -607,140 +268,6 @@ abstract public class AbstractStatisticsCollector {
 
     }
 
-    /**
-     * A {@link Runnable} that reads the output of an {@link ActiveProcess}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public abstract class AbstractProcessReader implements Runnable {
-        
-        /**
-         * The {@link InputStream} from which the output of the process will be
-         * read.
-         */
-        protected InputStream is;
-
-        /**
-         * Saves a reference to the {@link InputStream}.
-         * 
-         * @param is
-         *            The input stream from which the output of the process will
-         *            be read.
-         */
-        public void start(InputStream is) {
-
-            if (is == null)
-                throw new IllegalArgumentException();
-
-            this.is = is;
-
-        }
-
-    }
-
-    public abstract class ProcessReaderHelper extends AbstractProcessReader {
-
-        /**
-         * The {@link Reader} from which the output of the process will be read.
-         */
-        protected LineNumberReader r = null;
-        
-        public ProcessReaderHelper() {
-            
-        }
-        
-        /**
-         * Creates a {@link LineNumberReader} from the {@link InputStream}.
-         * 
-         * @param is
-         *            The input stream from which the output of the process will
-         *            be read.
-         */
-        public void start(InputStream is) {
-
-            if (r != null)
-                throw new IllegalStateException();
-            
-            super.start( is );
-            
-            r = new LineNumberReader( new InputStreamReader( is ));
-            
-        }
-
-        /**
-         * Override to return the {@link ActiveProcess}.
-         */
-        abstract protected ActiveProcess getActiveProcess();
-        
-        /**
-         * Returns the next line and blocks if a line is not available.
-         * 
-         * @return The next line.
-         * 
-         * @throws InterruptedException 
-         * 
-         * @throws IOException
-         *             if the source is closed.
-         * @throws InterruptedException
-         *             if the thread has been interrupted (this is
-         *             normal during shutdown).
-         */
-        public String readLine() throws IOException, InterruptedException {
-            
-            while(getActiveProcess().isAlive()) {
-                
-                if(Thread.currentThread().isInterrupted()) {
-                    
-                    throw new InterruptedException();
-                    
-                }
-                
-                if(!r.ready()) {
-                    
-                    Thread.sleep(100/*ms*/);
-                    
-                    continue;
-                    
-                }
-
-                final String s = r.readLine();
-                
-                if(DEBUG) {
-                    
-                    log.debug(s);
-                    
-                }
-                
-                return s;
-                
-            }
-            
-            throw new IOException("Closed");
-            
-        }
-        
-        public void run() {
-            
-            try {
-                readProcess();
-            } catch (InterruptedException e) {
-                AbstractStatisticsCollector.log.info("Interrupted - will halt.");
-            } catch (Exception e) {
-                AbstractStatisticsCollector.log.fatal(e.getMessage(),e);
-            }
-            
-        }
-
-        /**
-         * Responsible for reading the data.
-         * 
-         * @throws Exception
-         */
-        abstract protected void readProcess() throws Exception;
-    
-    }
-    
     /**
      * Options for {@link AbstractStatisticsCollector}
      * 

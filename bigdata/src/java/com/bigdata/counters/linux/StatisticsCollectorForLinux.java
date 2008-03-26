@@ -1,13 +1,8 @@
 package com.bigdata.counters.linux;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -69,7 +64,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
     static protected int pid;
     static {
 
-        pid = getLinuxPIDWithBash();
+        pid = PIDUtil.getLinuxPIDWithBash();
 
     }
     
@@ -82,6 +77,12 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         kernelVersion = KernelVersion.get();
 
     }
+
+    /**
+     * The name of the process (or more typically its service {@link UUID})
+     * whose per-process performance counters are to be collected.
+     */
+    protected final String processName;
 
     /** reports on the host CPU utilization. */
     protected SarCpuUtilizationCollector sar1;
@@ -113,72 +114,6 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     }
     
-    /**
-     * Return the PID of the Java VM under Linux using bash.
-     * 
-     * @return The PID.
-     * 
-     * @throws RuntimeException
-     *             if anything goes wrong.
-     */
-    static public int getLinuxPIDWithBash() {
-
-        final List<String> commands = new LinkedList<String>();
-
-        final Process pr;
-        
-        try {
-        
-            commands.add("/bin/bash");
-            
-            commands.add("-c");
-            
-            commands.add("echo $PPID");
-            
-            ProcessBuilder pb = new ProcessBuilder(commands);
-            
-            pr = pb.start();
-            
-            pr.waitFor();
-        
-        } catch (Exception ex) {
-        
-            throw new RuntimeException("Problem running command: ["
-                    + commands + "]", ex);
-            
-        }
-        
-        if (pr.exitValue() == 0) {
-        
-            BufferedReader outReader = new BufferedReader(
-                    new InputStreamReader(pr.getInputStream()));
-            
-            final String val;
-            try {
-            
-                val = outReader.readLine().trim();
-                
-            } catch (IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-            log.info("read: [" + val + "]");
-            
-            int pid = Integer.parseInt(val);
-            
-            return pid;
-            
-        } else {
-            
-            throw new RuntimeException("Could not get PID: exitValue="
-                    + pr.exitValue());
-            
-        }
-
-    }
-
     private boolean countersAdded = false;
     
     public CounterSet getCounters() {
@@ -194,11 +129,11 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
             root.makePath(fullyQualifiedHostName).attach( sar1.getCounters() );
 
             /*
-             * These are per-process counters. The process name is already in
-             * the path for these counters. We attach them under the fully
-             * qualified hostname.
+             * These are per-process counters. We attach them under a path
+             * described by the fully qualified hostname followed by the process
+             * name.
              */
-            root.makePath(fullyQualifiedHostName).attach( pidstat.getCounters() );
+            root.makePath(fullyQualifiedHostName+ps+processName).attach( pidstat.getCounters() );
             
         }
         
@@ -220,11 +155,16 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
         super(interval);
 
+        if (processName == null)
+            throw new IllegalArgumentException();
+        
+        this.processName = processName;
+        
         // host wide collection
         sar1 = new SarCpuUtilizationCollector(interval,kernelVersion);
 
         // process specific collection.
-        pidstat = new PIDStatCollector(processName, pid, interval, kernelVersion);
+        pidstat = new PIDStatCollector(pid, interval, kernelVersion);
 
     }
 

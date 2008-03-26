@@ -31,26 +31,38 @@ package com.bigdata.counters;
 import java.util.List;
 import java.util.Map;
 
+
 /**
  * Base class for collection of performance counters as reported by a native process.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractProcessCollector extends AbstractStatisticsCollector {
+abstract public class AbstractProcessCollector implements IStatisticsCollector {
 
+    final private int interval;
+
+    public int getInterval() {
+        
+        return interval;
+        
+    }
+    
     protected ActiveProcess activeProcess;
 
     /**
      * 
      * @param interval
      *            The interval at which the performance counters will be
-     *            read.
+     *            read in milliseconds.
      */
     public AbstractProcessCollector(int interval) {
-        
-        super(interval);
 
+        if (interval == 0)
+            throw new IllegalArgumentException();
+        
+        this.interval = interval;
+        
     }
 
     /**
@@ -67,8 +79,6 @@ abstract public class AbstractProcessCollector extends AbstractStatisticsCollect
      */
     public void start() {
 
-        super.start();
-
         activeProcess = new ActiveProcess(getCommand(), this);
         
         activeProcess.start(getProcessReader());
@@ -76,8 +86,6 @@ abstract public class AbstractProcessCollector extends AbstractStatisticsCollect
     }
 
     public void stop() {
-
-        super.stop();
 
         if (activeProcess != null) {
 
