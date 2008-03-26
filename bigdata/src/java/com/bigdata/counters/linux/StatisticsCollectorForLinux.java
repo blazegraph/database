@@ -10,6 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CounterSet;
 
 /**
  * Collection of host performance data using the <code>sysstat</code> suite.
@@ -179,6 +180,24 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     }
 
+    private boolean countersAdded = false;
+    
+    public CounterSet getCounters() {
+        
+        CounterSet root = super.getCounters();
+        
+        if( ! countersAdded ) {
+            
+            root.attach( sar1.getCounters() );
+
+            root.attach( pidstat.getCounters() );
+            
+        }
+        
+        return root;
+        
+    }
+    
     public StatisticsCollectorForLinux(int interval) {
 
         super(interval);

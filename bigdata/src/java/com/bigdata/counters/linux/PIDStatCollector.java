@@ -39,10 +39,11 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.AbstractProcessCollector;
+import com.bigdata.counters.ActiveProcess;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessCollector;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -222,24 +223,27 @@ public class PIDStatCollector extends AbstractProcessCollector {
              * to [0:1] using a scaling factor.
              */
             
-            inst.add(new I(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
+            // FIXME The counters need to be in the _SERVICE_ UUID namespace under the FQ hostname.
+            final String p = hostPathPrefix;
+
+            inst.add(new I(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new I(IProcessCounters.CPU_PercentUserTime,.01d));
+            inst.add(new I(p+IProcessCounters.CPU_PercentUserTime,.01d));
             
-            inst.add(new I(IProcessCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new I(p+IProcessCounters.CPU_PercentSystemTime,.01d));
             
-            inst.add(new I(IProcessCounters.Memory_minorFaultsPerSec,1d));
-            inst.add(new I(IProcessCounters.Memory_majorFaultsPerSec,1d));
-            inst.add(new I(IProcessCounters.Memory_virtualSize,1d));
-            inst.add(new I(IProcessCounters.Memory_residentSetSize,1d));
-            inst.add(new I(IProcessCounters.Memory_percentMemorySize,.01d));
+            inst.add(new I(p+IProcessCounters.Memory_minorFaultsPerSec,1d));
+            inst.add(new I(p+IProcessCounters.Memory_majorFaultsPerSec,1d));
+            inst.add(new I(p+IProcessCounters.Memory_virtualSize,1d));
+            inst.add(new I(p+IProcessCounters.Memory_residentSetSize,1d));
+            inst.add(new I(p+IProcessCounters.Memory_percentMemorySize,.01d));
 
             /*
              * Note: pidstat reports in kb/sec so we normalize to bytes/second
              * using a scaling factor.
              */
-            inst.add(new I(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
-            inst.add(new I(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
+            inst.add(new I(p+IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
+            inst.add(new I(p+IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
 
         }
         

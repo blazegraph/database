@@ -38,10 +38,11 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.AbstractProcessCollector;
+import com.bigdata.counters.ActiveProcess;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IInstrument;
-import com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessCollector;
 
 /**
  * Collects statistics on the CPU utilization for the entire host using
@@ -215,11 +216,13 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
              * [0:1] using a scaling factor.
              */
 
-            inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
+            final String p = hostPathPrefix;
+
+            inst.add(new DI(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new DI(IHostCounters.CPU_PercentUserTime,.01d));
-            inst.add(new DI(IHostCounters.CPU_PercentSystemTime,.01d));
-            inst.add(new DI(IHostCounters.CPU_PercentIOWait,.01d));
+            inst.add(new DI(p+IHostCounters.CPU_PercentUserTime,.01d));
+            inst.add(new DI(p+IHostCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new DI(p+IHostCounters.CPU_PercentIOWait,.01d));
             
         }
         
