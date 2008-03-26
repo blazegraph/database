@@ -395,22 +395,18 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             /*
              * Read the properties file used to configure the service.
              */
-            final Properties properties = new Properties();
+            final File propertyFile = (File) config.getEntry(SERVICE_LABEL,
+                    "propertyFile", File.class);
+
+            Properties properties = null;
+            
             try {
-
-                File propertyFile = (File) config.getEntry(SERVICE_LABEL,
-                        "propertyFile", File.class);
-
-                InputStream is = new BufferedInputStream(new FileInputStream(
-                        propertyFile));
                 
-                properties.load(is);
+                properties = getProperties(propertyFile);
                 
-                is.close();
+            } catch(IOException ex) {
                 
-            } catch (IOException ex) {
-
-                fatal("Configuration error: "+ex, ex);
+                fatal("Problem reading properties: " + propertyFile, ex);
                 
             }
 
@@ -494,6 +490,38 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
     }
 
+    /**
+     * Read and return the content of the properties file.
+     * 
+     * @param propertyFile
+     *            The properties file.
+     * 
+     * @throws IOException
+     */
+    protected static Properties getProperties(File propertyFile)
+            throws IOException {
+
+        final Properties properties = new Properties();
+
+        InputStream is = null;
+
+        try {
+
+            is = new BufferedInputStream(new FileInputStream(propertyFile));
+
+            properties.load(is);
+
+            return properties;
+
+        } finally {
+
+            if (is != null)
+                is.close();
+
+        }
+
+    }
+    
     /**
      * Unexports the proxy.
      * 

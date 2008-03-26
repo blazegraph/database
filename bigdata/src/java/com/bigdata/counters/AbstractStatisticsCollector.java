@@ -40,6 +40,7 @@ import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -756,6 +757,20 @@ abstract public class AbstractStatisticsCollector {
         
         public String DEFAULT_INTERVAL = "60";
         
+        /**
+         * The name of the process whose per-process performance counters are to
+         * be collected (required, no default). This causes the per-process
+         * counters to be reported using the path:
+         * 
+         * <strong>/<i>fullyQualifiedHostname</i>/<i>processName</i>/...</strong>
+         * <p>
+         * Note: Services are generally associated with a {@link UUID} and that
+         * {@link UUID} is generally used as the service name. A single host may
+         * run many different services and will report the counters for each
+         * service using the path formed as described above.
+         */
+        public String PROCESS_NAME = "counters.processName";
+        
     }
     
     /**
@@ -779,11 +794,17 @@ abstract public class AbstractStatisticsCollector {
         if (interval <= 0)
             throw new IllegalArgumentException();
         
+        final String processName = properties.getProperty(Options.PROCESS_NAME);
+        
+        if (processName == null)
+            throw new IllegalArgumentException(
+                    "Required option not specified: " + Options.PROCESS_NAME);
+        
         final String osname = System.getProperty("os.name").toLowerCase();
         
         if(osname.equalsIgnoreCase("linux")) {
             
-            return new StatisticsCollectorForLinux(interval);
+            return new StatisticsCollectorForLinux(interval, processName);
             
         } else if(osname.contains("windows")) {
             
@@ -857,6 +878,22 @@ abstract public class AbstractStatisticsCollector {
             
             // Override the interval property from the command line.
             properties.setProperty(Options.INTERVAL,""+interval);
+            
+        }
+
+        if(properties.getProperty(Options.PROCESS_NAME)==null) {
+            
+            /*
+             * Set a default process name if none was specified in the
+             * environment.
+             * 
+             * Note: Normally the process name is specified explicitly by the
+             * service which instantiates the performance counter collection for
+             * that process. We specify a default here since main() is used for
+             * testing purposes only.
+             */
+
+            properties.setProperty(Options.PROCESS_NAME,"testService");
             
         }
         

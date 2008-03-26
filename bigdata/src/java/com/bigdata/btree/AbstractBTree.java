@@ -44,7 +44,6 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
-import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -198,26 +197,34 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      */
     final protected NodeSerializer nodeSer;
 
-    /**
-     * Count of the #of times that a reference to this {@link AbstractBTree}
-     * occurs on a {@link HardReferenceQueue}. This field will remain zero(0)
-     * unless the {@link AbstractBTree} is placed onto a
-     * {@link HardReferenceQueue} maintained by the application.
-     * <p>
-     * Note: <em>DO NOT MODIFY THIS FIELD DIRECTLY</em> -- The
-     * {@link IResourceManager} is responsible for setting up the
-     * {@link HardReferenceQueue}, updating this field, and
-     * {@link #close() closing} {@link AbstractBTree}s that are not in use.
-     */
-    public int referenceCount = 0;
+//    /**
+//     * Count of the #of times that a reference to this {@link AbstractBTree}
+//     * occurs on a {@link HardReferenceQueue}. This field will remain zero(0)
+//     * unless the {@link AbstractBTree} is placed onto a
+//     * {@link HardReferenceQueue} maintained by the application.
+//     * <p>
+//     * Note: <em>DO NOT MODIFY THIS FIELD DIRECTLY</em> -- The
+//     * {@link IResourceManager} is responsible for setting up the
+//     * {@link HardReferenceQueue}, updating this field, and
+//     * {@link #close() closing} {@link AbstractBTree}s that are not in use.
+//     */
+//    public int referenceCount = 0;
 
     /**
      * Nodes (that is nodes or leaves) are added to a hard reference queue when
      * they are created or read from the store. On eviction from the queue a
      * dirty node is serialized by a listener against the {@link IRawStore}.
-     * Once the node is no longer strongly reachable weak references to that
-     * node may be cleared by the VM - in this manner the node will become
-     * unreachable by navigation from its ancestors in the btree.
+     * The nodes and leaves refer to their parent with a {@link WeakReference}s.
+     * Likewise, nodes refer to their children with a {@link WeakReference}.
+     * The hard reference queue in combination with {@link #touch(AbstractNode)}
+     * and with hard references held on the stack ensures that the parent and/or
+     * children remain reachable during operations. Once the node is no longer
+     * strongly reachable weak references to that node may be cleared by the VM -
+     * in this manner the node will become unreachable by navigation from its
+     * ancestors in the btree.  The special role of the hard reference queue is
+     * to further ensure that dirty nodes remain dirty by defering persistence
+     * until the reference count for the node is zero during an eviction from
+     * the queue.
      * <p>
      * Note that nodes are evicted as new nodes are added to the hard reference
      * queue. This occurs in two situations: (1) when a new node is created
@@ -1678,11 +1685,11 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
 
     /**
      * <p>
-     * Touch the node or leaf on the {@link #writeRetentionQueue}. If the node is not
-     * found on a scan of the tail of the queue, then it is appended to the
-     * queue and its {@link AbstractNode#referenceCount} is incremented. If the
-     * a node is being appended to the queue and the queue is at capacity, then
-     * this will cause a reference to be evicted from the queue. If the
+     * Touch the node or leaf on the {@link #writeRetentionQueue}. If the node
+     * is not found on a scan of the head of the queue, then it is appended to
+     * the queue and its {@link AbstractNode#referenceCount} is incremented. If
+     * the a node is being appended to the queue and the queue is at capacity,
+     * then this will cause a reference to be evicted from the queue. If the
      * reference counter for the evicted node or leaf is zero, then the node or
      * leaf will be written onto the store and made immutable. A subsequent
      * attempt to modify the node or leaf will force copy-on-write for that node
@@ -1696,11 +1703,15 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * <p>
      * In conjunction with {@link DefaultEvictionListener}, this method
      * guarentees that the reference counter for the node will reflect the #of
-     * times that the node is actually present on the {@link #writeRetentionQueue}.
+     * times that the node is actually present on the
+     * {@link #writeRetentionQueue}.
      * </p>
      * 
      * @param node
      *            The node or leaf.
+     * 
+     * @todo review the guarentees offered by this method under the assumption
+     *       of concurrent readers.
      */
     final protected void touch(AbstractNode node) {
 

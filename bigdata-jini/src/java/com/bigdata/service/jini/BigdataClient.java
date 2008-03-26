@@ -315,14 +315,22 @@ public class BigdataClient extends AbstractBigdataClient {
 
         final Properties properties = new Properties();
 
-        InputStream is = new BufferedInputStream(new FileInputStream(
-                propertyFile));
+        InputStream is = null;
 
-        properties.load(is);
+        try {
 
-        is.close();
+            is = new BufferedInputStream(new FileInputStream(propertyFile));
 
-        return properties;
+            properties.load(is);
+
+            return properties;
+
+        } finally {
+
+            if (is != null)
+                is.close();
+
+        }
 
     }
     
