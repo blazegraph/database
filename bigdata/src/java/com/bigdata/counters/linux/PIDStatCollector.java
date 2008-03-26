@@ -35,16 +35,20 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.AbstractProcessCollector;
+import com.bigdata.counters.AbstractProcessReader;
 import com.bigdata.counters.ActiveProcess;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IInstrument;
+import com.bigdata.counters.IProcessCounters;
+import com.bigdata.counters.ProcessReaderHelper;
+import com.bigdata.counters.linux.SarCpuUtilizationCollector.DI;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -59,7 +63,8 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PIDStatCollector extends AbstractProcessCollector {
+public class PIDStatCollector extends AbstractProcessCollector implements
+        ICounterHierarchy, IProcessCounters {
 
     static protected final Logger log = Logger.getLogger(PIDStatCollector.class);
 
@@ -78,12 +83,6 @@ public class PIDStatCollector extends AbstractProcessCollector {
     /** process to be monitored. */
     protected final int pid;
     
-    /**
-     * The path prefix under which the per-process performance counters will be
-     * placed within the {@link ICounterSet} hierarchy.
-     */
-    protected final String processName;
-
     /**
      * set <code>true</code> if per-process IO data collection should be
      * supported based on the {@link KernelVersion}.
@@ -120,10 +119,14 @@ public class PIDStatCollector extends AbstractProcessCollector {
         
         public Double getValue() {
          
-            double d = (Double) vals.get(path);
-            
-            d *= scale;
-            
+            final Double value = (Double) vals.get(path);
+
+            // no value is defined.
+            if (value == null)
+                return 0d;
+
+            final double d = value.doubleValue() * scale;
+
             return d;
             
         }
@@ -147,24 +150,25 @@ public class PIDStatCollector extends AbstractProcessCollector {
     }
 
     /**
-     * Updated each time a new row of data is read from the process and
-     * reported as the last modified time for counters based on that
-     * process.
+     * Updated each time a new row of data is read from the process and reported
+     * as the last modified time for counters based on that process and
+     * defaulted to the time that we begin to collect performance data.
      */
     private long lastModified = System.currentTimeMillis();
     
     /**
-     * Map containing the current values for the configured counters. The
-     * keys are paths into the {@link CounterSet}. The values are the data
-     * most recently read from <code>pidstat</code>.
+     * Map containing the current values for the configured counters. The keys
+     * are paths into the {@link CounterSet}. The values are the data most
+     * recently read from <code>pidstat</code>.
+     * <p>
+     * Note: The paths are in fact relative to how the counters are declared by
+     * {@link #getCounters()}. Likewise {@link DI#getValue()} uses the paths
+     * declared within {@link #getCounters()} and not whatever path the counters
+     * are eventually placed under within a larger hierarchy.
      */
     private Map<String,Object> vals = new HashMap<String, Object>();
 
     /**
-     * @param processName
-     *            The name of the process (or more typically its service
-     *            {@link UUID}) whose per-process performance counters are to
-     *            be collected.
      * @param pid
      *            Process to be monitored.
      * @param interval
@@ -174,13 +178,9 @@ public class PIDStatCollector extends AbstractProcessCollector {
      * 
      * @todo kernelVersion could be static.
      */
-    public PIDStatCollector(String processName, int pid, int interval,
-            KernelVersion kernelVersion) {
+    public PIDStatCollector(int pid, int interval, KernelVersion kernelVersion) {
 
         super(interval);
-        
-        if (processName == null)
-            throw new IllegalArgumentException();
         
         if (interval <= 0)
             throw new IllegalArgumentException();
@@ -189,8 +189,6 @@ public class PIDStatCollector extends AbstractProcessCollector {
             throw new IllegalArgumentException();
 
         this.pid = pid;
-
-        this.processName = processName;
         
         perProcessIOData = kernelVersion.version >= 2
                 && kernelVersion.major >= 6 && kernelVersion.minor >= 20;
@@ -227,15 +225,17 @@ public class PIDStatCollector extends AbstractProcessCollector {
     }
     
     /**
-     * Extended to declare the counters that we will collect using
-     * <code>pidstat</code>.
+     * Declare the counters that we will collect using <code>pidstat</code>.
+     * These counters are NOT placed within the counter hierarchy but are
+     * declared using the bare path for the counter. E.g., as
+     * {@link IProcessCounters#Memory_virtualSize}.
      */
-    public CounterSet getCounters() {
+    synchronized public CounterSet getCounters() {
         
-        CounterSet root = super.getCounters();
+        if(root == null) {
         
-        if(inst == null) {
-        
+            root = new CounterSet();
+            
             inst = new LinkedList<I>();
             
             /*
@@ -245,27 +245,23 @@ public class PIDStatCollector extends AbstractProcessCollector {
              * Note: pidstat reports percentages as [0:100] so we normalize them
              * to [0:1] using a scaling factor.
              */
-            
-            final String p = processName + ps;
 
-            inst.add(new I(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
+            inst.add(new I(IProcessCounters.CPU_PercentUserTime,.01d));
+            inst.add(new I(IProcessCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new I(IProcessCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new I(p+IProcessCounters.CPU_PercentUserTime,.01d));
-            
-            inst.add(new I(p+IProcessCounters.CPU_PercentSystemTime,.01d));
-            
-            inst.add(new I(p+IProcessCounters.Memory_minorFaultsPerSec,1d));
-            inst.add(new I(p+IProcessCounters.Memory_majorFaultsPerSec,1d));
-            inst.add(new I(p+IProcessCounters.Memory_virtualSize,1d));
-            inst.add(new I(p+IProcessCounters.Memory_residentSetSize,1d));
-            inst.add(new I(p+IProcessCounters.Memory_percentMemorySize,.01d));
+            inst.add(new I(IProcessCounters.Memory_minorFaultsPerSec,1d));
+            inst.add(new I(IProcessCounters.Memory_majorFaultsPerSec,1d));
+            inst.add(new I(IProcessCounters.Memory_virtualSize,1d));
+            inst.add(new I(IProcessCounters.Memory_residentSetSize,1d));
+            inst.add(new I(IProcessCounters.Memory_percentMemorySize,.01d));
 
             /*
              * Note: pidstat reports in kb/sec so we normalize to bytes/second
              * using a scaling factor.
              */
-            inst.add(new I(p+IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
-            inst.add(new I(p+IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
+            inst.add(new I(IProcessCounters.PhysicalDisk_BytesReadPerSec, Bytes.kilobyte32));
+            inst.add(new I(IProcessCounters.PhysicalDisk_BytesWrittenPerSec, Bytes.kilobyte32));
 
         }
         
@@ -281,6 +277,7 @@ public class PIDStatCollector extends AbstractProcessCollector {
         
     }
     private List<I> inst = null;
+    private CounterSet root = null;
     
     /**
      * Extended to force <code>pidstat</code> to use a consistent
