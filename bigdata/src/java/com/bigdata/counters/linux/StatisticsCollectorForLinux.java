@@ -187,10 +187,17 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         
         if( ! countersAdded ) {
 
-            // these are per-host counters.
+            /*
+             * These are per-host counters. We attach them under the fully
+             * qualified hostname.
+             */
             root.makePath(fullyQualifiedHostName).attach( sar1.getCounters() );
 
-            // these are per-process counters.
+            /*
+             * These are per-process counters. The process name is already in
+             * the path for these counters. We attach them under the fully
+             * qualified hostname.
+             */
             root.makePath(fullyQualifiedHostName).attach( pidstat.getCounters() );
             
         }
