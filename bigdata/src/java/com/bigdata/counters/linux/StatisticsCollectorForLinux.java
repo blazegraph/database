@@ -12,7 +12,6 @@ import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
 
 /**
  * Collection of host performance data using the <code>sysstat</code> suite.
@@ -187,9 +186,11 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         CounterSet root = super.getCounters();
         
         if( ! countersAdded ) {
-            
+
+            // these are per-host counters.
             root.attach( sar1.getCounters() );
 
+            // these are per-process counters.
             root.attach( pidstat.getCounters() );
             
         }

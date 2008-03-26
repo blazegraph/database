@@ -228,7 +228,7 @@ public class Name2Addr extends BTree {
      *            The capacity of the inner {@link LRUCache} for the
      *            {@link WeakValueCache}.
      * 
-     * @see Options#NAME2ADDR_CACHE_CAPACITY
+     * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
     synchronized protected void setupCache(int cacheCapacity) {
         

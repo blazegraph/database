@@ -322,7 +322,13 @@ public class CounterSet implements ICounterSet {
 
         if (children.containsKey(child.getName())) {
 
-            throw new IllegalStateException("child by that name exists");
+            /*
+             * Note: This can also occur when the child is a counter vs a
+             * counter set.
+             */
+            
+            throw new IllegalStateException("child by that name exists: path="
+                    + getPath() + ", child=" + child.getName());
             
         }
         

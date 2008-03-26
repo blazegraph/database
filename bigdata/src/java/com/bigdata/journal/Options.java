@@ -30,6 +30,7 @@ import java.nio.channels.FileChannel;
 import java.util.Properties;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -77,7 +78,7 @@ public interface Options {
      * {@link #CREATE} is true, then a new journal will be created. The filename
      * extension <code>.jnl</code> is recommended.
      */
-    public static final String FILE = "file";
+    String FILE = "file";
 
     /**
      * <code>bufferMode</code> - One of "Transient", "Direct", "Mapped", or
@@ -91,24 +92,65 @@ public interface Options {
      * 
      * @see #DEFAULT_BUFFER_MODE
      */
-    public static final String BUFFER_MODE = "bufferMode";
+    String BUFFER_MODE = "bufferMode";
 
     /**
-     * The capacity of the LRU cache for the "live" {@link Name2Addr} object
-     * (default 20). The {@link Name2Addr} class maintains the mapping between
-     * the name of an index and its address as of any given commit point. The
-     * capacity of the {@link Name2Addr}'s cache indirectly controls how many
-     * <strong>clean</strong> indices the journal will hold open. The effect is
-     * indirect owning to the semantics of weak references and the control of
-     * the JVM over when they are cleared. Dirty indices will be held open until
-     * the next commit/abort regardless since a hard reference is placed on the
-     * commit list.
+     * The capacity of the LRU cache for canonicalizing mapping maintained by
+     * the {@link AbstractJournal} for index {@link Checkpoint}s. The capacity
+     * of this cache indirectly controls how many <strong>historical</strong>
+     * indices the journal will hold open. The main reason for keeping a
+     * historical index open is to reuse its buffers, including its node and
+     * leaf cache, if another request arrives "soon" for that historical commit
+     * point of the index.
+     * <p>
+     * The effect of this parameter is indirect owning to the semantics of weak
+     * references and the control of the JVM over when they are cleared. Once an
+     * index becomes weakly reachable, the JVM will eventually GC the index
+     * object, thereby effectively closing it (or at least releasing all
+     * resources associated with that index). Since indices which are strongly
+     * reachable are never "closed" this provides our guarentee that indices are
+     * never closed if they are in use.
      * 
-     * @see #DEFAULT_NAME2ADDR_CACHE_CAPACITY
+     * @see #DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY
+     * 
+     * @see #LIVE_INDEX_CACHE_CAPACITY, which governs the retention of clean
+     *      "live" indices.
+     * 
+     * @see AbstractJournal#getIndex(long)
+     */
+    String HISTORICAL_INDEX_CACHE_CAPACITY = "historicalIndexCacheCapacity";
+    
+    /**
+     * The capacity of the LRU cache for the "live" {@link Name2Addr} object
+     * (default 20). A special {@link Name2Addr} instance is maintained for the
+     * "live" index objects, gives the most recent {@link Checkpoint} address
+     * from which the "live" version of the index may be loaded, and provides a
+     * canonicalizing cache for the "live" index objects by name.
+     * <p>
+     * The capacity of this cache for this special {@link Name2Addr} instance
+     * indirectly controls how many <strong>clean</strong> "live" indices the
+     * journal will hold open. A "live" index is only clean when it has just
+     * been loaded from the store or when it has just been committed, so this
+     * really effects how long an index which has been committed will be keep
+     * open. The main reason for keeping the index open after a commit is to
+     * reuse its buffers, including its node and leaf cache, if another request
+     * arrives "soon" for an operation on that index.
+     * <p>
+     * The effect of this parameter is indirect owning to the semantics of weak
+     * references and the control of the JVM over when they are cleared. Once an
+     * index becomes weakly reachable, the JVM will eventually GC the index
+     * object, thereby effectively closing it (or at least releasing all
+     * resources associated with that index). Dirty indices will be held open
+     * until the next commit/abort regardless since a hard reference is placed
+     * on the commit list.
+     * 
+     * @see #DEFAULT_LIVE_INDEX_CACHE_CAPACITY
+     * 
+     * @see #HISTORICAL_INDEX_CACHE_CAPACITY
      * 
      * @see Name2Addr
      */
-    String NAME2ADDR_CACHE_CAPACITY = "name2AddrCacheCapacity";
+    String LIVE_INDEX_CACHE_CAPACITY = "liveIndexCacheCapacity";
     
     /**
      * <code>useDirectBuffers</code> - A boolean property whose value controls
@@ -118,7 +160,7 @@ public interface Options {
      * {@link BufferMode#Direct}. This parameter has no effect for the
      * memory-mapped or disk-only buffer modes.
      */
-    public static final String USE_DIRECT_BUFFERS = "useDirectBuffers";
+    String USE_DIRECT_BUFFERS = "useDirectBuffers";
     
     /**
      * <code>writeCacheCapacity</code> - An integer property whose value
@@ -130,7 +172,7 @@ public interface Options {
      * 
      * @see #DEFAULT_WRITE_CACHE_CAPACITY
      */
-    public static final String WRITE_CACHE_CAPACITY = "writeCacheCapacity";
+    String WRITE_CACHE_CAPACITY = "writeCacheCapacity";
     
     /**
      * <code>initialExtent</code> - The initial extent of the journal (bytes).
@@ -144,11 +186,11 @@ public interface Options {
      * 
      * @see #DEFAULT_INITIAL_EXTENT
      */
-    public static final String INITIAL_EXTENT = "initialExtent";
+    String INITIAL_EXTENT = "initialExtent";
     
-    public static final long minimumInitialExtent = Bytes.megabyte;
+    long minimumInitialExtent = Bytes.megabyte;
     
-    public static final int minimumWriteCacheCapacity = Bytes.megabyte32;
+    int minimumWriteCacheCapacity = Bytes.megabyte32;
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
@@ -157,7 +199,7 @@ public interface Options {
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */
-    public static final String MAXIMUM_EXTENT = "maximumExtent";
+    String MAXIMUM_EXTENT = "maximumExtent";
 
     /**
      * <code>offsetBits</code> - The #of bits in a 64-bit long integer
@@ -169,7 +211,7 @@ public interface Options {
      * @see WormAddressManager
      * @see WormAddressManager#DEFAULT_OFFSET_BITS
      */
-    public static final String OFFSET_BITS = "offsetBits";
+    String OFFSET_BITS = "offsetBits";
     
     /**
      * <code>validateChecksum</code> - An optional boolean property (default
@@ -181,14 +223,14 @@ public interface Options {
      * 
      * @see #DEFAULT_VALIDATE_CHECKSUM
      */
-    public static final String VALIDATE_CHECKSUM = "validateChecksum";
+    String VALIDATE_CHECKSUM = "validateChecksum";
     
     /**
      * <code>create</code> - An optional boolean property (default is
      * <code>true</code>). When true and the named file is not found, a new
      * journal will be created.
      */
-    public static final String CREATE = "create";
+    String CREATE = "create";
 
     /**
      * <code>createTime</code> - An optional property allowed iff a new
@@ -197,13 +239,13 @@ public interface Options {
      * is used by the {@link ResourceManager} to place consistent createTime
      * timestamps on its managed journal resources.
      */
-    public static final String CREATE_TIME = "createTime";
+    String CREATE_TIME = "createTime";
     
     /**
      * <code>readOnly</code> - When true, the journal must pre-exist and
      * will be read-only (optional, default is <code>false</code>).
      */
-    public static final String READ_ONLY = "readOnly";
+    String READ_ONLY = "readOnly";
     
     /**
      * <code>forceWrites</code> - A trinary property {no, force,
@@ -217,7 +259,7 @@ public interface Options {
      * @see #DEFAULT_FORCE_WRITES
      * @see ForceEnum
      */
-    public static final String FORCE_WRITES = "forceWrites";
+    String FORCE_WRITES = "forceWrites";
 
     /**
      * <code>forceOnCommit</code> - A trinary property {no, force,
@@ -256,7 +298,7 @@ public interface Options {
      * @see FileChannel#force(boolean)
      * @see ForceEnum
      */
-    public static final String FORCE_ON_COMMIT = "forceOnCommit";
+    String FORCE_ON_COMMIT = "forceOnCommit";
 
     /**
      * <code>doubleSync</code> - This boolean option causes application data
@@ -283,7 +325,7 @@ public interface Options {
      *             since writes will be ordered and all data will be on disk
      *             before we update the commit blocks.
      */
-    public static final String DOUBLE_SYNC = "doubleSync";
+    String DOUBLE_SYNC = "doubleSync";
 
     /**
      * <code>createTempFile</code> - This boolean option causes a new file to
@@ -303,7 +345,7 @@ public interface Options {
      * MUST (a) set this option to <code>false</code> and (b) set
      * {@link #FILE} to the value returned by {@link AbstractJournal#getFile()}.
      */
-    public final static String CREATE_TEMP_FILE = "createTempFile";
+    String CREATE_TEMP_FILE = "createTempFile";
     
     /**
      * <code>deleteOnClose</code> - This boolean option causes the journal
@@ -312,7 +354,7 @@ public interface Options {
      * restart safety) to keep down the disk burden of the tests and MUST NOT be
      * used with restart-safe data.
      */
-    public final static String DELETE_ON_CLOSE = "deleteOnClose";
+    String DELETE_ON_CLOSE = "deleteOnClose";
 
     /**
      * <code>deleteOnExit</code> - This boolean option causes the journal file
@@ -320,7 +362,7 @@ public interface Options {
      * is used by the test suites to keep down the disk burden of the tests
      * and MUST NOT be used with restart-safe data.
      */
-    public final static String DELETE_ON_EXIT = "deleteOnExit";
+    String DELETE_ON_EXIT = "deleteOnExit";
     
     /**
      * <code>tmp.dir</code> - The property whose value is the name of the
@@ -330,7 +372,7 @@ public interface Options {
      * files that can be created, including temporary journals, intermediate
      * files from an index merge process, etc.
      */
-    public static final String TMP_DIR = "tmp.dir";
+    String TMP_DIR = "tmp.dir";
 
     /**
      * <code>branchingFactor</code> - The branching factor for indices
@@ -338,33 +380,33 @@ public interface Options {
      * 
      * @see #DEFAULT_BRANCHING_FACTOR
      */
-    public static final String BRANCHING_FACTOR = "branchingFactor";
+    String BRANCHING_FACTOR = "branchingFactor";
     
     /**
      * The default for the {@link #BUFFER_MODE}.
      */
-    public final static BufferMode DEFAULT_BUFFER_MODE = BufferMode.Disk;
+    BufferMode DEFAULT_BUFFER_MODE = BufferMode.Disk;
     
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.
      */
-    public final static boolean DEFAULT_USE_DIRECT_BUFFERS = false;
+    boolean DEFAULT_USE_DIRECT_BUFFERS = false;
 
     /**
      * The default for {@link #WRITE_CACHE_CAPACITY} (10M).
      */
-    public final static int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
+    int DEFAULT_WRITE_CACHE_CAPACITY = 10 * Bytes.megabyte32;
     
     /**
      * The default initial extent for a new journal.
      */
-    public final static long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
+    long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
     
     /**
      * The default maximum extent for a new journal before a commit triggers an
      * overflow event.
      */
-    public final static long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
+    long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
     
     /**
      * The default #of bits used to encode the byte offset of a record in the
@@ -372,19 +414,19 @@ public interface Options {
      * 
      * @see WormAddressManager#DEFAULT_OFFSET_BITS
      */
-    public final static int DEFAULT_OFFSET_BITS = WormAddressManager.DEFAULT_OFFSET_BITS;
+    int DEFAULT_OFFSET_BITS = WormAddressManager.DEFAULT_OFFSET_BITS;
 
-    public final static boolean DEFAULT_VALIDATE_CHECKSUM = true;
+    boolean DEFAULT_VALIDATE_CHECKSUM = true;
     
     /**
      * The default for the {@link #CREATE} option.
      */
-    public final static boolean DEFAULT_CREATE = true;
+    boolean DEFAULT_CREATE = true;
 
     /**
      * The default for the {@link #READ_ONLY} option.
      */
-    public final static boolean DEFAULT_READ_ONLY = false;
+    boolean DEFAULT_READ_ONLY = false;
     
     /**
      * The default for the {@link #FORCE_WRITES} option (writes are not forced).
@@ -392,53 +434,58 @@ public interface Options {
      * @todo consider changing this default so that we normally request
      *       synchronous writes.
      */
-    public final static ForceEnum DEFAULT_FORCE_WRITES = ForceEnum.No;
+    ForceEnum DEFAULT_FORCE_WRITES = ForceEnum.No;
     
     /**
      * The default for the {@link #FORCE_ON_COMMIT} option (file data and
      * metadata are forced).
      */
-    public final static ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.ForceMetadata;
+    ForceEnum DEFAULT_FORCE_ON_COMMIT = ForceEnum.ForceMetadata;
     
     /**
      * The default for the {@link #DOUBLE_SYNC} option (application data is NOT
      * forced to disk before we write the root blocks).
      */
-    public final static boolean DEFAULT_DOUBLE_SYNC = false;
+    boolean DEFAULT_DOUBLE_SYNC = false;
     
     /**
      * The default for the {@link #DELETE_ON_CLOSE} option.
      */
-    public final static boolean DEFAULT_DELETE_ON_CLOSE = false;
+    boolean DEFAULT_DELETE_ON_CLOSE = false;
 
     /**
      * The default for the {@link #DELETE_ON_EXIT} option.
      */
-    public final static boolean DEFAULT_DELETE_ON_EXIT = false;
+    boolean DEFAULT_DELETE_ON_EXIT = false;
 
     /**
      * The default for the {@link #CREATE_TEMP_FILE} option.
      */
-    public final static boolean DEFAULT_CREATE_TEMP_FILE = false;
+    boolean DEFAULT_CREATE_TEMP_FILE = false;
 
     /**
      * The default for the {@link #BRANCHING_FACTOR} option.
      */
-    public final static String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
+    String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
 
     /**
-     * The default for the {@link #NAME2ADDR_CACHE_CAPACITY} option.
+     * The default for the {@link #HISTORICAL_INDEX_CACHE_CAPACITY} option.
      */
-    String DEFAULT_NAME2ADDR_CACHE_CAPACITY = "20";
+    String DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY = "20";
+
+    /**
+     * The default for the {@link #LIVE_INDEX_CACHE_CAPACITY} option.
+     */
+    String DEFAULT_LIVE_INDEX_CACHE_CAPACITY = "20";
     
     /**
      * The recommended extension for journal files.
      */
-    public static final String JNL = ".jnl";
+    String JNL = ".jnl";
     
     /**
      * The recommended extension for {@link IndexSegment} files.
      */
-    public static final String SEG = ".seg";
+    String SEG = ".seg";
     
 }

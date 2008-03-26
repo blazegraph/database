@@ -1307,6 +1307,14 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
      * 
      * @throws RuntimeException
      *             if something goes wrong.
+     * 
+     * @todo Since these operations can have modest latency, especially if we
+     *       open an fully buffered index segment, it would be nice to use a
+     *       per-store (or store UUID) lock to avoid imposing latency on threads
+     *       requiring access to different stores.
+     * 
+     * FIXME When we decide that a store will be closed we need a lock which
+     * will serialize a concurrent request to open that store.
      */
     synchronized public IRawStore openStore(UUID uuid) {
 
@@ -1315,10 +1323,6 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
             throw new IllegalArgumentException();
 
         }
-
-//        lock.lock();
-//        
-//        try {
         
         /*
          * Check to see if the given resource is already open.
@@ -1485,12 +1489,6 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 
         // return the reference to the open store.
         return store;
-
-//        } finally {
-//            
-//            lock.unlock();
-//            
-//        }
         
     }
 
