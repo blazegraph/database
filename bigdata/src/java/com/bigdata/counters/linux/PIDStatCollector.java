@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -76,6 +77,12 @@ public class PIDStatCollector extends AbstractProcessCollector {
 
     /** process to be monitored. */
     protected final int pid;
+    
+    /**
+     * The path prefix under which the per-process performance counters will be
+     * placed within the {@link ICounterSet} hierarchy.
+     */
+    protected final String processName;
 
     /**
      * set <code>true</code> if per-process IO data collection should be
@@ -154,21 +161,37 @@ public class PIDStatCollector extends AbstractProcessCollector {
     private Map<String,Object> vals = new HashMap<String, Object>();
 
     /**
-     * 
+     * @param processName
+     *            The name of the process (or more typically its service
+     *            {@link UUID}) whose per-process performance counters are to
+     *            be collected.
      * @param pid
      *            Process to be monitored.
      * @param interval
      *            Reporting interval in seconds.
      * @param kernelVersion
      *            The Linux {@link KernelVersion}.
+     * 
+     * @todo kernelVersion could be static.
      */
-    public PIDStatCollector(int pid, int interval,
+    public PIDStatCollector(String processName, int pid, int interval,
             KernelVersion kernelVersion) {
 
         super(interval);
+        
+        if (processName == null)
+            throw new IllegalArgumentException();
+        
+        if (interval <= 0)
+            throw new IllegalArgumentException();
+        
+        if (kernelVersion == null)
+            throw new IllegalArgumentException();
 
         this.pid = pid;
 
+        this.processName = processName;
+        
         perProcessIOData = kernelVersion.version >= 2
                 && kernelVersion.major >= 6 && kernelVersion.minor >= 20;
 
@@ -223,8 +246,7 @@ public class PIDStatCollector extends AbstractProcessCollector {
              * to [0:1] using a scaling factor.
              */
             
-            // FIXME The counters need to be in the _SERVICE_ UUID namespace under the FQ hostname.
-            final String p = hostPathPrefix;
+            final String p = hostPathPrefix + processName + ps;
 
             inst.add(new I(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             

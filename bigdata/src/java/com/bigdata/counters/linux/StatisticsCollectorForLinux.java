@@ -8,16 +8,16 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSet;
 
 /**
  * Collection of host performance data using the <code>sysstat</code> suite.
  * 
  * @see http://pagesperso-orange.fr/sebastien.godard/
- * 
- * FIXME verify scaling for all collected counters.
  * 
  * @todo configuration parameters to locate the sysstat utilities (normally
  *       installed into /usr/bin).
@@ -198,7 +198,17 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         
     }
     
-    public StatisticsCollectorForLinux(int interval) {
+    /**
+     * 
+     * @param interval
+     *            The interval at which the performance counters will be
+     *            collected in seconds.
+     * @param processName
+     *            The name of the process (or more typically its service
+     *            {@link UUID}) whose per-process performance counters are to
+     *            be collected.
+     */
+    public StatisticsCollectorForLinux(int interval, String processName) {
 
         super(interval);
 
@@ -206,7 +216,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
         sar1 = new SarCpuUtilizationCollector(interval,kernelVersion);
 
         // process specific collection.
-        pidstat = new PIDStatCollector(pid, interval, kernelVersion);
+        pidstat = new PIDStatCollector(processName, pid, interval, kernelVersion);
 
     }
 
