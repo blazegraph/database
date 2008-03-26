@@ -284,7 +284,15 @@ abstract public class DataService implements IDataService, IWritePipeline,
     final protected ResourceManager resourceManager;
     final protected ConcurrencyManager concurrencyManager;
     final protected AbstractLocalTransactionManager localTransactionManager;
-    final protected AbstractStatisticsCollector statisticsCollector;
+    
+    /**
+     * Note: this value is not bound until the {@link #getServiceUUID()} reports
+     * a non-null value.
+     * 
+     * @see StartPerformanceCounterCollectionTask
+     * @see ReportTask
+     */
+    protected AbstractStatisticsCollector statisticsCollector;
 
     /**
      * Runs a {@link StatusTask} printing out periodic service status
@@ -457,27 +465,15 @@ abstract public class DataService implements IDataService, IWritePipeline,
         // setup to collect statistics and report about this host.
         {
             
-            statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
-            
-            statisticsCollector.start();
-
-            final long delay = Long.parseLong(properties.getProperty(
-                    Options.REPORT_DELAY,
-                    Options.DEFAULT_REPORT_DELAY));
-
-            log.info(Options.REPORT_DELAY + "=" + delay);
-            
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            // wait the normal amount of time before reporting in the first time.
-            final long initialDelay = delay;
-            
             reportService = Executors
             .newSingleThreadScheduledExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
             
-            reportService.scheduleWithFixedDelay(new ReportTask(),
-                    initialDelay, delay, unit);
+            reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(properties),
+                    50, // initialDelay (ms)
+                    50, // delay
+                    TimeUnit.MILLISECONDS // unit
+                    );
 
         }
         
@@ -874,6 +870,127 @@ abstract public class DataService implements IDataService, IWritePipeline,
         
     }
 
+    /**
+     * This task runs periodically. Once {@link IDataService#getServiceUUID()}
+     * reports a non-<code>null</code> value, it starts the performance
+     * counter collector and the {@link ReportTask} which will relay the
+     * performance counters to the {@link ILoadBalancerService}. At that point
+     * this task will throw an exception in order to prevent it from being
+     * re-executed by the {@link DataService#reportService}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public class StartPerformanceCounterCollectionTask implements Runnable {
+
+        /**
+         * Note: The logger is named for this class, but since it is an inner
+         * class the name uses a "$" delimiter (vs a ".") between the outer and
+         * the inner class names.
+         */
+        final protected Logger log = Logger.getLogger(StartPerformanceCounterCollectionTask.class);
+
+        protected Properties properties;
+        
+        public StartPerformanceCounterCollectionTask(Properties properties) {
+        
+            if (properties == null)
+                throw new IllegalArgumentException();
+            
+            // prevent modification of the caller's properties.
+            this.properties = new Properties( properties );
+        
+        }
+
+        /**
+         * @throws RuntimeException
+         *             once the performance counter collection task is running.
+         */
+        public void run() {
+
+            final boolean started;
+            
+            try {
+                
+                started = startCollection();
+                
+            } catch (Throwable t) {
+
+                log.warn("Problem in report task?", t);
+
+                return;
+                
+            }
+
+            if (started) {
+
+                /*
+                 * Note: This exception is thrown once we have started
+                 * performance counter collection.
+                 */
+                
+                throw new RuntimeException(
+                        "Task aborting after normal completion - performance collection is now running");
+                
+            }
+            
+        }
+        
+        /**
+         * Starts performance counter collection once the service {@link UUID}
+         * is known.
+         * 
+         * @return <code>true</code> iff performance counter collection was
+         *         started.
+         * 
+         * @throws IOException
+         *             if {@link IDataService#getServiceUUID()} throws this
+         *             exception (it never should since it is a local method
+         *             call).
+         */
+        protected boolean startCollection() throws IOException {
+
+            final UUID uuid = getServiceUUID();
+
+            if (uuid == null) {
+
+                log.info("Service UUID is not assigned yet.");
+
+                return false;
+
+            }
+
+            log.info("Service UUID was assigned - will start performance counter collection: uuid="
+                            + uuid);
+            
+            properties.setProperty(
+                    AbstractStatisticsCollector.Options.PROCESS_NAME, uuid
+                            .toString());
+            
+            statisticsCollector = AbstractStatisticsCollector.newInstance(properties);
+            
+            statisticsCollector.start();
+
+            final long delay = Long.parseLong(properties.getProperty(
+                    Options.REPORT_DELAY,
+                    Options.DEFAULT_REPORT_DELAY));
+
+            log.info(Options.REPORT_DELAY + "=" + delay);
+            
+            final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+            // wait the normal amount of time before reporting in the first time.
+            final long initialDelay = delay;
+            
+            reportService.scheduleWithFixedDelay(new ReportTask(),
+                    initialDelay, delay, unit);
+            
+            return true;
+            
+        }
+        
+    }
+    
     /**
      * Periodically send performance counter data to the
      * {@link ILoadBalancerService}.

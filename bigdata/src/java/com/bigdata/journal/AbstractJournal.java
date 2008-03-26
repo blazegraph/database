@@ -50,7 +50,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.ReadOnlyIndex;
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -119,18 +118,7 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * FIXME Priority items are:
  * <ol>
- * <li> Resource management (closing down unused unisolated btrees, index
- * segments and journals based on LRU policy and timeout; in a distributed
- * solution resources would be migrated to other hosts to reduce the total
- * sustained resource load).</li>
  * <li> Minimize (de-)serialization costs for B+Trees since we are not IO bound.</li>
- * <li> Reduce heap churn through the use allocation pools for ByteBuffers and
- * byte[]s. There are several places where we can do this, including:
- * {@link BTree}, the {@link Tx} backing store, etc. Bin the objects into
- * buckets within a pool. Each bucket can be a {@link HardReferenceQueue}.
- * Limit the #of objects retained in a given bucket so that the pool does not
- * become a memory sink. Profile using the BEA tool to look for sources of
- * memory allocation and leakage. </li>
  * <li> AIO for the Direct and Disk modes (low priority since not IO bound).</li>
  * <li> GOM integration features, including: support for primary key (clustered)
  * indices; supporting both embedded and remote scenarios; and using state-based
@@ -155,16 +143,16 @@ import com.bigdata.util.ChecksumUtility;
  *       must be rolled back. This should be worked out with the resource
  *       deallocation for old journals and segments.
  * 
- * @todo Define distributed protocol for robust startup, operation, and
- *       failover.
- * 
  * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
  *       or other persistence capable data structure basis. It is nice to be
  *       able to choose for which indices and when ( {@link Journal} vs
  *       {@link IndexSegment}) to apply these algorithms. However, it might be
  *       nice to factor their application out a bit into a layered api - as long
  *       as the right layering is correctly re-established on load of the
- *       persistence data structure.
+ *       persistence data structure. In that view the {@link IRawStore} either
+ *       computes checksums or it does not and the checksums is stored in the
+ *       record, perhaps in the last 4 bytes. The checksum itself would not be
+ *       visible at the {@link IRawStore} API layer.
  * 
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
@@ -246,6 +234,43 @@ public abstract class AbstractJournal implements IJournal {
     private ICommitRecord _commitRecord;
 
     /**
+     * The configured capacity for the LRU backing the index cache maintained by
+     * the "live" {@link Name2Addr} object.
+     * 
+     * @see Options#LIVE_INDEX_CACHE_CAPACITY
+     */
+    private final int liveIndexCacheCapacity;
+    
+    /**
+     * The configured capacity for the LRU baching the {@link #historicalIndexCache}.
+     * 
+     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+     */
+    private final int historicalIndexCacheCapacity;
+    
+    /**
+     * A cache that is used by the {@link AbstractJournal} to provide a
+     * canonicalizing mapping from an address to the instance of a read-only
+     * historical object loaded from that address and which indirectly controls
+     * how long the journal will "keep open" historical index objects by prevent
+     * them from being swept by the garbage collector.
+     * <p>
+     * Note: the "live" version of an object MUST NOT be placed into this cache
+     * since its state will continue to evolve with additional writes while the
+     * cache is intended to provide a canonicalizing mapping to the historical
+     * committed states of the object. This means that objects such as indices
+     * and the {@link Name2Addr} index MUST NOT be inserted into the cache if
+     * the are being read from the store for "live" use. For this reason
+     * {@link Name2Addr} uses its own caching mechanisms.
+     * <p>
+     * Note: {@link #abort()} discards the contents of this cache in order to
+     * ensure that partial writes are discarded.
+     * 
+     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
+     */
+    final private WeakValueCache<Long, ICommitter> historicalIndexCache;
+    
+    /**
      * The "live" BTree mapping index names to the last metadata record
      * committed for the named index. The keys are index names (unicode
      * strings). The values are the names and the last known address of the
@@ -266,14 +291,6 @@ public abstract class AbstractJournal implements IJournal {
      */
     /*private*/Name2Addr name2Addr; // Note: used by some unit tests.
 
-    /**
-     * The configured capacity for the LRU backing the index cache maintained by
-     * the "live" {@link Name2Addr} object.
-     * 
-     * @see Options#NAME2ADDR_CACHE_CAPACITY
-     */
-    private final int name2addrCacheCapacity;
-    
     /**
      * A read-only view of the {@link Name2Addr} object mapping index names to
      * the last metadata record committed for the named index. The keys are
@@ -445,20 +462,39 @@ public abstract class AbstractJournal implements IJournal {
 //        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
 
         /*
-         * name2addrCacheCapacity
+         * historicalIndexCacheCapacity
+         */
+        {
+            historicalIndexCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.HISTORICAL_INDEX_CACHE_CAPACITY,
+                    Options.DEFAULT_HISTORICAL_INDEX_CACHE_CAPACITY));
+
+            log.info(Options.HISTORICAL_INDEX_CACHE_CAPACITY+"="+historicalIndexCacheCapacity);
+
+            if (historicalIndexCacheCapacity <= 0)
+                throw new RuntimeException(Options.HISTORICAL_INDEX_CACHE_CAPACITY
+                        + " must be non-negative");
+
+            historicalIndexCache = new WeakValueCache<Long, ICommitter>(
+                    new LRUCache<Long, ICommitter>(historicalIndexCacheCapacity));
+
+        }
+        
+        /*
+         * liveIndexCacheCapacity
          */
         {
         
-            name2addrCacheCapacity = Integer.parseInt(properties.getProperty(
-                    Options.NAME2ADDR_CACHE_CAPACITY,
-                    Options.DEFAULT_NAME2ADDR_CACHE_CAPACITY));
+            liveIndexCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.LIVE_INDEX_CACHE_CAPACITY,
+                    Options.DEFAULT_LIVE_INDEX_CACHE_CAPACITY));
 
-            log.info(Options.NAME2ADDR_CACHE_CAPACITY+"="+name2addrCacheCapacity);
+            log.info(Options.LIVE_INDEX_CACHE_CAPACITY+"="+liveIndexCacheCapacity);
 
-            if (name2addrCacheCapacity <= 0)
-                throw new RuntimeException(Options.NAME2ADDR_CACHE_CAPACITY
+            if (liveIndexCacheCapacity <= 0)
+                throw new RuntimeException(Options.LIVE_INDEX_CACHE_CAPACITY
                         + " must be non-negative");
-            
+
         }
         
         /*
@@ -518,10 +554,7 @@ public abstract class AbstractJournal implements IJournal {
         log.info(Options.WRITE_CACHE_CAPACITY + "=" + writeCacheCapacity);
 
         /*
-         * "maximumExtent" @todo refactor this a bit so that it is more
-         * explictly an overflow trigger leading to a new journal and eventually
-         * to a compacting merge. the parameter is not definable until the layer
-         * at which overflow is handled.
+         * "maximumExtent"
          */
 
         maximumExtent = Long.parseLong(properties.getProperty(
@@ -1041,9 +1074,6 @@ public abstract class AbstractJournal implements IJournal {
 
         log.info("");
         
-//        // force the commit thread to quit immediately.
-//        writeService.shutdownNow();
-        
         _bufferStrategy.close();
 
         // report event.
@@ -1317,41 +1347,24 @@ public abstract class AbstractJournal implements IJournal {
     }
 
     /**
-     * Discards any unisolated writes since the last {@link #commitNow(long)()}.
+     * Discards any unisolated writes since the last {@link #commitNow(long)()}
+     * and also discards the unisolated (aka live) btree objects, reloading them
+     * from the current {@link ICommitRecord} on demand.
      * <p>
-     * This is invoked if a transaction fails after it has begun writing data
-     * onto the global state from its isolated state. Once the transaction has
-     * begun this process it has modified the global (unisolated) state and the
-     * next commit will make those changes restart-safe. While this processing
-     * is not begun unless the commit SHOULD succeed, errors can nevertheless
-     * occur. Therefore, if the transaction fails its writes on the unisolated
-     * state must be discarded. Since the isolatable data structures (btrees)
-     * use a copy-on-write policy, writing new data never overwrites old data so
-     * nothing has been lost.
+     * Note: The {@link WriteExecutorService} handles commit group and uses an
+     * index {@link Checkpoint} strategy so that it is able to abort individual
+     * tasks simply by discarding their changes and without interrupting
+     * concurrent writers. An {@link #abort()} is therefore an action of last
+     * resort and is generally triggered by things such as running out of disk
+     * space or memory within the JVM.
      * <p>
-     * We can not simply reload the last root block since concurrent
-     * transactions may write non-restart safe data onto the store (transactions
-     * may use btrees to isolate changes, and those btrees will write on the
-     * store). Reloading the root block would discarding all writes, including
-     * those occurring in isolation in concurrent transactions.
-     * <p>
-     * Instead, what we do is discard the unisolated objects, reloading them
-     * from the current root addresses on demand. This correctly discards any
-     * writes on those unisolated objects while NOT resetting the nextOffset at
-     * which writes will occur on the store and NOT causing persistence capable
-     * objects (btrees) used for isolated by concurrent transactions to lose
-     * their write sets.
-     * <p>
-     * Note: When a commit group is aborted, the {@link Thread}s for the tasks
-     * in that commit group are interrupted. If a task was in the midst of an IO
-     * operation on a {@link Channel} then the channel will be asynchronously
-     * closed by the JDK. Since some {@link IBufferStrategy}s use a
-     * {@link FileChannel} to access the backing store, this means that we need
-     * to re-open the backing store transparently so that we can continue
-     * operations after the commit group was aborted.
-     * <p>
-     * Note: it is possible that threads can be interrupted for other reasons,
-     * but we do not necessarily notice and support re-opening of the store.
+     * If a {@link Thread}s is interrupted in the midst of an IO operation on a
+     * {@link Channel} then the channel will be asynchronously closed by the
+     * JDK. Since some {@link IBufferStrategy}s use a {@link FileChannel} to
+     * access the backing store, this means that we need to re-open the backing
+     * store transparently so that we can continue operations after the commit
+     * group was aborted. This is done automatially when we re-load the current
+     * {@link ICommitRecord} from the root blocks of the store.
      */
     public void abort() {
 
@@ -1365,7 +1378,8 @@ public abstract class AbstractJournal implements IJournal {
          * necessary in order to discard any checkpoints that may have been
          * written on indices since the last commit.
          */
-        objectCache.clear();
+    
+        historicalIndexCache.clear();
         
         // clear the root addresses - they will be reloaded.
         _commitRecord = null;
@@ -1383,10 +1397,10 @@ public abstract class AbstractJournal implements IJournal {
          * forcing its reload. However, doing this here is definately safer.
          * 
          * Note: This reads on the store. If the backing channel for a stable
-         * store was closed by an interrupt, e.g., during an abort of a group
-         * commit, then this will cause the backing channel to be transparent
-         * re-opened.  At that point both readers and writers will be able to
-         * access the channel again.
+         * store was closed by an interrupt, e.g., during an abort, then this
+         * will cause the backing channel to be transparent re-opened. At that
+         * point both readers and writers will be able to access the channel
+         * again.
          */
         
         _commitRecordIndex = getCommitRecordIndex(_rootBlock
@@ -1401,96 +1415,6 @@ public abstract class AbstractJournal implements IJournal {
         log.info("done");
 
     }
-    
-//    /**
-//     * When the journal is backed by a disk file and the file channel was
-//     * asynchronously closed by an interrupt during an IO operation then this
-//     * method will re-open the file.
-//     * <p>
-//     * Note:we need the filename and the fileMode to re-open the channel.
-//     * 
-//     * @todo encapsulate this logic better.
-//     * 
-//     * @todo verify that a mapped store will not let us do this. if it does then
-//     *       that is a great way to get the thing un-mapped!
-//     */
-//    private void reopenAfterInterrupt() {
-//        
-//        /*
-//         * Note: clear the interrupted flag in case it is still set on
-//         * this thread.  (It is the thread that is conducting the group
-//         * commit that winds up doing the abort.)
-//         */
-//        Thread.interrupted();
-//        
-//        if (_bufferStrategy.isStable() && _bufferStrategy.isOpen() ) {
-//            
-//            switch (_bufferStrategy.getBufferMode()) {
-//
-//            case Direct: {
-//                
-//                DirectBufferStrategy bs = (DirectBufferStrategy) _bufferStrategy;
-//            
-//                if (!bs.getChannel().isOpen()) {
-//
-//                    try {
-//
-//                        bs.raf = new RandomAccessFile(fileMetadata.file,
-//                                fileMetadata.fileMode);
-//
-//                        log.warn("Re-opened file closed by asynchronous interrupt");
-//
-//                    } catch (Throwable t) {
-//
-//                        throw new RuntimeException("Could not reopen file: "
-//                                + fileMetadata.file + " : " + t, t);
-//
-//                    }
-//                    
-//                }
-//                
-//                break;
-//                
-//            }
-//            
-//            case Disk: {
-//                
-//                DiskOnlyStrategy bs = (DiskOnlyStrategy) _bufferStrategy;
-//
-//                if (!bs.getChannel().isOpen()) {
-//
-//                    try {
-//
-//                        bs.raf.close();
-//                        
-//                        bs.raf = new RandomAccessFile(fileMetadata.file,
-//                                fileMetadata.fileMode);
-//                        
-//                        log.warn("Re-opened file closed by asynchronous interrupt");
-//
-//                    } catch (Throwable t) {
-//
-//                        throw new RuntimeException("Could not reopen file: "
-//                                + fileMetadata.file + " : " + t, t);
-//
-//                    }
-//                    
-//                }
-//                
-//                break;
-//                
-//            }
-//
-//            case Mapped:
-//            
-//            default:
-//                throw new UnsupportedOperationException();
-//
-//            }
-//            
-//        }
-//
-//    }
     
     /**
      * Note: This method can not be implemented by the {@link AbstractJournal}
@@ -1797,7 +1721,7 @@ public abstract class AbstractJournal implements IJournal {
      *            The root address of the btree -or- 0L iff the btree has not
      *            been defined yet.
      * 
-     * @see Options#NAME2ADDR_CACHE_CAPACITY
+     * @see Options#LIVE_INDEX_CACHE_CAPACITY
      */
     private void setupName2AddrBTree(long addr) {
 
@@ -1829,7 +1753,7 @@ public abstract class AbstractJournal implements IJournal {
 
         }
 
-        name2Addr.setupCache(name2addrCacheCapacity);
+        name2Addr.setupCache(liveIndexCacheCapacity);
         
         // register for commit notices.
         setCommitter(ROOT_NAME2ADDR, name2Addr);
@@ -1973,66 +1897,20 @@ public abstract class AbstractJournal implements IJournal {
     }
     
     /**
-     * A cache that is used by the {@link Journal} to provide a canonicalizing
-     * mapping from an address to the instance of a read-only historical object
-     * loaded from that address.
-     * <p>
-     * Note: the "live" version of an object MUST NOT be placed into this cache
-     * since its state will continue to evolve with additional writes while the
-     * cache is intended to provide a canonicalizing mapping to only the
-     * historical states of the object. This means that objects such as indices
-     * and the {@link Name2Addr} index MUST NOT be inserted into the cache if
-     * the are being read from the store for "live" use. For this reason
-     * {@link Name2Addr} uses its own caching mechanisms.
-     * 
-     * @todo discard cache on abort? that should not be necessary. even through
-     *       it can contain objects whose addresses were not made restart safe
-     *       those addresses should not be accessible to the application and
-     *       hence the objects should never be looked up and will be evicted in
-     *       due time from the cache. (this does rely on the fact that the store
-     *       never reuses an address.)
-     * 
-     * FIXME This is the place to solve the resource (RAM) burden for indices is
-     * Name2Addr. Currently, indices are never closed once opened which is a
-     * resource leak. We need to close them out eventually based on LRU plus
-     * timeout plus NOT IN USE. The way to approach this is a weak reference
-     * cache combined with an LRU or hard reference queue that tracks reference
-     * counters (just like the BTree hard reference cache for leaves). Eviction
-     * events lead to closing an index iff the reference counter is zero.
-     * Touches keep recently used indices from closing even though they may have
-     * a zero reference count.
-     * 
-     * @todo the {@link MasterJournal} needs to do similar things with
-     *       {@link IndexSegment}.
-     * 
-     * @todo review the metadata index lookup in the {@link SlaveJournal}. This
-     *       is a somewhat different case since we only need to work with the
-     *       current metadata index as along as we make sure not to reclaim
-     *       resources (journals and index segments) until there are no more
-     *       transactions which can read from them.
-     * 
-     * @todo support metering of index resources and timeout based shutdown of
-     *       indices. note that the "live" {@link Name2Addr} has its own cache
-     *       for the unisolated indices and that metering needs to pay attention
-     *       to the indices in that cache as well. Also, those indices can be
-     *       shutdown as long as they are not dirty (pending a commit).
-     */
-    final private WeakValueCache<Long, ICommitter> objectCache = new WeakValueCache<Long, ICommitter>(
-            new LRUCache<Long, ICommitter>(20));
-    
-    /**
      * A canonicalizing mapping for {@link BTree}s.
      * 
      * @param addr
      *            The address of the {@link Checkpoint} record for the {@link BTree}.
      *            
      * @return The {@link BTree} loaded from that {@link Checkpoint}.
+     * 
+     * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
     final public BTree getIndex(long addr) {
         
-        synchronized (objectCache) {
+        synchronized (historicalIndexCache) {
 
-            BTree obj = (BTree) objectCache.get(addr);
+            BTree obj = (BTree) historicalIndexCache.get(addr);
 
             if (obj == null) {
                 
@@ -2040,7 +1918,7 @@ public abstract class AbstractJournal implements IJournal {
                 
             }
             
-            objectCache.put(addr, (ICommitter)obj, false/*dirty*/);
+            historicalIndexCache.put(addr, (ICommitter)obj, false/*dirty*/);
     
             return obj;
 

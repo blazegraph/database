@@ -264,6 +264,11 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
 
     /**
      * The unique identifier for this data service.
+     * <p>
+     * Note: Some service discovery frameworks (Jini) will assign the service a
+     * {@link UUID} asynchronously after a new service starts, in which case
+     * this method will return <code>null</code> until the service
+     * {@link UUID} has been assigned.
      * 
      * @return The unique data service identifier.
      * 
