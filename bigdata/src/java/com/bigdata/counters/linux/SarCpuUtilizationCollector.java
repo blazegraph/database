@@ -154,10 +154,14 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
         
         public Double getValue() {
          
-            double d = (Double) vals.get(path);
-            
-            d *= scale;
-            
+            final Double value = (Double) vals.get(path);
+
+            // no value is defined.
+            if (value == null)
+                return 0d;
+
+            final double d = value.doubleValue() * scale;
+
             return d;
             
         }

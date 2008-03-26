@@ -116,7 +116,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
     
     private boolean countersAdded = false;
     
-    public CounterSet getCounters() {
+    synchronized public CounterSet getCounters() {
         
         CounterSet root = super.getCounters();
         
@@ -134,6 +134,8 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
              * name.
              */
             root.makePath(fullyQualifiedHostName+ps+processName).attach( pidstat.getCounters() );
+            
+            countersAdded = true;
             
         }
         
