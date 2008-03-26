@@ -216,13 +216,11 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector {
              * [0:1] using a scaling factor.
              */
 
-            final String p = hostPathPrefix;
-
-            inst.add(new DI(p+IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
+            inst.add(new DI(IRequiredHostCounters.CPU_PercentProcessorTime,.01d));
             
-            inst.add(new DI(p+IHostCounters.CPU_PercentUserTime,.01d));
-            inst.add(new DI(p+IHostCounters.CPU_PercentSystemTime,.01d));
-            inst.add(new DI(p+IHostCounters.CPU_PercentIOWait,.01d));
+            inst.add(new DI(IHostCounters.CPU_PercentUserTime,.01d));
+            inst.add(new DI(IHostCounters.CPU_PercentSystemTime,.01d));
+            inst.add(new DI(IHostCounters.CPU_PercentIOWait,.01d));
             
         }
         
