@@ -46,18 +46,25 @@ public class StatisticsCollectorForLinux extends
      */
     static protected final SimpleDateFormat f;
     static {
-        
+
         f = new SimpleDateFormat("hh:mm:ss aa");
 
-        System.err.println("Format: " + f.format(new Date()));
+        /*
+         * Code may be enabled for a runtime test of the date format.
+         */
+        if (true) {
 
-        try {
+            System.err.println("Format: " + f.format(new Date()));
 
-            System.err.println("Parsed: " + f.parse("06:35:15 AM"));
+            try {
 
-        } catch (ParseException e) {
+                System.err.println("Parsed: " + f.parse("06:35:15 AM"));
 
-            log.error("Could not parse?");
+            } catch (ParseException e) {
+
+                log.error("Could not parse?");
+
+            }
 
         }
         
@@ -489,10 +496,13 @@ public class StatisticsCollectorForLinux extends
             @Override
             protected void readProcess() throws Exception {
                 
+                // The most recently read header.
+                String header;
+                
                 // skip banner.
                 final String banner = readLine();
                 
-                log.info("banner: " + banner);
+                if(INFO) log.info("banner: " + banner);
 
                 {
                 
@@ -501,9 +511,10 @@ public class StatisticsCollectorForLinux extends
                     assert blank.trim().length() == 0 : "Expecting a blank line";
 
                     // header.
-                    final String header = readLine();
+                    header = readLine();
                     
-                    log.debug("header: "+header);
+                    if (INFO)
+                        log.info("header: "+header);
 
                 }
                 
@@ -514,15 +525,14 @@ public class StatisticsCollectorForLinux extends
                     
                     if(data.trim().length()==0) {
                         
-                        String header = readLine();
+                        header = readLine();
 
-                        log.debug("header: "+header);
+                        if (INFO)
+                            log.info("header: "+header);
 
                         continue;
                         
                     }
-
-                    log.debug("data: "+data);
                     
 //                    *   04:14:45 PM     CPU     %user     %nice   %system   %iowait    %steal     %idle
 //                    *   04:14:46 PM     all      0.00      0.00      0.00      0.00      0.00    100.00
@@ -541,6 +551,11 @@ public class StatisticsCollectorForLinux extends
                     final String iowait = data.substring(50-1, 60-1);
 //                    final String steal = data.substring(60-1, 70-1);
                     final String idle = data.substring(70-1, 80-1);
+
+                    if (INFO)
+                        log.info("\n%user=" + user + ", %system=" + system
+                                + ", iowait=" + iowait + ", idle="+idle+ "\n" + header + "\n"
+                                + data);
 
                     vals.put(IHostCounters.CPU_PercentUserTime, Double.parseDouble(user));
                     
@@ -828,7 +843,8 @@ public class StatisticsCollectorForLinux extends
             // skip banner.
             final String banner = readLine();
             
-            log.info("banner: "+banner);
+            if(INFO)
+                log.info("banner: "+banner);
 
             // #of "events" read.  each event is three lines.
             long n = 0;
@@ -867,7 +883,10 @@ public class StatisticsCollectorForLinux extends
                     final String system  = data.substring(30-1,38-1).trim();
                     final String cpu     = data.substring(38-1,46-1).trim();
                     
-                    log.info("\n%user="+user+", %system="+system+", %cpu="+cpu+"\n"+header+"\n"+data);
+                    if (INFO)
+                            log.info("\n%user=" + user + ", %system=" + system
+                                    + ", %cpu=" + cpu + "\n" + header + "\n"
+                                    + data);
                     
                     vals.put(IProcessCounters.CPU_PercentProcessorTime,
                                 Double.parseDouble(cpu));
@@ -893,7 +912,8 @@ public class StatisticsCollectorForLinux extends
                     final String residentSetSize   = data.substring(50-1,57-1).trim();
                     final String percentMemory     = data.substring(57-1,64-1).trim();
 
-                    log.info("\nminorFaultsPerSec="
+                    if(INFO)
+                        log.info("\nminorFaultsPerSec="
                                 + minorFaultsPerSec
                                 + ", majorFaultsPerSec="
                                 + majorFaultsPerSec + ", virtualSize="
@@ -928,6 +948,7 @@ public class StatisticsCollectorForLinux extends
                     final String kBrdS = data.substring(22-1, 32-1).trim();
                     final String kBwrS = data.substring(32-1, 42-1).trim();
 
+                    if(INFO)
                     log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
                                 + kBwrS + "\n" + header + "\n" + data);
 

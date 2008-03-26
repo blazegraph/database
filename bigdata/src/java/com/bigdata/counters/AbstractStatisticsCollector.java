@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
+import java.io.Reader;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.reflect.InvocationTargetException;
@@ -45,6 +46,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
@@ -79,6 +81,18 @@ abstract public class AbstractStatisticsCollector {
     
     static protected final Logger log = Logger
             .getLogger(AbstractStatisticsCollector.class);
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
 
     /**
      * Various namespaces for per-host and per-process counters.
@@ -604,32 +618,52 @@ abstract public class AbstractStatisticsCollector {
      */
     protected abstract class AbstractProcessReader implements Runnable {
         
+        /**
+         * The {@link InputStream} from which the output of the process will be
+         * read.
+         */
         protected InputStream is;
 
         /**
-         * @todo consider moving this parameter out of start().
+         * Saves a reference to the {@link InputStream}.
+         * 
+         * @param is
+         *            The input stream from which the output of the process will
+         *            be read.
          */
         public void start(InputStream is) {
-        
-            if(is==null) throw new IllegalArgumentException();
-            
+
+            if (is == null)
+                throw new IllegalArgumentException();
+
             this.is = is;
-            
+
         }
-        
+
     }
-    
+
     protected abstract class ProcessReaderHelper extends AbstractProcessReader {
-        
+
+        /**
+         * The {@link Reader} from which the output of the process will be read.
+         */
         protected LineNumberReader r = null;
         
         public ProcessReaderHelper() {
             
         }
         
+        /**
+         * Creates a {@link LineNumberReader} from the {@link InputStream}.
+         * 
+         * @param is
+         *            The input stream from which the output of the process will
+         *            be read.
+         */
         public void start(InputStream is) {
 
-            if( r != null) throw new IllegalStateException();
+            if (r != null)
+                throw new IllegalStateException();
             
             super.start( is );
             
@@ -644,7 +678,6 @@ abstract public class AbstractStatisticsCollector {
         
         /**
          * Returns the next line and blocks if a line is not available.
-         * 
          * 
          * @return The next line.
          * 
@@ -674,7 +707,15 @@ abstract public class AbstractStatisticsCollector {
                     
                 }
 
-                return r.readLine();
+                final String s = r.readLine();
+                
+                if(DEBUG) {
+                    
+                    log.debug(s);
+                    
+                }
+                
+                return s;
                 
             }
             
@@ -886,13 +927,9 @@ abstract public class AbstractStatisticsCollector {
         }
         
         /**
-         * FIXME The initialization logic is broken here. The ProcessReader is
-         * being setup before the {@link ActiveProcess} has been created which
-         * leads to an attempt to read from a null InputStream/Reader in
-         * {@link ProcessReaderHelper#readLine()}. Consider using a start() on
-         * the {@link ActiveProcess} rather than having it start in its ctor and
-         * then only requesting the {@link AbstractProcessReader} once the
-         * process is running.
+         * Creates the {@link ActiveProcess} and the
+         * {@link ActiveProcess#start(com.bigdata.counters.AbstractStatisticsCollector.AbstractProcessReader)}s
+         * it passing in the value returned by the {@link #getProcessReader()}
          */
         public void start() {
 
