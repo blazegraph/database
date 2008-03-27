@@ -75,7 +75,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
     /**
      * @param len
-     *            The #of bytes of data in the provided buffer.
+     *            The #of bytes of data already in the provided buffer.
      * @param buf
      *            The buffer, with <i>len</i> pre-existing bytes of valid data.
      *            The buffer reference is used directly rather than making a
@@ -83,7 +83,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      */
     public DataOutputBuffer(final int len, byte[] buf) {
 
-        super(len,buf);
+        super(len/*pos*/, buf.length/*readLimit*/, buf);
         
     }
 

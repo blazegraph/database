@@ -44,10 +44,13 @@ public interface ICommitter {
      * return the address from which the persistence capable data structure may
      * be reloaded.
      * 
+     * @param commitTime
+     *            The timestamp assigned to the commit.
+     * 
      * @return The address of the record from which the persistence capable data
      *         structure may be reloaded. If no changes have been made then the
      *         previous address should be returned as it is still valid.
      */
-    public long handleCommit();
+    public long handleCommit(long commitTime);
 
 }

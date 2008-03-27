@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -42,6 +43,16 @@ import com.bigdata.rawstore.WormAddressManager;
  */
 public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
 
+    /**
+     * The size of the live index cache for the {@link Name2Addr} instance.
+     * 
+     * @todo this should be a configuration property once the temporary store
+     *       accepts a {@link Properties} object in its ctor.
+     * 
+     * @see Options#DEFAULT_LIVE_INDEX_CACHE_CAPACITY
+     */
+    private final int liveIndexCacheCapacity = 20;
+    
     /**
      * 
      */
@@ -91,6 +102,8 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
         
         name2Addr = Name2Addr.create(this);
 
+        name2Addr.setupCache(liveIndexCacheCapacity);
+        
     }
 
     /**

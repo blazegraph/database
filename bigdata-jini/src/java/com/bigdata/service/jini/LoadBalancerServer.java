@@ -97,7 +97,7 @@ public class LoadBalancerServer extends AbstractServer {
     
     protected Remote newService(Properties properties) {
         
-        return new AdministrableLoadBalancer(this,properties);
+        return new AdministrableLoadBalancer(this, properties);
         
     }
     

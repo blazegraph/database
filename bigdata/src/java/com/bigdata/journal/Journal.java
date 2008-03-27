@@ -75,6 +75,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
+     * Create or re-open a journal.
+     * 
      * @param properties
      *            See {@link com.bigdata.journal.Options}.
      */
@@ -217,13 +219,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             if (btree != null) {
 
                 /*
-                 * Mark the B+Tree as read-only and set the lastCommitTime
-                 * timestamp from the commitRecord.
+                 * Mark the B+Tree as read-only.
                  */
                 
                 btree.setReadOnly(true);
-                
-                btree.setLastCommitTime(commitRecord.getTimestamp());
+
+                assert ((BTree) btree).getLastCommitTime() != 0;
+//                btree.setLastCommitTime(commitRecord.getTimestamp());
                 
             }
             
@@ -251,13 +253,13 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             if (btree != null) {
 
                 /*
-                 * Mark the B+Tree as read-only and set the lastCommitTime
-                 * timestamp from the commitRecord.
+                 * Mark the B+Tree as read-only.
                  */
                 
                 btree.setReadOnly(true);
                 
-                btree.setLastCommitTime(commitRecord.getTimestamp());
+                assert ((BTree) btree).getLastCommitTime() != 0;
+//                btree.setLastCommitTime(commitRecord.getTimestamp());
                 
             }
 

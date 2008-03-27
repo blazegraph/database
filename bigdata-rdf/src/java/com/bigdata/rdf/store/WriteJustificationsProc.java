@@ -96,12 +96,12 @@ public class WriteJustificationsProc
 
         long nwritten = 0;
         
-        int n = getKeyCount();
+        final int n = getKeyCount();
         
-        for (int i=0; i<n; i++) {
+        for (int i = 0; i < n; i++) {
 
-            byte[] key = getKey( i );
-
+            final byte[] key = getKey( i );
+            
             if (!ndx.contains(key)) {
 
                 ndx.insert(key, null/* no value */);

@@ -43,8 +43,7 @@ import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ICommitRecord;
-import com.bigdata.journal.ITx;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -164,8 +163,13 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      * is non-null. This assumption is valid if {@link #close()} is invoked by
      * the application in a manner consistent with the single-threaded contract
      * for the {@link AbstractBTree}.
+     * <p>
+     * Note: This field MUST be marked as [volatile] in order to guarentee
+     * correct semantics for double-checked locking in {@link #reopen()}
+     * 
+     * @see http://en.wikipedia.org/wiki/Double-checked_locking
      */
-    protected AbstractNode root;
+    protected volatile AbstractNode root;
 
 //    /**
 //     * The finger is a trial feature. The purpose is to remember the last
@@ -566,18 +570,15 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     }
     
     /**
-     * The timestamp of the last committed state of this index.
+     * The timestamp associated with the last {@link IAtomicStore#commit()} in
+     * which writes buffered by this index were made restart-safe on the backing
+     * store. The lastCommitTime is set when the index is loaded from the
+     * backing store and updated after each commit. It is ZERO (0L) when
+     * {@link BTree} is first created and will remain ZERO (0L) until the
+     * {@link BTree} is committed.  If the backing store does not support atomic
+     * commits, then this value will always be ZERO (0L).
      * <p>
      * Note: This is fixed for an {@link IndexSegment}.
-     * <p>
-     * Note: This is NOT normally set on the {@link ITx#UNISOLATED} view of a
-     * {@link BTree} (it SHOULD be ZERO(0L)).
-     * <p>
-     * Note: If you are reading from a historical state of a {@link BTree} then
-     * this SHOULD be set to {@link ICommitRecord#getTimestamp()} for that
-     * historical state - it MUST NOT be set to any other value.
-     * 
-     * @todo add to {@link IIndex}?
      */
     abstract public long getLastCommitTime();
     
@@ -613,6 +614,9 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *       and leaving it to the caller to clone as required. Either the
      *       former or the latter might be a better choice.
      * 
+     * FIXME if the metadata record is updated (and it can be) then we really
+     * need to invalidate the cloned metadata record also.
+     * 
      * @return The metadata record for this btree and never <code>null</code>.
      */
     final public IndexMetadata getIndexMetadata() {
@@ -639,8 +643,8 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
     private IndexMetadata metadata2;
    
     /**
-     * The metadata record for the index. This data does not change during the
-     * life of the {@link BTree} object.
+     * The metadata record for the index. This data rarely changes during the
+     * life of the {@link BTree} object, but it CAN be changed.
      */
     protected IndexMetadata metadata;
     
@@ -1711,7 +1715,18 @@ abstract public class AbstractBTree implements IIndex, ILocalBTree {
      *            The node or leaf.
      * 
      * @todo review the guarentees offered by this method under the assumption
-     *       of concurrent readers.
+     *       of concurrent readers. See
+     *       http://www.ibm.com/developerworks/java/library/j-jtp06197.html for
+     *       some related issues. Among them ++ and -- are not atomic unless you
+     *       are single-threaded, so this code probably needs to use
+     *       synchronized(){} or the reference counts could be wrong. Since the
+     *       reference counts only effect when a node is made persistent
+     *       (assuming its dirty) and since we already require single threaded
+     *       access for writes on the btree, there may not actually be a problem
+     *       here. The reference counts could only be wrong for concurrent
+     *       readers, and nodes are never dirty and hence will never be made
+     *       persistent on eviction so it probably does not matter if the
+     *       reference counts are over or under for this case.
      */
     final protected void touch(AbstractNode node) {
 

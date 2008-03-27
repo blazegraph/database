@@ -247,6 +247,10 @@ abstract public class AbstractKeyArrayIndexProcedure implements
         if (vals != null && toIndex > vals.length)
             throw new IllegalArgumentException(Errors.ERR_TO_INDEX);
 
+        this.keySer = keySer;
+        
+        this.valSer = valSer;
+        
         this.fromIndex = fromIndex;
         
         this.toIndex = toIndex;
@@ -366,12 +370,17 @@ abstract public class AbstractKeyArrayIndexProcedure implements
      * @param in
      * 
      * @throws IOException
+     * @throws ClassNotFoundException 
      */
-    protected void readMetadata(ObjectInput in) throws IOException {
+    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
         
         fromIndex = 0;
         
         toIndex = (int) LongPacker.unpackLong(in);
+        
+        keySer = (IDataSerializer)in.readObject();
+
+        valSer = (IDataSerializer)in.readObject();
         
     }
 
@@ -391,6 +400,10 @@ abstract public class AbstractKeyArrayIndexProcedure implements
         final int n = toIndex - fromIndex;
         
         LongPacker.packLong(out, n);
+        
+        out.writeObject(keySer);
+
+        out.writeObject(valSer);
         
     }
 

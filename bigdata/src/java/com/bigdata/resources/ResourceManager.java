@@ -31,7 +31,6 @@ import java.util.Properties;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -60,8 +59,6 @@ import com.bigdata.service.IBigdataFederation;
  * <dt>{@link ResourceEvents}</dt>
  * <dd>Event reporting API</dd>
  * </dl>
- * 
- * @todo update javadoc.
  * 
  * @todo Transparent promotion of unpartitioned indices to indicate that support
  *       delete markers and can therefore undergo {@link #overflow()}? This is

@@ -28,12 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.journal.Options;
+import com.bigdata.rdf.store.LocalTripleStoreWithEmbeddedDataService.Options;
 
 /**
  * Proxy test suite for {@link LocalTripleStoreWithEmbeddedDataService}.
@@ -88,14 +89,47 @@ public class TestLocalTripleStoreWithEmbeddedDataService extends AbstractTestCas
         
     }
 
+    /**
+     * The directory under which the persistent data for the unit test is
+     * stored.
+     */
+    File testDir = null;
+    
     public Properties getProperties() {
 
         /*
-         * Note: nothing needs to be overriden.  This test corresponds to the
+         * Note: nothing needs to be overriden. This test corresponds to the
          * default configuration for the LocalTripleStore.
          */
+
+        Properties properties = new Properties(super.getProperties());
+
+        if (testDir == null) {
+            
+            try {
+
+                testDir = File.createTempFile("embeddedTripleStore","");
+                
+                /* delete the plain file since we want a directory by this name. */
+                testDir.delete();
+
+            } catch (IOException e) {
+
+                throw new RuntimeException(e);
+
+            }
+            
+        }
         
-        return super.getProperties();
+        properties.setProperty(Options.DATA_DIR, testDir.toString());
+
+        /*
+         * Turn off these options that were defaulted in our super class.
+         */
+        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+        properties.setProperty(Options.DELETE_ON_EXIT,"false");
+        
+        return properties;
         
     }
     
@@ -129,21 +163,21 @@ public class TestLocalTripleStoreWithEmbeddedDataService extends AbstractTestCas
             
         }
         
-        // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
+//        // Note: clone to avoid modifying!!!
+//        Properties properties = (Properties)getProperties().clone();
+//        
+//        // Turn this off now since we want to re-open the same store.
+//        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//        
+//        // The backing file that we need to re-open.
+//        File file = ((LocalTripleStoreWithEmbeddedDataService)store).getFile();
+//        
+//        assertNotNull(file);
+//        
+//        // Set the file property explictly.
+//        properties.setProperty(Options.FILE,file.toString());
         
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        File file = ((LocalTripleStoreWithEmbeddedDataService)store).getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new LocalTripleStoreWithEmbeddedDataService( properties );
+        return new LocalTripleStoreWithEmbeddedDataService( getProperties() );
         
     }
 

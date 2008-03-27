@@ -399,10 +399,7 @@ public class ResourceEvents {
     /**
      * Report an overflow event.
      * 
-     * @param filename
-     *            The filename or null iff the journal was not backed by a file.
-     * @param nbytes
-     *            The total #of bytes written on the journal.
+     * @param journal
      */
     public void notifyJournalOverflowEvent(AbstractJournal journal) {
 

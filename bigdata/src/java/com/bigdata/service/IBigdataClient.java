@@ -105,6 +105,17 @@ public interface IBigdataClient {
     public IDataService getDataService(UUID serviceUUID);
 
     /**
+     * Return ANY {@link IDataService} which has been (or could be) discovered
+     * and which is part of the connected federation.
+     * <p>
+     * Note: This method is here as a failsafe when the
+     * {@link ILoadBalancerService} is not available.
+     * 
+     * @return <code>null</code> if there are NO known {@link IDataService}s.
+     */
+    public IDataService getAnyDataService();
+    
+    /**
      * Return the load balancer service (or a proxy for that service).
      */
     public ILoadBalancerService getLoadBalancerService();

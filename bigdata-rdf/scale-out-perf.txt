@@ -335,7 +335,9 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
       - Since jini is so fast on the server, try to get asynchronous
         writes to disk working in DiskOnlyStrategy - it might have a
         big impact since we loose all concurrency when a write to disk
-        occurs.
+        occurs (however, disk writes will always be at group commits
+        if the write cache is large enough so this might have NO
+        impact).
 
       - Try U10000 reading the data from NAS with 2 clients, 10
         threads each and 2 servers.  See if scale-out holds as we
@@ -361,8 +363,17 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
           subdirectory?  Could work, but need to fiddle with the jini
           config and CLASSPATH.
 
-      - Try with multiple index partitions, ideally dynamically
-        determined!
+      - Try with dynamically determined index partitions.  We can
+        start with either single or double host placement of the
+        initial index partitions.  Watch the load balancer and see how
+        host utilization and service response time change as the run
+        progresses, for different #of client threads, and as index
+        splits occur, and as index moves occur.  Delay start of some
+        data services, either on each host or on one of the hosts and
+        then see how the load changes once we start additional data
+        services.  Observe the metadata service response time and
+        verify that it does not become a bottleneck since the current
+        implementation is NOT caching.
 
       - Run single client with the metadata service (its lightly
         loaded) and one data service on one server and the other data
@@ -397,6 +408,8 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
         and code from that (assuming that value reuse is common - if
         not then at least URIs can be broken down into common
         symbols).
+
+	Do not store bnodes in the id:term index.
 
       - The terms (term:id) index is on the order of 5x larger than
         the ids (id:term) index.  Presumably this is because updates
@@ -441,39 +454,6 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 			at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1035)
 			... 9 more
 			
-	 - done. Going to work converting values to byte[]s throughout the
-	   api, exposing versionCounter and deletion marker metadata
-	   via the ITuple and IEntryIterator interface and moving
-	   their data into the leaf, copying data into/out of leafs
-	   (rather than by reference), fused views that process
-	   version counters (never implemented before and required for
-	   compacting merges of isolatable indices), and better
-	   alignment of the various serialization apis.  This will
-	   also set the stage for a compacting btree node or leaf data
-	   structure which should help with long-term GC problems.
-
-	 - done. Update UnisolatedBTree, IsolatedBTree.
-
-	 - done. Update the fused views for these classes.  There is a
-           single unifying model: the IsolatedBTree should be a fused
-           view of the read-only historical state of an index
-           partition and the btree on which the write set is isolated.
-           Right now it is stated just in terms of the UnisolatedBTree
-           (the historical state of the index as of the transaction
-           start) and is not generalized to an index partition view.
-           The rangeIterator for the fused view will examine the
-           version metadata.
-
-		   I can keep the simple btree api and extend the semantics on
-		   the abstract btree, node and leaf directly and then roll
-		   them into the rest of the system incrementally.
-	
-		   This will also make it easy to convert the values stored
-		   under the keys to byte[]s since they are no longer going to
-		   be wrapped by Value objects.
-	
-		   That will make it easier to align the serialization?
-
      - Support copy in/out of keys and vals in lookup(),
            insert(), remove(), and rangeIterator so that we can (a) be
            more efficient in handling keys and vals by copying; (b)
@@ -485,6 +465,9 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
 
 	 - done. change version counters to long (commit timestamps).
 
+     - Turn off sendVals for rangeIterators if we recognize the value
+       serialized as the NoDataSerializer?
+
     - Tune serialization:
 
 	 - Test use of FastRDFValueCompression to write the values for
@@ -495,9 +478,10 @@ autoFlush=false, #done=20022, #ok=20020, #err=2)
            serialization and only overridden in special cases like RDF
            where we can do even better with less effort.
            
-	   (old summary, revisit now since significant code changes): the "fast" rdf serializers definately write (and
-	   read) less data resulting in a smaller store and less IO.
-	   However, they are also without a doubt SLOWER.
+	   (old summary, revisit now since significant code changes):
+	   the "fast" rdf serializers definately write (and read) less
+	   data resulting in a smaller store and less IO.  However,
+	   they are also without a doubt SLOWER.
 
 	   It is hard to tell to what extend the throughput drop is
 	   due to the work required to compute the compressed codes
@@ -601,48 +585,135 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
     - The temp triple store supports concurrent read only, so it is
       not appropriate for a concurrent bulk loader.
 
-    Other tuning and feature completeness
-
-    - Inference has to be snell across the data service api.  So does
-      high-level query.  At least inference is slow due to a large #of
-      small join results.  Parallel sub-query is probably the way to
-      beat that.  After tuning, compare to the purely local
-      unconcurrent line.
-
-      - Consider batching a set of rangeQueries together in a single
-        operation vs parallel submits.  
-
-    - quad store
-
-    - 3+1 or 4+1 data models.  It IS possible to do statement
-      identifiers using bnodes on a quad store, but we lose the
-      opportunity to use the context position for virtual graph
-      partition (often used to group one or more data sources
-      together), which is also a key feature for federation
-
-    - Sesame 2 TCL (integration tests)
-
-**  Maven 2.x build and subversion for bigdata.
-
-
 Short term tasks:
+
+   - ** Maven 2.x build and subversion for bigdata.
+
+   - * Start doing snapshot releases.
 
    - Compute average response time and throughput as 1/average
      response time. and measure on the client as well so that we can
-     compute the RMI overhead,
+     compute the RMI overhead.
 
-   - closeForWrites()
+   - LocalTripleStoreWithEmbeddedDataService
+     
+     - Optimized JOIN that assumes that all indices are local within
+       the data service and reads locally on both access paths.  This
+       would probably be implemented as a DataServiceIndexProcedure
+       and it would need to declare access to the indices being used
+       for the left and right hand sides of the join.
+
+   - ScaleOutTripleStore
+
+     - Optimized JOIN for the scale-out triple store.  It needs to
+       block up a set of right hand tuples that will be joined against
+       data on a given data service and then send those tuples to that
+       data service, recieving the results in return. It will also
+       have to handle stale locators if the join is running in an
+       read-committed mode, but not if it is transactional or a
+       historical read.
+
+       Inference is slow due to a large #of small join results.
+       Parallel sub-query is probably the way to beat that.  After
+       tuning, compare to the purely local unconcurrent line.
+
+       Consider batching a set of rangeQueries together in a single
+       operation vs parallel submits.
+
+     - The distinct term scan (really, the prefix scan) needs to be
+       optimized for the data service and the federation use cases.
+       This also effects the sparse row store.  Also, the sparse row
+       store needs to use an extended split handler that always
+       chooses a split point which is on a logical row boundary.
+
+   - *** The consistentRead option used by the
+     PartitionedIndexRangeIterator needs to use the most recent commit
+     time for the federation.
+
+     Currently it uses the lastCommitTime for the first index
+     partition which it scans.  However, it is quite possible that
+     there have been writes on other index partitions since which
+     would not be reflected in BTree#lastCommitTime.  The
+     consistentRead would therefore reflect an older history rather
+     than the most recent writes when it moved onto the other index
+     partitions.
+
+     In order to fix this the data services MUST discover and use a
+     centralized timeservice.  This can be essentially a stripped down
+     centralized transaction manager.  The data services will obtain
+     their commitTime timestamps from this centralized time service
+     and MUST also notify the centralized timeservice once they have
+     successfully committed.  The PartitionedRangeIterator will then
+     query the centralized time service for the last commit time for
+     the federation as a whole and use that as the time for a
+     consistentRead operation.
+
+   - *** Close out index resources (and journals) in resource manager so
+     that we do not always grow the memory demand (StoreFileManager)
+
+     - Use a weak value cache backed by an LRU for the index segments.
+       An index segment that is no longer used will have its reference
+       cleared and when it is swept by the garbage collector (this is
+       the same as for historical indices on the journal).
+
+       At that point the index segment store is still open, and it can
+       buffer a significant amount of data in addition to the file
+       handle.  However, since the index segment no longer holds a
+       hard reference to the store, the store will also become weakly
+       reachable unless there are other references.  Since we need to
+       explictly close the file handle, we need to hold onto a
+       reference to the IndexSegmentStoreFile.
+
+       The easiest way to do this is a map from the store UUID to the
+       IndexSegmentFileStore, but that does not let us know when the
+       store file is no longer required.  Another approach is to rely
+       on the hard reference from the index segment to the index
+       segment file store and track the index segment file stores in a
+       weak value cache backed by an LRU. The references would be the
+       IndexSegment objects and the reference object would have to
+       also hold onto the store UUID so that we can get the store
+       reference from the openStores map.  When the weak reference was
+       cleared we would know that there were no longer any hard
+       references to the IndexSegment and hence that the corresponding
+       IndexSegmentStoreFile could be closed.
+
+     - Since the journal already manages its own index resources we
+       can simply keep the journals open until they are purged.  When
+       a journal is purged we closeAndDelete() it and any readers will
+       simply abort.
+
+       This is Ok if the journal uses [bufferMode := DiskOnly] since a
+       journal without a write cache and which is not fully buffered
+       will not have a large memory footprint outside of its most
+       recently used indices.  In order to do better than this and
+       proactively close historical journals we will require a
+       mechanisms similar to the one proposed above for index segment
+       file stores.  However, there is a many-to-one mapping from
+       index views on historical journals to the historical journals
+       themselves.
+
+   - ** closeForWrites()
 
       - MUST NOT close the journal or concurrent readers will get
         hosed since they are NOT suspended during synchronous overflow
         processing.
 
+      - MUST discard the write cache in order to reduce the memory
+        footprint.
+
+      - Could optionally convert from a fully-buffered to a disk-only
+        store in order to reduce the memory footprint for fully
+        buffered stores, but in that case this conversion should
+        happen once asynchronous overflow handling was complete.
+
       - There is very little logic to enforce read-only semantics on a
         journal at this time.
 
-   - Full text indexing for KB.
+   - **** Full text indexing for KB.
 
-   - Change tx timestamps to negative and use positive timestamps for
+   - *** Batch API for extractor, allowing runs directly against the KB.
+
+   - ** Change tx timestamps to negative and use positive timestamps for
      historical reads.  Changes to AbstractTask, ITx,
      ITransactionManager, StoreFileManager, IsolationEnum, and the
      post-processing tasks.  This will greatly simplify thinking about
@@ -650,14 +721,17 @@ Short term tasks:
      commit time while transactions will use a free (-timestamp) value
      selected by the transaction manager.
 
-   - Quad store.
+   - ** Quad store.
+
+    - 3+1 or 4+1 data models.  It IS possible to do statement
+      identifiers using bnodes on a quad store, but we lose the
+      opportunity to use the context position for virtual graph
+      partition (often used to group one or more data sources
+      together), which is also a key feature for federation
+
+   - ** Sesame 2 TCL (integration tests)
 
    - SemTech08 submission?
-
-   - close out index resources (and journals) in resource manager so
-     that we do not always grow the memory demand.
-
-   - test counter reporting under linux.
 
    - stress testing with index partition moves, not just split/join.
 
@@ -679,35 +753,6 @@ Short term tasks:
 
 ============================================================
 
-@7:42PM Sunday - for a lot of different negative array indices.
-WARN : 40000  4293f5be-63ea-42a8-b4be-31a5026b122f   pool-1-thread-12 com.bigdata.counters.CounterSet$MyHandler.endElement(CounterSet.java:1197): Could not set counter value: path=/dpp2-wrkst13.dpp2.org/service/32c7601d-79d3-4a8e-b3b3-2a29e9174ef8/Concurrency Manager/Tasks/Unisolated, name=Average Task Latency : java.lang.ArrayIndexOutOfBoundsException: -4
-java.lang.ArrayIndexOutOfBoundsException: -4
-	at com.bigdata.counters.History.getAverage(History.java:383)
-	at com.bigdata.counters.History.getAverage(History.java:329)
-	at com.bigdata.counters.History.add(History.java:582)
-	at com.bigdata.counters.HistoryInstrument.add(HistoryInstrument.java:111)
-	at com.bigdata.counters.HistoryInstrument.setValue(HistoryInstrument.java:117)
-	at com.bigdata.counters.Counter.setValue(Counter.java:128)
-	at com.bigdata.counters.CounterSet$MyHandler.endElement(CounterSet.java:1188)
-	at com.sun.org.apache.xerces.internal.parsers.AbstractSAXParser.endElement(AbstractSAXParser.java:633)
-	at com.sun.org.apache.xerces.internal.impl.XMLNSDocumentScannerImpl.scanEndElement(XMLNSDocumentScannerImpl.java:719)
-	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl$FragmentContentDispatcher.dispatch(XMLDocumentFragmentScannerImpl.java:1685)
-	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl.scanDocument(XMLDocumentFragmentScannerImpl.java:368)
-	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:834)
-	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
-	at com.sun.org.apache.xerces.internal.parsers.XMLParser.parse(XMLParser.java:148)
-	at com.sun.org.apache.xerces.internal.parsers.AbstractSAXParser.parse(AbstractSAXParser.java:1242)
-	at javax.xml.parsers.SAXParser.parse(SAXParser.java:375)
-	at javax.xml.parsers.SAXParser.parse(SAXParser.java:176)
-	at com.bigdata.counters.CounterSet.readXML(CounterSet.java:1002)
-	at com.bigdata.service.LoadBalancerService.notify(LoadBalancerService.java:1244)
-	at com.bigdata.service.DataService$ReportTask.reportPerformanceCounters(DataService.java:959)
-	at com.bigdata.service.DataService$ReportTask.run(DataService.java:906)
-	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:417)
-
-
-============================================================
-
 - ERROR: 39296     pool-1-thread-142 com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1436): java.lang.AssertionError: ndone=8, but #used=9
 java.lang.AssertionError: ndone=8, but #used=9
 	at com.bigdata.resources.PostProcessOldJournalTask.chooseTasks(PostProcessOldJournalTask.java:1299)
@@ -717,29 +762,3 @@ java.lang.AssertionError: ndone=8, but #used=9
 	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
 	at java.lang.Thread.run()V(Unknown Source)
-
-============================================================
-
-  - De-serialization errors:
-
-java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
-	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
-	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
-	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
-	at com.bigdata.btree.BTree.load(BTree.java:1079)
-	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:2016)
-	at com.bigdata.journal.AbstractJournal.getName2Addr(AbstractJournal.java:292)
-	at com.bigdata.resources.ResourceManager.listIndexPartitions(ResourceManager.java:2644)
-	at com.bigdata.resources.PostProcessOldJournalTask.call(PostProcessOldJournalTask.java:1407)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-	at java.lang.Thread.run()V(Unknown Source)
-Caused by: java.io.StreamCorruptedException: invalid stream header
-	at java.io.ObjectInputStream.readStreamHeader()V(Unknown Source)
-	at java.io.ObjectInputStream.<init>(Ljava.io.InputStream;)V(Unknown Source)
-	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:120)
-	... 12 more
-
-============================================================

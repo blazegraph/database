@@ -88,75 +88,75 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
     
     /**
      * Creates a {@link Justification}, writes it on the store using an
-     * {@link SPOAssertionBuffer}, verifies that we can read it back from the store, and
-     * then retracts the justified statement and verifies that the justification
-     * was also retracted.
+     * {@link SPOAssertionBuffer}, verifies that we can read it back from the
+     * store, and then retracts the justified statement and verifies that the
+     * justification was also retracted.
      */
     public void test_writeReadRetract() {
-        
+
         AbstractTripleStore store = getStore();
-        
+
         try {
 
             /*
              * the explicit statement that is the support for the rule.
              */
-            
+
             long U = store.addTerm(new URIImpl("http://www.bigdata.com/U"));
             long A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
             long Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
-            
+
             store.addStatements(new SPO[] { new SPO(U, A, Y,
                     StatementEnum.Explicit) }, 1);
-            
+
             assertTrue(store.hasStatement(U, A, Y));
-            assertEquals(1,store.getStatementCount());
-            
+            assertEquals(1, store.getStatementCount());
+
             InferenceEngine inf = store.getInferenceEngine();
-            
+
             // the rule.
             Rule r = new RuleRdf01(inf);
 
             // the entailment.
             SPO head = new SPO(A, inf.rdfType.id, inf.rdfProperty.id,
                     StatementEnum.Inferred);
-            
-            long[] bindings = new long[] {
-                    U, A, Y
-            };
-            
+
+            long[] bindings = new long[] { U, A, Y };
+
             Justification jst = new Justification(r, head, bindings);
 
-            assertEquals(head,jst.getHead());
+            assertEquals(head, jst.getHead());
 
             assertEquals(
-                    new SPO[]{new SPO(U,A,Y,StatementEnum.Inferred)},
-                    jst.getTail()
-                    );
-            
-            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store, null/* filter */,
-                    100/* capacity */, true/* justified */);
+                    new SPO[] { new SPO(U, A, Y, StatementEnum.Inferred) }, jst
+                            .getTail());
+
+            SPOAssertionBuffer buf = new SPOAssertionBuffer(store, store,
+                    null/* filter */, 100/* capacity */, true/* justified */);
 
             assertTrue(buf.add(head, jst));
-            
+
             // no justifications before hand.
-            assertEquals(0,store.getJustificationIndex().rangeCount(null,null));
+            assertEquals(0, store.getJustificationIndex()
+                    .rangeCount(null, null));
 
             // flush the buffer.
-            assertEquals(1,buf.flush());
-            
+            assertEquals(1, buf.flush());
+
             // one justification afterwards.
-            assertEquals(1,store.getJustificationIndex().rangeCount(null,null));
-            
+            assertEquals(1, store.getJustificationIndex()
+                    .rangeCount(null, null));
+
             /*
              * verify read back from the index.
              */
             {
-                
-                ITupleIterator itr = store.getJustificationIndex().rangeIterator(null, null);
-                
-                while(itr.hasNext()) {
-                    
+
+                ITupleIterator itr = store.getJustificationIndex()
+                        .rangeIterator(null, null);
+
+                while (itr.hasNext()) {
+
                     // de-serialize the justification from the key.
                     Justification tmp = new Justification(itr);
                     

@@ -2497,7 +2497,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         
         int njust = 0;
         
-        if(justifications) {
+        if(justifications && justify) {
             
             IIndex ndx = getJustificationIndex();
             
@@ -2682,7 +2682,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @param ndx
      *            The index.
      */
-    final public String usage(String name,IIndex ndx) {
+    final public String usage(String name, IIndex ndx) {
         
         if (ndx == null) {
             
@@ -2691,21 +2691,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         }
         
         return name + " : "+ndx.getStatistics();
-        
-//        if (ndx instanceof BTree) {
-//
-//            BTree btree = (BTree) ndx;
-//
-//            return name+" : "+btree.getStatistics();
-//            
-//        } else {
-//
-//            // Note: this is only an estimate if the index is a view.
-//            final int nentries = ndx.rangeCount(null, null);
-//
-//            return (name+": #entries(est)="+nentries);
-//            
-//        }
         
     }
 

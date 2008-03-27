@@ -96,6 +96,8 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
         
+        try {
+
         if(store instanceof ScaleOutTripleStore || store instanceof LocalTripleStoreWithEmbeddedDataService) {
 
             /*
@@ -105,9 +107,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
             fail("Test needs batch verification method for data service versions.");
             
         }
-        
-        try {
-    
+            
         // avoid modification of the properties.
         Properties properties = new Properties(getProperties());
         

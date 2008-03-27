@@ -223,10 +223,24 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             final AbstractTask task = new BuildIndexSegmentTask(
                     resourceManager, lastCommitTime, name, outFile);
 
-            // submit task and await result (metadata describing the new index
-            // segment).
-            result = (BuildResult) concurrencyManager.submit(
+            try {
+
+                // overflow must be disallowed as a task pre-condition.
+                resourceManager.overflowAllowed.compareAndSet(true, false);
+
+                /*
+                 * Submit task and await result (metadata describing the new
+                 * index segment).
+                 */
+                result = (BuildResult) concurrencyManager.submit(
                     task).get();
+                
+            } finally {
+
+                // re-enable overflow processing.
+                resourceManager.overflowAllowed.set(true);
+                
+            }
 
             final IResourceMetadata segmentMetadata = result.segmentMetadata;
 

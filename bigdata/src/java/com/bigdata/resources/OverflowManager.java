@@ -690,6 +690,9 @@ abstract public class OverflowManager extends IndexManager {
          * to override the directory in which the journal is created. That will
          * allow the atomic creation of the journal in the desired directory
          * without changing the existing semantics for CREATE_TEMP_FILE.
+         * 
+         * See StoreFileManager#start() which has very similar logic with the
+         * same problem.
          */
         final AbstractJournal newJournal;
         {
@@ -752,7 +755,7 @@ abstract public class OverflowManager extends IndexManager {
                         .deserialize(new DataInputBuffer(tuple.getValue()));
 
                 // old index (just the mutable btree on the old journal, not the full view of that index).
-                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.addr);
+                final BTree oldBTree = (BTree) oldJournal.getIndex(entry.checkpointAddr);
 
                 // #of index entries on the old index.
                 final int entryCount = oldBTree.getEntryCount();

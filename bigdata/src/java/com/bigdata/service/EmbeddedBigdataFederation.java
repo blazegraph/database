@@ -251,8 +251,8 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
         /*
          * Start the load balancer.
          */
-        loadBalancer = new EmbeddedLoadBalancerService(this, UUID
-                .randomUUID(), properties);
+        loadBalancer = new EmbeddedLoadBalancerService(UUID.randomUUID(),
+                properties);
 
         /*
          * The directory in which the data files will reside.
@@ -917,57 +917,6 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
             
         }
 
-    }
-
-    /**
-     * Embedded {@link LoadBalancerService}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class EmbeddedLoadBalancerService extends LoadBalancerService {
-
-        final private UUID serviceUUID;
-        private EmbeddedBigdataFederation federation;
-        
-        public EmbeddedLoadBalancerService(EmbeddedBigdataFederation federation,
-                UUID serviceUUID,
-                Properties properties) {
-            
-            super( properties );
-            
-            if (federation == null)
-                throw new IllegalArgumentException();
-
-            if (serviceUUID == null)
-                throw new IllegalArgumentException();
-
-            this.federation = federation;
-            
-            this.serviceUUID = serviceUUID;
-            
-        }
-
-        public UUID getServiceUUID() {
-            
-            return serviceUUID;
-            
-        }
-
-        protected String getClientHostname() {
-            
-            try {
-                
-                return Inet4Address.getLocalHost().getCanonicalHostName();
-                
-            } catch (UnknownHostException e) {
-                
-                return "localhost";
-                
-            }
-            
-        }
-        
     }
 
 }

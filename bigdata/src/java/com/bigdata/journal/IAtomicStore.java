@@ -114,14 +114,14 @@ public interface IAtomicStore extends IRawStore {
      * is used by a {@link Tx transaction} to locate the committed state that is
      * the basis for its operations.
      * 
-     * @param commitTime
-     *            Typically, the commit time assigned to a transaction.
+     * @param timestamp
+     *            The timestamp of interest.
      * 
      * @return The {@link ICommitRecord} for the most recent committed state
      *         whose commit timestamp is less than or equal to <i>timestamp</i>
      *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
      *         that satisify the probe.
      */
-    public ICommitRecord getCommitRecord(long commitTime);
+    public ICommitRecord getCommitRecord(long timestamp);
 
 }

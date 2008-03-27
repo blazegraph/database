@@ -132,6 +132,8 @@ public class BigdataClient extends AbstractBigdataClient {
         // Note: allowed before 'connected'.
 //      assertConnected();
       
+        if(dataServicesClient==null) throw new IllegalStateException();
+        
         return dataServicesClient.getMetadataService();
                 
     }
@@ -141,6 +143,8 @@ public class BigdataClient extends AbstractBigdataClient {
         // Note: allow before connected.
 //        assertConnected();
 
+        if(dataServicesClient==null) throw new IllegalStateException();
+
         return dataServicesClient.getDataServiceUUIDs(maxCount);
         
     }
@@ -149,6 +153,8 @@ public class BigdataClient extends AbstractBigdataClient {
         
         // Note: allow before connected.
 //        assertConnected();
+
+        if(dataServicesClient==null) throw new IllegalStateException();
 
         return dataServicesClient.getDataService(serviceUUID);
                 
@@ -182,6 +188,8 @@ public class BigdataClient extends AbstractBigdataClient {
     protected BigdataClient(Properties properties) {
 
         super(properties);
+        
+        loadBalancerClient = new LoadBalancerClient(discoveryManager);
         
     }
     
@@ -334,7 +342,7 @@ public class BigdataClient extends AbstractBigdataClient {
 
     }
     
-    public void shutdown() {
+    synchronized public void shutdown() {
 
         final long begin = System.currentTimeMillis();
         
@@ -359,7 +367,7 @@ public class BigdataClient extends AbstractBigdataClient {
         
     }
     
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
         final long begin = System.currentTimeMillis();
         
@@ -389,6 +397,14 @@ public class BigdataClient extends AbstractBigdataClient {
      */
     private void terminateDiscoveryProcesses() {
 
+        if (loadBalancerClient != null) {
+
+            loadBalancerClient.terminate();
+
+            loadBalancerClient = null;
+            
+        }
+        
         if (dataServicesClient != null) {
 
             dataServicesClient.terminate();
@@ -413,7 +429,7 @@ public class BigdataClient extends AbstractBigdataClient {
      * 
      * @return The federation.
      */
-    public IBigdataFederation connect() {
+    synchronized public IBigdataFederation connect() {
 
         if (fed == null) {
 
@@ -482,6 +498,16 @@ public class BigdataClient extends AbstractBigdataClient {
         }
         
         throw new TimeoutException();
+        
+    }
+
+    public IDataService getAnyDataService() {
+
+        // Note: allowed before connected.
+        
+        if(dataServicesClient==null) return null;
+        
+        return dataServicesClient.getDataService();
         
     }
 

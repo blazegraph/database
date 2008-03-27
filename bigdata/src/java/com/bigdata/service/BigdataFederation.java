@@ -168,19 +168,47 @@ public class BigdataFederation implements IBigdataFederation {
 
         if (dataServiceUUID == null) {
             
-            try {
-            
-                dataServiceUUID = getLoadBalancerService()
-                        .getUnderUtilizedDataService();
+            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
 
-            } catch (Exception ex) {
+            if (loadBalancerService == null) {
 
-                log.error(ex);
+                try {
 
-                throw new RuntimeException(ex);
+                    /*
+                     * As a failsafe (or at least a failback) we ask the client
+                     * for ANY data service that it knows about and use that as
+                     * the data service on which we will register this index.
+                     * This lets us keep going if the load balancer is dead when
+                     * this request comes through.
+                     */
+
+                    dataServiceUUID = client.getAnyDataService().getServiceUUID();
+
+                } catch (Exception ex) {
+
+                    log.error(ex);
+
+                    throw new RuntimeException(ex);
+
+                }
+                
+            } else {
+
+                try {
+
+                    dataServiceUUID = loadBalancerService
+                            .getUnderUtilizedDataService();
+
+                } catch (Exception ex) {
+
+                    log.error(ex);
+
+                    throw new RuntimeException(ex);
+
+                }
 
             }
-
+            
         }
 
         return registerIndex(//

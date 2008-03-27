@@ -329,7 +329,8 @@ public class DataServiceIndex implements IIndex {
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey, int capacity, int flags, ITupleFilter filter) {
 
         // @todo make this a ctor argument or settable property?
-        final boolean readConsistent = (timestamp == ITx.UNISOLATED?false:true);
+        final boolean readConsistent = (timestamp == ITx.UNISOLATED ? false
+                : true);
         
         return new RawDataServiceRangeIterator(dataService, name, timestamp,
                 readConsistent, fromKey, toKey, capacity, flags, filter);

@@ -151,14 +151,72 @@ public class ResultSet implements Externalizable {
 //        return keys;
 //        
 //    }
+
+    /**
+     * Return the keys.
+     * 
+     * @throws IllegalStateException
+     *             if the keys were not retrieved.
+     */
+    public IRandomAccessByteArray getKeys() {
+        
+        if (keys == null)
+            throw new IllegalStateException();
+        
+        return keys;
+        
+    }
     
+    /**
+     * Return the values.
+     * 
+     * @throws IllegalStateException
+     *             if the values were not retrieved.
+     */
+    public IRandomAccessByteArray getValues() {
+        
+        if (vals == null)
+            throw new IllegalStateException();
+        
+        return vals;
+        
+    }
+    
+    /**
+     * Return the key at the specified index.
+     * 
+     * @param index
+     *            The index of the key to be returned.
+     * 
+     * @see #getKeys()
+     * 
+     * @throws IllegalStateException
+     *             if the keys were not retrieved.
+     */
     public byte[] getKey(int index) {
+        
+        if (keys == null)
+            throw new IllegalStateException();
         
         return keys.getKey(index);
         
     }
 
+    /**
+     * Return the value at the specified index.
+     * 
+     * @param index
+     *            The index of the value to be returned.
+     * 
+     * @see #getValues()
+     * 
+     * @throws IllegalStateException
+     *             if the values were not retrieved.
+     */
     public byte[] getValue(int index) {
+        
+        if (vals == null)
+            throw new IllegalStateException();
         
         return vals.getKey(index);
         

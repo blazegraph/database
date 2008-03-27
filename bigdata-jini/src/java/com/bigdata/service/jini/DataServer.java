@@ -41,6 +41,7 @@ import net.jini.io.context.ClientSubject;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -162,10 +163,12 @@ public class DataServer extends AbstractServer {
 
         DataService service = (DataService)impl;
         
+        IResourceManager resourceManager = service.getResourceManager();
+        
         super.destroy();
         
         // destroy all resources.
-        service.getResourceManager().deleteResources();
+        resourceManager.deleteResources();
 
     }
 

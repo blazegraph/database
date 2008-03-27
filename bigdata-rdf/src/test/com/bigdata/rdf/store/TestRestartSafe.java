@@ -142,44 +142,6 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
         assertEquals("#lits",3,store.getLiteralCount());
         assertEquals("#bnodes",2,store.getBNodeCount());
 
-//        /* force overflow -- if using partitioned indices then this will build
-//         * index segments IFF you have also set the threshold to zero in the
-//         * properties.
-//         * 
-//         * @todo review with overflow implemented.
-//         */
-//        if(false && store instanceof LocalTripleStore) {
-//        
-//            ((LocalTripleStore) store).getJournal().overflow(true);
-//
-//            assertEquals(x_id, store.getTermId(x));
-//            assertEquals(y_id, store.getTermId(y));
-//            assertEquals(z_id, store.getTermId(z));
-//            assertEquals(A_id, store.getTermId(A));
-//            assertEquals(B_id, store.getTermId(B));
-//            assertEquals(C_id, store.getTermId(C));
-//            assertEquals(rdfType_id, store.getTermId(rdfType));
-//            assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
-//
-//            assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(
-//                    null, null));
-//            assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(
-//                    null, null));
-//            assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(
-//                    null, null));
-//            assertTrue(store.hasStatement(x, rdfType, C));
-//            assertTrue(store.hasStatement(y, rdfType, B));
-//            assertTrue(store.hasStatement(z, rdfType, A));
-//            assertTrue(store.hasStatement(B, rdfsSubClassOf, A));
-//            assertTrue(store.hasStatement(C, rdfsSubClassOf, B));
-//
-//            assertEquals("#terms", 8 + 3 + 2, store.getTermCount());
-//            assertEquals("#uris", 8, store.getURICount());
-//            assertEquals("#lits", 3, store.getLiteralCount());
-//            assertEquals("#bnodes", 2, store.getBNodeCount());
-//
-//        }
-
         store.dumpStore();
         
         store.commit();

@@ -379,10 +379,20 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
                 log.info("New service instance - ServiceID will be assigned");
                 
-                // Make sure that the parent directory exists.
-                File parentDir = serviceIdFile.getParentFile();
+                /*
+                 * Make sure that the parent directory exists.
+                 * 
+                 * Note: the parentDir will be null if the serviceIdFile is in
+                 * the root directory or if it is specified as a filename
+                 * without any parents in the path expression. Note that the
+                 * file names a file in the current working directory in the
+                 * latter case and the root always exists in the former - and in
+                 * both of those cases we do not have to create the parent
+                 * directory.
+                 */
+                final File parentDir = serviceIdFile.getAbsoluteFile().getParentFile();
                 
-                if(!parentDir.exists()) {
+                if(parentDir!=null && !parentDir.exists()) {
                     
                     log.warn("Creating: " + parentDir);
 
@@ -803,12 +813,11 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         shutdownNow();
         
-        log.info("Deleting: "+serviceIdFile);
+        log.info("Deleting: " + serviceIdFile);
 
         if (!serviceIdFile.delete()) {
 
-            log.warn("Could not delete file: "
-                    + serviceIdFile);
+            log.warn("Could not delete file: " + serviceIdFile);
 
         }
         
