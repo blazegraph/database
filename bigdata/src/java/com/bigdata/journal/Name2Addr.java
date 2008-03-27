@@ -119,9 +119,9 @@ public class Name2Addr extends BTree {
     private class DirtyListener implements IDirtyListener {
         
         final String name;
-        final IIndex ndx;
+        final BTree ndx;
         
-        DirtyListener(String name,IIndex ndx) {
+        DirtyListener(String name, BTree ndx) {
             
             assert name!=null;
             
@@ -174,9 +174,9 @@ public class Name2Addr extends BTree {
                 
             }
 
-            log.info("Adding dirty index to commit list: ndx="+name);
-            
-            commitList.putIfAbsent(name,this);
+            log.info("Adding dirty index to commit list: ndx=" + name);
+
+            commitList.putIfAbsent(name, this);
             
         }
 
@@ -264,40 +264,60 @@ public class Name2Addr extends BTree {
      * within its internal mapping, and finally flushes itself and returns the
      * address from which this btree may be reloaded.
      */
-    public long handleCommit() {
+    public long handleCommit(final long commitTime) {
 
         // visit the indices on the commit list.
         Iterator<DirtyListener> itr = commitList.values().iterator();
         
         while(itr.hasNext()) {
             
-            DirtyListener l = itr.next();
+            final DirtyListener l = itr.next();
             
-            String name = l.name;
+            final String name = l.name;
             
-            IIndex btree = l.ndx;
+            final BTree btree = l.ndx;
             
             log.info("Will commit: "+name);
             
             // request commit.
-            final long addr = ((ICommitter)btree).handleCommit();
+            final long checkpointAddr = btree.handleCommit(commitTime);
+            
+            // set commitTime on the btree: @todo could be done by BTree#handleCommit() as easily.
+            btree.setLastCommitTime(commitTime);
             
             // encode the index name as a key.
             final byte[] key = getKey(name);
-            
+
             // lookup the current entry (if any) for that index.
             final byte[] val = lookup(key);
 
             // de-serialize iff entry was found.
-            final Entry oldValue = (val == null ? null
+            final Entry oldEntry = (val == null ? null
                     : EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(
                             val)));
-            
-            // if there is no existing entry or if the addr has changed.
-            if (oldValue == null || oldValue.addr != addr) {
 
-                // then update persistent mapping.
-                insert(key, EntrySerializer.INSTANCE.serialize(new Entry(name, addr)));
+            /*
+             * Update if there is no existing entry or if the checkpointAddr has
+             * changed or if there was no commit time on the old entry.
+             */
+            if (oldEntry == null || oldEntry.checkpointAddr != checkpointAddr
+                    || oldEntry.commitTime == 0L) {
+
+                final Entry entry = new Entry(name, checkpointAddr, commitTime);
+                
+                // update persistent mapping.
+                insert(key, EntrySerializer.INSTANCE.serialize( entry ));
+
+                // update the transient cache.
+                if (addrCache != null) {
+                    
+                    synchronized (addrCache) {
+                    
+                        addrCache.put(name, entry);
+                        
+                    }
+                    
+                }
                 
             }
             
@@ -310,7 +330,7 @@ public class Name2Addr extends BTree {
         commitList.clear();
         
         // and flushes out this btree as well.
-        return super.handleCommit();
+        return super.handleCommit(commitTime);
         
     }
     
@@ -370,7 +390,10 @@ public class Name2Addr extends BTree {
 //        btree = journal.getIndex(entry.addr);
         
         // re-load btree from the store.
-        btree = BTree.load(this.store, entry.addr);
+        btree = BTree.load(this.store, entry.checkpointAddr);
+        
+        // set the lastCommitTime on the index.
+        btree.setLastCommitTime(entry.commitTime);
         
         // save name -> btree mapping in transient cache.
 //        indexCache.put(name,btree);
@@ -388,8 +411,8 @@ public class Name2Addr extends BTree {
     }
     
     /**
-     * Return the address from which the historical state of the named index may
-     * be loaded.
+     * Return the address of the {@link Checkpoint} record from which the
+     * historical state of the named index may be loaded.
      * <p>
      * Note: This is a lower-level access mechanism that is used by
      * {@link Journal#getIndex(String, ICommitRecord)} when accessing historical
@@ -398,51 +421,70 @@ public class Name2Addr extends BTree {
      * @param name
      *            The index name.
      * 
-     * @return The address or <code>0L</code> if the named index was not
-     *         registered.
+     * @return The {@link Entry} for the named index.
      */
-    protected long getAddr(String name) {
+    protected Entry getEntry(String name) {
 
-        /*
-         * Note: This uses a private cache to reduce the Unicode -> key
-         * translation burden. We can not use the normal cache since that maps
-         * the name to the index and we have to return the address not the index
-         * in order to support a canonicalizing mapping in the Journal.
-         */
-        synchronized (addrCache) {
+        if (addrCache != null) {
 
-            Long addr = addrCache.get(name);
+            /*
+             * Note: This uses a private cache to reduce the Unicode -> key
+             * translation burden. We can not use the normal cache since that
+             * maps the name to the index and we have to return the address not
+             * the index in order to support a canonicalizing mapping in the
+             * Journal.
+             */
+            synchronized (addrCache) {
 
-            if (addr == null) {
+                // check our pricate cache.
+                Entry entry = addrCache.get(name);
 
-                final byte[] val = super.lookup(getKey(name));
+                if (entry == null) {
 
-                if (val == null) {
+                    // lookup in the index.
+                    final byte[] val = super.lookup(getKey(name));
 
-                    addr = 0L;
-                    
-                } else {
+                    if (val != null) {
 
-                    // deserialize entry.
-                    final Entry entry = EntrySerializer.INSTANCE.deserialize(new DataInputBuffer(val));
-                    
-                    addr = entry.addr;
-                    
+                        // deserialize entry.
+                        entry = EntrySerializer.INSTANCE
+                                .deserialize(new DataInputBuffer(val));
+
+                        // update cache.
+                        addrCache.put(name, entry);
+
+                    }
+
                 }
 
-                addrCache.put(name, addr);
-                
+                return entry;
+
+            }
+            
+        } else {
+
+            // lookup in the index.
+            final byte[] val = super.lookup(getKey(name));
+
+            Entry entry = null;
+
+            if (val != null) {
+
+                // deserialize entry.
+                entry = EntrySerializer.INSTANCE
+                        .deserialize(new DataInputBuffer(val));
+
             }
 
-            return addr;
+            return entry;
 
         }
 
     }
     /**
-     * A private cache used only by {@link #getAddr(String)}.
+     * A private cache used only by {@link #getEntry(String)}.
      */
-    private HashMap<String/* name */, Long/* Addr */> addrCache = new HashMap<String, Long>();
+    private HashMap<String/* name */, Entry> addrCache = new HashMap<String, Entry>();
 
     /**
      * Add an entry for the named index.
@@ -460,34 +502,44 @@ public class Name2Addr extends BTree {
      * @exception IndexExistsException
      *                if there is already an index registered under that name.
      */
-    public void registerIndex(String name,BTree btree) {
-        
+    public void registerIndex(String name, BTree btree) {
+
         if (name == null)
             throw new IllegalArgumentException();
 
         if (btree == null)
             throw new IllegalArgumentException();
-        
-        if( ! (btree instanceof ICommitter) ) {
-            
+
+        if (!(btree instanceof ICommitter)) {
+
             throw new IllegalArgumentException("Index does not implement: "
                     + ICommitter.class);
-            
+
         }
 
         final byte[] key = getKey(name);
-        
-        if(super.contains(key)) {
-            
+
+        if (super.contains(key)) {
+
             throw new IndexExistsException(name);
-            
+
         }
-        
+
         // flush btree to the store to get the checkpoint record address.
-        final long addr = ((ICommitter)btree).handleCommit();
+        final long checkpointAddr = btree.writeCheckpoint();
+
+        /*
+         * Add a serialized entry to the persistent index.
+         * 
+         * Note: The commit time here is a placeholder. It will be replaced with
+         * the actual commit time by the next commit since the newly created
+         * B+Tree is on our commit list. If there is an abort, then the entry is
+         * simply discarded along with the rest of the Name2Addr state.
+         */
         
-        // add a serialized entry to the persistent index.
-        super.insert(key,EntrySerializer.INSTANCE.serialize(new Entry(name,addr)));
+        final Entry entry = new Entry(name, checkpointAddr, 0L/* commitTime */);
+        
+        super.insert(key, EntrySerializer.INSTANCE.serialize( entry ));
         
 //        // touch the btree in the journal's object cache.
 //        journal.touch(addr, btree);
@@ -531,7 +583,7 @@ public class Name2Addr extends BTree {
         }
         
         // remove the name -> btree mapping from the transient cache.
-        IIndex btree = indexCache.remove(name);
+        final BTree btree = indexCache.remove(name);
         
         if (btree != null) {
 
@@ -545,8 +597,18 @@ public class Name2Addr extends BTree {
             commitList.remove(name);
             
             // clear our listener.
-            ((BTree)btree).setDirtyListener(null);
+            ((BTree) btree).setDirtyListener(null);
 
+            if (addrCache != null) {
+                
+                synchronized (addrCache) {
+
+                    addrCache.remove(name);
+
+                }
+                
+            }
+            
         }
 
         /*
@@ -573,16 +635,30 @@ public class Name2Addr extends BTree {
         public final String name;
         
         /**
-         * The address of the last known {@link IndexMetadata} record for the
+         * The address of the last known {@link Checkpoint} record for the
          * index with that name.
          */
-        public final long addr;
-        
-        public Entry(String name,long addr) {
+        public final long checkpointAddr;
+
+        /**
+         * The commit time associated with the last commit point for the named
+         * index.
+         */
+        public final long commitTime;
+
+        public Entry(String name, long checkpointAddr, long commitTime) {
             
             this.name = name;
             
-            this.addr = addr;
+            this.checkpointAddr = checkpointAddr;
+            
+            this.commitTime = commitTime;
+            
+        }
+        
+        public String toString() {
+            
+            return "Entry{name=" + name + ",checkpointAddr=" + checkpointAddr + ",commitTime=" + commitTime + "}";
             
         }
         
@@ -612,8 +688,10 @@ public class Name2Addr extends BTree {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream(capacity);
                 
                 DataOutput os = new DataOutputStream(baos);
-                
-                os.writeLong(entry.addr);
+
+                os.writeLong(entry.commitTime);
+
+                os.writeLong(entry.checkpointAddr);
 
                 os.writeUTF(entry.name);
                 
@@ -631,11 +709,13 @@ public class Name2Addr extends BTree {
 
             try {
 
-                final long addr = in.readLong();
+                final long commitTime = in.readLong();
+                
+                final long checkpointAddr = in.readLong();
 
                 final String name = in.readUTF();
 
-                return new Entry(name, addr);
+                return new Entry(name, checkpointAddr, commitTime);
 
             } catch (IOException e) {
 

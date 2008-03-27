@@ -48,6 +48,7 @@ import org.apache.log4j.MDC;
 import com.bigdata.Banner;
 import com.bigdata.btree.Counters;
 import com.bigdata.btree.IIndexProcedure;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IReadOnlyOperation;
 import com.bigdata.btree.ITupleFilter;
 import com.bigdata.btree.IndexMetadata;
@@ -71,7 +72,6 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
@@ -545,7 +545,13 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         reportService.shutdownNow();
 
-        statisticsCollector.stop();
+        if (statisticsCollector != null) {
+
+            // Note: value is not bound until after the service UUID is bound.
+            
+            statisticsCollector.stop();
+            
+        }
 
 //        if (INFO)
 //            log.info(getCounters().toString());
@@ -1228,7 +1234,15 @@ abstract public class DataService implements IDataService, IWritePipeline,
             
             if(counters == null) {
                 
-                throw new NoSuchIndexException(name);
+                /*
+                 * Note: A null return above is not an indication that the named
+                 * index does not exist, just an indication that there are no
+                 * counters for that index. This will happen if noone has
+                 * written on the index.
+                 */
+                return "No data for "+name;
+                
+//                throw new NoSuchIndexException(name);
                 
             }
             
@@ -1295,8 +1309,13 @@ abstract public class DataService implements IDataService, IWritePipeline,
             if (name == null)
                 throw new IllegalArgumentException();
             
+            // Choose READ_COMMITTED iff itr is read-only and UNISOLATED was requested.
+            final long startTime = (tx == ITx.UNISOLATED
+                        && ((flags & IRangeQuery.REMOVEALL)==0)? ITx.READ_COMMITTED
+                        : tx);
+
             final RangeIteratorTask task = new RangeIteratorTask(
-                    concurrencyManager, tx, name, fromKey, toKey, capacity,
+                    concurrencyManager, startTime, name, fromKey, toKey, capacity,
                     flags, filter);
     
             // submit the task and wait for it to complete.

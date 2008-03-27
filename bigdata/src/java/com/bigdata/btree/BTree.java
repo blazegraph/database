@@ -29,9 +29,11 @@ package com.bigdata.btree;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Name2Addr;
+import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 
@@ -502,27 +504,36 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
              * 
              * Note: This is synchronized to avoid race conditions when
              * re-opening the index from the backing store.
+             * 
+             * Note: [root] MUST be marked as [volatile] to guarentee correct
+             * semantics.
+             * 
+             * See http://en.wikipedia.org/wiki/Double-checked_locking
              */
 
             synchronized(this) {
             
-                /*
-                 * Setup the root leaf.
-                 */
-                if (checkpoint.getRootAddr() == 0L) {
-
-                    /*
-                     * Create the root leaf.
-                     */
-                    newRootLeaf();
-                    
-                } else {
+                if (root == null) {
                     
                     /*
-                     * Read the root node of the btree.
+                     * Setup the root leaf.
                      */
-                    root = readNodeOrLeaf(checkpoint.getRootAddr());
-                    
+                    if (checkpoint.getRootAddr() == 0L) {
+    
+                        /*
+                         * Create the root leaf.
+                         */
+                        newRootLeaf();
+                        
+                    } else {
+                        
+                        /*
+                         * Read the root node of the btree.
+                         */
+                        root = readNodeOrLeaf(checkpoint.getRootAddr());
+                        
+                    }
+                
                 }
                 
             }
@@ -594,25 +605,40 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
     }
     
     /**
-     * Sets the lastCommitTime
+     * Sets the lastCommitTime.
+     * <p>
+     * Note: The lastCommitTime is set by a combination of the
+     * {@link AbstractJournal} and {@link Name2Addr} based on the actual
+     * commitTime of the commit during which an {@link Entry} for that index was
+     * last committed. It is set for both historical index reads and unisolated
+     * index reads. The lastCommitTime for an unisolated index will advance as
+     * commits are performed with that index.
      * 
      * @param lastCommitTime
-     *            The timestamp of the last committed state of this index. This
-     *            should always be {@link ICommitRecord#getTimestamp()}.
+     *            The timestamp of the last committed state of this index.
      * 
+     * @throws IllegalArgumentException
+     *             if lastCommitTime is ZERO (0).
      * @throws IllegalStateException
-     *             if you attempt to replace a non-zero lastCommitTime with a
-     *             different timestamp.
+     *             if the timestamp is less than the previous value (it is
+     *             permitted to advance but not to go backwards).
      */
     final public void setLastCommitTime(long lastCommitTime) {
         
-//        if (this.lastCommitTime != 0L) {
-//            
-//            throw new IllegalStateException();
-//            
-//        }
+        if (lastCommitTime == 0L)
+            throw new IllegalArgumentException();
         
-        if (this.lastCommitTime != 0L && this.lastCommitTime != lastCommitTime) {
+        if (this.lastCommitTime == lastCommitTime) {
+
+            // No change.
+            
+            return;
+            
+        }
+        
+        log.info("old="+this.lastCommitTime+", new="+lastCommitTime);
+        
+        if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
 
             throw new IllegalStateException("Updated lastCommitTime: old="
                     + this.lastCommitTime + ", new=" + lastCommitTime);
@@ -622,7 +648,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
         this.lastCommitTime = lastCommitTime;
         
     }
-    private long lastCommitTime = 0L; // ITx.UNISOLATED
+    private long lastCommitTime = 0L;// Until the first commit.
     
     /**
      * Return the {@link IDirtyListener}.
@@ -899,7 +925,7 @@ public class BTree extends AbstractBTree implements IIndex, ICommitter {
      * @return The address of a {@link Checkpoint} record from which the btree
      *         may be reloaded.
      */
-    public long handleCommit() {
+    public long handleCommit(final long commitTime) {
 
         if (autoCommit && needsCheckpoint()) {
 

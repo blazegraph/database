@@ -249,8 +249,13 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
          
             Journal journal = new Journal(properties);
             
-//            // commit the journal to assign [firstCommitTime].
-//            journal.commit();
+            /*
+             * Commit the journal - this causes the commitRecordIndex to become
+             * restart safe and makes it possible to re-open the resulting
+             * journal in read-only mode.
+             */
+
+            journal.commit();
 
             journalMetadata2 = journal.getResourceMetadata();
             

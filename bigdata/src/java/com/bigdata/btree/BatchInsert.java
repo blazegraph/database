@@ -198,7 +198,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
     }
     
     @Override
-    protected void readMetadata(ObjectInput in) throws IOException {
+    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
 
         super.readMetadata(in);
 

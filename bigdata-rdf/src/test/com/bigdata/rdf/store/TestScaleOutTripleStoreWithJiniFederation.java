@@ -32,6 +32,7 @@ import junit.framework.Test;
 
 import com.bigdata.service.jini.BigdataClient;
 import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
@@ -50,7 +51,7 @@ import com.bigdata.service.jini.MetadataServer;
  * to the resources in <code>src/resources/config</code>.
  * 
  * <pre>
- * -Djava.security.policy=policy.all
+ *  -Djava.security.policy=policy.all
  * </pre>
  * 
  * Note: You will sometimes see a connection refused exception thrown while
@@ -66,8 +67,7 @@ import com.bigdata.service.jini.MetadataServer;
  * @todo consider reusing a single federation for all unit tests in order to
  *       reduce the setup time for the tests. this would have the consequence
  *       that we are not guarenteed a clean slate when we connect to the
- *       federation and we would definately have to implement dropIndex on the
- *       metadata service for this to work.
+ *       federation. we would need to use dropIndex.
  * 
  * @todo the java service browser log contains exceptions - presumably because
  *       we have not setup a codebase, e.g., using an embedded class server,
@@ -175,6 +175,10 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
+    protected LoadBalancerServer loadBalancerServer0;
+    /**
+     * Starts in {@link #setUpFederation()}.
+     */
     protected BigdataClient client;
     
     public void setUp() throws Exception {
@@ -197,12 +201,30 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
         log.warn("Starting data services.");
         
+        /*
+         * Start up a data server before the metadata server so that we can make
+         * sure that it is detected by the metadata server once it starts up.
+         */
+        dataServer1 = new DataServer(new String[] {
+                "src/resources/config/standalone/DataServer1.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                dataServer1.run();
+                
+            }
+            
+        }.start();
+
       /*
-       * Start up a data server before the metadata server so that we can make
-       * sure that it is detected by the metadata server once it starts up.
+       * Start up a load balancer server.
        */
-      dataServer1 = new DataServer(new String[] {
-              "src/resources/config/standalone/DataServer1.config"
+      loadBalancerServer0 = new LoadBalancerServer(new String[] {
+              "src/resources/config/standalone/LoadBalancerServer0.config"
 //              , AbstractServer.ADVERT_LABEL+groups 
               });
 
@@ -210,7 +232,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
           public void run() {
               
-              dataServer1.run();
+              loadBalancerServer0.run();
               
           }
           
@@ -264,6 +286,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);
       AbstractServerTestCase.getServiceID(dataServer1);
+      AbstractServerTestCase.getServiceID(loadBalancerServer0);
       
       // verify that the client has/can get the metadata service.
       assertNotNull("metadataService", client.getMetadataService());
@@ -275,10 +298,6 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     public void tearDownFederation() throws Exception {
 
         log.warn("Destroying federation.");
-        
-        /*
-         * @todo consider fed.destroy().
-         */
         
         if(client!=null) {
 
@@ -309,6 +328,14 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
             dataServer1.destroy();
 
             dataServer1 = null;
+            
+        }
+
+        if (loadBalancerServer0 != null) {
+            
+            loadBalancerServer0.destroy();
+
+            loadBalancerServer0 = null;
             
         }
 

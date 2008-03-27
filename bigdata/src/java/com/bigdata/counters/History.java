@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.HistoryInstrument.IEntry;
@@ -25,6 +26,18 @@ public class History<T> {
 
     protected static Logger log = Logger.getLogger(History.class);
     
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
+
     /**
      * The #of samples that can be stored in the buffer.
      */
@@ -476,7 +489,8 @@ public class History<T> {
      */
     synchronized public void add(final long timestamp, final T value) {
 
-        log.info("timestamp=" + timestamp + ", value="
+        if(INFO)
+            log.info("timestamp=" + timestamp + ", value="
                 + value);
 
         if (timestamp <= 0) {
@@ -549,8 +563,9 @@ public class History<T> {
                  * the same logicalSlot.
                  */
 
-                log.warn("overwrite ignored: t=" + timestamp
-                        + ", value=" + value);
+                if (INFO)
+                    log.info("overwrite ignored: t=" + timestamp + ", value="
+                            + value);
 
                 return;
 
@@ -581,8 +596,8 @@ public class History<T> {
 
                     final T avg = getAverage();
 
-                    log.info("overflow: t=" + t + ", avg="
-                            + avg);
+                    if (INFO)
+                        log.info("overflow: t=" + t + ", avg=" + avg);
 
                     sink.add(t, avg);
 

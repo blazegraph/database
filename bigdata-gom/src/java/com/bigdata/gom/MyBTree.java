@@ -163,7 +163,7 @@ final public class MyBTree extends AbstractBTree {
         IJournal journal = ((PersistenceStore) getNativeObjectManager()
                 .getPersistenceStore()).getJournal();
 
-        // Load btree from store.
+        // Load btree from store (@todo is not setting the lastCommitTime)
         btree = BTree.load(journal, _nativeBTreeId);
 
         if (btree == null) {
@@ -589,7 +589,7 @@ final public class MyBTree extends AbstractBTree {
     /**
      * Note: unnamed bigdata {@link BTree} objects needs to be explicitly
      * written on the store since they will not not otherwise participate in the
-     * commit protocol. This method invokes {@link BTree#handleCommit()} to
+     * commit protocol. This method invokes {@link BTree#writeCheckpoint()} to
      * flush the {@link BTree} state to the store and obtain the address of the
      * new checkpoint record from which the btree's state may be reloaded.
      */
@@ -599,7 +599,7 @@ final public class MyBTree extends AbstractBTree {
 
             final long oldAddress = _nativeBTreeId;
             
-            _nativeBTreeId = btree.handleCommit();
+            _nativeBTreeId = btree.writeCheckpoint();
             
             log.info("Saving BTree: " + this + ", old address="
                     + oldAddress + ", new address=" + _nativeBTreeId + "\n"

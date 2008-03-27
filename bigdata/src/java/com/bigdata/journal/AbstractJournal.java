@@ -418,7 +418,14 @@ public abstract class AbstractJournal implements IJournal {
     }
     
     /**
-     * Create or open a journal.
+     * Create or re-open a journal.
+     * <p>
+     * Note: Creating a new journal registers some internal indices but does NOT
+     * perform a commit. Those indices will become restart safe with the first
+     * commit. A newly created journal can not be closed and re-opened in
+     * read-only mode until there has been at least one commit since it will
+     * attempt to re-register those internal indices and that operation is not
+     * allowed for a read-only store.
      * 
      * @param properties
      *            The properties as defined by {@link Options}.
@@ -1320,11 +1327,16 @@ public abstract class AbstractJournal implements IJournal {
      * Notify all registered committers and collect their reported root
      * addresses in an array.
      * 
+     * @param commitTime
+     *            The timestamp assigned to the commit.
+     * 
      * @return The array of collected root addresses for the registered
      *         committers.
      */
-    final private long[] notifyCommitters() {
+    final private long[] notifyCommitters(final long commitTime) {
 
+        assert commitTime > 0L;
+        
         int ncommitters = 0;
 
         long[] rootAddrs = new long[_committers.length];
@@ -1334,7 +1346,7 @@ public abstract class AbstractJournal implements IJournal {
             if (_committers[i] == null)
                 continue;
 
-            final long addr = _committers[i].handleCommit();
+            final long addr = _committers[i].handleCommit(commitTime);
             
             rootAddrs[i] = addr;
 
@@ -1428,13 +1440,13 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * An atomic commit is performed by directing each registered
      * {@link ICommitter} to flush its state onto the store using
-     * {@link ICommitter#handleCommit()}. The address returned by that method
-     * is the address from which the {@link ICommitter} may be reloaded (and its
-     * previous address if its state has not changed). That address is saved in
-     * the {@link ICommitRecord} under the index for which that committer was
-     * {@link #registerCommitter(int, ICommitter) registered}. We then force
-     * the data to stable store, update the root block, and force the root block
-     * and the file metadata to stable store.
+     * {@link ICommitter#handleCommit(long)}. The address returned by that
+     * method is the address from which the {@link ICommitter} may be reloaded
+     * (and its previous address if its state has not changed). That address is
+     * saved in the {@link ICommitRecord} under the index for which that
+     * committer was {@link #registerCommitter(int, ICommitter) registered}. We
+     * then force the data to stable store, update the root block, and force the
+     * root block and the file metadata to stable store.
      * 
      * @param commitTime
      *            The commit time either of a transaction or of an unisolated
@@ -1445,7 +1457,7 @@ public abstract class AbstractJournal implements IJournal {
      * @return The timestamp assigned to the commit record -or- 0L if there were
      *         no data to commit.
      */
-    protected long commitNow(long commitTime) {
+    protected long commitNow(final long commitTime) {
 
         assertOpen();
 
@@ -1461,7 +1473,7 @@ public abstract class AbstractJournal implements IJournal {
          * on the store should not cause any committers to update their root
          * address.
          */
-        final long[] rootAddrs = notifyCommitters();
+        final long[] rootAddrs = notifyCommitters(commitTime);
 
         /*
          * See if anything has been written on the store since the last commit.
@@ -1809,8 +1821,8 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * @todo the {@link CommitRecordIndex} is a possible source of thread
      *       contention since transactions need to use this code path in order
-     *       to locate named indices but the {@link #writeService} can also
-     *       write on this index. I have tried some different approaches to
+     *       to locate named indices but the {@link WriteExecutorService} can
+     *       also write on this index. I have tried some different approaches to
      *       handling this.
      */
     public ICommitRecord getCommitRecord(long commitTime) {
@@ -1876,9 +1888,9 @@ public abstract class AbstractJournal implements IJournal {
          * The address at which the named index was written for that historical
          * state.
          */
-        final long indexCheckpointAddr = name2Addr.getAddr(name);
+        final Name2Addr.Entry entry = name2Addr.getEntry(name);
         
-        if (indexCheckpointAddr == 0L) {
+        if (entry == null) {
 
             // No such index by name for that historical state.
 
@@ -1892,33 +1904,41 @@ public abstract class AbstractJournal implements IJournal {
          * address on which it was written in the store.
          */
 
-        return getIndex(indexCheckpointAddr);
+        final BTree btree = getIndex(entry.checkpointAddr);
+        
+        assert entry.commitTime != 0L : "Entry="+entry;
+        
+        // Set the last commit time on the btree.
+        btree.setLastCommitTime(entry.commitTime);
+        
+        return btree;
 
     }
     
     /**
      * A canonicalizing mapping for {@link BTree}s.
      * 
-     * @param addr
+     * @param checkpointAddr
      *            The address of the {@link Checkpoint} record for the {@link BTree}.
      *            
      * @return The {@link BTree} loaded from that {@link Checkpoint}.
      * 
      * @see Options#HISTORICAL_INDEX_CACHE_CAPACITY
      */
-    final public BTree getIndex(long addr) {
+    final public BTree getIndex(long checkpointAddr) {
         
         synchronized (historicalIndexCache) {
 
-            BTree obj = (BTree) historicalIndexCache.get(addr);
+            BTree obj = (BTree) historicalIndexCache.get(checkpointAddr);
 
             if (obj == null) {
-                
-                obj = BTree.load(this,addr);
+
+                // Note: Does not set lastCommitTime.
+                obj = BTree.load(this, checkpointAddr);
                 
             }
             
-            historicalIndexCache.put(addr, (ICommitter)obj, false/*dirty*/);
+            historicalIndexCache.put(checkpointAddr, (ICommitter)obj, false/*dirty*/);
     
             return obj;
 

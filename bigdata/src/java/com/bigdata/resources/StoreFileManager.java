@@ -37,12 +37,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -53,10 +50,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentFileStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
@@ -80,7 +75,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * segments), including the logic to compute the effective release time for the
  * managed resources and to release those resources by deleting them from the
  * file system.
- *
+ * 
+ * @todo There is neither a "CREATE_TEMP_DIR" and "DELETE_ON_CLOSE" does not
+ *       remove all directories created during setup. One of the consequences is
+ *       that you have to explicitly clean up after a unit test using a
+ *       {@link ResourceManager} or it will leave its files around.
+ * 
  * @todo track the disk space used by the {@link #getDataDir()} and the free
  *       space remaining on the mount point that hosts the data directory and
  *       report via counters to the {@link ILoadBalancerService}. if we
@@ -581,7 +581,7 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 
                 log.info("Creating: "+journalsDir);
 
-                if (!journalsDir.mkdir()) {
+                if (!journalsDir.mkdirs()) {
 
                     throw new RuntimeException("Could not create directory: "
                             + journalsDir.getAbsolutePath());
@@ -594,7 +594,7 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 
                 log.info("Creating: "+segmentsDir);
                 
-                if (!segmentsDir.mkdir()) {
+                if (!segmentsDir.mkdirs()) {
 
                     throw new RuntimeException("Could not create directory: "
                             + segmentsDir.getAbsolutePath());
@@ -740,6 +740,9 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
                  * in which the journal is created. That will allow the atomic
                  * creation of the journal in the desired directory without
                  * changing the existing semantics for CREATE_TEMP_FILE.
+                 * 
+                 * See OverflowManager#doOverflow() which has very similar logic
+                 * with the same problem.
                  */
 
                 log.info("Creating initial journal");
@@ -929,14 +932,33 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
      */
     private static class Stats {
 
+        /**
+         * #of files scanned.
+         */
         public int nfiles;
 
+        /**
+         * #of journal files scanned.
+         */
         public int njournals;
 
+        /**
+         * #of index segment files found.
+         */
         public int nsegments;
 
+        /**
+         * total #of bytes of user data found in those files.
+         */
         public long nbytes;
 
+        public String toString() {
+            
+            return "Stats{nfiles=" + nfiles + ", njournals=" + njournals
+                    + ", nsegments=" + nsegments + ", nbytes=" + nbytes + "}";
+            
+        }
+        
     };
 
     /**
@@ -981,40 +1003,54 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
 
     private void scanFile(File file, Stats stats) {
 
+        log.info("Scanning file: "+file+", stats="+stats);
+        
         final IResourceMetadata resource;
 
         final String name = file.getName();
 
         if (name.endsWith(Options.JNL)) {
 
-            Properties properties = getProperties();
+            final Properties properties = getProperties();
 
             properties.setProperty(Options.FILE, file.getAbsolutePath());
 
             properties.setProperty(Options.READ_ONLY, "true");
 
-            AbstractJournal tmp = new ManagedJournal(properties);
+            final AbstractJournal tmp = new ManagedJournal(properties);
 
-            resource = tmp.getResourceMetadata();
-
-            stats.njournals++;
-            stats.nfiles++;
-            stats.nbytes += tmp.getBufferStrategy().getExtent();
-
-            tmp.close();
+            try {
+            
+                resource = tmp.getResourceMetadata();
+    
+                stats.njournals++;
+                stats.nfiles++;
+                stats.nbytes += file.length(); //tmp.size(); //getBufferStrategy().getExtent();
+                
+            } finally {
+            
+                tmp.close();
+                
+            }
 
         } else if (name.endsWith(Options.SEG)) {
 
-            IndexSegmentFileStore segStore = new IndexSegmentFileStore(file
+            final IndexSegmentFileStore segStore = new IndexSegmentFileStore(file
                     .getAbsoluteFile());
 
-            resource = segStore.getResourceMetadata();
+            try {
 
-            stats.nsegments++;
-            stats.nfiles++;
-            stats.nbytes += segStore.size();
+                resource = segStore.getResourceMetadata();
 
-            segStore.close();
+                stats.nsegments++;
+                stats.nfiles++;
+                stats.nbytes += file.length(); //segStore.size();
+
+            } finally {
+
+                segStore.close();
+
+            }
 
         } else {
 
@@ -1517,6 +1553,9 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
     /**
      * Recursively removes any files and subdirectories and then removes the
      * file (or directory) itself.
+     * <p>
+     * Note: Files that are not recognized will be logged by the
+     * {@link ResourceFileFilter}.
      * 
      * @param f
      *            A file or directory.
@@ -1525,7 +1564,7 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
         
         if(f.isDirectory()) {
             
-            File[] children = f.listFiles(newFileFilter());
+            final File[] children = f.listFiles(newFileFilter());
             
             for(int i=0; i<children.length; i++) {
                 
@@ -1533,19 +1572,11 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
                 
             }
             
-            log.info("Removing: "+f);
-            
-            if(!f.delete()) {
-                
-                log.warn("Could not remove: "+f);
-                
-            }
-            
         }
-            
-        log.info("Removing: " + f);
-
-        if (!f.delete()) {
+        
+        log.info("Removing: "+f);
+        
+        if (f.exists() && !f.delete()) {
 
             log.warn("Could not remove: " + f);
 
@@ -1557,7 +1588,7 @@ abstract public class StoreFileManager extends ResourceEvents implements IResour
      * Updates the {@link #releaseTime}.
      * 
      * @see #purgeOldResources(), which is responsible for actually deleting the
-     * old resources.
+     *      old resources.
      */
     public void setReleaseTime(long releaseTime) {
 

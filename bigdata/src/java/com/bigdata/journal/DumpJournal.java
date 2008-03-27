@@ -293,7 +293,7 @@ public class DumpJournal {
             Name2Addr.Entry entry = (Name2Addr.Entry) itr.next();
 
             System.err.print("name=" + entry.name + ", addr="
-                    + journal.toString(entry.addr) + " : ");
+                    + journal.toString(entry.checkpointAddr) + " : ");
 
             BTree ndx = (BTree) journal.getIndex(entry.name, commitRecord);
 

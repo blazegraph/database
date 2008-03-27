@@ -671,8 +671,6 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
 
         AbstractTripleStore store = getStore();
         
-        Properties properties = store.getProperties();
-
         try {
             
             if(store instanceof ScaleOutTripleStore || store instanceof LocalTripleStoreWithEmbeddedDataService) {
@@ -681,6 +679,8 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
                 
             }
             
+            final Properties properties = store.getProperties();
+
             /*
              * Note: overrides properties to make sure that entailments are
              * not computed on load.

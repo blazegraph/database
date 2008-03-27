@@ -118,9 +118,9 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
             Justification jst = new Justification(itr);
 
             // @todo comment out and make ids private.
-            assert jst.ids[0] == head.s;
-            assert jst.ids[1] == head.p;
-            assert jst.ids[2] == head.o;
+            assert jst.ids[0] == head.s : jst.toString(db);
+            assert jst.ids[1] == head.p : jst.toString(db);
+            assert jst.ids[2] == head.o : jst.toString(db);
             
             justifications[i++] = jst;
             

@@ -78,12 +78,7 @@ public class Tuple implements ITuple {
      * be used to completely avoid heap allocations when considering keys. The
      * data for the current key are simply copied from the leaf into the
      * {@link #kbuf} and the application can either examine the data in the
-     * {@link #kbuf} or copy it into its own buffers. The key will always begin
-     * at ZERO(0) within the #kbuf and extend up to (but exclusive of) the
-     * current {@link DataOutputBuffer#pos()} in the buffer. The
-     * application MUST NOT modify the {@link DataOutputBuffer#mark()} as that
-     * is used to efficiently copy keys that have been broken into a shared
-     * prefix and a per-key remainder.
+     * {@link #kbuf} or copy it into its own buffers.
      */
     final private DataOutputBuffer kbuf;
     
@@ -104,29 +99,30 @@ public class Tuple implements ITuple {
      */
     final public DataInputBuffer getKeyStream() {
 
-        if(!needKeys)
+        if (!needKeys)
             throw new UnsupportedOperationException();
-       
-        if(keyStream==null) {
-            
+
+        if (keyStream == null) {
+
             // setup the input stream.
-            
+
             keyStream = new DataInputBuffer(kbuf.array(), 0/* offset */, kbuf
-                    .limit()/*len*/);
-            
+                    .limit()/* len */);
+
         } else {
 
             // reset the buffer.
-            
+
             keyStream.setBuffer(kbuf.array(), 0, kbuf.limit());
-            
+
         }
-        
+
         return keyStream;
-        
+
     }
+
     private DataInputBuffer keyStream = null;
-    
+
     /**
      * Return a stream from which the value may be read.
      * 
@@ -135,27 +131,28 @@ public class Tuple implements ITuple {
      */
     final public DataInputBuffer getValueStream() {
 
-        if(!needVals)
-            throw new UnsupportedOperationException();
-       
-        if(isNull) 
+        if (!needVals)
             throw new UnsupportedOperationException();
 
-        if(versionDeleted) 
+        if (isNull)
             throw new UnsupportedOperationException();
-        
+
+        if (versionDeleted)
+            throw new UnsupportedOperationException();
+
         if (valStream == null) {
-            
+
             // setup the input stream.
-            
-            valStream = new DataInputBuffer(vbuf.array(),0/*offset*/,vbuf.limit()/*len*/);
-            
+
+            valStream = new DataInputBuffer(vbuf.array(), 0/* offset */, vbuf
+                    .limit()/* len */);
+
         } else {
 
             // reset the buffer.
-            
-            valStream.setBuffer(vbuf.array(),0,vbuf.limit());
-            
+
+            valStream.setBuffer(vbuf.array(), 0, vbuf.limit());
+
         }
         
         return valStream;

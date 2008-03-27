@@ -109,6 +109,27 @@ public class DataInputBuffer extends InputStream implements DataInput {
     }
 
     /**
+     * Prepare for reading from the buffer. The bytes between the
+     * {@link ByteArrayBuffer#pos()} and the {@link ByteArrayBuffer#limit()}
+     * will be read.
+     * 
+     * @param buf
+     *            The buffer.
+     */
+    public DataInputBuffer(ByteArrayBuffer buf) {
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+        
+        this.buf = buf.array();
+        
+        this.off = buf.pos;
+        
+        this.len = buf.limit;
+        
+    }
+    
+    /**
      * Replaces the buffer and resets the offset to zero (0).
      * 
      * @param buf
@@ -129,6 +150,8 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * 
      * @param buf
      *            The new buffer.
+     * @param off
+     * @param len
      */
     public void setBuffer(byte[] buf,int off,int len) {
         
@@ -143,6 +166,23 @@ public class DataInputBuffer extends InputStream implements DataInput {
         this.off = off;
         
         this.len = len;;
+        
+    }
+    
+    /**
+     * Replaces the buffer reference with {@link ByteArrayBuffer#array()} and
+     * resets the offset and length to the {@link ByteArrayBuffer#pos()} and the
+     * {@link ByteArrayBuffer#limit()} respectively.
+     * 
+     * @param buf
+     *            The buffer.
+     */
+    public void setBuffer(ByteArrayBuffer buf) {
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+
+        setBuffer(buf.array(), buf.pos, buf.limit);
         
     }
     

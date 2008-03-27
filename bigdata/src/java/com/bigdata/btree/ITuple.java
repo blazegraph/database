@@ -92,8 +92,8 @@ public interface ITuple {
     /**
      * Returns a copy of the current key.
      * <p>
-     * Note: This causes a heap allocation. See {@link #getKeyBuffer()} to avoid
-     * that allocation.
+     * Note: This can cause a heap allocation depending on how the keys are
+     * buffered. See {@link #getKeyBuffer()} to avoid that allocation.
      * 
      * @throws UnsupportedOperationException
      *             if keys are not being materialized.

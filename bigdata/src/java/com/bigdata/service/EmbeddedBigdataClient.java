@@ -157,4 +157,14 @@ public class EmbeddedBigdataClient extends AbstractBigdataClient {
         
     }
 
+    public IDataService getAnyDataService() {
+        
+        assertConnected();
+        
+        final EmbeddedBigdataFederation fed = ((EmbeddedBigdataFederation)this.fed);
+
+        return fed.getDataService(0);
+        
+    }
+
 }

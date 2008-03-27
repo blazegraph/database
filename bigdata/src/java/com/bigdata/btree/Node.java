@@ -2066,13 +2066,20 @@ public class Node extends AbstractNode implements INodeData {
     /**
      * Return the child node or leaf at the specified index in this node. If the
      * node is not in memory then it is read from the store.
+     * <p>
+     * Note: This is synchronized in order to make sure that concurrent readers
+     * are single-threaded at the point where they read a node or leaf which is
+     * the child of this {@link Node} from the store into the btree. This
+     * ensures that only one thread will read the missing child in from the
+     * store and that inconsistencies in the data structure can not arise from
+     * concurrent readers.
      * 
      * @param index
      *            The index in [0:nkeys].
      * 
      * @return The child node or leaf and never null.
      */
-    final protected AbstractNode getChild(int index) {
+    synchronized final protected AbstractNode getChild(int index) {
 
         if(Thread.interrupted()) {
             /*
@@ -2090,42 +2097,29 @@ public class Node extends AbstractNode implements INodeData {
         AbstractNode child = childRef == null ? null : childRef.get();
 
         if (child == null) {
-            
-            /*
-             * Note: This is synchronized in order to make sure that concurrent
-             * readers are single-threaded at the point where they read a node
-             * or leaf from the store into the btree. This ensures that only one
-             * thread will read the missing child in from the store and that
-             * inconsistencies in the data structure can not arise from
-             * concurrent readers.
-             */
 
-            synchronized (this) {
+            final long key = childAddr[index];
 
-                long key = childAddr[index];
-
-                if (key == NULL) {
-                    dump(Level.DEBUG, System.err);
-                    throw new AssertionError(
-                            "Child does not have persistent identity: this="
-                                    + this + ", index=" + index);
-                }
-
-                child = btree.readNodeOrLeaf(key);
-
-                // patch parent reference since loaded from store.
-                child.parent = btree.newRef(this);
-
-                // patch the child reference.
-                childRefs[index] = btree.newRef(child);
-
+            if (key == NULL) {
+                dump(Level.DEBUG, System.err);
+                throw new AssertionError(
+                        "Child does not have persistent identity: this=" + this
+                                + ", index=" + index);
             }
-        
-        }
 
+            child = btree.readNodeOrLeaf(key);
+
+            // patch parent reference since loaded from store.
+            child.parent = btree.newRef(this);
+
+            // patch the child reference.
+            childRefs[index] = btree.newRef(child);
+
+        }
+     
         /*
-         * @todo touch the node or leaf here? or here and in the return from
-         * the recursive search and mutation methods?
+         * @todo touch the node or leaf here? or here and in the return from the
+         * recursive search and mutation methods?
          */
         
         assert child != null;

@@ -852,12 +852,26 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * Note: We consult the load balancer service on this since it is able
          * to put the load of this service into perspective by also considering
          * the load on the other services in the federation.
+         * 
+         * Note: This is robust to failure of the load balancer service. When it
+         * is not available we simply do not consider index partition moves.
          */
 
         // lookup the load balancer service.
-        final ILoadBalancerService loadBalancerService = resourceManager
-                .getLoadBalancerService();
+        final ILoadBalancerService loadBalancerService;
+        
+        try {
 
+            loadBalancerService = resourceManager.getLoadBalancerService();
+
+        } catch (Exception ex) {
+
+            log.warn("Could not discover the load balancer service", ex);
+
+            return EMPTY_LIST;
+            
+        }
+        
         if (loadBalancerService == null) {
 
             log.warn("Could not discover the load balancer service");

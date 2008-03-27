@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -37,6 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.DataServiceRangeIterator;
@@ -116,6 +118,11 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
      * empty, a range query of the entire index will still query each of the N
      * partitions. However, since the index is empty none of the partitions will
      * have any matching entries and all result sets will be empty.
+     * 
+     * @todo it would be useful if the {@link ResultSet} reported the maximum
+     *       length for the keys and for the values. This could be used to right
+     *       size the buffers which otherwise we have to let grow until they are
+     *       of sufficient capacity.
      */
     protected ResultSet rset = null;
 
@@ -483,21 +490,52 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
 
         public ByteArrayBuffer getKeyBuffer() {
 
-            return new ByteArrayBuffer(getKey());
+            if (lastVisited == -1)
+                throw new IllegalStateException();
 
+            if (keyBuffer == null) {
+
+                final int initialCapacity = rset.getKeys().getLength(lastVisited);
+                
+                keyBuffer = new DataOutputBuffer(initialCapacity);
+                
+            }
+            
+            keyBuffer.reset();
+            
+            try {
+            
+                rset.getKeys().copyKey(lastVisited, keyBuffer);
+
+                keyBuffer.flip();
+
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+            return keyBuffer;
+            
         }
+        private DataOutputBuffer keyBuffer = null;
 
         public DataInputBuffer getKeyStream() {
-            byte[] key = getKey();
-            if (keyStream == null) {
-                keyStream = new DataInputBuffer(key);
-            } else {
-                keyStream.setBuffer(key);
-            }
-            return keyStream;
-        }
 
-        private DataInputBuffer keyStream = null;
+            return new DataInputBuffer(getKeyBuffer());
+            
+        }
+        
+//        public DataInputBuffer getKeyStream() {
+//            byte[] key = getKey();
+//            if (keyStream == null) {
+//                keyStream = new DataInputBuffer(key);
+//            } else {
+//                keyStream.setBuffer(key);
+//            }
+//            return keyStream;
+//        }
+//        private DataInputBuffer keyStream = null;
 
         public byte[] getValue() {
 
@@ -518,29 +556,67 @@ abstract public class AbstractChunkedRangeIterator implements ITupleIterator {
         }
         
         public ByteArrayBuffer getValueBuffer() {
-
-            final byte[] val = getValue();
             
-            if (val == null)
-                throw new UnsupportedOperationException();
+            if (lastVisited == -1)
+                throw new IllegalStateException();
+            
+            if (valueBuffer == null) {
+                
+                final int initialCapacity = rset.getValues().getLength(lastVisited);
 
-            return new ByteArrayBuffer(val);
-
+                valueBuffer = new DataOutputBuffer(initialCapacity);
+                
+            }
+            
+            valueBuffer.reset();
+            
+            try {
+            
+                rset.getValues().copyKey(lastVisited, valueBuffer);
+                
+                valueBuffer.flip();
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+            return valueBuffer;
+            
         }
+        private DataOutputBuffer valueBuffer = null;
 
         public DataInputBuffer getValueStream() {
-            byte[] val = getValue();
-            if (val == null)
-                throw new UnsupportedOperationException();
-            if (valStream == null) {
-                valStream = new DataInputBuffer(val);
-            } else {
-                valStream.setBuffer(val);
-            }
-            return valStream;
-        }
 
-        private DataInputBuffer valStream = null;
+            return new DataInputBuffer(getValueBuffer());
+            
+        }
+        
+//        public ByteArrayBuffer getValueBuffer() {
+//
+//            final byte[] val = getValue();
+//            
+//            if (val == null)
+//                throw new UnsupportedOperationException();
+//
+//            return new ByteArrayBuffer(val);
+//
+//        }
+//
+//        public DataInputBuffer getValueStream() {
+//            byte[] val = getValue();
+//            if (val == null)
+//                throw new UnsupportedOperationException();
+//            if (valStream == null) {
+//                valStream = new DataInputBuffer(val);
+//            } else {
+//                valStream.setBuffer(val);
+//            }
+//            return valStream;
+//        }
+//
+//        private DataInputBuffer valStream = null;
 
         public long getVersionTimestamp() {
 

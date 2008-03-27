@@ -125,7 +125,9 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     }
     
     /**
-     * Uses an initial buffer capacity of <code>1024</code> bytes.
+     * Creates a buffer with an initial capacity of <code>1024</code> bytes.
+     * The position and the read limit will zero. The capacity of the buffer
+     * will be automatically extended as required.
      */
     public ByteArrayBuffer() {
         
@@ -134,33 +136,23 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     }
     
     /**
+     * Creates a buffer with the specified initial capacity. The position and
+     * the read limit will be zero. The capacity of the buffer will be
+     * automatically extended as required.
+     * 
      * @param initialCapacity
-     *            The initial capacity of the internal byte[].
+     *            The initial capacity.
      */
     public ByteArrayBuffer(final int initialCapacity) {
         
-        this(new byte[assertNonNegative("initialCapacity", initialCapacity)]);
+        this(//
+                0, // pos
+                0, // readLimit
+                new byte[assertNonNegative("initialCapacity", initialCapacity)]//
+        );
         
     }
 
-    /**
-     * @param buf
-     *            The buffer, which may have pre-existing data. The buffer
-     *            reference is used directly rather than making a copy of the
-     *            data.
-     * 
-     * @throws IllegalArgumentException
-     *             if the <i>buf</i> is <code>null</code>.
-     */
-    public ByteArrayBuffer(final byte[] buf) {
-
-        if (buf == null)
-            throw new IllegalArgumentException();
-
-        this.buf = buf;
-
-    }
-    
     /**
      * Ensure that at least <i>len</i> bytes are free in the buffer starting at
      * <i>pos</i>. The {@link #buf buffer} may be grown by this operation but
@@ -497,29 +489,39 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     private int mark = 0;
     
     /**
-     * Create a new buffer backed by the given array. The position will be zero,
-     * the limit will be the capacity, and the mark will be zero.
+     * Create a new buffer backed by the given array. The initial capacity will
+     * be the size of the given byte[]. The mark will be zero. The capacity of
+     * the buffer will be automatically extended as required.
+     * <p>
+     * Note: The buffer reference is used directly rather than making a copy of
+     * the data.
      * 
-     * @param len
-     *            The #of bytes of data in the provided buffer.
+     * @param pos
+     *            The initial {@link #pos() position}.
+     * @param limit
+     *            The initial {@link #limit()}.
      * @param buf
-     *            The buffer, with <i>len</i> pre-existing bytes of valid data.
-     *            The buffer reference is used directly rather than making a
-     *            copy of the data.
+     *            The backing byte[].
      */
-    public ByteArrayBuffer(final int len, byte[] buf) {
+    public ByteArrayBuffer(final int pos, final int limit, final byte[] buf) {
 
-        this( buf );
+        if (pos < 0)
+            throw new IllegalArgumentException("pos<0");
         
-        if (len < 0)
-            throw new IllegalArgumentException("len");
+        if (pos > limit)
+            throw new IllegalArgumentException("pos>limit");
 
-        if (len > buf.length)
-            throw new IllegalArgumentException("len>buf.length");
+        if (limit > buf.length)
+            throw new IllegalArgumentException("limit>buf.length");
 
-        this.pos = len;
+        if (buf == null)
+            throw new IllegalArgumentException("buf");
         
-        this.limit = buf.length;
+        this.buf = buf;
+
+        this.pos = pos;
+        
+        this.limit = limit;
 
     }
     
@@ -1124,15 +1126,19 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     }
 
-    final public void write(final byte[] b, final int off, final int len) throws IOException {
-        if(len==0) return;
-      ensureFree(len);
-      
-      System.arraycopy(b, off, buf, this.pos, len);
-      
-      this.pos += len;
-      
-      this.limit = this.pos;
+    final public void write(final byte[] b, final int off, final int len)
+            throws IOException {
+
+        if (len == 0)
+            return;
+
+        ensureFree(len);
+
+        System.arraycopy(b, off, buf, this.pos, len);
+
+        this.pos += len;
+
+        this.limit = this.pos;
 
     }
 

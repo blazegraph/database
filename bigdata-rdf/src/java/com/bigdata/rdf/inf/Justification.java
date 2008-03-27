@@ -36,6 +36,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -250,8 +251,8 @@ public class Justification implements Comparable<Justification> {
      * @param bindings
      *            The term identifiers for the bindings under which the rule
      *            justified the entailments. A binding MAY be
-     *            {@link IRawTripleStore#NULL} in which case it MUST be interpreted
-     *            as a wildcard.
+     *            {@link IRawTripleStore#NULL} in which case it MUST be
+     *            interpreted as a wildcard.
      */
     public Justification(Rule rule, SPO head, long[] bindings) {
 
@@ -260,7 +261,8 @@ public class Justification implements Comparable<Justification> {
         assert bindings != null;
         
         // verify enough bindings for one or more triple patterns.
-        assert bindings.length % N == 0;
+        assert bindings.length % N == 0 : "bindings.length=" + bindings.length;
+        assert bindings.length / N >= 1 : "bindings.length=" + bindings.length;
         
         this.rule = rule;
         
@@ -294,9 +296,11 @@ public class Justification implements Comparable<Justification> {
         
         final ITuple tuple = itr.next();
         
-        final int keyLen = tuple.getKeyBuffer().pos();
+        final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
         
-        final byte[] data = tuple.getKeyBuffer().array();
+        final int keyLen = kbuf.limit();
+        
+        final byte[] data = kbuf.array();
         
         this.rule = null; // Not persisted.
         
@@ -306,6 +310,9 @@ public class Justification implements Comparable<Justification> {
         // #of term identifiers in the key.
         final int m = keyLen / Bytes.SIZEOF_LONG;
 
+        // A justification must include at least a head and one tuple in the tail.
+        assert m >= N * 2 : "keyLen="+keyLen+", N="+N+", m="+m;
+        
         ids = new long[m];
         
         for (int i = 0; i < m; i++) {

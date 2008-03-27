@@ -28,11 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
@@ -41,10 +44,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
 import com.bigdata.service.EmbeddedDataService;
+import com.bigdata.service.EmbeddedLoadBalancerService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
@@ -52,13 +55,6 @@ import com.bigdata.service.IMetadataService;
 /**
  * A thread-safe variant that supports concurrent data load and query (the
  * {@link ScaleOutTripleStore} also supports concurrent data load and query).
- * 
- * @deprecated Replaced by {@link LocalTripleStoreWithEmbeddedDataService}. The
- *             latter provides all of the concurrency controls of the
- *             {@link DataService} without RMI overhead and also supports
- *             dynamically partitioned key-range indices. Index partitioning can
- *             be disabled using
- *             {@link ResourceManager.Options#OVERFLOW_ENABLED}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -77,6 +73,8 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
      * concurrency control.
      */
     final private EmbeddedDataService dataService;
+    
+    final private ILoadBalancerService loadBalancerService;
     
     /**
      * The operations on the indices are unisolated.
@@ -102,7 +100,23 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     final IIndex ndx_just;
     
     /**
+     * Options understood by the {@link LocalTripleStoreWithEmbeddedDataService}.
      * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends AbstractLocalTripleStore.Options, DataService.Options {
+        
+    }
+    
+    /**
+     * Note: Journal overflow is disabled by this class. Therefore indices will
+     * never be split and will remain monolithic.
+     * <p>
+     * Note: The persistent state of the database will be stored in the directory
+     * named by the required {@link Options#DATA_DIR} property.
+     * 
+     * @see Options
      */
     public LocalTripleStoreWithEmbeddedDataService(Properties properties) {
         
@@ -111,16 +125,30 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         branchingFactor = Integer.parseInt(properties.getProperty(
                 Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
         
+        loadBalancerService = new EmbeddedLoadBalancerService(
+                UUID.randomUUID(), properties);
+        
         /*
          * Note: The embedded data service does not support scale-out indices.
-         * Use an embedded federation for that.
+         * Use an embedded or distributed federation for that.
          * 
          * @todo the UUID of the data service might be best persisted with the
          * data service in case anything comes to rely on it, but as far as I
          * can tell nothing does or should.
          */
-        dataService = new EmbeddedDataService(UUID.randomUUID(),properties) {
+        
+        // wrap the caller's properties to prevent side-effects.
+        final Properties p = new Properties( properties );
+        
+        // Disable overflow.
+        p.setProperty(Options.OVERFLOW_ENABLED,"false");
+        
+        dataService = new EmbeddedDataService(UUID.randomUUID(), p) {
 
+            /**
+             * @throws UnsupportedOperationException
+             *             always since the metadata index is not used.
+             */
             @Override
             public IMetadataService getMetadataService() {
 
@@ -131,19 +159,41 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
             @Override
             public ILoadBalancerService getLoadBalancerService() {
 
-                throw new UnsupportedOperationException();
+                return loadBalancerService;
                 
             }
 
+            /**
+             * Returns the embedded data service IFF the given serviceUUID is
+             * the UUID for the embedded data service and <code>null</code>
+             * otherwise.
+             */
             @Override
             public IDataService getDataService(UUID serviceUUID) {
 
-                throw new UnsupportedOperationException();
+                if (serviceUUID == null)
+                    throw new IllegalArgumentException();
+                
+                final UUID uuid;
+                try {
+                    uuid = dataService.getServiceUUID();
+                } catch(IOException ex) {
+                    // Note: Should never happen since this is a local method call.
+                    throw new RuntimeException(ex);
+                }
+                
+                if(uuid.equals(serviceUUID)) {
+                    
+                    return dataService;
+                    
+                }
+
+                return null; 
                 
             }
             
         };
-
+        
         log.info("Using embedded data service: "+getFile());
         
         /*
@@ -180,7 +230,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         final String name;
         
         public RegisterIndexTask(String name) {
+
             this.name = name;
+            
         }
         
         protected IndexMetadata getIndexMetadata() {
@@ -195,6 +247,8 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
         public Object call() throws Exception {
             
+            log.info("Registering index: "+name);
+            
             dataService.registerIndex(name, getIndexMetadata());
             
             return null;
@@ -206,7 +260,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     private class RegisterTermIdIndexTask extends RegisterIndexTask {
 
         public RegisterTermIdIndexTask(String name) {
+            
             super(name);
+            
         }
 
         protected IndexMetadata getIndexMetadata() {
@@ -222,7 +278,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     private class RegisterIdTermIndexTask extends RegisterIndexTask {
 
         public RegisterIdTermIndexTask(String name) {
+
             super(name);
+            
         }
 
         protected IndexMetadata getIndexMetadata() {
@@ -238,7 +296,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     private class RegisterFreeTextIndexTask extends RegisterIndexTask {
 
         public RegisterFreeTextIndexTask(String name) {
+            
             super(name);
+            
         }
 
         protected IndexMetadata getIndexMetadata() {
@@ -256,7 +316,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     private class RegisterStatementIndexTask extends RegisterIndexTask {
 
         public RegisterStatementIndexTask(String name) {
+
             super(name);
+            
         }
 
         protected IndexMetadata getIndexMetadata() {
@@ -276,7 +338,9 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     private class RegisterJustIndexTask extends RegisterIndexTask {
 
         public RegisterJustIndexTask(String name) {
+
             super(name);
+            
         }
 
         protected IndexMetadata getIndexMetadata() {
@@ -293,12 +357,10 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     
     /**
      * Registers the various indices that will be made available to the client.
-     * 
-     * FIXME Custom registration of key and value serializers for various
-     * indices. Also, the branching factor parameter got dropped by the
-     * refactor.
      */
     private void registerIndices() {
+        
+        log.info("");
         
         final List<Callable<Object>> tasks = new LinkedList<Callable<Object>>();
 
@@ -338,20 +400,37 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
         try {
             
-            writeService.invokeAll(tasks);
-                        
+            final List<Future<Object>> futures = writeService.invokeAll(tasks);
+            
+            for(Future<Object> f : futures) {
+             
+                // throws exception if there was a problem.
+                f.get();
+                
+            }
+            
             log.info("Registered indices.");
 
         } catch (InterruptedException ex) {
             
             throw new RuntimeException(ex);
             
+        } catch (ExecutionException e) {
+            
+            throw new RuntimeException("Problem registering index", e);
+            
         }
 
     }
     
+    /**
+     * @todo could be done as a single task or using invokeAll, which is how we
+     *       register the indices.
+     */
     public void clear() {
 
+        log.info("");
+        
         try {
 
             if (lexicon) {
@@ -466,7 +545,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
     final public void close() {
         
-        log.info("\n"+dataService.getLiveJournal().getStatistics());
+        log.info("");
         
         super.close();
         
@@ -476,7 +555,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
     
     final public void closeAndDelete() {
 
-        log.info("\n"+dataService.getLiveJournal().getStatistics());
+        log.info("");
 
         super.closeAndDelete();
         

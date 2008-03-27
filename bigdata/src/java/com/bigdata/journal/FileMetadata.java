@@ -367,6 +367,7 @@ public class FileMetadata {
                  * Read the MAGIC and VERSION.
                  */
                 raf.seek(0L);
+                // Note: this next line will throw IOException if there is a file lock contention.
                 magic = raf.readInt();
                 if (magic != MAGIC)
                     throw new RuntimeException("Bad journal magic: expected="
@@ -607,12 +608,12 @@ public class FileMetadata {
                 default:
                     throw new AssertionError();
                 }
-    
+
             }
 
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
+        } catch (IOException ex) {
+
+            throw new RuntimeException("file=" + file, ex);
             
         }
         

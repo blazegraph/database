@@ -283,12 +283,14 @@ abstract public class IndexManager extends StoreFileManager {
      * commit point (vs the live unisolated index) it will be marked as
      * {@link AbstractBTree#isReadOnly()} and
      * {@link AbstractBTree#getLastCommitTime()} will reflect the commitTime of
-     * the {@link ICommitRecord} from which that {@link BTree} was loaded. Note
-     * further that the commitTime MAY NOT be the same as the specified
-     * <i>timestamp</i> for a number of reasons. First, <i>timestamp</i> MAY
-     * be negative to indicate a historical read vs a transactional read.
-     * Second, the {@link ICommitRecord} will be the record having the greatest
-     * commitTime LTE the specified <i>timestamp</i>.
+     * the commit point during which changes to the state of the {@link BTree}
+     * were last written. Note further that the commitTime MAY NOT be the same
+     * as the specified <i>timestamp</i> for a number of reasons. First,
+     * <i>timestamp</i> MAY be negative to indicate a historical read vs a
+     * transactional read. Second, the {@link ICommitRecord} will be the record
+     * having the greatest commitTime LTE the specified <i>timestamp</i>.
+     * Third, the lastCommitTime reflects the specific commit in which the
+     * writes on the {@link BTree} last participated in a commit.
      * <p>
      * Note: An {@link IndexSegment} is always read-only and always reports the
      * commitTime associated with the view from which it was constructed.
@@ -378,13 +380,13 @@ abstract public class IndexManager extends StoreFileManager {
                 if (btree != null) {
 
                     /*
-                     * Mark the B+Tree as read-only and set the lastCommitTime
-                     * timestamp from the commitRecord.
+                     * Mark the B+Tree as read-only.
                      */
                     
                     ((BTree)btree).setReadOnly(true);
                     
-                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
+                    assert ((BTree) btree).getLastCommitTime() != 0;
+//                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
                     
                 }
 
@@ -416,13 +418,13 @@ abstract public class IndexManager extends StoreFileManager {
                 if (btree != null) {
 
                     /*
-                     * Mark the B+Tree as read-only and set the lastCommitTime
-                     * timestamp from the commitRecord.
+                     * Mark the B+Tree as read-only.
                      */
                     
                     ((BTree)btree).setReadOnly(true);
                     
-                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
+                    assert ((BTree) btree).getLastCommitTime() != 0;
+//                    ((BTree)btree).setLastCommitTime(commitRecord.getTimestamp());
                     
                 }
 

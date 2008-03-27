@@ -99,9 +99,13 @@ public class TestIndexPartitionMove extends AbstractEmbeddedBigdataFederationTes
      * Test forces a move of an index partition and validates the scale-out
      * after the move against ground truth.
      * 
-     * @throws IOException 
-     * @throws ExecutionException 
-     * @throws InterruptedException 
+     * @throws IOException
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * 
+     * FIXME This test needs to override the {@link ILoadBalancerService} in
+     * order to setup the pre-conditions for the move (the source data service
+     * is "highly utilized" and the target data service is "under utilized").
      */
     public void test_move() throws IOException, InterruptedException, ExecutionException {
         
