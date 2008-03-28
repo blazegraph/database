@@ -42,7 +42,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.AbstractJournal;
@@ -258,7 +258,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         // verify segment has all data in the groundTruth btree.
         {
 
-            IndexSegmentFileStore segStore = new IndexSegmentFileStore(
+            IndexSegmentStore segStore = new IndexSegmentStore(
                     new File(result.segmentMetadata.getFile()));
 
             IndexSegment seg = segStore.load();

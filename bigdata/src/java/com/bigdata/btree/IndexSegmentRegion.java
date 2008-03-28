@@ -2,10 +2,10 @@ package com.bigdata.btree;
 
 /**
  * Type-safe enumeration of the regions to which relative offsets may be
- * constructed for an {@link IndexSegmentFileStore}.
+ * constructed for an {@link IndexSegmentStore}.
  * 
  * @see IndexSegmentBuilder
- * @see IndexSegmentFileStore
+ * @see IndexSegmentStore
  * @see IndexSegmentCheckpoint
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

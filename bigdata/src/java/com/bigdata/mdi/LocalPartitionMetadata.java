@@ -38,7 +38,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.DataService;
@@ -81,7 +81,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     /**
      * Description of the resources required to materialize a view of the index
      * partition (optional - not stored when the partition metadata is stored on
-     * an {@link IndexSegmentFileStore}).
+     * an {@link IndexSegmentStore}).
      * <p>
      * The entries in the array reflect the creation time of the resources. The
      * earliest resource is listed first. The most recently created resource is

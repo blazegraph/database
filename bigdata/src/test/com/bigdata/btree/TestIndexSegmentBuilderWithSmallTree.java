@@ -148,7 +148,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * specifics of the length of serialized nodes or leaves).
           */
         
-        final IndexSegmentFileStore fileStore = new IndexSegmentFileStore(outFile);
+        final IndexSegmentStore fileStore = new IndexSegmentStore(outFile);
         
         assertEquals(commitTime,fileStore.getCheckpoint().commitTime);
         assertEquals(2,fileStore.getCheckpoint().height);
@@ -231,7 +231,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+        final IndexSegment seg = new IndexSegmentStore(outFile).load();
 
         assertEquals(9,seg.getBranchingFactor());
         assertEquals(1,seg.getHeight());
@@ -291,7 +291,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
              * example, those aspects that depend on the specifics of the length
              * of serialized nodes or leaves).
              */
-        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+        final IndexSegment seg = new IndexSegmentStore(outFile).load();
 
         assertEquals(10,seg.getBranchingFactor());
         assertEquals(0,seg.getHeight());
@@ -372,7 +372,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+        final IndexSegment seg = new IndexSegmentStore(outFile).load();
 
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(1,seg.getHeight());
@@ -466,7 +466,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractBTreeTestCase 
           * case and not, for example, those aspects that depend on the
           * specifics of the length of serialized nodes or leaves).
           */
-        final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+        final IndexSegment seg = new IndexSegmentStore(outFile).load();
 
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(2,seg.getHeight());

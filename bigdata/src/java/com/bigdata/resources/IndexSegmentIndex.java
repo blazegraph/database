@@ -29,7 +29,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
@@ -37,7 +37,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * {@link BTree} mapping {@link IndexSegmentFileStore} commit times to
+ * {@link BTree} mapping {@link IndexSegmentStore} commit times to
  * {@link IResourceMetadata} records. The keys are the long integers
  * (commitTimes) followed by the index segment UUID to break ties (this is not
  * the scale-out index UUID, but the UUID of the specific index segment). The

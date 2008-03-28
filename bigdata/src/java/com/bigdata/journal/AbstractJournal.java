@@ -1004,6 +1004,21 @@ public abstract class AbstractJournal implements IJournal {
     }
 
     /**
+     * Closes out the journal iff it is still open.
+     */
+    protected void finalize() throws Exception {
+        
+        log.warn("Closing journal: "+getFile());
+        
+        if(_bufferStrategy.isOpen()) {
+            
+            shutdownNow();
+            
+        }
+        
+    }
+    
+    /**
      * Statistics describing the journal including IO, indices, etc.
      * 
      * @deprecated by {@link #getCounters()}

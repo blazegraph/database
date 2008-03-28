@@ -39,7 +39,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
@@ -451,7 +451,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         // verify index segments discovered.
         for(int i=0; i<nsegments; i++) {
             
-            IndexSegmentFileStore segStore = (IndexSegmentFileStore) resourceManager
+            IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
                     .openStore(segmentUUIDs[i]);
 
             // verify opened.
@@ -693,7 +693,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         assertEquals(1, resourceManager.getIndexSegmentCount());
 
         // verify index segment discovered.
-        IndexSegmentFileStore segStore = (IndexSegmentFileStore) resourceManager
+        IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
                 .openStore(segmentUUID);
 
         // verify opened.

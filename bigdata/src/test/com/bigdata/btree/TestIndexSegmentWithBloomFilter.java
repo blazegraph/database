@@ -270,7 +270,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          * specifics of the length of serialized nodes or leaves).
          */
         System.err.println("Opening index segment w/ bloom filter.");
-        final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
+        final IndexSegment seg2 = new IndexSegmentStore(outFile2).load();
 
         /*
          * Verify the total index order.
@@ -388,7 +388,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/o bloom filter.");
-            final IndexSegment seg = new IndexSegmentFileStore(outFile).load();
+            final IndexSegment seg = new IndexSegmentStore(outFile).load();
 
             /*
              * Verify can load the index file and that the metadata
@@ -398,7 +398,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
              * specifics of the length of serialized nodes or leaves).
              */
             System.err.println("Opening index segment w/ bloom filter.");
-            final IndexSegment seg2 = new IndexSegmentFileStore(outFile2).load();
+            final IndexSegment seg2 = new IndexSegmentStore(outFile2).load();
 
             /*
              * Explicitly test the bloom filter against ground truth. 

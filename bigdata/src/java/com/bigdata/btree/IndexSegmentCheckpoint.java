@@ -121,13 +121,13 @@ public class IndexSegmentCheckpoint {
 
     /**
      * The #of bits in an 64-bit long integer address that are used to represent
-     * the byte offset into the {@link IndexSegmentFileStore}.
+     * the byte offset into the {@link IndexSegmentStore}.
      */
     final public int offsetBits;
 
     /**
      * The {@link IAddressManager} used to interpret addresses in the
-     * {@link IndexSegmentFileStore}.
+     * {@link IndexSegmentStore}.
      */
     final IndexSegmentAddressManager am;
     

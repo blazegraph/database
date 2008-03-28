@@ -167,7 +167,7 @@ public class StressTestConcurrent extends
         properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
 
         // Note: another way to disable moves is to restrict the test to a single data service.
-        properties.setProperty(com.bigdata.service.EmbeddedBigdataFederation.Options.NDATA_SERVICES,"1");
+//        properties.setProperty(com.bigdata.service.EmbeddedBigdataFederation.Options.NDATA_SERVICES,"1");
 
         // disable overflow processing
 //        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
@@ -211,6 +211,7 @@ public class StressTestConcurrent extends
         int nops = 100;
         int nindices = 1;
 
+        
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
                 nops, nindices);
 

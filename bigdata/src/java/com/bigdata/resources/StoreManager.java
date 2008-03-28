@@ -322,106 +322,11 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * FIXME make sure this cache purges entries that have not been touched in
      * the last N seconds, where N might be 60.
      * 
-     * FIXME make sure that finalize() is doing what we need on
-     * {@link AbstractJournal} and {@link IndexSegmentStore}. Do we have to use
-     * any JVM options to make sure it gets called during normal operation? It
-     * probably does not matter whether or not it is getting called before
-     * system shutdown, which is I think the only place where there are JVM
-     * issues concerning whether or not it is called.
-     * 
      * FIXME make sure that we do not fully buffer an {@link IndexSegmentStore}
      * in {@link #scanFile(File, com.bigdata.resources.StoreManager.Stats)} -
      * what a waste that would be!
      */
     final protected WeakValueCache<UUID, IRawStore> storeCache;
-
-//    /**
-//     * Listens for cleared references on the {@link #storeCache}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private class ClearReferenceListener implements
-//            IClearReferenceListener<UUID> {
-//
-//        public void cleared(UUID uuid) {
-//
-////            lock.lock();
-//
-//            try {
-//
-//                /*
-//                 * FIXME concurrency of the notifications by the
-//                 * {@link WeakValueCache} and requests for indices is going to
-//                 * be problem. The risk is that we get a notice that the weak
-//                 * reference paired with an IndexSegment was cleared while there
-//                 * is a concurrent request for the store on which that index
-//                 * segment resides. This can result in a hard reference for the
-//                 * store in the hands of the application at the same time as we
-//                 * are planning to close the store here.
-//                 * 
-//                 * Perhaps the problem is that I should be maintaining a weak
-//                 * reference cache on the store rather than the index segment.
-//                 * The index segment has a reference to the store, so the store
-//                 * will be strongly held while there is a hard reference to any
-//                 * index segment on that store. The StoreManager currently holds
-//                 * a hard reference to all open stores, but maybe that could be
-//                 * changed and this logic moved back into that class and we
-//                 * would have a solution for closing out ANY store (journal or
-//                 * index segment - it would not matter). The only catch is that
-//                 * the journal also maintains weak value cache backed by a hard
-//                 * reference LRU. The hard references to the indices in the LRU
-//                 * might prevent us from ever closing a journal (actually, they
-//                 * probably would not if there is no hard reference to any of
-//                 * the indices other than from the journal since that object
-//                 * graph would not be reachable). However, by ensuring that LRU
-//                 * entries are purged after a certain age we can certainly help
-//                 * things along!
-//                 * 
-//                 * Modify the LRU to close out entries older than some threshold
-//                 * (a configuration parameter). This seems a worthy general
-//                 * purpose refinement since the whole point of the LRU is
-//                 * _recent_ use. If things just hang around on the LRU forever
-//                 * then the information is basically worthless. Clearing an LRU
-//                 * entry is always safe since the purpose of the LRU is to cause
-//                 * references to remain strongly reachable and hence not be
-//                 * cleared from the weak value cache. The LRU should be cleared
-//                 * from the MRU position forward to the LRU position by a
-//                 * scheduled thread since otherwise there is no guarentee that
-//                 * old entries will be cleared. Old entries can also be cleared
-//                 * each time there is a touch on the LRU. The asynchronous
-//                 * thread can run every so often (a configuration parameter).
-//                 * The delay between runs will place an upper bound on the
-//                 * length of time that a reference to an unused object will
-//                 * remain on the queue.
-//                 * 
-//                 * For store files, we should default the maximum unused age to
-//                 * 60 seconds and the asynchronous thread to 60 seconds as well.
-//                 * That way we will close out old journals and index segments no
-//                 * later than 60 seconds after the last touch.
-//                 */
-//                
-//                log.warn("Cleared index segment reference: " + uuid);
-//
-//                final IRawStore store = openStores.remove(uuid);
-//
-//                assert store instanceof IndexSegmentStore;
-//
-//                assert store != null;
-//
-//                log.error("SHOULD close index segment store: " + store.getFile());
-//
-////                store.close();
-//
-////            } finally {
-////
-////                lock.unlock();
-////                
-////            }
-//            
-//        }
-//        
-//    }
 
     /**
      * <code>true</code> iff {@link BufferMode#Transient} was indicated.
@@ -1487,22 +1392,6 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
     }
 
-    /**
-     * Closes the {@link IRawStore}.
-     * 
-     * @param uuid
-     *            The {@link UUID} identifying that store file.
-     * 
-     * FIXME Either implement or remove. This is basically a close() but not a
-     * removeResource() with some additional protection for synchronization
-     * issues.
-     */
-    synchronized public void closeStore(UUID uuid) {
-     
-        throw new UnsupportedOperationException();
-        
-    }
-    
     /**
      * Opens an {@link IRawStore}.
      * 

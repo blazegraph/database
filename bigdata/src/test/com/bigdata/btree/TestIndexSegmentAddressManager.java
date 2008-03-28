@@ -34,14 +34,14 @@ import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Tests logic to encode and decode the offsets within regions in an
- * {@link IndexSegmentFileStore}.
+ * {@link IndexSegmentStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @see IndexSegment
  * @see IndexSegmentBuilder
- * @see IndexSegmentFileStore
+ * @see IndexSegmentStore
  */
 public class TestIndexSegmentAddressManager extends AbstractBTreeTestCase {
 
