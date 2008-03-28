@@ -31,6 +31,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -38,7 +39,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.FusedView;
-import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -46,16 +46,16 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.WeakValueCache.IClearReferenceListener;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
@@ -70,84 +70,12 @@ import com.bigdata.service.MetadataService;
 
 /**
  * Class encapsulates logic and handshaking for tracking which indices (and
- * their backing stores) are recently and currently referenced.  This information
- * is used to coordinate the close out of index resources (and their backing stores)
- * on an LRU basis by the {@link ResourceManager}.
+ * their backing stores) are recently and currently referenced. This information
+ * is used to coordinate the close out of index resources (and their backing
+ * stores) on an LRU basis by the {@link ResourceManager}.
  * 
- * 
- * FIXME The {@link AbstractTask} needs to explicitly coordinate with this class
- * (or an IndexManager) so that we know which index views are in use.
- * AbstractTask has the advantage that all concurrent access to any index views
- * will go through that class and it knows when indices are opened and when the
- * task completes so it is the ideal point from which to maintain reference
- * counts on read-only and read-write indices. This is important for buffer
- * management for the indices. Indices should be on an "touch" style LRU (like
- * the nodes and leaves of a btree) together with a reference count so that they
- * get closed out once they are no longer active and also on a weak reference
- * cache so that we have a canonicalizing mapping. There is logic for all of
- * this already in the journal and btree classes and it could probably be
- * refactored to create an IndexManager.
- * <P>
- * review use of synchronization and make sure that there is no way in which we
- * can double-open a store or index.
- * <P>
- * Use a hard reference queue to track recently used AbstractBTrees (and
- * stores?). Add a public referenceCount field on AbstractBTree and close the
- * AbstractBTree on eviction from the hard reference queue iff the
- * referenceCount is zero (no references to that AbstractBTree remain on the
- * hard reference queue).
- * <p>
- * re-examine the caching for B+Trees from the perspective of the
- * {@link ResourceManager}. Ideally a checkpoint operation will not discard the
- * per-btree node / leaf cache (the write retention and/or read retention
- * queues). Equally, it would be nice if read-committed and historical reads for
- * "hot" points (such as the lastCommitTime of the old journal or an intensive
- * tx) were able to benefit from a read-cache at the node/leaf or record level.
- * Also, note that {@link IndexSegment}s may be reused in a number of views,
- * e.g., both the unisolated and read-committed view of an index, but that all
- * of those views share the same {@link IndexSegment} instance and hence the
- * same read cache. This makes it worth while to fully buffer the nodes of the
- * index segment, but since the branching factor is larger the write/read
- * retention queue should be smaller.
- * <P>
- * consider handling close out of index partitions "whole at once" to include
- * all index segments in the current view of that partition. this probably does
- * not matter but might be a nicer level of aggregation than the individual
- * index segment. It's easy enough to identify the index segments from the btree
- * using the partition metadata record. However, it is harder to go the other
- * way (and in fact impossible since the same index segment can be used in
- * multiple index partition views as the partition definition evolves - in
- * contrast 1st btree in the index partition view always has the current
- * partition metadata description and therefore could be used to decrement the
- * usage counters on the other components of that view (but not to directly
- * close them out)).
- * <p>
- * this still does not suggest a mechanism for close by timeout. one solutions
- * is to just close down all open indices if the server quieses. if the server
- * is not quiesent then unused indices will get shutdown in any case (this is
- * basically how we are closing btrees and index segments now, so they remain
- * available but release their resources).
- * 
- * <pre>
- * 
- * 
- *  Cache of added/retrieved btrees by _name_. This cache is ONLY used by the
- *  &quot;live&quot; {@link Name2Addr} instance.
- * <p>
- *  Map from the name of an index to a weak reference for the corresponding
- *  &quot;live&quot; version of the named index. Entries will be cleared from this map
- *  after they have become only weakly reachable. In order to prevent dirty
- *  indices from being cleared, we register an {@link IDirtyListener}. When
- *  it is informed that an index is dirty it places a hard reference to that
- *  index into the {@link #commitList}.
- * <p>
- *  Note: The capacity of the backing hard reference LRU effects how many
- *  _clean_ indices can be held in the cache. Dirty indices remain strongly
- *  reachable owing to their existence in the {@link #commitList}.
- * 
- *     private WeakValueCache&lt;String, BTree&gt; indexCache = new WeakValueCache&lt;String, BTree&gt;(
- *             new LRUCache&lt;String, BTree&gt;(cacheCapacity));
- * </pre>
+ * @todo review use of synchronization and make sure that there is no way in
+ *       which we can double-open a store or index.
  * 
  * @todo Scale-out index import and index recovery
  *       <p>
@@ -174,11 +102,11 @@ import com.bigdata.service.MetadataService;
  *       <p>
  *       Work through a federated index recovery where we re-generate the
  *       metadata index from the on hand data services.
- *       
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class IndexManager extends StoreFileManager {
+abstract public class IndexManager extends StoreManager {
 
     /**
      * Logger.
@@ -197,9 +125,56 @@ abstract public class IndexManager extends StoreFileManager {
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
-    public interface Options extends StoreFileManager.Options {
-        
+    /**
+     * Options understood by the {@link IndexManager}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options extends StoreManager.Options {
+     
+        /**
+         * The capacity of the LRU cache of open {@link IndexSegment}s. The
+         * capacity of this cache indirectly controls how many
+         * {@link IndexSegment}s will be held open. The main reason for keeping
+         * an {@link IndexSegment} open is to reuse its buffers, including its
+         * node and leaf cache, if another request arrives "soon" which would
+         * read on that {@link IndexSegment}.
+         * <p>
+         * The effect of this parameter is indirect owning to the semantics of
+         * weak references and the control of the JVM over when they are
+         * cleared. Once an index becomes weakly reachable, the JVM will
+         * eventually GC the index object, thereby effectively closing it (or at
+         * least releasing all resources associated with that index). Since
+         * indices which are strongly reachable are never "closed" this provides
+         * our guarentee that indices are never closed if they are in use.
+         * <p>
+         * Note: {@link IndexSegment}s have a reference to the
+         * {@link IndexSegmentStore} and an {@link IClearReferenceListener} is
+         * used to see to it that the {@link IndexSegmentStore} is also closed,
+         * thereby releasing its buffers and the associated file handle.
+         * 
+         * @see #DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY
+         */
+        String INDEX_SEGMENT_CACHE_CAPACITY = "indexSegmentCacheCapacity";
+
+        /**
+         * The default for the {@link #INDEX_SEGMEWNT_CACHE_CAPACITY} option.
+         */
+        String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "20";
+
+
     }
+    
+    /**
+     * A canonicalizing cache for {@link IndexSegment}.
+     * 
+     * FIXME make sure this cache purges entries that have not been touched in
+     * the last N seconds, where N might be 60.
+     * 
+     * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
+     */
+    final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
     
     /**
      * This cache is used to provide remote clients with an unambiguous
@@ -212,7 +187,7 @@ abstract public class IndexManager extends StoreFileManager {
      * identifier) either on the same or on another data service. The value is a
      * reason, e.g., "split", "join", or "move".
      */
-    private final LRUCache<String/*name*/, String/*reason*/> staleIndexCache = new LRUCache<String, String>(10000);  
+    private final LRUCache<String/*name*/, String/*reason*/> staleIndexCache = new LRUCache<String, String>(1000);  
     
     /**
      * Return non-<code>null</code> iff <i>name</i> is the name of an index
@@ -270,7 +245,32 @@ abstract public class IndexManager extends StoreFileManager {
     protected IndexManager(Properties properties) {
         
         super(properties);
-        
+     
+        /*
+         * indexSegmentCacheCapacity
+         */
+        {
+
+            final int indexSegmentCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.INDEX_SEGMENT_CACHE_CAPACITY,
+                    Options.DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY));
+
+            log.info(Options.INDEX_SEGMENT_CACHE_CAPACITY+"="+indexSegmentCacheCapacity);
+
+            if (indexSegmentCacheCapacity <= 0)
+                throw new RuntimeException(Options.INDEX_SEGMENT_CACHE_CAPACITY
+                        + " must be non-negative");
+
+            indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
+//                    WeakValueCache.INITIAL_CAPACITY,//
+//                    WeakValueCache.LOAD_FACTOR, //
+                    new LRUCache<UUID, IndexSegment>(indexSegmentCacheCapacity)
+//                    new WeakCacheEntryFactory<UUID,IndexSegment>()
+//                    new ClearReferenceListener()
+                    );
+
+        }
+
     }
     
     /**
@@ -308,26 +308,8 @@ abstract public class IndexManager extends StoreFileManager {
      *         was not registered on the resource as of the timestamp or if the
      *         store has no data for that timestamp.
      * 
-     * FIXME add hard reference queue for {@link AbstractBTree} to the journal
-     * and track the #of instances of each {@link AbstractBTree} on the queue
-     * using #referenceCount and "touch()", perhaps in Name2Addr; write tests.
-     * consider one queue for mutable btrees and another for index segments,
-     * partitioned indices, metadata indices, etc. consider the meaning of
-     * "queue length" here and how to force close based on timeout. improve
-     * reporting of index segments by name and partition.<br>
-     * Mutable indices are low-cost to close/open. Closing them once they are no
-     * longer receiving writes can release some large buffers and reduce the
-     * latency of commits since dirty nodes will already have been flushed to
-     * disk. The largest cost on re-open is de-serializing nodes and leaves for
-     * subsequent operations. Those nodes will be read from a fully buffered
-     * store, so the latency will be small even though deserialization is CPU
-     * intensive. <br>
-     * Close operations on unisolated indices need to be queued in the
-     * {@link #writeService} so that they are executed in the same thread as
-     * other operations on the unisolated index.<br>
-     * Make sure that we close out old {@link Journal}s that are no longer
-     * required by any open index. This will require a distinct referenceCount
-     * on the {@link Journal}.
+     * @todo this might have to be private since we assume that the store is in
+     *       {@link StoreManager#openStores}.
      */
     public AbstractBTree getIndexOnStore(String name, long timestamp, IRawStore store) {
 
@@ -432,7 +414,7 @@ abstract public class IndexManager extends StoreFileManager {
 
         } else {
 
-            final IndexSegmentFileStore segStore = ((IndexSegmentFileStore) store);
+            final IndexSegmentStore segStore = ((IndexSegmentStore) store);
 
             if (timestamp != ITx.READ_COMMITTED && timestamp != ITx.UNISOLATED) {
             
@@ -449,9 +431,31 @@ abstract public class IndexManager extends StoreFileManager {
                 }
 
             }
+
+            {
+                
+                final IResourceMetadata resourceMetadata = store.getResourceMetadata();
+                
+                final UUID storeUUID = resourceMetadata.getUUID();
+
+                // check the cache first.
+                IndexSegment seg = indexSegmentCache.get(storeUUID);
+
+                if (seg == null) {
+
+                    log.warn("Loading index segment from store: name=" + name
+                            + ", file=" + resourceMetadata.getFile());
+
+                    // Open an index segment.
+                    seg = segStore.load();
+
+                    indexSegmentCache.put(storeUUID, seg, false/* dirty */);
+
+                }
+
+                btree = seg;
             
-            // Open an index segment.
-            btree = segStore.load();
+            }
 
         }
 
