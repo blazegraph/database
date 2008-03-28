@@ -60,6 +60,7 @@ import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.util.ChecksumUtility;
@@ -422,10 +423,7 @@ public abstract class AbstractJournal implements IJournal {
      * <p>
      * Note: Creating a new journal registers some internal indices but does NOT
      * perform a commit. Those indices will become restart safe with the first
-     * commit. A newly created journal can not be closed and re-opened in
-     * read-only mode until there has been at least one commit since it will
-     * attempt to re-register those internal indices and that operation is not
-     * allowed for a read-only store.
+     * commit.
      * 
      * @param properties
      *            The properties as defined by {@link Options}.
@@ -1136,6 +1134,12 @@ public abstract class AbstractJournal implements IJournal {
      * Note: This does NOT perform a commit - any uncommitted writes will be
      * discarded.
      * 
+     * @throws IllegalStateException
+     *             If there are no commits on the journal.  (A journal with no
+     *             commits can not be re-opened in a read-only mode so closing
+     *             out writes on that journal will only lead to an error when
+     *             you try to re-open the journal later.)
+     * 
      * @todo write unit tests for this. Make sure that the journal can not be
      *       re-opened in a read-write mode (only as a read-only journal).
      * 
@@ -1163,6 +1167,12 @@ public abstract class AbstractJournal implements IJournal {
                 + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
         
         final IRootBlockView old = _rootBlock;
+
+        if(old.getCommitCounter()==0L) {
+            
+            throw new IllegalStateException("No commits on journal");
+            
+        }
         
         /*
          * Create the final root block.
@@ -1747,9 +1757,14 @@ public abstract class AbstractJournal implements IJournal {
              * The btree has either never been created or if it had been created
              * then the store was never committed and the btree had since been
              * discarded. In any case we create a new btree now.
+             * 
+             * Note: if the journal is read-only the we create the commit record
+             * index on an in-memory store in order to avoid triggering a write
+             * exception on the journal.
              */
 
-            name2Addr = Name2Addr.create(this);
+            name2Addr = Name2Addr
+                    .create((isReadOnly() ? new SimpleMemoryRawStore() : this));
 
         } else {
 
@@ -1799,10 +1814,14 @@ public abstract class AbstractJournal implements IJournal {
              * The btree has either never been created or if it had been created
              * then the store was never committed and the btree had since been
              * discarded. In any case we create a new btree now.
+             * 
+             * Note: if the journal is read-only the we create the commit record
+             * index on an in-memory store in order to avoid triggering a write
+             * exception on the journal.
              */
 
             // create btree mapping names to addresses.
-            ndx = CommitRecordIndex.create(this);
+            ndx = CommitRecordIndex.create((isReadOnly()?new SimpleMemoryRawStore() :this));
 
         } else {
 

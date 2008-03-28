@@ -36,6 +36,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.mapred.MapService.EmbeddedMapService;
 import com.bigdata.service.mapred.ReduceService.EmbeddedReduceService;
@@ -255,7 +256,7 @@ public abstract class AbstractMaster {
     final MapReduceJob job;
 
     /**
-     * The client for the {@link BigdataFederation} used to store the
+     * The client for the {@link AbstractRemoteBigdataFederation} used to store the
      * intermediate state of the map/reduce operation.
      */
     final IBigdataClient client;
@@ -475,20 +476,21 @@ public abstract class AbstractMaster {
      */
     protected void setUpDataStores() {
 
+        final IBigdataFederation fed = client.getFederation();
         dataServices = new UUID[reduceTasks.length];
         {
 //            IMetadataService metadataService = client.getMetadataService();
             for (int i = 0; i < reduceTasks.length; i++) {
                 try {
                     // @todo should not do RMI inside of this loop.
-                    dataServices[i] = client.getLoadBalancerService().getUnderUtilizedDataService();
+                    dataServices[i] = fed.getLoadBalancerService().getUnderUtilizedDataService();
                 } catch (Exception e) {
                     log.warn("Load balancer: " + e);
                 }
                 try {
                     // the index name (local on the data service).
                     String name = reduceTasks[i].toString();
-                    client.getDataService(dataServices[i])
+                    fed.getDataService(dataServices[i])
                             .registerIndex(
                                     name,
                                     new IndexMetadata(reduceTasks[i]));
@@ -536,13 +538,14 @@ public abstract class AbstractMaster {
          * Release the intermediate stores.
          */
 
+        final IBigdataFederation fed = client.getFederation();
         if (dataServices != null) {
 
             for (int i = 0; i < dataServices.length; i++) {
 
                 try {
                 
-                    IDataService ds = client.getDataService(dataServices[i]);
+                    IDataService ds = fed.getDataService(dataServices[i]);
                     
                     if (ds == null) {
                         

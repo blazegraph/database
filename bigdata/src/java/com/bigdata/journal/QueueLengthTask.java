@@ -1,14 +1,10 @@
 package com.bigdata.journal;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.Instrument;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Helper class maintains the moving average of the length of a queue.
@@ -129,8 +125,23 @@ public class QueueLengthTask extends Instrument<Double> implements Runnable {
     public void run() {
 
         try {
-            
-            final int activeCount = service.getActiveCount();
+
+            final int activeCount;
+            if (service instanceof WriteExecutorService) {
+
+                /*
+                 * Note: This is reporting the task execution concurrency
+                 * _with_locks_held_ for the write service
+                 */
+
+                activeCount = ((WriteExecutorService) service)
+                        .getConcurrentTaskCount();
+                
+            } else {
+                
+                activeCount = service.getActiveCount();
+                
+            }
             
             final int queueSize =  service.getQueue().size();
 

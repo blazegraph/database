@@ -168,11 +168,11 @@ public class ClientIndexView implements IIndex {
     }
     
     /**
-     * The thread pool exposed by {@link IBigdataClient#getThreadPool()}
+     * The thread pool exposed by {@link IBigdataFederation#getThreadPool()}
      */
     protected ExecutorService getThreadPool() {
 
-        return fed.getClient().getThreadPool();
+        return fed.getThreadPool();
 
     }
     
@@ -1789,7 +1789,7 @@ public class ClientIndexView implements IIndex {
 
         try {
 
-            dataService = fed.getClient().getDataService(serviceUUID);
+            dataService = fed.getDataService(serviceUUID);
 
         } catch (Exception ex) {
 

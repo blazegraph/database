@@ -29,49 +29,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.QueueLengthTask;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.Banner;
 
 /**
- * Abstract base class encapsulates for {@link IBigdataClient} implementations.
+ * Abstract base class for {@link IBigdataClient} implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 abstract public class AbstractBigdataClient implements IBigdataClient {
-
     
     /**
      * The properties specified to the ctor.
      */
-    protected final Properties properties;
-
-    /**
-     * The federation and <code>null</code> iff not connected.
-     */
-    protected IBigdataFederation fed = null;
-
-    /**
-     * Used to run application tasks.
-     */
-    private final ThreadPoolExecutor threadPool;
-
-    /**
-     * Used to sample and report on the queue associated with the
-     * {@link #threadPool}.
-     */
-    protected final ScheduledExecutorService sampleService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+    private final Properties properties;
+    
+    public Properties getProperties() {
+        
+        return new Properties( properties );
+        
+    }
     
     private final int defaultRangeQueryCapacity;
     private final boolean batchApiOnly;
+    private final int threadPoolSize;
     private final int maxStaleLocatorRetries; 
     private final int maxParallelTasksPerRequest; 
     
@@ -79,14 +61,12 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
      * IBigdataClient API.
      */
 
-    public ExecutorService getThreadPool() {
+    public int getThreadPoolSize() {
         
-        assertConnected();
-        
-        return threadPool;
+        return threadPoolSize;
         
     }
-
+    
     public int getDefaultRangeQueryCapacity() {
         
         return defaultRangeQueryCapacity;
@@ -111,13 +91,6 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
         
     }
     
-    protected void assertConnected() {
-        
-        if (fed == null)
-            throw new IllegalStateException("Not connected");
-        
-    }
-    
     /**
      * 
      * @param properties
@@ -125,6 +98,9 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
      */
     protected AbstractBigdataClient(Properties properties) {
         
+        // show the copyright banner during statup.
+        Banner.banner();
+
         if (properties == null)
             throw new IllegalArgumentException();
 
@@ -133,15 +109,12 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
         // client thread pool setup.
         {
          
-            final int nthreads = Integer.parseInt(properties.getProperty(
+            threadPoolSize = Integer.parseInt(properties.getProperty(
                     Options.CLIENT_THREAD_POOL_SIZE,
                     Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
 
-            log.info(Options.CLIENT_THREAD_POOL_SIZE + "=" + nthreads);
+            log.info(Options.CLIENT_THREAD_POOL_SIZE + "=" + threadPoolSize);
 
-            threadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    nthreads, DaemonThreadFactory.defaultThreadFactory());
-            
         }
 
         // maxStaleLocatorRetries
@@ -184,27 +157,6 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
             
         }
         
-        /*
-         * Setup sampling and reporting on the client's thread pool.
-         * 
-         * @todo report to the load balancer.
-         * 
-         * @todo config. See ConcurrencyManager, which also setups up some queue
-         * monitors.
-         */
-        {
-
-            final long initialDelay = 0; // initial delay in ms.
-            final long delay = 1000; // delay in ms.
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
-
-            QueueLengthTask queueLengthTask = new QueueLengthTask(
-                    "clientThreadPool", threadPool);
-
-            sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,
-                    delay, unit);
-        }
-
         // defaultRangeQueryCapacity
         {
          
@@ -228,66 +180,6 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
             
         }
 
-    }
-    
-    /**
-     * Note: concrete implementations MUST extend this method to either
-     * disconnect from the remote federation or close the embedded federation
-     * and then clear the {@link #fed} reference so that the client is no longer
-     * "connected" to the federation.
-     */
-    public void shutdown() {
-
-        final long begin = System.currentTimeMillis();
-        
-        log.info("begin");
-
-        if (fed != null) {
-
-            // allow client requests to finish normally.
-            threadPool.shutdown();
-            
-            try {
-            
-                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    
-                    log.warn("Timeout awaiting thread pool termination.");
-                    
-                }
-   
-            } catch (InterruptedException e) {
-                
-                log.warn("Interrupted awaiting thread pool termination.", e);
-                
-            }
-            
-        }
-
-        log.info("done: elapsed="+(System.currentTimeMillis()-begin));
-        
-    }
-
-    /**
-     * Note: concrete implementations MUST extend this method to either
-     * disconnect from the remote federation or close the embedded federation
-     * and then clear the {@link #fed} reference so that the client is no longer
-     * "connected" to the federation.
-     */
-    public void shutdownNow() {
-        
-        final long begin = System.currentTimeMillis();
-        
-        log.info("begin");
-        
-        if(fed != null) {
-
-            // stop client requests.
-            threadPool.shutdownNow();
-            
-        }
-
-        log.info("done: elapsed="+(System.currentTimeMillis()-begin));
-        
     }
     
 }

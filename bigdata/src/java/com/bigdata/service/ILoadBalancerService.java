@@ -33,8 +33,6 @@ import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.log4j.Logger;
-
 /**
  * Interface for collecting, reporting, and decision-making based on node and
  * service utilization statistics.
@@ -44,8 +42,24 @@ import org.apache.log4j.Logger;
  */
 public interface ILoadBalancerService extends Remote {
     
+    /**
+     * The {@link UUID} of the {@link ILoadBalancerService} itself.
+     * 
+     * @throws IOException
+     */
     public UUID getServiceUUID() throws IOException;
 
+    /**
+     * Notify the load balancer service that the identified service is shutting
+     * down.
+     * 
+     * @param msg
+     *            A message.
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     */
+    public void leave(String msg, UUID serviceUUID) throws IOException;
+    
     /**
      * Send performance counters. Clients SHOULD invoke this method no less than
      * once every 60 seconds.

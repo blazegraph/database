@@ -29,8 +29,9 @@ package com.bigdata.rdf.store;
 
 import junit.framework.TestCase;
 
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
@@ -69,7 +70,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
     /**
      * Starts in {@link #setUp()}.
      */
-    BigdataClient client;
+    JiniBigdataClient client;
     
     public void setUp() throws Exception {
 
@@ -134,7 +135,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           
       }.start();
 
-      client = BigdataClient.newInstance(
+      client = JiniBigdataClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
@@ -144,8 +145,10 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
       AbstractServerTestCase.getServiceID(dataServer0);
       AbstractServerTestCase.getServiceID(dataServer1);
       
+      IBigdataFederation fed = client.connect();
+      
       // verify that the client has/can get the metadata service.
-      assertNotNull("metadataService", client.getMetadataService());
+      assertNotNull("metadataService", fed.getMetadataService());
 
     }
 
@@ -155,9 +158,9 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
          * @todo consider fed.destroy().
          */
         
-        if(client!=null) {
+        if (client != null && client.isConnected()) {
 
-            client.shutdownNow();
+            client.disconnect(true/* immediateShutdown */);
 
             client = null;
             

@@ -259,7 +259,7 @@ abstract public class IndexManager extends StoreFileManager {
         
         synchronized(staleIndexCache) {
         
-            log.warn("name="+name+", reason="+reason);
+            log.info("name="+name+", reason="+reason);
             
             staleIndexCache.put(name, reason, true);
             
@@ -505,7 +505,7 @@ abstract public class IndexManager extends StoreFileManager {
 
             if (btree == null) {
 
-                log.warn("No such index: name=" + name + ", timestamp="
+                log.info("No such index: name=" + name + ", timestamp="
                         + timestamp);
 
                 return null;
@@ -754,7 +754,7 @@ abstract public class IndexManager extends StoreFileManager {
                 
                 if (sources == null) {
 
-                    log.warn("No such index: name="+name+", timestamp="+timestamp);
+                    log.info("No such index: name="+name+", timestamp="+timestamp);
                     
                     return null;
                     

@@ -99,10 +99,10 @@ public class TestAbstractJobAndTaskService extends TestCase {
     }
     
     public void tearDown() throws Exception {
-     
-        if(bigdataClient!=null) {
 
-            bigdataClient.shutdownNow();
+        if (bigdataClient != null) {
+
+            bigdataClient.disconnect(true/*immediateShutdown*/);
             
         }
         

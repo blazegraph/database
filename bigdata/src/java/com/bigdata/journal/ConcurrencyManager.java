@@ -818,6 +818,15 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 /*
                  * data only available for the write service.
                  */
+
+                // Note: this is an instantaneous measure and needs to be sampled and smoothed.
+                tmp.addCounter("#concurrentTasks",
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long)writeService.getConcurrentTaskCount());
+                            }
+                        });
+                
                 tmp.addCounter("#commits",
                         new Instrument<Long>() {
                             public void sample() {

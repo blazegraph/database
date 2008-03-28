@@ -113,7 +113,8 @@ public class TestEmbeddedMaster extends TestCase {
      */
     public void tearDown() throws Exception {
         
-        client.shutdownNow();
+        if (client != null)
+            client.disconnect(true/* immediateShutdown */);
         
         super.tearDown();
         

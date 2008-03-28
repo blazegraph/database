@@ -25,14 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 
@@ -41,13 +40,20 @@ import com.bigdata.mdi.IMetadataIndex;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo reconcile with {@link IIndexManager} and {@link IIndexStore}.
  */
 public interface IBigdataFederation {
 
     public static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
+    /**
+     * Return the client object that was used to connect to the federation.
+     * 
+     * @throws IllegalStateException
+     *             if the client disconnected and this object is no longer
+     *             valid.
+     */
+    public IBigdataClient getClient();
+            
     /**
      * Return the load balancer service (or a proxy for that service).
      */
@@ -59,6 +65,51 @@ public interface IBigdataFederation {
     public IMetadataService getMetadataService();
     
     /**
+     * A thread pool that may be used by clients to parallelize operations
+     * against the federation. This thread pool is automatically used by the
+     * {@link ClientIndexView}.
+     */
+    public ExecutorService getThreadPool();
+
+    /**
+     * Return an array UUIDs for {@link IDataService}s.
+     * 
+     * @param maxCount
+     *            The maximum #of data services whose UUIDs will be returned.
+     *            When zero (0) the UUID for all known data services will be
+     *            returned.
+     * 
+     * @return An array of {@link UUID}s for data services.
+     */
+    public UUID[] getDataServiceUUIDs(int maxCount);
+    
+    /**
+     * Resolve the service identifier to an {@link IDataService}.
+     * <p>
+     * Note: Whether the returned object is a proxy or the service
+     * implementation depends on whether the federation is embedded (in process)
+     * or distributed (networked).
+     * 
+     * @param serviceUUID
+     *            The identifier for a {@link IDataService}.
+     * 
+     * @return The {@link IDataService} or <code>null</code> iff the
+     *         {@link IDataService} could not be discovered from its identifier.
+     */
+    public IDataService getDataService(UUID serviceUUID);
+
+    /**
+     * Return ANY {@link IDataService} which has been (or could be) discovered
+     * and which is part of the connected federation.
+     * <p>
+     * Note: This method is here as a failsafe when the
+     * {@link ILoadBalancerService} is not available.
+     * 
+     * @return <code>null</code> if there are NO known {@link IDataService}s.
+     */
+    public IDataService getAnyDataService();
+     
+    /**
      * Return a read-only view of the index partitions for the named scale-out
      * index.
      * 
@@ -68,7 +119,7 @@ public interface IBigdataFederation {
      * @return The {@link IMetadataIndex} for the named scale-out index -or-
      *         <code>null</code> iff there is no such scale-out index.
      */
-    public IMetadataIndex getMetadataIndex(String name,long timestamp);
+    public IMetadataIndex getMetadataIndex(String name, long timestamp);
     
     /**
      * Register a scale-out index.
@@ -148,16 +199,6 @@ public interface IBigdataFederation {
      * @return The index or <code>null</code> if the index is not
      *         registered with the {@link MetadataService}.
      */
-    public IIndex getIndex(String name,long timestamp);
+    public IIndex getIndex(String name, long timestamp);
     
-    /**
-     * Return the client object that was used to connect to the federation.
-     */
-    public IBigdataClient getClient();
-
-    /**
-     * Disconnect from the federation.
-     */
-    public void disconnect();
-            
 }

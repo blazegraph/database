@@ -100,7 +100,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * metadata services.
          */
         assertEquals("#dataServices", 2,
-                ((EmbeddedBigdataFederation) fed).ndataServices);
+                ((EmbeddedBigdataFederation) fed).getDataServiceCount());
         
         final UUID metadataServiceUUID = fed.getMetadataService()
                 .getServiceUUID();
@@ -200,7 +200,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * See setUp() in the parent class.
          */
         
-        client.shutdownNow();
+        client.disconnect(true/*immediateShutdown*/);
         
         client = null;
         
@@ -229,7 +229,7 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
 
         dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
 
-        metadataService = ((EmbeddedBigdataFederation)fed).getMetadataService();
+        metadataService = fed.getMetadataService();
 
         /*
          * Verify the data and metadata service UUIDs.

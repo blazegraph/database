@@ -134,16 +134,6 @@ public class StressTestConcurrent extends
         super(arg0);
     }
     
-//    /**
-//     * Starts in {@link #setUp()}.
-//     */
-//    IBigdataClient client;
-//    
-//    /**
-//     * 
-//     */
-//    IBigdataFederation federation;
-    
     public Properties getProperties() {
         
         Properties properties = new Properties(super.getProperties());
@@ -176,6 +166,9 @@ public class StressTestConcurrent extends
         // load balancer update delay
         properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
 
+        // Note: another way to disable moves is to restrict the test to a single data service.
+        properties.setProperty(com.bigdata.service.EmbeddedBigdataFederation.Options.NDATA_SERVICES,"1");
+
         // disable overflow processing
 //        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
         
@@ -185,87 +178,41 @@ public class StressTestConcurrent extends
         
     }
     
-//    /**
-//     * Starts a {@link DataServer} ({@link #dataServer1}) and then a
-//     * {@link MetadataServer} ({@link #metadataServer0}). Each runs in its own
-//     * thread.
-//     */
-//    public void setUp() throws Exception {
-//
-//        super.setUp();
-//        
-//        log.info(getName());
-//
-//        client = new EmbeddedBigdataClient(getProperties());
-//        
-//        federation = client.connect();
-//
-//    }
-//    
-//    /**
-//     * Destroy the test services.
-//     */
-//    public void tearDown() throws Exception {
-//                
-//        if(client!=null) {
-//            
-//            client.terminate();
-//
-//            client = null;
-//            
-//        }
-//        
-//        log.info(getName());
-//
-//        super.tearDown();
-//        
-//    }
-    
     public void setUpComparisonTest(Properties properties) throws Exception {
 
         super.setUp();
         
-//        log.info(getName());
-//
-//        client = new EmbeddedBigdataClient( properties );
-//        
-//        federation = client.connect();
-        
     }
-    
+
     public void tearDownComparisonTest() throws Exception {
-        
-//        if(client!=null) {
-//            
-//            client.terminate();
-//
-//            client = null;
-//            
-//        }
-//        
-//        log.info(getName());
 
         super.tearDown();
-        
+
     }
 
     /**
-     * Test of N concurrent operations against one {@link DataService}.
+     * Test of N concurrent operations.
      * 
+     * @todo run a performance analysis generating a graph of response time by
+     *       queue length. the queue length can be the #of parallel clients but
+     *       be sure to set up the {@link ClientIndexView} so that it does not
+     *       cap the concurrency or it will skew the results.  also note that
+     *       the maximum possible parallelism will be capped by the #of index
+     *       partitions and (if indices are not being split) by the #of indices.
+     *       
      * @throws Exception
      */
     public void test_stressTest1() throws Exception {
 
-        DataService dataService = ((EmbeddedBigdataFederation)fed).getDataService(0);
-        
-        int nclients = 20;
+        int nclients = 40;
         long timeout = 20; // 20 or 40
         int ntrials = 10000;
         int keyLen = 4;
         int nops = 100;
-        
-        doConcurrentClientTest(client, dataService, nclients, timeout, ntrials,
-                keyLen, nops);
+        int nindices = 1;
+
+        doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
+                nops, nindices);
 
     }
 
@@ -274,10 +221,6 @@ public class StressTestConcurrent extends
      * 
      * @param client
      *            The client.
-     * 
-     * @param dataService
-     *            The data service on which the initial index partition will be
-     *            registered.
      * 
      * @param timeout
      *            The #of seconds before the test will terminate.
@@ -296,6 +239,20 @@ public class StressTestConcurrent extends
      * 
      * @param nops
      *            The #of rows in each operation.
+     * 
+     * @param nindices
+     *            The #of different indices to which the operation will be
+     *            applied. The tasks will be generated modulo <i>nindices</i>.
+     *            When nindices is greater than one, there is increased
+     *            likelyhood of tasks running concurrently before the first
+     *            split. Regardless of the value of nindices, after a scale-out
+     *            index has been split the liklelyhood of concurrent writers
+     *            goes up significantly.
+     * 
+     * @todo Note: When <i>nindices</i> is high the setup time on this test is
+     *       quite large since the indices are registered sequentially rather
+     *       than using parallelism. Run the index registration tasks in a
+     *       thread pool to cut down the test setup latency.
      * 
      * @todo factor out the operation to be run.
      * 
@@ -319,9 +276,6 @@ public class StressTestConcurrent extends
      *       machines, but that also requires a distributed client otherwise the
      *       client may become the bottleneck.
      * 
-     * @todo parameterize the maximum journal size, random timing for forcing
-     *       overflow, index split and join thresholds, etc.
-     * 
      * @todo introduce a ground truth index on a local (temp) store and verify
      *       the state of the scale-out index. access to the ground truth index
      *       would have to be synchronized, e.g., using a lock for mutation and
@@ -330,64 +284,63 @@ public class StressTestConcurrent extends
      * @todo parameterize for random deletes and writes and parameterize those
      *       operations so that they can be made likely to force a join or split
      *       of an index partition.
-     * 
-     * @todo parameterize how likely we are to move index partitions around and
-     *       the #of data services available to the federation. report on the
-     *       #of builds, splits, joins, and moves and the load on each data
-     *       service over time.
-     * 
-     * @todo test with and without overflow and measure performance both ways.
-     *       in order to get a sense of the burden imposed by overflow we
-     *       probably need to run the journal out to its real size, so that
-     *       might only be testable on a cluster using a suitable workload,
-     *       e.g., as part of performance analysis.
      */
     static public Result doConcurrentClientTest(final IBigdataClient client,
-            final DataService dataService, final int nclients,
-            final long timeout, final int ntrials, final int keyLen,
-            final int nops) throws InterruptedException, IOException {
+            final int nclients, final long timeout, final int ntrials, final int keyLen,
+            final int nops, final int nindices) throws InterruptedException, IOException {
         
-        // name of the scale-out index for the test.
-        final String name = "testIndex";
+        // The basename of the scale-out index(s) for the test.
+        final String basename = "testIndex";
 
         // connect to the federation.
         final IBigdataFederation federation = client.connect();
         
         /*
-         * Register the scale-out index.
+         * Register the scale-out index(s).
          */
+        assert nindices > 0;
         
-        final UUID indexUUID = UUID.randomUUID();
-        final int entryCountPerSplit = 400;
-        final double overCapacityMultiplier = 1.5;
-        final int minimumEntryCountPerSplit = 100;
-        {
-
-            final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
-
-            // The threshold below which we will try to join index partitions.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setMinimumEntryCount(minimumEntryCountPerSplit);
+        IIndex[] index = new IIndex[nindices]; 
+        
+        for(int i=0; i<nindices; i++) {
             
-            // The target #of index entries per partition.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setEntryCountPerSplit(entryCountPerSplit);
+            final String name = basename+(i % nindices);
+            final UUID indexUUID = UUID.randomUUID();
+            final int entryCountPerSplit = 400;
+            final double overCapacityMultiplier = 1.5;
+            final int minimumEntryCountPerSplit = 100;
+            {
 
-            // Overcapacity multipler before an index partition will be split.
-            ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setOverCapacityMultiplier(overCapacityMultiplier);
-            
-            // must support delete markers
-            indexMetadata.setDeleteMarkers(true);
+                final IndexMetadata indexMetadata = new IndexMetadata(name,
+                        indexUUID);
 
-            // register the scale-out index, creating a single index partition.
-            federation.registerIndex(indexMetadata,dataService.getServiceUUID());
-            
+                // The threshold below which we will try to join index
+                // partitions.
+                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                        .setMinimumEntryCount(minimumEntryCountPerSplit);
+
+                // The target #of index entries per partition.
+                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                        .setEntryCountPerSplit(entryCountPerSplit);
+
+                // Overcapacity multipler before an index partition will be
+                // split.
+                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
+                        .setOverCapacityMultiplier(overCapacityMultiplier);
+
+                // must support delete markers
+                indexMetadata.setDeleteMarkers(true);
+
+                // register the scale-out index, creating a single index
+                // partition.
+                federation.registerIndex(indexMetadata);
+
+            }
+        
+            index[i] = federation.getIndex(name, ITx.UNISOLATED);
+        
         }
-        
-        // request index view.
-        IIndex ndx = federation.getIndex(name,ITx.UNISOLATED);
-        
-        assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
-                .getIndexUUID());
-        
+                
         ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(
                 nclients, DaemonThreadFactory.defaultThreadFactory());
 
@@ -414,7 +367,7 @@ public class StressTestConcurrent extends
 
         for(int i=0; i<ntrials; i++) {
             
-            tasks.add(new Task(ndx, keyLen, nops));
+            tasks.add(new Task(index[i % nindices], keyLen, nops));
             
         }
 
@@ -423,6 +376,8 @@ public class StressTestConcurrent extends
          */
         
         final long begin = System.currentTimeMillis();
+        
+        log.warn("Starting tasks on client");
         
         final List<Future<Void>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
         
@@ -495,20 +450,11 @@ public class StressTestConcurrent extends
          * running some tasks.
          */
         executorService.shutdownNow();
-        
-//        String msg = "#clients=" + nclients + ", nops=" + nops + ", ntrials="
-//                + ntrials + ", ncomitted=" + ncommitted + ", nfailed="
-//                + nfailed + ", nuncommitted=" + nuncommitted + ", " + elapsed
-//                + "ms, " + ncommitted * 1000 / elapsed
-//                + " operations per second";
 
         Result ret = new Result();
-        
-//        // @todo these are conditions not results
-//        ret.put("nops", ""+nops);
-//        ret.put("ntx", ""+ntrials);
-        
-        final long groupCommitCount = dataService.getConcurrencyManager().getWriteService().getGroupCommitCount();
+
+        // @todo the groupCommitCount is per data service so we can't easily report it here.
+//        final long groupCommitCount = dataService.getConcurrencyManager().getWriteService().getGroupCommitCount();
         
         ret.put("ncommitted",""+ncommitted);
         ret.put("nfailed",""+nfailed);
@@ -517,15 +463,13 @@ public class StressTestConcurrent extends
         ret.put("ninterrupted", ""+ninterrupted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("operations/sec", ""+(ncommitted * 1000 / elapsed));
-        ret.put("groupCommitCount", ""+groupCommitCount);
-        ret.put("avgCommitGroupSize", ""+(ncommitted/groupCommitCount));
-        ret.put("#overflow", ""+((ResourceManager)dataService.getResourceManager()).getOverflowCount());
+//        ret.put("groupCommitCount", ""+groupCommitCount);
+//        ret.put("avgCommitGroupSize", ""+(ncommitted/groupCommitCount));
+//        ret.put("#overflow", ""+((ResourceManager)dataService.getResourceManager()).getOverflowCount());
         ret.put("failures", ""+(failures.size()));
 
         System.err.println(ret.toString(true/*newline*/));
 
-        System.out.println(ndx.getStatistics());
-        
         if(!failures.isEmpty()) {
             
             System.err.println("failures:\n"+Arrays.toString(failures.toArray()));
@@ -792,6 +736,13 @@ public class StressTestConcurrent extends
          * The #of operations in each trial.
          */
         public static final String NOPS = "nops";
+        
+        /**
+         * The #of distinct scale-out indices that will be used during the run.
+         * Each index may be split over time as the run progresses, eventually
+         * yielding multiple index partitions.
+         */
+        public static final String NINDICES = "nindices";
 
     }
 
@@ -819,11 +770,11 @@ public class StressTestConcurrent extends
         final int nops = Integer.parseInt(properties
                 .getProperty(TestOptions.NOPS));
 
-        DataService dataService = ((EmbeddedBigdataFederation) fed)
-                .getDataService(0);
+        final int nindices = Integer.parseInt(properties
+                .getProperty(TestOptions.NINDICES));
 
-        Result result = doConcurrentClientTest(client, dataService, nclients,
-                timeout, ntrials, keyLen, nops);
+        Result result = doConcurrentClientTest(client, nclients, timeout,
+                ntrials, keyLen, nops, nindices);
 
         return result;
 

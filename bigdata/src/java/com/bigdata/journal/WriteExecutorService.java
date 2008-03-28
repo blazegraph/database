@@ -222,6 +222,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long committedTaskCount = 0;
     private long noverflow = 0;
 
+    protected AtomicInteger concurrentTaskCount = new AtomicInteger(0);
+
     /**
      * The maximum #of threads in the pool.
      */
@@ -322,6 +324,24 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public long getOverflowCount() {
     
         return noverflow;
+        
+    }
+    
+    /**
+     * The instantaneous #of tasks that have <strong>acquired</strong> their
+     * locks are executing concurrently on the write service. This is the real
+     * measure of concurrent task execution on the write service. However, you
+     * need to sample this value and compute a moving average in order to turn
+     * it into useful information.
+     * <p>
+     * The returned value is limited by {@link #getActiveCount()}. Note that
+     * {@link #getActiveCount()} reports tasks which are <strong>waiting on
+     * their locks</strong> as well as those engaged in various pre- or
+     * post-processing.
+     */
+    public int getConcurrentTaskCount() {
+
+        return concurrentTaskCount.get();
         
     }
     
@@ -466,9 +486,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * This is executed after {@link AbstractTask#doTask()}. If the task
      * completed successfully (no exception thrown and its thread is not
-     * interrupted) then we invoke {@link #groupCommit()}. If there was a
-     * problem and an abort is not already in progress, then we invoke
-     * {@link #abort()}.
+     * interrupted) then we invoke {@link #groupCommit()}. Otherwise the write
+     * set of the task was already discarded by
+     * {@link AbstractTask.InnerWriteServiceCallable} and we do nothing.
      * 
      * @param r
      *            The {@link Callable} wrapping the {@link AbstractTask}.
@@ -629,7 +649,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         sb.append("{ paused="+paused);
         
         sb.append(", nrunning="+nrunning);
-        
+
+        sb.append(", concurrentTaskCount="+concurrentTaskCount);
+
         sb.append(", activeTaskSetSize="+active.size());
 
         sb.append(", nwrites="+nwrites);
@@ -716,7 +738,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * invokes {@link #overflow()} which will decide whether or not to do
      * synchronous overflow processing.
      * <p>
-     * If there is a problem during the commit protocol then the write set(s)
+     * If there is a problem during the {@link #commit()} then the write set(s)
      * are abandoned using {@link #abort()}.
      * <p>
      * Note: This method does NOT throw anything. All exceptions are caught and
@@ -741,9 +763,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * </ul>
      * 
      * @return <code>true</code> IFF the commit was successful. Otherwise the
-     *         commit group was aborted and the caller MUST throw a
-     *         {@link RetryException} so that the abort is observable from
-     *         {@link Future#get()}.
+     *         commit group was aborted.
      */
     private boolean groupCommit(){
 
@@ -782,57 +802,44 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         // attempt to atomically set the [groupCommit] flag.
         if (!groupCommit.compareAndSet(false, true)) {
 
-//            /*
-//             * Try/finally block ensures that we release the lock once we leave
-//             * this code.
-//             */
-//
-//            try {
-        
-                /*
-                 * This thread could not set the flag so some other thread is
-                 * running the group commit and this thread will just await that
-                 * commit.
-                 */
+            /*
+             * This thread could not set the flag so some other thread is
+             * running the group commit and this thread will just await that
+             * commit.
+             */
 
-                log.debug("Already executing in another thread");
+            log.debug("Already executing in another thread");
 
-                /*
-                 * Notify the thread running the group commit that this thread
-                 * will await that commit.
-                 * 
-                 * Note: We avoid the possibility of missing the [commit] signal
-                 * since we currently hold the [lock].
-                 */
+            /*
+             * Notify the thread running the group commit that this thread will
+             * await that commit.
+             * 
+             * Note: We avoid the possibility of missing the [commit] signal
+             * since we currently hold the [lock].
+             */
 
-                waiting.signal();
+            waiting.signal();
 
-                try {
+            try {
 
-                    // await [commit]; releases [lock] while awaiting signal.
+                // await [commit]; releases [lock] while awaiting signal.
 
-                    commit.await();
+                commit.await();
 
-                    return true;
-                    
-                } catch (InterruptedException ex) {
+                return true;
 
-                    // The task was aborted.
+            } catch (InterruptedException ex) {
 
-                    log.warn("Task interrupted awaiting group commit: "+r);
+                // The task was aborted.
 
-                    // Set the interrupt flag again.
-                    Thread.currentThread().interrupt();
-                    
-                    return false;
-                    
-                }
-                
-//            } finally {
-//
-//                lock.unlock();
-//
-//            }
+                log.warn("Task interrupted awaiting group commit: " + r);
+
+                // Set the interrupt flag again.
+                Thread.currentThread().interrupt();
+
+                return false;
+
+            }
 
         }
 
@@ -841,8 +848,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         try {
 
             /*
-             * Note: The logic above MUST NOT have released the lock if control was
-             * allowed to flow down to this point.
+             * Note: The logic above MUST NOT have released the lock if control
+             * was allowed to flow down to this point.
              */
             
             assert lock.isHeldByCurrentThread();
@@ -950,6 +957,23 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         } catch(Throwable t) {
             
             log.error("Problem with commit? : "+t,t);
+            
+            /*
+             * A thrown exception here indicates a failure, but not during the
+             * commit() itself. One example is when the group commit is
+             * interrupted during shutdown. However, there can doubtless be
+             * others.
+             * 
+             * Since at least one task succeeded (the one executed by the thread
+             * that is running the group commit) there are index checkpoints
+             * that will get written by the next commit. If we do nothing then
+             * those checkpoints will be made restart safe if a subsequent
+             * commit succeeds, which would be pretty suprising since the task
+             * will have reported a failure! So, yes, we do need to do an
+             * abort() here.
+             */
+            
+            abort();
             
             return false;
             
