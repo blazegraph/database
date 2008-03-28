@@ -39,6 +39,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
@@ -89,6 +90,18 @@ import com.bigdata.journal.ConcurrencyManager.TaskCounters;
 public abstract class AbstractTask implements Callable<Object>, ITask {
 
     static protected final Logger log = Logger.getLogger(AbstractTask.class);
+
+    /**
+     * True iff the {@link #log} level is INFO or less.
+     */
+    static final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+            .toInt();
+
+    /**
+     * True iff the {@link #log} level is DEBUG or less.
+     */
+    static final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+            .toInt();
 
     /**
      * Used to protect against re-submission of the same task object.
@@ -925,7 +938,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * exception, most probably indicating that the store or the file channel is
      * "not open".
      */
-    static private class InnerReadWriteTxServiceCallable extends DelegateTask {
+    static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
 
         final ITx tx;
         
@@ -990,7 +1003,7 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static private class InnerWriteServiceCallable extends DelegateTask {
+    static protected class InnerWriteServiceCallable extends DelegateTask {
 
         InnerWriteServiceCallable(AbstractTask delegate) {
             
@@ -1005,24 +1018,33 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
 
             delegate.nanoTime_beginWork = System.nanoTime();
 
+            // The write service on which this task is running.
+            final WriteExecutorService writeService = delegate.concurrencyManager.getWriteService();
+
             /*
-             * Get reference to lock (this is just a reference - it is used
-             * below).
+             * Get reference to lock (this is just a reference - we acquire the
+             * lock itself below).
              * 
              * Note: this object is used to ensure that checkpoints and
              * rollbacks are coordinated with the write service. In particular,
              * this ensures that checkpoint and rollback operations do NOT
              * overlap a group commit.
              */
-            final Lock lock = delegate.concurrencyManager.getWriteService().lock;
+            final Lock lock = writeService.lock;
 
             try {
 
+                if(INFO)
                 log.info("Running with resource lock(s): "+this);
+
+                writeService.concurrentTaskCount.incrementAndGet();
                 
                 // invoke doTask() on AbstractTask with locks.
                 final Object ret = delegate.doTask();
-                
+
+                writeService.concurrentTaskCount.decrementAndGet();
+
+                if(INFO)
                 log.info("Did run with resource lock(s): "+this);
                 
                 lock.lock();

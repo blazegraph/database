@@ -37,8 +37,9 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.DataServicesClient;
+import com.bigdata.service.jini.JiniBigdataFederation;
 import com.bigdata.service.jini.LoadBalancerClient;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.IMapService;
@@ -59,7 +60,7 @@ public class Master extends AbstractMaster {
 
     final MapReduceServiceDiscoveryManager serviceDiscoveryManager;
     
-    public Master(MapReduceJob job, BigdataClient client,
+    public Master(MapReduceJob job, JiniBigdataClient client,
             MapReduceServiceDiscoveryManager serviceDiscoveryManager) {
 
         super(job,client);
@@ -115,7 +116,7 @@ public class Master extends AbstractMaster {
          * @todo refactor discovery and lookup per {@link DataServicesClient}
          *       and {@link LoadBalancerClient}.
          */
-        public MapReduceServiceDiscoveryManager(BigdataClient client) {
+        public MapReduceServiceDiscoveryManager(JiniBigdataClient client) {
 
             /*
              * Setup a helper class that will be notified as services join or
@@ -124,7 +125,8 @@ public class Master extends AbstractMaster {
              */
             try {
 
-                serviceDiscoveryManager = new ServiceDiscoveryManager(client
+                JiniBigdataFederation fed = client.getFederation();
+                serviceDiscoveryManager = new ServiceDiscoveryManager(fed
                         .getDiscoveryManagement(), new LeaseRenewalManager());
 
             } catch (IOException ex) {

@@ -893,6 +893,19 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
              * 
              * @todo Really needs to check on each partition on which we have a
              * data service.
+             * 
+             * @todo this will issue a warning for a windows host on which a
+             * service is just starting up. For some reason, it takes a few
+             * cycles to begin reporting performance counters on a windows host
+             * and the initial counters will therefore all be reported as zeros.
+             * This problem should be fixed, but we also need to discount an
+             * average whose result is zero if the #of samples is also zero. In
+             * that case we just don't have any information. Likewise, when the
+             * #of samples to date (cumulative or just the #of minutes in 0:60
+             * of data in the minutes history) is less than 5 minutes worth of
+             * data then we may still need to discount the data. Also consider
+             * adding a "moving average" computation to the History so that we
+             * can smooth short term spikes.
              */
             final double percentDiskFreeSpace = getCurrentValue(hostCounterSet,
                     IRequiredHostCounters.LogicalDisk_PercentFreeSpace, .5d);
@@ -1153,9 +1166,9 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
      * 
      * @param serviceUUID
      */
-    protected void leave(UUID serviceUUID) {
+    public void leave(String msg, UUID serviceUUID) {
 
-        log.info("serviceUUID=" + serviceUUID);
+        log.info("msg="+msg+", serviceUUID=" + serviceUUID);
 
         lock.lock();
 

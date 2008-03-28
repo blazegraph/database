@@ -255,6 +255,21 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
 
         AbstractTripleStore store = getStore();
         
+        try {
+
+            doTest(store, nclass, nproperty, nliteral, litsize);
+            
+        } finally {
+            
+            store.closeAndDelete();
+        }
+
+    }
+    
+    private void doTest(AbstractTripleStore store, final int nclass,
+            final int nproperty, final int nliteral, final int litsize)
+            throws IOException {
+
         final URI[] cspace = new URI[nclass];
         final URI[] pspace = new URI[nproperty];
         final URI[] tspace = new URI[] {
@@ -522,8 +537,6 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
         w.flush();
 
         w.close();
-
-        store.closeAndDelete();
         
         }
 

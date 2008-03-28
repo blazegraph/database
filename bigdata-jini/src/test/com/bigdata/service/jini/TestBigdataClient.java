@@ -38,17 +38,18 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
+import com.bigdata.service.AbstractRemoteBigdataFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
- * Test suite for the {@link BigdataClient}.
+ * Test suite for the {@link JiniBigdataClient}.
  * <p>
  * Note: The core test suite has already verified the basic semantics of the
  * {@link IDataService} interface and partitioned indices so all we have to
@@ -90,7 +91,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    BigdataClient client;
+    JiniBigdataClient client;
     
     /**
      * Starts a {@link DataServer} ({@link #dataServer1}) and then a
@@ -159,7 +160,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }.start();
 
-        client = BigdataClient.newInstance(
+        client = JiniBigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
@@ -169,24 +170,26 @@ public class TestBigdataClient extends AbstractServerTestCase {
         getServiceID(dataServer0);
         getServiceID(dataServer1);
         
+        final JiniBigdataFederation fed = client.connect();
+        
         // verify that the client has/can get the metadata service.
-        metadataService0 = client.getMetadataService();
+        metadataService0 = fed.getMetadataService();
         assertNotNull("metadataService", metadataService0);
 
-        assertEquals("#dataServices", 2, client.awaitServices(
+        assertEquals("#dataServices", 2, fed.awaitServices(
                 2/* minDataServices */, 2000/* timeout(ms) */));
         
         assertTrue(metadataServer0.getProxy() instanceof IMetadataService);
         
-        assertTrue(client.getMetadataService() instanceof IMetadataService);
+        assertTrue(fed.getMetadataService() instanceof IMetadataService);
 
         // resolve proxy.
-        dataService0 = client.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
+        dataService0 = fed.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
         
         assertNotNull("dataService0",dataService0);
 
         // resolve proxy.
-        dataService1 = client.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
+        dataService1 = fed.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
 
         assertNotNull("dataService1",dataService1);
 
@@ -231,9 +234,9 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }
 
-        if (client != null) {
+        if (client != null && client.isConnected()) {
 
-            client.shutdownNow();
+            client.disconnect(true/*immediateShutdown*/);
 
             client = null;
 

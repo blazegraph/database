@@ -118,23 +118,24 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         
         fed = client.connect();
 
-        metadataService = ((EmbeddedBigdataFederation)fed).getMetadataService();
+        metadataService = fed.getMetadataService();
         System.err.println("metadataService: "+metadataService.getServiceUUID());
 
         dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
         System.err.println("dataService0   : "+dataService0.getServiceUUID());
 
-        dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
-        System.err.println("dataService1   : "+dataService1.getServiceUUID());
+        if (((EmbeddedBigdataFederation) fed).getDataServiceCount() > 1) {
+        
+            dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
+            System.err.println("dataService1   : "+dataService1.getServiceUUID());
+            
+        }
         
     }
     
     public void tearDown() throws Exception {
         
-        /*
-         * Note: this is normal termination and shutdown for the federation.
-         */
-        client.shutdownNow();
+        client.disconnect(true/*immediateShutdown*/);
 
         /*
          * Optional cleanup after the test runs, but sometimes its helpful to be

@@ -284,7 +284,7 @@ abstract public class MapService
                 UUID dataService, Tuple[] tuples) throws InterruptedException,
                 ExecutionException, IOException {
             
-            IDataService ds = client.getDataService(dataService);
+            IDataService ds = client.getFederation().getDataService(dataService);
 
             if (ds == null)
                 throw new RuntimeException("Could not locate dataService: "

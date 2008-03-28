@@ -38,7 +38,7 @@ import net.jini.config.Configuration;
 
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.jini.AbstractServer;
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.mapred.MapService;
 
@@ -174,7 +174,7 @@ public class MapServer extends AbstractServer {
         public IBigdataClient getBigdataClient() {
             
             // @todo this assumes the default federation.
-            return BigdataClient.newInstance(new String[]{});
+            return JiniBigdataClient.newInstance(new String[]{});
             
         }
 

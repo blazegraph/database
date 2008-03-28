@@ -41,14 +41,9 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
-import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
-import com.bigdata.util.InnerCause;
 
 /**
  * An implementation that uses an embedded database rather than a distributed
@@ -62,16 +57,10 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedBigdataFederation implements IBigdataFederation {
+public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
 
     public static final Logger log = Logger.getLogger(EmbeddedBigdataFederation.class);
 
-    /**
-     * The client or <code>null</code> iff the client has disconnected from
-     * the federation.
-     */
-    private EmbeddedBigdataClient client;
-    
     /**
      * The #of data service instances.
      */
@@ -103,9 +92,9 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      */
     private Map<UUID,DataService> dataServiceByUUID = new HashMap<UUID,DataService>();
 
-    public IBigdataClient getClient() {
+    public EmbeddedBigdataClient getClient() {
         
-        return client;
+        return (EmbeddedBigdataClient)super.getClient();
         
     }
 
@@ -113,7 +102,9 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * The (in process) {@link LoadBalancerService}.
      */
     public ILoadBalancerService getLoadBalancerService() {
-        
+
+        assertOpen();
+
         return loadBalancer;
         
     }
@@ -122,6 +113,8 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      * The (in process) {@link MetadataService}.
      */
     public IMetadataService getMetadataService() {
+
+        assertOpen();
         
         return metadataService;
         
@@ -136,30 +129,81 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      *         there is no data service instance with that service UUID.
      */
     public IDataService getDataService(UUID serviceUUID) {
-        
-        return dataServiceByUUID.get(serviceUUID);
-        
-    }
 
-    /**
-     * There are {@link #ndataServices} data services defined in the federation.
-     * This returns the data service with that index.
-     * 
-     * @param index
-     *            The index.
-     *            
-     * @return The data service at that index.
-     */
-    public DataService getDataService(int index) {
-        
-        return dataService[index];
+        assertOpen();
+
+        return dataServiceByUUID.get(serviceUUID);
         
     }
     
     /**
+     * The #of configured data services in the embedded federation.
+     */
+    public int getDataServiceCount() {
+        
+        return ndataServices;
+        
+    }
+    
+    /**
+     * There are {@link #getDataServiceCount()} data services defined in the
+     * federation. This returns the data service with that index.
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return The data service at that index.
+     */
+    public DataService getDataService(int index) {
+        
+        assertOpen();
+
+        return dataService[index];
+        
+    }
+    
+    public UUID[] getDataServiceUUIDs(int maxCount) {
+
+        assertOpen();
+
+        if (maxCount < 0)
+            throw new IllegalArgumentException();
+        
+        final int n = maxCount == 0 ? ndataServices : Math.min(maxCount,
+                ndataServices);
+        
+        final UUID[] uuids = new UUID[ n ];
+        
+        for(int i=0; i<n; i++) {
+            
+            try {
+            
+                uuids[i] = getDataService( i ).getServiceUUID();
+            
+            } catch (IOException e) {
+                
+                throw new RuntimeException( e );
+                
+            }
+            
+        }
+        
+        return uuids;
+        
+    }
+
+    public IDataService getAnyDataService() {
+        
+        return getDataService(0);
+        
+    }
+
+    /**
      * Options for the embedded (in process) federation. Service instances will
      * share the same configuration properties except for the name of the
      * backing store file.
+     * 
+     * @todo move the options into {@link EmbeddedBigdataClient}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -205,20 +249,6 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
     }
     
     /**
-     * @exception IllegalStateException
-     *                if the client has disconnected from the federation.
-     */
-    private void assertOpen() {
-
-        if (client == null) {
-
-            throw new IllegalStateException();
-
-        }
-
-    }
-    
-    /**
      * Start or restart an embedded bigdata federation.
      * 
      * @param properties
@@ -226,13 +256,10 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
      */
     protected EmbeddedBigdataFederation(EmbeddedBigdataClient client, Properties properties) {
         
-        if (client == null)
-            throw new IllegalArgumentException();
+        super(client);
         
         if (properties == null)
             throw new IllegalArgumentException();
-        
-        this.client = client;
 
         // isolate caller from any changes we may make.
         properties = new Properties(properties);
@@ -655,159 +682,28 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
 
     }
     
-    public UUID registerIndex(IndexMetadata metadata) {
-
-        assertOpen();
-
-        return registerIndex(metadata, null);
-
-    }
-
-    public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
-
-        assertOpen();
-
-        if (dataServiceUUID == null) {
-            
-            try {
-            
-                dataServiceUUID = loadBalancer.getUnderUtilizedDataService();
-
-            } catch (Exception ex) {
-
-                log.error(ex);
-
-                throw new RuntimeException(ex);
-
-            }
-
-        }
-
-        return registerIndex(//
-                metadata, //
-                new byte[][] { new byte[] {} },//
-                new UUID[] { dataServiceUUID } //
-            );
-        
-    }
-
-    public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
-            UUID[] dataServiceUUIDs) {
-
-        assertOpen();
-
-        try {
-
-            UUID indexUUID = getMetadataService().registerScaleOutIndex(
-                    metadata, separatorKeys, dataServiceUUIDs);
-
-            return indexUUID;
-
-        } catch (Exception ex) {
-
-            log.error(ex);
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    public void dropIndex(String name) {
-
-        assertOpen();
-
-        try {
-            
-            getMetadataService().dropScaleOutIndex(name);
-            
-        } catch (Exception e) {
-
-            throw new RuntimeException( e );
-            
-        }
-
-    }
-
-    public IIndex getIndex(String name,long timestamp) {
-
-        assertOpen();
-
-        final MetadataIndexMetadata mdmd;
-        try {
-
-            mdmd = (MetadataIndexMetadata) getMetadataService()
-                    .getIndexMetadata(
-                            MetadataService.getMetadataIndexName(name),
-                            timestamp);
-            
-            assert mdmd != null;
-            
-        } catch (Exception ex) {
-
-            if(InnerCause.isInnerCause(ex, NoSuchIndexException.class)) {
-                
-                return null;
-                
-            }
-            
-            throw new RuntimeException(ex);
-
-        }
-
-        return new ClientIndexView(this, name, timestamp, mdmd);
-
-    }
-
-    /**
-     * Note: the {@link EmbeddedBigdataFederation} is {@link #shutdown()} when
-     * the client {@link #disconnect()}s.
-     */
-    public void disconnect() {
-
-        if (client == null)
-            throw new IllegalStateException();
-        
-        shutdown();
-        
-    }
-
     /**
      * Normal shutdown of the services in the federation.
      */
-    public void shutdown() {
+    synchronized public void shutdown() {
         
         log.info("begin");
         
-        assertOpen();
-        
-        client = null;
+        super.shutdown();
         
         for(int i=0; i<dataService.length; i++) {
             
             DataService ds = this.dataService[i];
             
-            try {
-
-                // notify leave event.
-                loadBalancer.leave(ds.getServiceUUID());
-                
-            } catch (IOException e) {
-                
-                // Should never be thrown for an embedded service.
-                log.warn(e.getMessage(),e);
-                
-            }
-            
-            ds.shutdown();
+            ds.shutdownNow();
             
         }
 
-        metadataService.shutdown();
+        metadataService.shutdownNow();
         
         if (loadBalancer != null) {
 
-            loadBalancer.shutdown();
+            loadBalancer.shutdownNow();
 
             loadBalancer = null;
             
@@ -820,29 +716,15 @@ public class EmbeddedBigdataFederation implements IBigdataFederation {
     /**
      * Immediate shutdown of the services in the embedded federation.
      */
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
         
         log.info("begin");
 
-        assertOpen();
-        
-        client = null;
+        super.shutdownNow();
         
         for(int i=0; i<dataService.length; i++) {
             
             DataService ds = this.dataService[i];
-            
-            try {
-
-                // notify leave event.
-                loadBalancer.leave(ds.getServiceUUID());
-                
-            } catch (IOException e) {
-                
-                // Should never be thrown for an embedded service.
-                log.warn(e.getMessage(),e);
-                
-            }
             
             ds.shutdownNow();
             

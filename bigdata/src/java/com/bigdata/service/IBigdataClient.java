@@ -1,43 +1,75 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 /*
  * Created on Jul 25, 2007
  */
 
 package com.bigdata.service;
 
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndexProcedure;
-import com.bigdata.journal.CommitRecordIndex.Entry;
+import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Interface for clients of a {@link IBigdataFederation}.
+ * <p>
+ * An application uses a {@link IBigdataClient} to connect to an
+ * {@link IBigdataFederation}. Once connected, the application uses the
+ * {@link IBigdataFederation} for operations against a given federation.
+ * <p>
+ * An application can read and write on multiple federations by creating an
+ * {@link IBigdataClient} for each federation to which it needs to establish a
+ * connection. In this manner, an application can connect to federations that
+ * are deployed using different service discovery frameworks. However, precisely
+ * how the client is configured to identify the federation depends on the
+ * specific service discovery framework, including any protocol options or
+ * security measures, with which that federation was deployed. Likewise, the
+ * services within a given federation only see those services which belong to
+ * that federation. Therefore federation to federation data transfers MUST go
+ * through a client.
+ * <p>
+ * Applications normally work with scale-out indices using the methods defined
+ * by {@link IBigdataFederation} to register, drop, or access indices.
+ * <p>
+ * An application may use an {@link ITransactionManagerService} if needs to use
+ * transactions as opposed to unisolated reads and writes. When the client
+ * requests a transaction, the transaction manager responds with a long integer
+ * containing the transaction identifier - this is simply the unique start time
+ * assigned to that transaction by the transaction manager. The client then
+ * provides that transaction identifier for operations that are isolated within
+ * the transaction. When the client is done with the transaction, it must use
+ * the transaction manager to either abort or commit the transaction.
+ * (Transactions that fail to progress may be eventually aborted.)
+ * <p>
+ * When using unisolated operations, the client simply specifies
+ * {@link ITx#UNISOLATED} as the timestamp for its operations.
+ * 
+ * @see ClientIndexView
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -50,93 +82,48 @@ public interface IBigdataClient {
      * Connect to a bigdata federation. If the client is already connected, then
      * the existing connection is returned.
      * 
-     * @return The federation.
-     * 
-     * @todo determine how a federation will be identified, e.g., by a name that
-     *       is an {@link Entry} on the {@link MetadataServer} and
-     *       {@link DataServer} service descriptions and provide that name
-     *       attribute here. Note that a {@link MetadataService} can failover,
-     *       so the {@link ServiceID} for the {@link MetadataService} is not the
-     *       invariant, but rather the name attribute for the federation.
+     * @return The object used to access the federation services.
      */
     public IBigdataFederation connect();
-    
+
     /**
+     * Return the connected federation,
+     * 
+     * @throws IllegalStateException
+     *             if the client is not connected.
+     */
+    public IBigdataFederation getFederation();
+
+    /**
+     * Disconnect from the bigdata federation.
+     * <p>
      * Normal shutdown allows any existing client requests to federation
-     * services to complete but does not schedule new requests, disconnects from
-     * the federation, and then terminates any background processing that is
-     * being performed on the behalf of the client (service discovery, etc).
-     */
-    public void shutdown();
-
-    /**
+     * services to complete but does not schedule new requests, and then
+     * terminates any background processing that is being performed on the
+     * behalf of the client (service discovery, etc).
+     * <p>
      * Immediate shutdown terminates any client requests to federation services,
-     * disconnects from the federation, and then terminate any background
-     * processing that is being performed on the behalf of the client (service
-     * discovery, etc).
+     * and then terminate any background processing that is being performed on
+     * the behalf of the client (service discovery, etc).
+     * 
+     * @param immediateShutdown
+     *            When <code>true</code> an immediate shutdown will be
+     *            performed as described above. Otherwise a normal shutdown will
+     *            be performed.
      */
-    public void shutdownNow();
+    public void disconnect(boolean immediateShutdown);
 
     /**
-     * Return an array UUIDs for {@link IDataService}s.
-     * 
-     * @param maxCount
-     *            The maximum #of data services whose UUIDs will be returned.
-     *            When zero (0) the UUID for all known data services will be
-     *            returned.
-     * 
-     * @return An array of {@link UUID}s for data services.
+     * Return <code>true</code> iff the client is connected to a federation.
      */
-    public UUID[] getDataServiceUUIDs(int maxCount);
-    
-    /**
-     * Resolve the service identifier to an {@link IDataService}.
-     * <p>
-     * Note: Whether the returned object is a proxy or the service
-     * implementation depends on whether the federation is embedded (in process)
-     * or distributed (networked).
-     * 
-     * @param serviceUUID
-     *            The identifier for a {@link IDataService}.
-     * 
-     * @return The {@link IDataService} or <code>null</code> iff the
-     *         {@link IDataService} could not be discovered from its identifier.
-     */
-    public IDataService getDataService(UUID serviceUUID);
+    public boolean isConnected();
 
     /**
-     * Return ANY {@link IDataService} which has been (or could be) discovered
-     * and which is part of the connected federation.
-     * <p>
-     * Note: This method is here as a failsafe when the
-     * {@link ILoadBalancerService} is not available.
+     * The configured #of threads in the client's thread pool.
      * 
-     * @return <code>null</code> if there are NO known {@link IDataService}s.
+     * @see Options#CLIENT_THREAD_POOL_SIZE
      */
-    public IDataService getAnyDataService();
-    
-    /**
-     * Return the load balancer service (or a proxy for that service).
-     */
-    public ILoadBalancerService getLoadBalancerService();
-
-    /**
-     * Return the metadata service.
-     * <p>
-     * Note: Whether the returned object is a proxy or the service
-     * implementation depends on whether the federation is embedded (in process)
-     * or distributed (networked).
-     * 
-     * @return The metadata service.
-     */
-    public IMetadataService getMetadataService();
-     
-    /**
-     * A thread pool that may be used by clients to parallelize operations
-     * against the federation. This thread pool is automatically used by the
-     * {@link ClientIndexView}.
-     */
-    public ExecutorService getThreadPool();
+    public int getThreadPoolSize();
 
     /**
      * The default capacity when a client issues a range query request.
@@ -144,7 +131,7 @@ public interface IBigdataClient {
      * @see Options#CLIENT_RANGE_QUERY_CAPACITY
      */
     public int getDefaultRangeQueryCapacity();
-    
+
     /**
      * When <code>true</code> requests for non-batch API operations will throw
      * exceptions.
@@ -152,9 +139,10 @@ public interface IBigdataClient {
      * @see Options#CLIENT_BATCH_API_ONLY
      */
     public boolean getBatchApiOnly();
-    
+
     /**
-     * The maximum #of retries when an operation results in a {@link StaleLocatorException}.
+     * The maximum #of retries when an operation results in a
+     * {@link StaleLocatorException}.
      * 
      * @see Options#CLIENT_MAX_STALE_LOCATOR_RETRIES
      */
@@ -169,22 +157,28 @@ public interface IBigdataClient {
     public int getMaxParallelTasksPerRequest();
 
     /**
+     * An object wrapping the properties used to configure the client.
+     */
+    public Properties getProperties();
+
+    /**
      * Configuration options for {@link IBigdataClient}s.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static interface Options {
-    
+
         /**
-         * The #of threads in the client thread pool (default is <code>20</code>).
-         * This thread pool is used to parallelize all requests issued by the
-         * client and also to limit the maximum parallelism of the client with
-         * respect to requests made of the federation.
+         * The #of threads in the client thread pool -or- ZERO (0) if the size
+         * of the thread pool is not fixed (default is <code>0</code>). The
+         * thread pool is used to parallelize all requests issued by the client
+         * and optionally to limit the maximum parallelism of the client with
+         * respect to requests made of the connected federation.
          */
         String CLIENT_THREAD_POOL_SIZE = "client.threadPoolSize";
-        
-        String DEFAULT_CLIENT_THREAD_POOL_SIZE = "20";
+
+        String DEFAULT_CLIENT_THREAD_POOL_SIZE = "0";
 
         /**
          * The maximum #of times that a client will retry an operation which
@@ -197,7 +191,7 @@ public interface IBigdataClient {
          * abnormal sequences to terminate.
          */
         String CLIENT_MAX_STALE_LOCATOR_RETRIES = "client.maxStaleLocatorRetries";
-        
+
         String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "3";
 
         /**
@@ -213,13 +207,15 @@ public interface IBigdataClient {
          * for the request have completed.
          */
         String CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "client.maxParallelTasksPerRequest";
-        
+
         String DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "100";
-        
+
         /**
-         * The default capacity used when a client issues a range query request (50000).
+         * The default capacity used when a client issues a range query request
+         * (50000).
          * 
-         * @todo allow override on a per index basis as part of the index metadata?
+         * @todo allow override on a per index basis as part of the index
+         *       metadata?
          */
         String CLIENT_RANGE_QUERY_CAPACITY = "client.rangeIteratorCapacity";
 
@@ -235,7 +231,7 @@ public interface IBigdataClient {
         String CLIENT_BATCH_API_ONLY = "client.batchOnly";
 
         String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
-        
+
     };
-    
+
 }

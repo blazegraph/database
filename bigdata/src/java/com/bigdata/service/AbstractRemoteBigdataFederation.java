@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
@@ -38,7 +37,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.RangeCountProcedure;
 import com.bigdata.journal.ITransactionManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IMetadataIndex;
@@ -48,9 +46,9 @@ import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * This class encapsulates access to the metadata and data services for a
- * bigdata federation - it is in effect a proxy object for the distributed set
- * of services that comprise the federation.
+ * This class encapsulates access to the services for a remote bigdata
+ * federation - it is in effect a proxy object for the distributed set of
+ * services that comprise the federation.
  * 
  * @todo Explore a variety of cached and uncached strategies for the metadata
  *       index. An uncached strategy is currently used. However, caching may be
@@ -67,13 +65,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataFederation implements IBigdataFederation {
-
-    /**
-     * The client - cleared to <code>null</code> when the client
-     * {@link #disconnect()}s from the federation.
-     */
-    private IBigdataClient client;
+abstract public class AbstractRemoteBigdataFederation extends AbstractBigdataFederation {
 
     /**
      * A temporary store used to cache various data in the client.
@@ -87,191 +79,40 @@ public class BigdataFederation implements IBigdataFederation {
      */
     private final Map<String, MetadataIndex> partitions = new ConcurrentHashMap<String, MetadataIndex>();
     
-    /**
-     * @exception IllegalStateException
-     *                if the client has disconnected from the federation.
-     */
-    private void assertOpen() {
+    public AbstractRemoteBigdataFederation(IBigdataClient client) {
 
-        if (client == null) {
-
-            throw new IllegalStateException();
-
-        }
+        super(client);
 
     }
 
-    public BigdataFederation(IBigdataClient client) {
+    synchronized public void shutdownNow() {
 
-        if (client == null)
-            throw new IllegalArgumentException();
-
-        this.client = client;
-
-    }
-
-    public void disconnect() {
+        super.shutdownNow();
         
-        if(client==null) {
-            
-            // Already disconnected.
-            
-            return;
-            
-        }
-        
-        client = null;
-
-        if(clientTempStore.isOpen()) {
+        if (clientTempStore.isOpen()) {
 
             clientTempStore.close();
-            
+
         }
 
         partitions.clear();
 
     }
+    
+    synchronized public void shutdown() {
 
-    public IBigdataClient getClient() {
+        super.shutdown();
         
-        return client;
-        
-    }
+        if (clientTempStore.isOpen()) {
 
-    public ILoadBalancerService getLoadBalancerService() {
-        
-        assertOpen();
-        
-        return client.getLoadBalancerService();
-        
+            clientTempStore.close();
+
+        }
+
+        partitions.clear();
+
     }
     
-    public IMetadataService getMetadataService() {
-
-        assertOpen();
-
-        return client.getMetadataService();
-
-    }
-
-    public UUID registerIndex(IndexMetadata metadata) {
-
-        assertOpen();
-
-        return registerIndex(metadata, null);
-
-    }
-
-    public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
-
-        assertOpen();
-
-        if (dataServiceUUID == null) {
-            
-            final ILoadBalancerService loadBalancerService = getLoadBalancerService();
-
-            if (loadBalancerService == null) {
-
-                try {
-
-                    /*
-                     * As a failsafe (or at least a failback) we ask the client
-                     * for ANY data service that it knows about and use that as
-                     * the data service on which we will register this index.
-                     * This lets us keep going if the load balancer is dead when
-                     * this request comes through.
-                     */
-
-                    dataServiceUUID = client.getAnyDataService().getServiceUUID();
-
-                } catch (Exception ex) {
-
-                    log.error(ex);
-
-                    throw new RuntimeException(ex);
-
-                }
-                
-            } else {
-
-                try {
-
-                    dataServiceUUID = loadBalancerService
-                            .getUnderUtilizedDataService();
-
-                } catch (Exception ex) {
-
-                    log.error(ex);
-
-                    throw new RuntimeException(ex);
-
-                }
-
-            }
-            
-        }
-
-        return registerIndex(//
-                metadata, //
-                new byte[][] { new byte[] {} },//
-                new UUID[] { dataServiceUUID } //
-            );
-
-    }
-
-    public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
-            UUID[] dataServiceUUIDs) {
-
-        assertOpen();
-
-        try {
-
-            UUID indexUUID = getMetadataService().registerScaleOutIndex(
-                    metadata, separatorKeys, dataServiceUUIDs);
-
-            return indexUUID;
-
-        } catch (Exception ex) {
-
-            log.error(ex);
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    public void dropIndex(String name) {
-
-        assertOpen();
-
-        try {
-            
-            getMetadataService().dropScaleOutIndex(name);
-            
-        } catch (Exception e) {
-
-            throw new RuntimeException( e );
-            
-        }
-
-    }
-
-    public IIndex getIndex(String name,long timestamp) {
-
-        assertOpen();
-
-        final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name, timestamp);
-        
-        // No such index.
-        if (mdmd == null)
-            return null;
-
-        // Index exists.
-        return new ClientIndexView(this, name, timestamp, mdmd);
-
-    }
-
     /**
      * This is a read-through view onto the metadata index.
      * <p>
@@ -388,54 +229,6 @@ public class BigdataFederation implements IBigdataFederation {
         
     }
 
-    /**
-     * Return the metadata for the metadata index itself.
-     * 
-     * @param name
-     *            The name of the scale-out index.
-     * 
-     * @param timestamp
-     * 
-     * @return The metadata for the metadata index or <code>null</code> iff no
-     *         scale-out index is registered by that name at that timestamp.
-     */
-    private MetadataIndexMetadata getMetadataIndexMetadata(String name, long timestamp) {
-
-        assertOpen();
-
-        final MetadataIndexMetadata mdmd;
-        try {
-
-            // @todo test cache for this object as of that timestamp?
-            mdmd = (MetadataIndexMetadata) getMetadataService()
-                    .getIndexMetadata(
-                            MetadataService.getMetadataIndexName(name),
-                            timestamp);
-            
-            assert mdmd != null;
-
-        } catch( NoSuchIndexException ex ) {
-            
-            return null;
-        
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-        
-        if (mdmd == null) {
-
-            // No such index.
-            
-            return null;
-
-        }
-        
-        return mdmd;
-
-    }
-    
     /**
      * Cache the index partition metadata in the client.
      * 

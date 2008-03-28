@@ -51,17 +51,6 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
     public TestRestartSafe(String name) {
         super(name);
     }
-
-//    public Properties getProperties() {
-//        
-//        Properties properties = super.getProperties();
-//        
-////        // force migration of all indices on overflow.
-////        properties.setProperty(Options.MIGRATION_THRESHOLD, "0");
-////        
-//        return properties;
-//        
-//    }
     
     public void test_restartSafe() throws IOException {
 

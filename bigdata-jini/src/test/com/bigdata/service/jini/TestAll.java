@@ -26,14 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.jini;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
-import com.bigdata.service.TestEmbeddedBigdataClient;
+import java.net.MalformedURLException;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import net.jini.core.discovery.LookupLocator;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.discovery.LookupLocatorDiscovery;
+
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
+import com.bigdata.service.TestEmbeddedBigdataClient;
 
 /**
  * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
@@ -43,7 +48,7 @@ import junit.framework.TestSuite;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class TestAll extends TestCase {
-
+    
     public TestAll() {}
     
     public TestAll(String name) {super(name);}
@@ -72,10 +77,29 @@ public class TestAll extends TestCase {
             
         }
 
-        TestSuite suite = new TestSuite("Jini-based services");
+        // Optional boolean property may be used to force skip of these tests.
+        final boolean forceSkip;
+        {
+            String val = System
+                    .getProperty("maven.test.services.skip", "false");
 
-        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
-                "false"))) {
+            if (val != null) {
+                
+                forceSkip = Boolean.parseBoolean(val);
+                
+            } else {
+                
+                forceSkip = false;
+                
+            }
+            
+        }
+        
+        final boolean willRun = !forceSkip && isJiniRunning();
+
+        final TestSuite suite = new TestSuite("Jini-based services");
+
+        if(willRun) {
 
             /*
              * Note: The service tests require that Jini is running, that you
@@ -101,16 +125,7 @@ public class TestAll extends TestCase {
             /*
              * Test of a single client talking to a bigdata federation.
              */
-            suite.addTestSuite( TestEmbeddedBigdataClient.class );
-            
-            /*
-             * @todo test correctness when services fail at various points in
-             * distributed operations, e.g., during the FSA for registering a
-             * scale-out index the data service onto which the first index partition
-             * will be mapped may fail during registration - or may overflow during
-             * registration, all of which lead to interesting places that need to
-             * be handled correctly.
-             */
+            suite.addTestSuite( TestBigdataClient.class );
             
             /*
              * @todo test data replication at the service level.
@@ -132,18 +147,6 @@ public class TestAll extends TestCase {
              */
             
             /*
-             * @todo test telemetry (define a telemetry service that will collect
-             * data from other services on their operation load and on server load
-             * that will be used to inform load-balancing decisions, including which
-             * data service to map a new partition onto and when to have a partition
-             * moved to a new data service - either choosing a secondary service to
-             * become primary and thereby changing hosts (and either making the
-             * primary into a secondary or choosing a new secondary to maintain
-             * replication) or by selecting a new host and bringing the state onto
-             * that host).
-             */
-
-            /*
              * The map/reduce test suite.
              */
             suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
@@ -154,4 +157,74 @@ public class TestAll extends TestCase {
         
     }
     
+    /**
+     * Return <code>true</code> if Jini appears to be running on the
+     * localhost.
+     * 
+     * @throws Exception
+     */
+    public static boolean isJiniRunning() {
+        
+        final LookupLocator[] locators;
+        
+        try {
+
+            /*
+             * One or more unicast URIs of the form jini://host/ or jini://host:port/.
+             * This MAY be an empty array if you want to use multicast discovery _and_
+             * you have specified LookupDiscovery.ALL_GROUPS above.
+             */
+
+            locators = new LookupLocator[] {
+                
+                    new LookupLocator("jini://localhost/")
+                    
+            };
+
+        } catch (MalformedURLException e) {
+            
+            throw new RuntimeException(e);
+
+        }
+
+        final LookupLocatorDiscovery discovery = new LookupLocatorDiscovery(
+                locators);
+
+        try {
+
+            final long timeout = 2000; // ms
+
+            final long begin = System.currentTimeMillis();
+
+            long elapsed;
+
+            while ((elapsed = (System.currentTimeMillis() - begin)) < timeout) {
+
+                ServiceRegistrar[] registrars = discovery.getRegistrars();
+
+                if (registrars.length > 0) {
+
+                    System.err.println("Found " + registrars.length
+                            + " registrars in " + elapsed + "ms.");
+
+                    return true;
+
+                }
+
+            }
+
+            System.err
+                    .println("Could not find any service registrars on localhost after "
+                            + elapsed + " ms");
+
+            return false;
+
+        } finally {
+
+            discovery.terminate();
+
+        }
+
+    }
+
 }

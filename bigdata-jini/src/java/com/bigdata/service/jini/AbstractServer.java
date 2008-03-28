@@ -649,6 +649,26 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
         open = false;
         
+        if(impl instanceof IServiceShutdown) {
+            
+            /*
+             * Invoke the services own logic to shutdown its processing.
+             */
+
+            try {
+
+                ((IServiceShutdown)impl).shutdownNow();
+                
+            } catch(Exception ex) {
+                
+                log.error(ex.getMessage(), ex);
+                
+                // fall through.
+                
+            }
+            
+        }
+        
         /*
          * Terminate manager threads.
          */
@@ -679,16 +699,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
         unexport(true);
 
-        if(impl instanceof IServiceShutdown) {
-            
-            /*
-             * Invoke the services own logic to shutdown its processing.
-             */
-
-            ((IServiceShutdown)impl).shutdownNow();
-            
-        }
-        
     }
 
     /**

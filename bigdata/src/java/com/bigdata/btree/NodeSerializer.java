@@ -965,7 +965,7 @@ public class NodeSerializer {
             // branching factor
             final int branchingFactor = (int) LongPacker.unpackLong(is);
 
-            assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR;
+            assert branchingFactor >= BTree.MIN_BRANCHING_FACTOR : "branchingFactor="+branchingFactor+", but must be GTE "+BTree.MIN_BRANCHING_FACTOR;
 
             // nentries
             final int nentries = (int) LongPacker.unpackLong(is);

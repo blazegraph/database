@@ -111,13 +111,13 @@ public class BuildIndexSegmentTask extends AbstractResourceManagerTask {
         // The source view.
         final IIndex src = getIndex(name);
 
-        if (src instanceof BTree) {
-
-            // pre-condition.
-            log.warn("View is only a B+Tree: name=" + name
-                    + ", pmd=" + src.getIndexMetadata().getPartitionMetadata());
-            
-        }
+//        if (src instanceof BTree) {
+//
+//            // pre-condition.
+//            log.warn("View is only a B+Tree: name=" + name
+//                    + ", pmd=" + src.getIndexMetadata().getPartitionMetadata());
+//            
+//        }
         
         // Build the index segment.
         final BuildResult result = resourceManager.buildIndexSegment(name, src,

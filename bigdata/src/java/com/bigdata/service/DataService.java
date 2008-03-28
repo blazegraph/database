@@ -511,6 +511,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * existing requests have been processed.
      */
     public void shutdown() {
+
+        notifyLeave(false/*immediateShutdown*/);
         
         concurrencyManager.shutdown();
         
@@ -535,6 +537,8 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     public void shutdownNow() {
 
+        notifyLeave(true/*immediateShutdown*/);
+        
         concurrencyManager.shutdownNow();
 
         localTransactionManager.shutdownNow();
@@ -556,6 +560,33 @@ abstract public class DataService implements IDataService, IWritePipeline,
 //        if (INFO)
 //            log.info(getCounters().toString());
         
+    }
+    
+    private void notifyLeave(boolean immediateShutdown) {
+        
+        final ILoadBalancerService loadBalancerService = getLoadBalancerService();
+
+        if (loadBalancerService != null) {
+            
+            try {
+
+                // Note: this is a local method call.
+                final UUID serviceUUID = getServiceUUID();
+                
+                // notify leave event.
+                loadBalancerService.leave("Goodbye: class="
+                        + getClass().getName() + ", immediateShutdown="
+                        + immediateShutdown, serviceUUID);
+
+            } catch (IOException e) {
+
+                log.warn(e.getMessage(), e);
+
+            }
+            
+        }
+
+
     }
     
     /**

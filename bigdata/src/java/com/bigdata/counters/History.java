@@ -573,10 +573,24 @@ public class History<T> {
 
             if (timestamp < lastModified) {
 
-                throw new IllegalStateException(
-                        "Time goes backwards: lastModified=" + lastModified
-                                + ", but timestamp=" + timestamp);
+                /*
+                 * FIXME This can happen if there is just a smidge of latency
+                 * and the counter update falls right around the minute mark. By
+                 * ignoring this we will wind up with dropped samples when
+                 * aggregating data, which is not desirable. I need to verify
+                 * that we can let in slightly old samples (from the last
+                 * minute's data) without messing up the current data.
+                 * 
+                 * @todo It can also happen if some sample is wildly late for
+                 * some reason. Those cases should be logged at WARN.
+                 */
+                
+                if (INFO)
+                    log.info("Time goes backwards: lastModified="
+                            + lastModified + ", but timestamp=" + timestamp);
 
+                return;
+                
             }
 
             for (long ls = lastLogicalSlot + 1; ls <= logicalSlot; ls++) {

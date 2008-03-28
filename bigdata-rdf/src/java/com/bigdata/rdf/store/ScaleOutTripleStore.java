@@ -37,15 +37,16 @@ import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
-import com.bigdata.service.BigdataFederation;
+import com.bigdata.service.AbstractRemoteBigdataFederation;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of a
- * {@link BigdataFederation}. The implementation supports a scale-out
+ * {@link AbstractRemoteBigdataFederation}. The implementation supports a scale-out
  * architecture in which each index may have one or more partitions. Index
  * partitions are multiplexed onto {@link IDataService}s.
  * <p>
@@ -139,7 +140,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      */
     final public void registerIndices() {
 
-        final IBigdataClient client = fed.getClient();
+//        final IBigdataClient client = fed.getClient();
         
         /*
          * Note: Do not use isolation (only deletion markers are required).
@@ -175,7 +176,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         }
 
         // all known data service UUIDs.
-        final UUID[] uuids = client.getDataServiceUUIDs(0);
+        final UUID[] uuids = fed.getDataServiceUUIDs(0);
     
         if (true && uuids.length == 2 && lexicon && !oneAccessPath) {
 
@@ -435,90 +436,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         return just;
         
     }
-
-    /*
-     * terms index.
-     */
-    
-// final public _Value getTerm(long id) {
-//
-// byte[] data = (byte[])getIdTermIndex().lookup(keyBuilder.id2key(id));
-//
-//        if (data == null)
-//            return null;
-//
-//        return _Value.deserialize(data);
-//
-//    }
-//
-//    final public long getTermId(Value value) {
-//
-//        if(value==null) return IRawTripleStore.NULL;
-//        
-//        _Value val = (_Value) OptimizedValueFactory.INSTANCE
-//                .toNativeValue(value);
-//        
-//        if( val.termId != IRawTripleStore.NULL ) return val.termId; 
-//
-//        Object tmp = getTermIdIndex().lookup(keyBuilder.value2Key(value));
-//        
-//        if (tmp == null)
-//            return IRawTripleStore.NULL;
-//
-//        try {
-//
-//            val.termId = new DataInputBuffer((byte[]) tmp).unpackLong();
-//
-//        } catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//        return val.termId;
-//
-//    }
     
     /** TODO Auto-generated method stub */
     public IIndex getFullTextIndex() {
         throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Adds reporting by data service to the usage summary.
-     */
-    public String usage(){
-        
-        StringBuilder sb = new StringBuilder( super.usage() );
-        
-        sb.append("\nsummary by dataService::\n");
-        
-        IBigdataClient client = fed.getClient();
-        
-        UUID[] dataServiceIds = client.getDataServiceUUIDs(0);
-        
-        for(int i=0; i<dataServiceIds.length; i++) {
-            
-            UUID serviceId = dataServiceIds[ i ];
-            
-            IDataService dataService = client.getDataService(serviceId);
-            
-            sb.append("\n");
-            
-            try {
-            
-                sb.append( dataService.getStatistics() );
-                
-            } catch (IOException e) {
-                
-                sb.append( "Could not get statistics for data service: uuid="+serviceId);
-                
-            }
-            
-        }
-        
-        return sb.toString();
-        
     }
 
     /**
@@ -560,10 +481,12 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     /**
      * Disconnects from the {@link IBigdataFederation}.
+     * 
+     * @todo redefine so that the client is not shutdown by this method.
      */
     final public void close() {
         
-        fed.disconnect();
+        fed.getClient().disconnect(false/*immediateShutdown*/);
         
         super.close();
         
@@ -572,33 +495,21 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     /**
      * Drops the indices used by the {@link ScaleOutTripleStore} and disconnects
      * from the {@link IBigdataFederation}.
+     * 
+     * @todo redefine so that the client is not shutdown by this method.
      */
     final public void closeAndDelete() {
         
         clear();
         
-        fed.disconnect();
+        fed.getClient().disconnect(false/*immediateShutdown*/);
         
         super.closeAndDelete();
         
     }
 
-//    /**
-//     * @todo this is temporarily overriden in order to experiment with buffer
-//     *       capacity vs data transfer size for batch operations vs data
-//     *       compaction techniques for client-service RPC vs breaking down
-//     *       within index partition operations to no more than n megabytes per
-//     *       operation.
-//     */
-//    protected int getDataLoadBufferCapacity() {
-//        
-//        return 100000;
-//        
-//    }
-
     /**
-     * This store is safe for concurrent operations (but it only supports
-     * read operations).
+     * This store is safe for concurrent operations.
      */
     public boolean isConcurrent() {
 

@@ -30,7 +30,8 @@ package com.bigdata.rdf.store;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
@@ -51,7 +52,7 @@ import com.bigdata.service.jini.MetadataServer;
  * to the resources in <code>src/resources/config</code>.
  * 
  * <pre>
- *  -Djava.security.policy=policy.all
+ *         -Djava.security.policy=policy.all
  * </pre>
  * 
  * Note: You will sometimes see a connection refused exception thrown while
@@ -60,23 +61,28 @@ import com.bigdata.service.jini.MetadataServer;
  * de-registered from jini. A little wait or a restart of Jini fixes this
  * problem.
  * <p>
- * Note: You may see a "metadata index exists" exception. This occurs when the
- * store files backing the data services were not removed before the unit test.
- * This is fixed by deleting the store files and re-running.
+ * Note: All configuration of the services and the client are performed using
+ * the files in <code>src/resources/config/standalone</code>. The
+ * <code>.config</code> files have the jini aspect of the client and services
+ * configurations. The <code>.property</code> files have the bigdata aspect of
+ * the client and services configurations.
+ * <p>
+ * Note: Normally the services are destroyed after each test, which has the
+ * effect of removing all files create by each service. Therefore tests normally
+ * start from a clean slate. If you have test setup problems, such as "metadata
+ * index exists", first verify that the <code>standalone</code> directory in
+ * which the federation is created has been properly cleaned. If files have been
+ * left over due to an improper cleanup by a prior test run then you can see
+ * such startup problems.
  * 
  * @todo consider reusing a single federation for all unit tests in order to
  *       reduce the setup time for the tests. this would have the consequence
  *       that we are not guarenteed a clean slate when we connect to the
  *       federation. we would need to use dropIndex.
  * 
- * @todo the java service browser log contains exceptions - presumably because
+ * @todo the jini service browser log contains exceptions - presumably because
  *       we have not setup a codebase, e.g., using an embedded class server,
  *       such that it is unable to resolve the various bigdata classes.
- * 
- * @todo the following tests are failing:
- *       <p>
- *       {@link TestRestartSafe#test_restartSafe()} - IllegalStateException
- *       during re-open of the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -134,32 +140,6 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
     }
 
-//    /**
-//     * Properties used by tests in the file and in this proxy suite.
-//     */
-//    public Properties getProperties() {
-//
-//        Properties properties = new Properties( super.getProperties() );
-//
-////         Note: this reduces the disk usage at the expense of memory usage.
-////        properties.setProperty(EmbeddedBigdataFederation.Options.BUFFER_MODE,
-////                BufferMode.Transient.toString());
-//
-////        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-//
-////        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//
-////        properties.setProperty(Options.DELETE_ON_EXIT,"true");
-//
-//        /*
-//         * Note: there are also properties to control the #of data services
-//         * created in the embedded federation.
-//         */
-//        
-//        return properties;
-//
-//    }
-
     /**
      * Starts in {@link #setUpFederation()}.
      */
@@ -179,7 +159,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
-    protected BigdataClient client;
+    protected JiniBigdataClient client;
     
     public void setUp() throws Exception {
         
@@ -194,7 +174,14 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         super.tearDown();
         
     }
-    
+
+    /**
+     * This starts each of the services in the federartion, all of which will
+     * run in the local process of this JVM. Since jini is used for service
+     * discovery, all service requests will in fact use RMI.
+     * 
+     * @throws Exception
+     */
     public void setUpFederation() throws Exception {
 
 //      final String groups = ".groups = new String[]{\"" + getName() + "\"}";
@@ -277,7 +264,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
       log.warn("Starting client.");
 
-      client = BigdataClient.newInstance(
+      client = JiniBigdataClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
@@ -288,47 +275,55 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
       AbstractServerTestCase.getServiceID(dataServer1);
       AbstractServerTestCase.getServiceID(loadBalancerServer0);
       
+      IBigdataFederation fed = client.connect();
+      
       // verify that the client has/can get the metadata service.
-      assertNotNull("metadataService", client.getMetadataService());
+      assertNotNull("metadataService", fed.getMetadataService());
 
       log.warn("Federation is running.");
       
     }
 
+    /**
+     * This terminates client processing and destroys each of the services
+     * (their persistent state is also destroyed).
+     * 
+     * @throws Exception
+     */
     public void tearDownFederation() throws Exception {
 
         log.warn("Destroying federation.");
-        
-        if(client!=null) {
 
-            client.shutdownNow();
+        if (client != null && client.isConnected()) {
+
+            client.disconnect(true/*immediateShutdown*/);
 
             client = null;
-            
+
         }
-        
-        if(metadataServer0!=null) {
+
+        if (metadataServer0 != null) {
 
             metadataServer0.destroy();
-        
+
             metadataServer0 = null;
 
         }
 
-        if(dataServer0!=null) {
+        if (dataServer0 != null) {
 
             dataServer0.destroy();
-        
+
             dataServer0 = null;
 
         }
-        
+
         if (dataServer1 != null) {
-            
+
             dataServer1.destroy();
 
             dataServer1 = null;
-            
+
         }
 
         if (loadBalancerServer0 != null) {
@@ -351,63 +346,15 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         
         super.setUp(testCase);
         
-//        File dataDir = new File( testCase.getName() );
-//        
-//        if(dataDir.exists() && dataDir.isDirectory()) {
-//
-//            recursiveDelete( dataDir );
-//            
-//        }
-
     }
     
     public void tearDown(ProxyTestCase testCase) throws Exception {
 
-//        // Note: close() is disconnecting from the embedded federation.
-////        client.terminate();
-//
-//        // delete on disk federation (if any).
-//        recursiveDelete(new File(testCase.getName()));
-        
         super.tearDown();
         
         tearDownFederation();
         
     }
-    
-//    /**
-//     * Recursively removes any files and subdirectories and then removes the
-//     * file (or directory) itself.
-//     * 
-//     * @param f A file or directory.
-//     */
-//    private void recursiveDelete(File f) {
-//        
-//        if(f.isDirectory()) {
-//            
-//            File[] children = f.listFiles();
-//            
-//            for(int i=0; i<children.length; i++) {
-//                
-//                recursiveDelete( children[i] );
-//                
-//            }
-//            
-//        }
-//        
-//        if (f.exists()) {
-//
-//            log.warn("Removing: " + f);
-//
-//            if (!f.delete()) {
-//
-//                throw new RuntimeException("Could not remove: " + f);
-//
-//            }
-//
-//        }
-//
-//    }
     
     protected AbstractTripleStore getStore() {
         
@@ -424,6 +371,8 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
  
     /**
      * Re-open the same backing store.
+     * <p>
+     * This basically disconnects the client
      * 
      * @param store
      *            the existing store.
@@ -439,9 +388,11 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
         // close the client connection to the federation.
         store.close();
-        
+
         // re-connect to the federation.
-        return getStore();
+        store = new ScaleOutTripleStore(client.connect(), getProperties());
+        
+        return store;
         
     }
 

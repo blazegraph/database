@@ -133,7 +133,7 @@ abstract public class ReduceService
             
             assert jobState.client != null;
             
-            IDataService ds = jobState.client.getDataService(dataService);
+            IDataService ds = jobState.client.getFederation().getDataService(dataService);
 
             if (ds == null)
                 throw new RuntimeException("Could not locate dataService: "

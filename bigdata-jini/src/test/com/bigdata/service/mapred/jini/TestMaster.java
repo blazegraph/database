@@ -27,8 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.mapred.jini;
 
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServerTestCase;
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniBigdataClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
@@ -134,7 +135,7 @@ public class TestMaster extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    BigdataClient client;
+    JiniBigdataClient client;
     /**
      * Starts in {@link #setUp()}.
      */
@@ -179,7 +180,7 @@ public class TestMaster extends AbstractServerTestCase {
             
         }.start();
 
-        client = BigdataClient.newInstance(
+        client = JiniBigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
                         });
 
@@ -197,8 +198,10 @@ public class TestMaster extends AbstractServerTestCase {
         getServiceID(mapServer0);
         getServiceID(reduceServer0);
         
+        IBigdataFederation fed = client.connect();
+        
         // verify that the client has/can get the metadata service.
-        assertNotNull("metadataService", client.getMetadataService());
+        assertNotNull("metadataService", fed.getMetadataService());
 
         serviceDiscoveryManager = new MapReduceServiceDiscoveryManager(client);
         
@@ -243,9 +246,9 @@ public class TestMaster extends AbstractServerTestCase {
 
         }
 
-        if(client!=null) {
+        if(client!=null && client.isConnected()) {
 
-            client.shutdownNow();
+            client.disconnect(true/*immediateShutdown*/);
 
             client = null;
             

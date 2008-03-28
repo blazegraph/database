@@ -27,9 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.service.jini.JiniBigdataClient.JiniConfig;
+
+import net.jini.config.Configuration;
+import net.jini.config.ConfigurationProvider;
+import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceID;
+import net.jini.discovery.LookupDiscovery;
 
 /**
  * Some utility methods that attempt to isolate the aspects of the Jini

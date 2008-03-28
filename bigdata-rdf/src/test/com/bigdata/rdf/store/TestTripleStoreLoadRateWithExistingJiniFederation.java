@@ -33,7 +33,8 @@ import java.io.FilenameFilter;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.service.jini.BigdataClient;
+import com.bigdata.service.jini.JiniBigdataClient;
+import com.bigdata.service.jini.JiniBigdataFederation;
 
 /**
  * Class designed to connect to an existing bigdata federation using jini and
@@ -134,16 +135,18 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         /**
          * Starts in {@link #setUp()}.
          */
-        BigdataClient client = BigdataClient.newInstance(
+        JiniBigdataClient client = JiniBigdataClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
 
+        JiniBigdataFederation fed = client.connect();
+        
         /*
          * Await at least N data services and one metadata service (otherwise
          * abort).
          */
-        final int N = client.awaitServices(minDataServices, timeout);
+        final int N = fed.awaitServices(minDataServices, timeout);
         
         System.err.println("Will run with "+N+" data services");
         
@@ -169,7 +172,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         }, ""/* baseURL */, RDFFormat.RDFXML/* fallback */,
                 false/* autoFlush */, nclients, clientNum);
         
-        client.shutdownNow();
+        client.disconnect(true/*immediateShutdown*/);
         
         System.out.println("Exiting normally.");
         
