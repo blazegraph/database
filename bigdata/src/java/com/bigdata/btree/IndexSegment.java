@@ -56,7 +56,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Type safe reference to the backing store.
      */
-    protected final IndexSegmentFileStore fileStore;
+    protected final IndexSegmentStore fileStore;
 
     /**
      * An optional bloom filter that will be used to filter point tests. Since
@@ -117,9 +117,9 @@ public class IndexSegment extends AbstractBTree {
      *       Consider whether we can use only a read-retention queue for an
      *       index segment.
      * 
-     * @see IndexSegmentFileStore#load()
+     * @see IndexSegmentStore#load()
      */
-    public IndexSegment(IndexSegmentFileStore fileStore) {
+    public IndexSegment(IndexSegmentStore fileStore) {
 
         super(fileStore,
                 ImmutableNodeFactory.INSTANCE,
@@ -129,7 +129,7 @@ public class IndexSegment extends AbstractBTree {
                 );
 
         // Type-safe reference to the backing store.
-        this.fileStore = (IndexSegmentFileStore) fileStore;
+        this.fileStore = (IndexSegmentStore) fileStore;
 
         _open();
 

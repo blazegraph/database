@@ -86,7 +86,6 @@ import org.apache.log4j.Logger;
  * 
  * @todo Consider removing synchronization for use in a single threaded context.
  */
-
 final public class WeakValueCache<K,T>
     implements ICachePolicy<K,T>
 {
@@ -194,6 +193,20 @@ final public class WeakValueCache<K,T>
     
     final private IWeakRefCacheEntryFactory<K,T> _factory;
 
+    final private IClearReferenceListener<K> _clearReferenceListener;
+    
+    /**
+     * An optional listener that is invoked when we notice a cleared reference.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface IClearReferenceListener<K> {
+        
+        public void cleared(K key);
+        
+    }
+    
     public WeakValueCache( ICachePolicy<K,T> delegate )
     {
         
@@ -239,7 +252,19 @@ final public class WeakValueCache<K,T>
     	  float loadFactor,
     	  ICachePolicy<K,T> delegate,
     	  IWeakRefCacheEntryFactory<K,T> factory
-    	  )
+    	  ) {
+        
+        this(initialCapacity, loadFactor, delegate, factory, null/*clearReferenceListener*/);
+        
+    }
+    
+    public WeakValueCache
+    ( int initialCapacity,
+      float loadFactor,
+      ICachePolicy<K,T> delegate,
+      IWeakRefCacheEntryFactory<K,T> factory,
+      IClearReferenceListener<K> clearReferenceListener
+      )
     {
     
         if( delegate == null || factory == null ) {
@@ -263,6 +288,8 @@ final public class WeakValueCache<K,T>
         _delegate = delegate;
         
         _factory = factory;
+        
+        _clearReferenceListener = clearReferenceListener;
         
     }
 
@@ -479,7 +506,6 @@ final public class WeakValueCache<K,T>
 	 * that is being cleared here.
 	 * </p>
 	 */
-    
     private void removeClearedEntries()
     {
         
@@ -499,6 +525,12 @@ final public class WeakValueCache<K,T>
                     
                 _cache.remove( oid );
 
+                if(_clearReferenceListener!=null) {
+                    
+                    _clearReferenceListener.cleared( oid );
+                    
+                }
+                
                 counter++;
                 
                 _nclear++;

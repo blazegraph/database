@@ -54,13 +54,13 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore {
+public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     /**
      * Logger.
      */
     protected static final Logger log = Logger
-            .getLogger(IndexSegmentFileStore.class);
+            .getLogger(IndexSegmentStore.class);
 
     /**
      * Used to correct decode region-based addresses. The
@@ -148,7 +148,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
      * 
      * @see #load()
      */
-    public IndexSegmentFileStore(File file) {
+    public IndexSegmentStore(File file) {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -159,6 +159,25 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
 
     }
     
+    /**
+     * Closes out the {@link IndexSegmentStore} iff it is still open.
+     * <p>
+     * Note: The {@link IndexSegment} has hard reference to the
+     * {@link IndexSegmentStore} but not the other way around. Therefore an
+     * {@link IndexSegment} will be swept before its store is finalized.
+     */
+    protected void finalize() throws Exception {
+        
+        log.warn("Closing index segment store: "+getFile());
+        
+        if(isOpen()) {
+            
+            close();
+            
+        }
+        
+    }
+
     public String toString() {
         
         // @todo add filename if filename dropped from resourcemetadata.
@@ -270,7 +289,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
             Class cl = Class.forName(metadata.getClassName());
             
             Constructor ctor = cl
-                    .getConstructor(new Class[] { IndexSegmentFileStore.class });
+                    .getConstructor(new Class[] { IndexSegmentStore.class });
 
             IndexSegment seg = (IndexSegment) ctor
                     .newInstance(new Object[] { this });
@@ -383,7 +402,7 @@ public class IndexSegmentFileStore extends AbstractRawStore implements IRawStore
     }
 
     /**
-     * Read a record from the {@link IndexSegmentFileStore}. If the request is
+     * Read a record from the {@link IndexSegmentStore}. If the request is
      * in the node region and the nodes have been buffered then this uses a
      * slice on the node buffer. Otherwise this reads through to the backing
      * file.

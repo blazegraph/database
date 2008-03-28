@@ -576,12 +576,6 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
       that hash MOD N to that host.  (note that only AddTerms and
       AddIds go across the network API in this case.)
 
-    - Make it easy to summarize data service or index partition
-      properties (report named properties by data service and/or index
-      partition and aggregate).  Probably an XML syntax or a
-      generalized property set model will benefit in the long term for
-      telemetry.
-
     - The temp triple store supports concurrent read only, so it is
       not appropriate for a concurrent bulk loader.
 
@@ -591,9 +585,53 @@ Short term tasks:
 
    - * Start doing snapshot releases.
 
-   - Compute average response time and throughput as 1/average
-     response time. and measure on the client as well so that we can
-     compute the RMI overhead.
+   - Counters
+
+     - Compute average response time and throughput as 1/average
+       response time.  And measure on the client as well so that we
+       can compute the RMI overhead.
+
+     - HTTP interface for examining aggregated statistics at the load
+       balancer.
+
+     - When aggregating data to the load balancer it will be
+       relatively common for some samples to arive "late", especially
+       when the reporting period falls right around the minute mark.
+       These samples SHOULD be let in if we do not already have a
+       sample for that period since otherwise we could see a lot of
+       dropped samples.
+
+     - Add a moving average computation to History
+
+     - Add counter to the write service that reports the #of tasks
+       which have their locks and are actually doing their work
+       concurrently.  This is the real concurrency of the tasks.  The
+       #of active tasks in the write service is a red herring since
+       those tasks could be waiting for their locks.
+
+       Done, but report the averageQueueLength for both tasks holding
+       their locks and for all active tasks in the pool since both are
+       interesting data. For example, the averageQueueLength below is
+       .25 but the activeTaskSetSize is 20.  For this example this was
+       because there were two indices and many operations were forced
+       to be sequential.  Even though the commit group size was large
+       (committedTaskCount/groupCommitCount) =~ 20, the parallelism
+       was poor (average of .25 tasks executing in parallel!)
+
+       averageQueueLength=0.25841155522560005
+       (activeCountAverage=0.217179869184,queueSizeAverage=0.04123168604160004),
+       nsamples=20
+
+       WriteExecutorService{ paused=false, nrunning=8,
+       concurrentTaskCount=1, activeTaskSetSize=20, nwrites=12,
+       groupCommitFlag=true, abortFlag=false,
+       lockHeldByCurrentThread=false, lockHoldCount=0,
+       lockQueueLength=0, activeCount=20, queueSize=0, poolSize=200,
+       largestPoolSize=200, maxPoolSize=200, maxRunning=20,
+       maxCommitLatency=187, maxLatencyUntilCommit=125,
+       groupCommitCount=109, abortCount=0, failedTaskCount=0,
+       successTaskCount=2152, committedTaskCount=2140,
+       overflowCount=0}
 
    - LocalTripleStoreWithEmbeddedDataService
      
@@ -648,49 +686,21 @@ Short term tasks:
      the federation as a whole and use that as the time for a
      consistentRead operation.
 
-   - *** Close out index resources (and journals) in resource manager so
-     that we do not always grow the memory demand (StoreFileManager)
+   - StoreManager / IndexManager
 
-     - Use a weak value cache backed by an LRU for the index segments.
-       An index segment that is no longer used will have its reference
-       cleared and when it is swept by the garbage collector (this is
-       the same as for historical indices on the journal).
+      - Modify LRU to purge entries older than a specified age
+        (including an asych daemon thread to make sure that they get
+        purged even if the LRU is not being touched).  Do this for the
+        index segment cache in the IndexManager as well.
 
-       At that point the index segment store is still open, and it can
-       buffer a significant amount of data in addition to the file
-       handle.  However, since the index segment no longer holds a
-       hard reference to the store, the store will also become weakly
-       reachable unless there are other references.  Since we need to
-       explictly close the file handle, we need to hold onto a
-       reference to the IndexSegmentStoreFile.
+      - Modify to NOT fully buffer index segment stores when scanning
+        during startup!
 
-       The easiest way to do this is a map from the store UUID to the
-       IndexSegmentFileStore, but that does not let us know when the
-       store file is no longer required.  Another approach is to rely
-       on the hard reference from the index segment to the index
-       segment file store and track the index segment file stores in a
-       weak value cache backed by an LRU. The references would be the
-       IndexSegment objects and the reference object would have to
-       also hold onto the store UUID so that we can get the store
-       reference from the openStores map.  When the weak reference was
-       cleared we would know that there were no longer any hard
-       references to the IndexSegment and hence that the corresponding
-       IndexSegmentStoreFile could be closed.
-
-     - Since the journal already manages its own index resources we
-       can simply keep the journals open until they are purged.  When
-       a journal is purged we closeAndDelete() it and any readers will
-       simply abort.
-
-       This is Ok if the journal uses [bufferMode := DiskOnly] since a
-       journal without a write cache and which is not fully buffered
-       will not have a large memory footprint outside of its most
-       recently used indices.  In order to do better than this and
-       proactively close historical journals we will require a
-       mechanisms similar to the one proposed above for index segment
-       file stores.  However, there is a many-to-one mapping from
-       index views on historical journals to the historical journals
-       themselves.
+   - The LockManager should periodically purge unused resources.
+     Otherwise the size of its internal map from resource name to
+     resource queue will grow without bound on a data service as index
+     partitions are split and moved around.  Maybe use a
+     WeakValueCache rather than a HashMap?
 
    - ** closeForWrites()
 
@@ -762,3 +772,154 @@ java.lang.AssertionError: ndone=8, but #used=9
 	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
 	at java.lang.Thread.run()V(Unknown Source)
+
+============================================================
+
+Running ScaleOutTripleStore/TestInsertRate#test_small
+
+.ERROR: 226031 dpp2-wrkst13.dpp2.org 9eb93bee-8d86-4e0d-9bb6-652962baff72 pool-1-thread-2436 com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1185): Commit failed - will abort: java.lang.RuntimeException: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
+java.lang.RuntimeException: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
+	at com.bigdata.journal.DiskOnlyStrategy.writeOnDisk(DiskOnlyStrategy.java:1402)
+	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.flush(DiskOnlyStrategy.java:325)
+	at com.bigdata.journal.DiskOnlyStrategy.flushWriteCache(DiskOnlyStrategy.java:418)
+	at com.bigdata.journal.DiskOnlyStrategy.force(DiskOnlyStrategy.java:856)
+	at com.bigdata.journal.DiskOnlyStrategy.writeRootBlock(DiskOnlyStrategy.java:1438)
+	at com.bigdata.journal.AbstractJournal.commitNow(AbstractJournal.java:1593)
+	at com.bigdata.resources.StoreFileManager$ManagedJournal.commit(StoreFileManager.java:1274)
+	at com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1169)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:925)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:519)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:786)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:694)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:590)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
+Caused by: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
+	at com.bigdata.journal.DiskOnlyStrategy.writeOnDisk(DiskOnlyStrategy.java:1395)
+	... 17 more
+
+and
+
+Caused by: java.nio.BufferOverflowException
+	at java.nio.HeapByteBuffer.put(HeapByteBuffer.java:182)
+	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.write(DiskOnlyStrategy.java:350)
+	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:1290)
+	at com.bigdata.journal.AbstractJournal.write(AbstractJournal.java:1631)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:1990)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:98)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
+	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:1752)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:320)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:356)
+	at com.bigdata.btree.Leaf.<init>(Leaf.java:210)
+	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:499)
+	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:438)
+	at com.bigdata.btree.Leaf.insert(Leaf.java:350)
+	at com.bigdata.btree.Node.insert(Node.java:637)
+
+	at com.bigdata.btree.Node.insert(Node.java:637)
+	at com.bigdata.btree.Node.insert(Node.java:637)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:1016)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:961)
+	at com.bigdata.rdf.store.IndexWriteProc.apply(IndexWriteProc.java:196)
+
+
+The 2nd might be a side-effect of the 1st.  The first is probably
+valid behavior and I just need to invoke the write on the channel in a
+loop.
+
+Another possibility is that the buffer position is GT zero.  This does
+not seem to be checked and could explain writing less than nbytes,
+where nbytes := data.limit().  (89 fewer bytes were written than
+expected.)  The javadoc on DiskOnlyBuffer#write() does indicate that
+it will write from the position to the limit, so computing nbytes in
+this way would appear to be an error.  I do need to verify all callers
+and see if the buffer position is ever non-zero, especially as called
+to flush the writeCache as in this stack trace.
+
+Looking at flushWriteCache its clear that the buffer position SHOULD
+be zero, so maybe there is a concurrent writer running that writes 89
+bytes on the buffer before we start writing on the channel itself.
+Who could that be?  This is getting called from commitNow, so there
+SHOULD NOT be anyone writing on the journal.
+
+Perhaps there is some thread that is using it as a raw store?
+
+Can I identify who that might be?
+
+Can the writeCacheFlush be made thread-safe so that if there are
+concurrent writers on the store that they do not interfere with the
+write or corrupt the write cache buffer's contents?
+
+On reflection, the problem is the change to the group commit.  Since
+it now checkpoints indices and allows writers to continue during
+commits there are now concurrent writers when we call force.
+
+   - change the stress test to allow N indices so that we can see the
+     effect of concurrent writers during commits.
+
+   - modify force to use an atomic handoff of the write cache so that
+     the net result is atomic from the perspective of the caller.
+     This may require locking on the write cache so that we wait until
+     concurrent writes have finished before flushing to the disk or I
+     may be able to use nextOffset to make an atomic determination of
+     the range of the buffer to be forced, create a view of that
+     range, and use the view to force to disk so that the position and
+     limits are not changed by force nor by concurrent writers.
+
+   - this may also be a problem for the Direct mode and the Mapped
+     mode.
+
+============================================================
+
+For the ScaleOutTripleStore: TestRestartSafe#test_restartSafe
+
+java.lang.NullPointerException
+	at com.bigdata.rdf.store.ScaleOutTripleStore.registerIndices(ScaleOutTripleStore.java:178)
+	at com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation.getStore(TestScaleOutTripleStoreWithJiniFederation.java:419)
+	at com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation.reopenStore(TestScaleOutTripleStoreWithJiniFederation.java:444)
+	at com.bigdata.rdf.store.ProxyTestCase.reopenStore(ProxyTestCase.java:165)
+	at com.bigdata.rdf.store.TestRestartSafe.test_restartSafe(TestRestartSafe.java:151)
+
+============================================================
+
+Still seeing this in StressTestConcurrent - possible cause is
+corrupted write cache per above.
+
+ERROR: 39250  52378185-c6e1-4dbc-b8d2-3f3330f9c0d0   pool-1-thread-1073 com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1034): Overflow error
+java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
+	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
+	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
+	at com.bigdata.btree.BTree.load(BTree.java:1105)
+	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:1937)
+	at com.bigdata.journal.AbstractJournal.getName2Addr(AbstractJournal.java:311)
+	at com.bigdata.resources.IndexManager.listIndexPartitions(IndexManager.java:802)
+	at com.bigdata.resources.OverflowManager.doOverflow(OverflowManager.java:744)
+	at com.bigdata.resources.OverflowManager.overflow(OverflowManager.java:603)
+	at com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1026)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:946)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:519)
+
+followed by 
+
+Caused by: java.lang.RuntimeException: unknown node type=17
+	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:662)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2074)
+	at com.bigdata.btree.BTree.reopen(BTree.java:533)
+	at com.bigdata.btree.AbstractBTree.getRoot(AbstractBTree.java:818)
+	at com.bigdata.btree.AbstractBTree.getRootOrFinger(AbstractBTree.java:837)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1148)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:380)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:353)
+	at com.bigdata.btree.FusedView.lookup(FusedView.java:321)
+	at com.bigdata.btree.FusedView.insert(FusedView.java:274)
+	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:163)
+	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:1)
+	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+

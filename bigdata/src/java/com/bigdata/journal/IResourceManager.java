@@ -38,7 +38,7 @@ import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.IndexSegmentFileStore;
+import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
@@ -50,7 +50,7 @@ import com.bigdata.service.IServiceShutdown;
 /**
  * Interface manging the resources on which indices are stored. The resources
  * may be either a journal, which contains {@link BTree}s, or an
- * {@link IndexSegmentFileStore} containing a single {@link IndexSegment}.
+ * {@link IndexSegmentStore} containing a single {@link IndexSegment}.
  * <p>
  * Note: For historical reasons there are two implementations of this interface.
  * The {@link Journal} uses an implementation that does not support
@@ -251,7 +251,7 @@ public interface IResourceManager extends IServiceShutdown {
      *            that has completed and whose resources may now be reclaimed.
      *            Resources whose lastCommitTime is LTE this timestamp MAY be
      *            released (deleted) by the resource manager. Note that the
-     *            createTime of an {@link IndexSegmentFileStore} is equivalent
+     *            createTime of an {@link IndexSegmentStore} is equivalent
      *            to its lastCommitTime.
      */
     public void setReleaseTime(long releaseTime);

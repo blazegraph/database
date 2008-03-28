@@ -53,7 +53,7 @@ import com.bigdata.service.IBigdataFederation;
  * <dd>Overflow processing.</dd>
  * <dt>{@link IndexManager}</dt>
  * <dd>Manages indices</dd>
- * <dt>{@link StoreFileManager}</dt>
+ * <dt>{@link StoreManager}</dt>
  * <dd>Manages the journal and index segment files, including the release of
  * old resources.</dd>
  * <dt>{@link ResourceEvents}</dt>

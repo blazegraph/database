@@ -178,13 +178,13 @@ public class IndexSegmentBuilder {
     /**
      * A copy of the metadata object provided to the ctor. This object is
      * further modified before being written on the
-     * {@link IndexSegmentFileStore}.
+     * {@link IndexSegmentStore}.
      */
     final public IndexMetadata metadata;
     
     /**
      * The {@link IndexSegmentCheckpoint} record written on the
-     * {@link IndexSegmentFileStore}.
+     * {@link IndexSegmentStore}.
      */
     final public IndexSegmentCheckpoint checkpoint;
     
