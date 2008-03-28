@@ -996,9 +996,9 @@ abstract public class OverflowManager extends IndexManager {
         /*
          * Close out the old journal.
          * 
-         * FIXME This MUST NOT "close" the old journal or we can trash
-         * concurrent readers. Note that we only have an exclusive lock on the
-         * writeService, NOT the readService or the txWriteService.
+         * FIXME closeForWrites() MUST NOT "close" the old journal or we can
+         * trash concurrent readers. Note that we only have an exclusive lock on
+         * the writeService, NOT the readService or the txWriteService.
          */
         {
             
@@ -1006,11 +1006,7 @@ abstract public class OverflowManager extends IndexManager {
             oldJournal.closeForWrites(closeTime);
             
             // remove from list of open journals.
-            if (this.openStores.remove(oldJournal.getRootBlockView().getUUID()) != oldJournal) {
-                
-                throw new AssertionError();
-                
-            }
+            storeCache.remove(oldJournal.getRootBlockView().getUUID());
 
             log.info("Closed out the old journal.");
             
@@ -1025,13 +1021,9 @@ abstract public class OverflowManager extends IndexManager {
 
             addResource(newJournal.getResourceMetadata(), newJournal.getFile());
             
-            if (this.openStores.put(newJournal.getRootBlockView().getUUID(),
-                    newJournal) != null) {
-
-                throw new AssertionError();
-
-            }
-
+            storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal,
+                    false/* dirty */);
+            
             log.info("Changed over to a new live journal");
 
         }
