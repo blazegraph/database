@@ -467,20 +467,6 @@ abstract public class AbstractLocalTransactionManager implements
          */
         
     }
-
-    public String getStatistics() {
-        
-        if (countersRoot != null) {
-
-            return countersRoot.toString();
-
-        } else {
-
-            return "N/A";
-            
-        }
-        
-    }
     
     /**
      * This task is an UNISOLATED operation that validates and commits a
@@ -536,8 +522,6 @@ abstract public class AbstractLocalTransactionManager implements
         
     }
     
-    private CounterSet countersRoot;
-    
     /**
      * Return the {@link CounterSet}.
      */
@@ -564,5 +548,6 @@ abstract public class AbstractLocalTransactionManager implements
         return countersRoot;
         
     }
+    private CounterSet countersRoot;
     
 }

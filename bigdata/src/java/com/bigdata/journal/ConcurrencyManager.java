@@ -34,7 +34,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.InstrumentDelta;
 import com.bigdata.counters.InstrumentInstantaneousAverage;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -889,6 +888,11 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                 setValue(writeService.getMaxRunning());
                             }
                         });
+                
+                /*
+                 * The lock manager for the write service.
+                 */
+                tmp.makePath("LockManager").attach(lockManager.getCounters());
 
             }
             

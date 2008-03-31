@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 
@@ -114,6 +115,15 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
     public boolean isOpen() {
 
         return open;
+        
+    }
+
+    public boolean isReadOnly() {
+
+        if (!open)
+            throw new IllegalArgumentException();
+
+        return false;
         
     }
 
@@ -360,4 +370,12 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
     
+    synchronized public CounterSet getCounters() {
+        if(root==null) {
+            root = new CounterSet();
+        }
+        return root;
+    }
+    private CounterSet root;
+
 }

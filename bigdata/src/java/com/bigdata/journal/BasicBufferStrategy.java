@@ -28,6 +28,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import com.bigdata.counters.CounterSet;
+
 /**
  * Implements logic to read from and write on a buffer. This is sufficient
  * for a {@link BufferMode#Transient} implementation or a
@@ -114,9 +116,9 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     BasicBufferStrategy(long maximumExtent, int offsetBits, long nextOffset,
             int headerSize, long extent, BufferMode bufferMode,
-            ByteBuffer buffer) {
+            ByteBuffer buffer, boolean readOnly) {
 
-        super(extent, maximumExtent, offsetBits, nextOffset, bufferMode);
+        super(extent, maximumExtent, offsetBits, nextOffset, bufferMode, readOnly);
 
         this.buffer = buffer;
 
@@ -145,6 +147,9 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         if (data == null)
             throw new IllegalArgumentException(ERR_BUFFER_NULL);
 
+        if (isReadOnly())
+            throw new IllegalStateException(ERR_READ_ONLY);
+        
         // #of bytes to store.
         final int nbytes = data.remaining();
 
@@ -365,5 +370,22 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         return count;
         
     }
+    
+    /**
+     * FIXME Counters need to be added here for the {@link DirectBufferStrategy},
+     * {@link MappedBufferStrategy}, and {@link TransientBufferStrategy}.
+     */
+    synchronized public CounterSet getCounters() {
+
+        if (root == null) {
+
+            root = new CounterSet();
+
+        }
+
+        return root;
+
+    }
+    private CounterSet root;
 
 }

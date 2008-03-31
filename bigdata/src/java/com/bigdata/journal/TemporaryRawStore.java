@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
@@ -252,6 +253,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
         
     }
 
+    public boolean isReadOnly() {
+        
+        if(!open) throw new IllegalStateException();
+        
+        return false;
+        
+    }
+    
     /**
      * Always returns <code>false</code> since the store will be deleted as soon
      * as it is closed.
@@ -450,5 +459,13 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
                 .getMaxByteCount();
 
     }
+
+    synchronized public CounterSet getCounters() {
+        if(root==null) {
+            root = new CounterSet();
+        }
+        return root;
+    }
+    private CounterSet root;
 
 }

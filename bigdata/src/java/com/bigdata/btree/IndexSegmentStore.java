@@ -32,9 +32,11 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
@@ -43,13 +45,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * A read-only store backed by a file. The section of the file containing the
- * index nodes may be fully buffered.
- * <p>
- * Note: An LRU disk cache is a poor choice for the leaves. Since the btree
- * already maintains a cache of the recently touched leaf objects, a recent read
- * against the disk is the best indication that we have that we will NOT want to
- * read that region again soon.
+ * A read-only store backed by a file containing a single {@link IndexSegment}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -63,6 +59,25 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             .getLogger(IndexSegmentStore.class);
 
     /**
+     * A clone of the properties specified to the ctor.
+     */
+    private final Properties properties;
+    
+    /**
+     * An object wrapping the properties specified to the ctor.
+     */
+    public Properties getProperties() {
+        
+        return new Properties( properties );
+        
+    }
+
+    /**
+     * The file containing the index segment.
+     */
+    protected final File file;
+
+    /**
      * Used to correct decode region-based addresses. The
      * {@link IndexSegmentBuilder} encodes region-based addresses using
      * {@link IndexSegmentRegion}. Those addresses are then transparently
@@ -72,18 +87,18 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     private IndexSegmentAddressManager addressManager;
     
     /**
-     * A buffer containing the disk image of the nodes in the index segment.
-     * While some nodes will be held in memory by the hard reference queue
-     * the use of this buffer means that reading a node that has fallen off
-     * of the queue does not require any IOs.
+     * See {@link Options#MAX_BYTES_TO_FULLY_BUFFER_NODES}.
+     */
+    private final long maxBytesToFullyBufferNodes;
+    
+    /**
+     * A buffer containing the disk image of the nodes in the
+     * {@link IndexSegment}. While some nodes will be held in memory by the
+     * hard reference queue the use of this buffer means that reading a node
+     * that has fallen off of the queue does not require any IOs.
      */
     private ByteBuffer buf_nodes;
-
-    /**
-     * The file containing the index segment.
-     */
-    protected final File file;
-
+    
     /**
      * The random access file used to read the index segment.
      */
@@ -137,24 +152,128 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     private boolean open = false;
 
     /**
-     * Open the read-only store.
+     * Options understood by the {@link IndexSegmentStore}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options {
+        
+        /**
+         * <code>segmentFile</code> - The name of the file to be opened.
+         */
+        String SEGMENT_FILE = "segmentFile";
+        
+        /**
+         * <code> maxBytesToFullyBufferedNodes</code> - the maximum #of bytes
+         * in the node region for which the {@link IndexSegmentStore} will fully
+         * buffer (default <code>10485760</code> bytes (10M)). This may be set
+         * to a small value, e.g., <code>1L</code>, to disable buffering.
+         * When ZERO (<code>0L</code>) the nodes will be fully buffered
+         * regardless of the memory requirements. Nodes are buffered when the
+         * {@link IndexSegmentStore} is (re-)opened.
+         * <p>
+         * The nodes in the {@link IndexSegment} are serialized in a contiguous
+         * region by the {@link IndexSegmentBuilder}. That region may be fully
+         * buffered, in which case queries against the {@link IndexSegment} will
+         * incur NO disk hits for the nodes and only one disk hit per visited
+         * leaf.
+         * 
+         * @see #DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES
+         */
+        String MAX_BYTES_TO_FULLY_BUFFER_NODES = "maxBytesToFullyBufferNodes";
+        
+        /**
+         * @see #MAX_BYTES_TO_FULLY_BUFFER_NODES
+         */
+        String DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES = ""+Bytes.megabyte*10;
+        
+    }
+    
+    /**
+     * Used solely to align the old ctor with the new.
+     */
+    private static Properties getDefaultProperties(File file) {
+
+        if(file==null)
+            throw new IllegalArgumentException();
+
+        Properties p = new Properties();
+        
+        p.setProperty(Options.SEGMENT_FILE, ""+file);
+        
+        return p;
+        
+    }
+    
+    /**
+     * Open a read-only store containing an {@link IndexSegment}.
      * 
      * @param file
+     *            The name of the store file.
      * 
-     * @throws IOException
-     * 
-     * @todo make it optional to fully buffer the index nodes?
-     * @todo make it optional to fully buffer the leaves as well as the nodes?
-     * 
-     * @see #load()
+     * @deprecated by {@link IndexSegmentStore#IndexSegmentStore(Properties)}
      */
     public IndexSegmentStore(File file) {
 
-        if (file == null)
+        this( getDefaultProperties(file));
+
+    }
+    
+    /**
+     * Open a read-only store containing an {@link IndexSegment}.
+     * 
+     * @param properties
+     *            The properties. See {@link Options}.
+     * 
+     * @see Options
+     * @see #loadIndexSegment()
+     */
+    public IndexSegmentStore(Properties properties) {
+
+        if (properties == null)
             throw new IllegalArgumentException();
 
-        this.file = file;
+        // clone to avoid side effects from modifications by the caller.
+        this.properties = (Properties)properties.clone();
+        
+        // segmentFile
+        {
 
+            String val = properties.getProperty(Options.SEGMENT_FILE);
+
+            if (val == null) {
+
+                throw new RuntimeException("Required property not found: "
+                        + Options.SEGMENT_FILE);
+
+            }
+
+            file = new File(val);
+            
+        }
+        
+        // maxBytesToFullyBufferNodes
+        
+        {
+            
+            maxBytesToFullyBufferNodes = Long.parseLong(properties.getProperty(
+                    Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,
+                    Options.DEFAULT_MAX_BYTES_TO_FULLY_BUFFER_NODES));
+
+            log.info(Options.MAX_BYTES_TO_FULLY_BUFFER_NODES + "="
+                    + maxBytesToFullyBufferNodes);
+            
+            if (maxBytesToFullyBufferNodes < 0L) {
+
+                throw new RuntimeException(
+                        Options.MAX_BYTES_TO_FULLY_BUFFER_NODES
+                                + " must be non-negative");
+                
+            }
+            
+        }
+        
         reopen();
 
     }
@@ -203,7 +322,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * 
      * @see #close()
      */
-    public void reopen() {
+    synchronized public void reopen() {
 
         if (open)
             throw new IllegalStateException("Already open.");
@@ -243,15 +362,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
                 this.buf_nodes = null;
                 
             } else {
-            
-                // @todo configurable : we will not buffer more than this much data.
-                final long MAX_NODE_REGION_LENGTH = Bytes.megabyte * 100; 
-            
-                final long nodesByteCount = getByteCount(checkpoint.addrLeaves);
                 
-                this.buf_nodes = (nodesByteCount < MAX_NODE_REGION_LENGTH ? bufferIndexNodes(raf)
-                        : null);
-            
+                final long nodesByteCount = getByteCount(checkpoint.addrLeaves);
+
+                final boolean bufferNodes = maxBytesToFullyBufferNodes == 0L
+                        || nodesByteCount < maxBytesToFullyBufferNodes;
+                
+                this.buf_nodes = (bufferNodes ? bufferIndexNodes(raf) : null);
+
             }
 
             /*
@@ -269,9 +387,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
     
     /**
-     * Load the {@link IndexSegment} or derived class from the store. The
-     * {@link IndexSegment} or derived class MUST provide a public constructor
-     * with the following signature: <code>
+     * Load the {@link IndexSegment}. The {@link IndexSegment} (or derived
+     * class) MUST provide a public constructor with the following signature:
+     * <code>
      * 
      * <i>className</i>(IndexSegmentFileStore store)
      * 
@@ -282,7 +400,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * 
      * @return The {@link IndexSegment} or derived class loaded from that store.
      */
-    public IndexSegment load() {
+    synchronized public IndexSegment loadIndexSegment() {
         
         try {
             
@@ -310,15 +428,37 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
    
+    public boolean isReadOnly() {
+
+        assertOpen();
+
+        return true;
+        
+    }
+    
     public boolean isStable() {
         
         return true;
         
     }
-    
+
+    /**
+     * Return <code>false</code> since the leaves are not fully buffered even
+     * if the nodes are fully buffered.
+     */
     public boolean isFullyBuffered() {
         
         return false;
+        
+    }
+    
+    /**
+     * Return <code>true</code> if the nodes of the {@link IndexSegment} are
+     * fully buffered in memory.
+     */
+    public boolean isNodesFullyBuffered() {
+        
+        return isOpen() && buf_nodes != null;
         
     }
     
@@ -333,7 +473,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * This operation may be reversed by {@link #reopen()} as long as the
      * backing file remains available.
      */
-    public void close() {
+    synchronized public void close() {
 
         assertOpen();
         
@@ -359,8 +499,8 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     }
     
-    public void deleteResources() {
-
+    synchronized public void deleteResources() {
+        
         if (open)
             throw new IllegalStateException();
         
@@ -373,7 +513,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     }
     
-    public void closeAndDelete() {
+    synchronized public void closeAndDelete() {
         
         close();
 
@@ -402,10 +542,26 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
 
     /**
-     * Read a record from the {@link IndexSegmentStore}. If the request is
-     * in the node region and the nodes have been buffered then this uses a
-     * slice on the node buffer. Otherwise this reads through to the backing
-     * file.
+     * @todo report some interesting stats, but most are on the
+     *       {@link IndexSegment} itself.
+     */
+    synchronized public CounterSet getCounters() {
+        if(root==null) {
+            root = new CounterSet();
+        }
+        return root;
+    }
+    private CounterSet root;
+
+    /**
+     * Read a record from the {@link IndexSegmentStore}. If the request is in
+     * the node region and the nodes have been buffered then this uses a slice
+     * on the node buffer. Otherwise this reads through to the backing file.
+     * <p>
+     * Note: An LRU disk cache is a poor choice for the leaves. Since the btree
+     * already maintains a cache of the recently touched leaf objects, a recent
+     * read against the disk is the best indication that we have that we will
+     * NOT want to read that region again soon.
      */
     public ByteBuffer read(long addr) {
 
@@ -492,6 +648,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         final int nbytes = addressManager.getByteCount(checkpoint.addrLeaves);
 
+        log.info("Buffering nodes: #nodes=" + checkpoint.nnodes + ", #bytes="
+                + nbytes + ", file=" + file);
+        
         /*
          * Note: The direct buffer imposes a higher burden on the JVM and all
          * operations after we read the data from the disk should be faster with

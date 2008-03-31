@@ -386,6 +386,10 @@ public class Tx extends AbstractTx implements IIndexStore, ITx {
         if (name == null)
             throw new IllegalArgumentException();
 
+        /*
+         * @todo lock could be per index for higher concurrency rather than for
+         * all indices which you might access through this tx.
+         */
         lock.lock();
 
         try {

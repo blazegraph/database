@@ -39,6 +39,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
@@ -166,10 +167,6 @@ public interface IResourceManager extends IServiceShutdown {
      *                information which indicates that the index partition has
      *                been split, joined or moved.
      */
-//    * 
-//    * @exception IllegalStateException
-//    *                if <i>timestamp</i> is positive but there is no active
-//    *                transaction with that timestamp.
     public IIndex getIndex(String name, long timestamp);
 
     /**
@@ -194,10 +191,8 @@ public interface IResourceManager extends IServiceShutdown {
     
     /**
      * Statistics about the {@link IResourceManager}.
-     * 
-     * @todo report as XML or Object.
      */
-    public String getStatistics();
+    public CounterSet getCounters();
     
     /**
      * Return <code>true</code> if the pre-conditions for overflow of the

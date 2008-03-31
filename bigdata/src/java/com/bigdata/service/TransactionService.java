@@ -40,6 +40,8 @@ import java.util.concurrent.Executors;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.isolation.IsolatedFusedView;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITransactionManager;
@@ -183,12 +185,6 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
         
     }
     
-    public String getStatistics() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
-
     /*
      * ITransactionManager.
      */
@@ -563,5 +559,33 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
         // TODO Auto-generated method stub
         
     }
+
+    /**
+     * Return the {@link CounterSet}.
+     */
+    synchronized public CounterSet getCounters() {
+        
+        if (countersRoot == null) {
+
+            countersRoot = new CounterSet();
+
+            countersRoot.addCounter("#active", new Instrument<Integer>() {
+                protected void sample() {
+                    setValue(activeTx.size());
+                }
+            });
+
+//            countersRoot.addCounter("#prepared", new Instrument<Integer>() {
+//                protected void sample() {
+//                    setValue(preparedTx.size());
+//                }
+//            });
+
+        }
+        
+        return countersRoot;
+        
+    }
+    private CounterSet countersRoot;
 
 }

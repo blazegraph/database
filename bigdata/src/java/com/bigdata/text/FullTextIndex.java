@@ -66,21 +66,22 @@ import com.bigdata.rawstore.Bytes;
 /**
  * Full text indexing and search support.
  * <p>
- * The basic data model is consists of documents, fields in documents, and
- * tokens extracted by an analyzer from those fields.
+ * The basic data model consists of documents, fields in documents, and tokens
+ * extracted by an analyzer from those fields.
  * <p>
- * The frequency distributions may be normalized to account for a varient of
+ * The frequency distributions may be normalized to account for a variety of
  * effects producing "term weights". For example, normalizing for document
  * length or relative frequency of a term in the overall collection. Therefore
  * the logical model is:
  * 
  * <pre>
- *                                                    
- *   token : {docId, freq?, weight?}+
- *                                                    
+ *                                                      
+ *  token : {docId, freq?, weight?}+
+ *                                                      
  * </pre>
  * 
- * where docId happens to be the term identifier as assigned by the terms index.
+ * (For RDF, docId is the term identifier as assigned by the term:id index.)
+ * <p>
  * The freq and weight are optional values that are representative of the kinds
  * of statistical data that are kept on a per-token-document basis. The freq is
  * the token frequency (the frequency of occurrence of the token in the
@@ -90,9 +91,9 @@ import com.bigdata.rawstore.Bytes;
  * In fact, we actually represent the data as follows:
  * 
  * <pre>
- *               
- *                {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
- *                        
+ *                 
+ *  {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
+ *                          
  * </pre>
  * 
  * That is, there is a distinct entry in the full text B+Tree for each field in
@@ -124,16 +125,16 @@ import com.bigdata.rawstore.Bytes;
  * which must be tagged by the field.
  * <p>
  * A query is tokenized, producing a (possibly normalized) token-frequency
- * vector identifical. The relevance of documents to the query is generally
- * taken as the cosine between the query's and each document's (possibly
- * normalized) token-frequency vectors. The main effort of search is assembling
- * a token frequency vector for just those documents with which there is an
- * overlap with the query. This is done using a key range scan for each token in
- * the query against the full text index.
+ * vector. The relevance of documents to the query is generally taken as the
+ * cosine between the query's and each document's (possibly normalized)
+ * token-frequency vectors. The main effort of search is assembling a token
+ * frequency vector for just those documents with which there is an overlap with
+ * the query. This is done using a key range scan for each token in the query
+ * against the full text index.
  * 
  * <pre>
- *                    fromKey := token, 0L
- *                    toKey   := successor(token), 0L
+ *  fromKey := token, 0L
+ *  toKey   := successor(token), 0L
  * </pre>
  * 
  * and extracting the appropriate token frequency, normalized token weight, or
@@ -174,6 +175,9 @@ import com.bigdata.rawstore.Bytes;
  * their declared language code (if any). However, once tokenized, the language
  * code is discarded and we perform search purely on the Unicode sort keys
  * resulting from the extracted tokens.
+ * 
+ * @todo consider a collection identifier in the key as well or just use a
+ *       separate text index for each collection?
  * 
  * @todo verify that PRIMARY US English is an acceptable choice for the full
  *       text index collator regardless of the language family in which the

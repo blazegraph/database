@@ -415,7 +415,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     public String usage(){
         
-        return super.usage() + store.getStatistics();
+        return super.usage() + store.getCounters();
         
     }
 

@@ -39,6 +39,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.WeakValueCache;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 
 /**
  * This class coordinates a schedule among concurrent operations requiring
@@ -150,6 +152,62 @@ public class LockManager</*T,*/R extends Comparable<R>> {
      * counters
      */
 
+    synchronized public CounterSet getCounters() {
+        
+        if (root == null) {
+            
+            root = new CounterSet();
+            
+            root.addCounter("nstarted", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nstarted.get());
+                }
+            });
+            
+            root.addCounter("nended", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nended.get());
+                }
+            });
+            
+            root.addCounter("nerror", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nerror.get());
+                }
+            });
+            
+            root.addCounter("ndeadlock", new Instrument<Long>() {
+                public void sample() {
+                    setValue(ndeadlock.get());
+                }
+            });
+            
+            root.addCounter("ntimeout", new Instrument<Long>() {
+                public void sample() {
+                    setValue(ntimeout.get());
+                }
+            });
+            
+            // Note: #that have acquired locks are executing concurrently.
+            root.addCounter("nrunning", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nrunning.get());
+                }
+            });
+            
+            root.addCounter("maxRunning", new Instrument<Long>() {
+                public void sample() {
+                    setValue(maxrunning.get());
+                }
+            });
+            
+        }
+        
+        return root;
+        
+    }
+    private CounterSet root;
+    
     /**
      * The #of tasks that start execution (enter
      * {@link LockManagerTask#call()}). This counter is incremented
@@ -183,8 +241,10 @@ public class LockManager</*T,*/R extends Comparable<R>> {
     AtomicLong ntimeout = new AtomicLong(0);
 
     /**
-     * #of tasks that are concurrently executing in
-     * {@link LockManagerTask#run()}.
+     * #of tasks that have acquired their locks and are concurrently executing.
+     * 
+     * @todo sample and track this with a moving average to measure the real
+     *       concurrency of the system.
      */
     AtomicLong nrunning = new AtomicLong(0);
 
@@ -770,12 +830,9 @@ public class LockManager</*T,*/R extends Comparable<R>> {
 
     }
 
-    public String status() {
+    public String toString() {
 
-        return "maxrunning=" + maxrunning + ", nrunning=" + nrunning
-                + ", nstarted=" + nstarted + ", nended=" + nended + ", nerror="
-                + nerror + ", ndeadlock=" + ndeadlock + ", ntimeout="
-                + ntimeout;
+        return getCounters().toString();
 
     }
 

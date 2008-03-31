@@ -261,7 +261,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
             IndexSegmentStore segStore = new IndexSegmentStore(
                     new File(result.segmentMetadata.getFile()));
 
-            IndexSegment seg = segStore.load();
+            IndexSegment seg = segStore.loadIndexSegment();
 
             AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
 

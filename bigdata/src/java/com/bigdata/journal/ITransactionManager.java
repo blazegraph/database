@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -210,10 +211,8 @@ public interface ITransactionManager extends ITimestampService {
     
     /**
      * Return interesting statistics about the transaction manager.
-     * 
-     * @todo use object or xml for telemetry.
      */
-    public String getStatistics();
+    public CounterSet getCounters();
 
     /**
      * Invoked by tasks executing a transaction to notify the transaction

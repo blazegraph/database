@@ -278,12 +278,7 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
     public abstract UUID getServiceUUID() throws IOException;
     
     /**
-     * Representation of performance counters for the {@link IDataService}.
-     * 
-     * FIXME Make this an XML Serialization of performance counters describing
-     * the data service, so the return type should be a byte[] or a String iff
-     * we write onto a StringWriter... It is currently the toString()
-     * serialization of the counters.
+     * An XML representation of performance counters for the {@link IDataService}.
      */
     public String getStatistics() throws IOException;
     

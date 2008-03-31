@@ -43,6 +43,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -570,6 +571,10 @@ public class ReplicatedStore implements IRawStore {
         return localStore.isOpen();
     }
 
+    public boolean isReadOnly() {
+        return localStore.isReadOnly();
+    }
+
     public boolean isStable() {
         return localStore.isStable();
     }
@@ -604,6 +609,10 @@ public class ReplicatedStore implements IRawStore {
 
     public long unpackAddr(DataInput in) throws IOException {
         return localStore.unpackAddr(in);
+    }
+
+    public CounterSet getCounters() {
+        return localStore.getCounters();
     }
 
 }

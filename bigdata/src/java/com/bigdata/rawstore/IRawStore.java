@@ -31,6 +31,7 @@ import java.io.File;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
 
@@ -113,11 +114,14 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      *         data may be read and the #of bytes to be read. See
      *         {@link IAddressManager}.
      * 
-     * @exception IllegalArgumentException
-     *                if <i>data</i> is <code>null</code>.
-     * @exception IllegalArgumentException
-     *                if <i>data</i> has zero bytes
-     *                {@link ByteBuffer#remaining()}.
+     * @throws IllegalArgumentException
+     *             if <i>data</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>data</i> has zero bytes {@link ByteBuffer#remaining()}.
+     * @throws IllegalStateException
+     *             if the store is not open.
+     * @throws IllegalStateException
+     *             if the store does not allow writes.
      * 
      * @todo define exception if the maximum extent would be exceeded.
      * 
@@ -164,9 +168,11 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      *         (the position will be zero and the limit will be the #of bytes
      *         read).
      * 
-     * @exception IllegalArgumentException
+     * @throws IllegalArgumentException
      *                If the address is known to be invalid (never written or
      *                deleted). Note that the address 0L is always invalid.
+     * @throws IllegalStateException
+     *             if the store is not open.
      */
     public ByteBuffer read(long addr);
 
@@ -205,11 +211,19 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
 //    public ByteBuffer read(long addr, ByteBuffer dst);
 
     /**
-     * True iff the store is open.
+     * <code>true</code> iff the store is open.
      * 
      * @return <code>true</code> iff the store is open.
      */
     public boolean isOpen();
+    
+    /**
+     * <code>true</code> iff the store does not allow writes.
+     * 
+     * @throws IllegalStateException
+     *             if the store is not open.
+     */
+    public boolean isReadOnly();
     
     /**
      * Close the store immediately.
@@ -291,5 +305,10 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * headers or root blocks that may exist for the store).
      */
     public long size();
+
+    /**
+     * Reports performance counters.
+     */
+    public CounterSet getCounters();
     
 }

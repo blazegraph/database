@@ -102,10 +102,25 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     protected static final String ERR_TRUNCATE = "Would truncate written data.";
     
     /**
-     * True iff the {@link IBufferStrategy} is open.
+     * Error message used when the writes are not allowed.
+     */
+    protected static final String ERR_READ_ONLY = "Read only";
+    
+    /**
+     * Error message used when the store is closed. 
+     */
+    protected static final String ERR_NOT_OPEN = "Not open";
+    
+    /**
+     * <code>true</code> iff the {@link IBufferStrategy} is open.
      */
     private boolean open = false;
 
+    /**
+     * <code>true</code> iff the {@link IBufferStrategy} is read-only.
+     */
+    private boolean readOnly;
+    
     protected final long initialExtent;
     protected final long maximumExtent;
     
@@ -185,7 +200,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      *            The {@link BufferMode}.
      */
     AbstractBufferStrategy(long initialExtent, long maximumExtent,
-            int offsetBits, long nextOffset, BufferMode bufferMode) {
+            int offsetBits, long nextOffset, BufferMode bufferMode, boolean readOnly) {
 
         super(offsetBits);
         
@@ -203,6 +218,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         this.open = true;
         
+        this.readOnly = readOnly;
+        
     }
     
     public final long size() {
@@ -211,12 +228,27 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
 
+    protected final void assertOpen() {
+        
+        if (!open)
+            throw new IllegalStateException(ERR_NOT_OPEN);
+        
+    }
+    
     public boolean isOpen() {
         
         return open;
         
     }
 
+    public boolean isReadOnly() {
+
+        assertOpen();
+
+        return readOnly;
+        
+    }
+    
     /**
      * Manages the {@link #open} flag state.
      */
@@ -455,5 +487,22 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         throw new UnsupportedOperationException();
         
     }
-    
+
+    /**
+     * Sets the <code>readOnly</code> flag.
+     * <p>
+     * Note: This method SHOULD be extended to release write caches, etc.
+     */
+    public void closeForWrites() {
+
+        if(isReadOnly()) {
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        readOnly = true;
+        
+    }
+
 }

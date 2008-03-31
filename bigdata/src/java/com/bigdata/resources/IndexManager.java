@@ -187,7 +187,7 @@ abstract public class IndexManager extends StoreManager {
      * identifier) either on the same or on another data service. The value is a
      * reason, e.g., "split", "join", or "move".
      */
-    private final LRUCache<String/*name*/, String/*reason*/> staleIndexCache = new LRUCache<String, String>(1000);  
+    private final LRUCache<String/*name*/, String/*reason*/> staleLocatorCache = new LRUCache<String, String>(1000);  
     
     /**
      * Return non-<code>null</code> iff <i>name</i> is the name of an index
@@ -207,9 +207,9 @@ abstract public class IndexManager extends StoreManager {
      */
     private String getIndexPartitionGone(String name) {
     
-        synchronized(staleIndexCache) {
+        synchronized(staleLocatorCache) {
         
-            return staleIndexCache.get(name);
+            return staleLocatorCache.get(name);
             
         }
         
@@ -232,13 +232,22 @@ abstract public class IndexManager extends StoreManager {
         
         assert reason != null;
         
-        synchronized(staleIndexCache) {
+        synchronized(staleLocatorCache) {
         
             log.info("name="+name+", reason="+reason);
             
-            staleIndexCache.put(name, reason, true);
+            staleLocatorCache.put(name, reason, true);
             
         }
+        
+    }
+
+    /**
+     * The #of entries in the stale locator LRU.
+     */
+    protected int getStaleLocatorCount() {
+
+        return staleLocatorCache.size();
         
     }
     
@@ -447,7 +456,7 @@ abstract public class IndexManager extends StoreManager {
                             + ", file=" + resourceMetadata.getFile());
 
                     // Open an index segment.
-                    seg = segStore.load();
+                    seg = segStore.loadIndexSegment();
 
                     indexSegmentCache.put(storeUUID, seg, false/* dirty */);
 
@@ -686,6 +695,9 @@ abstract public class IndexManager extends StoreManager {
              * 
              * Note: The backing index is always a historical state of the named
              * index.
+             * 
+             * Note: Tx#getIndex(String name) serializes concurrent requests for
+             * the same index (thread-safe).
              */
 
             final IIndex isolatedIndex = tx.getIndex(name);
@@ -701,79 +713,116 @@ abstract public class IndexManager extends StoreManager {
             tmp = isolatedIndex;
 
         } else {
-            
+
             /*
-             * historical read -or- read-committed operation.
+             * Note: serializes concurrent requests for the same index
+             * (thread-safe).
+             * 
+             * FIXME In fact, this serializes all requests for any index which
+             * limits concurrency. Change to use a per (name) lock using a
+             * LockManager to serialize the requests. Use a different lock for
+             * the historical read and the unisolated requests since they access
+             * different views.
+             * 
+             * Note: neither a per (name,timestamp) lock nor a per
+             * (name,commitRecord) lock makes sense since they fail to capture
+             * the essential distinction which is {journal, checkpointAddr}. The
+             * journal is identified by the timestamp and then the
+             * checkpointAddr is identified using the Name2Addr for the
+             * commitRecord on that journal identified by the timestamp.
+             * 
+             * Is there an API change to getIndexSources() which would let us
+             * use this distinction and thereby only serialize requests for
+             * exactly the same historical view?
+             * 
+             * FIXME Make sure that the synchronization changes are also made to
+             * Journal.
+             * 
+             * FIXME Make sure that we properly synchronize getIndexSources(),
+             * getJournal(), and getIndexOnStore().
              */
+//            synchronized (this) 
+            {
 
-            if (readOnly) {
-
-                final AbstractBTree[] sources = getIndexSources(name, timestamp);
-
-                if (sources == null) {
-
-                    log.warn("No such index: name="+name+", timestamp="+timestamp);
-                    
-                    return null;
-
-                }
-
-                assert sources.length > 0;
-
-                assert sources[0].isReadOnly();
-
-                if (sources.length == 1) {
-
-                    tmp = sources[0];
-
-                } else {
-
-                    tmp = new FusedView(sources);
-                    
-                }
-                
-            } else {
-                
                 /*
-                 * Writable unisolated index.
-                 * 
-                 * Note: This is the "live" mutable index. This index is NOT
-                 * thread-safe. A lock manager is used to ensure that at most
-                 * one task has access to this index at a time.
+                 * historical read -or- read-committed operation.
                  */
 
-                assert timestamp == ITx.UNISOLATED;
-                
-                // Check to see if an index partition was split, joined or moved.
-                final String reason = getIndexPartitionGone(name);
+                if (readOnly) {
 
-                if (reason != null) {
+                    final AbstractBTree[] sources = getIndexSources(name,
+                            timestamp);
 
-                    // Notify client of stale locator.
-                    throw new StaleLocatorException(name, reason);
-                    
-                }
-                
-                final AbstractBTree[] sources = getIndexSources(name, ITx.UNISOLATED);
-                
-                if (sources == null) {
+                    if (sources == null) {
 
-                    log.info("No such index: name="+name+", timestamp="+timestamp);
-                    
-                    return null;
-                    
-                }
+                        log.warn("No such index: name=" + name + ", timestamp="
+                                + timestamp);
 
-                assert ! sources[0].isReadOnly();
-                
-                if (sources.length == 1) {
+                        return null;
 
-                    tmp = sources[0];
-                    
+                    }
+
+                    assert sources.length > 0;
+
+                    assert sources[0].isReadOnly();
+
+                    if (sources.length == 1) {
+
+                        tmp = sources[0];
+
+                    } else {
+
+                        tmp = new FusedView(sources);
+
+                    }
+
                 } else {
-                    
-                    tmp = new FusedView( sources );
-                    
+
+                    /*
+                     * Writable unisolated index.
+                     * 
+                     * Note: This is the "live" mutable index. This index is NOT
+                     * thread-safe. A lock manager is used to ensure that at
+                     * most one task has access to this index at a time.
+                     */
+
+                    assert timestamp == ITx.UNISOLATED;
+
+                    // Check to see if an index partition was split, joined or
+                    // moved.
+                    final String reason = getIndexPartitionGone(name);
+
+                    if (reason != null) {
+
+                        // Notify client of stale locator.
+                        throw new StaleLocatorException(name, reason);
+
+                    }
+
+                    final AbstractBTree[] sources = getIndexSources(name,
+                            ITx.UNISOLATED);
+
+                    if (sources == null) {
+
+                        log.info("No such index: name=" + name + ", timestamp="
+                                + timestamp);
+
+                        return null;
+
+                    }
+
+                    assert !sources[0].isReadOnly();
+
+                    if (sources.length == 1) {
+
+                        tmp = sources[0];
+
+                    } else {
+
+                        tmp = new FusedView(sources);
+
+                    }
+
                 }
 
             }
