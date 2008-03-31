@@ -90,10 +90,19 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
         return false;
         
     }
+
+    final private boolean rangeCheck(int index) {
+        
+        assert index >= 0 && index < (toIndex - fromIndex) : "index=" + index
+                + ", fromIndex=" + fromIndex + ", toIndex=" + toIndex;
+
+        return true;
+        
+    }
     
     public void setKey(int index, byte[] key) {
         
-        assert index >= 0 && index < toIndex;
+        assert rangeCheck(index);
         
         a[fromIndex + index] = key;
         
@@ -101,7 +110,7 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
 
     public byte[] getKey(int index) {
 
-        assert index >= 0 && index < toIndex;
+        assert rangeCheck(index);
         
         return a[fromIndex + index];
         
@@ -109,7 +118,7 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
 
     public int getLength(int index) {
         
-        assert index >= 0 && index < toIndex;
+        assert rangeCheck(index);
         
         byte[] tmp = a[fromIndex + index];
 
@@ -121,7 +130,7 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
     
     public boolean isNull(int index) {
 
-        assert index >= 0 && index < toIndex;
+        assert rangeCheck(index);
 
         return a[fromIndex + index] == null;
         
@@ -129,7 +138,7 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
     
     public int copyKey(int index, DataOutput out) throws IOException {
         
-        assert index >= 0 && index < toIndex;
+        assert rangeCheck(index);
 
         byte[] tmp = a[fromIndex + index];
 

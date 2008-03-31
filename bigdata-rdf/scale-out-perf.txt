@@ -576,8 +576,9 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
       that hash MOD N to that host.  (note that only AddTerms and
       AddIds go across the network API in this case.)
 
-    - The temp triple store supports concurrent read only, so it is
-      not appropriate for a concurrent bulk loader.
+    - The temp triple store supports concurrent read only but not
+      concurrent write, so it is not appropriate for a concurrent bulk
+      loader.
 
 Short term tasks:
 
@@ -740,24 +741,7 @@ Short term tasks:
        Also, efficient nextLeaf could improve read performance by
        reducing node reads.
 
-     - Done. Enforce read-only semantics.
-
-     - closeForWrites()
-
-      - Done. MUST NOT close the journal or concurrent readers will
-        get hosed since they are NOT suspended during synchronous
-        overflow processing.
-
-      - Done. MUST discard the write cache in order to reduce the
-        memory footprint.  I believe that reads on the write cache
-        always return a ByteBuffer backed by a new byte[] so this
-        should not be a problem.
-
      - CounterSets
-
-       - Done. Add CounterSet reporting and link into journal counter
-         set reporting and then into the ResourceManager counter set
-         for the live journal.
 
        - Add counters designed to give insight into whether the write
          cache tends to full up completely or only partly before the
@@ -771,46 +755,6 @@ Short term tasks:
          exceed the cache capacity are written directly to the disk -
          the cache itself is always dense in terms of the bytes
          written on the address space.
-
-     - ** Write cache synchronization problem. The problem arose with
-       the change to the group commit.  Since it now checkpoints
-       indices and allows writers to continue during commits there are
-       now concurrent writers when we call force.
-
-       - Try AbstractMRMWTestCase for demonstrating this problem, but
-         it might not trigger commits and if not then it would not
-         demonstrate this problem.
-
-       - change the stress test to allow N indices so that we can see
-         the effect of concurrent writers during commits
-
-	 I've done this but it still does not trigger the error.  I
-	 see the error more readily with
-	 TestScaleOutTripleStoreWithXXXFederation /
-	 TestInsertRate#test_small
-
-	 I have also seen this problem there:
-
-	 java.lang.AssertionError
-	     at com.bigdata.resources.OverflowManager.shouldOverflow(OverflowManager.java:537)
-	     at com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1017)
-	     at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:953)
-
-       - modify force to  use an atomic handoff of  the write cache so
-         that the  net result  is atomic from  the perspective  of the
-         caller.  This may require locking  on the write cache so that
-         we wait until concurrent writes have finished before flushing
-         to the  disk or I  may be able  to use nextOffset to  make an
-         atomic determination of the range of the buffer to be forced,
-         create a  view of that  range, and use  the view to  force to
-         disk so that the position and limits are not changed by force
-         nor by  concurrent writers - this  may also be  a problem for
-         the Direct mode  and the Mapped mode, at least  if they use a
-         write cache.
-
-      - Async cache writes are also useful if the disk cache is turned
-        off and could gain importance in offering tighter control over
-        IO guarentees.
 
    - **** Full text indexing for KB.
 
@@ -836,9 +780,11 @@ Short term tasks:
 
    - SemTech08 submission?
 
-   - stress testing with index partition moves, not just split/join.
-
-   - ** correctness testing for scale-out.
+   - ** correctness testing for scale-out with index partition split,
+        move, and join.  See AbstractMRMWTestCase and
+        StressTestConcurrent.  The latter should be modified to use
+        ground truth indices in a TemporaryStore and we could write
+        other classes for performance testing on a cluster.
 
    - streaming io for block read/write.  note that asynch IO for the
      disk only strategy will not have an impact if we are doing
@@ -865,141 +811,10 @@ java.lang.AssertionError: ndone=8, but #used=9
 	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
 	at java.lang.Thread.run()V(Unknown Source)
-
+	
 ============================================================
 
-Running ScaleOutTripleStore/TestInsertRate#test_small
-
-.ERROR: 226031 dpp2-wrkst13.dpp2.org 9eb93bee-8d86-4e0d-9bb6-652962baff72 pool-1-thread-2436 com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1185): Commit failed - will abort: java.lang.RuntimeException: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
-java.lang.RuntimeException: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
-	at com.bigdata.journal.DiskOnlyStrategy.writeOnDisk(DiskOnlyStrategy.java:1402)
-	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.flush(DiskOnlyStrategy.java:325)
-	at com.bigdata.journal.DiskOnlyStrategy.flushWriteCache(DiskOnlyStrategy.java:418)
-	at com.bigdata.journal.DiskOnlyStrategy.force(DiskOnlyStrategy.java:856)
-	at com.bigdata.journal.DiskOnlyStrategy.writeRootBlock(DiskOnlyStrategy.java:1438)
-	at com.bigdata.journal.AbstractJournal.commitNow(AbstractJournal.java:1593)
-	at com.bigdata.resources.StoreFileManager$ManagedJournal.commit(StoreFileManager.java:1274)
-	at com.bigdata.journal.WriteExecutorService.commit(WriteExecutorService.java:1169)
-	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:925)
-	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:519)
-	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:786)
-	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:694)
-	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:590)
-	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
-	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
-	at java.lang.Thread.run(Thread.java:595)
-Caused by: java.io.IOException: Expecting to write 110812 bytes, but wrote 110723 bytes.
-	at com.bigdata.journal.DiskOnlyStrategy.writeOnDisk(DiskOnlyStrategy.java:1395)
-	... 17 more
-
-and
-
-Caused by: java.nio.BufferOverflowException
-	at java.nio.HeapByteBuffer.put(HeapByteBuffer.java:182)
-	at com.bigdata.journal.DiskOnlyStrategy$WriteCache.write(DiskOnlyStrategy.java:350)
-	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:1290)
-	at com.bigdata.journal.AbstractJournal.write(AbstractJournal.java:1631)
-	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:1990)
-	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:98)
-	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
-	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:273)
-	at com.bigdata.cache.HardReferenceQueue.append(HardReferenceQueue.java:235)
-	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:1752)
-	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:320)
-	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:356)
-	at com.bigdata.btree.Leaf.<init>(Leaf.java:210)
-	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:499)
-	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:438)
-	at com.bigdata.btree.Leaf.insert(Leaf.java:350)
-	at com.bigdata.btree.Node.insert(Node.java:637)
-
-	at com.bigdata.btree.Node.insert(Node.java:637)
-	at com.bigdata.btree.Node.insert(Node.java:637)
-	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:1016)
-	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:961)
-	at com.bigdata.rdf.store.IndexWriteProc.apply(IndexWriteProc.java:196)
-
-
-The 2nd might be a side-effect of the 1st.  The first is probably
-valid behavior and I just need to invoke the write on the channel in a
-loop.
-
-Another possibility is that the buffer position is GT zero.  This does
-not seem to be checked and could explain writing less than nbytes,
-where nbytes := data.limit().  (89 fewer bytes were written than
-expected.)  The javadoc on DiskOnlyBuffer#write() does indicate that
-it will write from the position to the limit, so computing nbytes in
-this way would appear to be an error.  I do need to verify all callers
-and see if the buffer position is ever non-zero, especially as called
-to flush the writeCache as in this stack trace.
-
-Looking at flushWriteCache its clear that the buffer position SHOULD
-be zero, so maybe there is a concurrent writer running that writes 89
-bytes on the buffer before we start writing on the channel itself.
-Who could that be?  This is getting called from commitNow, so there
-SHOULD NOT be anyone writing on the journal.
-
-Perhaps there is some thread that is using it as a raw store?
-
-Can I identify who that might be?
-
-Can the writeCacheFlush be made thread-safe so that if there are
-concurrent writers on the store that they do not interfere with the
-write or corrupt the write cache buffer's contents?
-
-
-============================================================
-
-For the ScaleOutTripleStore: TestRestartSafe#test_restartSafe
-
-java.lang.NullPointerException
-	at com.bigdata.rdf.store.ScaleOutTripleStore.registerIndices(ScaleOutTripleStore.java:178)
-	at com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation.getStore(TestScaleOutTripleStoreWithJiniFederation.java:419)
-	at com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation.reopenStore(TestScaleOutTripleStoreWithJiniFederation.java:444)
-	at com.bigdata.rdf.store.ProxyTestCase.reopenStore(ProxyTestCase.java:165)
-	at com.bigdata.rdf.store.TestRestartSafe.test_restartSafe(TestRestartSafe.java:151)
-
-============================================================
-
-Still seeing this in StressTestConcurrent - possible cause is
-corrupted write cache per above.
-
-ERROR: 39250  52378185-c6e1-4dbc-b8d2-3f3330f9c0d0   pool-1-thread-1073 com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1034): Overflow error
-java.lang.RuntimeException: java.io.StreamCorruptedException: invalid stream header
-	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:126)
-	at com.bigdata.io.SerializerUtil.deserialize(SerializerUtil.java:179)
-	at com.bigdata.btree.Checkpoint.load(Checkpoint.java:282)
-	at com.bigdata.btree.BTree.load(BTree.java:1105)
-	at com.bigdata.journal.AbstractJournal.getIndex(AbstractJournal.java:1937)
-	at com.bigdata.journal.AbstractJournal.getName2Addr(AbstractJournal.java:311)
-	at com.bigdata.resources.IndexManager.listIndexPartitions(IndexManager.java:802)
-	at com.bigdata.resources.OverflowManager.doOverflow(OverflowManager.java:744)
-	at com.bigdata.resources.OverflowManager.overflow(OverflowManager.java:603)
-	at com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1026)
-	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:946)
-	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:519)
-
-followed by 
-
-Caused by: java.lang.RuntimeException: unknown node type=17
-	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:662)
-	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2074)
-	at com.bigdata.btree.BTree.reopen(BTree.java:533)
-	at com.bigdata.btree.AbstractBTree.getRoot(AbstractBTree.java:818)
-	at com.bigdata.btree.AbstractBTree.getRootOrFinger(AbstractBTree.java:837)
-	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1148)
-	at com.bigdata.btree.FusedView.lookup(FusedView.java:380)
-	at com.bigdata.btree.FusedView.lookup(FusedView.java:353)
-	at com.bigdata.btree.FusedView.lookup(FusedView.java:321)
-	at com.bigdata.btree.FusedView.insert(FusedView.java:274)
-	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:163)
-	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:1)
-	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
-
-
-Also, in TestConcurrentJournal#test_concurrentReadersAreOk
+TestConcurrentJournal#test_concurrentReadersAreOk - might have been write cache flush problem?
 
 java.lang.AssertionError: limit=0, byteCount(addr)=392, addr={nbytes=392,offset=486601}
 	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2056)
