@@ -106,12 +106,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
-    public String getStatistics() {
-        
-        return super.getStatistics() + localTransactionManager.getStatistics();
-        
-    }
-        
     synchronized public CounterSet getCounters() {
         
         if(counters==null) {
@@ -119,6 +113,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             counters = super.getCounters();
             
             counters.attach(concurrencyManager.getCounters());
+    
             counters.attach(localTransactionManager.getCounters());
             
         }

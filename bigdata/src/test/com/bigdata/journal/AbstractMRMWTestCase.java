@@ -180,8 +180,7 @@ abstract public class AbstractMRMWTestCase
 
     }
 
-    // @todo rename.
-    private IRawStore store;
+    protected IRawStore store;
     
     public void setUpComparisonTest(Properties properties) throws Exception {
         
@@ -201,7 +200,7 @@ abstract public class AbstractMRMWTestCase
 
         IRawStore store = getStore();
 
-        final long timeout = 5;
+        final long timeout = 10; // @todo was 5
         
         final int ntrials = 10000;
 
@@ -258,6 +257,9 @@ abstract public class AbstractMRMWTestCase
             int nclients, double percentReaders, int reclen,
             int nwritesPerTask, int nreadsPerTask) throws Exception {
 
+        if (store == null)
+            throw new IllegalArgumentException();
+        
         if (percentReaders < 0 || percentReaders > 1)
             throw new IllegalArgumentException();
         
@@ -272,7 +274,7 @@ abstract public class AbstractMRMWTestCase
 
             final int nprewrites = 5000;
             
-            new WriterTask(groundTruth, store, reclen, nprewrites).call();
+            new WriterTask(groundTruth, store, reclen, nprewrites, false/*forceToDisk*/).call();
             
             System.err.println("Pre-wrote " + nprewrites + " records");
             
@@ -304,7 +306,10 @@ abstract public class AbstractMRMWTestCase
                     
                 } else {
                     
-                    task = new WriterTask(groundTruth, store, reclen, nwritesPerTask);
+                    // @todo parameterize
+                    boolean forceToDisk = false; // r.nextDouble() < .01;
+                    
+                    task = new WriterTask(groundTruth, store, reclen, nwritesPerTask, forceToDisk);
                     
                     nwriters++;
                     
@@ -476,6 +481,8 @@ abstract public class AbstractMRMWTestCase
         
         System.err.println(ret.toString(true/*newline*/));
         
+        System.out.println(store.getCounters().toString());
+        
         store.closeAndDelete();
 
         return ret;
@@ -634,6 +641,7 @@ abstract public class AbstractMRMWTestCase
         private final IRawStore store;
         private final int reclen;
         private final int nwrites;
+        private final boolean forceToDisk;
 
         /**
          * 
@@ -648,8 +656,13 @@ abstract public class AbstractMRMWTestCase
          *            The #of records to write.
          */
         public WriterTask(GroundTruth groundTruth, IRawStore store,
-                int reclen, int nwrites) {
+                int reclen, int nwrites, boolean forceToDisk) {
 
+            assert groundTruth != null;
+            assert store != null;
+            assert reclen > 0;
+            assert nwrites > 0;
+            
             this.groundTruth = groundTruth;
             
             this.store = store;
@@ -657,6 +670,8 @@ abstract public class AbstractMRMWTestCase
             this.reclen = reclen;
             
             this.nwrites = nwrites;
+            
+            this.forceToDisk = forceToDisk;
             
         }
 
@@ -672,9 +687,15 @@ abstract public class AbstractMRMWTestCase
                 for (int i = 0; i < nwrites; i++) {
 
                     write();
-                
+                    
                 }
-                
+
+                if (forceToDisk) {
+
+                    store.force(true/* metadata */);
+                    
+                }
+            
             } catch(Throwable t) {
                 
                 log.warn(t.getMessage(),t);
@@ -857,9 +878,25 @@ abstract public class AbstractMRMWTestCase
      */
     public static class StressTestMRMW extends AbstractMRMWTestCase {
 
-        protected IRawStore getStore() {
+        public Result doComparisonTest(Properties properties) throws Exception {
             
-            return new Journal(getProperties()).getBufferStrategy();
+            setUpComparisonTest(properties);
+            
+            return super.doComparisonTest(properties);
+            
+        }
+        
+        protected IRawStore getStore() {
+
+            assert store != null;
+            
+//            if(store==null) {
+//            
+//                store = new Journal(getProperties()).getBufferStrategy();
+//                
+//            }
+            
+            return store;
             
         }
 

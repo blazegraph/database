@@ -26,6 +26,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
 
@@ -145,11 +146,23 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public long transferTo(RandomAccessFile out) throws IOException;
 
-//    /**
-//     * Seals the store against further writes and discards any write caches
-//     * since they will no longer be used.  The method should be implemented
-//     * such that concurrent readers are not disturbed.
-//     */
-//    public void closeForWrites();
+    /**
+     * Seals the store against further writes and discards any write caches
+     * since they will no longer be used. Buffered writes are NOT forced to the
+     * disk so the caller SHOULD be able to guarentee that concurrent writers
+     * are NOT running. The method should be implemented such that concurrent
+     * readers are NOT disturbed.
+     * 
+     * @throws IllegalStateException
+     *             if the store is closed.
+     * @throws IllegalStateException
+     *             if the store is read-only.
+     */
+    public void closeForWrites();
+
+    /**
+     * Return the performance counter hierarchy.
+     */
+    public CounterSet getCounters();
     
 }

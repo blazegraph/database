@@ -31,6 +31,7 @@ package com.bigdata.counters;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 
@@ -109,6 +110,19 @@ public interface ICounterSet extends ICounterNode {
      *            counters.
      */
     public void asXML(OutputStream os, String encoding, Pattern filter) throws IOException;
+
+    /**
+     * Write an XML reprentation of the counters in the hierarchy together with
+     * their current value - does not write the XML declaration element since
+     * the encoding is unknown.
+     * 
+     * @param w
+     *            The sink on which the representation will be written.
+     * @param filter
+     *            An optional filter that will be used to select only specific
+     *            counters.
+     */
+    public void asXML(Writer w, Pattern filter) throws IOException;
 
     /**
      * A factory for {@link IInstrument}.

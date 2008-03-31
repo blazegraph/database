@@ -230,6 +230,9 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             
             assertTrue(journalMetadata1.getCreateTime() > 0L);
             
+            // and close the journal.
+            journal.close();
+            
         }
 
         /*

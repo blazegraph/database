@@ -97,51 +97,100 @@ abstract public class ResourceManager extends OverflowManager implements IResour
     final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
             .toInt();
 
-    private CounterSet countersRoot;
-    
     /**
      * Return the {@link CounterSet}.
      */
     synchronized public CounterSet getCounters() {
         
-        if (countersRoot == null) {
+        if (root == null) {
 
-            countersRoot = new CounterSet();
+            root = new CounterSet();
 
-            countersRoot.addCounter("Journal Count", new Instrument<Long>(){
-                public void sample() {setValue((long)getJournalCount());}
-            });
+            // OverflowManager
+            {
 
-            countersRoot.addCounter("Index Segment Count", new Instrument<Long>(){
-                public void sample() {setValue((long)getIndexSegmentCount());}
-            });
+                final CounterSet tmp = root.makePath("Overflow Manager");
 
-            countersRoot.addCounter("Overflow Count", new Instrument<Long>(){
-                public void sample() {setValue(getOverflowCount());}
-            });
+                tmp.addCounter("Overflow Count", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(getOverflowCount());
+                    }
+                });
 
-            countersRoot.addCounter("Overflow Allowed", new Instrument<Boolean>(){
-                public void sample() {setValue(overflowAllowed.get());}
-            });
+                tmp.addCounter("Overflow Allowed", new Instrument<Boolean>() {
+                    public void sample() {
+                        setValue(overflowAllowed.get());
+                    }
+                });
+                
+                tmp.addCounter("Should Overflow", new Instrument<Boolean>() {
+                    public void sample() {
+                        setValue(shouldOverflow());
+                    }
+                });
+                
+            }
+            
+            // IndexManager
+            {
+                
+                final CounterSet tmp = root.makePath("Index Manager");
 
-            countersRoot.addCounter("Minimum Release Age", new Instrument<Long>(){
-                public void sample() {setValue(minReleaseAge);}
-            });
+                tmp.addCounter("Stale Locator Cache Size",
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue((long) getStaleLocatorCount());
+                            }
+                        });
+                
+            }
 
-            countersRoot.addCounter("Release Time", new Instrument<Long>(){
-                public void sample() {setValue(releaseTime);}
-            });
+            // StoreManager
+            {
+                
+                final CounterSet tmp = root.makePath("Store Manager");
 
-            countersRoot.addCounter("Effective Release Time", new Instrument<Long>(){
-                public void sample() {setValue(lastEffectiveReleaseTime);}
-            });
+                tmp.addCounter("DataDir", new Instrument<String>() {
+                    public void sample() {
+                        setValue(dataDir.getAbsolutePath());
+                    }
+                });
 
+                tmp.addCounter("Journal Count", new Instrument<Long>(){
+                    public void sample() {setValue((long)getJournalCount());}
+                });
+
+                tmp.addCounter("Index Segment Count", new Instrument<Long>(){
+                    public void sample() {setValue((long)getIndexSegmentCount());}
+                });
+
+                tmp.addCounter("Minimum Release Age", new Instrument<Long>(){
+                    public void sample() {setValue(minReleaseAge);}
+                });
+
+                tmp.addCounter("Release Time", new Instrument<Long>(){
+                    public void sample() {setValue(releaseTime);}
+                });
+
+                tmp.addCounter("Effective Release Time", new Instrument<Long>(){
+                    public void sample() {setValue(lastEffectiveReleaseTime);}
+                });
+
+            }
+            
+            /*
+             * Note: these counters are detached and reattached to the new
+             * live journal during overflow processing.
+             */
+            root.makePath("Live Journal").attach(getLiveJournal().getCounters());
+                        
         }
         
-        return countersRoot;
+        return root;
         
     }
-    
+    private CounterSet root;
+        
     /**
      * {@link ResourceManager} options.
      * 
@@ -198,20 +247,6 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
         super(properties);
         
-    }
-
-    /**
-     * @todo convert to counters or counter xml?
-     */
-    public String getStatistics() {
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("ResourceManager: dataService=" + getDataServiceUUID()
-                + ", dataDir=" + dataDir);
-
-        return sb.toString();
-
     }
 
 }

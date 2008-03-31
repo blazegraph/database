@@ -922,21 +922,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * and moved with their index partitions since validation depends on an
      * unisolated operation comparing the local write set for an index partition
      * with the local index partition.
-     * <p>
-     * The {@link AbstractJournal#closeForWrites(long)} method should be
-     * reworked as "sealStore(long)" or something of that nature whose semantics
-     * are a restart safe conversion of the store into a read-only store with
-     * the specified closeTime. The method should drive through the buffer
-     * strategy and release any write cache since write are no longer allowed.
-     * The file channel could be converted to read-only, but that it not
-     * necessary and it would effect concurrent readers. The method should be
-     * safe for concurrent reads so that we do not need to pause the historical
-     * read service during synchronous overflow.
-     * <p>
-     * When a historical resource is released it is closed (if open) and the
-     * backing file is deleted. This will cause any active readers to throw an
-     * exception, most probably indicating that the store or the file channel is
-     * "not open".
      */
     static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
 

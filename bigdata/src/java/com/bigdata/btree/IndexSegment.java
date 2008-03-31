@@ -117,7 +117,7 @@ public class IndexSegment extends AbstractBTree {
      *       Consider whether we can use only a read-retention queue for an
      *       index segment.
      * 
-     * @see IndexSegmentStore#load()
+     * @see IndexSegmentStore#loadIndexSegment()
      */
     public IndexSegment(IndexSegmentStore fileStore) {
 

@@ -581,9 +581,16 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
 
 Short term tasks:
 
-   - ** Maven 2.x build and subversion for bigdata.
+   - (*) Builds and releases.
+   
+      - Change over to subversion so that the edit trail does not get
+        lost.
 
-   - * Start doing snapshot releases.
+      - Maven 2.x build
+      
+         - Start doing snapshot releases.
+
+	 - Start periodic project documentation builds, perhaps on SF.
 
    - Counters
 
@@ -603,11 +610,17 @@ Short term tasks:
 
      - Add a moving average computation to History
 
+     - Add counters for #of index partition split, move (on/off), and
+       join operations (OverflowManager).  Also report #of errors
+       during asynchronous overflow processing.
+
      - Add counter to the write service that reports the #of tasks
        which have their locks and are actually doing their work
-       concurrently.  This is the real concurrency of the tasks.  The
-       #of active tasks in the write service is a red herring since
-       those tasks could be waiting for their locks.
+       concurrently (LockManager defines such a counter but we need
+       its moving average not the instantaneous value).  This is the
+       real concurrency of the tasks.  The #of active tasks in the
+       write service is a red herring since those tasks could be
+       waiting for their locks.
 
        Done, but report the averageQueueLength for both tasks holding
        their locks and for all active tasks in the pool since both are
@@ -664,7 +677,7 @@ Short term tasks:
        store needs to use an extended split handler that always
        chooses a split point which is on a logical row boundary.
 
-   - *** The consistentRead option used by the
+   - * The consistentRead option used by the
      PartitionedIndexRangeIterator needs to use the most recent commit
      time for the federation.
 
@@ -686,38 +699,118 @@ Short term tasks:
      the federation as a whole and use that as the time for a
      consistentRead operation.
 
+   - OverflowManager
+
+      - Could optionally convert from  a fully-buffered to a disk-only
+        store  in  order to  reduce  the  memory  footprint for  fully
+        buffered  stores,  but in  that  case  this conversion  should
+        happen once asynchronous overflow handling was complete.
+
    - StoreManager / IndexManager
 
-      - Modify LRU to purge entries older than a specified age
-        (including an asych daemon thread to make sure that they get
+      - Modify  LRU  to  purge  entries  older than  a  specified  age
+        (including an asych  daemon thread to make sure  that they get
         purged even if the LRU is not being touched).  Do this for the
         index segment cache in the IndexManager as well.
 
-      - Modify to NOT fully buffer index segment stores when scanning
-        during startup!
+      - (*) Better concurrency for openIndex, openStore, getJournal,
+        and getIndexOnStore
 
-   - The LockManager should periodically purge unused resources.
-     Otherwise the size of its internal map from resource name to
-     resource queue will grow without bound on a data service as index
-     partitions are split and moved around.  Maybe use a
-     WeakValueCache rather than a HashMap?
+   - LockManager
 
-   - ** closeForWrites()
+       - Use a WeakValueCache to purge unused resources.  The size of
+         its internal map from resource name to resource queue will
+         grow without bound on a data service as index partitions are
+         split and moved around.  There are notes on this issue in the
+         LockManager class.
 
-      - MUST NOT close the journal or concurrent readers will get
-        hosed since they are NOT suspended during synchronous overflow
-        processing.
+   - DiskOnlyStrategy
+   
+     - Lazy creation of the backing file.
 
-      - MUST discard the write cache in order to reduce the memory
-        footprint.
+     - An LRU read cache for records.
 
-      - Could optionally convert from a fully-buffered to a disk-only
-        store in order to reduce the memory footprint for fully
-        buffered stores, but in that case this conversion should
-        happen once asynchronous overflow handling was complete.
+       This could be a big win for the DiskOnlyStrategy.  Either make
+       this its own layer that can be interposed between the journal
+       and the DiskOnlyStrategy or add directly to the
+       DiskOnlyStrategy since a read cache is not required for the
+       fully buffered modes. Regardless, allow configuration of the
+       cache size.
 
-      - There is very little logic to enforce read-only semantics on a
-        journal at this time.
+       Also, efficient nextLeaf could improve read performance by
+       reducing node reads.
+
+     - Done. Enforce read-only semantics.
+
+     - closeForWrites()
+
+      - Done. MUST NOT close the journal or concurrent readers will
+        get hosed since they are NOT suspended during synchronous
+        overflow processing.
+
+      - Done. MUST discard the write cache in order to reduce the
+        memory footprint.  I believe that reads on the write cache
+        always return a ByteBuffer backed by a new byte[] so this
+        should not be a problem.
+
+     - CounterSets
+
+       - Done. Add CounterSet reporting and link into journal counter
+         set reporting and then into the ResourceManager counter set
+         for the live journal.
+
+       - Add counters designed to give insight into whether the write
+         cache tends to full up completely or only partly before the
+         next group command and the #of bytes that tend to be written.
+         What I want to understand is whether the cache is too large
+         and whether an asynchronous of the cache to the disk would be
+         a benefit.
+
+	 Note that writes which would exceed the remaining cache size
+         cause the existing cache to be flushed while writes that
+         exceed the cache capacity are written directly to the disk -
+         the cache itself is always dense in terms of the bytes
+         written on the address space.
+
+     - ** Write cache synchronization problem. The problem arose with
+       the change to the group commit.  Since it now checkpoints
+       indices and allows writers to continue during commits there are
+       now concurrent writers when we call force.
+
+       - Try AbstractMRMWTestCase for demonstrating this problem, but
+         it might not trigger commits and if not then it would not
+         demonstrate this problem.
+
+       - change the stress test to allow N indices so that we can see
+         the effect of concurrent writers during commits
+
+	 I've done this but it still does not trigger the error.  I
+	 see the error more readily with
+	 TestScaleOutTripleStoreWithXXXFederation /
+	 TestInsertRate#test_small
+
+	 I have also seen this problem there:
+
+	 java.lang.AssertionError
+	     at com.bigdata.resources.OverflowManager.shouldOverflow(OverflowManager.java:537)
+	     at com.bigdata.journal.WriteExecutorService.overflow(WriteExecutorService.java:1017)
+	     at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:953)
+
+       - modify force to  use an atomic handoff of  the write cache so
+         that the  net result  is atomic from  the perspective  of the
+         caller.  This may require locking  on the write cache so that
+         we wait until concurrent writes have finished before flushing
+         to the  disk or I  may be able  to use nextOffset to  make an
+         atomic determination of the range of the buffer to be forced,
+         create a  view of that  range, and use  the view to  force to
+         disk so that the position and limits are not changed by force
+         nor by  concurrent writers - this  may also be  a problem for
+         the Direct mode  and the Mapped mode, at least  if they use a
+         write cache.
+
+      - Async cache writes are also useful if the disk cache is turned
+        off and could gain importance in offering tighter control over
+        IO guarentees.
 
    - **** Full text indexing for KB.
 
@@ -745,7 +838,7 @@ Short term tasks:
 
    - stress testing with index partition moves, not just split/join.
 
-   - correctness testing for scale-out.
+   - ** correctness testing for scale-out.
 
    - streaming io for block read/write.  note that asynch IO for the
      disk only strategy will not have an impact if we are doing
@@ -856,24 +949,6 @@ Can the writeCacheFlush be made thread-safe so that if there are
 concurrent writers on the store that they do not interfere with the
 write or corrupt the write cache buffer's contents?
 
-On reflection, the problem is the change to the group commit.  Since
-it now checkpoints indices and allows writers to continue during
-commits there are now concurrent writers when we call force.
-
-   - change the stress test to allow N indices so that we can see the
-     effect of concurrent writers during commits.
-
-   - modify force to use an atomic handoff of the write cache so that
-     the net result is atomic from the perspective of the caller.
-     This may require locking on the write cache so that we wait until
-     concurrent writes have finished before flushing to the disk or I
-     may be able to use nextOffset to make an atomic determination of
-     the range of the buffer to be forced, create a view of that
-     range, and use the view to force to disk so that the position and
-     limits are not changed by force nor by concurrent writers.
-
-   - this may also be a problem for the Direct mode and the Mapped
-     mode.
 
 ============================================================
 
@@ -922,4 +997,37 @@ Caused by: java.lang.RuntimeException: unknown node type=17
 	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:163)
 	at com.bigdata.btree.BatchInsert.apply(BatchInsert.java:1)
 	at com.bigdata.journal.IndexProcedureTask.doTask(IndexProcedureTask.java:56)
+
+
+Also, in TestConcurrentJournal#test_concurrentReadersAreOk
+
+java.lang.AssertionError: limit=0, byteCount(addr)=392, addr={nbytes=392,offset=486601}
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:2056)
+	at com.bigdata.btree.Node.getChild(Node.java:2110)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:1)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:59)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:56)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Appenderator.hasNext(Appenderator.java:52)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at cutthecrap.utils.striterators.Expanderator.hasNext(Expanderator.java:58)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.btree.AbstractNode$PostOrderEntryIterator.hasNext(AbstractNode.java:669)
+	at com.bigdata.btree.ReadOnlyEntryIterator.hasNext(ReadOnlyEntryIterator.java:58)
+	at com.bigdata.journal.TestConcurrentJournal$1ReadTask.doTask(TestConcurrentJournal.java:1701)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:684)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:603)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run(Thread.java:595)
 

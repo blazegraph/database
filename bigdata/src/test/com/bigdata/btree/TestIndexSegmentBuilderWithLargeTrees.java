@@ -266,7 +266,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractBTreeTestCase
              * of serialized nodes or leaves).
              */
             System.err.println("Opening index segment.");
-            final IndexSegment seg = new IndexSegmentStore(outFile).load();
+            final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
             /*
              * Verify the total index order.
              */

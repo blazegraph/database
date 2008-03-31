@@ -300,14 +300,6 @@ public class LockManagerTask<R extends Comparable<R>> implements
         /*
          * Run the task now that we have the necessary lock(s).
          */
-        /*
-         * Note: "running" means in "run()". 
-         */
-        long nrunning = lockManager.nrunning.incrementAndGet();
-
-        // Note: not really atomic and hence only approximate.
-        lockManager.maxrunning.set(Math.max(lockManager.maxrunning.get(), nrunning));
-
         try {
 
             log.info(toString() + ": run - start");
@@ -318,10 +310,26 @@ public class LockManagerTask<R extends Comparable<R>> implements
                 
             }
             
-            final Object ret = target.call();
+            /*
+             * Note: "running" means in "call()" for the delegate task.
+             */
+            final long nrunning = lockManager.nrunning.incrementAndGet();
 
-            // done "running".
-            lockManager.nrunning.decrementAndGet();
+            // Note: not really atomic and hence only approximate.
+            lockManager.maxrunning.set(Math.max(lockManager.maxrunning.get(),
+                    nrunning));
+
+            final Object ret;
+            try {
+
+                ret = target.call();
+
+            } finally {
+
+                // done "running".
+                lockManager.nrunning.decrementAndGet();
+
+            }
 
             log.info(toString() + ": run - end");
 
@@ -330,9 +338,6 @@ public class LockManagerTask<R extends Comparable<R>> implements
             return ret;
 
         } catch (Throwable t) {
-
-            // done "running".
-            lockManager.nrunning.decrementAndGet();
 
             if (t instanceof HorridTaskDeath) {
 

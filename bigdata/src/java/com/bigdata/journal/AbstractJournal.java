@@ -53,6 +53,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
@@ -127,7 +128,6 @@ import com.bigdata.util.ChecksumUtility;
  * metadata, indices, and distributed split cache and hot cache support.</li>
  * <li> Scale-out database, including:
  * <ul>
- * <li> Resource reclaimation. </li>
  * <li> Media replication for data service failover </li>
  * <li> Transaction service (low-latency with failover instances that keep track
  * of the current transaction metadata).</li>
@@ -932,8 +932,6 @@ public abstract class AbstractJournal implements IJournal {
     }
 
     /**
-     * @todo consider wrapping up the properties rather than cloning them.
-     *  
      * @todo consider making the properties restart safe so that they can be
      *       read from the journal. This will let some properties be specified
      *       on initialization while letting others default or be overriden on
@@ -945,7 +943,7 @@ public abstract class AbstractJournal implements IJournal {
      */
     final public Properties getProperties() {
 
-        return (Properties) properties.clone();
+        return new Properties( properties );
 
     }
 
@@ -1019,25 +1017,27 @@ public abstract class AbstractJournal implements IJournal {
     }
     
     /**
-     * Statistics describing the journal including IO, indices, etc.
+     * Statistics describing the journal including IO, registered indices, etc.
      * 
-     * @deprecated by {@link #getCounters()}
+     * @todo Since this reports on the registered indices as of the current
+     *       commit record it presents data which is not available via
+     *       {@link #getCounters()}. Is there any meaningful way to add that
+     *       data to {@link #getCounters()} since it is structurally dynamic?
+     * 
+     * @todo make this 100% XML by changing {@link BTree} to report counters as
+     *       XML and placing the index counters under a path corresponding to
+     *       the index name. indices are added and dropped, but the counter
+     *       reporting should probably be "at the instant" rather than modifying
+     *       the defined counter hierarchy as those indices are created and
+     *       destroyed just to keep down the memory profile if there happens to
+     *       be a large #of indices. the internal indices (name2addr and the
+     *       commit record index) could also be reported on in this manner.
      */
     public String getStatistics() {
 
         StringBuilder sb = new StringBuilder();
 
-        if(_bufferStrategy instanceof DiskOnlyStrategy) {
-        
-            sb.append(((DiskOnlyStrategy)_bufferStrategy).getStatistics());
-            
-        } else {
-
-            sb.append("\nfile="+getFile());
-            
-            sb.append("\nbyteCount="+getBufferStrategy().getNextOffset());
-
-        }
+        sb.append(_bufferStrategy.getCounters().toString());
         
         /*
          * Report on the registered indices.
@@ -1064,16 +1064,26 @@ public abstract class AbstractJournal implements IJournal {
         
     }
     
+    /**
+     * Return counters reporting on various aspects of the journal.
+     */
     synchronized public CounterSet getCounters() {
         
-        if(counters==null) {
+        if (counters == null) {
 
             counters = new CounterSet();
-         
-            // FIXME setup various counters from getStatistics()
+
+            counters.addCounter("file", new Instrument<String>() {
+                public void sample() {
+                    File file = _bufferStrategy.getFile();
+                    setValue(file == null ? "N/A" : file.getAbsolutePath());
+                }
+            });
             
+            counters.attach(_bufferStrategy.getCounters());
+
         }
-        
+
         return counters;
         
     }
@@ -1092,7 +1102,7 @@ public abstract class AbstractJournal implements IJournal {
         
         assertOpen();
 
-        log.info("");
+        log.warn("file="+getFile());
         
         _bufferStrategy.close();
 
@@ -1136,13 +1146,16 @@ public abstract class AbstractJournal implements IJournal {
     }
     
     /**
-     * Sets the "closeTime" on the root block such that the journal will no
-     * longer accept writes, flushes all buffered writes, and releases any write
-     * cache buffers since they will no longer be used. This method is normally
-     * used when one journal is being closed out for writes during synchronous
-     * overflow processing and new writes will be buffered on a new journal. The
-     * has advantages over closing the journal directly including that it does
-     * not disturb concurrent readers.
+     * Restart safe conversion of the store into a read-only store with the
+     * specified <i>closeTime</i>.
+     * <p>
+     * This implementation sets the "closeTime" on the root block such that the
+     * journal will no longer accept writes, flushes all buffered writes, and
+     * releases any write cache buffers since they will no longer be used. This
+     * method is normally used when one journal is being closed out for writes
+     * during synchronous overflow processing and new writes will be buffered on
+     * a new journal. This has advantages over closing the journal directly
+     * including that it does not disturb concurrent readers.
      * <p>
      * Note: The caller MUST have exclusive write access to the journal.
      * <p>
@@ -1150,25 +1163,7 @@ public abstract class AbstractJournal implements IJournal {
      * discarded.
      * 
      * @throws IllegalStateException
-     *             If there are no commits on the journal.  (A journal with no
-     *             commits can not be re-opened in a read-only mode so closing
-     *             out writes on that journal will only lead to an error when
-     *             you try to re-open the journal later.)
-     * 
-     * @todo write unit tests for this. Make sure that the journal can not be
-     *       re-opened in a read-write mode (only as a read-only journal).
-     * 
-     * FIXME rework so that this does not close the journal, just "seals" it in
-     * a restart-safe manner against further writes (including flushing the
-     * final root block to disk) and discards the write cache (if any) since it
-     * will no longer be used. At present there is not much logic testing for
-     * read-only - the transient store appears to always be read/write while the
-     * disk backed stores appear to rely on the mode in which the file was
-     * opened. One choice is to close the {@link IBufferStrategy} and then
-     * re-open it as readOnly, but that requires a synchronization point for
-     * readers as well. Even then, the {@link DiskOnlyStrategy} does not
-     * consider the file mode or {@link FileMetadata#readOnly} and will
-     * therefore reallocate a write cache.
+     *             If there are no commits on the journal.
      * 
      * FIXME There should also be an option to convert a journal from
      * {@link BufferMode#Direct} to {@link BufferMode#Disk}. We would want to
@@ -1178,15 +1173,15 @@ public abstract class AbstractJournal implements IJournal {
      */
     public void closeForWrites(long closeTime) {
         
-        log.info("Closing journal for further writes: closeTime=" + closeTime
+        log.warn("Closing journal for further writes: closeTime=" + closeTime
                 + ", lastCommitTime=" + _rootBlock.getLastCommitTime());
         
         final IRootBlockView old = _rootBlock;
 
-        if(old.getCommitCounter()==0L) {
-            
+        if (old.getCommitCounter() == 0L) {
+
             throw new IllegalStateException("No commits on journal");
-            
+
         }
         
         /*
@@ -1210,16 +1205,17 @@ public abstract class AbstractJournal implements IJournal {
         /*
          * Write it on the store.
          * 
-         * Note: We request that the write is forced to disk since close() will
-         * not force buffered writes. This is necessary in order to make sure
-         * that the updated root block (and anything left in the write cache for
-         * the disk buffer) get forced through onto the disk. We do not need to
-         * specify ForceMetadata here since the file size is unchanged by this
-         * operation.
+         * Note: We request that the write is forced to disk to ensure that all
+         * buffered writes are forced to the disk. This is necessary in order to
+         * make sure that the updated root block (and anything left in the write
+         * cache for the disk buffer) get forced through onto the disk. We do
+         * not need to specify ForceMetadata here since the file size is
+         * unchanged by this operation.
          */
         _bufferStrategy.writeRootBlock(newRootBlock, ForceEnum.Force);
 
-//        _bufferStrategy.closeForWrites();
+        // discard write cache and make store read-only.
+        _bufferStrategy.closeForWrites();
         
         // replace the root block reference.
         _rootBlock = newRootBlock;
@@ -1227,7 +1223,7 @@ public abstract class AbstractJournal implements IJournal {
         // discard current commit record - can be re-read from the store.
         _commitRecord = null;
        
-        close();
+//        close();
         
     }
     
@@ -1295,10 +1291,18 @@ public abstract class AbstractJournal implements IJournal {
 
     }
 
+    /**
+     * Return <code>true</code> if the journal was opened in a read-only mode
+     * or if {@link #closeForWrites(long)} was used to seal the journal against
+     * further writes.
+     */
     public boolean isReadOnly() {
         
-        // FIXME handling of read-only restrictions is not very good
-        return readOnly || getRootBlockView().getCloseTime() != 0L;
+//        return readOnly || getRootBlockView().getCloseTime() != 0L;
+        
+        assertOpen();
+        
+        return _bufferStrategy.isReadOnly();
         
     }
     

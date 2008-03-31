@@ -158,7 +158,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
         super(maximumExtent, fileMetadata.offsetBits, fileMetadata.nextOffset,
                 FileMetadata.headerSize0, fileMetadata.extent, bufferMode,
-                fileMetadata.buffer);
+                fileMetadata.buffer, fileMetadata.readOnly);
 
         this.file = fileMetadata.file;
         

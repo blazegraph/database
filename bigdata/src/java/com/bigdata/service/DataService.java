@@ -30,6 +30,7 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.UUID;
@@ -808,14 +809,15 @@ abstract public class DataService implements IDataService, IWritePipeline,
     }
 
     /**
-     * FIXME Make this an XML Serialization of performance counters describing
-     * the data service, so the return type should be a byte[] or a String iff
-     * we write onto a StringWriter... It is currently the toString()
-     * serialization of the counters.
+     * An XML Serialization of performance counters.
      */
     public String getStatistics() throws IOException {
         
-        return getCounters().toString();
+        StringWriter w = new StringWriter();
+        
+        getCounters().asXML(w, null/*filter*/);
+        
+        return w.toString();
         
     }
 

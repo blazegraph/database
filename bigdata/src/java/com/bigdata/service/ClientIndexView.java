@@ -774,10 +774,19 @@ public class ClientIndexView implements IIndex {
                 + " will be mapped across index partitions in "
                 + (parallel ? "parallel" : "sequence"));
 
-        // max #of tasks to queue at once.
-        final int maxTasks = Math.min(((ThreadPoolExecutor) getThreadPool())
-                .getCorePoolSize(), fed.getClient().getMaxParallelTasksPerRequest());
+        final int poolSize = ((ThreadPoolExecutor) getThreadPool())
+                .getCorePoolSize();
 
+        final int maxTasksPerRequest = fed.getClient().getMaxParallelTasksPerRequest();
+        
+        // max #of tasks to queue at once.
+        final int maxTasks = poolSize == 0 ? maxTasksPerRequest : Math.min(
+                poolSize, maxTasksPerRequest);
+
+        // verify positive or the loop below will fail to progress.
+        assert maxTasks > 0 : "maxTasks=" + maxTasks + ", poolSize=" + poolSize
+                + ", maxTasksPerRequest=" + maxTasksPerRequest;
+        
         // scan spanned index partition locators in key order.
         final ITupleIterator itr = locatorScan(fromKey, toKey);
         
@@ -930,6 +939,14 @@ public class ClientIndexView implements IIndex {
     protected void runTasks(final boolean parallel,
             final ArrayList<Callable<Void>> tasks) {
 
+        if(tasks.isEmpty()) {
+            
+            log.warn("No tasks to run?",new RuntimeException("No tasks to run?"));
+            
+            return;
+            
+        }
+        
         if (getRecursionDepth().get() > 0) {
 
             /*

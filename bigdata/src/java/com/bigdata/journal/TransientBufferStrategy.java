@@ -55,13 +55,15 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
          */
         super(  maximumExtent,
                 offsetBits,
-                0/* nextOffset */, //
-                0/*headerSize*/, //
+                0, // nextOffset
+                0, // headerSize
                 initialExtent, //
                 BufferMode.Transient, //
                 (useDirectBuffers ? ByteBuffer
                         .allocateDirect((int) initialExtent) : ByteBuffer
-                        .allocate((int) initialExtent)));
+                        .allocate((int) initialExtent)),
+                false// readOnly
+        );
         
     }
     

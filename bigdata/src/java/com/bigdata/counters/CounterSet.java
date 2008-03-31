@@ -289,7 +289,7 @@ public class CounterSet implements ICounterSet {
     synchronized public void attach(ICounterNode src) {
         
         // FIXME detect cycles.
-
+        
         if(src.isRoot()) {
             
             /*
@@ -314,9 +314,13 @@ public class CounterSet implements ICounterSet {
         
     }
 
+    /**
+     * @todo during recursive attach if we encounter a node that already exists
+     *       then just copy its children.
+     */
     @SuppressWarnings("unchecked")
     private void attach2(ICounterNode child) {
-        
+
         if (child == null)
             throw new IllegalArgumentException();
 
@@ -369,6 +373,40 @@ public class CounterSet implements ICounterSet {
         
     }
 
+    /**
+     * Detaches and returns the node having that path.
+     * 
+     * @param path
+     *            The path.
+     * @return The node -or- <code>null</code> if there is no node with that
+     *         path.
+     */
+    synchronized public ICounterNode detach(String path) {
+        
+        final ICounterNode node = getPath(path);
+        
+        if(node != null && !node.isRoot() ) { 
+            
+            final CounterSet p = (CounterSet)node.getParent();
+            
+            p.children.remove(node.getName());
+            
+            if(node.isCounterSet()) {
+                
+                ((CounterSet)node).parent = null;
+                
+            } else {
+                
+                ((Counter)node).parent = null;
+                
+            }
+            
+        }
+        
+        return node;
+        
+    }
+    
     /**
      * Visits counters belonging directly to this set of counters and
      * matching the optional filter.
@@ -895,13 +933,29 @@ public class CounterSet implements ICounterSet {
      *          &lt;/cs&gt;
      *           &lt;/counters&gt;
      * </pre>
-     * 
      */
     public void asXML(OutputStream os, String encoding, Pattern filter) throws IOException {
         
         final Writer w = new OutputStreamWriter(os, encoding);
         
         w.write("<?xml version=\"1.0\" encoding=\""+encoding+"\" ?>");
+
+        asXML(w, filter);
+        
+    }
+    
+    /**
+     * Per {@link #asXML(OutputStream, String, Pattern)} but does not write out
+     * the header declaring the encoding.
+     * 
+     * @param w
+     *            The XML will be written on this object.
+     * @param filter
+     *            The optional filter.
+     *            
+     * @throws IOException
+     */
+    public void asXML(Writer w, Pattern filter) throws IOException  {
         
         w.write("<counters");
         w.write(" xmlns:xs=\""+NAMESPACE_XSD+"\"");
@@ -941,8 +995,8 @@ public class CounterSet implements ICounterSet {
                 final String type = getXSDType(value);
             
                 final long time = counter.lastModified();
-                
-                if(time<=0L) {
+
+                if (time <= 0L) {
                     
                     /*
                      * Zero and negative timestamps are generally an indicator
@@ -969,7 +1023,7 @@ public class CounterSet implements ICounterSet {
                 // FIXME encode for XML.
                 w.write("" + value);
                 
-                w.write("</c>");
+                w.write("</c\n>");
                 
             }
 

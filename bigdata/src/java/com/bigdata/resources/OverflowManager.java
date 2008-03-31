@@ -51,6 +51,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ConcurrencyManager;
@@ -479,7 +480,6 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * An overflow condition is recognized when the journal is within some
      * declared percentage of {@link Options#MAXIMUM_EXTENT}.
-     * 
      */
     public boolean shouldOverflow() {
      
@@ -530,12 +530,8 @@ abstract public class OverflowManager extends IndexManager {
              * will run out of memory if you use a fully buffered mode).
              */
             
-//            final long limit = Math.max(journal.maximumExtent, journal
-//                    .getBufferStrategy().getUserExtent());
-            
             nextOffset = journal.getRootBlockView().getNextOffset();
-            assert nextOffset == journal.getBufferStrategy().getNextOffset();
-
+            
             if (nextOffset > .9 * journal.getMaximumExtent()) {
 
                 shouldOverflow = true;
@@ -665,10 +661,6 @@ abstract public class OverflowManager extends IndexManager {
      *            Any index partitions that are copied are added to this set.
      * 
      * @return The lastCommitTime of the old journal.
-     * 
-     * @todo closing out and re-opening the old journal as read-only is going to
-     *       discard some buffering that we might prefer to keep on hand during
-     *       the {@link PostProcessOldJournalTask}.
      */
     protected long doOverflow(Set<String> copied) {
         
@@ -996,17 +988,17 @@ abstract public class OverflowManager extends IndexManager {
         /*
          * Close out the old journal.
          * 
-         * FIXME closeForWrites() MUST NOT "close" the old journal or we can
-         * trash concurrent readers. Note that we only have an exclusive lock on
-         * the writeService, NOT the readService or the txWriteService.
+         * Note: closeForWrites() does NOT "close" the old journal in order to
+         * avoid disturbing concurrent readers (we only have an exclusive lock
+         * on the writeService, NOT the readService or the txWriteService).
          */
         {
             
             // writes no longer accepted.
             oldJournal.closeForWrites(closeTime);
-            
-            // remove from list of open journals.
-            storeCache.remove(oldJournal.getRootBlockView().getUUID());
+
+//            // remove from list of open journals.
+//            storeCache.remove(oldJournal.getRootBlockView().getUUID());
 
             log.info("Closed out the old journal.");
             
@@ -1026,6 +1018,26 @@ abstract public class OverflowManager extends IndexManager {
             
             log.info("Changed over to a new live journal");
 
+        }
+        
+        /*
+         * Change over the counter set to the new live journal.
+         * 
+         * Note: The spelling of the counter set names MUST be consistent with
+         * their declarations!
+         */
+        try {
+
+            final CounterSet tmp = (CounterSet)getCounters();
+            
+            tmp.detach("Live Journal");
+            
+            tmp.makePath("Live Journal").attach(getLiveJournal().getCounters());
+
+        } catch(Throwable t) {
+            
+            log.warn("Problem updating counters: "+t, t);
+            
         }
         
         /*

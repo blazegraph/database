@@ -62,7 +62,6 @@ import com.bigdata.journal.QueueLengthTask;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.DefaultSplitHandler;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService.Options;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -211,10 +210,17 @@ public class StressTestConcurrent extends
         int nops = 100;
         int nindices = 1;
 
-        
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
                 nops, nindices);
 
+        log.info("dataService0\n" + dataService0.getStatistics());
+       
+        if (dataService1 != null) {
+            
+            log.info("dataService1\n" + dataService1.getStatistics());
+            
+        }
+        
     }
 
     /**
@@ -342,8 +348,9 @@ public class StressTestConcurrent extends
         
         }
                 
-        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(
-                nclients, DaemonThreadFactory.defaultThreadFactory());
+        final ThreadPoolExecutor executorService = (ThreadPoolExecutor) Executors
+                .newFixedThreadPool(nclients, DaemonThreadFactory
+                        .defaultThreadFactory());
 
         // will log the behavior of this queue.
         {        
@@ -386,7 +393,7 @@ public class StressTestConcurrent extends
         
         log.warn("Examining task results: elapsed="+elapsed);
         
-        Iterator<Future<Void>> itr = results.iterator();
+        final Iterator<Future<Void>> itr = results.iterator();
         
         int nfailed = 0; // #of operations that failed
         int ncommitted = 0; // #of operations that committed.

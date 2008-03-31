@@ -25,6 +25,8 @@ package com.bigdata.btree;
 
 import java.text.NumberFormat;
 
+import com.bigdata.counters.CounterSet;
+
 /**
  * A helper class that collects statistics on an {@link AbstractBTree}.
  * 
@@ -38,7 +40,7 @@ import java.text.NumberFormat;
  *       isolated persistent index), and evaluate the buffer strategy by
  *       comparing accesses with IOs.
  * 
- * @todo expose more of the counters using property access methods.
+ * @todo report counters using {@link CounterSet}
  */
 public class Counters {
 

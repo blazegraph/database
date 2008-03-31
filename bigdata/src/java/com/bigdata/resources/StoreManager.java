@@ -37,15 +37,10 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -53,21 +48,15 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakCacheEntryFactory;
 import com.bigdata.cache.WeakValueCache;
-import com.bigdata.cache.WeakValueCache.IClearReferenceListener;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
-import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Name2Addr;
-import com.bigdata.journal.Options;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
@@ -76,9 +65,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.MetadataService;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Class encapsulates logic for managing the store files (journals and index
@@ -133,14 +120,18 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
     /**
      * Options for the {@link StoreManager}.
+     * <p>
+     * Note: See {@link com.bigdata.journal.Options} for options that may be
+     * applied when opening an {@link AbstractJournal}.
+     * <p>
+     * Note: See {@link IndexSegmentStore.Options} for options that may be
+     * applied when opening an {@link IndexSegment}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo add options to control whether an {@link IndexSegmentStore} is
-     *       opened with the nodes fully buffered.
      */
-    public static interface Options extends com.bigdata.journal.Options {
+    public static interface Options extends com.bigdata.journal.Options,
+            IndexSegmentStore.Options {
         
         /**
          * <code>data.dir</code> - The property whose value is the name of the
@@ -321,10 +312,6 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * 
      * FIXME make sure this cache purges entries that have not been touched in
      * the last N seconds, where N might be 60.
-     * 
-     * FIXME make sure that we do not fully buffer an {@link IndexSegmentStore}
-     * in {@link #scanFile(File, com.bigdata.resources.StoreManager.Stats)} -
-     * what a waste that would be!
      */
     final protected WeakValueCache<UUID, IRawStore> storeCache;
 
@@ -922,13 +909,13 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     
     public void shutdown() {
 
-        final long begin = System.currentTimeMillis();
-        
         assertOpen();
 
 //        // closeStoreService shutdown
 //        {
 //
+//        final long begin = System.currentTimeMillis();
+//        
 //            /*
 //             * Note: when the timeout is zero we approximate "forever" using
 //             * Long.MAX_VALUE.
@@ -1094,8 +1081,14 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
         } else if (name.endsWith(Options.SEG)) {
 
-            final IndexSegmentStore segStore = new IndexSegmentStore(file
-                    .getAbsoluteFile());
+            final Properties p = new Properties();
+            
+            p.setProperty(IndexSegmentStore.Options.SEGMENT_FILE, file.getAbsolutePath());
+            
+            // Note: disables buffering nodes during the scan.
+            p.setProperty(IndexSegmentStore.Options.MAX_BYTES_TO_FULLY_BUFFER_NODES,"1");
+            
+            final IndexSegmentStore segStore = new IndexSegmentStore( p );
 
             try {
 
@@ -1403,10 +1396,12 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * @throws RuntimeException
      *             if something goes wrong.
      * 
-     * @todo Since these operations can have modest latency, especially if we
-     *       open an fully buffered index segment, it would be nice to use a
-     *       per-store (or store UUID) lock to avoid imposing latency on threads
-     *       requiring access to different stores.
+     * FIXME per-store lock to reduce latency.
+     * <p>
+     * Since these operations can have modest latency, especially if we open an
+     * fully buffered index segment, it would be nice to use a per-store (or
+     * store UUID) lock to avoid imposing latency on threads requiring access to
+     * different stores.
      */
     synchronized public IRawStore openStore(UUID uuid) {
 

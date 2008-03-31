@@ -33,6 +33,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 
@@ -98,6 +99,15 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
     public boolean isOpen() {
 
         return open;
+        
+    }
+    
+    public boolean isReadOnly() {
+
+        if (!open)
+            throw new IllegalArgumentException();
+
+        return false;
         
     }
     
@@ -388,4 +398,12 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
     
+    synchronized public CounterSet getCounters() {
+        if(root==null) {
+            root = new CounterSet();
+        }
+        return root;
+    }
+    private CounterSet root;
+
 }

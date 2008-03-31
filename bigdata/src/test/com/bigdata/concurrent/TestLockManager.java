@@ -373,7 +373,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
         }
 
         // Done.
-        System.out.println(db.status());
+        System.out.println(db.toString());
 
         Result result = new Result();
 
