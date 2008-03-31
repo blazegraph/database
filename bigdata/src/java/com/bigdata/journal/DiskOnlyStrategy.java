@@ -71,8 +71,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * http://mail-archives.apache.org/mod_mbox/db-derby-dev/200609.mbox/%3C44F820A8.6000000@sun.com%3E
  * 
  * <pre>
- *             /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
- *             /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
+ *                /sbin/hdparm -W 0 /dev/hda 0 Disable write caching
+ *                /sbin/hdparm -W 1 /dev/hda 1 Enable write caching
  * </pre>
  * 
  * @todo report whether or not the on-disk write cache is enabled for each
@@ -97,7 +97,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       writeQueue. A thread reads from the writeQueue and performs writes,
  *       placing empty WriteCache objects onto the availableQueue. Sync places
  *       the current writeCache on the writeQueue and then waits on the
- *       writeQueue to be empty.  Large objects could be wrapped and written out
+ *       writeQueue to be empty. Large objects could be wrapped and written out
  *       using the same mechansims but should not become "available" again after
  *       they are written.
  *       <p>
@@ -106,6 +106,19 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       disk rather than from a WriteCache. In this case we might do a larger
  *       read so as to populate more of the WriteCache object in the hope that
  *       we will have more hits in that part of the journal.
+ *       <p>
+ *       modify force to use an atomic handoff of the write cache so that the
+ *       net result is atomic from the perspective of the caller. This may
+ *       require locking on the write cache so that we wait until concurrent
+ *       writes have finished before flushing to the disk or I may be able to
+ *       use nextOffset to make an atomic determination of the range of the
+ *       buffer to be forced, create a view of that range, and use the view to
+ *       force to disk so that the position and limits are not changed by force
+ *       nor by concurrent writers - this may also be a problem for the Direct
+ *       mode and the Mapped mode, at least if they use a write cache.
+ *       <p>
+ *       Async cache writes are also useful if the disk cache is turned off and
+ *       could gain importance in offering tighter control over IO guarentees.
  * 
  * FIXME Add lazy creation of the backing file so that we can use the
  * {@link DiskOnlyStrategy} for temporary stores as well. The backing file will
@@ -1045,8 +1058,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      */
     public void force(boolean metadata) {
 
-        // flush all pending writes to disk.
-        flushWriteCache();
+        synchronized(this) {
+
+            // flush all pending writes to disk.
+            flushWriteCache();
+            
+        }
 
         try {
 

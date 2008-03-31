@@ -74,9 +74,6 @@ import com.bigdata.service.MetadataService;
  * is used to coordinate the close out of index resources (and their backing
  * stores) on an LRU basis by the {@link ResourceManager}.
  * 
- * @todo review use of synchronization and make sure that there is no way in
- *       which we can double-open a store or index.
- * 
  * @todo Scale-out index import and index recovery
  *       <p>
  *       Note that key range partitioned indices are simply registered under a
@@ -740,6 +737,9 @@ abstract public class IndexManager extends StoreManager {
              * 
              * FIXME Make sure that we properly synchronize getIndexSources(),
              * getJournal(), and getIndexOnStore().
+             * 
+             * @todo review use of synchronization and make sure that there is
+             * no way in which we can double-open a store or index.
              */
 //            synchronized (this) 
             {

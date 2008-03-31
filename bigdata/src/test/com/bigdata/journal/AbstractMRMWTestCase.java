@@ -57,6 +57,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -130,6 +131,13 @@ abstract public class AbstractMRMWTestCase
          * BOTH writers and readers!
          */
         public static final String PERCENT_READERS = "percentReaders";
+
+        /**
+         * The percentage of those trials that are tasked as a
+         * {@link WriterTask} where the {@link WriterTask} will force the data
+         * to the disk using {@link IRawStore#force(boolean)}.
+         */
+        public static final String PERCENT_WRITER_WILL_FLUSH = "percentWriterWillFlush";
         
         /**
          * The maximum length of the records used in the test.
@@ -167,6 +175,8 @@ abstract public class AbstractMRMWTestCase
 
         final double percentReaders = Double.parseDouble(properties.getProperty(TestOptions.PERCENT_READERS));
         
+        final double percentWritersWillFlush = Double.parseDouble(properties.getProperty(TestOptions.PERCENT_WRITER_WILL_FLUSH));
+        
         final int reclen = Integer.parseInt(properties.getProperty(TestOptions.RECLEN));
 
         final int nwritesPerTask = Integer.parseInt(properties.getProperty(TestOptions.NWRITES));
@@ -174,7 +184,7 @@ abstract public class AbstractMRMWTestCase
         final int nreadsPerTask = Integer.parseInt(properties.getProperty(TestOptions.NREADS));
 
         Result result = doMRMWTest(store, timeout, ntrials, nclients,
-                percentReaders, reclen, nwritesPerTask, nreadsPerTask);
+                percentReaders, percentWritersWillFlush, reclen, nwritesPerTask, nreadsPerTask);
 
         return result;
 
@@ -200,13 +210,15 @@ abstract public class AbstractMRMWTestCase
 
         IRawStore store = getStore();
 
-        final long timeout = 10; // @todo was 5
+        final long timeout = 5;
         
         final int ntrials = 10000;
 
         final int nclients = 20;
         
-        final double percentReaders = .7d;
+        final double percentReaders = .70d;
+        
+        final double percentWriterWillFlush = .10d;
         
         final int reclen = 128;
         
@@ -214,7 +226,7 @@ abstract public class AbstractMRMWTestCase
 
         final int nreads = 100;
         
-        doMRMWTest(store, timeout, ntrials, nclients, percentReaders, reclen, nwrites, nreads);
+        doMRMWTest(store, timeout, ntrials, nclients, percentReaders, percentWriterWillFlush, reclen, nwrites, nreads);
         
     }
 
@@ -243,6 +255,11 @@ abstract public class AbstractMRMWTestCase
      *            [0.0:1.0]. When <code>1.0</code>, only readers will be
      *            created. When <code>0.0</code> only writers will be created.
      * 
+     * @param percentWriterWillFlush
+     *            The percentage of writer clients that will invoke
+     *            {@link IRawStore#force(boolean)} to flush the data to the
+     *            store.
+     * 
      * @param reclen
      *            The length of the random byte[] records used in the
      *            operations.
@@ -254,7 +271,7 @@ abstract public class AbstractMRMWTestCase
      *            The #of records to read per {@link ReaderTask}.
      */
     static public Result doMRMWTest(IRawStore store, long timeout, int ntrials,
-            int nclients, double percentReaders, int reclen,
+            int nclients, double percentReaders, double percentWriterWillFlush, int reclen,
             int nwritesPerTask, int nreadsPerTask) throws Exception {
 
         if (store == null)
@@ -306,8 +323,7 @@ abstract public class AbstractMRMWTestCase
                     
                 } else {
                     
-                    // @todo parameterize
-                    boolean forceToDisk = false; // r.nextDouble() < .01;
+                    final boolean forceToDisk = r.nextDouble() < percentWriterWillFlush;
                     
                     task = new WriterTask(groundTruth, store, reclen, nwritesPerTask, forceToDisk);
                     
@@ -403,13 +419,8 @@ abstract public class AbstractMRMWTestCase
                 
             } catch(ExecutionException ex ) {
 
-                Throwable cause = ex.getCause();
+                if(InnerCause.isInnerCause(ex, ClosedChannelException.class)) {
                 
-                if (cause != null
-                        && cause.getCause() != null
-                        && cause.getCause().getCause() != null
-                        && cause.getCause().getCause() instanceof ClosedChannelException) {
-
                     /*
                      * Note: This is not an error. It is just the behavior of
                      * the channel when we cancelled the running tasks.
@@ -434,7 +445,7 @@ abstract public class AbstractMRMWTestCase
                     
                 }
                 
-                errors[nerr++] = cause;
+                errors[nerr++] = ex.getCause();
                 
             }
             
