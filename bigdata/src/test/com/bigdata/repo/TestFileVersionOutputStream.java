@@ -30,7 +30,6 @@ package com.bigdata.repo;
 
 import java.io.IOException;
 
-import com.bigdata.repo.BigdataRepository.FileVersionOutputStream;
 
 /**
  * Tests some specifics of the {@link FileVersionOutputStream}. These behaviors

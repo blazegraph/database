@@ -38,17 +38,17 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 
 /**
- * Test suite for the {@link EmbeddedBigdataClient}.
+ * Test suite for the {@link EmbeddedClient}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestEmbeddedBigdataClient extends AbstractEmbeddedBigdataFederationTestCase {
+public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
 
-    public TestEmbeddedBigdataClient() {
+    public TestEmbeddedClient() {
     }
 
-    public TestEmbeddedBigdataClient(String name) {
+    public TestEmbeddedClient(String name) {
         super(name);
     }
 

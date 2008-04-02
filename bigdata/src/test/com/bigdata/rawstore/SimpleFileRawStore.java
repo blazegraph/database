@@ -74,7 +74,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
      */
     public SimpleFileRawStore(File file, String mode) throws IOException {
         
-        super(WormAddressManager.DEFAULT_OFFSET_BITS);
+        super(WormAddressManager.SCALE_UP_OFFSET_BITS);
         
         if (file == null)
             throw new IllegalArgumentException("file is null");

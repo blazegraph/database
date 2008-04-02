@@ -32,8 +32,8 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
-import com.bigdata.service.EmbeddedBigdataClient;
-import com.bigdata.service.EmbeddedBigdataFederation;
+import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
 
 /**
@@ -78,10 +78,12 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
         
         Properties properties = new Properties(System.getProperties());
               
-        properties.setProperty(EmbeddedBigdataFederation.Options.DATA_DIR,
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR,
                 getName());
         
-        client = new EmbeddedBigdataClient(properties);
+        client = new EmbeddedClient(properties);
+        
+        client.connect();
         
     }
     

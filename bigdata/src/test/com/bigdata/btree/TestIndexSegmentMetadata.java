@@ -72,7 +72,7 @@ public class TestIndexSegmentMetadata extends TestCase {
         /*
          * Note: allows records up to 64M in length.
          */
-        final int offsetBits = WormAddressManager.BLOB_OFFSET_BITS;
+        final int offsetBits = WormAddressManager.SCALE_OUT_OFFSET_BITS;
 
         /*
          * Fake a checkpoint record. The only parts of this that we need are the

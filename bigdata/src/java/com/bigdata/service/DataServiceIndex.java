@@ -50,8 +50,10 @@ import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.util.InnerCause;
 
 /**
  * A view onto an unpartitioned index living inside an embedded
@@ -80,7 +82,7 @@ public class DataServiceIndex implements IIndex {
     
     private final String name;
     private final long timestamp;
-    private final EmbeddedDataService dataService;
+    private final DataService dataService;
 
     /**
      * The transaction identifier -or- {@link ITx#UNISOLATED} iff the index
@@ -130,15 +132,25 @@ public class DataServiceIndex implements IIndex {
      *            historical read of the most recent committed state not later
      *            than <i>timestamp</i>.
      * @param dataService
-     *            The data service.
+     *            The data service (a local object, not a proxy for a remote
+     *            data service).
+     * 
+     * @throws NoSuchIndexException
+     *             if the named index does not exist.
      */
-    public DataServiceIndex(String name, long timestamp, EmbeddedDataService dataService) {
+    public DataServiceIndex(String name, long timestamp, DataService dataService) {
 
         this.name = name;
         
         this.timestamp = timestamp;
         
         this.dataService = dataService;
+        
+    }
+    
+    public String toString() {
+        
+        return name+" @ "+timestamp;
         
     }
     

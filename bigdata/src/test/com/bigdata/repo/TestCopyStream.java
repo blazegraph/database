@@ -32,7 +32,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Random;
 
-import com.bigdata.repo.BigdataRepository.FileVersionOutputStream;
 
 /**
  * Unit tests for copying streams into the repository and reading them back.

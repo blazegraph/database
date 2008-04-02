@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,14 +62,12 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.LongAggregator;
-import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.cache.LRUCache;
@@ -100,17 +99,17 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.spo.SPOIterator;
 import com.bigdata.rdf.store.AddIds.AddIdsConstructor;
 import com.bigdata.rdf.store.AddTerms.AddTermsConstructor;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
-import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.store.IndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
 import com.bigdata.service.EmbeddedDataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.text.FullTextIndex;
+import com.bigdata.text.Hit;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -120,12 +119,11 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class that implements logic for the {@link ITripleStore}
- * interface that is invariant across the choice of the backing store.
- * 
- * @todo store persistent metadata about the rdf database in a named object in
- *       the federation and use that to locate the indices. This will give us
- *       more than one rdf store per federation and will also let us persist
- *       other metadata about the rdf store.
+ * interface that is invariant across the choice of the backing store. The
+ * {@link ScaleOutTripleStore} supports concurrency and can be used with either
+ * local or distributed {@link IBigdataFederation}s. There is also a
+ * {@link LocalTripleStore} and a {@link TempTripleStore}, neither of which
+ * supports concurrent operations.
  * 
  * @todo term prefix scan. write prefix scan procedure (aka distinct term scan).
  *       possible use for both the {@link SparseRowStore} and the triple store?
@@ -135,14 +133,8 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @todo performance improvements:
  *       <p>
- *       Tune btree record structure using the same mechanisms (reduce disk
- *       utilization) - need to specify the {@link FastRDFKeyCompression} and
- *       {@link FastRDFValueCompression} objects for the statement indices.
- *       <p>
- *       Tune serialization for {@link ResultSet} to use the same key and value
- *       serializers as the statement indices (should be transparent based on
- *       the key and value serializers declared for the btree, but those will
- *       have to be serialized with the {@link ResultSet}).
+ *       Custom joins for the {@link LocalDataServiceFederation} deployment
+ *       scenario.
  *       <p>
  *       Tune inference - when computing closure on a store that supports
  *       concurrent read/write, for each SPO[] chunk from the 1st triple
@@ -176,10 +168,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       quad position could of course be bound to some constant, in which case
  *       it would not be a statement identifier - more the context model.
  * 
- * @todo parameterize the rdf database constructor such that you can have more
- *       than on graph in the same database instance, e.g., by specifying a
- *       namespace prefix for the indices for that graph.
- * 
  * @todo finish the full text indexing support. We may also need
  *       (case-insensitive) "exact" matching on literals.
  * 
@@ -189,9 +177,8 @@ import cutthecrap.utils.striterators.Striterator;
  *       load and scale-out architecture with concurrent data load and policy
  *       for deciding which host loads which source files).
  * 
- * @todo get dynamic partitioning working and test on 10, 20, 40 nodes...
- * 
- * @todo subversion and maven 2.x builds.
+ * @todo test on 10, 20, 40, ... nodes using dynamic partitioning and scale-out
+ *       indices.
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
@@ -432,9 +419,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     abstract public boolean isConcurrent();
     
     /**
-     * Close the client. If the client uses an embedded database, then close and
-     * delete the embedded database as well. If the client is connected to a
-     * remote database then only the connection is closed.
+     * Disconnect from and drop the {@link ITripleStore}.
      * <p>
      * Note: This is mainly used by the test suites.
      * <p>
@@ -3563,21 +3548,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @see #textSearch(String, String)
      * @see #getFullTextIndex()
      * 
-     * FIXME Optimize the insert order (sort by the key before insert) and batch
-     * indexing.
-     * 
-     * @todo isolate method to return the 1st 2/3 characters of the language
-     *       code (without any embedded whitespace).
-     * 
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
      */
     protected void indexTermText(_Value[] terms, int numTerms) {
 
-        final FullTextIndex ndx = new FullTextIndex(getFullTextIndex());
+        final FullTextIndex ndx = getSearchEngine();
 
-        final IKeyBuilder keyBuilder = getKeyBuilder().keyBuilder;
-        
         for (int i = 0; i < numTerms; i++) {
 
             _Value val = terms[i];
@@ -3596,10 +3573,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             final String text = ((_Literal) val).term;
 
-            ndx.index(keyBuilder, val.termId, languageCode, text);
+            ndx.index(val.termId, 0/*fieldId*/, languageCode, new StringReader(text));
 
         }
-
+        
     }
 
     /**
@@ -3615,6 +3592,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      */
     abstract public IIndex getFullTextIndex();
 
+    abstract public FullTextIndex getSearchEngine();
+    
     /**
      * Performs a full text search against literals returning the term
      * identifiers of literals containing tokens parsed from the query. Those
@@ -3637,24 +3616,16 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @return An iterator that visits each term in the lexicon in which one or
      *         more of the extracted tokens has been found.
      * 
-     * @todo the returned iterator should be a chunked iterator. The same
+     * @throws InterruptedException 
+     * 
+     * @todo the returned iterator should be a chunked iterator (the same
      *       requirement exists for the iterator returned by
-     *       {@link AccessPath#distinctTermScan()}.
-     * 
-     * @todo introduce basic normalization for free text indexing and search
-     *       (e.g., of term frequencies in the collection, document length,
-     *       etc).
-     * 
-     * @todo consider other kinds of queries that we might write here. For
-     *       example, full text search should support AND OR NOT operators for
-     *       tokens. Filtering by {@link Value} type, language code, data type
-     *       attributes, or role played in {@link Statement}s is done once you
-     *       have the search results.
+     *       {@link AccessPath#distinctTermScan()}) and should include the
+     *       computed relevance.
      */
-    public Iterator<Long> textSearch(String languageCode,String text) {
-        
-        return new FullTextIndex(getFullTextIndex()).textSearch(
-                getKeyBuilder().keyBuilder, languageCode, text);
+    public Iterator<Hit> textSearch(String languageCode,String text) throws InterruptedException {
+
+        return getSearchEngine().textSearch( text, languageCode);
         
     }
     

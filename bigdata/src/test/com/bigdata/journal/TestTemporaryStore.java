@@ -155,7 +155,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
              * transition from transient to disk-only.
              */
             return new TemporaryRawStore(
-                    WormAddressManager.DEFAULT_OFFSET_BITS,
+                    WormAddressManager.SCALE_UP_OFFSET_BITS,
                     0, // DEFAULT_INITIAL_IN_MEMORY_EXTENT,
                     0, //DEFAULT_MAXIMUM_IN_MEMORY_EXTENT
                     false // use direct buffers.
@@ -449,7 +449,7 @@ public class TestTemporaryStore extends AbstractRawStoreTestCase {
          * correctness.
          */
         TemporaryRawStore store = new TemporaryRawStore(
-                WormAddressManager.DEFAULT_OFFSET_BITS, Bytes.kilobyte * 10,
+                WormAddressManager.SCALE_UP_OFFSET_BITS, Bytes.kilobyte * 10,
                 Bytes.kilobyte * 100, false);
         
         // verify that we are using an in-memory buffer.

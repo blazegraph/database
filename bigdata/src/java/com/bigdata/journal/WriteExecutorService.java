@@ -596,6 +596,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     
                     log.warn("Task interrupted: task=" + r);//, t);
 
+                } else if(InnerCause.isInnerCause(t, NoSuchIndexException.class)) {
+
+                    /*
+                     * NoSuchIndexException.
+                     * 
+                     * The task attempted to access an index that does not
+                     * exist. This is pretty common and often occurs when an
+                     * application attempts to determine whether or not an index
+                     * has been registered.
+                     */
+ 
+                    log.info("No such index: task=" + r);//, t);
+                    
+
                 } else if(InnerCause.isInnerCause(t, StaleLocatorException.class)) {
 
                     /*
@@ -610,7 +624,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
  
                     log.info("Stale locator: task=" + r);//, t);
                     
-                    log.info(this.toString(), t); // FIXME comment out once working.
+//                    log.info(this.toString(), t);
                     
                 } else {
 

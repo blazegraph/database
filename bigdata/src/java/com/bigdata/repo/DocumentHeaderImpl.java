@@ -6,8 +6,12 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.repo.BigdataRepository.MetadataSchema;
-
+/**
+ * Flyweight {@link DocumentHeader} implementation.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class DocumentHeaderImpl implements DocumentHeader 
 {
 

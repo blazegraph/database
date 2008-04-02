@@ -276,7 +276,7 @@ public class TestRootBlockView extends TestCase2 {
         //
 //        final int segmentId = 0; // no constraint
         //
-        final int offsetBitsOk = WormAddressManager.DEFAULT_OFFSET_BITS;
+        final int offsetBitsOk = WormAddressManager.SCALE_UP_OFFSET_BITS;
         final int offsetBitsBad = WormAddressManager.MIN_OFFSET_BITS - 1;
         final int offsetBitsBad2 = WormAddressManager.MAX_OFFSET_BITS + 1;
         // used to form valid addresses.

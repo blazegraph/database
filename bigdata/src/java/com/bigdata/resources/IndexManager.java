@@ -160,7 +160,6 @@ abstract public class IndexManager extends StoreManager {
          */
         String DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY = "20";
 
-
     }
     
     /**

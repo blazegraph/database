@@ -42,8 +42,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
+import com.bigdata.service.EmbeddedClient.Options;
 
 /**
  * An implementation that uses an embedded database rather than a distributed
@@ -57,14 +59,20 @@ import com.bigdata.mdi.ReadOnlyMetadataIndexView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
+public class EmbeddedFederation extends AbstractFederation {
 
-    public static final Logger log = Logger.getLogger(EmbeddedBigdataFederation.class);
+    public static final Logger log = Logger.getLogger(EmbeddedFederation.class);
 
     /**
      * The #of data service instances.
      */
     final int ndataServices;
+    
+    /**
+     * True if the federation is not backed by disk.
+     * @return
+     */
+    private final boolean isTransient;
     
     /**
      * The directory in which the data files will reside.
@@ -74,7 +82,7 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
     /**
      * The (in process) {@link LoadBalancerService}.
      */
-    private LoadBalancerService loadBalancer;
+    private LoadBalancerService loadBalancerService;
     
     /**
      * The (in process) {@link MetadataService}.
@@ -92,9 +100,18 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
      */
     private Map<UUID,DataService> dataServiceByUUID = new HashMap<UUID,DataService>();
 
-    public EmbeddedBigdataClient getClient() {
+    /**
+     * Return true if the federation is not backed by disk.
+     */
+    public boolean isTransient() {
+    
+        return isTransient;
         
-        return (EmbeddedBigdataClient)super.getClient();
+    }
+    
+    public EmbeddedClient getClient() {
+        
+        return (EmbeddedClient)super.getClient();
         
     }
 
@@ -105,7 +122,7 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
 
         assertOpen();
 
-        return loadBalancer;
+        return loadBalancerService;
         
     }
     
@@ -199,73 +216,19 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
     }
 
     /**
-     * Options for the embedded (in process) federation. Service instances will
-     * share the same configuration properties except for the name of the
-     * backing store file.
-     * 
-     * @todo move the options into {@link EmbeddedBigdataClient}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static interface Options extends MetadataService.Options {
-
-        /**
-         * The name of the optional property whose value is the #of data
-         * services that will be (re-)started.
-         */
-        public static String NDATA_SERVICES = "ndataServices";
-
-        /**
-         * The default is two (2).
-         */
-        public static String DEFAULT_NDATA_SERVICES = "2";
-        
-        /**
-         * <code>data.dir</code> - The name of the required property whose
-         * value is the name of the directory under which each metadata and data
-         * service will store their state (their journals and index segments).
-         * <p>
-         * Note: A set of subdirectories will be created under the specified
-         * data directory. Those subdirectories will be named by the UUID of the
-         * corresponding metadata or data service. In addition, the subdirectory
-         * corresponding to the metadata service will have a file named ".mds"
-         * to differentiate it from the data service directories. The presence
-         * of that ".mds" file is used to re-start the service as a metadata
-         * service rather than a data service.
-         * <p>
-         * Since a set of subdirectories will be created for the embedded
-         * federation, it is important to give each embedded federation its own
-         * data directory. Otherwise a new federation starting up with another
-         * federation's data directory will attempt to re-start that federation.
-         */
-        public static final String DATA_DIR = "data.dir";
-
-//        /**
-//         * The default is the current working directory.
-//         */
-//        public static final String DEFAULT_DATA_DIR = ".";
-        
-    }
-    
-    /**
      * Start or restart an embedded bigdata federation.
      * 
-     * @param properties
-     *            The configuration properties as defined by {@link Options}.
+     * @param client
+     *            The client.
      */
-    protected EmbeddedBigdataFederation(EmbeddedBigdataClient client, Properties properties) {
+    protected EmbeddedFederation(EmbeddedClient client) {
         
         super(client);
         
-        if (properties == null)
-            throw new IllegalArgumentException();
-
-        // isolate caller from any changes we may make.
-        properties = new Properties(properties);
+        final Properties properties = client.getProperties();
         
         // true iff the federation is diskless.
-        final boolean isTransient = BufferMode.Transient.toString().equals(
+        isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
         log.info("federation is "+(isTransient?"not ":"")+"persistent");
@@ -278,7 +241,7 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
         /*
          * Start the load balancer.
          */
-        loadBalancer = new EmbeddedLoadBalancerService(UUID.randomUUID(),
+        loadBalancerService = new EmbeddedLoadBalancerService(UUID.randomUUID(),
                 properties);
 
         /*
@@ -323,9 +286,6 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
                 
             } else {
 
-//                dataDir = new File(properties.getProperty(Options.DATA_DIR,
-//                        Options.DEFAULT_DATA_DIR));
-                
                 String val = properties.getProperty(Options.DATA_DIR);
                 
                 if (val == null) {
@@ -503,7 +463,7 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
 
                 try {
 
-                    loadBalancer.join(ds.getServiceUUID(), hostname);
+                    loadBalancerService.join(ds.getServiceUUID(), hostname);
                     
                 } catch (IOException e) {
                     
@@ -633,7 +593,7 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
                     
                     public ILoadBalancerService getLoadBalancerService() {
                         
-                        return loadBalancer;
+                        return loadBalancerService;
                         
                     }
 
@@ -701,11 +661,11 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
 
         metadataService.shutdownNow();
         
-        if (loadBalancer != null) {
+        if (loadBalancerService != null) {
 
-            loadBalancer.shutdownNow();
+            loadBalancerService.shutdownNow();
 
-            loadBalancer = null;
+            loadBalancerService = null;
             
         }
         
@@ -732,15 +692,59 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
 
         metadataService.shutdownNow();
 
-        if (loadBalancer != null) {
+        if (loadBalancerService != null) {
 
-            loadBalancer.shutdownNow();
+            loadBalancerService.shutdownNow();
 
-            loadBalancer = null;
+            loadBalancerService = null;
             
         }
         
         log.info("done");
+        
+    }
+    
+    public void destroy() {
+
+        log.info("");
+
+        for (int i=0; i<dataService.length; i++) {
+
+            IDataService ds = dataService[i];
+            
+            try {
+                
+                ds.destroy();
+            
+            } catch (IOException e) {
+             
+                log.error("Could not destroy dataService", e );
+                
+            }
+            
+            dataService[i] = null;
+
+        }
+
+        {
+
+            try {
+
+                metadataService.destroy();
+
+            } catch (IOException e) {
+
+                log.error("Could not destroy dataService", e);
+
+            }
+
+            metadataService = null;
+            
+        }
+
+        loadBalancerService.shutdownNow();
+        
+        loadBalancerService = null;
         
     }
     
@@ -753,9 +757,9 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
     public static class EmbeddedMetadataService extends MetadataService {
 
         final private UUID serviceUUID;
-        private EmbeddedBigdataFederation federation;
+        private EmbeddedFederation federation;
         
-        public EmbeddedMetadataService(EmbeddedBigdataFederation federation,
+        public EmbeddedMetadataService(EmbeddedFederation federation,
                 UUID serviceUUID, Properties properties) {
             
             super(properties);
@@ -795,10 +799,32 @@ public class EmbeddedBigdataFederation extends AbstractBigdataFederation {
         @Override
         public ILoadBalancerService getLoadBalancerService() {
             
-            return federation.loadBalancer;
+            return federation.loadBalancerService;
             
         }
 
+        public void destroy() throws IOException {
+
+            log.info("");
+            
+            IResourceManager resourceManager = getResourceManager();
+
+            shutdownNow();
+            
+            // destroy all resources.
+            resourceManager.deleteResources();
+            
+        }
+
+    }
+
+    /**
+     * Return <code>true</code>.
+     */
+    public boolean isScaleOut() {
+        
+        return true;
+        
     }
 
 }

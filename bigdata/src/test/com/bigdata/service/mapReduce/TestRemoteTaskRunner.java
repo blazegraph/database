@@ -35,7 +35,7 @@ import java.util.UUID;
 import junit.framework.TestCase;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.service.EmbeddedBigdataClient;
+import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.mapred.AbstractJobAndTaskService;
 import com.bigdata.service.mapred.IJobAndTaskService;
@@ -104,10 +104,10 @@ public class TestRemoteTaskRunner extends TestCase {
         
         properties
                 .setProperty(
-                        com.bigdata.service.EmbeddedBigdataFederation.Options.BUFFER_MODE,
+                        com.bigdata.service.EmbeddedClient.Options.BUFFER_MODE,
                         BufferMode.Transient.toString());
         
-        bigdataClient = new EmbeddedBigdataClient(properties);
+        bigdataClient = new EmbeddedClient(properties);
         
     }
     

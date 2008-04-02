@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IResourceManager;
 
 /**
  * A local (in process) data service.
@@ -35,15 +35,16 @@ abstract public class EmbeddedDataService extends DataService {
         
     }
  
-    /**
-     * This returns only the live journal. In general there may be many
-     * resources associated with the data service.
-     * 
-     * @deprecated by {@link #getResourceManager()}
-     */
-    public AbstractJournal getLiveJournal() {
+    public void destroy() throws IOException {
+
+        log.info("");
         
-        return resourceManager.getLiveJournal();
+        IResourceManager resourceManager = getResourceManager();
+
+        shutdownNow();
+        
+        // destroy all resources.
+        resourceManager.deleteResources();
         
     }
     

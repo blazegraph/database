@@ -58,22 +58,22 @@ public class TestWormAddressManager extends TestCase {
         super(name);
     }
 
-    /**
-     * verify that the constructor correctly interprets is parameter as the #of
-     * offset bits.
-     */
-    public void test_ctor_default() {
-        
-        WormAddressManager am = new WormAddressManager();
-        
-        assertEquals("offsetBits", WormAddressManager.DEFAULT_OFFSET_BITS,
-                am.getOffsetBits() );
-        
-        assertEquals("maxOffset", 4 * Bytes.terabyte - 1, am.getMaxOffset());
-        
-        assertEquals("maxByteCount", 4 * Bytes.megabyte - 1, am.getMaxByteCount());
-        
-    }
+//    /**
+//     * verify that the constructor correctly interprets is parameter as the #of
+//     * offset bits.
+//     */
+//    public void test_ctor_default() {
+//        
+//        WormAddressManager am = new WormAddressManager();
+//        
+//        assertEquals("offsetBits", WormAddressManager.DEFAULT_OFFSET_BITS,
+//                am.getOffsetBits() );
+//        
+//        assertEquals("maxOffset", 4 * Bytes.terabyte - 1, am.getMaxOffset());
+//        
+//        assertEquals("maxByteCount", 4 * Bytes.megabyte - 1, am.getMaxByteCount());
+//        
+//    }
     
     /**
      * Test of constructor when splitting the long integer into two 32-bit

@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -37,10 +39,18 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.KeyBuilder;
+import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.QueueLengthTask;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.ITPV;
+import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -50,7 +60,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractBigdataFederation implements IBigdataFederation {
+abstract public class AbstractFederation implements IBigdataFederation {
 
     private IBigdataClient client;
     
@@ -172,7 +182,7 @@ abstract public class AbstractBigdataFederation implements IBigdataFederation {
         
     }
 
-    protected AbstractBigdataFederation(IBigdataClient client) {
+    protected AbstractFederation(IBigdataClient client) {
 
         if (client == null)
             throw new IllegalArgumentException();
@@ -193,6 +203,16 @@ abstract public class AbstractBigdataFederation implements IBigdataFederation {
                     client.getThreadPoolSize(), DaemonThreadFactory
                             .defaultThreadFactory());
 
+        }
+        
+        /*
+         * indexCache
+         */
+        {
+
+            indexCache = new WeakValueCache<NT, IIndex>(
+                    new LRUCache<NT, IIndex>(client.getIndexCacheCapacity()));
+            
         }
         
         /*
@@ -321,18 +341,93 @@ abstract public class AbstractBigdataFederation implements IBigdataFederation {
 
     }
 
-    public IIndex getIndex(String name,long timestamp) {
+    /**
+     * An index name and a timestamp.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected static class NT {
+        
+        public final String name;
+        public final long timestamp;
+        private final int hashCode;
+       
+        public NT(String name, long timestamp) {
+            
+            if (name == null)
+                throw new IllegalArgumentException();
+            
+            this.name = name;
+            
+            this.timestamp = timestamp;
+            
+            this.hashCode = name.hashCode()<<32 + (Long.valueOf(timestamp).hashCode()>>>32);
+            
+        }
+        
+        public int hashCode() {
+            
+            return hashCode;
+            
+        }
+        
+        public boolean equals(Object o) {
+
+            return equals((NT)o);
+            
+        }
+        
+        public boolean equals(NT o) {
+            
+            if(this==o) return true;
+            
+            if(!this.name.equals(o.name)) return false;
+
+            if(this.timestamp != o.timestamp) return false;
+            
+            return true;
+            
+        }
+        
+    }
+    
+    /**
+     * A canonicalizing cache for the client's {@link IIndex} proxy objects. The
+     * keys are {@link NT} objects which represent both the name of the index
+     * and the timestamp for the index view. The values are the {@link IIndex}
+     * proxy objects.
+     * <p>
+     * Note: The "dirty" flag associated with the object in this cache is
+     * ignored.
+     */
+    final protected WeakValueCache<NT, IIndex> indexCache;
+    
+    synchronized public IIndex getIndex(String name,long timestamp) {
 
         assertOpen();
 
-        final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name, timestamp);
+        final NT nt = new NT(name,timestamp);
         
-        // No such index.
-        if (mdmd == null)
-            return null;
+        IIndex ndx = indexCache.get(nt);
 
-        // Index exists.
-        return new ClientIndexView(this, name, timestamp, mdmd);
+        if (ndx == null) {
+
+            final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(name,
+                    timestamp);
+
+            // No such index.
+            if (mdmd == null)
+                return null;
+
+            // Index exists.
+            ndx = new ClientIndexView(this, name, timestamp, mdmd);
+            
+            indexCache.put(nt,ndx,false/*dirty*/);
+
+        }
+
+        return ndx;
 
     }
 
@@ -390,4 +485,137 @@ abstract public class AbstractBigdataFederation implements IBigdataFederation {
 
     }
     
+    /*
+     * thread-local key builder. 
+     */
+
+    /**
+     * A {@link ThreadLocal} variable providing access to thread-specific
+     * instances of a configured {@link IKeyBuilder}.
+     * <p>
+     * Note: this {@link ThreadLocal} is not static since we need configuration
+     * properties from the constructor - those properties can be different for
+     * different {@link IBigdataClient}s on the same machine.
+     */
+    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
+
+        protected synchronized IKeyBuilder initialValue() {
+
+            return KeyBuilder.newUnicodeInstance(client.getProperties());
+
+        }
+
+    };
+
+    /**
+     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
+     * using the properties specified for the {@link IBigdataClient}.
+     */
+    public IKeyBuilder getKeyBuilder() {
+        
+        assertOpen();
+        
+        return threadLocalKeyBuilder.get();
+        
+    }
+    
+    /*
+     * named records
+     */
+    
+    private final String GLOBAL_ROW_STORE_INDEX = "__global_namespace_index";
+
+    synchronized public SparseRowStore getGlobalRowStore() {
+
+        if (globalRowStore == null) {
+
+            IIndex ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+
+            if (ndx == null) {
+
+                try {
+
+                    registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
+                            UUID.randomUUID()));
+
+                } catch (Exception ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                ndx = getIndex(GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+
+                if (ndx == null) {
+
+                    throw new RuntimeException("Could not find index?");
+
+                }
+
+            }
+
+            globalRowStore = new SparseRowStore(ndx);
+
+        }
+        
+        return globalRowStore;
+
+    }
+    private SparseRowStore globalRowStore;
+    
+    public Object getNamedRecord(final String primaryKey) {
+
+        if (primaryKey == null)
+            throw new IllegalArgumentException();
+
+        final ITPS tps = getGlobalRowStore().read(getKeyBuilder(),//
+                GlobalRowStoreSchema.INSTANCE, //
+                primaryKey,//
+                Long.MAX_VALUE, // most recent value only
+                null // filter
+                );
+        
+        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
+
+        if (tpv.getValue() == null) {
+
+            // No value for that name.
+            return null;        
+            
+        }
+        
+        return tpv;
+        
+    }
+
+    public Object putNamedRecord(String primaryKey, Object value) {
+
+        if (primaryKey == null)
+            throw new IllegalArgumentException();
+
+        final Map<String,Object> row = new HashMap<String,Object>();
+        
+        row.put(primaryKey,value);
+        
+        final ITPS tps = getGlobalRowStore().write(//
+                getKeyBuilder(), //
+                GlobalRowStoreSchema.INSTANCE, //
+                row,//
+                SparseRowStore.AUTO_TIMESTAMP_UNIQUE,//
+                null // filter
+                );
+
+        final ITPV tpv = tps.get(GlobalRowStoreSchema.VALUE);
+
+        if (tpv.getValue() == null) {
+
+            // No value for that name.
+            return null;
+
+        }
+
+        return tpv;
+
+    }
+
 }

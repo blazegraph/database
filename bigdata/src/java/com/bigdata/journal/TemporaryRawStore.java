@@ -127,7 +127,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
      */
     public TemporaryRawStore() {
 
-        this(WormAddressManager.DEFAULT_OFFSET_BITS);
+        this(WormAddressManager.SCALE_UP_OFFSET_BITS);
         
     }
     

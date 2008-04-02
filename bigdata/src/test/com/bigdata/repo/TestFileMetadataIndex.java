@@ -33,8 +33,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.bigdata.repo.BigdataRepository.MetadataSchema;
-import com.bigdata.repo.BigdataRepository.RepositoryDocumentImpl;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
 

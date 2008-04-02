@@ -69,7 +69,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestMetadataIndex.class );
         
         // client basics, including static partitioning of indices.
-        suite.addTestSuite( TestEmbeddedBigdataClient.class );
+        suite.addTestSuite( TestEmbeddedClient.class );
         
         // test basic index operations.
         suite.addTestSuite( TestBasicIndexStuff.class);

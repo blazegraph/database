@@ -29,14 +29,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.text;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Vector;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -56,12 +65,16 @@ import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 
-import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TemporaryStore;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Full text indexing and search support.
@@ -75,9 +88,9 @@ import com.bigdata.rawstore.Bytes;
  * the logical model is:
  * 
  * <pre>
- *                                                      
- *  token : {docId, freq?, weight?}+
- *                                                      
+ *                                                               
+ *           token : {docId, freq?, weight?}+
+ *                                                               
  * </pre>
  * 
  * (For RDF, docId is the term identifier as assigned by the term:id index.)
@@ -91,9 +104,9 @@ import com.bigdata.rawstore.Bytes;
  * In fact, we actually represent the data as follows:
  * 
  * <pre>
- *                 
- *  {sortKey(token), fldId, docId} : {freq?, weight?, sorted(pos)+}
  *                          
+ *           {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
+ *                                   
  * </pre>
  * 
  * That is, there is a distinct entry in the full text B+Tree for each field in
@@ -133,8 +146,8 @@ import com.bigdata.rawstore.Bytes;
  * against the full text index.
  * 
  * <pre>
- *  fromKey := token, 0L
- *  toKey   := successor(token), 0L
+ *           fromKey := token, 0L
+ *           toKey   := successor(token), 0L
  * </pre>
  * 
  * and extracting the appropriate token frequency, normalized token weight, or
@@ -176,8 +189,31 @@ import com.bigdata.rawstore.Bytes;
  * code is discarded and we perform search purely on the Unicode sort keys
  * resulting from the extracted tokens.
  * 
- * @todo consider a collection identifier in the key as well or just use a
- *       separate text index for each collection?
+ * @todo Consider model in which fields are declared and then a "Document" is
+ *       indexed. This lets us encapsulate the "driver" for indexing. The
+ *       "field" can be a String or a Reader, etc.
+ *       <p>
+ *       Note that lucene handles declaration of the data that will be stored
+ *       for a field on a per Document basis {none, character offsets, character
+ *       offsets + token positions}. There is also an option to store the term
+ *       vector itself. Finally, there are options to store, compress+store, or
+ *       not store the field value. You can also choose {None, IndexTokenized,
+ *       IndexUntokenized} and an option dealing with norms.
+ * 
+ * @todo lucene {@link Analyzer}s may be problematic. For example, it is
+ *       difficult to tokenize numbers. consider replacing the lucene
+ *       analyzer/tokenizer with our own stuff. this might help with
+ *       tokenization of numbers, etc. and with tokenization of native html or
+ *       xml with intact offsets.
+ * 
+ * @todo lucene analyzers will strip stopwords by default. There should be a
+ *       configuration option to strip out stopwords and another to enable
+ *       stemming. how we do that should depend on the language family.
+ *       Likewise, there should be support for language family specific stopword
+ *       lists and language family specific exclusions.
+ * 
+ * @todo key compression: prefix compression, possibly with hamming codes for
+ *       the docId and fieldId.
  * 
  * @todo verify that PRIMARY US English is an acceptable choice for the full
  *       text index collator regardless of the language family in which the
@@ -187,13 +223,10 @@ import com.bigdata.rawstore.Bytes;
  *       (http://unicode.org/reports/tr10/#Legal_Code_Points indicates that they
  *       SHOULD).
  * 
- * @todo we will get relatively little compression on the fldId or docId
- *       component in the key using just leading key compression. A Hu-Tucker
- *       encoding of those components would be much more compact. Note that the
- *       encoding must be reversable since we need to be able to read the docId
- *       out of the key in order to retrieve the document.
- * 
- * @todo refactor the full text index into a general purpose bigdata service
+ * @todo refactor the full text index into a general purpose bigdata service.
+ *       <p>
+ *       We may need an additional index for the term weights and the document
+ *       weights.
  * 
  * @todo support normalization passes over the index in which the weights are
  *       updated based on aggregated statistics.
@@ -217,10 +250,14 @@ public class FullTextIndex {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
+    private final IBigdataFederation fed;
+    
+    private final long timestamp;
+    
     /**
      * The backing index.
      */
-    private IIndex ndx;
+    final IIndex ndx;
 
     /**
      * The index used to associate term identifiers with tokens parsed from
@@ -233,11 +270,29 @@ public class FullTextIndex {
     }
     
     /**
-     * 
+     * @param client
+     *            The client. Configuration information is obtained from the
+     *            client.
      */
-    public FullTextIndex(IIndex ndx) {
+    public FullTextIndex(IBigdataClient client, String name) {
         
-        if(ndx==null) throw new IllegalArgumentException();
+        if (client == null)
+            throw new IllegalArgumentException();
+        
+        this.fed = client.getFederation();
+        
+        this.timestamp = ITx.UNISOLATED;
+        
+        // @todo support transactions.
+        IIndex ndx = fed.getIndex(name, timestamp);
+            
+        if (ndx == null) {
+            
+            fed.registerIndex(new IndexMetadata(name,UUID.randomUUID()));
+            
+        }
+        
+        ndx = fed.getIndex(name, timestamp);
         
         this.ndx = ndx;
         
@@ -255,19 +310,22 @@ public class FullTextIndex {
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    protected Analyzer getAnalyzer(IKeyBuilder keyBuilder,String languageCode) {
+    protected Analyzer getAnalyzer(String languageCode) {
         
         Map<String,Analyzer> map = getAnalyzers();
         
         Analyzer a = null;
         
         if(languageCode==null) {
-            
+        
+            final IKeyBuilder keyBuilder = getKeyBuilder();
+
             // The configured local for the database.
-            Locale locale = ((KeyBuilder)keyBuilder).getSortKeyGenerator().getLocale();
-            
+            final Locale locale = ((KeyBuilder) keyBuilder).getSortKeyGenerator()
+                    .getLocale();
+
             // The analyzer for that locale.
-            a = getAnalyzer(keyBuilder,locale.getLanguage());
+            a = getAnalyzer(locale.getLanguage());
             
         } else {
             
@@ -465,210 +523,23 @@ public class FullTextIndex {
         
     }
     
-    /**
-     * Models a document frequency vector (the set of document identifiers
-     * having some token in common). In this context a document is something in
-     * the terms index. Each document is broken down into a series of tokens by
-     * an {@link Analyzer}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @deprecated not used yet.
-     */
-    protected static final class DFV {
-        
-        private final String token;
-        
-        /*
-         * @todo could just manage a long[] directly using an insertion sort.
-         * the frequency data could be tracked in a co-ordered array.
-         */
-        private final ArrayList<Long> data = new ArrayList<Long>();
-
-        public String getToken() {
-            
-            return token;
-            
-        }
-        
-        public DFV(String token) {
-        
-            if(token==null) throw new IllegalArgumentException();
-            
-            this.token = token;
-        
-        }
-        
-        // @todo track the frequency count.
-        public void add(long docId) {
-
-            data.add(docId);
-            
-        }
-        
-        public long[] toArray() {
-            
-            long[] a = new long[data.size()];
-            
-            for(int i=0; i<a.length; i++) {
-                
-                a[i] = data.get(i);
-                
-            }
-            
-            return a;
-            
-        }
-        
-    }
     
-    /**
-     * Index a document.
-     * 
-     * @param keyBuilder
-     * @param docId
-     * @param languageCode
-     * @param text
-     * 
-     * @todo handle multiple fields.
-     * 
-     * @todo delete old data when updating the document.
+    /*
+     * thread-local key builder. 
      */
-    public void index(IKeyBuilder keyBuilder, Object docId,
-            String languageCode, String text) {
 
-        // tokenize.
-        final TokenStream tokenStream = getTokenStream(keyBuilder,
-                languageCode, text);
-
-        Token token = null;
-        
-        /*
-         * @todo modify to accept the current token for reuse (only in the
-         * current nightly build). Also, termText() is deprecated in the
-         * nightly build.
-         * 
-         * @todo this would be a good example for a mark/reset feature on
-         * the KeyBuilder.
-         */
-        try {
-
-            while ((token = tokenStream.next(/* token */)) != null) {
-
-                final byte[] key = getTokenKey(token, false/* successor */,
-                        docId);
-
-                if (!ndx.contains(key)) {
-
-                    ndx.insert(key, null/* no value */);
-                    
-                }
-
-            }
-     
-        } catch (IOException ex) {
-            
-            throw new RuntimeException("Tokenization problem", ex);
-            
-        }
-
-    }
-    
     /**
-     * Tokenize text using an {@link Analyzer} that is appropriate to the
-     * specified language family.
-     * 
-     * @param languageCode
-     *            The language code (an empty string will be interpreted as
-     *            the default {@link Locale}).
-     * 
-     * @param text
-     *            The text to be tokenized.
-     * 
-     * @return The extracted token stream.
-     * 
-     * @todo there should be a configuration option to strip out stopwords and
-     *       another to enable stemming. how we do that should depend on the
-     *       language family. Likewise, there should be support for language
-     *       family specific stopword lists and language family specific
-     *       exclusions.
+     * A {@link ThreadLocal} variable providing access to thread-specific
+     * instances of a configured {@link IKeyBuilder}.
+     * <p>
+     * Note: this {@link ThreadLocal} is not static since we need configuration
+     * properties from the constructor - those properties can be different for
+     * different {@link IBigdataClient}s on the same machine.
      */
-    protected TokenStream getTokenStream(IKeyBuilder keyBuilder,
-            String languageCode, String text) {
+    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
 
-        /*
-         * @todo is this stripping out stopwords by default regardless of
-         * the language family and yet in a language family specific manner?
-         */
-        final Analyzer a = getAnalyzer(keyBuilder,languageCode);
-        
-        TokenStream tokenStream = a.tokenStream(null/*field*/, new StringReader(text));
-        
-        // force to lower case.
-        tokenStream = new LowerCaseFilter(tokenStream);
-        
-        return tokenStream;
-        
-    }
-    
-    /**
-     * Create a key for the {@link #getFullTextIndex()} from a token extracted
-     * from some text.
-     * 
-     * @param token
-     *            The token whose key will be formed.
-     * @param successor
-     *            When <code>true</code> the successor of the token's text
-     *            will be encoded into the key. This is useful when forming the
-     *            <i>toKey</i> in a search.
-     * @param docId
-     *            The document identifier - use <code>null</code> when forming
-     *            a search key.
-     * 
-     * @return The key.
-     */
-    protected byte[] getTokenKey(Token token, boolean successor, Object docId) {
-        
-        IKeyBuilder keyBuilder = getFullTextKeyBuilder();
-        
-        final String tokenText = token.termText();
-        
-        keyBuilder.reset();
+        protected synchronized IKeyBuilder initialValue() {
 
-        // the token text (or its successor as desired).
-        keyBuilder
-                .appendText(tokenText, true/* unicode */, successor);
-        
-        // the document identifier.
-        if(docId!=null) {
-
-            keyBuilder.append(docId);
-            
-        }
-        
-        final byte[] key = keyBuilder.getKey();
-
-        if (INFO) {
-
-            log.info("[" + tokenText + "][" + docId + "]");
-            
-        }
-
-        return key;
-
-    }
-    
-    /**
-     * The {@link IKeyBuilder} used to form the keys for the
-     * {@link #getFullTextIndex()}.
-     * 
-     * @todo thread-safety for the returned object (as well as its allocation).
-     */
-    protected final IKeyBuilder getFullTextKeyBuilder() {
-        
-        if(fullTextKeyBuilder==null) {
-        
             Properties properties = new Properties();
             
             /*
@@ -688,139 +559,447 @@ public class FullTextIndex {
              * locale?  Of course, you can just explicitly specify the locale
              * on the command line!
              */
+        
+            return KeyBuilder.newUnicodeInstance(properties);
+
+        }
+
+    };
+
+    /**
+     * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured to
+     * support full text indexing and search.
+     * 
+     * @todo improve documentation on configuration of the {@link IKeyBuilder}
+     *       for full text search and how it can differ from the one used by
+     *       other operations. the configuration should probably come from a
+     *       configuration properties stored for the full text indexer in the
+     *       {@link IBigdataFederation#getGlobalRowStore()}. The main issue is
+     *       how you want to encode unicode strings for search, which can be
+     *       different than encoding for other purposes.
+     * 
+     * @todo thread-safety for the returned object (as well as its allocation).
+     */
+    protected final IKeyBuilder getKeyBuilder() {
+
+        return threadLocalKeyBuilder.get();
             
-            fullTextKeyBuilder = KeyBuilder.newUnicodeInstance(properties);
+    }
+
+    /**
+     * Index a field in a document.
+     * <p>
+     * Note: The caller MUST index all text in a "field" sequentially. Text from
+     * different fields and different documents may be indexed in any order.
+     * <p>
+     * Note: This method does NOT force a write on the indices. An internal
+     * buffer is used. If it overflows, then there will be an index write. Once
+     * the caller is done indexing, they MUST invoke {@link #flush()} to force
+     * the writes to the indices.
+     * <p>
+     * Note: The writes on the terms index are scattered since the key for the
+     * index is {term, docId, fieldId}. This method will batch up and then apply
+     * a set of updates, but the total operation is not atomic. Therefore search
+     * results which are concurrent with indexing may not have access to the
+     * full data for concurrently indexed documents. This issue may be resolved
+     * by allowing the indexer to write ahead and using a historical commit time
+     * for the search.
+     * <p>
+     * If a document is pre-existing, then the existing data for that document
+     * MUST be removed unless you know that the fields to be found in the will
+     * not have changed (they may have different contents, but the same fields
+     * exist in the old and new versions of the document).
+     * 
+     * @param docId
+     *            The document identifier.
+     * @param fieldId
+     *            The field identifier.
+     * @param languageCode
+     *            The language code (defaults to the configured language code).
+     * @param r
+     *            A reader on the text to be indexed.
+     * 
+     * @see #flush()
+     * 
+     * @todo The key for the terms index is {term,docId,fieldId}. Since the data
+     *       are not pre-aggregated by {docId,fieldId} we can not easily remove
+     *       only those tuples corresponding to some document (or some field of
+     *       some document).
+     *       <p>
+     *       In order to removal of the fields for a document we need to know
+     *       either which fields were indexed for the document and the tokens
+     *       found in those fields and then scatter the removal request
+     *       (additional space requirements) or we need to flood a delete
+     *       procedure across the terms index (expensive).
+     */
+    public void index(long docId, int fieldId, String languageCode, Reader r) {
+
+        int n = 0;
+        
+        // tokenize (note: docId,fieldId are not on the tokenStream).
+        final TokenStream tokenStream = getTokenStream(languageCode, r);
+
+        while (true) {
+            
+            final Token token;
+            try {
+
+                token = tokenStream.next(/* token */);
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            if (token == null) {
+
+                break;
+                
+            }
+
+            buffer.add(docId, fieldId, token);
+            
+            n++;
+
+        }
+        
+        log.info("Indexed "+n+" tokens: docId="+docId+", fieldId="+fieldId);
+
+    }
+
+    /**
+     * Extract tokens.
+     * 
+     * @param languageCode
+     * @param r
+     * 
+     * @return The distinct tokens.
+     */
+    protected Set<String> getTokens(String languageCode, Reader r) {
+        
+        HashSet<String> tokens = new HashSet<String>();
+        
+        // tokenize (note: docId,fieldId are not on the tokenStream).
+        final TokenStream tokenStream = getTokenStream(languageCode, r);
+
+        while (true) {
+            
+            final Token token;
+            try {
+
+                token = tokenStream.next(/* token */);
+
+            } catch (IOException ex) {
+
+                throw new RuntimeException(ex);
+
+            }
+
+            if (token == null) {
+
+                break;
+                
+            }
+
+            tokens.add(token.termText());
+
+        }
+        
+        log.info("Parsed "+tokens.size()+" tokens: "+tokens);
+        
+        return tokens;
+        
+    }
+    
+    /**
+     * Flushes any buffered writes onto the index.
+     */
+    public void flush() {
+        
+        buffer.flush();
+        
+    }
+    
+    /**
+     * A buffer used when indexing text. The capacity of the buffer is the #of
+     * fields that can be indexed before the next batch write on the indices.
+     * The buffer will accumulate data for one or more documents until it
+     * reaches capacity and will then overflow, writing on the text index.
+     * 
+     * @todo configure capacity.
+     */
+    private TokenBuffer buffer = new TokenBuffer(1000/*nfields*/,this);
+    
+    /**
+     * Tokenize text using an {@link Analyzer} that is appropriate to the
+     * specified language family.
+     * 
+     * @param languageCode
+     *            The language code (an empty string will be interpreted as
+     *            the default {@link Locale}).
+     * 
+     * @param r
+     *            A reader on the text to be indexed.
+     * 
+     * @return The extracted token stream.
+     */
+    protected TokenStream getTokenStream(String languageCode, Reader r) {
+
+        /*
+         * Note: This stripping out stopwords by default.
+         * 
+         * @todo is it using a language family specific stopword list?
+         */
+        final Analyzer a = getAnalyzer(languageCode);
+        
+        TokenStream tokenStream = a.tokenStream(null/* @todo field */, r);
+        
+        // force to lower case.
+        tokenStream = new LowerCaseFilter(tokenStream);
+        
+        return tokenStream;
+        
+    }
+    
+    /**
+     * Create a key for the {@link #getFullTextIndex()} from a token extracted
+     * from some text.
+     * 
+     * @param keyBuilder
+     *            Used to construct the key.
+     * @param token
+     *            The token whose key will be formed.
+     * @param successor
+     *            When <code>true</code> the successor of the token's text
+     *            will be encoded into the key. This is useful when forming the
+     *            <i>toKey</i> in a search.
+     * @param docId
+     *            The document identifier - use <code>0L</code> when forming a
+     *            search key.
+     * @param fieldId
+     *            The field identifier - use <code>0</code> when forming a
+     *            search key.
+     * 
+     * @return The key.
+     */
+    protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText, boolean successor, long docId, int fieldId) {
+        
+        keyBuilder.reset();
+
+        // the token text (or its successor as desired).
+        keyBuilder.appendText(termText, true/* unicode */, successor);
+        
+        keyBuilder.append(docId);
+
+        keyBuilder.append(fieldId);
+        
+        final byte[] key = keyBuilder.getKey();
+
+        if (DEBUG) {
+
+            log.debug("{" + termText + "," + docId + "," + fieldId + "}, key="
+                    + BytesUtil.toString(key));
+
+        }
+
+        return key;
+
+    }
+
+    /**
+     * Return the byte[] that is the encoded value for per-{token,docId,fieldId}
+     * entry in the index.
+     * 
+     * @param buf
+     *            Used to encode the value.
+     * @param metadata
+     *            Metadata about the term.
+     * 
+     * @return The encoded value.
+     * 
+     * @todo based on the configuration, record either just the term-frequency
+     *       or the term-frequency plus the position metadata (ordered offsets).
+     * 
+     * @todo value compression: code "position" as delta from last position in
+     *       the same field or from 0 if the first token of a new document; code
+     *       "offsets" as deltas - the maximum offset between tokens will be
+     *       quite small (it depends on the #of stopwords) so use a nibble
+     *       format for this.
+     */
+    protected byte[] getTokenValue(ByteArrayBuffer buf, TermMetadata metadata) {
+
+        final int termFreq = metadata.termFreq();
+        
+        if (DEBUG) {
+
+            log.debug("termText=" + metadata.termText() + ", termFreq="
+                            + termFreq);
             
         }
         
-        return fullTextKeyBuilder;
+        // reset for new value.
+        buf.reset();
+        
+        // the term frequency.
+        buf.putShort(termFreq>Short.MAX_VALUE?Short.MAX_VALUE:(short)termFreq);
+        
+        return buf.toByteArray();
         
     }
-    private IKeyBuilder fullTextKeyBuilder;
     
     /**
      * Performs a full text search against indexed documents returning a hit
      * list.
      * 
+     * @param query
+     *            The query (it will be parsed into tokens).
      * @param languageCode
      *            The language code that should be used when tokenizing the
      *            query (an empty string will be interpreted as the default
      *            {@link Locale}).
-     * @param text
+     * 
+     * @return A {@link Iterator} which may be used to traverse the search
+     *         results in order of decreasing relevance to the query.
+     *         
+     * @throws InterruptedException 
+     */
+    public Hiterator textSearch(String query, String languageCode) throws InterruptedException {
+
+        return textSearch( //
+                query,//
+                languageCode,//
+                .4, // minCosine
+                10000 // maxRank
+                );
+        
+    }
+    
+    /**
+     * Performs a full text search against indexed documents returning a hit
+     * list.
+     * <p>
+     * The basic algorithm computes cosine between the term-frequency vector of
+     * the query and the indexed "documents". The cosine may be directly
+     * interpreted as the "relevance" of a "document" to the query. The query
+     * and document term-frequency vectors are normalized, so the cosine values
+     * are bounded in [0.0:1.0]. The higher the cosine the more relevant the
+     * document is to the query. A cosine of less than .4 is rarely of any
+     * interest.
+     * <p>
+     * The implementation creates and runs a set parallel tasks, one for each
+     * distinct token found in the query, and waits for those tasks to complete
+     * or for a timeout to occur. Each task uses a key-range scan on the terms
+     * index, collecting metadata for the matching "documents" and aggregating
+     * it on a "hit" for that document. Since the tasks run concurrently, there
+     * are concurrent writers on the "hits". On a timeout, the remaining tasks
+     * are interrupted.
+     * <p>
+     * The collection of hits is scored and hits that fail a threshold are
+     * discarded. The remaining hits are placed into a total order and the
+     * caller is returned an iterator which can read from that order.
+     * 
+     * @param query
      *            The query (it will be parsed into tokens).
+     * @param languageCode
+     *            The language code that should be used when tokenizing the
+     *            query (an empty string will be interpreted as the default
+     *            {@link Locale}).
+     * @param minCosine
+     *            The minimum cosine that will be returned.
+     * @param maxRank
+     *            The upper bound on the #of hits in the result set.
      * 
-     * @return An iterator that visits each term in the lexicon in which one or
-     *         more of the extracted tokens has been found.
+     * @return The hit list.
      * 
-     * @todo introduce basic normalization for free text indexing and search
-     *       (e.g., of term frequencies in the collection, document length,
-     *       etc).
+     * @todo manage the life of the result sets and perhaps serialize them onto
+     *       an index backed by a {@link TemporaryStore}. The fromIndex/toIndex
+     *       might be with respect to that short-term result set. Reclaim result
+     *       sets after N seconds.
      * 
      * @todo consider other kinds of queries that we might write here. For
      *       example, full text search should support AND OR NOT operators for
      *       tokens.
      * 
-     * @todo support fields in documents.
+     * @todo allow search within field(s). This will be a filter on the range
+     *       iterator that is sent to the data service such that the search
+     *       terms are visited only when they occur in the matching field(s).
+     * 
+     * @throws InterruptedException
+     *             If the operation is interrupted. Since the search runs on the
+     *             {@link IBigdataFederation#getThreadPool()}, a disconnect
+     *             from the federation will automatically interrupt the search.
      */
-    public Iterator<Long> textSearch(IKeyBuilder keyBuilder,
-            String languageCode, String text) {
+    public Hiterator textSearch(String query, String languageCode,
+            double minCosine, int maxRank) throws InterruptedException {
 
         if (languageCode == null)
             throw new IllegalArgumentException();
 
-        if (text == null)
+        if (query == null)
             throw new IllegalArgumentException();
         
-        log.info("languageCode=["+languageCode+"], text=["+text+"]");
-        
-        final IIndex ndx = getIndex(); 
-        
-        final TokenStream tokenStream = getTokenStream(keyBuilder,languageCode, text);
-        
-        /*
-         * @todo modify to accept the current token for reuse (only in the
-         * current nightly build). Also, termText() is deprecated in the nightly
-         * build.
-         * 
-         * @todo this would be a good example for a mark/reset feature on the
-         * KeyBuilder.
-         *
-         * @todo thread-safety for the keybuilder.
-         */
-        
-        final Vector<Vector<Long>> termVectors = new Vector<Vector<Long>>();
-        
-        try {
+        if (minCosine < 0d || minCosine > 1d)
+            throw new IllegalArgumentException();
 
-            Token token = null;
+        if (maxRank <= 0)
+            throw new IllegalArgumentException();
+
+        log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
+
+        // tokenize the query.
+        final Set<String> tokens = getTokens(languageCode,new StringReader(query));
+        
+        // @todo parameter (ms).
+        final long timeout = 1000;
+        
+        // @todo use size of collection as upper bound.
+        final ConcurrentHashMap<Long/*docId*/,Hit> hits = new ConcurrentHashMap<Long, Hit>(maxRank);
+
+        // @todo weight on each query term?
+        final double globalTermWeight = 1.0;
+        
+        final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(tokens.size());
+        
+        for(String termText : tokens) {
             
-            while ((token = tokenStream.next(/* token */)) != null) {
-
-                final byte[] fromKey = getTokenKey(token,
-                        false/* successor */, null);
-
-                final byte[] toKey = getTokenKey(token, true/* successor */,
-                        null);
-
-                // @todo capacity and growth policy? native long[]?
-                final Vector<Long> v = new Vector<Long>();
-
-                /*
-                 * Extract the term identifier for each entry in the key range
-                 * for the current token.
-                 */
-                
-                final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey);
-                
-                while(itr.hasNext()) {
-                    
-                    // next entry (value is ignored).
-                    ITuple tuple = itr.next();
-                    
-                    // the key contains the term identifier.
-                    final byte[] key = tuple.getKey();
-                    
-                    // decode the term identifier (aka docId).
-                    final long termId = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);
-
-                    // add to this term vector.
-                    v.add( termId );
-                    
-                }
-
-                if(!v.isEmpty()) {
-
-                    log.info("token: ["+token.termText()+"]("+languageCode+") : termIds="+v);
-                    
-                    termVectors.add( v );
-                    
-                } else {
-                    
-                    log.info("Not found: token=["+token.termText()+"]("+languageCode+")");
-                    
-                }
-                
-            }
-
-            if(termVectors.isEmpty()) {
-                
-                log.warn("No tokens found in index: languageCode=["
-                        + languageCode + "], text=[" + text + "]");
-                
-            }
+            tasks.add(new ReadIndexTask(termText, globalTermWeight, this,
+                            hits));
             
-            // rank order the terms based on the idss.
-            log.error("Rank order and return term ids");
-            
-            return null;
-            
-        } catch (IOException ex) {
-
-            throw new RuntimeException("Tokenization problem: languageCode=["
-                    + languageCode + "], text=[" + text + "]", ex);
-
         }
 
-    }
+        final ExecutorService threadPool = fed.getThreadPool();
 
+        // run on the client's thread pool.
+        final List<Future<Object>> futures = threadPool.invokeAll(tasks, timeout, TimeUnit.MILLISECONDS);
+        
+        for(Future f : futures) {
+            
+            if(!f.isDone()) {
+                
+            }
+            
+        }
+        
+        // #of hits.
+        final int nhits = hits.size();
+        
+        if (nhits == 0) {
+
+            log.warn("No hits: languageCode=[" + languageCode + "], text=["
+                    + query + "]");
+            
+        }
+        
+        /*
+         * FIXME rank order the hits by relevance. All results below a threshold
+         * should be pruned. Any relevant results exceeding the maxRank should
+         * be pruned. The remainder should be ordered.
+         */
+        log.error("Rank order hits by relevance");
+        
+        return new Hiterator(hits.values());
+
+    }
+    
 }

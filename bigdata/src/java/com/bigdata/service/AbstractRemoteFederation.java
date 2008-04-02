@@ -65,7 +65,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRemoteBigdataFederation extends AbstractBigdataFederation {
+abstract public class AbstractRemoteFederation extends AbstractFederation {
 
     /**
      * A temporary store used to cache various data in the client.
@@ -79,7 +79,7 @@ abstract public class AbstractRemoteBigdataFederation extends AbstractBigdataFed
      */
     private final Map<String, MetadataIndex> partitions = new ConcurrentHashMap<String, MetadataIndex>();
     
-    public AbstractRemoteBigdataFederation(IBigdataClient client) {
+    public AbstractRemoteFederation(IBigdataClient client) {
 
         super(client);
 
@@ -425,6 +425,15 @@ abstract public class AbstractRemoteBigdataFederation extends AbstractBigdataFed
 
         }
 
+    }
+
+    /**
+     * Return <code>true</code>.
+     */
+    public boolean isScaleOut() {
+        
+        return true;
+        
     }
 
 }

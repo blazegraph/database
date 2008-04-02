@@ -58,7 +58,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      */
     public TemporaryStore() {
 
-        this(WormAddressManager.DEFAULT_OFFSET_BITS,
+        this(WormAddressManager.SCALE_UP_OFFSET_BITS,
                 DEFAULT_INITIAL_IN_MEMORY_EXTENT,
                 DEFAULT_MAXIMUM_IN_MEMORY_EXTENT, false);
         

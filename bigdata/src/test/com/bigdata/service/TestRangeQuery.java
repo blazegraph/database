@@ -48,7 +48,7 @@ import com.bigdata.mdi.PartitionLocator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRangeQuery extends AbstractEmbeddedBigdataFederationTestCase {
+public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
     public TestRangeQuery() {
     }

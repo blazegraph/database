@@ -28,22 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.text;
 
-import junit.framework.TestCase;
+import java.io.StringReader;
+import java.util.Iterator;
+
+import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 
 /**
  * Test suite for full text indexing and search.
  * 
  * @todo test restart safety of the full text index.
  * 
- * @todo some sort of benchmarking. b+trees are not the normal means to realize
- *       search. how much of a performance penalty is there for this approach?
- *       If it is too high then there will need to be a looser integration with
- *       either lucene or mg4j.
+ * @todo some sort of benchmarking and run P/R on some known collections.
+ * 
+ * @todo provide M/R alternatives for indexing or computing/updating global
+ *       weights.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFullTextIndex extends TestCase {
+public class TestFullTextIndex extends AbstractLocalDataServiceFederationTestCase {
 
     /**
      * 
@@ -56,6 +59,42 @@ public class TestFullTextIndex extends TestCase {
      */
     public TestFullTextIndex(String arg0) {
         super(arg0);
+    }
+    
+    public void test_simple() throws InterruptedException {
+        
+        FullTextIndex ndx = new FullTextIndex(client,"test");
+        
+        final long docId = 12L;
+        
+        final int fieldId = 3;
+        
+        final String text = "The quick brown dog";
+        
+        final String languageCode = "EN";
+        
+        ndx.index(docId, fieldId, languageCode, new StringReader(text));
+
+        ndx.index(docId+1, fieldId, languageCode, new StringReader("The slow brown cow"));
+
+        ndx.flush();
+        
+        Hiterator itr = ndx.textSearch(text,languageCode);
+        
+        assertEquals(2,itr.size());
+        
+        assertTrue(itr.hasNext());
+        
+        IHit hit1 = itr.next();
+
+        System.err.println("hit1:"+hit1);
+        
+        assertTrue(itr.hasNext());
+        
+        IHit hit2 = itr.next();
+
+        System.err.println("hit2:"+hit2);
+        
     }
 
 }

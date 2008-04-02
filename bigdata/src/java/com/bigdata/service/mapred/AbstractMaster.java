@@ -256,7 +256,7 @@ public abstract class AbstractMaster {
     final MapReduceJob job;
 
     /**
-     * The client for the {@link AbstractRemoteBigdataFederation} used to store the
+     * The client for the {@link AbstractRemoteFederation} used to store the
      * intermediate state of the map/reduce operation.
      */
     final IBigdataClient client;

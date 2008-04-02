@@ -27,29 +27,45 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.io.IOException;
-import java.util.Properties;
+import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
-import com.bigdata.service.AbstractRemoteBigdataFederation;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.DataService;
+import com.bigdata.service.EmbeddedFederation;
+import com.bigdata.service.GlobalRowStoreSchema;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.text.FullTextIndex;
 
 /**
- * Implementation of an {@link ITripleStore} as a client of a
- * {@link AbstractRemoteBigdataFederation}. The implementation supports a scale-out
- * architecture in which each index may have one or more partitions. Index
- * partitions are multiplexed onto {@link IDataService}s.
- * <p>
+ * Implementation of an {@link ITripleStore} as a client of an
+ * {@link IBigdataFederation}.
+ * 
+ * <h2>Deployment choices</h2>
+ * 
+ * You can deploy the {@link ScaleOutTripleStore} using any
+ * {@link IBigdataClient}. The {@link LocalDataServiceFederation} preserves
+ * full concurrency control and uses monolithic indices. An
+ * {@link EmbeddedFederation} can be used if you want key-range partitioned
+ * indices but plan to run on a single machine and do not want to incur the
+ * overhead for RMI - all services will run in the same JVM. Finally, a
+ * {@link JiniFederation} can be used if you want to use a scale-out deployment.
+ * In this case indices will be key-range partitioned and will be automatically
+ * re-distributed over the available resources.
+ * 
+ * <h2>Architecture</h2>
+ *  
  * The client uses unisolated writes against the lexicon (terms and ids indices)
  * and the statement indices. The index writes are automatically broken down
  * into one split per index partition. While each unisolated write on an index
@@ -83,6 +99,9 @@ import com.bigdata.service.ILoadBalancerService;
  * 
  * @todo Tune up inference for remote data services.
  * 
+ * @todo provide batching and synchronization for database at once and TM update
+ *       scenarios with a distributed {@link ITripleStore}.
+ * 
  * @todo Write a distributed join for inference and high-level query.
  * 
  * @todo tune up SPARQL query (modified LUBM).
@@ -94,87 +113,217 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     private final IBigdataFederation fed;
     
+    private final String name;
+    
+    private final long timestamp;
+
     /**
-     * 
+     * The {@link IBigdataFederation} that is being used.
      */
-    public ScaleOutTripleStore(IBigdataFederation fed, Properties properties) {
-
-        super( properties );
-
-        if (fed == null)
-            throw new IllegalArgumentException();
-
-        // @todo throw ex if client not connected to the federation.
+    public IBigdataFederation getFederation() {
         
-        this.fed = fed;
+        return fed;
+        
+    }
 
-        /*
-         * Conditionally register the necessary indices.
-         * 
-         * @todo right now they are created when the federation is created.
-         */
-//        registerIndices();
+    /**
+     * The name of the connected {@link ITripleStore} as specified to the ctor.
+     */
+    public String getName() {
+        
+        return name;
+        
+    }
+    
+    /**
+     * The timestamp of the view of the connected {@link ITripleStore} as
+     * specified to the ctor.
+     */
+    public long getTimestamp() {
+        
+        return timestamp;
+        
+    }
+
+    protected void assertWritable() {
+        
+        if(isReadOnly()) {
+            
+            throw new IllegalStateException("READ_ONLY");
+            
+        }
+        
+    }
+    
+    /**
+     * Connect to a named {@link ITripleStore}.
+     * <p>
+     * Note: If the named {@link ITripleStore} does not exist AND the
+     * <i>timestamp</i> is {@link ITx#UNISOLATED} then it will be created.
+     * 
+     * @param client
+     *            The client. Configuration information is obtained from the
+     *            client. See {@link Options} for configuration options.
+     * 
+     * @param name
+     *            The name of the {@link ITripleStore}. Note that this also
+     *            serves as the namespace for the indices used by that
+     *            {@link ITripleStore}.
+     * 
+     * @param timestamp
+     *            The timestamp associated with the view of the
+     *            {@link ITripleStore}.
+     * 
+     * @throws IllegalStateException
+     *             if the client is not connected.
+     */
+    public ScaleOutTripleStore(IBigdataClient client, String name, long timestamp) {
+
+        super( client.getProperties() );
+
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        this.fed = client.getFederation();
+
+        this.name = name;
+        
+        this.timestamp = timestamp;
+        
+        final SparseRowStore rowStore = fed.getGlobalRowStore();
+        
+        Map<String,Object> row = rowStore.read(fed.getKeyBuilder(), GlobalRowStoreSchema.INSTANCE, name);
+        
+        if( row == null ) {
+
+            if (timestamp == ITx.UNISOLATED) {
+
+                /*
+                 * @todo race conditions in index registration could be handled
+                 * by having a property that indicated whether or not the
+                 * indices were in the process of being registered. The value of
+                 * the property could be a UUID identifying the client. The
+                 * property would be cleared once the indices were registered.
+                 * Other clients observing the property would wait until it had
+                 * been cleared. If not cleared within a timeout (say 10
+                 * seconds) then the waiting client should assume that the
+                 * client attempting to register the indices had died. In that
+                 * case the client should itself assert the property and then
+                 * attempt to register the indices itself - dropping existing
+                 * indices is Ok IFF they are empty, otherwise we need a thrown
+                 * exception and a flag to allow override.
+                 * 
+                 * To avoid a race condition when the client attemps to take a
+                 * compensating action we need a means to update a property iff
+                 * some pre-condition is satisified.
+                 * 
+                 * A similar approach could be used when taking a triple store
+                 * offline and dropping its indices.
+                 */
+                
+                row = new HashMap<String,Object>();
+                
+                // Create configuration entry.
+                row = rowStore.write(fed.getKeyBuilder(), GlobalRowStoreSchema.INSTANCE, row);
+
+                // Register the necessary indices.
+                registerIndices();
+                
+            } else {
+                
+                throw new RuntimeException("Not registered: "+name);
+                
+            }
+
+        }
+        
+    }
+    
+    protected IndexMetadata getIndexMetadata(String name) {
+            
+        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        
+        if(fed.isScaleOut()) {
+            
+            /*
+             * Note: deletion markers are required for scale-out indices.
+             */
+            
+            metadata.setDeleteMarkers(true);
+
+        }
+        
+        return metadata;
+            
+    }
+
+    protected IndexMetadata getTermIdIndexMetadata(String name) {
+
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        return metadata;
+
+    }
+    
+    protected IndexMetadata getIdTermIndexMetadata(String name) {
+            
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        return metadata;
+        
+    }
+    
+    protected IndexMetadata getFreeTextIndexMetadata(String name) {
+            
+        final IndexMetadata metadata = getIndexMetadata(name);
+        
+        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+
+        return metadata;
+        
+    }
+    
+    protected IndexMetadata getStatementIndexMetadata(String name) {
+
+        final IndexMetadata metadata = getIndexMetadata(name);
+
+        metadata.setLeafKeySerializer(FastRDFKeyCompression.N3);
+
+        metadata.setValueSerializer(new FastRDFValueCompression());
+
+        return metadata;
+        
+    }
+        
+    protected IndexMetadata getJustIndexMetadata(String name) {
+            
+        final IndexMetadata metadata = getIndexMetadata(name);
+        
+        metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+
+        return metadata;
         
     }
 
     /**
      * Register the indices.
      * 
-     * @todo default allocation of the terms, statements, and justifications
-     *       index (the latter iff justifications are configured). The default
-     *       allocation scheme should be based on expectations of data volume
-     *       written or read, the benefits of locality for the indices, and the
-     *       concurrency of read or write operations on those indices.
-     * 
-     * @todo handle exception if the index already exists.
-     * 
      * @todo you should not be able to turn off the lexicon for the scale-out
      *       triple store (or for the local triple store). That option only
      *       makes sense for the {@link TempTripleStore}.
-     * 
-     * @todo registration of indices should be atomic. this can be achieved
-     *       using a procedure that runs once it has a lock on the resource
-     *       corresponding to each required scale-out index. At that point the
-     *       indices either will or will not exist and we can create them or
-     *       accept their pre-existence atomically.
      */
-    final public void registerIndices() {
+    synchronized public void registerIndices() {
 
-//        final IBigdataClient client = fed.getClient();
+        log.info("");
         
-        /*
-         * Note: Do not use isolation (only deletion markers are required).
-         */
+        assertWritable();
         
-        final IndexMetadata idTermMetadata;
-        {
-            IndexMetadata md = new IndexMetadata(name_idTerm, UUID.randomUUID());
-            
-            md.setDeleteMarkers(true);
-            
-            idTermMetadata = md;
-        }
+        final IndexMetadata idTermMetadata = getIdTermIndexMetadata(name+name_idTerm);
         
-        final IndexMetadata termIdMetadata;
-        {
-            IndexMetadata md = new IndexMetadata(name_termId, UUID.randomUUID());
+        final IndexMetadata termIdMetadata = getTermIdIndexMetadata(name+name_termId);
+        
+        final IndexMetadata justMetadata = getJustIndexMetadata(name+name_just);
             
-            md.setDeleteMarkers(true);
-            
-            termIdMetadata = md;
-        }
-
-        final IndexMetadata justMetadata;
-        {
-            IndexMetadata md = new IndexMetadata(name_just, UUID.randomUUID());
-            
-            md.setDeleteMarkers(true);
-       
-            md.setValueSerializer(NoDataSerializer.INSTANCE);
-            
-            justMetadata = md;
-        }
-
         // all known data service UUIDs.
         final UUID[] uuids = fed.getDataServiceUUIDs(0);
     
@@ -234,13 +383,13 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
              * separator keys would have to be changed.
              */
             
-            fed.registerIndex(newStatementIndexMetadata(name_spo),
+            fed.registerIndex(getStatementIndexMetadata(name+name_spo),
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[0] });
 
-            fed.registerIndex(newStatementIndexMetadata(name_pos),
+            fed.registerIndex(getStatementIndexMetadata(name+name_pos),
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
 
-            fed.registerIndex(newStatementIndexMetadata(name_osp),
+            fed.registerIndex(getStatementIndexMetadata(name+name_osp),
                     new byte[][] { new byte[] {} }, new UUID[] { uuids[1] });
             
             if(justify) {
@@ -269,38 +418,48 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
             }
 
-            fed.registerIndex(newStatementIndexMetadata(name_spo));
+            fed.registerIndex(getStatementIndexMetadata(name+name_spo));
 
             if(!oneAccessPath) {
 
-                fed.registerIndex(newStatementIndexMetadata(name_pos));
+                fed.registerIndex(getStatementIndexMetadata(name+name_pos));
 
-                fed.registerIndex(newStatementIndexMetadata(name_osp));
+                fed.registerIndex(getStatementIndexMetadata(name+name_osp));
 
             }
 
             if (justify) {
 
-                fed.registerIndex(justMetadata );
+                fed.registerIndex(justMetadata);
 
             }
 
         }
 
-    }
-    
-    private IndexMetadata newStatementIndexMetadata(String name) {
-        
-        IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
-        
-        md.setDeleteMarkers(true);
+        /*
+         * Note: The term:id and id:term indices ALWAYS use unisolated operation
+         * to ensure consistency without write-write conflicts.
+         * 
+         */
 
-        md.setLeafKeySerializer(FastRDFKeyCompression.N3);
+        ids      = fed.getIndex(name+name_termId, ITx.UNISOLATED);
+        terms    = fed.getIndex(name+name_idTerm, ITx.UNISOLATED);
         
-        md.setValueSerializer(new FastRDFValueCompression());
+        // @todo ITx#UNISOLATED or timestamp?
+        freeText = fed.getIndex(name+name_freeText, ITx.UNISOLATED);
+        
+        /*
+         * Note: if full transactions are to be used then the statement indices
+         * and the justification indices should be assigned the transaction
+         * identifier.
+         */
 
-        return md;
+        spo      = fed.getIndex(name+name_spo, timestamp);
+        pos      = fed.getIndex(name+name_pos, timestamp);
+        osp      = fed.getIndex(name+name_osp, timestamp);
         
+        just     = fed.getIndex(name+name_just, timestamp);
+
     }
     
     /**
@@ -314,33 +473,35 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      *       triple store, and then having a client that still holds that object
      *       drop all of the indices.
      */
-    final public void clear() {
+    synchronized public void clear() {
+
+        assertWritable();
 
         if (lexicon) {
          
-            fed.dropIndex(name_idTerm); ids = null;
+            fed.dropIndex(name+name_idTerm); ids = null;
             
-            fed.dropIndex(name_termId); terms = null;
+            fed.dropIndex(name+name_termId); terms = null;
         
         }
         
         if(oneAccessPath) {
             
-            fed.dropIndex(name_spo); spo = null;
+            fed.dropIndex(name+name_spo); spo = null;
             
         } else {
             
-            fed.dropIndex(name_spo); spo = null;
+            fed.dropIndex(name+name_spo); spo = null;
             
-            fed.dropIndex(name_pos); pos = null;
+            fed.dropIndex(name+name_pos); pos = null;
             
-            fed.dropIndex(name_osp); osp = null;
+            fed.dropIndex(name+name_osp); osp = null;
             
         }
     
         if(justify) {
 
-            fed.dropIndex(name_just); just = null;
+            fed.dropIndex(name+name_just); just = null;
             
         }
         
@@ -351,27 +512,23 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     /**
      * The terms index.
      */
-    private ClientIndexView terms;
+    private IIndex terms;
 
     /**
      * The ids index.
      */
-    private ClientIndexView ids;
+    private IIndex ids;
 
     /**
      * The statement indices for a triple store.
      */
-    private ClientIndexView spo, pos, osp;
+    private IIndex spo, pos, osp;
 
-    private ClientIndexView just;
+    private IIndex just;
 
+    private IIndex freeText;
+    
     final public IIndex getTermIdIndex() {
-
-        if (terms == null) {
-
-            terms = (ClientIndexView) fed.getIndex(name_termId, ITx.UNISOLATED);
-
-        }
 
         return terms;
 
@@ -379,23 +536,11 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getIdTermIndex() {
 
-        if (ids == null) {
-
-            ids = (ClientIndexView) fed.getIndex(name_idTerm, ITx.UNISOLATED);
-
-        }
-
         return ids;
 
     }
 
     final public IIndex getSPOIndex() {
-
-        if (spo == null) {
-
-            spo = (ClientIndexView) fed.getIndex(name_spo, ITx.UNISOLATED);
-
-        }
 
         return spo;
 
@@ -403,23 +548,11 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getPOSIndex() {
 
-        if (pos == null) {
-
-            pos = (ClientIndexView) fed.getIndex(name_pos, ITx.UNISOLATED);
-
-        }
-
         return pos;
 
     }
 
     final public IIndex getOSPIndex() {
-
-        if (osp == null) {
-
-            osp = (ClientIndexView) fed.getIndex(name_osp, ITx.UNISOLATED);
-
-        }
 
         return osp;
 
@@ -427,19 +560,14 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getJustificationIndex() {
 
-        if (just == null) {
-
-            just = (ClientIndexView) fed.getIndex(name_just,ITx.UNISOLATED);
-
-        }
-
         return just;
-        
+
     }
-    
-    /** TODO Auto-generated method stub */
+
     public IIndex getFullTextIndex() {
-        throw new UnsupportedOperationException();
+
+        return freeText;
+
     }
 
     /**
@@ -453,56 +581,56 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     /**
      * NOP since the client uses unisolated writes which auto-commit.
-     * 
-     * @todo verify that no write state is maintained by the
-     *       {@link ClientIndexView} and that we therefore do NOT need to
-     *       discard those views on abort.
      */
     final public void abort() {
         
     }
     
     /**
-     * The federation is considered stable regardless of whether the federation
-     * is on stable storage since clients only disconnect when they use
-     * {@link #close()}.
+     * Note: A distributed federation is assumed to be stable.
      */
     final public boolean isStable() {
+
+        if(fed instanceof LocalDataServiceFederation) {
+            
+            return ((DataService) ((LocalDataServiceFederation) fed)
+                    .getDataService()).getResourceManager().getLiveJournal()
+                    .isStable();
+
+        }
+
+        if( fed instanceof EmbeddedFederation) {
+            
+            return ((EmbeddedFederation)fed).isTransient();
+            
+        }
         
+        // Assume federation is stable.
         return true;
-        
-    }
-    
-    final public boolean isReadOnly() {
-        
-        return false;
-        
-    }
-    
-    /**
-     * Disconnects from the {@link IBigdataFederation}.
-     * 
-     * @todo redefine so that the client is not shutdown by this method.
-     */
-    final public void close() {
-        
-        fed.getClient().disconnect(false/*immediateShutdown*/);
-        
-        super.close();
         
     }
 
     /**
-     * Drops the indices used by the {@link ScaleOutTripleStore} and disconnects
-     * from the {@link IBigdataFederation}.
-     * 
-     * @todo redefine so that the client is not shutdown by this method.
+     * <code>true</code> unless {{@link #getTimestamp()} is {@link ITx#UNISOLATED}.
      */
-    final public void closeAndDelete() {
+    final public boolean isReadOnly() {
+        
+        return timestamp != ITx.UNISOLATED;
+        
+    }
+    
+//    final public void close() {
+//        
+//        super.close();
+//        
+//    }
+
+    /**
+     * Drops the indices for the {@link ITripleStore}.
+     */
+    public void closeAndDelete() {
         
         clear();
-        
-        fed.getClient().disconnect(false/*immediateShutdown*/);
         
         super.closeAndDelete();
         
@@ -516,5 +644,57 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         return true;
         
     }
+    
+    /**
+     * A factory returning the singleton read-committed view of the database.
+     */
+    public ITripleStore asReadCommittedView() {
+
+        synchronized(this) {
+        
+            ITripleStore view = readCommittedRef == null ? null
+                    : readCommittedRef.get();
+            
+            if(view == null) {
+                
+                view = new ScaleOutTripleStore(fed.getClient(), name,
+                        ITx.READ_COMMITTED);
+                
+                readCommittedRef = new WeakReference<ITripleStore>(view);
+                
+            }
+            
+            return view; 
+        
+        }
+        
+    }
+    private WeakReference<ITripleStore> readCommittedRef;
+    
+
+    /**
+     * A factory returning the singleton for the {@link FullTextIndex}.
+     */
+    public FullTextIndex getSearchEngine() {
+
+        synchronized(this) {
+        
+            FullTextIndex view = searchEngineRef == null ? null
+                    : searchEngineRef.get();
+            
+            if(view == null) {
+                
+                view = new FullTextIndex(fed.getClient(),name+name_freeText);
+                
+                searchEngineRef = new WeakReference<FullTextIndex>(view);
+                
+            }
+            
+            return view; 
+        
+        }
+        
+    }    
+    private WeakReference<FullTextIndex> searchEngineRef;
     
 }

@@ -118,7 +118,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id$
  */
 public class StressTestConcurrent extends
-        AbstractEmbeddedBigdataFederationTestCase implements IComparisonTest {
+        AbstractEmbeddedFederationTestCase implements IComparisonTest {
 
     /**
      * 

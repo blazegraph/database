@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
@@ -157,6 +158,13 @@ public interface IBigdataClient {
     public int getMaxParallelTasksPerRequest();
 
     /**
+     * The capacity of the client's {@link IIndex} proxy cache.
+     * 
+     * @see Options#CLIENT_INDEX_CACHE_CAPACITY
+     */
+    public int getIndexCacheCapacity();
+    
+    /**
      * An object wrapping the properties used to configure the client.
      */
     public Properties getProperties();
@@ -232,6 +240,28 @@ public interface IBigdataClient {
 
         String DEFAULT_CLIENT_BATCH_API_ONLY = "false";
 
+        /**
+         * The capacity of the LRU cache of {@link IIndex} proxies held by the
+         * client. The capacity of this cache indirectly controls how long an
+         * {@link IIndex} proxy will be cached. The main reason for keeping an
+         * {@link IIndex} in the cache is to reuse its buffers if another
+         * request arrives "soon" for that {@link IIndex}.
+         * <p>
+         * The effect of this parameter is indirect owning to the semantics of
+         * weak references and the control of the JVM over when they are
+         * cleared. Once an {@link IIndex} proxy becomes weakly reachable, the
+         * JVM will eventually GC the {@link IIndex}, thereby releasing all
+         * resources associated with it.
+         * 
+         * @see #DEFAULT_CLIENT_INDEX_CACHE_CAPACITY
+         */
+        String CLIENT_INDEX_CACHE_CAPACITY = "indexCacheCapacity";
+
+        /**
+         * The default for the {@link #CLIENT_INDEX_CACHE_CAPACITY} option.
+         */
+        String DEFAULT_CLIENT_INDEX_CACHE_CAPACITY = "20";
+        
     };
 
 }

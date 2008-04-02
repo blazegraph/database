@@ -45,9 +45,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.repo.BigdataRepository;
-import com.bigdata.service.ClientIndexView;
-import com.bigdata.sparse.ValueType.AutoIncCounter;
+import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
+import com.bigdata.sparse.ValueType.AutoIncLongCounter;
 
 /**
  * A client-side class that knows how to use an {@link IIndex} to provide an
@@ -311,27 +310,32 @@ public class SparseRowStore {
         final AtomicRead proc = new AtomicRead(schema, primaryKey, timestamp,
                 filter);
         
-        if(ndx instanceof ClientIndexView) {
+//        if(ndx instanceof ClientIndexView) {
+//
+//            /*
+//             * Remote index.
+//             */
+//
+//            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+//
+//            // Submit the atomic read operation.
+//            return (TPS) ((ClientIndexView)ndx).submit(key, proc);
+//
+//        } else {
+//
+//            /*
+//             * Local index.
+//             */
+//            
+//            return (ITPS) proc.apply(ndx);
+//            
+//        }
 
-            /*
-             * Remote index.
-             */
+        final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
-            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+        // Submit the atomic read operation.
+        return (TPS) ndx.submit(key, proc);
 
-            // Submit the atomic read operation.
-            return (TPS) ((ClientIndexView)ndx).submit(key, proc);
-
-        } else {
-
-            /*
-             * Local index.
-             */
-            
-            return (ITPS) proc.apply(ndx);
-            
-        }
-        
     }
     
     /**
@@ -341,12 +345,48 @@ public class SparseRowStore {
      * Note: In order to cause a column value for row to be deleted you MUST
      * specify a <code>null</code> column value for that column.
      * <p>
+     * Note: the value of the <i>primaryKey</i> is written each time the
+     * logical row is updated and timestamp associate with the value for the
+     * <i>primaryKey</i> property tells you the timestamp of each row revision.
+     * 
+     * @param keyBuilder
+     *            An object used to construct keys for the index.
+     * 
+     * @param schema
+     *            The {@link Schema} governing the logical row.
+     * 
+     * @param propertySet
+     *            The column names and values for that row.
+     * 
+     * @return The result of an atomic read on the post-update state of the
+     *         logical row.  Only the most current bindings will be present
+     *         for each property.
+     */
+    public Map<String,Object> write(IKeyBuilder keyBuilder, Schema schema,
+            Map<String, Object> propertySet) {
+
+        return write(keyBuilder, schema, propertySet,
+                Long.MAX_VALUE/* timestamp */, null/* filter */).asMap();
+        
+    }
+
+    /**
+     * Atomic write with atomic read of the post-update state of the logical
+     * row.
+     * <p>
+     * Note: In order to cause a column value for row to be deleted you MUST
+     * specify a <code>null</code> column value for that column.
+     * <p>
+     * Note: the value of the <i>primaryKey</i> is written each time the
+     * logical row is updated and timestamp associate with the value for the
+     * <i>primaryKey</i> property tells you the timestamp of each row revision.
+     * <p>
      * Note: If the caller specified a <i>timestamp</i>, then that timestamp is
      * used by the atomic read. If the timestamp was assigned by the server,
      * then the server assigned timestamp is used by the atomic read.
      * 
      * @param keyBuilder
-     *            An object used to construct keys for the index. *
+     *            An object used to construct keys for the index.
      * 
      * @param schema
      *            The {@link Schema} governing the logical row.
@@ -368,9 +408,15 @@ public class SparseRowStore {
      * 
      * @see ITPS#getTimestamp()
      * 
+     * @todo add an assertion that the caller can pass through to validate the
+     *       state of the logical row on the server before or after the atomic
+     *       update. Among other things this could be used to reject an update
+     *       if someone has modified the logical row since you last read some
+     *       value.
+     * 
      * @todo the atomic read back may be overkill. When you need the data is
      *       means that you only do one RPC rather than two. When you do not
-     *       need the data is is just more network traffic and more complexity
+     *       need the data it is just more network traffic and more complexity
      *       in this method signature. You can get pretty much the same result
      *       by doing an atomic read after the fact using the timestamp assigned
      *       by the server to the row (pretty much in the sense that it is
@@ -386,14 +432,6 @@ public class SparseRowStore {
      *       it is also possible that the timestamp behavior should be defined
      *       by the {@link Schema} and therefore factored out of this method
      *       signature.
-     * 
-     * @todo modify the atomic write to not overwrite the primary key each time?
-     *       There is really no reason to do that - it just adds data to the
-     *       index, but be careful to not delete the primary key when applying a
-     *       history policy during a compacting merge. (One reason to write the
-     *       primary key each time is that the timestamp on the primary key
-     *       tells you the timestamp of each row revision. The {@link BigdataRepository}
-     *       currently depends on this feature.)
      */
     public ITPS write(IKeyBuilder keyBuilder, Schema schema,
             Map<String, Object> propertySet, long timestamp, INameFilter filter) {
@@ -401,28 +439,34 @@ public class SparseRowStore {
         final AtomicWriteRead proc = new AtomicWriteRead(schema, propertySet,
                 timestamp, filter);
         
-        if(ndx instanceof ClientIndexView) {
+//        if(ndx instanceof ClientIndexView) {
+//
+//            /*
+//             * Remote index.
+//             */
+//
+//            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
+//
+//            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+//
+//            return (TPS) ((ClientIndexView) ndx).submit(key, proc);
+//
+//        } else {
+//
+//            /*
+//             * Local index.
+//             */
+//            
+//            return (ITPS) proc.apply(ndx);
+//            
+//        }
 
-            /*
-             * Remote index.
-             */
+        final Object primaryKey = propertySet.get(schema.getPrimaryKey());
 
-            final Object primaryKey = propertySet.get(schema.getPrimaryKey());
+        final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
 
-            final byte[] key = schema.fromKey(keyBuilder, primaryKey).getKey();
+        return (TPS) ndx.submit(key, proc);
 
-            return (TPS) ((ClientIndexView) ndx).submit(key, proc);
-
-        } else {
-
-            /*
-             * Local index.
-             */
-            
-            return (ITPS) proc.apply(ndx);
-            
-        }
-        
     }
 
     /**
@@ -896,12 +940,26 @@ public class SparseRowStore {
 
                 Object value = entry.getValue();
                 
-                if (value instanceof AutoIncCounter) {
+                if (value instanceof AutoIncIntegerCounter) {
 
-                    value = Integer.valueOf(inc(ndx, schema, primaryKey,
-                            timestamp, col));
+                    final long counter = inc(ndx, schema, primaryKey, timestamp, col);
                     
+                    if (counter == Integer.MAX_VALUE + 1L) {
+                        
+                        throw new RuntimeException("Counter would overflow: "+col);
+                        
+                    }
+                    
+                    value = Integer.valueOf((int)counter);
+                    
+                } else if (value instanceof AutoIncLongCounter) {
+
+                    final long counter = inc(ndx, schema, primaryKey, timestamp, col);
+                    
+                    value = Long.valueOf( counter );
+
                 }
+
                 
                 // encode the schema name and the primary key.
                 schema.fromKey(keyBuilder, primaryKey);
@@ -938,7 +996,7 @@ public class SparseRowStore {
          * state of the logical row so that we can find the previous value(s)
          * for the counter column.
          */
-        protected int inc(IIndex ndx, Schema schema, Object primaryKey,
+        protected long inc(IIndex ndx, Schema schema, Object primaryKey,
                 long timestamp, final String col) {
             
             final TPS tps = atomicRead(ndx, schema, primaryKey, timestamp,
@@ -958,7 +1016,7 @@ public class SparseRowStore {
              * value then we start the counter at zero(0).
              */
             
-            int counter = 0;
+            long counter = 0;
             
             {
 
@@ -972,7 +1030,7 @@ public class SparseRowStore {
                         
                         try {
 
-                            counter = (Integer) val.getValue();
+                            counter = ((Number) val.getValue()).longValue();
                             
                             log.info("Previous value: name=" + col
                                     + ", counter=" + counter + ", timestamp="

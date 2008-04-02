@@ -529,6 +529,12 @@ public interface IDataService extends IRemoteTxCommitProtocol, Remote {
      */
     public long getOverflowCounter() throws IOException;
     
+    /**
+     * Shutdown the service immediately and destroy any persistent data
+     * associated with the service.
+     */
+    public void destroy() throws IOException;
+    
 //    /**
 //     * Returns <code>true</code> unless the data service is currently
 //     * performing either overflow or overflow post-processing actions.

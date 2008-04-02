@@ -379,6 +379,12 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
+        public void destroy() throws IOException {
+
+            throw new UnsupportedOperationException();
+
+        }
+
     }
     
 }

@@ -29,6 +29,10 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
+import com.bigdata.btree.IIndex;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.text.FullTextIndex;
+
 /**
  * Abstract base class for both transient and persistent {@link ITripleStore}
  * implementations using local storage.
@@ -50,6 +54,16 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
     public AbstractLocalTripleStore(Properties properties) {
         
         super(properties);
+        
+    }
+
+    /**
+     * FIXME Not supported since the search engine is accepting an
+     * {@link IBigdataClient} rather than one or more {@link IIndex}s.
+     */
+    public FullTextIndex getSearchEngine() {
+        
+        return null;
         
     }
     

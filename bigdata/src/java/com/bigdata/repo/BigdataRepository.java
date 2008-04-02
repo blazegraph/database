@@ -4,20 +4,14 @@
 package com.bigdata.repo;
 
 import java.io.DataInput;
-import java.io.Externalizable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,13 +22,8 @@ import java.util.Vector;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
-import com.bigdata.btree.ILinearList;
-import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -42,23 +31,19 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.btree.IIndexProcedure.ISimpleIndexProcedure;
-import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.service.DataServiceIndex;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.ITPV;
-import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.sparse.ValueType.AutoIncCounter;
+import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 import com.bigdata.text.FullTextIndex;
 
 import cutthecrap.utils.striterators.Resolver;
@@ -71,7 +56,7 @@ import cutthecrap.utils.striterators.Striterator;
  * structured so as to look like a hierarchical file system using any desired
  * convention. Files are versioned and historical versions MAY be accessed until
  * the next compacting merge discards their data. File data is stored in large
- * {@link #BLOCK_SIZE} blocks. Partial and even empty blocks are allowed and
+ * {@link #blockSize} blocks. Partial and even empty blocks are allowed and
  * only the data written will be stored. <code>2^63-1</code> distinct blocks
  * may be written per file version, making the maximum possible file size
  * <code>536,870,912</code> exabytes. Files may be used as queues, in which
@@ -153,7 +138,7 @@ import cutthecrap.utils.striterators.Striterator;
  * count and multiplying through by the block size. Blocks may be handed off to
  * the clients in parallel (of course, clients need to deal with the hassle of
  * processing files where records will cross split boundaries unless they always
- * pad out with unused bytes to the next {@link #BLOCK_SIZE} boundary).
+ * pad out with unused bytes to the next {@link #blockSize} boundary).
  * <p>
  * Use case: A reduce client wants to write a very large files so it creates a
  * metadata record for the file and then does a series of atomic appears to the
@@ -184,13 +169,6 @@ import cutthecrap.utils.striterators.Striterator;
  * This approach is necessary since files may moved from one "zone" to another
  * and since the file data must reside on the index partition(s) identified by
  * its file version.
- * 
- * @todo it should be possible to run against a {@link DataServiceIndex} and not
- *       only against an {@link IBigdataFederation}. I will have to modify the
- *       setup to support both.
- * 
- * @todo journal size and index segment sizes should be at least 500M when 64M
- *       blocks being stored - perhaps raise that threshold throughout?
  * 
  * @todo implement "zones" and their various policies (replication, retention,
  *       and media indexing). access control could also be part of the zones.
@@ -235,30 +213,54 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Configuration options.
      * 
-     * @todo block size as config option?
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     public static interface Options extends com.bigdata.journal.Options, KeyBuilder.Options {
-
+        
     }
-
+    
     /**
-     * The size of a file block (default is 64M). Block identifiers are 64-bit
-     * signed integers. With 64M file blocks the maximum file length is
-     * <code>2^63 - 1 </code> blocks ( 536,870,912 Exabytes).
+     * The #of offset bits.
      */
-    protected final int BLOCK_SIZE;
+    private final int offsetBits;
+
+    /** The size of a file block. */
+    private final int blockSize;
 
     /**
-     * The size of a file block (64M). Block identifiers are 64-bit signed
-     * integers. The maximum file length is <code>2^63 - 1 </code> blocks (
-     * 536,870,912 Exabytes).
+     * The #of bits in a 64-bit long integer identifier that are used to encode
+     * the byte offset of a record in the store as an unsigned integer.
+     * 
+     * @see com.bigdata.journal.Options#OFFSET_BITS
+     * @see #getBlockSize()
+     */
+    public final int getOffsetBits() {
+        
+        return offsetBits;
+        
+    }
+    
+    /**
+     * The size of a file block. Block identifiers are 64-bit signed integers.
+     * The maximum file length is <code>2^63 - 1 </code> blocks ( 536,870,912
+     * Exabytes).
+     * <p>
+     * Note: The {@link BigdataRepository} makes the <strong>assumption</strong>
+     * that the {@link com.bigdata.journal.Options#OFFSET_BITS} is the #of
+     * offset bits configured for the {@link IDataService}s in the connected
+     * {@link IBigdataFederation} and computes the
+     * {@link BigdataRepository#getBlockSize()} based on that assumption. It is
+     * NOT possible to write blocks on the {@link BigdataRepository} whose size
+     * is greater than the maximum block size actually configured for the
+     * {@link IDataService}s in the connected {@link IBigdataFederation}.
+     * 
+     * @see com.bigdata.journal.Options#OFFSET_BITS
+     * @see #getOffsetBits()
      */
     public final int getBlockSize() {
         
-        return BLOCK_SIZE;
+        return blockSize;
         
     }
     
@@ -286,7 +288,7 @@ public class BigdataRepository implements ContentRepository {
     /**
      * The name of the scale-out index in which the data are stored. The entries
      * in this index are a series of blocks for a file. Blocks are
-     * {@link #BLOCK_SIZE} bytes each and are assigned monotonically increasing
+     * {@link #blockSize} bytes each and are assigned monotonically increasing
      * block numbers by the atomic append operation. The final block may be
      * smaller (there is no need to pad out the data with nulls). The keys are
      * formed from two fields - a field containing the content identifier
@@ -298,103 +300,16 @@ public class BigdataRepository implements ContentRepository {
     private static final String DATA_NAME = BigdataRepository.class.getSimpleName()+"#data";
     
     /**
-     * A {@link ThreadLocal} variable providing access to thread-specific
-     * instances of a configured {@link IKeyBuilder}.
-     * <p>
-     * Note: this {@link ThreadLocal} is not static since we need configuration
-     * properties from the constructor - those properties can be different for
-     * different {@link Journal}s on the same machine.
-     */
-    private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
-
-        protected synchronized IKeyBuilder initialValue() {
-
-            return KeyBuilder.newUnicodeInstance(properties);
-
-        }
-
-    };
-
-    /**
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured
      * using the properties specified to the journal constructor.
      */
     public IKeyBuilder getKeyBuilder() {
         
-        return threadLocalKeyBuilder.get();
+        return fed.getKeyBuilder();
         
     }
         
-    /**
-     * The schema for metadata about file versions stored in the repository.
-     * Some well known properties are always defined, but any property may be
-     * stored - ideally within their own namespace!
-     * <p>
-     * Note: File version creation time and update times are available using the
-     * {@link SparseRowStore}, which stores and reports the timestamp for each
-     * property value. Convenience methods are available on
-     * {@link RepositoryDocumentImpl} to report those timestamps. Timestamps for
-     * file blocks can NOT be obtained.
-     * <p>
-     * Note: A content length property was deliberately NOT defined. The design
-     * is geared towards very large file and asynchronous read/write of file
-     * blocks. The length of short files may be readily computed by the
-     * expediency of sucking their contents into a buffer. Large files should
-     * always be processed using a stream-oriented technique or distributed to
-     * concurrent clients in block sized pieces.
-     * 
-     * @todo other obvious metadata would include the user identifier associated
-     *       with each update request.
-     */
-    public static class MetadataSchema extends Schema {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 2908749650061841935L;
-
-        /**
-         * The content identifer is an arbitrary Unicode {@link String} whose
-         * value may be defined by the client.
-         */
-        public static transient final String ID = "Id";
-        
-        /**
-         * The MIME type associated with the content (the same semantics as the
-         * HTTP <code>Content-Type</code> header).
-         */
-        public static transient final String CONTENT_TYPE = "ContentType";
-
-        /**
-         * The encoding, if any, used to convert the byte[] content to
-         * characters.
-         * <p>
-         * Note: This is typically deduced from an analysis of the MIME Type in
-         * <code>Content-Type</code> header and at times the leading bytes of
-         * the response body itself.
-         */
-        public static transient final String CONTENT_ENCODING = "ContentEncoding";
-
-        /**
-         * The file version number. Together the file {@link #ID} and the file
-         * {@link #VERSION} form the primary key for the data index.
-         */
-        public static transient final String VERSION = "Version";
-        
-        public MetadataSchema() {
-            
-            super("metadata", ID, KeyType.Unicode);
-            
-        }
-        
-    }
-
     public static final MetadataSchema metadataSchema = new MetadataSchema();
-    
-    /**
-     * A copy of the {@link Properties} specified to the ctor.
-     */
-    private final Properties properties;
     
     private SparseRowStore metadataIndex;
     
@@ -428,36 +343,37 @@ public class BigdataRepository implements ContentRepository {
     }
 
     /**
+     * Connect to a repository.
+     * 
      * @param client
-     *            The client.
-     * @param properties
-     *            See {@link Options}.
+     *            The client. Configuration information is obtained from the
+     *            client. See {@link Options} for configuration options.
+     * 
+     * @throws IllegalStateException
+     *             if the client is not connected.
+     * 
+     * @see Options
      */
-    public BigdataRepository(IBigdataFederation fed, Properties properties) {
+    public BigdataRepository(IBigdataClient client) {
         
-        this.fed = fed;
+        this.fed = client.getFederation();
         
-        // clone the properties to keep them immutable.
-        this.properties = (Properties) properties.clone();
-     
-        /*
-         * FIXME The {@link #BLOCK_SIZE} is set to 4M-1 bytes right now. In
-         * order to increase the block size to 64M a different value would have
-         * to be specified for the
-         * {@link WormAddressManager#DEFAULT_OFFSET_BITS}. 4M is [0:4,194,303]
-         * (42 offset bits) while 64M is 67,108,864 bytes (38 offset bits).
-         */
-        BLOCK_SIZE = WormAddressManager
-                .getMaxByteCount(WormAddressManager.DEFAULT_OFFSET_BITS) - 1;
+        offsetBits = Integer.parseInt(client.getProperties()
+                .getProperty(Options.OFFSET_BITS,
+                        Options.DEFAULT_OFFSET_BITS));
+        
+        blockSize = WormAddressManager.getMaxByteCount(offsetBits) - 1;
+        
+        log.info("offsetBits="+offsetBits+", blockSize="+blockSize);
         
     }
 
     /**
-     * An object wrapping the properties provided to the ctor.
+     * An object wrapping the properties provided to the {@link IBigdataClient}.
      */
     protected Properties getProperties() {
         
-        return new Properties(properties);
+        return new Properties(fed.getClient().getProperties());
         
     }
 
@@ -498,13 +414,17 @@ public class BigdataRepository implements ContentRepository {
     /**
      * Registers the scale-out indices.
      * 
-     * @todo make this an atomic operation.
+     * @todo make this an atomic operation ala the ScaleOutTripleStore and one
+     *       that is automatic.  The indices can exist in a namespace so that
+     *       more than one repository can be easily configured.
      * 
      * @todo parameterize the namespace for the file metadata and file data
      *       indices so that you can have more than one repository instance.
      */
     public void registerIndices() {
 
+        Properties properties = getProperties();
+        
         final int branchingFactor = Integer.parseInt(properties.getProperty(
                 Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
 
@@ -591,7 +511,7 @@ public class BigdataRepository implements ContentRepository {
         metadata = new HashMap<String, Object>(metadata);
         
         // auto-increment the last defined version counter.
-        metadata.put(MetadataSchema.VERSION, AutoIncCounter.INSTANCE);
+        metadata.put(MetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
         
         // write the metadata (atomic operation).
         final ITPS tps = getMetadataIndex().write(getKeyBuilder(),
@@ -690,300 +610,6 @@ public class BigdataRepository implements ContentRepository {
 
     }
     
-    /**
-     * A read-only view of a {@link Document} that has been read from a
-     * {@link BigdataRepository}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class RepositoryDocumentImpl implements DocumentHeader, Document 
-    {
-        
-        final private BigdataRepository repo;
-        
-        final private String id;
-        
-        /**
-         * The result of the atomic read on the file's metadata. This
-         * representation is significantly richer than the current set of
-         * property values.
-         */
-        final ITPS tps;
-
-        /**
-         * The current version identifer -or- <code>-1</code> iff there is no
-         * current version for the file (including when there is no record of
-         * any version for the file).
-         */
-        final int version;
-        
-        /**
-         * The property set for the current file version.
-         */
-        final private Map<String,Object> metadata;
-
-        /**
-         * Read the metadata for the current version of the file from the
-         * repository.
-         * 
-         * @param id
-         *            The file identifier.
-         * @param tps
-         *            The logical row describing the metadata for some file in
-         *            the repository.
-         */
-        public RepositoryDocumentImpl(BigdataRepository repo, String id,
-                ITPS tps) {
-            
-            if (repo == null)
-                throw new IllegalArgumentException();
-
-            if (id == null)
-                throw new IllegalArgumentException();
-            
-            this.repo = repo;
-            
-            this.id = id;
-            
-            this.tps = tps;
-            
-            if (tps != null) {
-
-                ITPV tmp = tps.get(MetadataSchema.VERSION);
-                
-                if (tmp.getValue() != null) {
-
-                    /*
-                     * Note the current version identifer.
-                     */
-                    
-                    this.version = (Integer) tmp.getValue();
-
-                    /*
-                     * Save a simplifed view of the propery set for the current
-                     * version.
-                     */
-                    
-                    this.metadata = tps.asMap();
-
-                    log.info("id="+id+", current version="+version);
-
-                } else {
-                    
-                    /*
-                     * No current version.
-                     */
-                    
-                    this.version = -1;
-
-                    this.metadata = null;
-                    
-                    log.warn("id="+id+" : no current version");
-
-                }
-    
-            } else {
-                
-                /*
-                 * Nothing on record for that file identifier.
-                 */
-                
-                this.version = -1;
-                
-                this.metadata = null;
-                
-                log.warn("id="+id+" : no record of any version(s)");
-
-            }
-            
-            if (DEBUG && metadata != null) {
-
-                Iterator<Map.Entry<String,Object>> itr = metadata.entrySet().iterator();
-                
-                while(itr.hasNext()) {
-                    
-                    Map.Entry<String, Object> entry = itr.next();
-                    
-                    log.debug("id=" + id + ", version=" + getVersion() + ", ["
-                            + entry.getKey() + "]=[" + entry.getValue() + "]");
-                    
-                }
-
-            }
-
-        }
-        
-        /**
-         * Read the metadata for the current version of the file from the
-         * repository.
-         * 
-         * @param id
-         *            The file identifier.
-         */
-        public RepositoryDocumentImpl(BigdataRepository repo,String id)
-        {
-            
-            this(repo, id, repo.getMetadataIndex().read(repo.getKeyBuilder(),
-                    metadataSchema, id, Long.MAX_VALUE, null/* filter */));
-            
-        }
-
-        /**
-         * Assert that a version of the file existed when this view was
-         * constructed.
-         * 
-         * @throws IllegalStateException
-         *             unless a version of the file existed at the time that
-         *             this view was constructed.
-         */
-        final protected void assertExists() {
-
-            if (version == -1) {
-
-                throw new IllegalStateException("No current version: id="+id);
-                
-            }
-            
-        }
-        
-        final public boolean exists() {
-            
-            return version != -1;
-            
-        }
-        
-        final public int getVersion() {
-
-            assertExists();
-
-            return (Integer)metadata.get(MetadataSchema.VERSION);
-
-        }
-
-        /**
-         * Note: This is obtained from the earliest available timestamp of the
-         * {@link MetadataSchema#ID} property.
-         */
-        final public long getEarliestVersionCreateTime() {
-            
-            assertExists();
-            
-            Iterator<ITPV> itr = tps.iterator();
-            
-            while(itr.hasNext()) {
-                
-                ITPV tpv = itr.next();
-                
-                if(tpv.getName().equals(MetadataSchema.ID)) {
-                    
-                    return tpv.getTimestamp();
-                    
-                }
-                
-            }
-            
-            throw new AssertionError();
-            
-        }
-
-        final public long getVersionCreateTime() {
-
-            assertExists();
-            
-            /*
-             * The timestamp for the most recent value of the VERSION property.
-             */
-            
-            final long createTime = tps.get(MetadataSchema.VERSION)
-                    .getTimestamp();
-            
-            return createTime;
-            
-        }
-
-        final public long getMetadataUpdateTime() {
-            
-            assertExists();
-            
-            /*
-             * The timestamp for the most recent value of the ID property.
-             */
-            
-            final long metadataUpdateTime = tps.get(MetadataSchema.ID)
-                    .getTimestamp();
-            
-            return metadataUpdateTime;
-
-        }
-
-        /**
-         * Return an array containing all non-eradicated values of the
-         * {@link MetadataSchema#VERSION} property for this file as of the time
-         * that this view was constructed.
-         * 
-         * @see BigdataRepository#getAllVersionInfo(String)
-         */
-        final public ITPV[] getAllVersionInfo() {
-            
-            return repo.getAllVersionInfo(id);
-            
-        }
-        
-        final public InputStream getInputStream() {
-
-            assertExists();
-            
-            return repo.inputStream(id,getVersion());
-            
-        }
-        
-        final public Reader getReader() throws UnsupportedEncodingException {
-
-            assertExists();
-
-            return repo.reader(id, getVersion(), getContentEncoding());
-
-        }
-
-        final public String getContentEncoding() {
-
-            assertExists();
-            
-            return (String)metadata.get(MetadataSchema.CONTENT_ENCODING);
-            
-        }
-
-        final public String getContentType() {
-         
-            assertExists();
-
-            return (String)metadata.get(MetadataSchema.CONTENT_TYPE);
-            
-        }
-
-        final public String getId() {
-
-            return id;
-            
-        }
-        
-        final public Object getProperty(String name) {
-            
-            return metadata.get(name);
-            
-        }
-        
-        final public Map<String,Object> asMap() {
-            
-            assertExists();
-
-            return Collections.unmodifiableMap( metadata );
-            
-        }
-
-    }
-
     /**
      * Update the metadata for the current file version.
      * 
@@ -1410,626 +1036,6 @@ public class BigdataRepository implements ContentRepository {
      */
     
     /**
-     * Atomic append of a single block to a file version.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class AtomicBlockAppendProc implements ISimpleIndexProcedure,
-            Externalizable {
-
-        private static final long serialVersionUID = 1441331704737671258L;
-
-        protected static transient Logger log = Logger
-                .getLogger(AtomicBlockAppendProc.class);
-
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
-        final public static transient boolean INFO = log.getEffectiveLevel()
-                .toInt() <= Level.INFO.toInt();
-
-        /**
-         * True iff the {@link #log} level is DEBUG or less.
-         */
-        final public static transient boolean DEBUG = log.getEffectiveLevel()
-                .toInt() <= Level.DEBUG.toInt();
-
-        private String id;
-        private int version;
-        private int off;
-        private int len;
-        private byte[] b;
-        
-        /**
-         * 
-         * @param id
-         *            The file identifier.
-         * @param version
-         *            The file version.
-         * @param b
-         *            The buffer containing the data to be written.
-         * @param off
-         *            The offset in the buffer of the first byte to be written.
-         * @param len
-         *            The #of bytes to be written.
-         */
-        public AtomicBlockAppendProc(BigdataRepository repo, String id, int version, byte[] b, int off, int len) {
-
-            assert id != null && id.length() > 0;
-            assert version >= 0;
-            assert b != null;
-            assert off >= 0 : "off="+off;
-            assert len >= 0 && off + len <= b.length;
-            assert len <= repo.BLOCK_SIZE : "len="+len+" exceeds blockSize="+repo.BLOCK_SIZE;
-
-            this.id = id;
-            this.version = version;
-            this.off = off;
-            this.len = len;
-            this.b = b;
-
-        }
-        
-        /**
-         * This procedure runs on the unisolated index. The block identifier is
-         * computed as a one up long integer for that file version using locally
-         * available state. The raw data for the block is written directly onto
-         * the {@link Journal} and an index entry is added for the file,
-         * version, and block whose value is the address of the block's data on
-         * the {@link Journal}.
-         * <p>
-         * Note: The caller MUST have correctly identified the data service on
-         * which the tail of the file exists (or on which the head of the file
-         * will be written).
-         * <p>
-         * The block identifier is computed by reading and decoding the key for
-         * the last block written for this file version (if any). Special cases
-         * exist when the file version spans more than one index partition, when
-         * the block would be the first block (in key order) for the index
-         * partition, and when the block would be the last block (in key order)
-         * for the index partition.
-         * 
-         * @return <code>true</code> iff the block was overwritten.
-         */
-        public Object apply(IIndex ndx) {
-
-            // tunnel through to the backing journal.
-            final AbstractJournal journal = (AbstractJournal)((AbstractBTree)ndx).getStore();
-            
-            // obtain the thread-local key builder for that journal.
-            final IKeyBuilder keyBuilder = journal.getKeyBuilder();
-            
-            /*
-             * The next block identifier to be assigned.
-             */
-            final long block;
-            {
-
-                /*
-                 * Find the key for the last block written for this file
-                 * version. We do this by forming a probe key from the file,
-                 * version, and the maximum allowed block identifier. This is
-                 * guarenteed to be after any existing block for that file and
-                 * version.
-                 * 
-                 * @todo This implies that the leftSeparator for the index
-                 * partition MUST NOT split the blocks for a file unless there
-                 * is at least one block in the index partition. In practice
-                 * this guarentee is easy to maintain. By default we choose to
-                 * split an index partition on a file boundary. If that would
-                 * result in an uneven split (or an empty split in the case of
-                 * very large files) then we choose a split point that lies
-                 * within the file's data - leaving at least one block for the
-                 * file (probably many) in both partitions created by the split.
-                 */
-                
-                final byte[] toKey = keyBuilder.reset().appendText(id,
-                        true/* unicode */, false/* successor */).append(
-                        version).append(Long.MAX_VALUE).getKey();
-
-                // @todo promote this interface onto IIndex?
-                // @todo verify iface implemented for index partition view.
-                final ILinearList tmp = (ILinearList) ndx;
-                
-                /*
-                 * Index of the first key after this file version.
-                 * 
-                 * Note: This will always be an insertion point (a negative
-                 * value) since the toKey only encodes the successor of the file
-                 * identifier.
-                 * 
-                 * We convert the insertion point to an index.
-                 * 
-                 * If the index is zero (0) then there are no blocks for this
-                 * file and the file will be the first file in the index order
-                 * on this index partition (there may or may not be other files
-                 * already on the index partition).
-                 * 
-                 * Else fetch the key at that index. If that key encodes the
-                 * same id as this file then we are appending to a file with
-                 * existing block(s) and we decode the block identifier from the
-                 * key. Otherwise this will be the first block written for that
-                 * file.
-                 */
-                int toIndex = tmp.indexOf(toKey);
-
-                assert toIndex < 0 : "Expecting insertion point: id=" + id
-                        + ", version=" + version + ", toIndex=" + toIndex;
-
-                log.debug("insertionPoint="+toIndex);
-                
-                toIndex = -(toIndex+1); // convert to an index.
-
-                // #of entries in the index.
-                final int entryCount = ((AbstractBTree)ndx).getEntryCount();
-                
-                log.debug("toIndex="+toIndex+", entryCount="+entryCount);
-
-                if (toIndex == 0) {
-
-                    /*
-                     * Insertion point is before all other entries in the index.
-                     * 
-                     * Note: In this case we need to examine the leftSeparator
-                     * key for the index partition. If that key is for the same
-                     * file version then we use the successor of the block
-                     * identifier found in that key.
-                     * 
-                     * Note: when it is not for the same file version it MAY be
-                     * that the leftSeparator does not include the block
-                     * identifier - the block identifier is only required in the
-                     * leftSeparator when the a file version spans both the
-                     * prior index partition and this index partition.
-                     */
-                    
-                    log.debug("Insertion point is before all entries in the index partition: id="
-                                    + id + ", version=" + version);
-                    
-                    final byte[] leftSeparator = ((BTree) ndx)
-                            .getIndexMetadata().getPartitionMetadata()
-                            .getLeftSeparatorKey();
-
-                    block = getNextBlockFromPriorKey(keyBuilder, leftSeparator);
-                    
-                } else {
-                    
-                    if (toIndex == entryCount) {
-
-                        /*
-                         * Insertion point is after all entries in the index.
-                         * 
-                         * Note: In this case we consider the prior key in the
-                         * index partition. If that key is for the same file
-                         * version then we use the successor of the block
-                         * identifier found in that key.
-                         */
-
-                        log.debug("Insertion point is after all entries in the index partition: id="
-                                        + id + ", version=" + version);
-
-                    } else {
-
-                        /*
-                         * Insertion point is at the toKey.
-                         * 
-                         * Note: Since the probe key is beyond the last block
-                         * for the file version we adjust the toIndex so that we
-                         * consider the prior key.
-                         */
-
-                        log.debug("Insertion point is at the toKey: id=" + id
-                                + ", version=" + version);
-
-                    }
-
-                    /*
-                     * Adjust to consider the key before the insertion point.
-                     */
-
-                    toIndex--;
-                    
-                    /*
-                     * Look at the key at the computed index. If it is a key for
-                     * this file version then we use the successor of the given
-                     * block identifier. Otherwise we are writing a new file
-                     * version and the block identifier will be zero (0).
-                     */
-                    
-                    log.debug("adjusted toIndex="+toIndex+", entryCount="+entryCount);
-                    
-                    // the key at that index.
-                    final byte[] key = tmp.keyAt(toIndex);
-
-                    assert key != null : "Expecting entry: id=" + id
-                            + ", version=" + version + ", toIndex=" + toIndex;
-
-                    block = getNextBlockFromPriorKey(keyBuilder, key);
-                    
-                }
-
-                log.info("Will write " + len + " bytes on id=" + id
-                        + ", version=" + version + ", block#=" + block);
-                
-            }
-
-            {
-
-                /*
-                 * write the block on the journal obtaining the address at which
-                 * it was written - use 0L for the address of an empty block.
-                 */
-                final long addr = len == 0 ? 0L : journal.write(ByteBuffer
-                        .wrap(b, off, len));
-
-                // form the key for the index entry for this block.
-                final byte[] key = keyBuilder.reset().appendText(id,
-                        true/* unicode */, false/* successor */).append(
-                        version).append(block).getKey();
-
-                // record the address of the block in the index.
-                {
-
-                    final DataOutputBuffer out = new DataOutputBuffer(
-                            Bytes.SIZEOF_LONG);
-
-                    // encode the value for the entry.
-                    out.reset().putLong(addr);
-
-                    final byte[] val = out.toByteArray();
-
-                    // insert the entry into the index.
-                    ndx.insert(key, val);
-
-                }
-
-                log.info("Wrote " + len + " bytes : id=" + id + ", version="
-                        + version + ", block#=" + block + " @ addr"
-                        + journal.toString(addr));
-
-            }
-
-            // the block identifier.
-            return block;
-
-        }
-
-        /**
-         * Decode the block identifier in the key and return the block
-         * identifier plus one, which is the block identifier to be used for the
-         * atomic append operation. If the key does NOT encode the same file +
-         * version then no blocks exist for that file version and the method
-         * returns zero (0L) as the block identifer to be used.
-         * 
-         * @param keyBuilder
-         *            The key builder.
-         * @param key
-         *            The key - either from the index partition or in some cases
-         *            from the leftSeparator of the index partition metadata.
-         *            <p>
-         *            Note that the leftSeparator MAY be an empty byte[] (e.g.,
-         *            for the 1st index partition in the key order) and MIGHT
-         *            NOT include the block identifier (the block identifier is
-         *            only included when it is necessary to split a file across
-         *            index partitions). When the block identifier is omitted
-         *            from the key and the key encodes the same file and version
-         *            we therefore use zero (0L) as the next block identifier
-         *            since we will be appending the first block to the file
-         *            version.
-         * 
-         * @return The block identifier that will be used by the atomic append
-         *         operation.
-         */
-        protected long getNextBlockFromPriorKey(IKeyBuilder keyBuilder,
-                byte[] key) {
-
-            // encode just the file id and the version.
-            final byte[] prefix = keyBuilder.reset().appendText(id,
-                    true/* unicode */, false/* successor */).append(version)
-                    .getKey();
-
-            if (DEBUG)
-                log.debug("Comparing\nkey   :" + Arrays.toString(key)
-                        + "\nprefix:" + Arrays.toString(prefix));
-
-            /*
-             * Test the encoded file id and version against the encoded file id
-             * and version in the recovered key. If they compare equals (for the
-             * length of the key that we just built) then they encode the same
-             * file id and version.
-             * 
-             * (I.e., if true, then the key is from a block entry for this
-             * version of this file).
-             */
-
-            if (key.length >= prefix.length) {
-
-                final int cmp = BytesUtil.compareBytesWithLenAndOffset(0,
-                        prefix.length, prefix, 0, prefix.length, key);
-
-                log.debug("Comparing " + prefix.length + " byte prefix with "
-                        + key.length + " byte key: cmp=" + cmp);
-
-                if (cmp == 0) {
-
-                    /*
-                     * The key at the computed toIndex is the same file version.
-                     */
-                    if (prefix.length + Bytes.SIZEOF_LONG == key.length) {
-                        
-                        /*
-                         * The given key includes a block identifier so we
-                         * extract it.
-                         * 
-                         * Note: When the given key is a leftSeparator for an
-                         * index partition AND the file version is not split
-                         * across the index partition then the block identifer
-                         * MAY be omitted from the leftSeparator. In this case
-                         * the block identifier will be zero since there are no
-                         * blocks yet for that file version.
-                         */
-
-                        // last block identifier assigned for this file + 1.
-                        final long block = KeyBuilder.decodeLong(key,
-                                key.length - Bytes.SIZEOF_LONG) + 1;
-
-                        if (block > MAX_BLOCK) {
-
-                            throw new RuntimeException(
-                                    "File version has maximum #of blocks: id="
-                                            + id + ", version=" + version);
-
-                        }
-
-                        log.info("Appending to existing file version: id=" + id
-                                + ", version=" + version + ", block=" + block);
-
-                        return block;
-
-                    } else {
-                        
-                        /*
-                         * This case arises when the leftSeparator encodes the
-                         * file version but does not include a block identifier.
-                         */
-                        
-                        log.info("Key is for same file version but does not contain block identifier.");
-                        
-                    }
-                    
-                } else {
-                    
-                    /*
-                     * Since the key does not compare as equal for the full
-                     * length of the prefix it can not encode the same file
-                     * version.
-                     */
-                    
-                    log.debug("Key does not compare as equal for length of prefix.");
-                    
-                }
-
-            } else {
-                
-                /*
-                 * Since the key is shorter than the prefix it can not be for
-                 * the same file version.
-                 */
-                
-                log.debug("Key is shorter than prefix.");
-                
-            }
-
-            /*
-             * The key at computed toIndex is a different file version so we are
-             * starting a new file version at block := 0.
-             */
-
-            log.info("Appending to new file version: id=" + id + ", version="
-                    + version + ", block=" + 0L);
-
-            return 0L;
-
-        }
-
-        public void readExternal(ObjectInput in) throws IOException,
-                ClassNotFoundException {
-
-            id = in.readUTF();
-
-            version = in.readInt();
-
-            off = 0; // Note: offset always zero when de-serialized.
-
-            len = in.readInt();
-
-            b = new byte[len];
-
-            in.readFully(b);
-
-        }
-
-        public void writeExternal(ObjectOutput out) throws IOException {
-
-            out.writeUTF(id);
-
-            out.writeInt(version);
-
-            /*
-             * Note: offset not written when serialized and always zero when
-             * de-serialized.
-             */
-            
-            out.writeInt(len); /* length */
-            
-            out.write(b, off, len); /* data */
-            
-        }
-        
-    }
-
-    /**
-     * Atomic write of a single block for a file version.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class AtomicBlockWriteProc implements ISimpleIndexProcedure,
-            Externalizable {
-
-        private static final long serialVersionUID = 4982851251684333327L;
-
-        protected static transient Logger log = Logger
-                .getLogger(AtomicBlockWriteProc.class);
-
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
-        final public static transient boolean INFO = log.getEffectiveLevel()
-                .toInt() <= Level.INFO.toInt();
-
-        /**
-         * True iff the {@link #log} level is DEBUG or less.
-         */
-        final public static transient boolean DEBUG = log.getEffectiveLevel()
-                .toInt() <= Level.DEBUG.toInt();
-
-        private String id;
-        private int version;
-        private long block;
-        private int off;
-        private int len;
-        private byte[] b;
-        
-        /**
-         * 
-         * @param id
-         *            The file identifier.
-         * @param version
-         *            The file version.
-         * @param block
-         *            The block identifier.
-         * @param b
-         *            The buffer containing the data to be written.
-         * @param off
-         *            The offset in the buffer of the first byte to be written.
-         * @param len
-         *            The #of bytes to be written.
-         */
-        public AtomicBlockWriteProc(BigdataRepository repo,String id, int version, long block, byte[] b, int off, int len) {
-
-            assert id != null && id.length() > 0;
-            assert version >= 0;
-            assert block >= 0 && block <= MAX_BLOCK;
-            assert b != null;
-            assert off >= 0 : "off="+off;
-            assert len >= 0 && off + len <= b.length;
-            assert len <= repo.BLOCK_SIZE : "len="+len+" exceeds blockSize="+repo.BLOCK_SIZE;
-
-            this.id = id;
-            this.version = version;
-            this.block = block;
-            this.off = off;
-            this.len = len;
-            this.b = b;
-
-        }
-        
-        /**
-         * This procedure runs on the unisolated index. The raw data is written
-         * directly onto the {@link Journal} and the index is added/updated
-         * using the given file, version and block and the address of the
-         * block's data on the {@link Journal}.
-         * 
-         * @return A {@link Boolean} whose value is <code>true</code> iff the
-         *         block was overwritten.
-         */
-        public Object apply(IIndex ndx) {
-
-            // tunnel through to the backing journal.
-            final AbstractJournal journal = (AbstractJournal)((AbstractBTree)ndx).getStore();
-            
-            // obtain the thread-local key builder for that journal.
-            final IKeyBuilder keyBuilder = journal.getKeyBuilder();
-
-            /*
-             * Write the block on the journal, obtaining the address at which it
-             * was written - use 0L as the address for an empty block.
-             */
-            final long addr = len == 0 ? 0L : journal.write(ByteBuffer.wrap(b,
-                    off, len));
-
-            // form the key for the index entry for this block.
-            final byte[] key = keyBuilder.reset().appendText(id,
-                    true/* unicode */, false/* successor */).append(version)
-                    .append(block).getKey();
-
-            // record the address of the block in the index.
-            final boolean overwrite;
-            {
-
-                final DataOutputBuffer out = new DataOutputBuffer(
-                        Bytes.SIZEOF_LONG);
-
-                // encode the value for the entry.
-                out.reset().putLong(addr);
-
-                final byte[] val = out.toByteArray();
-
-                // insert the entry into the index.
-                overwrite = ndx.insert(key, val) != null;
-
-            }
-
-            log.info("Wrote " + len + " bytes : id=" + id + ", version="
-                    + version + ", block#=" + block + " @ addr"
-                    + journal.toString(addr) + ", overwrite=" + overwrite);
-
-            return Boolean.valueOf(overwrite);
-
-        }
-        
-        public void readExternal(ObjectInput in) throws IOException,
-                ClassNotFoundException {
-
-            id = in.readUTF();
-
-            version = in.readInt();
-
-            block = in.readLong();
-
-            off = 0; // Note: offset always zero when de-serialized.
-
-            len = in.readInt();
-
-            b = new byte[len];
-
-            in.readFully(b);
-
-        }
-
-        public void writeExternal(ObjectOutput out) throws IOException {
-
-            out.writeUTF(id);
-
-            out.writeInt(version);
-
-            out.writeLong(block);
-
-            /*
-             * Note: offset not written when serialized and always zero when
-             * de-serialized.
-             */
-            
-            out.writeInt(len); /* length */
-            
-            out.write(b, off, len); /* data */
-            
-        }
-        
-    }
-
-    /**
      * Returns an iterator that visits all block identifiers for the file
      * version in sequence.
      * <p>
@@ -2057,73 +1063,6 @@ public class BigdataRepository implements ContentRepository {
 
         // resolve keys to block identifiers.
         return new BlockIdentifierIterator( id, version, itr );
-        
-    }
-    
-    /**
-     * Extracts the block identifier from the key.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class BlockIdentifierIterator implements Iterator<Long> {
-        
-        final private String id;
-        final private int version;
-        final private ITupleIterator src;
-
-        public String getId() {
-            
-            return id;
-            
-        }
-        
-        public int getVersion() {
-            
-            return version;
-            
-        }
-        
-        public BlockIdentifierIterator(String id, int version, ITupleIterator src) {
-        
-            if (id == null)
-                throw new IllegalArgumentException();
-            if (src == null)
-                throw new IllegalArgumentException();
-            
-            this.id = id;
-            this.version = version;
-            this.src = src;
-            
-        }
-
-        public boolean hasNext() {
-
-            return src.hasNext();
-            
-        }
-
-        public Long next() {
-
-            ITuple tuple = src.next();
-            
-            byte[] key = tuple.getKey();
-            
-            long block = KeyBuilder.decodeLong(key, key.length
-                    - Bytes.SIZEOF_LONG);
-
-            return block;
-            
-        }
-
-        /**
-         * Removes the last visited block for the file version.
-         */
-        public void remove() {
-
-            src.remove();
-            
-        }
         
     }
     
@@ -2197,7 +1136,7 @@ public class BigdataRepository implements ContentRepository {
      *            The block identifier in [0:{@link #MAX_BLOCK}].
      * @param b
      *            The buffer containing the bytes to be written. When the buffer
-     *            contains more than {@link #BLOCK_SIZE} bytes it will be broken
+     *            contains more than {@link #blockSize} bytes it will be broken
      *            up into multiple blocks.
      * @param off
      *            The offset of the 1st byte to be written.
@@ -2222,7 +1161,7 @@ public class BigdataRepository implements ContentRepository {
      *             if <i>len</id> is negative or <i>off+len</i> is greater
      *             than the length of the byte[].
      * @throws IllegalArgumentException
-     *             if <i>len</i> is greater than {@link #BLOCK_SIZE}.
+     *             if <i>len</i> is greater than {@link #blockSize}.
      * 
      * @todo return the data for the old block instead in the case of an
      *       overwrite?
@@ -2249,7 +1188,7 @@ public class BigdataRepository implements ContentRepository {
             throw new IllegalArgumentException("off="+off+", b.length="+b.length);
         if (len < 0 || off + len > b.length)
             throw new IllegalArgumentException("off="+off+", len="+len+", b.length="+b.length);
-        if(len>BLOCK_SIZE) {
+        if(len>blockSize) {
             throw new IllegalArgumentException();
         }
 
@@ -2560,7 +1499,7 @@ public class BigdataRepository implements ContentRepository {
      * @param off
      *            The offset of the 1st byte to be written.
      * @param len
-     *            The #of bytes to be written in [0:{@link #BLOCK_SIZE}].
+     *            The #of bytes to be written in [0:{@link #blockSize}].
      * 
      * @return The block identifer for the written block.
      * 
@@ -2577,7 +1516,7 @@ public class BigdataRepository implements ContentRepository {
      *             if <i>len</id> is negative or <i>off+len</i> is greater
      *             than the length of the byte[].
      * @throws IllegalArgumentException
-     *             if <i>len</i> is greater than {@link #BLOCK_SIZE}.
+     *             if <i>len</i> is greater than {@link #blockSize}.
      */
     public long appendBlock(String id, int version, byte[] b, int off, int len) {
         
@@ -2591,7 +1530,7 @@ public class BigdataRepository implements ContentRepository {
             throw new IllegalArgumentException("off="+off+", b.length="+b.length);
         if (len < 0 || off + len > b.length)
             throw new IllegalArgumentException("off="+off+", len="+len+", b.length="+b.length);
-        if (len > BLOCK_SIZE) {
+        if (len > blockSize) {
             throw new IllegalArgumentException();
         }
 
@@ -2966,626 +1905,6 @@ public class BigdataRepository implements ContentRepository {
         }
         
         return ncopied;
-
-    }
-
-    /**
-     * Class buffers up to a block of data at a time and flushes blocks using an
-     * atomic append operation on the identifier file version.
-     * 
-     * @todo this would benefit from asynchronous write-behind of the last block
-     *       so that caller's do not wait for the RPC that writes the block onto
-     *       the data index. use a blocking queue of buffers to be written so
-     *       that the caller can not get far ahead of the database. a queue
-     *       capacity of 1 or 2 should be sufficient.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class FileVersionOutputStream extends OutputStream {
-
-        protected final BigdataRepository repo;
-        protected final String id;
-        protected final int version;
-        
-        /**
-         * The file identifier.
-         */
-        public String getId() {
-            
-            return id;
-            
-        }
-
-        /**
-         * The file version identifer.
-         */
-        public int getVersion() {
-
-            return version;
-            
-        }
-
-        /**
-         * The buffer in which the current block is being accumulated.
-         */
-        private final byte[] buffer;
-
-        /**
-         * The index of the next byte in {@link #buffer} on which a byte would be
-         * written.
-         */
-        private int len = 0;
-
-        /**
-         * #of bytes written onto this output stream.
-         */
-        private long nwritten;
-        
-        /**
-         * #of bytes written onto this output stream.
-         * 
-         * @todo handle overflow of long - leave counter at {@link Long#MAX_VALUE}.
-         */
-        public long getByteCount() {
-            
-            return nwritten;
-            
-        }
-
-        /**
-         * #of blocks written onto the file version.
-         */
-        private long nblocks;
-        
-        /**
-         * #of blocks written onto the file version.
-         */
-        public long getBlockCount() {
-           
-            return nblocks;
-            
-        }
-        
-        /**
-         * Create an output stream that will atomically append blocks of data to
-         * the specified file version.
-         * 
-         * @param id
-         *            The file identifier.
-         * @param version
-         *            The version identifier.
-         */
-        public FileVersionOutputStream(BigdataRepository repo, String id, int version) {
-            
-            if (repo == null)
-                throw new IllegalArgumentException();
-            if (id == null)
-                throw new IllegalArgumentException();
-            
-            this.repo = repo;
-            
-            this.id = id;
-            
-            this.version = version;
-
-            this.buffer = new byte[repo.BLOCK_SIZE];
-            
-        }
-
-        /**
-         * Buffers the byte. If the buffer would overflow then it is flushed.
-         * 
-         * @throws IOException
-         */
-        public void write(int b) throws IOException {
-
-            if (len == buffer.length) {
-
-                // buffer would overflow.
-                
-                flush();
-                
-            }
-            
-            buffer[len++] = (byte) (b & 0xff);
-            
-            nwritten++;
-            
-        }
-
-        /**
-         * If there is data data accumulated in the buffer then it is written on
-         * the file version using an atomic append (empty buffers are NOT
-         * flushed).
-         * 
-         * @throws IOException
-         */
-        public void flush() throws IOException {
-            
-            if (len > 0) {
-
-                log.info("Flushing buffer: id="+id+", version="+version+", len="+len);
-                
-                repo.appendBlock(id, version, buffer, 0, len);
-
-                len = 0;
-                
-                nblocks++;
-                
-            }
-            
-        }
-        
-        /**
-         * Flushes the buffer.
-         * 
-         * @throws IOException
-         */
-        public void close() throws IOException {
-           
-            flush();
-            
-        }
-
-        /**
-         * Consumes the input stream, writing blocks onto the file version. The
-         * output stream is NOT flushed.
-         * 
-         * @param is
-         *            The input stream (closed iff it is fully consumed).
-         * 
-         * @return The #of bytes copied from the input stream.
-         * 
-         * @throws IOException
-         */
-        public long copyStream(InputStream is) throws IOException {
-
-            long ncopied = 0L;
-
-            while (true) {
-
-                if (this.len == buffer.length) {
-
-                    // flush if the buffer would overflow.
-                    
-                    flush();
-                    
-                }
-                
-                // next byte to write in the buffer.
-                final int off = this.len;
-
-                // #of bytes remaining in the buffer.
-                final int remainder = this.buffer.length - off;
-
-                // read into the buffer.
-                final int nread = is.read(buffer, off, remainder);
-
-                if (nread == -1) {
-
-                    // the input stream is exhausted.
-                    
-                    log.info("Copied " + ncopied + " bytes: id=" + id
-                            + ", version=" + version);
-
-                    try {
-
-                        is.close();
-                        
-                    } catch (IOException ex) {
-                        
-                        log.warn("Problem closing input stream: id=" + id
-                                + ", version=" + version, ex);
-                        
-                    }
-
-                    return ncopied;
-
-                }
-
-                // update the index of the next byte to write in the buffer.
-                this.len = off + nread;
-
-                // update #of bytes copied.
-                ncopied += nread;
-
-                // update #of bytes written on this output stream.
-                nwritten += nread;
-
-            }
-
-        }
-        
-    }
-    
-    /**
-     * Reads from blocks visited by a range scan for a file and version.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    protected static class FileVersionInputStream extends InputStream {
-
-        protected final String id;
-        protected final int version;
-        private final ITupleIterator src;
-
-        /**
-         * The current block# whose data are being read.
-         */
-        private long block;
-        
-        /**
-         * A buffer holding the current block's data. This is initially filled
-         * from the first block by the ctor. When no more data is available it
-         * is set to <code>null</code> to indicate that the input stream has
-         * been exhausted.
-         * 
-         * @todo reuse buffers sized out to the block size.
-         */
-        private byte[] b;
-        
-        /**
-         * The next byte to be returned from the current block's data.
-         */
-        private int off;
-        
-        /**
-         * The #of bytes remaining in the current block's data.
-         */
-        private int len;
-        
-        /**
-         * The file identifier.
-         */
-        public String getId() {
-            
-            return id;
-            
-        }
-
-        /**
-         * The file version identifer.
-         */
-        public int getVersion() {
-
-            return version;
-            
-        }
-        
-        /**
-         * The current block identifier.
-         */
-        public long getBlock() {
-
-            return block;
-            
-        }
-        
-        public FileVersionInputStream(String id, int version, ITupleIterator src) {
-            
-            this.id = id;
-            
-            this.version = version;
-            
-            this.src = src;
-            
-            // read the first block of data.
-            nextBlock();
-            
-        }
-        
-        /**
-         * Reads the next block of data from the iterator and sets it on the
-         * internal buffer. If the iterator is exhausted then the internal
-         * buffer is set to <code>null</code>.
-         * 
-         * @return true iff another block of data was read.
-         */
-        private boolean nextBlock() {
-            
-            assert b == null || off == len;
-            
-            if (!src.hasNext()) {
-
-                log.info("No more blocks: id="+id+", version="+version);
-                
-                b = null;
-                
-                off = 0;
-                
-                len = 0;
-                
-                return false;
-                
-            }
-            
-            final ITuple tuple = src.next();
-            
-            /*
-             * decode the block address.
-             */
-            final long addr;
-            try {
-
-                DataInput in = tuple.getValueStream();
-            
-                addr = in.readLong();
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-            if (addr == 0L) {
-
-                /*
-                 * Note: empty blocks are allowed and are recorded with 0L as
-                 * their address.
-                 */
-
-                b = new byte[] {};
-                
-                off = 0;
-                
-                len = 0;
-                
-                log.info("Read zero bytes: id="+id+", version="+version+", block="+block);
-                
-            } else {
-             
-                byte[] key = tuple.getKey();
-                
-                // decode the block identifier from the key.
-//                block = KeyBuilder.decodeLong(tuple.getKeyBuffer().array(),
-//                        tuple.getKeyBuffer().pos() - Bytes.SIZEOF_LONG);
-                block = KeyBuilder.decodeLong(key, key.length - Bytes.SIZEOF_LONG);
-                
-                final IBlock tmp = tuple.readBlock(addr);
-                
-                final int nbytes = tmp.length();
-                
-                // @todo reuse buffer!
-                b = new byte[nbytes];
-                
-                off = 0;
-                
-                len = nbytes;
-                
-                try {
-
-                    final int nread = tmp.inputStream().read(b,off,len);
-                    
-                    if (nread != len) {
-
-                        throw new RuntimeException("Expecting " + len
-                                + " bytes but read " + nread);
-                        
-                    }
-
-                } catch (IOException e) {
-
-                    throw new RuntimeException(e);
-                    
-                }
-                
-                log.info("Read "+b.length+" bytes: id="+id+", version="+version+", block="+block);
-                
-            }
-            
-            return true;
-            
-        }
-        
-        public int read() throws IOException {
-
-            if (b == null) {
-
-                // nothing left to read.
-
-                return -1;
-
-            }
-            
-            if(off == len) {
-                
-                if (!nextBlock()) {
-                    
-                    // no more blocks so nothing left to read.
-                    
-                    return -1;
-                    
-                }
-                
-            }
-            
-            // the next byte.
-            int v = (0xff & b[off++]);
-            
-            return v;
-            
-        }
-        
-        /**
-         * Overriden for greater efficiency.
-         */
-        public int read(byte[] b,int off, int len) throws IOException {
-
-            if (b == null) {
-
-                // nothing left to read.
-
-                return -1;
-
-            }
-            
-            if(this.off == this.len) {
-                
-                if (!nextBlock()) {
-                    
-                    // no more blocks so nothing left to read.
-                    
-                    return -1;
-                    
-                }
-                
-            }
-            
-            /*
-             * Copy everything in our internal buffer up to the #of bytes
-             * remaining in the caller's buffer.
-             */
-            
-            final int n = Math.min(this.len, len); 
-            
-            System.arraycopy(this.b, this.off, b, off, n);
-
-            this.off += n;
-            
-            return n;
-            
-        }
-        
-    }
-
-    /**
-     * Copies blocks onto the target store during overflow handling. Blocks that
-     * are no longer referenced by the file data index will be left behind on
-     * the journal and eventually discarded with the journal.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class BlobOverflowHandler implements IOverflowHandler {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -8180664203349900189L;
-
-        /**
-         * De-serialization constructor.
-         */
-        public BlobOverflowHandler() {
-            
-        }
-
-        DataOutputBuffer buf;
-        
-        public void close() {
-            
-            buf = null;
-            
-        }
-        
-        public byte[] handle(ITuple tuple, IRawStore target) {
-
-            if(buf==null) {
-                
-                buf = new DataOutputBuffer();
-                
-            }
-            
-            final long addr;
-            try {
-
-                DataInput in = tuple.getValueStream();
-            
-                addr = in.readLong();
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-            if (addr == 0L) {
-
-                /*
-                 * Note: empty blocks are allowed and are recorded with 0L as
-                 * their address.
-                 */
-                
-                return KeyBuilder.asSortKey(0L);
-
-            }
-
-            // read block from underlying source store.
-            final IBlock block = tuple.readBlock(addr);
-            
-            // #of bytes in the block.
-            final int len = block.length();
-
-            // make sure buffer has sufficient capacity.
-            buf.ensureCapacity(len);
-            
-            // prepare buffer for write.
-            buf.reset();
-            
-            final InputStream bin = block.inputStream();
-
-//            // the address on which the block will be written.
-//            final long addr2 = block2.getAddress();
-            final long addr2;
-            try {
-
-//                // #of bytes read so far.
-//                long n = 0;
-//                
-//                while (len - n > 0) {
-
-                    // read source into buffer.
-                    final int nread = bin.read(buf.array(),0,len);
-
-                    if (nread != len) {
-
-                        throw new RuntimeException(
-                                "Premature end of block: expected="+len+", actual="+nread);
-
-                    }
-
-                    // write on the target store.
-                    addr2 = target.write(buf.wrap());
-                    
-//                    // write buffer onto sink.
-//                    bout.write(buf, 0, nread);
-
-//                    n += nread;
-//
-//                }
-
-//                bout.flush();
-
-            } catch(IOException ex) {
-                
-                log.warn(
-                        "Problem copying block: addr=" + addr + ", len=" + len,
-                        ex);
-                
-                throw new RuntimeException(ex);
-                
-            } finally {
-
-//                try {
-//                    bout.close();
-//                } catch (IOException ex) {
-//                    log.warn(ex);
-//                }
-
-                try {
-                    bin.close();
-                } catch (IOException ex) {
-                    log.warn(ex);
-                }
-
-            }
-
-            // the address of the block on the target store.
-            return KeyBuilder.asSortKey(addr2);
-            
-        }
 
     }
 
