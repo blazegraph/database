@@ -64,7 +64,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedBigdataFederation;
+import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -114,7 +114,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       <p>
  *       However, a scale-out deployment based on an {@link IBigdataFederation}
  *       supports key-range partitioned indices regardless of whether it is an
- *       {@link EmbeddedBigdataFederation} or a distributed federation. This
+ *       {@link EmbeddedFederation} or a distributed federation. This
  *       means that the cost of a full compacting merge for an index partition
  *       is capped by the size limits we place on index partitions regardless of
  *       the total size of the scale-out index.

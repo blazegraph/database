@@ -67,12 +67,6 @@ import com.bigdata.io.DataOutputBuffer;
 public class WormAddressManager implements IAddressManager {
 
     /**
-     * A sharable instance created using the default constructor allowing byte
-     * offset of up to 4T and record lengths of up to 4M.
-     */
-    public static final WormAddressManager INSTANCE = new WormAddressManager();
-    
-    /**
      * Used to represent a null reference by {@link #toString(long)}.
      */
     protected static final String _NULL_ = "NULL";
@@ -94,20 +88,34 @@ public class WormAddressManager implements IAddressManager {
     public static final int MAX_OFFSET_BITS = 60;
     
     /**
-     * The default #of bits used to represent the byte offset (42). This allows
-     * byte offsets of up to 4,398,046,511,103 (4 terabytes minus one). The
-     * maximum record size is 4,194,303 (4 megabytes minus one). This is a good
-     * default and it is highly unlikely to have records as large as 4M with the
-     * modest branching factors used on a BTree backed by a Journal. At the same
-     * time, 4T is as much storage as we could reasonable expect to be able to
-     * address on a single file system.
+     * The #of offset bits that allows byte offsets of up to 4,398,046,511,103
+     * (4 terabytes minus one) and a maximum record size of 4,194,303 (4
+     * megabytes minus one).
+     * <p>
+     * This is a good value when deploying a scale-up solution. For the scale-out
+     * deployment scenario you will have monolithic indices on a journal,
+     * providing effectively a WORM or "immortal" database. It is highly
+     * unlikely to have records as large as 4M with the modest branching factors
+     * used on a BTree backed by a Journal. At the same time, 4T is as much
+     * storage as we could reasonable expect to be able to address on a single
+     * file system.
      */
-    public static final int DEFAULT_OFFSET_BITS = 42;
+    public static final int SCALE_UP_OFFSET_BITS = 42;
     
     /**
-     * The #of offset bits that must be used in order to support 64M blobs.
+     * The #of offset bits that must be used in order to support 64M (67,108,864
+     * bytes) blobs (38).
+     * <p>
+     * This is a good value when deploying a scale-out solution. For the
+     * scale-out deployment scenarior you will have key-range partitioned
+     * indices automatically distributed among data services available on a
+     * cluster. The journal files are never permitted to grow very large for
+     * scale-out deployments. Instead, the journal periodically overflows,
+     * generating index segments which capture historical views. The larger
+     * record size (64M) also supports the distributed repository and map/reduce
+     * processing models.
      */
-    public static final int BLOB_OFFSET_BITS = 38;
+    public static final int SCALE_OUT_OFFSET_BITS = 38;
     
     /**
      * The #of bits allocated to the byte offset (this is the sole input to the
@@ -241,17 +249,15 @@ public class WormAddressManager implements IAddressManager {
         
     }
     
-    /**
-     * Allows byte offsets of up to 4T and record lengths of up to 4M (it
-     * allocates {@link #DEFAULT_OFFSET_BITS} to the offset).
-     * 
-     * @see #INSTANCE
-     */
-    protected WormAddressManager() {
-
-        this( DEFAULT_OFFSET_BITS );
-        
-    }
+//    /**
+//     * Allows byte offsets of up to 4T and record lengths of up to 4M (it
+//     * allocates {@link #DEFAULT_OFFSET_BITS} to the offset).
+//     */
+//    protected WormAddressManager() {
+//
+//        this( DEFAULT_OFFSET_BITS );
+//        
+//    }
     
     /**
      * Construct an {@link IAddressManager} that will allocate a specified #of
@@ -264,8 +270,6 @@ public class WormAddressManager implements IAddressManager {
      *            may be stored. The remaining bits are used for the byte count,
      *            so this indirectly determines the maximum #of bytes that may
      *            be stored in a record.
-     * 
-     * @see #INSTANCE
      */
     public WormAddressManager(int offsetBits) {
         

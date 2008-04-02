@@ -38,7 +38,7 @@ import com.bigdata.Banner;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractBigdataClient implements IBigdataClient {
+abstract public class AbstractClient implements IBigdataClient {
     
     /**
      * The properties specified to the ctor.
@@ -55,7 +55,8 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
     private final boolean batchApiOnly;
     private final int threadPoolSize;
     private final int maxStaleLocatorRetries; 
-    private final int maxParallelTasksPerRequest; 
+    private final int maxParallelTasksPerRequest;
+    private final int indexCacheCapacity;
     
     /*
      * IBigdataClient API.
@@ -91,12 +92,18 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
         
     }
     
+    public int getIndexCacheCapacity() {
+        
+        return indexCacheCapacity;
+        
+    }
+    
     /**
      * 
      * @param properties
      *            See {@link IBigdataClient.Options}
      */
-    protected AbstractBigdataClient(Properties properties) {
+    protected AbstractClient(Properties properties) {
         
         // show the copyright banner during statup.
         Banner.banner();
@@ -179,7 +186,23 @@ abstract public class AbstractBigdataClient implements IBigdataClient {
             log.info(Options.CLIENT_BATCH_API_ONLY + "=" + batchApiOnly);
             
         }
+        /*
+         * indexCacheCapacity
+         */
+        {
 
+            indexCacheCapacity = Integer.parseInt(properties.getProperty(
+                    Options.CLIENT_INDEX_CACHE_CAPACITY,
+                    Options.DEFAULT_CLIENT_INDEX_CACHE_CAPACITY));
+
+            log.info(Options.CLIENT_INDEX_CACHE_CAPACITY+"="+indexCacheCapacity);
+
+            if (indexCacheCapacity <= 0)
+                throw new RuntimeException(Options.CLIENT_INDEX_CACHE_CAPACITY
+                        + " must be non-negative");
+
+        }
+        
     }
     
 }

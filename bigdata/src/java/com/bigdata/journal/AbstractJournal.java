@@ -580,7 +580,7 @@ public abstract class AbstractJournal implements IJournal {
          */
         
         final int offsetBits = Integer.parseInt(properties.getProperty(
-                Options.OFFSET_BITS, "" + Options.DEFAULT_OFFSET_BITS));
+                Options.OFFSET_BITS, Options.DEFAULT_OFFSET_BITS));
 
         WormAddressManager.assertOffsetBits(offsetBits);
 

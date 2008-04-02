@@ -38,18 +38,18 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
-import com.bigdata.service.AbstractRemoteBigdataFederation;
+import com.bigdata.service.AbstractRemoteFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.jini.JiniBigdataClient;
+import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
- * Test suite for the {@link JiniBigdataClient}.
+ * Test suite for the {@link JiniFederationClient}.
  * <p>
  * Note: The core test suite has already verified the basic semantics of the
  * {@link IDataService} interface and partitioned indices so all we have to
@@ -91,7 +91,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniBigdataClient client;
+    JiniFederationClient client;
     
     /**
      * Starts a {@link DataServer} ({@link #dataServer1}) and then a
@@ -160,7 +160,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }.start();
 
-        client = JiniBigdataClient.newInstance(
+        client = JiniFederationClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
@@ -170,7 +170,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
         getServiceID(dataServer0);
         getServiceID(dataServer1);
         
-        final JiniBigdataFederation fed = client.connect();
+        final JiniFederation fed = client.connect();
         
         // verify that the client has/can get the metadata service.
         metadataService0 = fed.getMetadataService();

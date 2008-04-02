@@ -261,7 +261,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      *       them from the {@link #dataDir}).
      */
     private final IRawStore tmpStore = new TemporaryRawStore(
-            WormAddressManager.DEFAULT_OFFSET_BITS,//
+            WormAddressManager.SCALE_UP_OFFSET_BITS,//
             10 * Bytes.kilobyte, // initial in memory extent
             100* Bytes.megabyte, // maximum in memory extent
             false // useDirectBuffers

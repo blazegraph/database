@@ -41,13 +41,16 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.KV;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
+import com.bigdata.repo.BigdataRepository;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.text.FullTextIndex;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data
@@ -56,20 +59,25 @@ import com.bigdata.resources.ResourceManager;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * FIXME modify this and {@link AbstractLocalDataServiceFederationTestCase} to
+ * be proxy test suites so that I can run tests against both with ease and make
+ * use of them for testing the {@link FullTextIndex} and
+ * {@link BigdataRepository}.
  */
-abstract public class AbstractEmbeddedBigdataFederationTestCase extends AbstractBTreeTestCase {
+abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTestCase {
 
     /**
      * 
      */
-    public AbstractEmbeddedBigdataFederationTestCase() {
+    public AbstractEmbeddedFederationTestCase() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public AbstractEmbeddedBigdataFederationTestCase(String arg0) {
+    public AbstractEmbeddedFederationTestCase(String arg0) {
         super(arg0);
     }
 
@@ -88,7 +96,7 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
                 .toString());
         
         // when the data are persistent use the test to name the data directory.
-        properties.setProperty(EmbeddedBigdataFederation.Options.DATA_DIR,
+        properties.setProperty(com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
                 getName());
         
         // disable moves.
@@ -114,19 +122,19 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
             
         }
 
-        client = new EmbeddedBigdataClient(getProperties());
+        client = new EmbeddedClient(getProperties());
         
         fed = client.connect();
 
         metadataService = fed.getMetadataService();
         System.err.println("metadataService: "+metadataService.getServiceUUID());
 
-        dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
+        dataService0 = ((EmbeddedFederation)fed).getDataService(0);
         System.err.println("dataService0   : "+dataService0.getServiceUUID());
 
-        if (((EmbeddedBigdataFederation) fed).getDataServiceCount() > 1) {
+        if (((EmbeddedFederation) fed).getDataServiceCount() > 1) {
         
-            dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
+            dataService1 = ((EmbeddedFederation)fed).getDataService(1);
             System.err.println("dataService1   : "+dataService1.getServiceUUID());
             
         }
@@ -414,33 +422,6 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends Abstract
         
     }
 
-    /**
-     * A key-value pair.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static class KV implements Comparable<KV>{
-        
-        final byte[] key;
-        final byte[] val;
-        
-        public KV(byte[] key, byte[] val) {
-            
-            this.key = key;
-            
-            this.val = val;
-            
-        }
-
-        public int compareTo(KV arg0) {
-
-            return BytesUtil.compareBytes(key, arg0.key);
-            
-        }
-        
-    }
-    
     /**
      * Generate random key-value data in key order.
      * <p>

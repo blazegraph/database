@@ -464,7 +464,7 @@ public class IndexSegmentBuilder {
          * generated index segment!
          */
 
-        final int offsetBits = WormAddressManager.BLOB_OFFSET_BITS;
+        final int offsetBits = WormAddressManager.SCALE_OUT_OFFSET_BITS;
         
         this.addressManager = new WormAddressManager(offsetBits);
         

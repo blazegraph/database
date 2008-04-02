@@ -48,7 +48,7 @@ import com.bigdata.resources.StaleLocatorException;
  * @version $Id$
  */
 public class TestBasicIndexStuff extends
-        AbstractEmbeddedBigdataFederationTestCase {
+        AbstractEmbeddedFederationTestCase {
 
     /**
      * 

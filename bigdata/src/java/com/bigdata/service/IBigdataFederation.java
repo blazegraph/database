@@ -31,9 +31,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * The client-facing interface to a bigdata federation.
@@ -196,9 +198,82 @@ public interface IBigdataFederation {
      *            <code>-timestamp</code> for a historical view no later than
      *            the specified timestamp.
      * 
-     * @return The index or <code>null</code> if the index is not
-     *         registered with the {@link MetadataService}.
+     * @return The index or <code>null</code> if the index does not exist.
      */
     public IIndex getIndex(String name, long timestamp);
+    
+    /**
+     * Return a thread-local {@link IKeyBuilder} configured using the properties
+     * specified for the {@link IBigdataClient}.
+     */
+    public IKeyBuilder getKeyBuilder();
+    
+    /**
+     * Return <code>true</code> iff the federation supports scale-out indices.
+     * <p>
+     * Note: A <code>false</code> return indicates that
+     * {@link #getMetadataService()} WILL NOT return a {@link IMetadataService}
+     * since key-range partitioned indices are NOT supported. Applications can
+     * use this method to decide whether or not to enable delete markers when
+     * registering an index since delete markers are only required for scale-out
+     * indices.
+     * 
+     * @see IndexMetadata
+     */
+    public boolean isScaleOut();
+    
+    /**
+     * Return the global {@link SparseRowStore} used to store named property
+     * sets in the federation.
+     * 
+     * @see GlobalRowStoreSchema
+     * @see #getNamedRecord(String)
+     * @see #putNamedRecord(String, Object)
+     */
+    public SparseRowStore getGlobalRowStore();
+    
+    /**
+     * Return a named object stored in the global namespace for the federation.
+     * 
+     * @param name
+     *            The name under which the object is stored.
+     * 
+     * @return The named record together -or- <code>null</code> iff there was
+     *         no record recorded under that name.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     */
+    public Object getNamedRecord(String name);
+    
+    /**
+     * Store or update a named object in the global namespace for the
+     * federation.
+     * 
+     * @param name
+     *            The name under which the object is to be stored.
+     * @param value
+     *            The value to be stored under that name -or- <code>null</code>
+     *            to clear any value associated with that name.
+     * 
+     * @return The old value -or- <code>null</code> if there was no value
+     *         stored under that name.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     * 
+     * @todo Consider replacing with <code>getGlobalRowStore()</code> since we
+     *       can use that directly to store property sets, serialized objects,
+     *       etc.
+     */
+    public Object putNamedRecord(String name, Object value);
+
+    /**
+     * Destroys all discovered services belonging to the federation and their
+     * persistent data.
+     * 
+     * @todo create()?
+     */
+    public void destroy();
     
 }

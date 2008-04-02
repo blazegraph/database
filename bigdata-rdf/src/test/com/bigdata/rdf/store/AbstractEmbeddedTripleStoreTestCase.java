@@ -29,7 +29,7 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
-import com.bigdata.service.IBigdataFederation;
+import com.bigdata.journal.ITx;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -69,11 +69,8 @@ public class AbstractEmbeddedTripleStoreTestCase extends
 
         super.setUp();
 
-        // Connect to the federation.
-        IBigdataFederation fed = client.connect();
-
-        // setup the database client.
-        store = new ScaleOutTripleStore(fed,getProperties());
+        // connect to the database.
+        store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
         // register the indices.
         store.registerIndices();

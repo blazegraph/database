@@ -33,8 +33,9 @@ import java.io.FilenameFilter;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.service.jini.JiniBigdataClient;
-import com.bigdata.service.jini.JiniBigdataFederation;
+import com.bigdata.journal.ITx;
+import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Class designed to connect to an existing bigdata federation using jini and
@@ -135,12 +136,12 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         /**
          * Starts in {@link #setUp()}.
          */
-        JiniBigdataClient client = JiniBigdataClient.newInstance(
+        JiniFederationClient client = JiniFederationClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
 
-        JiniBigdataFederation fed = client.connect();
+        JiniFederation fed = client.connect();
         
         /*
          * Await at least N data services and one metadata service (otherwise
@@ -149,17 +150,9 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         final int N = fed.awaitServices(minDataServices, timeout);
         
         System.err.println("Will run with "+N+" data services");
-        
-        ScaleOutTripleStore store = new ScaleOutTripleStore(client.connect(),System.getProperties());
 
-        if(store.getSPOIndex()==null) {
-    
-            log.info("Registering scale-out indices");
-            
-            store.registerIndices();
-            
-        }
-        
+        ScaleOutTripleStore store = new ScaleOutTripleStore(client,"test",ITx.UNISOLATED);
+
         new ConcurrentDataLoader(store, nthreads, bufferCapacity,
                 new File(file), new FilenameFilter() {
 

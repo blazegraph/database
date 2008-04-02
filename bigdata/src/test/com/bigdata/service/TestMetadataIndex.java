@@ -43,7 +43,7 @@ import com.bigdata.mdi.MetadataIndex;
  * @version $Id$
  */
 public class TestMetadataIndex extends
-        AbstractEmbeddedBigdataFederationTestCase {
+        AbstractEmbeddedFederationTestCase {
 
     /**
      * 

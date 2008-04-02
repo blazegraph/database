@@ -735,7 +735,7 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
                      * length parameters. The same changes should be applied to
                      * the writeBlock() case below.
                      */
-                    int capacity = r.nextInt(repo.BLOCK_SIZE); // [0:blockSize-1]
+                    int capacity = r.nextInt(repo.getBlockSize()); // [0:blockSize-1]
                     int off = r.nextInt(capacity); // [0:capacity-1]
                     int len = r.nextInt(capacity - off+1);
                     byte[] b = new byte[capacity];
@@ -776,7 +776,7 @@ public class TestRandomBlockOps extends AbstractRepositoryTestCase {
                     break;
                 }
                 case Op.write: {
-                    int capacity = r.nextInt(repo.BLOCK_SIZE); // [0:blockSize-1]
+                    int capacity = r.nextInt(repo.getBlockSize()); // [0:blockSize-1]
                     int off = r.nextInt(capacity); // [0:capacity-1]
                     int len = r.nextInt(capacity - off+1);
                     byte[] b = new byte[capacity];

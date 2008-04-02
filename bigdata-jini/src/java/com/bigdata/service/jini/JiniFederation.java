@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -35,11 +36,12 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 
-import com.bigdata.service.AbstractRemoteBigdataFederation;
+import com.bigdata.service.AbstractRemoteFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.jini.JiniBigdataClient.JiniConfig;
+import com.bigdata.service.jini.JiniFederationClient.JiniConfig;
+import com.sun.jini.admin.DestroyAdmin;
 
 /**
  * Concrete implementation for Jini.
@@ -47,7 +49,7 @@ import com.bigdata.service.jini.JiniBigdataClient.JiniConfig;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniBigdataFederation extends AbstractRemoteBigdataFederation {
+public class JiniFederation extends AbstractRemoteFederation {
 
     protected DataServicesClient dataServicesClient;
 
@@ -68,7 +70,7 @@ public class JiniBigdataFederation extends AbstractRemoteBigdataFederation {
      * @param client
      *            The client.
      */
-    public JiniBigdataFederation(JiniBigdataClient client, JiniConfig jiniConfig) {
+    public JiniFederation(JiniFederationClient client, JiniConfig jiniConfig) {
 
         super(client);
     
@@ -106,9 +108,9 @@ public class JiniBigdataFederation extends AbstractRemoteBigdataFederation {
 
     }
 
-    public JiniBigdataClient getClient() {
+    public JiniFederationClient getClient() {
         
-        return (JiniBigdataClient)super.getClient();
+        return (JiniFederationClient)super.getClient();
         
     }
     
@@ -272,6 +274,96 @@ public class JiniBigdataFederation extends AbstractRemoteBigdataFederation {
             
         }
 
+    }
+    
+    public void destroy() {
+
+        // destroy data services.
+        {
+
+            final UUID[] uuids = dataServicesClient.getDataServiceUUIDs(0);
+
+            for(UUID uuid : uuids) {
+                
+                final IDataService ds;
+                
+                try {
+
+                    ds = getDataService(uuid);
+                    
+                } catch(Exception ex) {
+                    
+                    log.error("Could not resolve dataService: uuid"+uuid);
+                    
+                    continue;
+                    
+                }
+                
+                try {
+                    
+                    ds.destroy();
+                    
+                } catch (IOException e) {
+                    
+                    log.error("Could not destroy dataService: "+ds,e);
+                    
+                }
+                
+            }
+            
+        }
+
+        // destroy metadata services.
+        {
+
+            final IMetadataService mds = dataServicesClient.getMetadataService();
+
+            if (mds != null) {
+
+                try {
+
+                    mds.destroy();
+
+                } catch (IOException e) {
+
+                    log.error("Could not destroy dataService: " + mds, e);
+
+                }
+
+            }
+
+        }
+
+    }
+
+    // destroy load balancer(s)
+    {
+
+        ILoadBalancerService loadBalancerService = loadBalancerClient.getLoadBalancerService();
+
+        if (loadBalancerService != null) {
+
+            if ((loadBalancerService instanceof DestroyAdmin)) {
+
+                try {
+
+                    ((DestroyAdmin) loadBalancerService).destroy();
+
+                } catch (IOException e) {
+
+                    log.error("Could not destroy loadBalancerService: "
+                            + loadBalancerService, e);
+
+                }
+                
+            } else {
+                
+                log.warn("Can not destroy: The load balancer does not implement DestroyAdmin");
+                
+            }
+            
+        }
+        
     }
     
 }

@@ -10,6 +10,12 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
 
+/**
+ * Flyweight document implementation.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class DocumentImpl extends DocumentHeaderImpl implements Document 
 {
     

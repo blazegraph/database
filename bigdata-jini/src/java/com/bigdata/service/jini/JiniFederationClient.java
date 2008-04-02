@@ -39,7 +39,7 @@ import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.LookupDiscovery;
 
-import com.bigdata.service.AbstractBigdataClient;
+import com.bigdata.service.AbstractClient;
 
 /**
  * A client capable of connecting to a distributed bigdata federation using
@@ -53,12 +53,12 @@ import com.bigdata.service.AbstractBigdataClient;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniBigdataClient extends AbstractBigdataClient {
+public class JiniFederationClient extends AbstractClient {
 
     /**
      * The federation and <code>null</code> iff not connected.
      */
-    private JiniBigdataFederation fed = null;
+    private JiniFederation fed = null;
 
     synchronized public boolean isConnected() {
         
@@ -86,7 +86,7 @@ public class JiniBigdataClient extends AbstractBigdataClient {
 
     }
 
-    synchronized public JiniBigdataFederation getFederation() {
+    synchronized public JiniFederation getFederation() {
 
         if (fed == null) {
 
@@ -98,11 +98,11 @@ public class JiniBigdataClient extends AbstractBigdataClient {
 
     }
 
-    synchronized public JiniBigdataFederation connect() {
+    synchronized public JiniFederation connect() {
 
         if (fed == null) {
 
-            fed = new JiniBigdataFederation(this, jiniConfig);
+            fed = new JiniFederation(this, jiniConfig);
 
         }
 
@@ -125,7 +125,7 @@ public class JiniBigdataClient extends AbstractBigdataClient {
      * 
      * @param jiniConfig
      */
-    protected JiniBigdataClient(JiniConfig jiniConfig) {
+    protected JiniFederationClient(JiniConfig jiniConfig) {
 
         super(jiniConfig.properties);
 
@@ -135,7 +135,7 @@ public class JiniBigdataClient extends AbstractBigdataClient {
     
     /**
      * Helper class for passing pre-extracted Jini configuration information to
-     * the {@link JiniBigdataFederation}.
+     * the {@link JiniFederation}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -178,7 +178,7 @@ public class JiniBigdataClient extends AbstractBigdataClient {
      *             client; reading the properties for the client; starting
      *             service discovery, etc.
      */
-    public static JiniBigdataClient newInstance(String[] args) {
+    public static JiniFederationClient newInstance(String[] args) {
 
         // set the security manager.
         setSecurityManager();
@@ -187,7 +187,7 @@ public class JiniBigdataClient extends AbstractBigdataClient {
         final JiniConfig jiniConfig = readConfiguration(args);
 
         // return the client.
-        return new JiniBigdataClient(jiniConfig);
+        return new JiniFederationClient(jiniConfig);
         
     }
 

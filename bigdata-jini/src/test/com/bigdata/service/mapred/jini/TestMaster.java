@@ -29,7 +29,7 @@ package com.bigdata.service.mapred.jini;
 
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServerTestCase;
-import com.bigdata.service.jini.JiniBigdataClient;
+import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
@@ -135,7 +135,7 @@ public class TestMaster extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniBigdataClient client;
+    JiniFederationClient client;
     /**
      * Starts in {@link #setUp()}.
      */
@@ -180,7 +180,7 @@ public class TestMaster extends AbstractServerTestCase {
             
         }.start();
 
-        client = JiniBigdataClient.newInstance(
+        client = JiniFederationClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
                         });
 

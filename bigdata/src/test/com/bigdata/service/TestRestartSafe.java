@@ -44,12 +44,12 @@ import com.bigdata.journal.ITx;
 import com.bigdata.repo.BigdataRepository.Options;
 
 /**
- * Test suite for the ability to re-open an {@link EmbeddedBigdataFederation}.
+ * Test suite for the ability to re-open an {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
+public class TestRestartSafe extends AbstractEmbeddedFederationTestCase {
 
     /**
      * 
@@ -100,15 +100,15 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * metadata services.
          */
         assertEquals("#dataServices", 2,
-                ((EmbeddedBigdataFederation) fed).getDataServiceCount());
+                ((EmbeddedFederation) fed).getDataServiceCount());
         
         final UUID metadataServiceUUID = fed.getMetadataService()
                 .getServiceUUID();
 
-        final UUID dataService0UUID = ((EmbeddedBigdataFederation) fed)
+        final UUID dataService0UUID = ((EmbeddedFederation) fed)
                 .getDataService(0).getServiceUUID();
         
-        final UUID dataService1UUID = ((EmbeddedBigdataFederation) fed)
+        final UUID dataService1UUID = ((EmbeddedFederation) fed)
                 .getDataService(1).getServiceUUID();
 
         /*
@@ -218,16 +218,16 @@ public class TestRestartSafe extends AbstractEmbeddedBigdataFederationTestCase {
          * See setUp() in the parent class.
          */
         
-        client = new EmbeddedBigdataClient(getProperties());
+        client = new EmbeddedClient(getProperties());
         
         fed = client.connect();
 
         assertEquals("#dataServices", 2,
-                ((EmbeddedBigdataFederation) fed).ndataServices);
+                ((EmbeddedFederation) fed).ndataServices);
         
-        dataService0 = ((EmbeddedBigdataFederation)fed).getDataService(0);
+        dataService0 = ((EmbeddedFederation)fed).getDataService(0);
 
-        dataService1 = ((EmbeddedBigdataFederation)fed).getDataService(1);
+        dataService1 = ((EmbeddedFederation)fed).getDataService(1);
 
         metadataService = fed.getMetadataService();
 

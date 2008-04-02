@@ -258,9 +258,7 @@ public interface ITripleStore {
     public void clear();
     
     /**
-     * Close the {@link ITripleStore}. If the client uses an embedded database,
-     * then close the embedded database as well. If the client is connected to a
-     * remote database, then only the connection is closed.
+     * Close the connection to the {@link ITripleStore}.
      */
     public void close();
 

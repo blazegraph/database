@@ -45,9 +45,15 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.LocalDataServiceClient;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
+ * 
+ * @deprecated By {@link ScaleOutTripleStore} when deployed using a
+ *             {@link LocalDataServiceClient}.  This option supports high concurrency and
+ *             optimized joins (well, I am working on the latter, but when that is done
+ *             this will be the one to use for a local deployment).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

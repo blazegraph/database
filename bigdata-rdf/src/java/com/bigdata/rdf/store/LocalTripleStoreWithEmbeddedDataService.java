@@ -194,7 +194,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
             
         };
         
-        log.info("Using embedded data service: "+getFile());
+        log.info("Using embedded data service: "+dataService);
         
         /*
          * register indices. 
@@ -519,13 +519,13 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
     public boolean isStable() {
 
-        return dataService.getLiveJournal().isStable();
+        return dataService.getResourceManager().getLiveJournal().isStable();
         
     }
 
     public boolean isReadOnly() {
 
-        return dataService.getLiveJournal().isReadOnly();
+        return dataService.getResourceManager().getLiveJournal().isReadOnly();
         
     }
 
@@ -561,17 +561,7 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
         
         dataService.shutdown();
         
-        dataService.getLiveJournal().deleteResources();
-        
-    }
-    
-    /**
-     * Note: There is no single file that backs the database. This returns only
-     * the file for the "live" {@link Journal}.
-     */
-    public File getFile() {
-        
-        return dataService.getLiveJournal().getFile();
+        dataService.getResourceManager().deleteResources();
         
     }
     

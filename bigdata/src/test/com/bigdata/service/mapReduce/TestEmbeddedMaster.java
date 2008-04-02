@@ -32,9 +32,9 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 import com.bigdata.journal.BufferMode;
-import com.bigdata.service.EmbeddedBigdataClient;
+import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.EmbeddedBigdataFederation.Options;
+import com.bigdata.service.EmbeddedClient.Options;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.EmbeddedMaster;
 import com.bigdata.service.mapred.MapReduceJob;
@@ -102,7 +102,7 @@ public class TestEmbeddedMaster extends TestCase {
                 .setProperty(Options.NDATA_SERVICES, "1");
 
         // Create the federation.
-        client = new EmbeddedBigdataClient(properties);
+        client = new EmbeddedClient(properties);
 
         client.connect();
 

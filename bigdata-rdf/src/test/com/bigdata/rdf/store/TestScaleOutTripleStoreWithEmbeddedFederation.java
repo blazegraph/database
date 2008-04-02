@@ -33,13 +33,14 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
-import com.bigdata.service.EmbeddedBigdataClient;
-import com.bigdata.service.EmbeddedBigdataFederation;
+import com.bigdata.journal.ITx;
+import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
 
 /**
- * Proxy test suite for {@link ScaleOutTripleStore} running against an embedded
- * federation.
+ * Proxy test suite for {@link ScaleOutTripleStore} running against an
+ * {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -148,17 +149,17 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         
         // Note: directory named for the unit test (name is available from the
         // proxy test case).
-        properties.setProperty(EmbeddedBigdataFederation.Options.DATA_DIR,
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR,
                 testCase.getName());
         
-        client = new EmbeddedBigdataClient(properties);
+        client = new EmbeddedClient(properties);
         
     }
     
     public void tearDown(ProxyTestCase testCase) throws Exception {
 
-        // Note: close() is disconnecting from the embedded federation.
-//        client.terminate();
+        // Note: also closes the embedded federation.
+        client.disconnect(true/*immediateShutdown*/);
 
         // delete on disk federation (if any).
         recursiveDelete(new File(testCase.getName()));
@@ -203,14 +204,8 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
     
     protected AbstractTripleStore getStore() {
         
-        // Connect to the federation.
-        ScaleOutTripleStore store = new ScaleOutTripleStore(client.connect(),
-                getProperties());
-        
-        // register indices.
-        store.registerIndices();
-        
-        return store;
+        // connect to the database.
+        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
     }
  
@@ -229,43 +224,18 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
      */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
-        /*
-         * @todo closing the embedded federation causes it to be disconnected
-         * and its data services shutdown but re-opening an existing embedded
-         * federation is not yet supported so we have to either report an
-         * exception here (since we can not reopen the client) or silently
-         * return the same store.
-         */
+        // Note: properties we need to re-start the client.
+        final Properties properties = client.getProperties();
         
-        log.warn("Embedded federation re-connect is not supported");
+        // Note: also shutdown the embedded federation.
+        client.disconnect(true/*immediateShutdown*/);
+
+        // Connect: will re-open the embedded federation.
+        client = new EmbeddedClient( properties );
         
-        return store;
-        
-//        // close the store.
-//        store.close();
-//        
-//        if (!store.isStable()) {
-//            
-//            throw new UnsupportedOperationException("The backing store is not stable");
-//            
-//        }
-//        
-//        // Note: clone to avoid modifying!!!
-//        Properties properties = (Properties)getProperties().clone();
-//        
-//        // Turn this off now since we want to re-open the same store.
-//        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-//        
-//        // The backing file that we need to re-open.
-//        File file = ((ScaleOutTripleStore) store).store.getFile();
-//        
-//        assertNotNull(file);
-//        
-//        // Set the file property explictly.
-//        properties.setProperty(Options.FILE,file.toString());
-//        
-//        return new ScaleOutTripleStore( properties );
-        
+        // Obtain view on the triple store.
+        return getStore();
+
     }
 
 }

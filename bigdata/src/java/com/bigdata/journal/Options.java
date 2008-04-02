@@ -180,9 +180,11 @@ public interface Options {
      * file. The initial user extent is typically slightly smaller as the head
      * of the file contains some metadata outside of the user space (the root
      * blocks). The initial extent will be transparently extended as necessary
-     * when the user space becomes full. When using a partitioned index strategy
-     * the initial extent and the maximum extent should be the same so that the
-     * cost of extending the journal buffer may be avoided as much as possible.
+     * when the user space becomes full.
+     * <p>
+     * Note: When using a partitioned index strategy the initial extent and the
+     * maximum extent should be the same so that the cost of extending the
+     * journal may be avoided as much as possible.
      * 
      * @see #DEFAULT_INITIAL_EXTENT
      */
@@ -194,8 +196,8 @@ public interface Options {
     
     /**
      * <code>maximumExtent</code> - The maximum extent of the journal (bytes).
-     * The journal will {@link IResourceManager#overflow(boolean, boolean)} once
-     * it approaches this limit.
+     * The journal will {@link IResourceManager#overflow()} once it approaches
+     * this limit.
      * 
      * @see #DEFAULT_MAXIMUM_EXTENT
      */
@@ -204,12 +206,16 @@ public interface Options {
     /**
      * <code>offsetBits</code> - The #of bits in a 64-bit long integer
      * identifier that are used to encode the byte offset of a record in the
-     * store as an unsigned integer. The default is
-     * {@link WormAddressManager#DEFAULT_OFFSET_BITS}, which allows store files
-     * up to ~4T in length and records up to (but not including) 4M in length.
+     * store as an unsigned integer (default is {@value #DEFAULT_OFFSET_BITS}).
+     * <p>
+     * The default supports scale-out deployments (distributed federation). If
+     * you are using a scale-up deployment (single data service or journal) then
+     * you SHOULD explicitly specify a different value in order to allow larger
+     * files.
      * 
-     * @see WormAddressManager
-     * @see WormAddressManager#DEFAULT_OFFSET_BITS
+     * @see #DEFAULT_OFFSET_BITS
+     * @see WormAddressManager#SCALE_UP_OFFSET_BITS
+     * @see WormAddressManager#SCALE_OUT_OFFSET_BITS
      */
     String OFFSET_BITS = "offsetBits";
     
@@ -399,22 +405,27 @@ public interface Options {
     
     /**
      * The default initial extent for a new journal.
+     * 
+     * @see #INITIAL_EXTENT
      */
     long DEFAULT_INITIAL_EXTENT = 10 * Bytes.megabyte;
     
     /**
      * The default maximum extent for a new journal before a commit triggers an
-     * overflow event.
+     * overflow event (500M).
+     * 
+     * @see #MAXIMUM_EXTENT
      */
-    long DEFAULT_MAXIMUM_EXTENT = 200 * Bytes.megabyte;
+    long DEFAULT_MAXIMUM_EXTENT = 500 * Bytes.megabyte;
     
     /**
-     * The default #of bits used to encode the byte offset of a record in the
-     * store as an unsigned integer.
+     * The default #of bits ({@value WormAddressManager#SCALE_OUT_OFFSET_BITS})
+     * used to encode the byte offset of a record in the store as an unsigned
+     * integer.
      * 
-     * @see WormAddressManager#DEFAULT_OFFSET_BITS
+     * @see #OFFSET_BITS
      */
-    int DEFAULT_OFFSET_BITS = WormAddressManager.DEFAULT_OFFSET_BITS;
+    String DEFAULT_OFFSET_BITS = ""+WormAddressManager.SCALE_OUT_OFFSET_BITS;
 
     boolean DEFAULT_VALIDATE_CHECKSUM = true;
     

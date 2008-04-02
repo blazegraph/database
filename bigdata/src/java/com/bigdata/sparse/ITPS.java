@@ -83,9 +83,12 @@ public interface ITPS {
      * 
      * @param name
      *            The propery name.
-     *            
+     * 
      * @return An object representing value of the property as of the indicated
-     *         timestamp and never <code>null</code>.
+     *         timestamp and never <code>null</code>. If no value was found
+     *         for the named property, then {@link ITPV#getValue()} will return
+     *         <code>null</code> and {@link ITPV#getTimestamp()} will return
+     *         <code>0L</code>.
      */
     public ITPV get(String name);
     

@@ -29,28 +29,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Properties;
-import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISplitHandler;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.KV;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.BatchRemove.BatchRemoveConstructor;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.DefaultSplitHandler;
@@ -117,7 +110,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestOverflow extends AbstractEmbeddedBigdataFederationTestCase {
+public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
     /**
      * 

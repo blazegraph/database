@@ -30,8 +30,9 @@ package com.bigdata.rdf.store;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniBigdataClient;
+import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
@@ -159,7 +160,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
-    protected JiniBigdataClient client;
+    protected JiniFederationClient client;
     
     public void setUp() throws Exception {
         
@@ -264,7 +265,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
       log.warn("Starting client.");
 
-      client = JiniBigdataClient.newInstance(
+      client = JiniFederationClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
@@ -358,14 +359,8 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     
     protected AbstractTripleStore getStore() {
         
-        // Connect to the federation.
-        ScaleOutTripleStore store = new ScaleOutTripleStore(client.connect(),
-                getProperties());
-
-        // register indices.
-        store.registerIndices();
-        
-        return store;
+        // Connect to the triple store.
+        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
     }
  
@@ -386,13 +381,16 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
      */
     protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
 
-        // close the client connection to the federation.
         store.close();
-
-        // re-connect to the federation.
-        store = new ScaleOutTripleStore(client.connect(), getProperties());
         
-        return store;
+        // close the client connection to the federation.
+        client.disconnect(true/*immediateShutdown*/);
+        
+        // re-connect to the federation.
+        client.connect();
+        
+        // obtain view of the triple store.
+        return getStore();
         
     }
 

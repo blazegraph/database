@@ -33,15 +33,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.util.Properties;
 
-import com.bigdata.service.AbstractEmbeddedBigdataFederationTestCase;
+import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.repo.BigdataRepository.Options;
+import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class AbstractRepositoryTestCase extends
-        AbstractEmbeddedBigdataFederationTestCase {
+        AbstractEmbeddedFederationTestCase {
 
     /**
      * 
@@ -56,6 +59,23 @@ public class AbstractRepositoryTestCase extends
         super(arg0);
     }
 
+    public Properties getProperties() {
+        
+        Properties properties = new Properties( super.getProperties() );
+        
+        /*
+         * Note: this uses the scale-up offset bits so that the maximum block
+         * size is only 4M when running the unit tests. Some of the unit tests
+         * read and write full size blocks, so using a 64M block will cause
+         * those tests to run out of memory without constributing any benefit to
+         * "correctness" testing.
+         */
+        properties.setProperty(Options.OFFSET_BITS,""+WormAddressManager.SCALE_UP_OFFSET_BITS);
+        
+        return properties;
+    
+    }
+    
     protected int BLOCK_SIZE;     
 
     protected BigdataRepository repo;
@@ -65,7 +85,7 @@ public class AbstractRepositoryTestCase extends
         super.setUp();
 
         // setup the repository
-        repo = new BigdataRepository(fed, getProperties());
+        repo = new BigdataRepository(client);
         
         BLOCK_SIZE = repo.getBlockSize();
         

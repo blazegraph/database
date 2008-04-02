@@ -35,7 +35,7 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.service.jini.JiniBigdataClient.JiniConfig;
+import com.bigdata.service.jini.JiniFederationClient.JiniConfig;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;

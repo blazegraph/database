@@ -136,6 +136,9 @@ public class LoadBalancerClient {
      * Return the {@link ILoadBalancerService} service from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
      * lookup times out.
+     * 
+     * @todo handle multiple service instances for failover but always designate
+     *       a primary.
      */
     public ILoadBalancerService getLoadBalancerService() {
 

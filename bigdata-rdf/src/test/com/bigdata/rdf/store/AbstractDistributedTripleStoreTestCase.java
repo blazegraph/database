@@ -29,6 +29,8 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
+import com.bigdata.journal.ITx;
+
 /**
  * Abstract test case that sets up and connects to a bigdata federation and
  * establishes an RDF database on that federation.
@@ -71,8 +73,8 @@ abstract public class AbstractDistributedTripleStoreTestCase extends AbstractDis
 
         super.setUp();
 
-        // setup the database client.
-        store = new ScaleOutTripleStore(client.connect(), getProperties());
+        // connect to the database.
+        store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
         // register the indices.
         store.registerIndices();

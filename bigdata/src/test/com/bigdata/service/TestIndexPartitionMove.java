@@ -38,6 +38,7 @@ import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.KV;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
@@ -57,7 +58,7 @@ import com.bigdata.resources.ResourceManager.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIndexPartitionMove extends AbstractEmbeddedBigdataFederationTestCase {
+public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
     public TestIndexPartitionMove() {
         super();

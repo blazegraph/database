@@ -42,13 +42,13 @@ import com.bigdata.btree.IResultHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.ReadOnlyEntryIterator;
-import com.bigdata.service.EmbeddedBigdataFederation;
+import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.Split;
 
 /**
  * Implementation disallows writes on the index.
  * <p>
- * Note: This is used by the {@link EmbeddedBigdataFederation} to return a
+ * Note: This is used by the {@link EmbeddedFederation} to return a
  * read-only view.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

@@ -31,7 +31,7 @@ import junit.framework.TestCase;
 
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.DataServer;
-import com.bigdata.service.jini.JiniBigdataClient;
+import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
@@ -70,7 +70,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniBigdataClient client;
+    JiniFederationClient client;
     
     public void setUp() throws Exception {
 
@@ -135,7 +135,7 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           
       }.start();
 
-      client = JiniBigdataClient.newInstance(
+      client = JiniFederationClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
