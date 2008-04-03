@@ -50,39 +50,37 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.journal.ConcurrencyManager.TaskCounters;
+import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.util.InnerCause;
 
 /**
- * Abstract base class for tasks that may be submitted to an
- * {@link IConcurrencyManager}. Tasks may be isolated (by a transaction) or
- * unisolated. Tasks access named resources (aka indices), which they
- * pre-declare in their constructors.
+ * Abstract base class for tasks that may be submitted to the
+ * {@link ConcurrencyManager}. Tasks may be isolated (by a transaction),
+ * unisolated, read-committed, or historical reads. Tasks access named resources
+ * (aka indices), which they pre-declare in their constructors.
  * <p>
- * Isolated tasks are part of a larger transaction. Transactions are started and
- * committed using an {@link ITransactionManagerService}. Several kinds of
- * isolation are supported - see {@link IsolationEnum}. Transactional tasks run
- * with full concurrency using an MVCC (Multi-Version Concurrency Control)
- * strategy. When a transaction is committed (by the
- * {@link ITransactionManagerService}) it must wait for lock(s) on the
- * unisolated named indices on which it has written before it may validate and
- * commit.
+ * A read-committed task runs against the most recently committed view of the
+ * named index. A historical read task runs against a historical view of the
+ * named index, but without guarentees of transactional isolation. Concurrent
+ * readers are permitted without locking on the same index.
  * <p>
- * Unisolated tasks are further divided into read only and read/write. A
- * read-only task reads against the last committed state of a named index.
- * Concurrent unisolated readers are permitted without locking on the same
- * index.
- * <p>
- * A read/write task reads and writes on the "live" index. Note that only a
- * single thread may write on a {@link BTree} at a time. Therefore read/write
+ * An unisolated task reads and writes on the "live" index. Note that only a
+ * single thread may write on a {@link BTree} at a time. Therefore unisolated
  * tasks (often referred to as writers) obtain an exclusive lock on the named
  * index(s). When more than one named index is used, the locks are used to infer
  * a partial ordering of the writers allowing as much concurrency as possible.
  * Pre-declaration of locks allows us to avoid deadlocks in the lock system.
  * <p>
- * Note: Use a distinct instance of this task each time you
- * {@link ConcurrencyManager#submit(AbstractTask)} it!
- * 
- * @todo review javadoc here and on {@link AbstractJournal} and the
- *       {@link IConcurrencyManager} interface.
+ * Isolated tasks are part of a larger transaction. Transactions are started and
+ * committed using an {@link ITransactionManagerService}. Transactional tasks
+ * run with full concurrency using an MVCC (Multi-Version Concurrency Control)
+ * strategy. When a transaction is committed (by the
+ * {@link ITransactionManagerService}) it must wait for lock(s) on the
+ * unisolated named indices on which it has written before it may validate and
+ * commit.
+ * <p>
+ * Note: You MUST submit a distinct instance of this task each time you
+ * {@link ConcurrencyManager#submit(AbstractTask)} it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -577,18 +575,21 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
      * "client" to commit or abort a transaction as it sees fit.
      * <p>
      * Note: Exceptions that are thrown from here will be wrapped as
-     * {@link ExecutionException}s by the {@link ExecutorService}.
+     * {@link ExecutionException}s by the {@link ExecutorService}. Use
+     * {@link InnerCause} to test for these exceptions.
      * 
-     * @throws {@link ResubmitException}
-     *             if the task has already been submitted.
-     * @throws {@link InterruptedException}
+     * @throws StaleLocatorException
+     *             if the task requests an index partition which has been split,
+     *             joined, or moved to another data service.
+     * @throws NoSuchIndexException
+     *             if the task requests an index that is not registered on the
+     *             data service.
+     * @throws InterruptedException
      *             can be thrown if the task is interrupted, for example while
      *             awaiting a lock, if the commit group is being discarded, or
      *             if the journal is being shutdown (which will cause the
      *             executor service running the task to be shutdown and thereby
      *             interrupt all running tasks).
-     * 
-     * @todo document other exceptions that can be thrown here.
      */
     final public Object call() throws Exception {
         
@@ -1233,11 +1234,19 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
     }
     
     /**
-     * @todo Make sure that we have tests for historical reads (including
-     *       readOnly with timestamp == 0L), unisolated read-write tasks, and
-     *       various kinds of transactions (timestamp > 0L). Also verify when
-     *       the indices are views with more than one resource (e.g., there are
-     *       one or more index segments that are part of the view).
+     * Return a view of the named index appropriate for the timestamp associated
+     * with this task.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @throws NullPointerException
+     *             if name is null.
+     * @throws StaleLocatorException
+     *             if the named index partition has been split, joined, or
+     *             moved.
+     * @throws NoSuchIndexException
+     *             if the named index is not registered as of the timestamp.
      */
     final public IIndex getIndex(String name) {
 

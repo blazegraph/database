@@ -45,15 +45,19 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.service.DataService;
 import com.bigdata.service.LocalDataServiceClient;
 
 /**
  * A triple store based on the <em>bigdata</em> architecture.
  * 
- * @deprecated By {@link ScaleOutTripleStore} when deployed using a
- *             {@link LocalDataServiceClient}.  This option supports high concurrency and
- *             optimized joins (well, I am working on the latter, but when that is done
- *             this will be the one to use for a local deployment).
+ * FIXME This class will probably be replaced by the use of the
+ * {@link ScaleOutTripleStore} and the {@link LocalDataServiceClient}. This
+ * combination will support full concurrency on local indices on the same
+ * {@link DataService} and therefore should offer all of the performance
+ * advantages once the JOINs are optimized, the one place where it will always
+ * remain weak in comparison is when performing index point tests or batch API
+ * operations for small N. Those cases will always incur a higher overhead.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -135,33 +139,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
         return ndx;
 
-    }
-
-    final public IIndex getFullTextIndex() {
-
-        if(!textIndex) return null;
-
-        if(ndx_freeText!=null) return ndx_freeText;
-        
-        IIndex ndx = store.getIndex(name_freeText);
-        
-        if(ndx==null && textIndex) {
-
-            IndexMetadata metadata = new IndexMetadata(name_freeText,UUID.randomUUID());
-
-            metadata.setDeleteMarkers(isolatableIndices);
-
-            metadata.setBranchingFactor(store.getDefaultBranchingFactor());
-
-            metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-            
-            ndx_freeText = ndx = store.registerIndex(name_freeText, BTree
-                    .create(store, metadata));
-            
-        }
-        
-        return ndx;
-        
     }
 
     /**
@@ -608,20 +585,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 //            
 //            return ndx_idTerm;
 
-        }
-
-        public IIndex getFullTextIndex() {
-
-            return db.store.getIndex(name_freeText, ITx.READ_COMMITTED);
-
-//            if(ndx_freeText==null && textIndex) {
-//                
-//                ndx_freeText= new ReadCommittedIndex(db.store,name_freeText);
-//                
-//            }
-//            
-//            return ndx_freeText;
-            
         }
 
         public IIndex getSPOIndex() {

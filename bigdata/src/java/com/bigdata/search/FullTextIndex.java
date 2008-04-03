@@ -26,20 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 23, 2008
  */
 
-package com.bigdata.text;
+package com.bigdata.search;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,6 +67,7 @@ import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
+import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
@@ -88,9 +88,9 @@ import com.bigdata.service.IBigdataFederation;
  * the logical model is:
  * 
  * <pre>
- *                                                               
- *           token : {docId, freq?, weight?}+
- *                                                               
+ *                                                                
+ *            token : {docId, freq?, weight?}+
+ *                                                                
  * </pre>
  * 
  * (For RDF, docId is the term identifier as assigned by the term:id index.)
@@ -104,9 +104,9 @@ import com.bigdata.service.IBigdataFederation;
  * In fact, we actually represent the data as follows:
  * 
  * <pre>
- *                          
- *           {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
- *                                   
+ *                           
+ *            {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
+ *                                    
  * </pre>
  * 
  * That is, there is a distinct entry in the full text B+Tree for each field in
@@ -146,8 +146,8 @@ import com.bigdata.service.IBigdataFederation;
  * against the full text index.
  * 
  * <pre>
- *           fromKey := token, 0L
- *           toKey   := successor(token), 0L
+ *            fromKey := token, 0L
+ *            toKey   := successor(token), 0L
  * </pre>
  * 
  * and extracting the appropriate token frequency, normalized token weight, or
@@ -189,6 +189,9 @@ import com.bigdata.service.IBigdataFederation;
  * code is discarded and we perform search purely on the Unicode sort keys
  * resulting from the extracted tokens.
  * 
+ * @todo provide M/R alternatives for indexing or computing/updating global
+ *       weights.
+ *       
  * @todo Consider model in which fields are declared and then a "Document" is
  *       indexed. This lets us encapsulate the "driver" for indexing. The
  *       "field" can be a String or a Reader, etc.
@@ -254,6 +257,9 @@ public class FullTextIndex {
     
     private final long timestamp;
     
+    /** The namespace for the indices maintained by this class (from the ctor). */
+    private final String namespace;
+    
     /**
      * The backing index.
      */
@@ -268,13 +274,60 @@ public class FullTextIndex {
         return ndx;
         
     }
+
+    /**
+     * Options understood by the {@link FullTextIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options {
+       
+        /**
+         * <code>indexer.overwrite</code> - boolean option (default
+         * <code>true</code>) controls the behavior when a write is requested
+         * on the index and the {term,doc,field} tuple which forms the key is
+         * already present in the index. When <code>true</code>, the new
+         * value will be written on the index. When <code>false</code>, the
+         * existing value will be retained. This option is an optimization which
+         * makes sense when the corpus (a) only grows; and (b) the content of
+         * the documents in the corpus never changes. For example, this is true
+         * for an RDF database since the set of terms only grows and each term
+         * is immutable.
+         */
+        String OVERWRITE = "indexer.overwrite";
+
+        String DEFAULT_OVERWRITE = "true";
+        
+    }
+    
+    /**
+     * @see Options#OVERWRITE
+     */
+    private final boolean overwrite;
+    
+    /**
+     * Return the value configured by the {@link Options#OVERWRITE} property.
+     */
+    public boolean isOverwrite() {
+        
+        return overwrite;
+        
+    }
     
     /**
      * @param client
      *            The client. Configuration information is obtained from the
-     *            client.
+     *            client. See {@link Options}.
+     * 
+     * @see Options
+     * 
+     * FIXME Customize a {@link ISplitHandler} such that we never split a term
+     * and make sure that the defaults for the split points (in terms of the #of
+     * entries) are reasonable. The #of entries per split could be smaller if we
+     * know that we are storing more data in the values.
      */
-    public FullTextIndex(IBigdataClient client, String name) {
+    public FullTextIndex(IBigdataClient client, String namespace) {
         
         if (client == null)
             throw new IllegalArgumentException();
@@ -283,18 +336,48 @@ public class FullTextIndex {
         
         this.timestamp = ITx.UNISOLATED;
         
-        // @todo support transactions.
-        IIndex ndx = fed.getIndex(name, timestamp);
+        this.namespace = namespace;
+        
+        final Properties properties = client.getProperties();
+        
+        // indexer.overwrite
+        {
             
-        if (ndx == null) {
-            
-            fed.registerIndex(new IndexMetadata(name,UUID.randomUUID()));
-            
+            overwrite = Boolean.parseBoolean(properties.getProperty(
+                    Options.OVERWRITE, Options.DEFAULT_OVERWRITE));
+
+            log.info(Options.OVERWRITE + "=" + overwrite);
+
         }
         
-        ndx = fed.getIndex(name, timestamp);
+        {
         
-        this.ndx = ndx;
+            // @todo support transactions.
+
+            final String name = namespace + "search";
+
+            IIndex ndx = fed.getIndex(name, timestamp);
+
+            if (ndx == null) {
+
+                IndexMetadata indexMetadata = new IndexMetadata(name, UUID.randomUUID());
+                
+                if (fed.isScaleOut()) {
+
+                    // @todo should be automatic in the data service or register index task.
+                    indexMetadata.setDeleteMarkers(true);
+                    
+                }
+                
+                fed.registerIndex(indexMetadata);
+
+            }
+
+            ndx = fed.getIndex(name, timestamp);
+
+            this.ndx = ndx;
+            
+        }
         
     }
 
@@ -589,27 +672,18 @@ public class FullTextIndex {
     /**
      * Index a field in a document.
      * <p>
-     * Note: The caller MUST index all text in a "field" sequentially. Text from
-     * different fields and different documents may be indexed in any order.
+     * Note: This method does NOT force a write on the indices. If the <i>buffer</i>
+     * overflows, then there will be an index write. Once the caller is done
+     * indexing, they MUST invoke {@link TokenBuffer#flush()} to force any data
+     * remaining in their <i>buffer</i> to the indices.
      * <p>
-     * Note: This method does NOT force a write on the indices. An internal
-     * buffer is used. If it overflows, then there will be an index write. Once
-     * the caller is done indexing, they MUST invoke {@link #flush()} to force
-     * the writes to the indices.
-     * <p>
-     * Note: The writes on the terms index are scattered since the key for the
-     * index is {term, docId, fieldId}. This method will batch up and then apply
-     * a set of updates, but the total operation is not atomic. Therefore search
-     * results which are concurrent with indexing may not have access to the
-     * full data for concurrently indexed documents. This issue may be resolved
-     * by allowing the indexer to write ahead and using a historical commit time
-     * for the search.
-     * <p>
-     * If a document is pre-existing, then the existing data for that document
-     * MUST be removed unless you know that the fields to be found in the will
-     * not have changed (they may have different contents, but the same fields
-     * exist in the old and new versions of the document).
+     * Note: If a document is pre-existing, then the existing data for that
+     * document MUST be removed unless you know that the fields to be found in
+     * the will not have changed (they may have different contents, but the same
+     * fields exist in the old and new versions of the document).
      * 
+     * @param buffer
+     *            Used to buffer writes onto the text index.
      * @param docId
      *            The document identifier.
      * @param fieldId
@@ -619,7 +693,7 @@ public class FullTextIndex {
      * @param r
      *            A reader on the text to be indexed.
      * 
-     * @see #flush()
+     * @see TokenBuffer#flush()
      * 
      * @todo The key for the terms index is {term,docId,fieldId}. Since the data
      *       are not pre-aggregated by {docId,fieldId} we can not easily remove
@@ -632,11 +706,12 @@ public class FullTextIndex {
      *       (additional space requirements) or we need to flood a delete
      *       procedure across the terms index (expensive).
      */
-    public void index(long docId, int fieldId, String languageCode, Reader r) {
+    public void index(TokenBuffer buffer, long docId, int fieldId,
+            String languageCode, Reader r) {
 
         int n = 0;
         
-        // tokenize (note: docId,fieldId are not on the tokenStream).
+        // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).
         final TokenStream tokenStream = getTokenStream(languageCode, r);
 
         while (true) {
@@ -667,69 +742,6 @@ public class FullTextIndex {
         log.info("Indexed "+n+" tokens: docId="+docId+", fieldId="+fieldId);
 
     }
-
-    /**
-     * Extract tokens.
-     * 
-     * @param languageCode
-     * @param r
-     * 
-     * @return The distinct tokens.
-     */
-    protected Set<String> getTokens(String languageCode, Reader r) {
-        
-        HashSet<String> tokens = new HashSet<String>();
-        
-        // tokenize (note: docId,fieldId are not on the tokenStream).
-        final TokenStream tokenStream = getTokenStream(languageCode, r);
-
-        while (true) {
-            
-            final Token token;
-            try {
-
-                token = tokenStream.next(/* token */);
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-            if (token == null) {
-
-                break;
-                
-            }
-
-            tokens.add(token.termText());
-
-        }
-        
-        log.info("Parsed "+tokens.size()+" tokens: "+tokens);
-        
-        return tokens;
-        
-    }
-    
-    /**
-     * Flushes any buffered writes onto the index.
-     */
-    public void flush() {
-        
-        buffer.flush();
-        
-    }
-    
-    /**
-     * A buffer used when indexing text. The capacity of the buffer is the #of
-     * fields that can be indexed before the next batch write on the indices.
-     * The buffer will accumulate data for one or more documents until it
-     * reaches capacity and will then overflow, writing on the text index.
-     * 
-     * @todo configure capacity.
-     */
-    private TokenBuffer buffer = new TokenBuffer(1000/*nfields*/,this);
     
     /**
      * Tokenize text using an {@link Analyzer} that is appropriate to the
@@ -763,8 +775,7 @@ public class FullTextIndex {
     }
     
     /**
-     * Create a key for the {@link #getFullTextIndex()} from a token extracted
-     * from some text.
+     * Create a key for a term.
      * 
      * @param keyBuilder
      *            Used to construct the key.
@@ -798,7 +809,8 @@ public class FullTextIndex {
 
         if (DEBUG) {
 
-            log.debug("{" + termText + "," + docId + "," + fieldId + "}, key="
+            log.debug("{" + termText + "," + docId + "," + fieldId
+                    + "}, successor=" + (successor?"true ":"false") + ", key="
                     + BytesUtil.toString(key));
 
         }
@@ -818,8 +830,11 @@ public class FullTextIndex {
      * 
      * @return The encoded value.
      * 
-     * @todo based on the configuration, record either just the term-frequency
-     *       or the term-frequency plus the position metadata (ordered offsets).
+     * @todo optionally record the token position metadata (sequence of token
+     *       positions in the source) and the token offset (character offsets
+     *       for the inclusive start and exclusive end of each token).
+     * 
+     * @todo value compression: 
      * 
      * @todo value compression: code "position" as delta from last position in
      *       the same field or from 0 if the first token of a new document; code
@@ -831,6 +846,8 @@ public class FullTextIndex {
 
         final int termFreq = metadata.termFreq();
         
+        final double localTermWeight = metadata.localTermWeight;
+        
         if (DEBUG) {
 
             log.debug("termText=" + metadata.termText() + ", termFreq="
@@ -841,8 +858,19 @@ public class FullTextIndex {
         // reset for new value.
         buf.reset();
         
-        // the term frequency.
-        buf.putShort(termFreq>Short.MAX_VALUE?Short.MAX_VALUE:(short)termFreq);
+        /*
+         * the term frequency
+         * 
+         * @todo rather the packing as a short, write an IDataSerializer to
+         * compress the whole thing onto a bit stream.
+         */
+        buf.putShort(termFreq > Short.MAX_VALUE ? Short.MAX_VALUE
+                : (short) termFreq);
+        
+        /*
+         *  
+         */
+        buf.putDouble(localTermWeight);
         
         return buf.toByteArray();
         
@@ -864,9 +892,9 @@ public class FullTextIndex {
      *         
      * @throws InterruptedException 
      */
-    public Hiterator textSearch(String query, String languageCode) throws InterruptedException {
+    public Hiterator search(String query, String languageCode) throws InterruptedException {
 
-        return textSearch( //
+        return search( //
                 query,//
                 languageCode,//
                 .4, // minCosine
@@ -930,9 +958,11 @@ public class FullTextIndex {
      *             {@link IBigdataFederation#getThreadPool()}, a disconnect
      *             from the federation will automatically interrupt the search.
      */
-    public Hiterator textSearch(String query, String languageCode,
+    public Hiterator search(String query, String languageCode,
             double minCosine, int maxRank) throws InterruptedException {
 
+        final long begin = System.currentTimeMillis();
+        
         if (languageCode == null)
             throw new IllegalArgumentException();
 
@@ -948,22 +978,51 @@ public class FullTextIndex {
         log.info("languageCode=[" + languageCode + "], text=[" + query + "]");
 
         // tokenize the query.
-        final Set<String> tokens = getTokens(languageCode,new StringReader(query));
+        final TermFrequencyData qdata;
+        {
+            
+            TokenBuffer buffer = new TokenBuffer(1,this);
+            
+            index(buffer, 0L/*docId*/, 0/*fieldId*/, languageCode, new StringReader(query));
+            
+            if (buffer.size() == 0) {
+                
+                /*
+                 * There were no terms after stopword extration.
+                 */
+                
+                log.warn("No terms after stopword extraction: query="+query);
+                
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                return new Hiterator<Hit>(Arrays.asList(new Hit[]{}), elapsed, minCosine, maxRank);
+                
+            }
+            
+            qdata = buffer.get(0);
+            
+            qdata.normalize();
+            
+        }
         
         // @todo parameter (ms).
         final long timeout = 1000;
         
-        // @todo use size of collection as upper bound.
-        final ConcurrentHashMap<Long/*docId*/,Hit> hits = new ConcurrentHashMap<Long, Hit>(maxRank);
-
-        // @todo weight on each query term?
-        final double globalTermWeight = 1.0;
-        
-        final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(tokens.size());
-        
-        for(String termText : tokens) {
+        final ConcurrentHashMap<Long/*docId*/,Hit> hits;
+        {
+       
+            // @todo use size of collection as upper bound.
+            final int initialCapacity = Math.min(maxRank,10000);
             
-            tasks.add(new ReadIndexTask(termText, globalTermWeight, this,
+            hits = new ConcurrentHashMap<Long, Hit>(initialCapacity);
+            
+        }
+
+        final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(qdata.distinctTermCount());
+        
+        for(TermMetadata md : qdata.terms.values()) {
+            
+            tasks.add(new ReadIndexTask(md.termText(), md.localTermWeight, this,
                             hits));
             
         }
@@ -986,20 +1045,39 @@ public class FullTextIndex {
         
         if (nhits == 0) {
 
-            log.warn("No hits: languageCode=[" + languageCode + "], text=["
+            log.warn("No hits: languageCode=[" + languageCode + "], query=["
                     + query + "]");
             
         }
         
         /*
-         * FIXME rank order the hits by relevance. All results below a threshold
-         * should be pruned. Any relevant results exceeding the maxRank should
-         * be pruned. The remainder should be ordered.
+         * Rank order the hits by relevance.
+         * 
+         * @todo consider moving documents through a succession of N pools where
+         * N is the #of distinct terms in the query. The read tasks would halt
+         * if the size of the pool for N terms reached maxRank. This might (or
+         * might not) help with triage since we could process hits by pool and
+         * only compute the cosines for one pool at a time until we had enough
+         * hits.
          */
-        log.error("Rank order hits by relevance");
         
-        return new Hiterator(hits.values());
+        log.info("Rank ordering "+nhits+" hits by relevance");
+        
+        Hit[] a = hits.values().toArray(new Hit[0]);
+        
+        Arrays.sort(a);
+
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        log.info("Done: "+nhits+" hits in "+elapsed+"ms");
+
+        /*
+         * Note: The caller will only see those documents which satisify both
+         * results below a threshold will be pruned. Any relevant results
+         * exceeding the maxRank will be pruned.
+         */
+        return new Hiterator<Hit>(Arrays.asList(a), elapsed, minCosine, maxRank);
 
     }
-    
+        
 }

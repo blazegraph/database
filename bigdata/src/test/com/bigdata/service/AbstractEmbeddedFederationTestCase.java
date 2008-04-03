@@ -50,7 +50,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.repo.BigdataRepository;
 import com.bigdata.repo.BigdataRepository.Options;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.text.FullTextIndex;
+import com.bigdata.search.FullTextIndex;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data

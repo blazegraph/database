@@ -26,7 +26,7 @@
  * Created on Apr 2, 2008
  */
 
-package com.bigdata.text;
+package com.bigdata.search;
 
 /**
  * Metadata about a search result.

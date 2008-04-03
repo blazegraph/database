@@ -127,6 +127,8 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
          * @todo test unisolated operation semantics.
          */
 
+//        suite.addTestSuite(TestFullTextIndex.class);
+
 //        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
 
         /*

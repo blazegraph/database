@@ -61,7 +61,6 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     private BTree ndx_termId;
     private BTree ndx_idTerm;
-    private BTree ndx_freeText;
 
     private BTree ndx_spo;
     private BTree ndx_pos;
@@ -104,12 +103,6 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     final public IIndex getIdTermIndex() {
 
         return ndx_idTerm;
-        
-    }
-
-    final public IIndex getFullTextIndex() {
-
-        return ndx_freeText;
         
     }
 
@@ -162,7 +155,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 
                 if(textIndex) {
                     
-                    ndx_freeText.removeAll();
+//                    ndx_freeText.removeAll();
                     
                 }
                 
@@ -193,7 +186,8 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 
                 if(textIndex) {
                     
-                    store.dropIndex(name_freeText); ndx_freeText = null;
+//                    store.dropIndex(name_freeText); ndx_freeText = null;
+                    
                 }
                 
             }
@@ -315,15 +309,18 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
             
             if(textIndex) {
 
-                IndexMetadata metadata = new IndexMetadata(name_freeText, UUID
-                        .randomUUID());
-
-                metadata.setBranchingFactor(branchingFactor);
-
-                metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+                log.warn("Full text search not supported by: "
+                                + getClass().getName());
                 
-                ndx_freeText = (BTree) store.registerIndex(name_freeText, BTree
-                        .create(store, metadata));
+//                IndexMetadata metadata = new IndexMetadata(name_freeText, UUID
+//                        .randomUUID());
+//
+//                metadata.setBranchingFactor(branchingFactor);
+//
+//                metadata.setValueSerializer(NoDataSerializer.INSTANCE);
+//                
+//                ndx_freeText = (BTree) store.registerIndex(name_freeText, BTree
+//                        .create(store, metadata));
 
             }
             

@@ -41,6 +41,8 @@ import com.bigdata.rdf.store.LocalTripleStoreWithEmbeddedDataService.Options;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link TestScaleOutTripleStoreWithLocalDataServiceFederation}
  */
 public class TestLocalTripleStoreWithEmbeddedDataService extends AbstractTestCase {
 

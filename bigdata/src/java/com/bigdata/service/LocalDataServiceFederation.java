@@ -335,6 +335,28 @@ public class LocalDataServiceFederation extends AbstractFederation {
         
     }
     
+    /**
+     * Extended to shutdown the embedded {@link DataService}.
+     */
+    synchronized public void shutdown() {
+        
+        super.shutdown();
+        
+        dataService.shutdown();
+        
+    }
+    
+    /**
+     * Extended to shutdown the embedded {@link DataService}.
+     */
+    synchronized public void shutdownNow() {
+
+        super.shutdownNow();
+        
+        dataService.shutdownNow();
+
+    }
+    
     public void destroy() {
 
         try {

@@ -35,6 +35,8 @@ import junit.framework.Test;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.Options;
+import com.bigdata.service.DataService;
+import com.bigdata.service.LocalDataServiceClient;
 
 /**
  * Proxy test suite for {@link LocalTripleStore} when the backing indices are

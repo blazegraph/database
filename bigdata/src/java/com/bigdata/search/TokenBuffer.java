@@ -1,8 +1,7 @@
-package com.bigdata.text;
+package com.bigdata.search;
 
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -68,12 +67,13 @@ public class TokenBuffer {
     /**
      * 
      * @param capacity
-     *            The #of distinct {document,field} tuples that can be held
-     *            in the buffer before it will overflow.
+     *            The #of distinct {document,field} tuples that can be held in
+     *            the buffer before it will overflow. The buffer will NOT
+     *            overflow until you exceed this capacity.
      * 
      * @param textIndexer
-     *            The object on which the buffer will write when it
-     *            overflows or is {@link #flush()}ed.
+     *            The object on which the buffer will write when it overflows or
+     *            is {@link #flush()}ed.
      */
     public TokenBuffer(int capacity, FullTextIndex textIndexer) {
         
@@ -93,7 +93,10 @@ public class TokenBuffer {
         
     }
     
-    private void reset() {
+    /**
+     * Discards all data in the buffer and resets it to a clean state.
+     */
+    public void reset() {
         
         for (int i = 0; i < count; i++) {
 
@@ -112,6 +115,34 @@ public class TokenBuffer {
         lastDocId = -1L;
         
         lastFieldId = -1;
+        
+    }
+    
+    /**
+     * The #of entries in the buffer.
+     */
+    public int size() {
+        
+        return count;
+        
+    }
+
+    /**
+     * Return the {@link TermFrequencyData} for the specified index.
+     * 
+     * @param index
+     *            The index in [0:<i>count</i>).
+     *            
+     * @return The {@link TermFrequencyData} at that index.
+     * 
+     * @throws IndexOutOfBoundsException
+     */
+    public TermFrequencyData get(int index) {
+        
+        if (index < 0 || index >= count)
+            throw new IndexOutOfBoundsException(); 
+        
+        return buffer[index];
         
     }
     
@@ -171,12 +202,18 @@ public class TokenBuffer {
 
                 newField = true;
 
+                // normalize the last term-frequency distribution.
+                buffer[count-1].normalize();
+
             } else if (lastFieldId != fieldId) {
 
                 // start of new field in same document.
                 nfields++;
 
                 newField = true;
+
+                // normalize the last term-frequency distribution.
+                buffer[count-1].normalize();
 
             } else {
                 
@@ -185,7 +222,7 @@ public class TokenBuffer {
             }
             
         }
-
+        
         if (newField && count == capacity) {
             
             flush();
@@ -216,6 +253,19 @@ public class TokenBuffer {
 
     /**
      * Write any buffered data on the indices.
+     * <p>
+     * Note: The writes on the terms index are scattered since the key for the
+     * index is {term, docId, fieldId}. This method will batch up and then apply
+     * a set of updates, but the total operation is not atomic. Therefore search
+     * results which are concurrent with indexing may not have access to the
+     * full data for concurrently indexed documents. This issue may be resolved
+     * by allowing the indexer to write ahead and using a historical commit time
+     * for the search.
+     * <p>
+     * Note: If a document is pre-existing, then the existing data for that
+     * document MUST be removed unless you know that the fields to be found in
+     * the will not have changed (they may have different contents, but the same
+     * fields exist in the old and new versions of the document).
      */
     public void flush() {
 
@@ -247,7 +297,7 @@ public class TokenBuffer {
             final int fieldId = termFreq.fieldId;
             
             // process in an arbitrary order.
-            final Iterator<TermMetadata> itr = termFreq.tokens.values().iterator();
+            final Iterator<TermMetadata> itr = termFreq.terms.values().iterator();
 
             // emit {term,doc,field} tuples.
             while(itr.hasNext()) {
@@ -322,8 +372,11 @@ public class TokenBuffer {
                 n, // toIndex
                 keys,//
                 vals,//
-                IndexWriteProc.IndexWriteProcConstructor.INSTANCE,//
-                resultHandler
+                (textIndexer.isOverwrite() //
+                        ? IndexWriteProc.IndexWriteProcConstructor.OVERWRITE
+                        : IndexWriteProc.IndexWriteProcConstructor.NO_OVERWRITE//
+                        ),//
+                 resultHandler//
                 );
         
         return resultHandler.getResult();

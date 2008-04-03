@@ -26,22 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 23, 2008
  */
 
-package com.bigdata.text;
+package com.bigdata.search;
 
 import java.io.StringReader;
-import java.util.Iterator;
 
 import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
 
 /**
  * Test suite for full text indexing and search.
  * 
- * @todo test restart safety of the full text index.
- * 
- * @todo some sort of benchmarking and run P/R on some known collections.
- * 
- * @todo provide M/R alternatives for indexing or computing/updating global
- *       weights.
+ * @todo test language code support
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,13 +67,15 @@ public class TestFullTextIndex extends AbstractLocalDataServiceFederationTestCas
         
         final String languageCode = "EN";
         
-        ndx.index(docId, fieldId, languageCode, new StringReader(text));
-
-        ndx.index(docId+1, fieldId, languageCode, new StringReader("The slow brown cow"));
-
-        ndx.flush();
+        TokenBuffer buffer = new TokenBuffer(2,ndx);
         
-        Hiterator itr = ndx.textSearch(text,languageCode);
+        ndx.index(buffer, docId, fieldId, languageCode, new StringReader(text));
+
+        ndx.index(buffer, docId+1, fieldId, languageCode, new StringReader("The slow brown cow"));
+
+        buffer.flush();
+        
+        Hiterator itr = ndx.search(text,languageCode);
         
         assertEquals(2,itr.size());
         
@@ -96,5 +92,5 @@ public class TestFullTextIndex extends AbstractLocalDataServiceFederationTestCas
         System.err.println("hit2:"+hit2);
         
     }
-
+    
 }

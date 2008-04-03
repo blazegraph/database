@@ -103,13 +103,15 @@ import com.bigdata.rdf.store.IndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.rdf.store.WriteJustificationsProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.util.KeyOrder;
 import com.bigdata.rdf.util.RdfKeyBuilder;
+import com.bigdata.search.FullTextIndex;
+import com.bigdata.search.IHit;
+import com.bigdata.search.TokenBuffer;
 import com.bigdata.service.EmbeddedDataService;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.text.FullTextIndex;
-import com.bigdata.text.Hit;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
@@ -123,7 +125,9 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link ScaleOutTripleStore} supports concurrency and can be used with either
  * local or distributed {@link IBigdataFederation}s. There is also a
  * {@link LocalTripleStore} and a {@link TempTripleStore}, neither of which
- * supports concurrent operations.
+ * supports concurrent operations. Also, full text indexing is only available
+ * with the {@link ScaleOutTripleStore} since it uses the {@link IBigdataClient}
+ * API.
  * 
  * @todo term prefix scan. write prefix scan procedure (aka distinct term scan).
  *       possible use for both the {@link SparseRowStore} and the triple store?
@@ -168,9 +172,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       quad position could of course be bound to some constant, in which case
  *       it would not be a statement identifier - more the context model.
  * 
- * @todo finish the full text indexing support. We may also need
- *       (case-insensitive) "exact" matching on literals.
- * 
  * @todo sesame 2.x TCK (technology compatibility kit).
  * 
  * @todo retest on 1B+ triples (single host single threaded and concurrent data
@@ -182,8 +183,6 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @todo possibly save frequently seen terms in each batch for the next batch in
  *       order to reduce unicode conversions.
- * 
- * @todo explore possible uses of bitmap indices
  * 
  * @todo examine role for semi joins (join indices) - these can be declared for
  *       various predicate combinations and then maintained, effectively by
@@ -264,7 +263,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * @version $Id$
      */
     public static interface Options extends InferenceEngine.Options,
-            com.bigdata.journal.Options, KeyBuilder.Options, DataLoader.Options {
+            com.bigdata.journal.Options, KeyBuilder.Options,
+            DataLoader.Options, FullTextIndex.Options {
 
         /**
          * Boolean option (default <code>true</code>) enables support for the
@@ -293,13 +293,13 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         public static final String DEFAULT_ONE_ACCESS_PATH = "false";
         
         /**
-         * Boolean option (default <code>false</code>) enables support for a
+         * Boolean option (default <code>true</code>) enables support for a
          * full text index that may be used to lookup literals by tokens found
          * in the text of those literals.
          */
         public static final String TEXT_INDEX = "textIndex";
 
-        public static final String DEFAULT_TEXT_INDEX = "false";
+        public static final String DEFAULT_TEXT_INDEX = "true";
 
         /**
          * Boolean option (default <code>false</code>) enables support for
@@ -353,6 +353,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         // Copy the properties object.
         this.properties = (Properties)properties.clone();
 
+        // Explicitly disable overwrite for the lexicon.
+        this.properties.setProperty(Options.OVERWRITE,"false");
+        
         /*
          * Reads off the property for the inference engine that tells us whether
          * or not the justification index is being used. This is used to
@@ -372,7 +375,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         log.info(Options.LEXICON+"="+lexicon);
 
-        // Note: the full text index is allowed iff the lexicon is enabled.
+        // Note: the full text index is not allowed unless the lexicon is enabled.
         if(lexicon) {
             
             this.textIndex = Boolean.parseBoolean(properties.getProperty(
@@ -480,34 +483,20 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
     abstract public boolean isStable();
 
     /**
-     * Return a newly allocated {@link RdfKeyBuilder} instance for this client.
-     * The object will be compatible with the Unicode preferences that are in
-     * effect for the {@link ITripleStore}.
-     * <p>
-     * Note: This object is NOT thread-safe.
-     * 
-     * @todo Consider making this a {@link ThreadLocal} to avoid hassles with
-     *       access by multiple threads. Note however that only the term:id
-     *       index requires Unicode support.
+     * Return a thread-local {@link RdfKeyBuilder} The object will be compatible
+     * with the Unicode preferences that are in effect for the
+     * {@link ITripleStore}.
      */
     final public RdfKeyBuilder getKeyBuilder() {
      
-        RdfKeyBuilder keyBuilder = (RdfKeyBuilder)threadLocalKeyBuilder.get();
+        return threadLocalKeyBuilder.get();
         
-        if(keyBuilder==null) {
-            
-            throw new AssertionError();
-            
-        }
-        
-        return keyBuilder;
-
     }
     
     // Note: not static since we need configuration properties.
-    private ThreadLocal threadLocalKeyBuilder = new ThreadLocal() {
+    private ThreadLocal<RdfKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<RdfKeyBuilder>() {
 
-        protected synchronized Object initialValue() {
+        protected synchronized RdfKeyBuilder initialValue() {
 
             if (lexicon) {
                 // unicode enabled.
@@ -853,7 +842,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         }
             
-        // was found in the forward mapping.
+        // was found in the forward mapping (@todo if known means in both mappings then DO NOT set it here)
         val.known = true;
         
         return val.termId;
@@ -882,11 +871,17 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         if (numTerms == 0)
             return;
 
-        long begin = System.currentTimeMillis();
+        final long begin = System.currentTimeMillis();
         long keyGenTime = 0; // time to convert unicode terms to byte[] sort keys.
         long sortTime = 0; // time to sort terms by assigned byte[] keys.
         long insertTime = 0; // time to insert terms into the forward and reverse index.
+        long indexerTime = 0; // time to insert terms into the text indexer.
         
+        /*
+         * Insert into the forward index (term -> id). This will either assign a
+         * termId or return the existing termId if the term is already in the
+         * lexicon.
+         */
         {
 
             /*
@@ -1000,7 +995,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
              * 
              * Note: Every term asserted against the forward mapping [terms]
              * MUST be asserted against the reverse mapping [ids] EVERY time.
-             * This is required in order to assure that the reverse index
+             * This is required in order to guarentee that the reverse index
              * remains complete and consistent. Otherwise a client that writes
              * on the terms index and fails before writing on the ids index
              * would cause those terms to remain undefined in the reverse index.
@@ -1069,13 +1064,26 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         }
 
-        long elapsed = System.currentTimeMillis() - begin;
+        /*
+         * Index the terms for keyword search.
+         */
+        if(textIndex && getSearchEngine() != null) {
+            
+            final long _begin = System.currentTimeMillis();
+
+            indexTermText(terms, numTerms);
+
+            indexerTime = System.currentTimeMillis() - _begin;
+            
+        }
+        
+        final long elapsed = System.currentTimeMillis() - begin;
         
         if (numTerms > 1000 || elapsed > 3000) {
 
             log.info("Wrote " + numTerms + " in " + elapsed + "ms; keygen="
                     + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
-                    + insertTime + "ms");
+                    + insertTime + "ms"+", indexerTime="+indexerTime+"ms");
             
         }
         
@@ -3546,7 +3554,6 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * </p>
      * 
      * @see #textSearch(String, String)
-     * @see #getFullTextIndex()
      * 
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
@@ -3555,6 +3562,10 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
         final FullTextIndex ndx = getSearchEngine();
 
+        final TokenBuffer buffer = new TokenBuffer(numTerms,ndx);
+        
+        int n = 0;
+        
         for (int i = 0; i < numTerms; i++) {
 
             _Value val = terms[i];
@@ -3573,9 +3584,23 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
 
             final String text = ((_Literal) val).term;
 
-            ndx.index(val.termId, 0/*fieldId*/, languageCode, new StringReader(text));
-
+            /*
+             * Note: The OVERWRITE option is turned off to avoid some of the
+             * cost of re-indexing each time we see a term.
+             */
+            
+            assert val.termId != 0L; // the termId must have been assigned.
+            
+            ndx.index(buffer, val.termId, 0/*fieldId*/, languageCode, new StringReader(text));
+         
+            n++;
+            
         }
+        
+        // flush writes to the text index.
+        buffer.flush();
+        
+        log.info("indexed "+n+" new terms");
         
     }
 
@@ -3586,19 +3611,23 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * the terms index as "documents" that are broken down into "token"s to
      * obtain a "token frequency distribution" for that document. The full text
      * index contains the indexed token data.
+     * <p>
+     * Note: the {@link FullTextIndex} is implemented against the
+     * {@link IBigdataFederation} API and is therefore not available for a
+     * {@link TempTripleStore}.
      * 
-     * @return The index or <code>null</code> iff the index is not being
-     *         maintained.
+     * @return The object managing the text search indices or <code>null</code>
+     *         iff text search is not enabled.
      */
-    abstract public IIndex getFullTextIndex();
-
     abstract public FullTextIndex getSearchEngine();
     
     /**
-     * Performs a full text search against literals returning the term
-     * identifiers of literals containing tokens parsed from the query. Those
-     * term identifiers may be used to join against the statement indices in
-     * order to bring back appropriate results.
+     * <p>
+     * Performs a full text search against literals returning an {@link IHit}
+     * list visiting the term identifiers for literals containing tokens parsed
+     * from the query. Those term identifiers may be used to join against the
+     * statement indices in order to bring back appropriate results.
+     * </p>
      * <p>
      * Note: If you want to discover a data typed value, then form the
      * appropriate data typed {@link Literal} and use
@@ -3614,19 +3643,22 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      *            The query (it will be parsed into tokens).
      * 
      * @return An iterator that visits each term in the lexicon in which one or
-     *         more of the extracted tokens has been found.
+     *         more of the extracted tokens has been found. The value returned
+     *         by {@link IHit#getDocId()} is in fact the <i>termId</i> and you
+     *         can resolve it to the term using {@link #getTerm(long)}.
      * 
-     * @throws InterruptedException 
+     * @throws InterruptedException
+     *             if the search operation is interrupted.
      * 
-     * @todo the returned iterator should be a chunked iterator (the same
-     *       requirement exists for the iterator returned by
-     *       {@link AccessPath#distinctTermScan()}) and should include the
-     *       computed relevance.
+     * @todo Abstract the search api so that it queries the terms index directly
+     *       when a data typed literal or a URI is used (typed query).
      */
-    public Iterator<Hit> textSearch(String languageCode,String text) throws InterruptedException {
+    @SuppressWarnings("unchecked")
+    public Iterator<IHit> textSearch(String languageCode, String text)
+            throws InterruptedException {
 
-        return getSearchEngine().textSearch( text, languageCode);
-        
+        return getSearchEngine().search(text, languageCode);
+
     }
     
 }

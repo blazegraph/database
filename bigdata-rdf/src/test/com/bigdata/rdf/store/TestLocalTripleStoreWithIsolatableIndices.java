@@ -42,6 +42,9 @@ import com.bigdata.journal.Options;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated this proxy test suite is no longer necessary.  we test delete markers
+ * with the embedded federation.
  */
 public class TestLocalTripleStoreWithIsolatableIndices extends AbstractTestCase {
 

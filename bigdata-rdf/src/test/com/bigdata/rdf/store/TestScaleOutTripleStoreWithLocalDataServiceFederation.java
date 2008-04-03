@@ -34,6 +34,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.LocalDataServiceFederation;
@@ -86,6 +87,8 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
 
 //        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
 
+        suite.addTestSuite(TestFullTextIndex.class);
+        
         /*
          * Pickup the basic triple store test suite. This is a proxied test
          * suite, so all the tests will run with the configuration specified in
@@ -111,7 +114,7 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
 
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
 
 //        properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
@@ -153,6 +156,8 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
                 testCase.getName());
         
         client = new LocalDataServiceClient(properties);
+        
+        client.connect();
         
     }
     
@@ -230,8 +235,11 @@ public class TestScaleOutTripleStoreWithLocalDataServiceFederation extends Abstr
         // Note: also shutdown the embedded federation.
         client.disconnect(true/*immediateShutdown*/);
 
-        // Connect: will re-open the embedded federation.
+        // new client.
         client = new LocalDataServiceClient( properties );
+        
+        // re-connect.
+        client.connect();
         
         // Obtain view on the triple store.
         return getStore();

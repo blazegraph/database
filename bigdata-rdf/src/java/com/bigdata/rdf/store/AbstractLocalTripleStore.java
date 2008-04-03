@@ -30,8 +30,8 @@ package com.bigdata.rdf.store;
 import java.util.Properties;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.text.FullTextIndex;
 
 /**
  * Abstract base class for both transient and persistent {@link ITripleStore}

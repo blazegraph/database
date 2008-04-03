@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.io.File;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -40,30 +39,21 @@ import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
 import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.search.FullTextIndex;
+import com.bigdata.service.IBigdataClient;
 
 /**
  * Test of adding terms with the full text index enabled and of lookup of terms
  * by tokens which appear within those terms.
- * 
- * @todo Note: This is not a proxied test suite since we have to explicitly
- *       create an instance of the store in which the full text index is
- *       enabled. If we ever make the full text index an "all the time" feature
- *       then this test could be moved into {@link TestTripleStoreBasics} and
- *       reconfigured as a proxied test suite.  The methods {@link #getStore()}
- *       and {@link #reopenStore(AbstractTripleStore)} would go away in this
- *       eventuality.
- * 
- * @todo test search against the full text index. abstract the search api so
- *       that it queries the terms index directly when a data typed literal or a
- *       URI is used (typed query).
+ * <p>
+ * Note: The {@link FullTextIndex} is written to the {@link IBigdataClient} API
+ * so it can not be tested against the {@link AbstractLocalTripleStore}s.
  * 
  * @todo test both the term at a time and the batch term insert APIs.
  * 
  * @todo test all term types (uris, bnodes, and literals). only literals are
  *       being indexed right now, but there could be a use case for tokenizing
  *       URIs. There is never going to be any reason to tokenize BNodes.
- * 
- * @todo test language code support
  * 
  * @todo test data type support (probably do not index data typed terms).
  * 
@@ -73,7 +63,7 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFullTextIndex extends AbstractTestCase {
+public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
     /**
      * 
@@ -88,65 +78,17 @@ public class TestFullTextIndex extends AbstractTestCase {
         super(name);
     }
 
-    public Properties getProperties() {
-
-        Properties properties = new Properties(super.getProperties());
-        
-        // enable the full text index.
-        properties.setProperty(Options.TEXT_INDEX,"true");
-        
-        return properties;
-
-    }
+//    public Properties getProperties() {
+//
+//        Properties properties = new Properties(super.getProperties());
+//        
+//        // enable the full text index.
+//        properties.setProperty(Options.TEXT_INDEX,"true");
+//        
+//        return properties;
+//
+//    }
     
-    protected AbstractTripleStore getStore() {
-     
-        return new LocalTripleStore( getProperties() );
-        
-    }
-
-    /**
-     * Re-open the same backing store.
-     * 
-     * @param store
-     *            the existing store.
-     * 
-     * @return A new store.
-     * 
-     * @exception Throwable
-     *                if the existing store is closed, or if the store can not
-     *                be re-opened, e.g., from failure to obtain a file lock,
-     *                etc.
-     */
-    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
-        
-        // close the store.
-        store.close();
-        
-        if (!((LocalTripleStore) store).store.isStable()) {
-            
-            throw new UnsupportedOperationException("The backing store is not stable");
-            
-        }
-        
-        // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
-        
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        File file = ((LocalTripleStore) store).store.getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new LocalTripleStore( properties );
-        
-    }
-
     /**
      * Test helper verifies that the term is not in the lexicon, adds the term
      * to the lexicon, verifies that the term can be looked up by its assigned
@@ -172,28 +114,30 @@ public class TestFullTextIndex extends AbstractTestCase {
 
     }
 
-    public void test_fullTextIndex01() {
+    public void test_fullTextIndex01() throws InterruptedException {
 
         AbstractTripleStore store = getStore();
 
+        _Value[] terms = new _Value[] { new _Literal("abc"),//
+                new _Literal("abc", new _URI(XMLSchema.DECIMAL)),//
+                new _Literal("abc", "en"),//
+                new _Literal("good day", "en"),//
+                new _Literal("gutten tag", "de"),//
+                new _Literal("tag team", "en"),//
+                new _Literal("the first day", "en"),// // 'the' is a stopword.
+
+                new _URI("http://www.bigdata.com"),//
+                new _URI(RDF.TYPE),//
+                new _URI(RDFS.SUBCLASSOF),//
+                new _URI(XMLSchema.DECIMAL),//
+
+                new _BNode(UUID.randomUUID().toString()),//
+                new _BNode("a12"),//
+        };
+
         try {
 
-            doAddTermTest(store, new _Literal("abc"));
-            doAddTermTest(store, new _Literal("abc",
-                    new _URI(XMLSchema.DECIMAL)));
-            doAddTermTest(store, new _Literal("abc", "en"));
-            doAddTermTest(store, new _Literal("good day", "en"));
-            doAddTermTest(store, new _Literal("gutten tag", "de"));
-            doAddTermTest(store, new _Literal("tag team", "en"));
-            doAddTermTest(store, new _Literal("the first day", "en")); // 'the' is a stopword.
-
-            doAddTermTest(store, new _URI("http://www.bigdata.com"));
-            doAddTermTest(store, new _URI(RDF.TYPE));
-            doAddTermTest(store, new _URI(RDFS.SUBCLASSOF));
-            doAddTermTest(store, new _URI(XMLSchema.DECIMAL));
-
-            doAddTermTest(store, new _BNode(UUID.randomUUID().toString()));
-            doAddTermTest(store, new _BNode("a12"));
+            store.addTerms(store.getKeyBuilder(), terms, terms.length);
 
             store.commit();
 

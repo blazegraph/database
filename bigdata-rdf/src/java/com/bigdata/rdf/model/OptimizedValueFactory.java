@@ -330,10 +330,20 @@ public class OptimizedValueFactory implements ValueFactory {
         
         /**
          * Initially <code>false</code>, this field is set <code>true</code>
-         * if it is determined that a term has already been assigned a term
-         * identifier and is therefore in both the terms index and the term
-         * identifiers index. This is used to avoid re-definition of terms in
-         * the term identifiers index during a bulk load operation.
+         * if it is determined that a term is in both the terms index and the
+         * term identifiers index. This basically captures the intermediate
+         * state after we have inserted a term into the term:id mapping, thereby
+         * assigning the termId, but have not yet verified that the term is also
+         * in the reverse id:term mapping. In this case, [known] should be false
+         * until we have that verification. [known] can be set [true] if we
+         * resolve a termId from a term since that demonstrates existence in the
+         * reverse index and the presence in the reverse index is taken as a
+         * guarentee of the existence in the forward index since we always
+         * insert into the forward index first and we never retract terms from
+         * the lexicon.
+         * 
+         * FIXME The use of this flag is not always consistent with the javadoc
+         * above.
          */
         public boolean known = false;
         

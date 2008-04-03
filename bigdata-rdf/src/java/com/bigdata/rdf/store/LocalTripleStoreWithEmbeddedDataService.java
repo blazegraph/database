@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,16 +40,17 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceIndex;
+import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedDataService;
 import com.bigdata.service.EmbeddedLoadBalancerService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.LocalDataServiceClient;
 
 /**
  * A thread-safe variant that supports concurrent data load and query (the
@@ -58,6 +58,9 @@ import com.bigdata.service.IMetadataService;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link ScaleOutTripleStore} using a {@link LocalDataServiceClient}
+ * or {@link EmbeddedClient}.
  */
 public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTripleStore {
 
@@ -485,12 +488,6 @@ public class LocalTripleStoreWithEmbeddedDataService extends AbstractLocalTriple
 
         return ndx_idTerm;
 
-    }
-
-    public IIndex getFullTextIndex() {
-
-        return ndx_freeText;
-        
     }
 
     public IIndex getSPOIndex() {

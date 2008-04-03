@@ -36,6 +36,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -44,7 +45,6 @@ import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
-import com.bigdata.text.FullTextIndex;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
