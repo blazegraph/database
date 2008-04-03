@@ -1,4 +1,4 @@
-package com.bigdata.text;
+package com.bigdata.search;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,6 +12,7 @@ import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -30,8 +31,6 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME The {@link ISplitHandler}
  */
 public class ReadIndexTask implements Callable<Object> {
 
@@ -49,18 +48,27 @@ public class ReadIndexTask implements Callable<Object> {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    private final String termText;
-    private final double globalTermWeight;
+    private final String queryTerm;
+    private final double queryTermWeight;
     private final FullTextIndex searchEngine;
     private final ConcurrentHashMap<Long, Hit> hits;
     private final ITupleIterator itr;
 
-    public ReadIndexTask(String termText, double globalTermWeight,
+    /**
+     * This instance is reused until it is consumed by a successful insertion
+     * into {@link #hits} using
+     * {@link ConcurrentHashMap#putIfAbsent(Object, Object)}. Once successfully
+     * inserted, the {@link Hit#setDocId(long) docId} is set on the {@link Hit}
+     * and a new instance is assigned to {@link #tmp}.
+     */
+    private Hit tmp = new Hit();
+
+    public ReadIndexTask(String termText, double queryTermWeight,
             FullTextIndex searchEngine, ConcurrentHashMap<Long, Hit> hits) {
 
-        this.termText = termText;
+        this.queryTerm = termText;
 
-        this.globalTermWeight = globalTermWeight;
+        this.queryTermWeight = queryTermWeight;
 
         this.searchEngine = searchEngine;
         
@@ -74,11 +82,11 @@ public class ReadIndexTask implements Callable<Object> {
         final byte[] toKey = searchEngine.getTokenKey(keyBuilder, termText,
                 true/* successor */, 0L, 0);
 
-        // @todo filter fields.
-        // @todo values iff term weights were computed.
+        // @todo filter by field
         itr = searchEngine.ndx
                 .rangeIterator(fromKey, toKey, 0/* capacity */,
                         IRangeQuery.KEYS | IRangeQuery.VALS, null/*filter*/);
+
     }
     
     /**
@@ -89,11 +97,17 @@ public class ReadIndexTask implements Callable<Object> {
         
         long nhits = 0;
         
+        if(DEBUG) {
+            
+            log.debug("queryTerm="+queryTerm+", termWeight="+queryTermWeight);
+            
+        }
+        
         while(itr.hasNext()) {
 
             if(Thread.currentThread().isInterrupted()) {
                 
-                log.info("Interrupted: term="+termText+", nhits="+nhits);
+                log.info("Interrupted: queryTerm="+queryTerm+", nhits="+nhits);
                 
                 break;
                 
@@ -109,28 +123,40 @@ public class ReadIndexTask implements Callable<Object> {
             final long docId = KeyBuilder.decodeLong(key, key.length
                     - Bytes.SIZEOF_LONG /*docId*/ - Bytes.SIZEOF_INT/*fieldId*/);
 
-            // FIXME extract the weight.
-            double weight = 1d;
+            /*
+             * Extract the term frequency and normalized term-frequency (term
+             * weight) for this document.
+             */
+            final DataInputBuffer dis = tuple.getValueStream();
+            final int termFreq = dis.readShort();
+            final double termWeight = dis.readDouble();
             
             if(DEBUG) {
                 
-                log.debug("hit: term="+termText+", docId="+docId+", weight="+weight);
+                log.debug("hit: term=" + queryTerm + ", docId=" + docId
+                        + ", termFreq=" + termFreq + ", termWeight="
+                        + termWeight + ", product="
+                        + (queryTermWeight * termWeight));
                 
             }
             
-            /* FIXME can I reuse the [tmp] hit until it is consumed?  probably, but
-             * then the docId needs to be set by the thread that successfully makes
-             * the assignment.
+            /*
+             * Play a little magic to get the docId in the hit set without race
+             * conditions.
              */
-            Hit tmp = new Hit(docId);
+            final Hit hit;
+            {
+                Hit oldValue = hits.putIfAbsent(docId, tmp);
+                if (oldValue == null) {
+                    hit = tmp;
+                    hit.setDocId(docId);
+                    tmp = new Hit();
+                } else {
+                    hit = oldValue;
+                }
+            }
             
-            Hit oldValue = hits.putIfAbsent(docId, tmp);
-            
-            final Hit hit = (oldValue == null ? tmp : oldValue);
-            
-            assert hit != null;
-            
-            hit.add( weight );
+            hit.add( queryTerm, queryTermWeight * termWeight );
             
             nhits++;
             

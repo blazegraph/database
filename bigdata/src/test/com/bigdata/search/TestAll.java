@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 10, 2007
  */
 
-package com.bigdata.text;
+package com.bigdata.search;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -57,6 +57,8 @@ public class TestAll extends TestCase {
         TestSuite suite = new TestSuite("full text indexing");
 
         suite.addTestSuite(TestFullTextIndex.class);
+        
+        suite.addTestSuite(TestSearch.class);
         
         return suite;
         

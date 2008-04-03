@@ -420,36 +420,6 @@ abstract public class AbstractTestCase
             
         }
         
-        /**
-         * Dumps the full text index.
-         */
-        if(((AbstractTripleStore)store).textIndex) {
-            
-            System.err.println("full text index");
-
-            IIndex ndx = store.getFullTextIndex();
-
-            ITupleIterator itr = ndx.rangeIterator(null, null, 0/* capacity */,
-                    IRangeQuery.KEYS, null/*filter*/);
-
-            while (itr.hasNext()) {
-
-                // next value (we only need the key).
-                ITuple tuple = itr.next();
-                
-                /*
-                 * The sort key
-                 * 
-                 * FIXME decode the languageCode, token, and term identifier.
-                 */
-                byte[] key = tuple.getKey();
-                
-                System.err.println(BytesUtil.toString(key));
-
-            }
-                        
-        }
-
     }
     
     /**

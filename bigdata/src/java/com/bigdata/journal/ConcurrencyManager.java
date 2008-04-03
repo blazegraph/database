@@ -38,42 +38,50 @@ import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * Supports concurrent operations against named indices. The
- * {@link ConcurrencyManager} a {@link LockManager} to administer exclusive
- * locks on unisolated named indices and thereby identify a schedule of
- * operations such that access to an unisolated named index is always single
+ * Supports concurrent operations against named indices. Historical read and
+ * read-committed tasks run with full concurrency. For unisolated tasks, the
+ * {@link ConcurrencyManager} uses a {@link LockManager} to identify a schedule
+ * of operations such that access to an unisolated named index is always single
  * threaded while access to distinct unisolated named indices MAY be concurrent.
  * <p>
  * There are several thread pools that facilitate concurrency. They are:
  * <dl>
  * 
- * <dt>{@link #txWriteService}</dt>
- * <dd>This is used for the "active" phrase of transaction. Transactions read
- * from historical states of named indices during their active phase and buffer
- * the results on isolated indices. Since transactions never write on the
- * unisolated indices during their "active" phase distinct transactions may be
- * run with arbitrary concurrency. However, concurrent tasks for the same
- * transaction must obtain an exclusive lock on the isolated index that is used
- * to buffer their writes. A transaction that requests a commit using the
- * {@link ITransactionManagerService} results in a task being submitted to the
- * {@link #writeService}. Transactions are selected to commit once they have
- * acquired a lock on the corresponding unisolated indices, thereby enforcing
- * serialization of their write sets both among other transactions and among
- * unisolated writers. The commit itself consists of the standard validation and
- * merge phrases.</dd>
- * 
  * <dt>{@link #readService}</dt>
- * <dd>Concurrent unisolated readers running against the <strong>historical</strong>
- * state of a named index. No locking is imposed. Concurrency is limited by the
- * size of the thread pool, but large thread pools can reduce overall
- * performance..</dd>
+ * <dd>Concurrent historical and read-committed tasks are run against a
+ * <strong>historical</strong> view of a named index using this service. No
+ * locking is imposed. Concurrency is limited by the size of the thread pool.</dd>
  * 
  * <dt>{@link #writeService}</dt>
  * <dd>Concurrent unisolated writers running against the <strong>current</strong>
- * state of (or more more) named index(s) (the "live" or "mutable" index(s)).
- * The underlying {@link BTree} is NOT thread-safe. Therefore writers MUST
- * predeclare their locks, which allows us to avoid deadlocks altogether. This
- * is also used to schedule the commit phrase of transactions. </dd>
+ * view of (or more more) named index(s) (the "live" or "mutable" index(s)). The
+ * underlying {@link BTree} is NOT thread-safe for writers. Therefore writers
+ * MUST predeclare their locks, which allows us to avoid deadlocks altogether.
+ * This is also used to schedule the commit phrase of transactions (transaction
+ * commits are in fact unisolated tasks).</dd>
+ * 
+ * <dt>{@link #txWriteService}</dt>
+ * <dd>
+ * <p>
+ * This is used for the "active" phrase of transaction. Transactions read from
+ * historical states of named indices during their active phase and buffer the
+ * results on isolated indices backed by a per-transaction
+ * {@link TemporaryStore}. Since transactions never write on the unisolated
+ * indices during their "active" phase, distinct transactions may be run with
+ * arbitrary concurrency. However, concurrent tasks for the same transaction
+ * must obtain an exclusive lock on the isolated index(s) that are used to
+ * buffer their writes.
+ * </p>
+ * <p>
+ * A transaction that requests a commit using the
+ * {@link ITransactionManagerService} results in a unisolated task being
+ * submitted to the {@link #writeService}. Transactions are selected to commit
+ * once they have acquired a lock on the corresponding unisolated indices,
+ * thereby enforcing serialization of their write sets both among other
+ * transactions and among unisolated writers. The commit itself consists of the
+ * standard validation and merge phrases.
+ * </p>
+ * </dd>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -165,13 +173,14 @@ public class ConcurrencyManager implements IConcurrencyManager {
          *       value down to something much smaller, e.g., 10-50.
          * 
          * @todo revisit this value after I modify the
-         *       {@link WriteExecutorService} to checkpoint indices so that it
-         *       does not need to wait for nrunning to reach zero and so that it
-         *       can abort individual tasks rather than discarding entire commit
-         *       groups. Use {@link StressTestConcurrentUnisolatedIndices} to
-         *       examine the behavior for just the writeService, but choose the
-         *       default in terms of a more complete test that loads all three
-         *       queues (read, write, and tx).
+         *       {@link WriteExecutorService} to checkpoint indices (which has
+         *       been done) so that it does not need to wait for nrunning to
+         *       reach zero and so that it can abort individual tasks rather
+         *       than discarding entire commit groups. Use
+         *       {@link StressTestConcurrentUnisolatedIndices} to examine the
+         *       behavior for just the writeService, but choose the default in
+         *       terms of a more complete test that loads all three queues
+         *       (read, write, and tx).
          */
         public final static String DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE = "200";
         

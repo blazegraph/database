@@ -84,6 +84,8 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
          * @todo test unisolated operation semantics.
          */
 
+//        suite.addTestSuite(TestFullTextIndex.class);
+
 //        suite.addTestSuite(TestLocalTripleStoreTransactionSemantics.class);
 
         /*
@@ -151,8 +153,12 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         // proxy test case).
         properties.setProperty(EmbeddedClient.Options.DATA_DIR,
                 testCase.getName());
-        
+
+        // new client
         client = new EmbeddedClient(properties);
+        
+        // connect.
+        client.connect();
         
     }
     
@@ -230,8 +236,11 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         // Note: also shutdown the embedded federation.
         client.disconnect(true/*immediateShutdown*/);
 
-        // Connect: will re-open the embedded federation.
+        // new client.
         client = new EmbeddedClient( properties );
+     
+        // connect.
+        client.connect();
         
         // Obtain view on the triple store.
         return getStore();

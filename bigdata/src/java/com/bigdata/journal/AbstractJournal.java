@@ -64,44 +64,74 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.DataService;
+import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.util.ChecksumUtility;
 
 /**
  * <p>
- * An append-only persistence capable data structure supporting atomic commit,
- * named indices, and transactions. Writes are logically appended to the journal
- * to minimize disk head movement. This is an abstract implementation of the
- * {@link IJournal} interface that does not implement services that are
- * independent in a scale-out solution (transaction management, partitioned
- * indices, and index metadata management).
+ * The journal is an append-only persistence capable data structure supporting
+ * atomic commit, named indices, and transactions. Writes are logically appended
+ * to the journal to minimize disk head movement.
+ * </p><p>
+ * This class is an abstract implementation of the {@link IJournal} interface
+ * that does not implement the {@link IConcurrencyManager},
+ * {@link IResourceManager}, or {@link ITransactionManager} interfaces. There
+ * are several classes which DO support all of these features, relying on the
+ * {@link AbstractJournal} for their underlying persistence store. These
+ * include:
+ * <dl>
+ * <dt>{@link Journal}</dt>
+ * <dd>A concrete implementation that may be used for a standalone immortal
+ * database complete with concurrency control and transaction management.</dd>
+ * <dt>{@link DataService}</dt>
+ * <dd>A class supporting remote clients, key-range partitioned indices,
+ * concurrency, and scale-out.</dd>
+ * <dt>{@link IBigdataClient}</dt>
+ * <dd>Clients connect to an {@link IBigdataFederation}, which is the basis
+ * for the scale-out architecture. There are several variants of a federation
+ * available, including:
+ * <dl>
+ * <dt>{@link LocalDataServiceClient}</dt>
+ * <dd>Purely local operations against a {@link DataService} with full
+ * concurrency controls and transaction management</dd>
+ * <dt>{@link EmbeddedClient}</dt>
+ * <dd>Operations against a collection of services running in the same JVM with
+ * full concurrency controls, transaction management, and key-range partitioned
+ * indices.</dd>
+ * <dt>{@link JiniClient}</dt>
+ * <dd>Operations against a collection of services running on a distributed
+ * services framework such as Jini with full concurrency controls, transaction
+ * management, and key-range partitioned indices. This is the scale-out
+ * solution.</dd>
+ * </dl>
+ * </dd>
+ * </dl>
+ * </p>
+ * <h2>Limitations</h2>
  * <p>
  * The {@link IIndexStore} implementation on this class is NOT thread-safe. The
  * basic limitation is that the mutable {@link BTree} is NOT thread-safe. The
  * {@link #getIndex(String)} method exposes this mutable {@link BTree}. If you
  * use this method to access the mutable {@link BTree} then YOU are responsible
  * for avoiding concurrent writes on the returned object.
+ * </p>
  * <p>
  * See {@link IConcurrencyManager#submit(AbstractTask)} for a thread-safe API
  * that provides suitable concurrency control for both isolated and unisolated
  * operations on named indices. Note that the use of the thread-safe API does
  * NOT protect against applications that directly access the mutable
  * {@link BTree} using {@link #getIndex(String)}.
+ * </p>
  * <p>
  * The {@link IRawStore} interface on this class is thread-safe. However, this
  * is a low-level API that is not used by directly by most applications. The
  * {@link BTree} class uses this low-level API to read and write its nodes and
  * leaves on the store. Applications generally use named indices rather than the
  * {@link IRawStore} interface.
- * </p>
- * <p>
- * Commit processing. The journal maintains two root blocks. Commit updates the
- * root blocks using the Challis algorithm. (The root blocks are updated using
- * an alternating pattern and "timestamps" are recorded at the head and tail of
- * each root block to detect partial writes. See {@link IRootBlockView} and
- * {@link RootBlockView}.) When the journal is backed by a disk file, the data
- * are {@link Options#FORCE_ON_COMMIT optionally flushed to disk on commit}. If
- * desired, the writes may be flushed before the root blocks are updated to
- * ensure that the writes are not reordered - see {@link Options#DOUBLE_SYNC}.
  * </p>
  * <p>
  * Note: transaction processing MAY occur be concurrent since the write set of a
@@ -113,6 +143,17 @@ import com.bigdata.util.ChecksumUtility;
  * that the {@link TemporaryStore} backing a transaction will spill
  * automatically from memory onto disk if the write set of the transaction grows
  * too large.
+ * </p>
+ * <h2>Commit processing</h2>
+ * <p>
+ * The journal maintains two root blocks. Commit updates the root blocks using
+ * the Challis algorithm. (The root blocks are updated using an alternating
+ * pattern and "timestamps" are recorded at the head and tail of each root block
+ * to detect partial writes. See {@link IRootBlockView} and
+ * {@link RootBlockView}.) When the journal is backed by a disk file, the data
+ * are {@link Options#FORCE_ON_COMMIT optionally flushed to disk on commit}. If
+ * desired, the writes may be flushed before the root blocks are updated to
+ * ensure that the writes are not reordered - see {@link Options#DOUBLE_SYNC}.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -160,8 +201,6 @@ import com.bigdata.util.ChecksumUtility;
  *       exceptions to be thrown out of concurrent threads. It would be nice if
  *       we could throw a single exception that indicated that the journal had
  *       been asynchronously closed.
- * 
- * @todo Run unit tests at some non-default #of offset bits.
  */
 public abstract class AbstractJournal implements IJournal {
 
@@ -433,12 +472,6 @@ public abstract class AbstractJournal implements IJournal {
      *             the journal file.
      * 
      * @see Options
-     * 
-     * @todo Write tests that verify (a) that read-only mode does not permit
-     *       writes; (b) that read-only mode is not supported for a transient
-     *       buffer (since the buffer does not pre-exist by definition); (c)
-     *       that read-only mode reports an error if the file does not
-     *       pre-exist; and (d) that you can not write on a read-only journal.
      */
     public AbstractJournal(Properties properties) {
 
@@ -451,7 +484,6 @@ public abstract class AbstractJournal implements IJournal {
             throw new IllegalArgumentException();
 
         this.properties = properties = (Properties) properties.clone();
-//        this.properties = properties;
 
         /*
          * "bufferMode" mode.
@@ -463,8 +495,6 @@ public abstract class AbstractJournal implements IJournal {
                 Options.BUFFER_MODE, "" + Options.DEFAULT_BUFFER_MODE));
 
         log.info(Options.BUFFER_MODE + "=" + bufferMode);
-
-//        System.err.println(Options.BUFFER_MODE + "=" + bufferMode);
 
         /*
          * historicalIndexCacheCapacity
@@ -1006,9 +1036,9 @@ public abstract class AbstractJournal implements IJournal {
      */
     protected void finalize() throws Exception {
         
-        log.warn("Closing journal: "+getFile());
-        
         if(_bufferStrategy.isOpen()) {
+            
+            log.warn("Closing journal: "+getFile());
             
             shutdownNow();
             

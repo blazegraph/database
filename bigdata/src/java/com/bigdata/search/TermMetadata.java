@@ -1,4 +1,4 @@
-package com.bigdata.text;
+package com.bigdata.search;
 
 import java.util.ArrayList;
 
@@ -31,7 +31,7 @@ public class TermMetadata {
     /**
      * The local term weight, which may be computed by a variety of methods.
      */
-    public float localTermWeight;
+    public double localTermWeight;
 
     // @todo make private?
     ArrayList<Token> occurrences = new ArrayList<Token>();

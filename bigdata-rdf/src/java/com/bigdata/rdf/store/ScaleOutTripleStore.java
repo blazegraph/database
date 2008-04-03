@@ -38,6 +38,7 @@ import com.bigdata.btree.IDataSerializer.NoDataSerializer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFKeyCompression;
 import com.bigdata.rdf.store.IndexWriteProc.FastRDFValueCompression;
+import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.GlobalRowStoreSchema;
@@ -46,7 +47,6 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.text.FullTextIndex;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of an
@@ -222,6 +222,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                  */
                 
                 row = new HashMap<String,Object>();
+                
+                row.put(GlobalRowStoreSchema.NAME, name);
                 
                 // Create configuration entry.
                 row = rowStore.write(fed.getKeyBuilder(), GlobalRowStoreSchema.INSTANCE, row);
@@ -445,9 +447,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         ids      = fed.getIndex(name+name_termId, ITx.UNISOLATED);
         terms    = fed.getIndex(name+name_idTerm, ITx.UNISOLATED);
         
-        // @todo ITx#UNISOLATED or timestamp?
-        freeText = fed.getIndex(name+name_freeText, ITx.UNISOLATED);
-        
         /*
          * Note: if full transactions are to be used then the statement indices
          * and the justification indices should be assigned the transaction
@@ -525,8 +524,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     private IIndex spo, pos, osp;
 
     private IIndex just;
-
-    private IIndex freeText;
     
     final public IIndex getTermIdIndex() {
 
@@ -561,12 +558,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     final public IIndex getJustificationIndex() {
 
         return just;
-
-    }
-
-    public IIndex getFullTextIndex() {
-
-        return freeText;
 
     }
 
@@ -684,7 +675,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
             
             if(view == null) {
                 
-                view = new FullTextIndex(fed.getClient(),name+name_freeText);
+                view = new FullTextIndex(fed.getClient(),name/*namespace*/);
                 
                 searchEngineRef = new WeakReference<FullTextIndex>(view);
                 
