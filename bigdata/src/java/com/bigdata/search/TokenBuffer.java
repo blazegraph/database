@@ -269,6 +269,14 @@ public class TokenBuffer {
      */
     public void flush() {
 
+        if (nterms == 0) {
+            
+            reset();
+            
+            return;
+            
+        }
+        
         log.info("count="+count+", ndocs="+ndocs+", nfields="+nfields+", nterms="+nterms);
         
         /*
