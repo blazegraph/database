@@ -70,7 +70,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     
     private TemporaryStore store;
     
-    public TemporaryStore getBackingStore() {
+    public TemporaryStore getStore() {
         
         return store;
         

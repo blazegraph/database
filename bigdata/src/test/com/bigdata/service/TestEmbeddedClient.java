@@ -69,7 +69,7 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
         assertNull(fed.getIndex(name,tx));
         
         // register.
-        UUID indexUUID = fed.registerIndex(metadata);
+        fed.registerIndex(metadata);
         
         // obtain view.
         IIndex ndx = fed.getIndex(name,tx);
@@ -78,7 +78,7 @@ public class TestEmbeddedClient extends AbstractEmbeddedFederationTestCase {
         assertNotNull(ndx);
         
         // verify same index UUID.
-        assertEquals(indexUUID,ndx.getIndexMetadata().getIndexUUID());
+        assertEquals(metadata.getIndexUUID(),ndx.getIndexMetadata().getIndexUUID());
         
     }
 

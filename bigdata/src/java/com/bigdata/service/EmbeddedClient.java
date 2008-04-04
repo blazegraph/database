@@ -111,8 +111,6 @@ public class EmbeddedClient extends AbstractClient {
      * share the same configuration properties except for the name of the
      * backing store file.
      * 
-     * @todo move the options into {@link EmbeddedClient}.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */

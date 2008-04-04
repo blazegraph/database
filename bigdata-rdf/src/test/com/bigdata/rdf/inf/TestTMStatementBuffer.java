@@ -55,7 +55,6 @@ import com.bigdata.rdf.spo.SPOArrayIterator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.IAccessPath;
-import com.bigdata.rdf.store.LocalTripleStoreWithEmbeddedDataService;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.SesameStatementIterator;
 import com.bigdata.rdf.store.StatementIterator;
@@ -673,7 +672,7 @@ public class TestTMStatementBuffer extends AbstractInferenceEngineTestCase {
         
         try {
             
-            if(store instanceof ScaleOutTripleStore || store instanceof LocalTripleStoreWithEmbeddedDataService) {
+            if(store instanceof ScaleOutTripleStore) {
                 
                 fail("Waiting on batch api procedure for distinct term scan");
                 

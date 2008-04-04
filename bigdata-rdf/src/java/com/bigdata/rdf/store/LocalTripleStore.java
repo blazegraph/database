@@ -37,6 +37,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IDataSerializer.NoDataSerializer;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -65,6 +66,12 @@ import com.bigdata.service.LocalDataServiceClient;
 public class LocalTripleStore extends AbstractLocalTripleStore implements ITripleStore {
 
     protected final Journal store;
+
+    public Journal getStore() {
+        
+        return store;
+        
+    }
     
     protected final boolean deleteMarkers;
     
@@ -450,6 +457,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     public static class ReadCommittedTripleStore extends AbstractLocalTripleStore {
 
         private final LocalTripleStore db;
+        
+        public IIndexManager getStore() {
+            
+            return db.getStore();
+            
+        }
         
         /**
          * Create a read-committed view of a read-write triple store.

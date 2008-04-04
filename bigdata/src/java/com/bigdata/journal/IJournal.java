@@ -38,7 +38,7 @@ import com.bigdata.rawstore.IMRMW;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IJournal extends IMRMW, IAtomicStore, IIndexManager, ITimestampService {
+public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager, ITimestampService {
 
     /**
      * A copy of the properties used to initialize this journal.
@@ -56,43 +56,4 @@ public interface IJournal extends IMRMW, IAtomicStore, IIndexManager, ITimestamp
      */
     public void shutdownNow();
     
-    /**
-     * Return the named index (unisolated). Writes on the returned index will be
-     * made restart-safe with the next {@link #commit()} unless discarded by
-     * {@link #abort()}.
-     * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @return The named index or <code>null</code> iff there is no index
-     *         registered with that name.
-     * 
-     * @exception IllegalArgumentException
-     *                if <i>name</i> is <code>null</code>
-     */
-    public IIndex getIndex(String name);
-
-//    /**
-//     * Return the named index (isolated). Writes will be allowed iff the
-//     * transaction is {@link IsolationEnum#ReadWrite}. Writes on the returned
-//     * index will be made restart-safe iff the transaction
-//     * {@link ITx#commit() commits}.
-//     * 
-//     * @param name
-//     *            The index name.
-//     * @param startTime
-//     *            The transaction start time, which serves as the unique
-//     *            identifier for the transaction.
-//     * 
-//     * @return The isolated index or <code>null</code> iff there is no index
-//     *         registered with that name.
-//     * 
-//     * @exception IllegalArgumentException
-//     *                if <i>name</i> is <code>null</code>
-//     * 
-//     * @exception IllegalStateException
-//     *                if there is no active transaction with that timestamp.
-//     */
-//    public IIndex getIndex(String name, long startTime);
-//
 }

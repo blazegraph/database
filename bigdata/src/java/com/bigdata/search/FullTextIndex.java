@@ -70,7 +70,9 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
+import com.bigdata.btree.KeyBuilder.StrengthEnum;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.service.IBigdataClient;
@@ -88,9 +90,9 @@ import com.bigdata.service.IBigdataFederation;
  * the logical model is:
  * 
  * <pre>
- *                                                                
- *            token : {docId, freq?, weight?}+
- *                                                                
+ *                                                                 
+ *             token : {docId, freq?, weight?}+
+ *                                                                 
  * </pre>
  * 
  * (For RDF, docId is the term identifier as assigned by the term:id index.)
@@ -104,9 +106,9 @@ import com.bigdata.service.IBigdataFederation;
  * In fact, we actually represent the data as follows:
  * 
  * <pre>
- *                           
- *            {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
- *                                    
+ *                            
+ *             {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
+ *                                     
  * </pre>
  * 
  * That is, there is a distinct entry in the full text B+Tree for each field in
@@ -146,8 +148,8 @@ import com.bigdata.service.IBigdataFederation;
  * against the full text index.
  * 
  * <pre>
- *            fromKey := token, 0L
- *            toKey   := successor(token), 0L
+ *             fromKey := token, 0L
+ *             toKey   := successor(token), 0L
  * </pre>
  * 
  * and extracting the appropriate token frequency, normalized token weight, or
@@ -189,9 +191,20 @@ import com.bigdata.service.IBigdataFederation;
  * code is discarded and we perform search purely on the Unicode sort keys
  * resulting from the extracted tokens.
  * 
+ * @todo The key for the terms index is {term,docId,fieldId}. Since the data are
+ *       not pre-aggregated by {docId,fieldId} we can not easily remove only
+ *       those tuples corresponding to some document (or some field of some
+ *       document).
+ *       <p>
+ *       In order to removal of the fields for a document we need to know either
+ *       which fields were indexed for the document and the tokens found in
+ *       those fields and then scatter the removal request (additional space
+ *       requirements) or we need to flood a delete procedure across the terms
+ *       index (expensive).
+ * 
  * @todo provide M/R alternatives for indexing or computing/updating global
  *       weights.
- *       
+ * 
  * @todo Consider model in which fields are declared and then a "Document" is
  *       indexed. This lets us encapsulate the "driver" for indexing. The
  *       "field" can be a String or a Reader, etc.
@@ -218,21 +231,7 @@ import com.bigdata.service.IBigdataFederation;
  * @todo key compression: prefix compression, possibly with hamming codes for
  *       the docId and fieldId.
  * 
- * @todo verify that PRIMARY US English is an acceptable choice for the full
- *       text index collator regardless of the language family in which the
- *       terms were expressed and in which search is performed. I.e., that the
- *       specific implementations retain some distinction among characters
- *       regardless of their code points
- *       (http://unicode.org/reports/tr10/#Legal_Code_Points indicates that they
- *       SHOULD).
- * 
- * @todo refactor the full text index into a general purpose bigdata service.
- *       <p>
- *       We may need an additional index for the term weights and the document
- *       weights.
- * 
- * @todo support normalization passes over the index in which the weights are
- *       updated based on aggregated statistics.
+ * @todo support more term weighting schemes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -253,7 +252,7 @@ public class FullTextIndex {
     final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
             .toInt();
 
-    private final IBigdataFederation fed;
+//    private final IBigdataFederation fed;
     
     private final long timestamp;
     
@@ -272,6 +271,29 @@ public class FullTextIndex {
     public IIndex getIndex() {
         
         return ndx;
+        
+    }
+    
+    private final Properties properties;
+    
+    /**
+     * Return an object wrapping the properties used to configured this
+     * instance.
+     */
+    public Properties getProperties() {
+        
+        return new Properties( properties );
+        
+    }
+
+    final private ExecutorService threadPool;
+    
+    /**
+     * The {@link ExecutorService} that will be used to run queries.
+     */
+    protected ExecutorService getThreadPool() {
+        
+        return threadPool;
         
     }
 
@@ -298,6 +320,34 @@ public class FullTextIndex {
         String OVERWRITE = "indexer.overwrite";
 
         String DEFAULT_OVERWRITE = "true";
+
+        /**
+         * Specify the collator {@link StrengthEnum strength} for the full-text
+         * index (default {@value StrengthEnum#Primary}).
+         * 
+         * @see KeyBuilder.Options#STRENGTH
+         * 
+         * @todo the configuration should probably come from a configuration
+         *       properties stored for the full text indexer in the
+         *       {@link IBigdataFederation#getGlobalRowStore()}. The main issue
+         *       is how you want to encode unicode strings for search, which can
+         *       be different than encoding for other purposes.
+         * 
+         * @todo consider modifying the default system so that defaults can be
+         *       made on a per-index, per-application, or per-namespace basis.
+         */
+        String INDEXER_COLLATOR_STRENGTH = "indexer.collator.strength";
+
+        String DEFAULT_INDEXER_COLLATOR_STRENGTH = StrengthEnum.Primary.toString();
+
+        /**
+         * The maximum time in milliseconds that the search engine will await
+         * completion of the tasks reading on each of the query terms (default
+         * {@value #DEFAULT_INDEXER_TIMEOUT}).
+         */
+        String INDEXER_TIMEOUT = "indexer.timeout";
+        
+        String DEFAULT_INDEXER_TIMEOUT = "1000";
         
     }
     
@@ -316,29 +366,50 @@ public class FullTextIndex {
     }
     
     /**
+     * @see Options#INDEXER_TIMEOUT
+     */
+    private final long timeout;
+    
+    /**
      * @param client
      *            The client. Configuration information is obtained from the
      *            client. See {@link Options}.
      * 
      * @see Options
      * 
-     * FIXME Customize a {@link ISplitHandler} such that we never split a term
-     * and make sure that the defaults for the split points (in terms of the #of
-     * entries) are reasonable. The #of entries per split could be smaller if we
-     * know that we are storing more data in the values.
+     * @todo Customize a {@link ISplitHandler} such that we never split a
+     *       {term,doc} tuple?
+     * 
+     * @todo Make sure that the defaults for the split points (in terms of the
+     *       #of entries) are reasonable. The #of entries per split could be
+     *       smaller if we know that we are storing more data in the values.
      */
     public FullTextIndex(IBigdataClient client, String namespace) {
+
+        this(client.getProperties(), namespace, client.getFederation(), client
+                .getFederation().getThreadPool());
+
+    }
+    
+    public FullTextIndex(Properties properties, String namespace,
+            IIndexManager indexManager, ExecutorService threadPool) {
         
-        if (client == null)
+        if (properties == null)
             throw new IllegalArgumentException();
         
-        this.fed = client.getFederation();
+        if (namespace == null)
+            throw new IllegalArgumentException();
         
-        this.timestamp = ITx.UNISOLATED;
+        if (threadPool == null)
+            throw new IllegalArgumentException();
         
         this.namespace = namespace;
         
-        final Properties properties = client.getProperties();
+        this.threadPool = threadPool;
+
+        this.timestamp = ITx.UNISOLATED;
+        
+        this.properties = (Properties) properties.clone();
         
         // indexer.overwrite
         {
@@ -349,31 +420,32 @@ public class FullTextIndex {
             log.info(Options.OVERWRITE + "=" + overwrite);
 
         }
+
+        // indexer.timeout
+        {
+            
+            timeout = Long.parseLong(properties.getProperty(
+                    Options.INDEXER_TIMEOUT, Options.DEFAULT_INDEXER_TIMEOUT));
+
+            log.info(Options.INDEXER_TIMEOUT+ "=" + timeout);
+
+        }
         
         {
         
-            // @todo support transactions.
-
             final String name = namespace + "search";
 
-            IIndex ndx = fed.getIndex(name, timestamp);
+            IIndex ndx = indexManager.getIndex(name, timestamp);
 
             if (ndx == null) {
 
                 IndexMetadata indexMetadata = new IndexMetadata(name, UUID.randomUUID());
                 
-                if (fed.isScaleOut()) {
-
-                    // @todo should be automatic in the data service or register index task.
-                    indexMetadata.setDeleteMarkers(true);
-                    
-                }
-                
-                fed.registerIndex(indexMetadata);
+                indexManager.registerIndex(indexMetadata);
 
             }
 
-            ndx = fed.getIndex(name, timestamp);
+            ndx = indexManager.getIndex(name, timestamp);
 
             this.ndx = ndx;
             
@@ -395,9 +467,9 @@ public class FullTextIndex {
      */
     protected Analyzer getAnalyzer(String languageCode) {
         
-        Map<String,Analyzer> map = getAnalyzers();
+        Map<String,AnalyzerConstructor> map = getAnalyzers();
         
-        Analyzer a = null;
+        AnalyzerConstructor ctor = null;
         
         if(languageCode==null) {
         
@@ -408,7 +480,11 @@ public class FullTextIndex {
                     .getLocale();
 
             // The analyzer for that locale.
-            a = getAnalyzer(locale.getLanguage());
+            Analyzer a = getAnalyzer(locale.getLanguage());
+            
+            if(a != null) return a;
+            
+            // fall through
             
         } else {
             
@@ -424,27 +500,27 @@ public class FullTextIndex {
 
                 code = code.substring(0, 2);
 
-                a = map.get(languageCode);
+                ctor = map.get(languageCode);
 
             }
 
-            if (a == null && code.length() > 2) {
+            if (ctor == null && code.length() > 2) {
 
                 code = code.substring(0, 1);
 
-                a = map.get(languageCode);
+                ctor = map.get(languageCode);
                 
             }
             
         }
         
-        if (a == null) {
+        if (ctor == null) {
 
             // request the default analyzer.
             
-            a = map.get("");
+            ctor = map.get("");
             
-            if (a == null) {
+            if (ctor == null) {
 
                 throw new IllegalStateException("No entry for empty string?");
                 
@@ -452,10 +528,18 @@ public class FullTextIndex {
             
         }
 
+        Analyzer a = ctor.newInstance();
+        
         return a;
         
     }
     
+    abstract private static class AnalyzerConstructor {
+        
+        abstract public Analyzer newInstance();
+        
+    }
+
     /**
      * A map containing instances of the various kinds of analyzers that we know
      * about.
@@ -463,7 +547,7 @@ public class FullTextIndex {
      * Note: There MUST be an entry under the empty string (""). This entry will
      * be requested when there is no entry for the specified language code.
      */
-    private Map<String,Analyzer> analyzers;
+    private Map<String,AnalyzerConstructor> analyzers;
     
     /**
      * Initializes the various kinds of analyzers that we know about.
@@ -487,7 +571,7 @@ public class FullTextIndex {
      * @todo There are a lot of pidgins based on french, english, and other
      *       languages that are not being assigned here.
      */
-    protected Map<String,Analyzer> getAnalyzers() {
+    synchronized private Map<String,AnalyzerConstructor> getAnalyzers() {
         
         if (analyzers != null) {
 
@@ -495,10 +579,14 @@ public class FullTextIndex {
             
         }
 
-        analyzers = new HashMap<String, Analyzer>();
+        analyzers = new HashMap<String, AnalyzerConstructor>();
 
         {
-            Analyzer a = new BrazilianAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new BrazilianAnalyzer();
+                }
+            };
             analyzers.put("por", a);
             analyzers.put("pt", a);
         }
@@ -514,7 +602,11 @@ public class FullTextIndex {
          * as well. I expect so, but no real clue.
          */
         {
-            Analyzer a = new ChineseAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new ChineseAnalyzer();
+                }
+            };
             analyzers.put("zho", a);
             analyzers.put("chi", a);
             analyzers.put("zh", a);
@@ -525,7 +617,11 @@ public class FullTextIndex {
          * extraction with overlap.
          */
         {
-            Analyzer a = new CJKAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new CJKAnalyzer();
+                }
+            };
 //            analyzers.put("zho", a);
 //            analyzers.put("chi", a);
 //            analyzers.put("zh", a);
@@ -537,21 +633,33 @@ public class FullTextIndex {
         }
 
         {
-            Analyzer a = new CzechAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new CzechAnalyzer();
+                }
+            };
             analyzers.put("ces",a);
             analyzers.put("cze",a);
             analyzers.put("cs",a);
         }
 
         {
-            Analyzer a = new DutchAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new DutchAnalyzer();
+                }
+            };
             analyzers.put("dut",a);
             analyzers.put("nld",a);
             analyzers.put("nl",a);
         }
         
         {  
-            Analyzer a = new FrenchAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new FrenchAnalyzer();
+                }
+            };
             analyzers.put("fra",a); 
             analyzers.put("fre",a); 
             analyzers.put("fr",a);
@@ -562,7 +670,11 @@ public class FullTextIndex {
          * might be useful here.
          */
         {  
-            Analyzer a = new GermanAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new GermanAnalyzer();
+                }
+            };
             analyzers.put("deu",a); 
             analyzers.put("ger",a); 
             analyzers.put("de",a);
@@ -570,7 +682,11 @@ public class FullTextIndex {
         
         // Note: ancient greek has a different code (grc).
         {  
-            Analyzer a = new GreekAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new GreekAnalyzer();
+                }
+            };
             analyzers.put("gre",a); 
             analyzers.put("ell",a); 
             analyzers.put("el",a);
@@ -578,20 +694,32 @@ public class FullTextIndex {
 
         // @todo what about other Cyrillic scripts?
         {  
-            Analyzer a = new RussianAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new RussianAnalyzer();
+                }
+            };
             analyzers.put("rus",a); 
             analyzers.put("ru",a); 
         }        
         
         {
-            Analyzer a = new ThaiAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new ThaiAnalyzer();
+                }
+            };
             analyzers.put("tha",a); 
             analyzers.put("th",a); 
         }
 
         // English
         {
-            Analyzer a = new StandardAnalyzer();
+            AnalyzerConstructor a = new AnalyzerConstructor() {
+                public Analyzer newInstance() {
+                    return new StandardAnalyzer();
+                }
+            };
             analyzers.put("eng", a);
             analyzers.put("en", a);
             /*
@@ -623,24 +751,26 @@ public class FullTextIndex {
 
         protected synchronized IKeyBuilder initialValue() {
 
-            Properties properties = new Properties();
-            
             /*
-             * Use primary strength only to increase retrieval with little
-             * impact on precision.
+             * Override the collator strength property to use the configured
+             * value or the default for the text indexer rather than the
+             * standard default. This is done because you typically want to
+             * recognize only Primary differences for text search while you
+             * often want to recognize more differences when generating keys for
+             * a B+Tree.
              */
             
-            properties.setProperty(KeyBuilder.Options.STRENGTH,
-                    KeyBuilder.StrengthEnum.Primary.toString());
+            Properties properties = getProperties();
+                        
+            properties.setProperty(KeyBuilder.Options.STRENGTH, properties
+                    .getProperty(Options.INDEXER_COLLATOR_STRENGTH,
+                            Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
 
             /*
              * Note: The choice of the language and country for the collator
-             * should not matter much for this purpose.
-             * 
-             * @todo consider explicit configuration of this in any case so that
-             * the configuration may be stable rather than relying on the default
-             * locale?  Of course, you can just explicitly specify the locale
-             * on the command line!
+             * should not matter much for this purpose since the total ordering
+             * is not used except to scan all entries for a given term, so the
+             * relative ordering between terms does not matter.
              */
         
             return KeyBuilder.newUnicodeInstance(properties);
@@ -653,15 +783,7 @@ public class FullTextIndex {
      * Return a {@link ThreadLocal} {@link IKeyBuilder} instance configured to
      * support full text indexing and search.
      * 
-     * @todo improve documentation on configuration of the {@link IKeyBuilder}
-     *       for full text search and how it can differ from the one used by
-     *       other operations. the configuration should probably come from a
-     *       configuration properties stored for the full text indexer in the
-     *       {@link IBigdataFederation#getGlobalRowStore()}. The main issue is
-     *       how you want to encode unicode strings for search, which can be
-     *       different than encoding for other purposes.
-     * 
-     * @todo thread-safety for the returned object (as well as its allocation).
+     * @see Options#INDEXER_COLLATOR_STRENGTH
      */
     protected final IKeyBuilder getKeyBuilder() {
 
@@ -694,17 +816,6 @@ public class FullTextIndex {
      *            A reader on the text to be indexed.
      * 
      * @see TokenBuffer#flush()
-     * 
-     * @todo The key for the terms index is {term,docId,fieldId}. Since the data
-     *       are not pre-aggregated by {docId,fieldId} we can not easily remove
-     *       only those tuples corresponding to some document (or some field of
-     *       some document).
-     *       <p>
-     *       In order to removal of the fields for a document we need to know
-     *       either which fields were indexed for the document and the tokens
-     *       found in those fields and then scatter the removal request
-     *       (additional space requirements) or we need to flood a delete
-     *       procedure across the terms index (expensive).
      */
     public void index(TokenBuffer buffer, long docId, int fieldId,
             String languageCode, Reader r) {
@@ -765,7 +876,7 @@ public class FullTextIndex {
          */
         final Analyzer a = getAnalyzer(languageCode);
         
-        TokenStream tokenStream = a.tokenStream(null/* @todo field */, r);
+        TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
         
         // force to lower case.
         tokenStream = new LowerCaseFilter(tokenStream);
@@ -1005,9 +1116,6 @@ public class FullTextIndex {
             
         }
         
-        // @todo parameter (ms).
-        final long timeout = 1000;
-        
         final ConcurrentHashMap<Long/*docId*/,Hit> hits;
         {
        
@@ -1027,7 +1135,7 @@ public class FullTextIndex {
             
         }
 
-        final ExecutorService threadPool = fed.getThreadPool();
+        final ExecutorService threadPool = getThreadPool();
 
         // run on the client's thread pool.
         final List<Future<Object>> futures = threadPool.invokeAll(tasks, timeout, TimeUnit.MILLISECONDS);

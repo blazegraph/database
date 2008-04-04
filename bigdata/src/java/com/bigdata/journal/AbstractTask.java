@@ -1080,30 +1080,6 @@ public abstract class AbstractTask implements Callable<Object>, ITask {
             }
             
         }
-
-        public IIndex registerIndex(String name) {
-            
-            return getJournal().registerIndex(name);
-            
-        }
-
-        public IIndex registerIndex(String name, IndexMetadata indexMetadata) {
-
-            return getJournal().registerIndex(name, indexMetadata);
-
-        }
-
-        public IIndex registerIndex(String name, BTree btree) {
-
-            return getJournal().registerIndex(name, btree);
-
-        }
-
-        public void dropIndex(String name) {
-
-            getJournal().dropIndex(name);
-
-        }
         
         /**
          * Checkpoint each index accessed by the UNISOLATED task (this is necessary

@@ -101,7 +101,7 @@ import com.bigdata.resources.ResourceManager;
  *       pre-conditions itself and exceptions being thrown from here if the
  *       server failed to test the pre-conditions and they were not met
  */
-public class Tx extends AbstractTx implements IIndexStore, ITx {
+public class Tx extends AbstractTx implements ITx {
 
 //    /**
 //     * The historical {@link ICommitRecord} choosen as the ground state for this

@@ -40,9 +40,12 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -300,11 +303,26 @@ public class ConcurrentDataLoader {
             
         }
         
-        loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                nthreads, DaemonThreadFactory.defaultThreadFactory());
-
-        //            // limit the maximum #of concurrent loaders.
-        //            loadService.setMaximumPoolSize(maxPoolSize);
+        /*
+         * Setup the load service. We will run the tasks that read the data and
+         * load it into the database on this service.
+         * 
+         * Note: we limit the #of tasks waiting in the queue so that we don't
+         * let the file scan get too far ahead of the executing tasks. This
+         * reduces the latency for startup and the memory overhead significantly
+         * when reading a large collection of files.  There is a minimum queue
+         * size so that we can be efficient for the file system reads.
+         */
+        
+//        loadService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
+//                nthreads, DaemonThreadFactory.defaultThreadFactory());
+        
+        final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
+                Math.max(100, nthreads * 2));
+        
+        loadService = new ThreadPoolExecutor(nthreads, nthreads,
+                Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
+                DaemonThreadFactory.defaultThreadFactory()); 
 
         try {
 
@@ -559,7 +577,17 @@ public class ConcurrentDataLoader {
         
     }
 
-    private void process2(File file, FilenameFilter filter) {
+    /**
+     * Scan the files, creating the tasks to be run and submitting them to the
+     * {@link #loadService}.
+     * 
+     * @param file
+     * @param filter
+     * 
+     * @throws InterruptedException
+     *             if the thread is interrupted while queuing tasks.
+     */
+    private void process2(File file, FilenameFilter filter) throws InterruptedException {
 
         if (file.isDirectory()) {
 
@@ -612,9 +640,7 @@ public class ConcurrentDataLoader {
 
                     log.info("Client" + clientNum + " tasked: " + file);
 
-                    ntasked.incrementAndGet();
-
-                    futures.add(loadService.submit(new LoadTask(file)));
+                    submitTask(file);
 
                 }   
             
@@ -623,10 +649,8 @@ public class ConcurrentDataLoader {
                 /*
                  * Only one client so it loads all of the files.
                  */
-                
-                ntasked.incrementAndGet();
 
-                futures.add(loadService.submit(new LoadTask(file)));
+                submitTask(file);
 
             }
                 
@@ -634,6 +658,48 @@ public class ConcurrentDataLoader {
 
     }
 
+    /**
+     * Submits a task to the {@link #loadService} to load the file into the
+     * database.
+     * 
+     * @param file
+     * 
+     * @throws InterruptedException
+     */
+    private void submitTask(File file) throws InterruptedException {
+        
+        final LoadTask task = new LoadTask(file);
+
+        while (true) {
+
+            try {
+
+                final Future f = loadService.submit(task);
+
+                futures.add( f );
+
+                ntasked.incrementAndGet();
+                
+                break;
+                
+            } catch (RejectedExecutionException ex) {
+
+                log.info("loadService queue full"//
+                        + ": queueSize="+ loadService.getQueue().size()//
+                        + ", poolSize" + loadService.getPoolSize()//
+                        + ", active="+ loadService.getActiveCount()//
+                        + ", tasked="+ ntasked //
+                        + ", completed="+ loadService.getCompletedTaskCount()//
+                        );
+                
+                Thread.sleep(100/*ms*/);
+                
+            }
+
+        }
+
+    }
+    
     /**
      * Tasks loads a single file.
      * 

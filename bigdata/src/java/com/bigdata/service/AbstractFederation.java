@@ -238,11 +238,11 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     }
     
-    public UUID registerIndex(IndexMetadata metadata) {
+    public void registerIndex(IndexMetadata metadata) {
 
         assertOpen();
 
-        return registerIndex(metadata, null);
+        registerIndex(metadata, null);
 
     }
 

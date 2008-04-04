@@ -992,6 +992,8 @@ public class ClientIndexView implements IIndex {
         
         int nfailed = 0;
         
+        Throwable cause = null;
+        
         try {
 
             final List<Future<Void>> futures = service.invokeAll(tasks);
@@ -1015,6 +1017,13 @@ public class ClientIndexView implements IIndex {
                     
                     log.error("Execution failed: task=" + task, e);
                     
+                    if (cause == null) {
+
+                        // Note the first cause.
+                        cause = e.getCause();
+                        
+                    }
+                    
                     nfailed++;
                     
                 }
@@ -1029,8 +1038,10 @@ public class ClientIndexView implements IIndex {
         
         if (nfailed > 0) {
             
+            // Note: will report only the first cause.
+            
             throw new RuntimeException("Execution failed: ntasks="
-                    + tasks.size() + ", nfailed=" + nfailed);
+                    + tasks.size() + ", nfailed=" + nfailed, cause);
             
         }
 

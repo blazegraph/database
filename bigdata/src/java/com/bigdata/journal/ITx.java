@@ -38,7 +38,7 @@ import com.bigdata.isolation.IsolatedFusedView;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITx extends IIndexStore {
+public interface ITx {
 
     /**
      * The constant that SHOULD used as the timestamp for an <em>unisolated</em>

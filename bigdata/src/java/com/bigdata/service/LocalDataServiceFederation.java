@@ -169,13 +169,13 @@ public class LocalDataServiceFederation extends AbstractFederation {
     /**
      * Registers an index that does not support scale-out.
      */
-    public UUID registerIndex(IndexMetadata metadata) {
+    public void registerIndex(IndexMetadata metadata) {
         
         assertOpen();
         
         try {
 
-            return registerIndex(metadata,getDataServiceUUID());
+            registerIndex(metadata,getDataServiceUUID());
             
         } catch (Exception e) {
             
@@ -215,7 +215,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
 
         log.warn("key-range partitioned indices not supported: "+metadata.getName());
         
-        return registerIndex(metadata);
+        registerIndex(metadata);
+        
+        return metadata.getIndexUUID();
         
     }
 

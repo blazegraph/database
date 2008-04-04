@@ -152,7 +152,7 @@ abstract public class ResourceManager extends OverflowManager implements IResour
 
                 tmp.addCounter("DataDir", new Instrument<String>() {
                     public void sample() {
-                        setValue(dataDir.getAbsolutePath());
+                        setValue(dataDir==null?"N/A":dataDir.getAbsolutePath());
                     }
                 });
 
