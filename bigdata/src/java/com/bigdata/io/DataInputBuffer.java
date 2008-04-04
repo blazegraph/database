@@ -192,16 +192,18 @@ public class DataInputBuffer extends InputStream implements DataInput {
     
     public boolean readBoolean() throws IOException {
 
-        if(off>=len) throw new EOFException();
-        
-        return buf[off++] == 1 ? true : false;
-        
+        if (off >= len)
+            throw new EOFException();
+
+        return buf[off++] == 0 ? false : true;
+
     }
 
     @Override
     public int read() throws IOException {
 
-        if (off >= len) return -1; // EOF
+        if (off >= len)
+            return -1; // EOF
         
         return buf[off++];
         
@@ -265,10 +267,10 @@ public class DataInputBuffer extends InputStream implements DataInput {
         int v = 0;
         
         // big-endian.
-        v += (0xffL & buf[off++]) << 24;
-        v += (0xffL & buf[off++]) << 16;
-        v += (0xffL & buf[off++]) <<  8;
-        v += (0xffL & buf[off++]) <<  0;
+        v += (0xff & buf[off++]) << 24;
+        v += (0xff & buf[off++]) << 16;
+        v += (0xff & buf[off++]) <<  8;
+        v += (0xff & buf[off++]) <<  0;
         
         return v;
 
@@ -333,11 +335,13 @@ public class DataInputBuffer extends InputStream implements DataInput {
         if (off + 2 > len)
             throw new EOFException();
 
-        int ch1 = buf[off++];
+        int a = buf[off++];
 
-        int ch2 = buf[off++];
+        int b = buf[off++];
         
-        return ((ch1 << 8) + (ch2 << 0));
+        return (((a & 0xff) << 8) | (b & 0xff));
+
+//        return ((ch1 << 8) + (ch2 << 0));
         
     }
 

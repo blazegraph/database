@@ -291,11 +291,23 @@ abstract public class MetadataService extends DataService implements
                 
             }
             
-            if (!metadata.getDeleteMarkers()) {
-
-                throw new IllegalArgumentException(ERR_DELETE_MARKERS);
-
+            /*
+             * Note: This automatically turns on delete markers since they are
+             * required for a scale-out index.
+             */
+            if(!metadata.getDeleteMarkers()) {
+                
+                metadata.setDeleteMarkers(true);
+                
+                log.info("Enabling delete markers: "+metadata.getName());
+                
             }
+            
+//            if (!metadata.getDeleteMarkers()) {
+//
+//                throw new IllegalArgumentException(ERR_DELETE_MARKERS);
+//
+//            }
 
             final String scaleOutIndexName = metadata.getName();
             

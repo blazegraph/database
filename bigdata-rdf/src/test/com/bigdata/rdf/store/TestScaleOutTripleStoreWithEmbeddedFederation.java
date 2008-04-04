@@ -174,40 +174,6 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         
     }
     
-    /**
-     * Recursively removes any files and subdirectories and then removes the
-     * file (or directory) itself.
-     * 
-     * @param f A file or directory.
-     */
-    private void recursiveDelete(File f) {
-        
-        if(f.isDirectory()) {
-            
-            File[] children = f.listFiles();
-            
-            for(int i=0; i<children.length; i++) {
-                
-                recursiveDelete( children[i] );
-                
-            }
-            
-        }
-        
-        if (f.exists()) {
-
-            log.warn("Removing: " + f);
-
-            if (!f.delete()) {
-
-                throw new RuntimeException("Could not remove: " + f);
-
-            }
-
-        }
-
-    }
-    
     protected AbstractTripleStore getStore() {
         
         // connect to the database.

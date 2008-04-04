@@ -68,7 +68,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
 
     private BTree ndx_just;
     
-    final private TemporaryStore store;
+    private TemporaryStore store;
     
     public TemporaryStore getBackingStore() {
         
@@ -140,13 +140,7 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
     
     final public void clear() {
         
-        /*
-         * FIXME probable problem with removeAll failing to clear the hard
-         * reference cache in BTree.  if fixed, then also make the indices
-         * final.
-         */
-        
-        if(false) {
+//        if(true) {
 
             if(lexicon) {
 
@@ -177,40 +171,40 @@ public class TempTripleStore extends AbstractLocalTripleStore implements ITriple
                 
             }
             
-        } else {        
-
-            if(lexicon) {
-            
-                store.dropIndex(name_idTerm); ndx_termId = null;
-                store.dropIndex(name_termId); ndx_idTerm = null;
-                
-                if(textIndex) {
-                    
-//                    store.dropIndex(name_freeText); ndx_freeText = null;
-                    
-                }
-                
-            }
-            
-            store.dropIndex(name_spo); ndx_spo = null;
-            
-            if(!oneAccessPath) {
-            
-                store.dropIndex(name_pos); ndx_pos = null;
-             
-                store.dropIndex(name_osp); ndx_osp = null;
-                
-            }
-            
-            if(justify) {
-
-                store.dropIndex(name_just); ndx_just = null;
-                
-            }
-            
-            createIndices();
-            
-        }
+//        } else {        
+//
+//            if(lexicon) {
+//            
+//                store.dropIndex(name_idTerm); ndx_termId = null;
+//                store.dropIndex(name_termId); ndx_idTerm = null;
+//                
+//                if(textIndex) {
+//                    
+////                    store.dropIndex(name_freeText); ndx_freeText = null;
+//                    
+//                }
+//                
+//            }
+//            
+//            store.dropIndex(name_spo); ndx_spo = null;
+//            
+//            if(!oneAccessPath) {
+//            
+//                store.dropIndex(name_pos); ndx_pos = null;
+//             
+//                store.dropIndex(name_osp); ndx_osp = null;
+//                
+//            }
+//            
+//            if(justify) {
+//
+//                store.dropIndex(name_just); ndx_just = null;
+//                
+//            }
+//            
+//            createIndices();
+//            
+//        }
         
     }
     

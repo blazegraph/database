@@ -30,6 +30,9 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
+import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 
 /**
  * Also reports whether the statement is explicit, inferred or an axiom.
@@ -67,5 +70,5 @@ public class StatementWithType extends StatementImpl {
         return type;
         
     }
-    
+ 
 }

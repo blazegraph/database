@@ -549,6 +549,13 @@ public class SparseRowStore {
         protected INameFilter filter;
         
         /**
+         * De-serialization ctor.
+         */
+        public AtomicRead() {
+            
+        }
+        
+        /**
          * Constructor for an atomic write/read operation.
          * 
          * @param schema
@@ -811,6 +818,13 @@ public class SparseRowStore {
         private static final long serialVersionUID = 7481235291210326044L;
 
         private Map<String,Object> propertySet;
+        
+        /**
+         * De-serialization ctor.
+         */
+        public AtomicWriteRead() {
+            
+        }
         
         /**
          * Constructor for an atomic write/read operation.

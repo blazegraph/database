@@ -1132,7 +1132,7 @@ public abstract class AbstractJournal implements IJournal {
         
         assertOpen();
 
-        log.warn("file="+getFile());
+        log.info("file="+getFile());
         
         _bufferStrategy.close();
 

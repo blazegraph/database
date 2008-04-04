@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -768,6 +769,40 @@ abstract public class AbstractTestCase
                 
             }            
             
+        }
+
+    }
+    
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself.
+     * 
+     * @param f A file or directory.
+     */
+    protected void recursiveDelete(File f) {
+        
+        if(f.isDirectory()) {
+            
+            File[] children = f.listFiles();
+            
+            for(int i=0; i<children.length; i++) {
+                
+                recursiveDelete( children[i] );
+                
+            }
+            
+        }
+        
+        if (f.exists()) {
+
+            log.warn("Removing: " + f);
+
+            if (!f.delete()) {
+
+                throw new RuntimeException("Could not remove: " + f);
+
+            }
+
         }
 
     }

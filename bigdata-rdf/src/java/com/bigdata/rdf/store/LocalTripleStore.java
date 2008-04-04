@@ -66,7 +66,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
     protected final Journal store;
     
-    protected final boolean isolatableIndices;
+    protected final boolean deleteMarkers;
     
     /*
      * At this time is is valid to hold onto a reference during a given load or
@@ -101,7 +101,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
             
                 IndexMetadata metadata = new IndexMetadata(name_termId,UUID.randomUUID());
                 
-                metadata.setDeleteMarkers(isolatableIndices);
+                metadata.setDeleteMarkers(deleteMarkers);
 
                 metadata.setBranchingFactor(store.getDefaultBranchingFactor());
                 
@@ -128,7 +128,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
             IndexMetadata metadata = new IndexMetadata(name_idTerm,UUID.randomUUID());
 
-            metadata.setDeleteMarkers(isolatableIndices);
+            metadata.setDeleteMarkers(deleteMarkers);
 
             metadata.setBranchingFactor(store.getDefaultBranchingFactor());
 
@@ -162,7 +162,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
                 
                 IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
                 
-                metadata.setDeleteMarkers(isolatableIndices);
+                metadata.setDeleteMarkers(deleteMarkers);
 
                 metadata.setBranchingFactor(store.getDefaultBranchingFactor());
                 
@@ -213,7 +213,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
 
             IndexMetadata metadata = new IndexMetadata(name_just,UUID.randomUUID());
 
-            metadata.setDeleteMarkers(isolatableIndices);
+            metadata.setDeleteMarkers(deleteMarkers);
 
             metadata.setBranchingFactor(store.getDefaultBranchingFactor());
 
@@ -331,21 +331,15 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
     public static interface Options extends AbstractTripleStore.Options {
         
         /**
-         * When <code>true</code>, the terms, ids, and statement indices will
-         * support isolation and maintain version metadata. Version metadata is
-         * required for both transactions and scale-out indices. Otherwise the
-         * indices will NOT support isolation by transactions.
+         * When <code>true</code>, delete markers will be enabled for the
+         * terms, ids, and statement indices.
          * 
-         * @deprecated For now, this just turns on the use of delete markers in
-         *             the indices. That is only interesting if you want to
-         *             measure the performance impact of delete markers on the
-         *             index. This does NOT provide transactional isolation.
-         *             That is not available for the {@link LocalTripleStore}
-         *             since it does not use the concurrency control API.
+         * @deprecated This is only interesting if you want to measure the
+         *             performance impact of delete markers on the index.
          */
-        public static final String ISOLATABLE_INDICES = "isolatableIndices";
+        public static final String DELETE_MARKERS = "isolatableIndices";
 
-        public static final String DEFAULT_ISOLATABLE_INDICES = "false";
+        public static final String DEFAULT_DELETE_MARKERS = "false";
         
     }
     
@@ -358,12 +352,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore implements ITripl
         
         store = new /*Master*/Journal(properties);
 
-        isolatableIndices = Boolean
+        deleteMarkers = Boolean
                 .parseBoolean(properties.getProperty(
-                        Options.ISOLATABLE_INDICES,
-                        Options.DEFAULT_ISOLATABLE_INDICES));
+                        Options.DELETE_MARKERS,
+                        Options.DEFAULT_DELETE_MARKERS));
 
-        log.info(Options.ISOLATABLE_INDICES+"="+isolatableIndices);
+        log.info(Options.DELETE_MARKERS+"="+deleteMarkers);
         
         registerIndices();
         

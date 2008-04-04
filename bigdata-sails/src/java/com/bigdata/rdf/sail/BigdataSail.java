@@ -886,7 +886,7 @@ public class BigdataSail extends SailBase implements Sail {
         
         public void addStatement(Resource s, URI p, Value o, Resource... contexts) throws SailException {
 
-            if (contexts == null || contexts.length == 0) {
+            if (contexts == null || contexts.length == 0 || contexts[0]==null ) {
                 
                 addStatement(s, p, o);
                 

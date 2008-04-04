@@ -128,7 +128,7 @@ public class IndexWriteProc extends AbstractKeyArrayIndexProcedure {
     
     protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
         
-        super.readExternal(in);
+        super.readMetadata(in);
         
         overwrite = in.readBoolean();
         
