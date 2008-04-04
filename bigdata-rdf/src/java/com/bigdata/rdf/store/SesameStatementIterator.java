@@ -70,6 +70,10 @@ public class SesameStatementIterator implements StatementIterator {
 
     /**
      * Note: Returns instances of {@link StatementWithType}.
+     * 
+     * FIXME Modify to do batch resolution of the termIds to the terms a chunk
+     * at at time. This will probably be a huge performance win for
+     * serialization as RDF/XML.
      */
     public Statement next() {
 

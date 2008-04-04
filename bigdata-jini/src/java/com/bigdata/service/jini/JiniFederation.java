@@ -275,48 +275,51 @@ public class JiniFederation extends AbstractRemoteFederation {
         }
 
     }
-    
+
     public void destroy() {
 
+        assertOpen();
+        
         // destroy data services.
-        {
+        if (dataServicesClient != null) {
 
             final UUID[] uuids = dataServicesClient.getDataServiceUUIDs(0);
 
-            for(UUID uuid : uuids) {
-                
+            for (UUID uuid : uuids) {
+
                 final IDataService ds;
-                
+
                 try {
 
                     ds = getDataService(uuid);
-                    
-                } catch(Exception ex) {
-                    
-                    log.error("Could not resolve dataService: uuid"+uuid);
-                    
+
+                } catch (Exception ex) {
+
+                    log.error("Could not resolve dataService: uuid" + uuid);
+
                     continue;
-                    
+
                 }
-                
+
                 try {
-                    
+
                     ds.destroy();
-                    
+
                 } catch (IOException e) {
-                    
-                    log.error("Could not destroy dataService: "+ds,e);
-                    
+
+                    log.error("Could not destroy dataService: " + ds, e);
+
                 }
-                
+
             }
-            
+
         }
 
         // destroy metadata services.
-        {
+        if (dataServicesClient != null) {
 
-            final IMetadataService mds = dataServicesClient.getMetadataService();
+            final IMetadataService mds = dataServicesClient
+                    .getMetadataService();
 
             if (mds != null) {
 
@@ -334,36 +337,38 @@ public class JiniFederation extends AbstractRemoteFederation {
 
         }
 
-    }
+        // destroy load balancer(s)
+        if (loadBalancerClient != null) {
 
-    // destroy load balancer(s)
-    {
+            final ILoadBalancerService loadBalancerService = loadBalancerClient
+                    .getLoadBalancerService();
 
-        ILoadBalancerService loadBalancerService = loadBalancerClient.getLoadBalancerService();
+            if (loadBalancerService != null) {
 
-        if (loadBalancerService != null) {
+                if ((loadBalancerService instanceof DestroyAdmin)) {
 
-            if ((loadBalancerService instanceof DestroyAdmin)) {
+                    try {
 
-                try {
+                        ((DestroyAdmin) loadBalancerService).destroy();
 
-                    ((DestroyAdmin) loadBalancerService).destroy();
+                    } catch (IOException e) {
 
-                } catch (IOException e) {
+                        log.error("Could not destroy loadBalancerService: "
+                                + loadBalancerService, e);
 
-                    log.error("Could not destroy loadBalancerService: "
-                            + loadBalancerService, e);
+                    }
+
+                } else {
+
+                    log
+                            .warn("Can not destroy: The load balancer does not implement DestroyAdmin");
 
                 }
-                
-            } else {
-                
-                log.warn("Can not destroy: The load balancer does not implement DestroyAdmin");
-                
+
             }
-            
+
         }
-        
+
     }
-    
+
 }

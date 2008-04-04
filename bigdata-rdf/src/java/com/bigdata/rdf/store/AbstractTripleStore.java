@@ -41,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -71,6 +72,7 @@ import com.bigdata.btree.LongAggregator;
 import com.bigdata.btree.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.BatchContains.BatchContainsConstructor;
 import com.bigdata.cache.LRUCache;
+import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.IConcurrencyManager;
@@ -86,6 +88,8 @@ import com.bigdata.rdf.model.OptimizedValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.OptimizedValueFactory.TermIdComparator;
 import com.bigdata.rdf.model.OptimizedValueFactory._Literal;
+import com.bigdata.rdf.model.OptimizedValueFactory._Resource;
+import com.bigdata.rdf.model.OptimizedValueFactory._URI;
 import com.bigdata.rdf.model.OptimizedValueFactory._Value;
 import com.bigdata.rdf.model.OptimizedValueFactory._ValueSortKeyComparator;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -730,6 +734,8 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * <P>
      * Note: Sets {@link _Value#termId} and {@link _Value#known} as
      * side-effects.
+     * 
+     * @todo add a batch variant accepting long[] termIds.
      */
     final public _Value getTerm(long id) {
 
@@ -748,7 +754,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         // Note: shortcut for keyBuilder.id2key(id)
         final byte[] key = keyBuilder.reset().append(id).getKey();
         
-        final Object data = ndx.lookup( key );
+        final byte[] data = ndx.lookup( key );
 
         if (data == null) {
 
@@ -756,7 +762,7 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
             
         }
 
-        value = _Value.deserialize((byte[]) data);
+        value = _Value.deserialize(data);
         
         synchronized(termCache) {
 
@@ -864,7 +870,9 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
      * {@link _Value#known} flag needs to be set so that we are assured that the
      * term is in both the forward and reverse indices). Also, evaluate the
      * impact on the LRU {@link #termCache} during bulk load operations. Perhaps
-     * that cache should be per thread?
+     * that cache should be per thread? (Review the {@link WeakValueCache} and
+     * see if perhaps it can be retrofitted to use {@link ConcurrentHashMap} and
+     * to support full concurrency).
      */
     public void addTerms(RdfKeyBuilder keyBuilder,final _Value[] terms, final int numTerms) {
         
@@ -1278,16 +1286,18 @@ abstract public class AbstractTripleStore implements ITripleStore, IRawTripleSto
         return OptimizedValueFactory.INSTANCE.toSesameObject(value);
         
     }
-    
+
+    // @todo modify to use a batch variant.
     public Statement asStatement(SPO spo) {
 
+        final _Resource s = (_Resource) getTerm(spo.s);
+        final _URI      p = (_URI)      getTerm(spo.p);
+        final _Value    o = (_Value)    getTerm(spo.o);
+        
         return new StatementWithType( //
-                (Resource) OptimizedValueFactory.INSTANCE
-                        .toSesameObject(getTerm(spo.s)),//
-                (URI) OptimizedValueFactory.INSTANCE
-                        .toSesameObject(getTerm(spo.p)), //
-                (Value) OptimizedValueFactory.INSTANCE
-                        .toSesameObject(getTerm(spo.o)), //
+                (Resource) OptimizedValueFactory.INSTANCE.toSesameObject(s),//
+                (URI) OptimizedValueFactory.INSTANCE.toSesameObject(p), //
+                (Value) OptimizedValueFactory.INSTANCE.toSesameObject(o), //
                 spo.type//
         );
         

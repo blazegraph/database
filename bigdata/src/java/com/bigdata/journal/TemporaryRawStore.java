@@ -179,7 +179,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IRawStore
     protected void finalize() throws Throwable {
         
         try {
-            if(open) close();
+            if(open) {
+                log.warn("Closing temp store.");
+                close();
+            }
         } catch (Throwable t) {
             t.printStackTrace(System.err);
         }

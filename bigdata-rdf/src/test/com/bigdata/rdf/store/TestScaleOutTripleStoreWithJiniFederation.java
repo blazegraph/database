@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.io.File;
+
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
@@ -167,6 +169,18 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     public void setUp() throws Exception {
         
         super.setUp();
+
+        /*
+         * Note: This is the data directory configured in the various .config
+         * and .properties files in src/resources/config/standlone.
+         */
+        File dataDir = new File("standalone");
+        
+        if(dataDir.exists() && dataDir.isDirectory()) {
+
+            recursiveDelete( dataDir );
+            
+        }
 
         System.setSecurityManager(new SecurityManager());
         

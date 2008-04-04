@@ -179,6 +179,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
         }
 
+        limit = pos;
+
     }
     
     final public void writeBoolean(final boolean v) throws IOException {
@@ -187,6 +189,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
             ensureCapacity(pos + 1);
 
         buf[pos++] = v ? (byte)1 : (byte)0;
+
+        limit = pos;
 
     }
 
@@ -197,6 +201,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
         buf[pos++] = (byte) (v & 0xff);
 
+        limit = pos;
+        
     }
 
     final public void writeDouble(final double v) throws IOException {
@@ -244,6 +250,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         buf[pos++] = (byte) (v >>> 8);
         buf[pos++] = (byte) (v >>> 0);
 
+        limit = pos;
+        
     }
 
     public void writeBytes(final String s) throws IOException {
@@ -260,6 +268,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
             
         }
 
+        limit = pos;
+        
     }
 
     public void writeChars(final String s) throws IOException {
@@ -282,6 +292,8 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 //            write((v >>> 0) & 0xFF); 
         
         }
+        
+        limit = pos;
         
     }
     

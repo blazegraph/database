@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
@@ -237,6 +238,10 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                 
             }
 
+        } else {
+
+            setIndexObjects();
+            
         }
         
     }
@@ -244,16 +249,6 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     protected IndexMetadata getIndexMetadata(String name) {
             
         IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
-        
-        if(fed.isScaleOut()) {
-            
-            /*
-             * Note: deletion markers are required for scale-out indices.
-             */
-            
-            metadata.setDeleteMarkers(true);
-
-        }
         
         return metadata;
             
@@ -438,10 +433,18 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
         }
 
+        setIndexObjects();
+        
+    }
+    
+    /**
+     * (Re-)sets the index references (ids, terms, spo, etc).
+     */
+    private void setIndexObjects() {
+        
         /*
          * Note: The term:id and id:term indices ALWAYS use unisolated operation
          * to ensure consistency without write-write conflicts.
-         * 
          */
 
         ids      = fed.getIndex(name+name_termId, ITx.UNISOLATED);
@@ -453,11 +456,29 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
          * identifier.
          */
 
-        spo      = fed.getIndex(name+name_spo, timestamp);
-        pos      = fed.getIndex(name+name_pos, timestamp);
-        osp      = fed.getIndex(name+name_osp, timestamp);
-        
-        just     = fed.getIndex(name+name_just, timestamp);
+        if(oneAccessPath) {
+            
+            spo      = fed.getIndex(name+name_spo, timestamp);
+            pos      = null;
+            osp      = null;
+            
+        } else {
+            
+            spo      = fed.getIndex(name+name_spo, timestamp);
+            pos      = fed.getIndex(name+name_pos, timestamp);
+            osp      = fed.getIndex(name+name_osp, timestamp);
+            
+        }
+
+        if(justify) {
+
+            just     = fed.getIndex(name+name_just, timestamp);
+            
+        } else {
+            
+            just = null;
+            
+        }
 
     }
     
@@ -651,7 +672,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                 view = new ScaleOutTripleStore(fed.getClient(), name,
                         ITx.READ_COMMITTED);
                 
-                readCommittedRef = new WeakReference<ITripleStore>(view);
+                readCommittedRef = new SoftReference<ITripleStore>(view);
                 
             }
             
@@ -660,9 +681,8 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         }
         
     }
-    private WeakReference<ITripleStore> readCommittedRef;
+    private SoftReference<ITripleStore> readCommittedRef;
     
-
     /**
      * A factory returning the singleton for the {@link FullTextIndex}.
      */
@@ -677,7 +697,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
                 
                 view = new FullTextIndex(fed.getClient(),name/*namespace*/);
                 
-                searchEngineRef = new WeakReference<FullTextIndex>(view);
+                searchEngineRef = new SoftReference<FullTextIndex>(view);
                 
             }
             
@@ -685,7 +705,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
         }
         
-    }    
-    private WeakReference<FullTextIndex> searchEngineRef;
+    }
+    private SoftReference<FullTextIndex> searchEngineRef;
     
 }

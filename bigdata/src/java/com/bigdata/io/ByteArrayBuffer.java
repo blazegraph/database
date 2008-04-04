@@ -478,7 +478,11 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     /**
      * The read limit (there is no write limit on the buffer since the capacity
-     * will be automatically extended on overflow).
+     * will be automatically extended on overflow). The read limit is always
+     * incremented by an append on the end of the buffer.
+     * 
+     * @todo review absolute writes on the buffer. they are the underlying write
+     *       operation in all cases, right?
      */
     protected int limit;
     
@@ -739,7 +743,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
         this.pos += len;
         
-        this.limit = pos;
+        this.limit = this.pos;
         
     }
     
@@ -790,7 +794,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     final public short getShort() {
         
-        if (pos +2 >= limit)
+        if (pos + 2 >= limit)
             throw new IndexOutOfBoundsException();
 
         final short v = getShort(pos);
@@ -1094,12 +1098,14 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
                 ensureCapacity(pos + 2);
             buf[pos++] = ( (byte)((0xff & (v >> 8))|0x80) ); // note: set the high bit.
             buf[pos++] = ( (byte)(0xff & v) );
+            limit = pos;
             return 2;
         } else {
             // the value fits in one byte.
             if (pos + 1 > buf.length)
                 ensureCapacity(pos + 1);
             buf[pos++] = ( (byte)(0xff & v) );
+            limit = pos;
             return 1;
         }
     }

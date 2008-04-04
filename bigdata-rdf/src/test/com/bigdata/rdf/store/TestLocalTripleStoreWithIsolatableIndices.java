@@ -106,7 +106,7 @@ public class TestLocalTripleStoreWithIsolatableIndices extends AbstractTestCase 
 
         properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
-        properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.ISOLATABLE_INDICES,"true");
+        properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.DELETE_MARKERS,"true");
 
         return properties;
 

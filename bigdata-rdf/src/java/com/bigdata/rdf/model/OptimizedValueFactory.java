@@ -441,7 +441,7 @@ public class OptimizedValueFactory implements ValueFactory {
          * @see {@link #deserialize(byte[])}
          */
         public byte[] serialize() {
-
+            
             DataOutputBuffer out = new DataOutputBuffer(128);
 
             return serialize(out);
