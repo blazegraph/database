@@ -41,7 +41,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
 
 /**
- * Test suite for {@link BackchainTypeResourceIterator}.
+ * Test suite for {@link BackchainOwlSameAsPropertiesIterator}.
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
