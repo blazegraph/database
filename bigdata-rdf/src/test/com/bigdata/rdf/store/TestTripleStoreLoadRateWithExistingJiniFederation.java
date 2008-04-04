@@ -48,11 +48,6 @@ import com.bigdata.service.jini.JiniFederation;
  * Note: The configuration options for the (meta)data services are set in their
  * respective <code>properties</code> files NOT by the System properties!
  * 
- * @todo support distributed client using hash(filename) MOD N to select host
- * 
- * @todo provide dropIndex so that we can guarentee a cleared federation or at
- *       least warn if the data services already have data.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

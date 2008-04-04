@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 
 /**
@@ -70,6 +71,10 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
     /**
      * Starts in {@link #setUp()}.
      */
+    protected LoadBalancerServer loadBalancerServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
     JiniFederationClient client;
     
     public void setUp() throws Exception {
@@ -93,6 +98,25 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           public void run() {
               
               dataServer1.run();
+              
+          }
+          
+      }.start();
+
+
+      /*
+       * Start up a load balancer server.
+       */
+      loadBalancerServer0 = new LoadBalancerServer(new String[] {
+              "src/resources/config/standalone/LoadBalancerServer0.config"
+//              , AbstractServer.ADVERT_LABEL+groups 
+              });
+
+      new Thread() {
+
+          public void run() {
+              
+              loadBalancerServer0.run();
               
           }
           
@@ -144,7 +168,8 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);
       AbstractServerTestCase.getServiceID(dataServer1);
-      
+      AbstractServerTestCase.getServiceID(loadBalancerServer0);
+
       IBigdataFederation fed = client.connect();
       
       // verify that the client has/can get the metadata service.
@@ -154,10 +179,6 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
 
     public void tearDown() throws Exception {
 
-        /*
-         * @todo consider fed.destroy().
-         */
-        
         if (client != null && client.isConnected()) {
 
             client.disconnect(true/* immediateShutdown */);
@@ -187,6 +208,14 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
             dataServer1.destroy();
 
             dataServer1 = null;
+            
+        }
+
+        if (loadBalancerServer0 != null) {
+            
+            loadBalancerServer0.destroy();
+
+            loadBalancerServer0 = null;
             
         }
 

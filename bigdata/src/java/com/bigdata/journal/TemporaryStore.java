@@ -28,11 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Properties;
-import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -41,7 +39,7 @@ import com.bigdata.rawstore.WormAddressManager;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
+public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 
     /**
      * The size of the live index cache for the {@link Name2Addr} instance.
@@ -106,21 +104,30 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
         
     }
 
-    /**
-     * Registers a {@link BTree} whose values are variable length byte[]s and
-     * which does NOT support isolation.
-     */
-    public BTree registerIndex(String name) {
+//    /**
+//     * @deprecated This is only used by the test suites.
+//     */
+//    public BTree registerIndex(String name) {
+//
+//        IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
+//        
+//        BTree btree = BTree.create(this, metadata);
+//
+//        return registerIndex(name, btree);
+//        
+//    }
 
-        return registerIndex( name, new IndexMetadata(UUID.randomUUID()));
+    public void registerIndex(IndexMetadata metadata) {
+        
+        registerIndex(metadata.getName(), metadata);
         
     }
-
+    
     public BTree registerIndex(String name, IndexMetadata metadata) {
     
         BTree btree = BTree.create(this, metadata);
 
-        return registerIndex(name,btree);
+        return registerIndex(name, btree);
         
     }
     
@@ -155,7 +162,7 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
      * same named method on the {@link Tx} in order to obtain an isolated
      * version of the named btree.
      */
-    public IIndex getIndex(String name) {
+    public BTree getIndex(String name) {
 
         synchronized(name2Addr) {
 
@@ -163,6 +170,22 @@ public class TemporaryStore extends TemporaryRawStore implements IIndexManager {
             
         }
 
+    }
+    
+    /**
+     * @throws UnsupportedOperationException
+     *             if <i>timestamp</i> NE {@link ITx#UNISOLATED}
+     */
+    public BTree getIndex(String name,long timestamp) {
+        
+        if(timestamp != ITx.UNISOLATED) {
+            
+            throw new UnsupportedOperationException("Only unisolated indices are supported");
+            
+        }
+
+        return getIndex(name);
+        
     }
 
 }

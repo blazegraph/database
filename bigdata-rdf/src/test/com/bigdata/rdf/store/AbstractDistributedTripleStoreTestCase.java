@@ -76,9 +76,6 @@ abstract public class AbstractDistributedTripleStoreTestCase extends AbstractDis
         // connect to the database.
         store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
         
-        // register the indices.
-        store.registerIndices();
-
     }
 
     public void tearDown() throws Exception {

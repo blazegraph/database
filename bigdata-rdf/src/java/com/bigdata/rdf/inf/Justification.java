@@ -533,7 +533,7 @@ public class Justification implements Comparable<Justification> {
             boolean testFocusStore
             ) {
 
-        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getBackingStore());        
+        VisitedSPOSet visited = new VisitedSPOSet(focusStore.getStore());        
         
         try {
 

@@ -168,11 +168,11 @@ public class TestBasicIndexStuff extends
 
         metadata.setDeleteMarkers(true);
 
-        UUID indexUUID = fed.registerIndex(metadata);
+        fed.registerIndex(metadata);
 
         IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
 
-        assertEquals("indexUUID", indexUUID, ndx.getIndexMetadata()
+        assertEquals("indexUUID", metadata.getIndexUUID(), ndx.getIndexMetadata()
                 .getIndexUUID());
 
         // the index is empty.

@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.util.UUID;
+
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 
 /**
  * Test suite for fully isolated read-only transactions.
@@ -68,8 +71,14 @@ public class TestReadOnlyTx extends ProxyTestCase {
             /*
              * register an index, write on the index, and commit the journal.
              */
-            IIndex ndx = journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
             
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
+
+            IIndex ndx = journal.getIndex(name);
+
             ndx.insert(k1, v1);
 
             journal.commit();

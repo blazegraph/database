@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 
 /**
@@ -40,73 +38,24 @@ import com.bigdata.btree.IndexMetadata;
 public interface IIndexManager extends IIndexStore {
 
     /**
-     * Register a named index (unisolated). Once registered the index will
-     * participate in atomic commits.
+     * Register a named index.
      * <p>
-     * Note: A named index must be registered outside of any transaction before
-     * it may be used inside of a transaction.
-     * 
-     * @param name
-     *            The name that can be used to recover the index.
-     * 
-     * @return The object that would be returned by {@link #getIndex(String)}.
-     * 
-     * @exception IllegalStateException
-     *                if there is an index already registered under that name.
-     */
-    public IIndex registerIndex(String name);
-    
-    /**
-     * Register a named index (unisolated). Once registered the index will
-     * participate in atomic commits.
-     * <p>
-     * Note: A named index must be registered before it may be used inside of a
-     * transaction.
-     * 
-     * @param name
-     *            The name that can be used to recover the index.
+     * Note: The <i>name</i> property MUST be set on the {@link IndexMetadata}
+     * and the index will be registered under that name.
      * 
      * @param indexMetadata
      *            The metadata describing the index.
      * 
-     * @return The object that would be returned by {@link #getIndex(String)}.
-     * 
      * @exception IndexExistsException
-     *                if there is an index already registered under that name.
-     *                Use {@link IIndexStore#getIndex(String)} to test whether
-     *                there is an index registered under a given name.
+     *                if there is an index already registered under the name
+     *                returned by {@link IndexMetadata#getName()}. Use
+     *                {@link IIndexStore#getIndex(String)} to test whether there
+     *                is an index registered under a given name.
      */
-    public IIndex registerIndex(String name,IndexMetadata indexMetadata);
+    public void registerIndex(IndexMetadata indexMetadata);
 
     /**
-     * Register a named index (unisolated). Once registered the index will
-     * participate in atomic commits.
-     * <p>
-     * Note: A named index must be registered before it may be used inside of a
-     * transaction.
-     * <p>
-     * Note: The return object MAY differ from the supplied {@link BTree}. For
-     * example, when using partitioned indices the {@link BTree} is encapsulated
-     * within an abstraction that knows how to managed index partitions.
-     * 
-     * @param name
-     *            The name that can be used to recover the index.
-     * 
-     * @param btree
-     *            The btree.
-     * 
-     * @return The object that would be returned by {@link #getIndex(String)}.
-     * 
-     * @exception IndexExistsException
-     *                if there is an index already registered under that name.
-     *                Use {@link IIndexStore#getIndex(String)} to test whether
-     *                there is an index registered under a given name.
-     */
-    public IIndex registerIndex(String name, BTree btree);
-
-    /**
-     * Drops the named index (unisolated). The index will no longer participate
-     * in atomic commits.
+     * Drops the named index.
      * <p>
      * Note: Whether or not and when index resources are reclaimed is dependent
      * on the store. For example, an immortal store will retain all historical
@@ -120,5 +69,5 @@ public interface IIndexManager extends IIndexStore {
      *                if <i>name</i> does not identify a registered index.
      */
     public void dropIndex(String name);
-    
+
 }

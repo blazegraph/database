@@ -33,6 +33,8 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.sparse.SparseRowStore;
@@ -43,7 +45,7 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IBigdataFederation {
+public interface IBigdataFederation extends IIndexManager {
 
     public static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
@@ -131,14 +133,10 @@ public interface IBigdataFederation {
      *            {@link BTree}s this scale-out index (this also specifies the
      *            name of the scale-out index).
      * 
-     * @return The UUID for the scale-out index.
-     * 
-     * @todo Since the index UUID is declared by the provided metadata object it
-     *       does not need to be returned here. However I am not sure what would
-     *       be a better return value.  We can't return an {@link IIndex} since
-     *       we do not have the timestamp to fully qualify the view.
+     * @todo compare the throws behavior of the federation with
+     *       {@link AbstractJournal#registerIndex(IndexMetadata)}
      */
-    public UUID registerIndex(IndexMetadata metadata);
+    public void registerIndex(IndexMetadata metadata);
     
     /**
      * Register a scale-out index and assign the initial index partition to the
@@ -153,6 +151,8 @@ public interface IBigdataFederation {
      *            a data service will be selected automatically.
      * 
      * @return The UUID of the registered index.
+     * 
+     * @todo change to void return
      */
     public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID);
     
@@ -174,6 +174,8 @@ public interface IBigdataFederation {
      *            array.
      * 
      * @return The UUID of the scale-out index.
+     * 
+     * @todo change to void return
      */
     public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys,
             UUID[] dataServiceUUIDs);

@@ -44,19 +44,19 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTripleStoreLoadRateLocalUnisolated extends TestLocalTripleStore {
+public class TestTripleStoreLoadRateLocal extends TestLocalTripleStore {
 
     /**
      * 
      */
-    public TestTripleStoreLoadRateLocalUnisolated() {
+    public TestTripleStoreLoadRateLocal() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestTripleStoreLoadRateLocalUnisolated(String arg0) {
+    public TestTripleStoreLoadRateLocal(String arg0) {
         super(arg0);
     }
 

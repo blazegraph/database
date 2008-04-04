@@ -35,63 +35,72 @@ import java.util.Properties;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
-import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.AbstractLocalDataServiceFederationTestCase;
+import com.bigdata.service.LocalDataServiceFederation;
 
 /**
- * Variant of {@link TestTripleStoreLoadRateWithJiniFederation} that tests with an
- * embedded bigdata federation and therefore does not incur costs for network
- * IO.
+ * Variant of {@link TestTripleStoreLoadRateWithJiniFederation} that tests with
+ * an {@link LocalDataServiceFederation} and therefore does not incur costs for
+ * network IO and does not use scale-out indices (no data service).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestTripleStoreLoadRateWithEmbeddedFederation extends
-        AbstractEmbeddedTripleStoreTestCase {
+public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
+        AbstractLocalDataServiceFederationTestCase {
 
     /**
      * 
      */
-    public TestTripleStoreLoadRateWithEmbeddedFederation() {
+    public TestTripleStoreLoadRateWithLocalDataServiceFederation() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestTripleStoreLoadRateWithEmbeddedFederation(String arg0) {
+    public TestTripleStoreLoadRateWithLocalDataServiceFederation(String arg0) {
         super(arg0);
     }
 
-    protected Properties getProperties() {
+    /**
+     * The triple store under test.
+     */
+    ScaleOutTripleStore store;
+
+    public void setUp() throws Exception {
+
+        super.setUp();
+
+        // connect to the database.
+        store = new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
+
+    }
+
+    public Properties getProperties() {
         
         Properties properties = new Properties(super.getProperties());
         
         // Use the disk-backed store.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
         
-        // Disable index partition moves (between data services).
-        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
-        
-        // setup overflow conditions.
-      properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
-        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
-//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*20);
-//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*20);
-//        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
-        
         // name data directory for the unit test.
-        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
+        properties.setProperty(com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR, getName());
         
+        // minimize overflow if we will be writing a large store.
+        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
+        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
+
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
 
         // turn off text indexing.
-//        properties.setProperty(Options.TEXT_INDEX,"false");
-
+        properties.setProperty(Options.TEXT_INDEX,"false");
+        
         return properties;
         
     }
@@ -109,7 +118,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 
     public void test_U1() {
         
-        new ConcurrentDataLoader(store, 3/*nthreads*/, 10000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
+        new ConcurrentDataLoader(store, 10/*nthreads*/, 10000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U1"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;
@@ -127,19 +136,6 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
     public void test_U10() {
         
         new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U10"), new FilenameFilter(){
-
-            public boolean accept(File dir, String name) {
-                if(name.endsWith(".owl")) return true;
-                return false;
-            }
-            
-        });
-        
-    }
-
-    public void test_U20() {
-        
-        new ConcurrentDataLoader(store, 20/*nthreads*/, 100000 /*bufferCapacity*/, new File("../rdf-data/lehigh/U20"), new FilenameFilter(){
 
             public boolean accept(File dir, String name) {
                 if(name.endsWith(".owl")) return true;

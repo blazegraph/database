@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -381,10 +382,13 @@ public interface Options {
     String TMP_DIR = "tmp.dir";
 
     /**
-     * <code>branchingFactor</code> - The branching factor for indices
-     * created with {@link IIndexManager#registerIndex(String)}.
+     * <code>branchingFactor</code> - The branching factor for indices created
+     * with {@link IIndexManager#registerIndex(String)}.
      * 
      * @see #DEFAULT_BRANCHING_FACTOR
+     * 
+     * @deprecated by the use of {@link IndexMetadata} which places control in
+     *             the hands of the client.
      */
     String BRANCHING_FACTOR = "branchingFactor";
     
@@ -476,6 +480,8 @@ public interface Options {
 
     /**
      * The default for the {@link #BRANCHING_FACTOR} option.
+     * 
+     * @deprecated See {@link #BRANCHING_FACTOR}
      */
     String DEFAULT_BRANCHING_FACTOR = ""+BTree.DEFAULT_BRANCHING_FACTOR;
 

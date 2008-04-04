@@ -309,7 +309,7 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
      *       triple store (or for the local triple store). That option only
      *       makes sense for the {@link TempTripleStore}.
      */
-    synchronized public void registerIndices() {
+    private void registerIndices() {
 
         log.info("");
         

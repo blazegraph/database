@@ -28,11 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.Date;
+import java.util.UUID;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
 import com.bigdata.isolation.IsolatedFusedView;
 
@@ -109,8 +111,16 @@ public class TestTx extends ProxyTestCase {
         String name = "abc";
         
         // register index in unisolated scope, but do not commit yet.
-        journal.registerIndex(name);
-        
+        {
+         
+            IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
+            
+        }
+                
         // start tx1.
         final long tx1 = journal.newTx(IsolationEnum.ReadWrite);
 
@@ -151,7 +161,11 @@ public class TestTx extends ProxyTestCase {
 
         {
             
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
             
             journal.commit();
             
@@ -205,8 +219,14 @@ public class TestTx extends ProxyTestCase {
              * register the index, write an entry on the unisolated index,
              * and commit the journal. 
              */
+
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
             
-            IIndex index = journal.registerIndex(name);
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
+
+            IIndex index = journal.getIndex(name);
         
             assertNull(index.insert(k1, v1));
             
@@ -309,8 +329,12 @@ public class TestTx extends ProxyTestCase {
              * register an index and commit the journal. 
              */
             
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
             
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
+                        
             assertNotSame(0L,journal.commit());
             
         }
@@ -446,7 +470,11 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
             
             journal.commit();
 
@@ -537,7 +565,11 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
             
             journal.commit();
 
@@ -644,7 +676,11 @@ public class TestTx extends ProxyTestCase {
             /*
              * register an index and commit the journal.
              */
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
             
             journal.commit();
 
@@ -730,7 +766,11 @@ public class TestTx extends ProxyTestCase {
         final long commitTime0;
         {
             
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
             
             commitTime0 = journal.commit();
             System.err.println("commitTime0: "+journal.getCommitRecord());
@@ -844,9 +884,12 @@ public class TestTx extends ProxyTestCase {
         final String name = "abc";
         
         {
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
             
-            journal.registerIndex(name);
+            md.setIsolatable(true);
             
+            journal.registerIndex(md);
+                        
             journal.commit();
             
         }

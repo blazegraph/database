@@ -26,8 +26,7 @@ package com.bigdata.journal;
 import com.bigdata.btree.IIndex;
 
 /**
- * Interface for reading and writing persistent data using one or more named
- * indices.
+ * Interface accessing named indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -35,14 +34,17 @@ import com.bigdata.btree.IIndex;
 public interface IIndexStore {
 
     /**
-     * Return a named index.
+     * Return a view of the named index as of the specified timestamp.
      * 
      * @param name
      *            The index name.
+     * @param timestamp
+     *            The transaction start time, which serves as the unique
+     *            identifier for the transaction.
      * 
-     * @return The named index or <code>null</code> if no index was registered
-     *         under that name.
+     * @return The index or <code>null</code> iff there is no index registered
+     *         with that name.
      */
-    public IIndex getIndex(String name);
+    public IIndex getIndex(String name, long timestamp);
 
 }

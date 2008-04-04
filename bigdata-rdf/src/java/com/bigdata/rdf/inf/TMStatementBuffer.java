@@ -336,7 +336,7 @@ public class TMStatementBuffer implements IStatementBuffer {
      */
     public void clear() {
 
-        if (tempStore != null && tempStore.getBackingStore().isOpen()) {
+        if (tempStore != null && tempStore.getStore().isOpen()) {
 
             try {
 
@@ -621,7 +621,7 @@ public class TMStatementBuffer implements IStatementBuffer {
         
         MDC.remove("depth");
         
-        assert ! tempStore.getBackingStore().isOpen();
+        assert ! tempStore.getStore().isOpen();
         
         /*
          * The tempStore will have been closed, but also release our hard

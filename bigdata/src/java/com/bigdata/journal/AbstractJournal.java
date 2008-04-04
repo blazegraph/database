@@ -414,6 +414,10 @@ public abstract class AbstractJournal implements IJournal {
 
     /**
      * The default branching factor for indices created using {@link #registerIndex(String)}.
+     * 
+     * @see Options#BRANCHING_FACTOR
+     * 
+     * @deprecated by the use of {@link IndexMetadata} 
      */
     private final int defaultBranchingFactor;
     
@@ -1901,6 +1905,14 @@ public abstract class AbstractJournal implements IJournal {
 
     }
 
+    public IIndex getIndex(String name, long commitTime) {
+
+        assertOpen();
+
+        return getIndex(name, getCommitRecord(commitTime));
+        
+    }
+    
     /**
      * Returns a read-only named index loaded from the given root block. This
      * method imposes a canonicalizing mapping and contracts that there will be
@@ -2036,27 +2048,62 @@ public abstract class AbstractJournal implements IJournal {
 //    }
 
     /**
-     * Registers an index that will support scale-out and transactional
-     * isolation.
+     * Registers a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
      * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      * 
+     * @param name
+     *            The name that can be used to recover the index.
+     * 
+     * @return The object that would be returned by {@link #getIndex(String)}.
+     * 
+     * @exception IllegalStateException
+     *                if there is an index already registered under that name.
+     *                
      * @see Options#BRANCHING_FACTOR
+     * 
+     * @deprecated This is only used by the test suites.
      */
     public BTree registerIndex(String name) {
 
-        IndexMetadata metadata = new IndexMetadata(name,UUID.randomUUID());
+        IndexMetadata metadata = new IndexMetadata(name, UUID.randomUUID());
 
         metadata.setBranchingFactor(defaultBranchingFactor);
         
-        metadata.setIsolatable(true);
+//        metadata.setIsolatable(true);
         
-        return registerIndex(name,metadata);
+        return registerIndex(name, metadata);
         
     }
     
     /**
+     * Registers a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
+     * <p>
+     * Note: You MUST {@link #commit()} before the registered index will be
+     * either restart-safe or visible to new transactions.
+     */
+    public void registerIndex(IndexMetadata metadata) {
+
+        registerIndex(metadata.getName(),metadata);
+        
+    }
+    
+    /**
+     * Registers a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
+     * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
@@ -2135,11 +2182,17 @@ public abstract class AbstractJournal implements IJournal {
 
         final BTree btree = BTree.create(this, metadata);
 
-        return registerIndex(name,btree);
+        return registerIndex(name, btree);
         
     }
     
     /**
+     * Registers a named index. Once registered the index will participate in
+     * atomic commits.
+     * <p>
+     * Note: A named index must be registered outside of any transaction before
+     * it may be used inside of a transaction.
+     * <p>
      * Note: You MUST {@link #commit()} before the registered index will be
      * either restart-safe or visible to new transactions.
      */
@@ -2181,6 +2234,12 @@ public abstract class AbstractJournal implements IJournal {
         
     }
 
+    /**
+     * Drops the named index. The index will no longer participate in atomic
+     * commits and will not be visible to new transactions. Resources are NOT
+     * reclaimed on the {@link AbstractJournal} (it is an immortal store) and
+     * historical states of the index will continue to be accessible.
+     */
     public void dropIndex(String name) {
         
         assertOpen();

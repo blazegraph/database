@@ -42,14 +42,13 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.LocalTripleStoreWithEmbeddedDataService;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.util.KeyOrder;
@@ -98,7 +97,7 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         
         try {
 
-        if(store instanceof ScaleOutTripleStore || store instanceof LocalTripleStoreWithEmbeddedDataService) {
+        if(store instanceof ScaleOutTripleStore) {
 
             /*
              * FIXME The test needs to use the batch API to verify the

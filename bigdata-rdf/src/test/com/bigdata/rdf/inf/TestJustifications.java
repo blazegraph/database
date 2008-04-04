@@ -195,7 +195,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
 
             assertTrue(Justification.isGrounded(inf, focusStore, store, head,
                     false/* testHead */, true/* testFocusStore */,
-                    new VisitedSPOSet(focusStore.getBackingStore())));
+                    new VisitedSPOSet(focusStore.getStore())));
 
             // add the statement (U A Y) to the focusStore.
             focusStore.addStatements(new SPO[] { new SPO(U, A, Y,
@@ -207,7 +207,7 @@ public class TestJustifications extends AbstractTripleStoreTestCase {
              */
             assertFalse(Justification.isGrounded(inf, focusStore, store, head,
                     false/* testHead */, true/* testFocusStore */,
-                    new VisitedSPOSet(focusStore.getBackingStore())));
+                    new VisitedSPOSet(focusStore.getStore())));
             
             /*
              * remove the justified statements.

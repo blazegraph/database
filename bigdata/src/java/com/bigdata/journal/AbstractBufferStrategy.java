@@ -270,9 +270,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     }
 
     /**
-     * Invoked if the store would overflow on {@link #write(ByteBuffer)}. The
-     * default behavior extends the capacity of the buffer by the maximum of 32M
-     * or the {@link Options#INITIAL_EXTENT}.
+     * Invoked if the store would exceed its current extent by
+     * {@link #write(ByteBuffer)}. The default behavior extends the capacity of
+     * the buffer by the maximum of 32M or the {@link Options#INITIAL_EXTENT}.
      * 
      * @return true if the capacity of the store was extended and the write
      *         operation should be retried. If the data are fully buffered, the

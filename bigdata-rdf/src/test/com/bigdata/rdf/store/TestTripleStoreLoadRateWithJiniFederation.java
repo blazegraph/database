@@ -34,7 +34,12 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.service.DataService;
+import com.bigdata.service.EmbeddedClient;
 
 /**
  * Note: The commit flag is ignored for the {@link ScaleOutTripleStore}.
@@ -67,8 +72,27 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
         
         Properties properties = new Properties(super.getProperties());
         
+        // Use the disk-backed store.
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+        
+        // Disable index partition moves (between data services).
+        properties.setProperty(EmbeddedClient.Options.MAXIMUM_MOVES_PER_TARGET,"0");
+        
+        // setup overflow conditions.
+        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*500);
+        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*500);
+//        properties.setProperty(Options.MAXIMUM_EXTENT,""+Bytes.megabyte*20);
+//        properties.setProperty(Options.INITIAL_EXTENT,""+Bytes.megabyte*20);
+        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+        
+        // name data directory for the unit test.
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
+        
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE,ClosureEnum.None.toString());
+
+        // turn off text indexing.
+        properties.setProperty(Options.TEXT_INDEX,"false");
         
         return properties;
         
@@ -137,8 +161,6 @@ public class TestTripleStoreLoadRateWithJiniFederation extends AbstractDistribut
      * as well.
      * 
      * @todo support load of the ontology as well?
-     * 
-     * @todo support distributed load (hash(filename) MOD #hosts)
      * 
      * @todo make this part of the {@link ConcurrentDataLoader} and modify so
      *       that you can run against any pre-existing database, including a
