@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.inf;
 
+import java.util.Properties;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
@@ -39,6 +40,7 @@ import com.bigdata.rdf.spo.ISPOIterator;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IAccessPath;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * Test suite for {@link BackchainOwlSameAsPropertiesIterator}.
@@ -69,11 +71,17 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
     public void test_backchain() 
     {
      
-        AbstractTripleStore store = getStore();
-
+        // store with no owl:sameAs closure
+        AbstractTripleStore noClosure = getStore();
+        
         try {
 
-            InferenceEngine inf = store.getInferenceEngine();
+            InferenceEngine inf = noClosure.getInferenceEngine();
+            
+            Rule[] rules = inf.getRuleModel();
+            for( Rule rule : rules ) {
+                System.err.println(rule.getName());
+            }
             
             final URI A = new URIImpl("http://www.bigdata.com/A");
             final URI B = new URIImpl("http://www.bigdata.com/B");
@@ -102,37 +110,37 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
 //                buffer.flush();
             }
             
-            final long a = store.getTermId(A);
-            final long b = store.getTermId(B);
-            final long c = store.getTermId(C);
-            final long d = store.getTermId(D);
-            final long e = store.getTermId(E);
-            final long v = store.getTermId(V);
-            final long w = store.getTermId(W);
-            final long x = store.getTermId(X);
-            final long y = store.getTermId(Y);
-            final long z = store.getTermId(Z);
-            final long same = store.getTermId(OWL.SAMEAS);
-            final long type = store.getTermId(RDF.TYPE);
-            final long property = store.getTermId(RDF.PROPERTY);
-            final long subpropof = store.getTermId(RDFS.SUBPROPERTYOF);
+            final long a = noClosure.getTermId(A);
+            final long b = noClosure.getTermId(B);
+            final long c = noClosure.getTermId(C);
+            final long d = noClosure.getTermId(D);
+            final long e = noClosure.getTermId(E);
+            final long v = noClosure.getTermId(V);
+            final long w = noClosure.getTermId(W);
+            final long x = noClosure.getTermId(X);
+            final long y = noClosure.getTermId(Y);
+            final long z = noClosure.getTermId(Z);
+            final long same = noClosure.getTermId(OWL.SAMEAS);
+            final long type = noClosure.getTermId(RDF.TYPE);
+            final long property = noClosure.getTermId(RDF.PROPERTY);
+            final long subpropof = noClosure.getTermId(RDFS.SUBPROPERTYOF);
             
-            store.dumpStore(true, true, false);
+            noClosure.dumpStore(true, true, false);
   
             { // test S
             
-                IAccessPath accessPath = store.getAccessPath(y,NULL,NULL);
+                IAccessPath accessPath = noClosure.getAccessPath(y,NULL,NULL);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(y,b,w,
@@ -156,18 +164,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test SP
                 
-                IAccessPath accessPath = store.getAccessPath(y,b,NULL);
+                IAccessPath accessPath = noClosure.getAccessPath(y,b,NULL);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(y,b,w,
@@ -185,18 +193,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test O
                 
-                IAccessPath accessPath = store.getAccessPath(NULL,NULL,w);
+                IAccessPath accessPath = noClosure.getAccessPath(NULL,NULL,w);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(y,b,w,
@@ -220,18 +228,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test PO
                 
-                IAccessPath accessPath = store.getAccessPath(NULL,a,w);
+                IAccessPath accessPath = noClosure.getAccessPath(NULL,a,w);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(y,a,w,
@@ -249,18 +257,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test SO
                 
-                IAccessPath accessPath = store.getAccessPath(x,NULL,z);
+                IAccessPath accessPath = noClosure.getAccessPath(x,NULL,z);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(x,a,z,
@@ -278,18 +286,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test SPO
                 
-                IAccessPath accessPath = store.getAccessPath(x,b,z);
+                IAccessPath accessPath = noClosure.getAccessPath(x,b,z);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(x,b,z,
@@ -305,18 +313,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test P
                 
-                IAccessPath accessPath = store.getAccessPath(NULL,a,NULL);
+                IAccessPath accessPath = noClosure.getAccessPath(NULL,a,NULL);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(x,a,z,
@@ -338,18 +346,18 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
             { // test ???
                 
-                IAccessPath accessPath = store.getAccessPath(NULL,NULL,NULL);
+                IAccessPath accessPath = noClosure.getAccessPath(NULL,NULL,NULL);
                 
                 ISPOIterator itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
                         accessPath.getTriplePattern()[0],
                         accessPath.getTriplePattern()[1],
                         accessPath.getTriplePattern()[2],
-                        store, //
+                        noClosure, //
                         same
                         );
 
-                assertSameSPOsAnyOrder(store,
+                assertSameSPOsAnyOrder(noClosure,
                     
                     new SPO[]{
                         new SPO(x,a,z,
@@ -395,7 +403,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
         } finally {
             
-            store.closeAndDelete();
+            noClosure.closeAndDelete();
             
         }
         
