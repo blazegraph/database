@@ -323,7 +323,7 @@ public class InferenceEngine extends RDFSHelper {
         
         /**
          * When <code>true</code> (default <code>true</code>) the reflexive
-         * and transitive entailments for <code>owl:sameAs</code> are computed
+         * entailments for <code>owl:sameAs</code> are computed
          * by forward chaining and stored in the database unless
          * {@link #RDFS_ONLY} is used to completely disable those entailments.
          * When <code>false</code> those entailments are not computed and
@@ -752,9 +752,9 @@ public class InferenceEngine extends RDFSHelper {
 
                 rules.add(ruleOwlSameAs1);
 
-                rules.add(ruleOwlSameAs1b);
-
                 if (forwardChainOwlSameAsProperties) {
+
+                    rules.add(ruleOwlSameAs1b);
 
                     rules.add(ruleOwlSameAs2);
 
@@ -1183,13 +1183,17 @@ public class InferenceEngine extends RDFSHelper {
         // owl:sameAs
         if(forwardChainOwlSameAsClosure) {
 
-            // reflexive and transitive closure over owl:sameAs.
-            Rule.fixedPoint(closureStats, new Rule[] { ruleOwlSameAs1,
-                    ruleOwlSameAs1b }, justify, focusStore, database, buffer);            
+            // reflexive closure over owl:sameAs.
+            Rule.fixedPoint(closureStats, new Rule[] { ruleOwlSameAs1/*,
+                    ruleOwlSameAs1b*/ }, justify, focusStore, database, buffer);            
             
             if(DEBUG) log.debug("owl:sameAs1,1b: "+closureStats);
 
             if (forwardChainOwlSameAsProperties) {
+                
+                // transitive closure over owl:sameAs.
+                Rule.fixedPoint(closureStats, new Rule[] { /*ruleOwlSameAs1,*/
+                        ruleOwlSameAs1b }, justify, focusStore, database, buffer);            
                 
                 /*
                  * Apply properties.
@@ -1335,171 +1339,12 @@ public class InferenceEngine extends RDFSHelper {
         
         } else if(forwardChainOwlSameAsClosure && !forwardChainOwlSameAsProperties) {
             
-            if(p == owlSameAs.id) {
-                
-                /*
-                 * Note: we do not generate entailments for owl:sameAs {2,3} when
-                 * the predicate is bound to owl:sameAs - those cases are already
-                 * covered by the reflexive and transitive closure maintained by
-                 * owl:sameAs {1,1b}.
-                 */
-    
-                ret = new Striterator(src);
-                
-            } else {
-    
-                /*
-                 * Wrap the original iterator so that we will record the distinct
-                 * subjects and objects visited.
-                 */
-/*    
-                final TemporaryRawStore tempStore = new TemporaryRawStore();
-    
-                final BTree subjects;
-                {
-
-                    IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-                    
-                    metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-          
-                    subjects = BTree.create(tempStore,metadata);
-                
-                }
-                
-                final BTree objects;
-                {
-                    
-                    IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-                    
-                    metadata.setValueSerializer(NoDataSerializer.INSTANCE);
-          
-                    objects = BTree.create(tempStore, metadata);
-                    
-                }
-    
-                ret = new Striterator(src);
-    
-                ret.addFilter(new TermIdRecordingResolver(subjects) {
-                    private static final long serialVersionUID = 1L;
-    
-                    void add(SPO spo) {
-                        log.info("addSubject: " + database.toString(spo.s)
-                                + " from " + spo.toString(database));
-                        add(spo.s);
-                    }
-                });
-
-                ret.addFilter(new TermIdRecordingResolver(objects) {
-                    private static final long serialVersionUID = 1L;
-
-                    void add(SPO spo) {
-                        log.info("addObject: " + database.toString(spo.o)
-                                + " from " + spo.toString(database));
-                        add(spo.o);
-                    }
-                });
-*/
-                /*
-                 * Append iterator yeilding owl:sameAs2 entailments for the
-                 * distinct subjects. This is wrapped so that we continue to
-                 * collect up the distinct objects visited in the entailments.
-                 */
-/*                
-                {
-
-                    // begin with the distinct subjects
-                    Striterator tmp = new Striterator(new TermIdKeyIterator(
-                            subjects));
-
-                    // expand each subject into an iterator with its owl:sameAs2
-                    // entailments.
-                    tmp.addFilter(new OwlSameAs2Expander(this, s, p, o));
-
-                    // notice the distinct objects in the visited entailments.
-                    tmp.addFilter(new TermIdRecordingResolver(objects) {
-                        private static final long serialVersionUID = 1L;
-
-                        void add(SPO spo) {
-                            log.info("addObject: " + database.toString(spo.o)
-                                    + " from " + spo.toString(database));
-                            add(spo.o);
-                        }
-                    });
-    
-                    // append the entailments across the distinct subjects.
-                    ret.append(tmp);
-    
-                }
-*/    
-                /*
-                 * Append iterator yeilding owl:sameAs3 entailments for the distinct
-                 * objects.
-                 */
-/*                
-                {
-    
-                    // begin with the distinct objects
-                    Striterator tmp = new Striterator(
-                            new TermIdKeyIterator(objects));
-    
-                    // expand each object into an iterator with its owl:sameAs3
-                    // entailments.
-                    tmp.addFilter(new OwlSameAs3Expander(this, s, p, o));
-    
-                    // append the entailments across the distinct objects.
-                    ret.append(tmp);
-    
-                }
-*/                
-                /*
-                 * Append an iterator that visits nothing but closes the temporary
-                 * store.
-                 */
-/*                
-                ret.append( new Iterator() {
-    
-                    public boolean hasNext() {
-    
-                        log.info("End of owl:sameAs entailments.");
-                        
-                        if (tempStore.isOpen()) {
-    
-                            tempStore.closeAndDelete();
-    
-                        }
-    
-                        return false;
-                        
-                    }
-    
-                    public Object next() {
-    
-                        if(!hasNext()) {
-                        
-                            throw new NoSuchElementException();
-                            
-                        }
-                        
-                        throw new AssertionError();
-                        
-                    }
-    
-                    public void remove() {
-                        
-                        throw new UnsupportedOperationException();
-                        
-                    }
-                    
-                });
-*/    
-                ret = new Striterator(new BackchainOwlSameAsPropertiesIterator(//
-                        src,//
-                        s,p,o,//
-                        database, //
-                        owlSameAs.id
-                        ));
-                
-            }
+            ret = new Striterator(new BackchainOwlSameAsPropertiesIterator(//
+                    src,//
+                    s,p,o,//
+                    database, //
+                    owlSameAs.id
+                    ));
 
         } else {
             
