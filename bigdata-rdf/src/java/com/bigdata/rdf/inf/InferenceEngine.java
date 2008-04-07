@@ -358,7 +358,7 @@ public class InferenceEngine extends RDFSHelper {
          */
         public static final String FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "forwardChainOwlSameAsProperties";
 
-        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "true";
+        public static final String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
 
         /**
          * When <code>true</code> (default <code>true</code>) the
@@ -1352,7 +1352,7 @@ public class InferenceEngine extends RDFSHelper {
                  * Wrap the original iterator so that we will record the distinct
                  * subjects and objects visited.
                  */
-    
+/*    
                 final TemporaryRawStore tempStore = new TemporaryRawStore();
     
                 final BTree subjects;
@@ -1398,12 +1398,13 @@ public class InferenceEngine extends RDFSHelper {
                         add(spo.o);
                     }
                 });
-
+*/
                 /*
                  * Append iterator yeilding owl:sameAs2 entailments for the
                  * distinct subjects. This is wrapped so that we continue to
                  * collect up the distinct objects visited in the entailments.
                  */
+/*                
                 {
 
                     // begin with the distinct subjects
@@ -1429,11 +1430,12 @@ public class InferenceEngine extends RDFSHelper {
                     ret.append(tmp);
     
                 }
-    
+*/    
                 /*
                  * Append iterator yeilding owl:sameAs3 entailments for the distinct
                  * objects.
                  */
+/*                
                 {
     
                     // begin with the distinct objects
@@ -1448,11 +1450,12 @@ public class InferenceEngine extends RDFSHelper {
                     ret.append(tmp);
     
                 }
-                
-                /**
+*/                
+                /*
                  * Append an iterator that visits nothing but closes the temporary
                  * store.
                  */
+/*                
                 ret.append( new Iterator() {
     
                     public boolean hasNext() {
@@ -1488,7 +1491,14 @@ public class InferenceEngine extends RDFSHelper {
                     }
                     
                 });
-    
+*/    
+                ret = new Striterator(new BackchainOwlSameAsPropertiesIterator(//
+                        src,//
+                        s,p,o,//
+                        database, //
+                        owlSameAs.id
+                        ));
+                
             }
 
         } else {
