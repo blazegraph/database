@@ -43,6 +43,7 @@ import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.service.MetadataService;
 
 /**
  * A read-only store backed by a file containing a single {@link IndexSegment}.
@@ -287,9 +288,14 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     protected void finalize() throws Exception {
         
-        log.warn("Closing index segment store: "+getFile());
-        
-        if(isOpen()) {
+        if(open) {
+
+            final String name = MetadataService.getIndexPartitionName(metadata
+                    .getName(), metadata.getPartitionMetadata()
+                    .getPartitionId());
+
+            log.warn("Closing index segment store: " + name + ", file="
+                    + getFile());
             
             close();
             

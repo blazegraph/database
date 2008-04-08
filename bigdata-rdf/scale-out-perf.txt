@@ -580,6 +580,15 @@ Computed closure in 125296ms yeilding 841842 statements total, 376849 inferences
       concurrent write, so it is not appropriate for a concurrent bulk
       loader.
 
+    - An extended transaction model can be used for truth maintenance.
+      The focus store is built up within isolated indices (that do not
+      actually correspond to persistent indices, they only exist on
+      the per-tx per-dataservice TemporaryStore).  The application can
+      simply combine sets of assertions or retractions within a single
+      transaction.  Either the application or an extension of the
+      transaction manager MUST serialize the commits.  Within the
+      commit processing, first do retractions then do assertions.
+
 Short term tasks:
 
    - (*) Builds and releases.
@@ -592,17 +601,26 @@ Short term tasks:
          - Start doing snapshot releases.
 
 	 - Start periodic project documentation builds, perhaps on SF.
+           Publish on the www.bigdata.com site.
+
+         - Change the dependency to dsiutils.
+
+	 - Update the Sesame 2.x dependency.
 
    - Counters
 
-     - Compute average response time and throughput as 1/average
+     - (**) HTTP interface for examining aggregated statistics at the
+       load balancer.
+
+     - (**) Compute average response time and throughput as 1/average
        response time.  And measure on the client as well so that we
        can compute the RMI overhead.
 
-     - HTTP interface for examining aggregated statistics at the load
-       balancer.
+     - (**) Add counters for #of index partition split, move (on/off),
+       and join operations (OverflowManager).  Also report #of errors
+       during asynchronous overflow processing.
 
-     - When aggregating data to the load balancer it will be
+     - (*) When aggregating data to the load balancer it will be
        relatively common for some samples to arive "late", especially
        when the reporting period falls right around the minute mark.
        These samples SHOULD be let in if we do not already have a
@@ -610,10 +628,6 @@ Short term tasks:
        dropped samples.
 
      - Add a moving average computation to History
-
-     - Add counters for #of index partition split, move (on/off), and
-       join operations (OverflowManager).  Also report #of errors
-       during asynchronous overflow processing.
 
      - Add counter to the write service that reports the #of tasks
        which have their locks and are actually doing their work
@@ -648,12 +662,19 @@ Short term tasks:
        overflowCount=0}
 
    - LocalTripleStoreWithEmbeddedDataService
-     
-     - Optimized JOIN that assumes that all indices are local within
-       the data service and reads locally on both access paths.  This
-       would probably be implemented as a DataServiceIndexProcedure
-       and it would need to declare access to the indices being used
-       for the left and right hand sides of the join.
+
+     - Benchmark with owl:sameAs backchainer.
+
+     - (*****) Optimized JOIN that assumes that all indices are local
+       within the data service and reads locally on both access paths.
+       This would probably be implemented as a AbstractTask and it
+       would need to declare access to the indices being used for the
+       left and right hand sides of the join.
+
+     - test small and large document sets with and without incremental
+       closure:
+
+       -server -Xmx500m -DtestClass=com.bigdata.rdf.store.TestLocalTripleStore -Ddocuments.directory=../rdf-data/metrics/smallDocuments -Ddocuments.ontology=../rdf-data/metrics/metricsOntology_v1.9.rdfs -Dfile=C:/smallDocuments.jnl -DdataLoader.commit=None -DdataLoader.closure=None
 
    - ScaleOutTripleStore
 
@@ -694,7 +715,7 @@ Short term tasks:
        for the IndexSegment and to make that more efficient for the
        BTree as well.
 
-   - * The consistentRead option used by the
+   - (*****) The consistentRead option used by the
      PartitionedIndexRangeIterator needs to use the most recent commit
      time for the federation.
 
@@ -716,6 +737,10 @@ Short term tasks:
      the federation as a whole and use that as the time for a
      consistentRead operation.
 
+     As an alternative, the data services could periodically publish
+     their commit times.  I need to see how much of a bottleneck it is
+     for clients calling nextTimestamp().
+
    - OverflowManager
 
       - Could optionally convert from  a fully-buffered to a disk-only
@@ -732,6 +757,14 @@ Short term tasks:
 
       - (*) Better concurrency for openIndex, openStore, getJournal,
         and getIndexOnStore
+
+      - Modify WeakValueCache to use ConcurrentHashMap and support an
+        atomic putIfAbsent operation.  This will reduce the latency
+        imposed when we need to re-open an index segment from a store.
+
+      - (***) StoreManager#getEarliestDependencyTimestamp() is not
+        implemented.  Old store files will not be released as a
+        result unless you explicitly set the release time.
 
    - LockManager
 
@@ -774,15 +807,25 @@ Short term tasks:
 
    - Done. Full text indexing for KB.
 
-       - (*) Analyzers are not thread-safe.
+       - Done. Analyzers are not thread-safe.
 
        - Try out an mg4j integration for an alternative text indexer
          and search.
 
-   - Try front compression for nodes and leaf keys using
-     it.unimi.dsi.fastutil.bytes#ByteArrayFrontCodedList
+   - (*) Try front compression for nodes and leaf keys using
+     it.unimi.dsi.fastutil.bytes#ByteArrayFrontCodedList.  Compare the
+     "FastRDFKeyCompression" with NO compression and
+     front-compression.
 
-   - *** Batch API for extractor, allowing runs directly against the KB.
+     Note: We should use front compression by default for the nodes of
+     the BTree.  Since the separator keys in the nodes are dynamically
+     determined prefixes, application specified compression generally
+     can't be used.
+
+   - *** Batch API for extractor, allowing runs directly against the
+     KB.  Form a single prefix-scan query from a sort of all simple
+     terms in the document and then piece together the phrases from
+     the result.
 
    - ** Change tx timestamps to negative and use positive timestamps for
      historical reads.  Changes to AbstractTask, ITx,
@@ -804,11 +847,9 @@ Short term tasks:
 
    - SemTech08 submission?
 
-   - ** correctness testing for scale-out with index partition split,
-        move, and join.  See AbstractMRMWTestCase and
-        StressTestConcurrent.  The latter should be modified to use
-        ground truth indices in a TemporaryStore and we could write
-        other classes for performance testing on a cluster.
+   - Done.  Correctness testing for scale-out with index partition
+     split, move, and join.  See services/StressTestConcurrent. It can
+     be parameterized for this purpose.
 
    - streaming io for block read/write.  note that asynch IO for the
      disk only strategy will not have an impact if we are doing
@@ -817,12 +858,14 @@ Short term tasks:
 
    - write performance test drivers and run on cluster.
 
-      - rdf concurrent data load.
+      - (****) rdf concurrent data load.
 
       - rdf concurrent query (rdf lubm is not designed to test with
         concurrent loads).
 
-      - bigdata file system workload
+      - bigdata file system workload (must provide reverse traversal
+        iterator to handle atomic append for the key-range partitioned
+        indices).
 
       - the memory demand jumps up during overflow handling.  maybe I
         need to throttle the thread pool more on the data service?
@@ -891,8 +934,3 @@ java.lang.AssertionError: lastModified=0
 	at com.sun.org.apache.xerces.internal.impl.XMLDocumentFragmentScannerImpl.scanDocument(XMLDocumentFragmentScannerImpl.java:368)
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:834)
 	at com.sun.org.apache.xerces.internal.parsers.XML11Configuration.parse(XML11Configuration.java:764)
-
-
-Fixed concurrency in the text indexer (problem with lucene) and
-modified so that it can be used with the LocalTripleStore as well (its
-turned on by default).

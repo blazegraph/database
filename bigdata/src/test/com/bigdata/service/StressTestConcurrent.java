@@ -188,24 +188,31 @@ public class StressTestConcurrent extends
      * @todo run a performance analysis generating a graph of response time by
      *       queue length. the queue length can be the #of parallel clients but
      *       be sure to set up the {@link ClientIndexView} so that it does not
-     *       cap the concurrency or it will skew the results.  also note that
-     *       the maximum possible parallelism will be capped by the #of index
+     *       cap the concurrency or it will skew the results. also note that the
+     *       maximum possible parallelism will be capped by the #of index
      *       partitions and (if indices are not being split) by the #of indices.
-     *       
+     * 
+     * @todo declare a variety of tests (a) overflow disabled; (b) w/ ground
+     *       truth; (c) overflow enabled; (d) with ground truth. these probably
+     *       need to be each in their own subclass in order to get the setup
+     *       correct since the properties need to be overriden. See
+     *       {@link #doComparisonTest(Properties)}.
+     * 
      * @throws Exception
      */
     public void test_stressTest1() throws Exception {
 
         int nclients = 40;
         long timeout = 20; // 20 or 40
-        int ntrials = 10000;
-        int keyLen = 4;
-        int nops = 100;
+        int ntrials = 1000; // 10000
+        int keyLen = 4; // @todo not used right now.
+        int nops = 100; // 100
+        double insertRate = .8d;
         int nindices = 1;
         boolean testCorrectness = true;
 
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
-                nops, nindices, testCorrectness );
+                nops, insertRate, nindices, testCorrectness );
 
         log.info("dataService0\n" + dataService0.getStatistics());
        
@@ -224,7 +231,8 @@ public class StressTestConcurrent extends
      *            The client.
      * 
      * @param timeout
-     *            The #of seconds before the test will terminate.
+     *            The #of seconds before the test will terminate (ignored if
+     *            <i>testCorrectness := true</i>).
      * 
      * @param nclients
      *            The #of concurrent clients.
@@ -240,6 +248,11 @@ public class StressTestConcurrent extends
      * 
      * @param nops
      *            The #of rows in each operation.
+     * 
+     * @param insertRate
+     *            The rate of insert operations (inserting <i>nops</i> tuples)
+     *            in [0.0:1.0]. The balance of the operations will remove
+     *            <i>nops</i> tuples.
      * 
      * @param nindices
      *            The #of different indices to which the operation will be
@@ -299,7 +312,7 @@ public class StressTestConcurrent extends
      */
     static public Result doConcurrentClientTest(final IBigdataClient client,
             final int nclients, final long timeout, final int ntrials,
-            final int keyLen, final int nops, final int nindices,
+            final int keyLen, final int nops, final double insertRate, final int nindices,
             boolean testCorrectness) throws InterruptedException, IOException {
         
         // The basename of the scale-out index(s) for the test.
@@ -411,7 +424,7 @@ public class StressTestConcurrent extends
 
             final int k = i % nindices;
             
-            tasks.add(new Task(index[k], keyLen, nops, groundTruth[k], lock[k]));
+            tasks.add(new Task(index[k], keyLen, nops, insertRate, groundTruth[k], lock[k]));
             
         }
 
@@ -422,8 +435,14 @@ public class StressTestConcurrent extends
         final long begin = System.currentTimeMillis();
         
         log.warn("Starting tasks on client");
-        
-        final List<Future<Void>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+
+        /*
+         * Note: We have to wait for all tasks to complete in order to test
+         * correctness since the ground truth data can otherwise differ from the
+         * data successfully committed on the database.
+         */
+        final List<Future<Void>> results = executorService.invokeAll(tasks,
+                testCorrectness ? Long.MAX_VALUE : timeout, TimeUnit.SECONDS);
         
         final long elapsed = System.currentTimeMillis() - begin;
         
@@ -524,6 +543,23 @@ public class StressTestConcurrent extends
         
         if(testCorrectness) {
             
+//            /*
+//             * Make sure that any asynchronous overflow processing has completed
+//             * normally. 
+//             */
+//            {
+//                
+//                // all known data services.
+//                final UUID[] dataServiceUUID = federation.getDataServiceUUIDs(0);
+//                
+//                for(int i=0; i<dataServiceUUID.length; i++) {
+//                    
+//                    // await async overflow processing ...
+//                    
+//                }
+//                
+//            }
+            
             /*
              * For each index, verify its state against the corresponding ground
              * truth index.
@@ -533,9 +569,9 @@ public class StressTestConcurrent extends
 
                 final String name = basename+i;
 
-                System.err.println("Validating: "+name);
-                
                 final IIndex expected = groundTruth[i];
+                
+                System.err.println("Validating: "+name+" #groundTruthEntries="+groundTruth[i].rangeCount(null, null));
                 
                 /*
                  * Note: This uses an iterator based comparison so that we can
@@ -561,7 +597,7 @@ public class StressTestConcurrent extends
                 
             }
             
-            throw new UnsupportedOperationException();
+            System.err.println("Validated "+nindices+" indices against ground truth.");
             
         }
         
@@ -577,6 +613,7 @@ public class StressTestConcurrent extends
         private final IIndex ndx;
 //        private final int keyLen;
         private final int nops;
+        private final double insertRate;
         private final IIndex groundTruth;
         private final ReentrantLock lock;
         
@@ -653,11 +690,16 @@ public class StressTestConcurrent extends
          * @todo keyLen is ignored. It could be replaced by an increment value
          *       that would govern the distribution of the keys.
          */
-        public Task(IIndex ndx, int keyLen, int nops, IIndex groundTruth, ReentrantLock lock) {
+        public Task(IIndex ndx, int keyLen, int nops, double insertRate, IIndex groundTruth, ReentrantLock lock) {
 
             this.ndx = ndx;
            
 //            this.keyLen = keyLen;
+            
+            if (insertRate < 0d || insertRate > 1d)
+                throw new IllegalArgumentException();
+            
+            this.insertRate = insertRate;
             
             this.nops = nops;
             
@@ -665,7 +707,7 @@ public class StressTestConcurrent extends
             
             this.lock = lock;
             
-            if (groundTruth != null && lock != null) {
+            if (groundTruth != null && lock == null) {
                 
                 throw new IllegalArgumentException();
                 
@@ -684,75 +726,101 @@ public class StressTestConcurrent extends
          * @return The commit time of the transaction.
          */
         public Void call() throws Exception {
-            
+
             byte[][] keys = new byte[nops][];
             byte[][] vals = new byte[nops][];
-            
-            if (r.nextInt(100) > 10) {
-                
+
+            if (r.nextDouble() <= insertRate) {
+
+                /*
+                 * Insert
+                 */
+
+//                log.info("insert: nops=" + nops);
+
                 for (int i = 0; i < nops; i++) {
 
                     keys[i] = nextKey();
-                    
+
                     vals[i] = new byte[5];
 
                     r.nextBytes(vals[i]);
 
                 }
-                
-                ndx.submit(0/*fromIndex*/,nops/*toIndex*/, keys, vals, //
-                        BatchInsertConstructor.RETURN_NO_VALUES, //
-                        null// handler
-                        );
-                
-                if(groundTruth!=null) {
-                
-                    lock.lock();
-                    
-                    try {
-                    
-                        groundTruth.submit(0/*fromIndex*/,nops/*toIndex*/, keys, vals, //
+
+                /*
+                 * Note: Lock is forcing the same serialization order on the
+                 * test and ground truth index writes.
+                 */
+                lock.lock();
+
+                try {
+
+                    ndx.submit(0/* fromIndex */, nops/* toIndex */, keys, vals, //
                             BatchInsertConstructor.RETURN_NO_VALUES, //
                             null// handler
                             );
-                    
-                    } finally {
-                        
-                        lock.unlock();
-                        
+
+                    if (groundTruth != null) {
+
+                        groundTruth.submit(0/* fromIndex */, nops/* toIndex */,
+                                keys, vals, //
+                                BatchInsertConstructor.RETURN_NO_VALUES, //
+                                null// handler
+                                );
+
                     }
-                    
+
+                } finally {
+
+                    lock.unlock();
+
                 }
-                
+
             } else {
+
+                /*
+                 * Remove.
+                 */
+
+//                log.info("remove: nops=" + nops);
 
                 for (int i = 0; i < nops; i++) {
 
                     keys[i] = nextKey();
 
                 }
-                
-                ndx.submit(0/*fromIndex*/,nops/*toIndex*/, keys, null/*vals*/,//
-                        BatchRemoveConstructor.RETURN_NO_VALUES,//
-                        null// handler
-                        );
-                
+
+                /*
+                 * Note: Lock is forcing the same serialization order on the
+                 * test and ground truth index writes.
+                 */
                 lock.lock();
-                
+
                 try {
-                
-                    groundTruth.submit(0/* fromIndex */,nops/*toIndex*/, keys, null/*vals*/,//
+
+                    ndx.submit(0/* fromIndex */, nops/* toIndex */, keys,
+                            null/* vals */,//
                             BatchRemoveConstructor.RETURN_NO_VALUES,//
                             null// handler
                             );
-                
+
+                    if (groundTruth != null) {
+
+                        groundTruth.submit(0/* fromIndex */, nops/* toIndex */,
+                                keys, null/* vals */,//
+                                BatchRemoveConstructor.RETURN_NO_VALUES,//
+                                null// handler
+                                );
+
+                    }
+
                 } finally {
-                    
+
                     lock.unlock();
-                    
+
                 }
 
-                
             }
             
             return null;
@@ -770,15 +838,6 @@ public class StressTestConcurrent extends
      * 
      * @todo compute the bytes/second rate (read/written) (its in the counters
      *       for the {@link DiskOnlyStrategy}).
-     * 
-     * FIXME Parameterize so that test with more than one named index in use. If
-     * we are only writing on a single named index then groupCommmit will only
-     * defer syncs to disk since operations on the same index must be
-     * serialized. If we are using more than one named index then those
-     * operations can be parallelized and we should see additional performance
-     * gains (for map/reduce this means that we are not going to find large
-     * performance gains in group commit since writes on the same index will not
-     * be parallelized - try using local map writes instead).
      * 
      * @todo Try to make this a correctness test since there are lots of little
      *       ways in which things can go wrong. Note that the actual execution
@@ -886,6 +945,13 @@ public class StressTestConcurrent extends
         public static final String NOPS = "nops";
         
         /**
+         * The rate of insert operations (inserting <i>nops</i> tuples) in
+         * [0.0:1.0]. The balance of the operations will remove <i>nops</i>
+         * tuples.
+         */
+        String INSERT_RATE = "insertRate";
+        
+        /**
          * The #of distinct scale-out indices that will be used during the run.
          * Each index may be split over time as the run progresses, eventually
          * yielding multiple index partitions.
@@ -931,6 +997,9 @@ public class StressTestConcurrent extends
         final int nops = Integer.parseInt(properties
                 .getProperty(TestOptions.NOPS));
 
+        final double insertRate = Integer.parseInt(properties
+                .getProperty(TestOptions.INSERT_RATE));
+
         final int nindices = Integer.parseInt(properties
                 .getProperty(TestOptions.NINDICES));
 
@@ -938,7 +1007,7 @@ public class StressTestConcurrent extends
                 .getProperty(TestOptions.TEST_CORRECTNESS));
 
         Result result = doConcurrentClientTest(client, nclients, timeout,
-                ntrials, keyLen, nops, nindices, testCorrectness);
+                ntrials, keyLen, nops, insertRate, nindices, testCorrectness);
 
         return result;
 

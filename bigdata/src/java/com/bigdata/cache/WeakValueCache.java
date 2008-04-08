@@ -35,6 +35,8 @@ import java.util.Map;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+
 /**
  * <p>
  * A memory sensitive cache using weak references for its values and object ids
@@ -278,8 +280,17 @@ final public class WeakValueCache<K,T>
         _loadFactor = loadFactor;
 
         /*
-         * @todo Consider changing to a concurrent hash map.  Would this let us
-         * remove some of the synchronization constraints?  Probably not.
+         * FIXME Changing to concurrent hash map and remove some of the
+         * synchronization constraints, e.g., by defining an atomic
+         * putIfAbsent() method. (I have not review the coupling between the
+         * outer hash map and the inner LRU, but it seems likely that the LRU
+         * can be an "approximate" least-recently-used order so all we need is a
+         * consistent way in which to update that order. Also, the
+         * ConcurrentHashMap requires an estimate of the concurrency level when
+         * using a loadFactor. There is going to be a relationship between the
+         * size of the LRU, the #of distinct objects that are likely in the map,
+         * the probability that N threads will have an overlapping "touch" set,
+         * and the maximum reasonable concurrency.)
          */
         _cache = new HashMap<K,IWeakRefCacheEntry<K,T>>( initialCapacity, loadFactor );
         
@@ -318,8 +329,9 @@ final public class WeakValueCache<K,T>
      * 
      * @param resetCounters
      *            When true the counters will be reset to zero.
+     * 
+     * @todo modify to use {@link CounterSet}.
      */
-    
     synchronized public void reportStatistics( boolean resetCounters )
     {
         

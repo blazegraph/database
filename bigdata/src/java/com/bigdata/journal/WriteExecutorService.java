@@ -1163,19 +1163,34 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         assert lock.isHeldByCurrentThread();
 
-        final AbstractJournal journal = resourceManager.getLiveJournal();
-
         /*
          * Note: if the journal was closed asynchronously then do not attempt to
          * commit the write set.
          * 
          * Note: the journal MUST be open unless shutdownNow() was used on the
-         * journal / data service.  shutdownNow() will cause the journal to be
+         * journal / data service. shutdownNow() will cause the journal to be
          * immediately closed, even while there are existing tasks running on
          * the various concurrency services, including this write service.
          * 
+         * Note: the resource manager and the journal can really be closed at
+         * any time, so you can see an exception thrown even though we check
+         * that they are open as a pre-condition here.
+         * 
          * @todo why not an abort() here?
          */
+
+        if(!resourceManager.isOpen()) {
+            
+            log.warn("ResourceManager not open?");
+
+            resetState();
+            
+            return false;            
+            
+        }
+        
+        // note: throws IllegalStateException if resource manager is not open.
+        final AbstractJournal journal = resourceManager.getLiveJournal();
 
         if(!journal.isOpen()) {
 
