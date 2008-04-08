@@ -60,6 +60,12 @@ package com.bigdata.service;
  */
 public class NIODataService implements IServiceShutdown {
 
+    public boolean isOpen() {
+        
+        return false;
+        
+    }
+    
     public void shutdown() {
         // TODO Auto-generated method stub
         

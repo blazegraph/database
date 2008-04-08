@@ -31,9 +31,10 @@ import junit.framework.TestCase;
 
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.DataServer;
-import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
+import com.bigdata.service.jini.TimestampServer;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data
@@ -75,7 +76,11 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniFederationClient client;
+    protected TimestampServer timestampServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
+    JiniClient client;
     
     public void setUp() throws Exception {
 
@@ -84,6 +89,24 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
 
 //      final String groups = ".groups = new String[]{\"" + getName() + "\"}";
       
+        /*
+         * Start up a timestamp server.
+         */
+        timestampServer0 = new TimestampServer(new String[] {
+                "src/resources/config/standalone/TimestampServer0.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                timestampServer0.run();
+                
+            }
+            
+        }.start();
+
       /*
        * Start up a data server before the metadata server so that we can make
        * sure that it is detected by the metadata server once it starts up.
@@ -159,12 +182,13 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
           
       }.start();
 
-      client = JiniFederationClient.newInstance(
+      client = JiniClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
 
       // Wait until all the services are up.
+      AbstractServerTestCase.getServiceID(timestampServer0);
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);
       AbstractServerTestCase.getServiceID(dataServer1);
@@ -216,6 +240,14 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
             loadBalancerServer0.destroy();
 
             loadBalancerServer0 = null;
+            
+        }
+
+        if (timestampServer0 != null) {
+            
+            timestampServer0.destroy();
+
+            timestampServer0 = null;
             
         }
 

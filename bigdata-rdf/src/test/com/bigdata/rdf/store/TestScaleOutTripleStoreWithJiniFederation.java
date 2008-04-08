@@ -34,10 +34,11 @@ import junit.framework.Test;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
+import com.bigdata.service.jini.TimestampServer;
 
 /**
  * Proxy test suite for {@link ScaleOutTripleStore} running against an
@@ -160,11 +161,15 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
     /**
      * Starts in {@link #setUpFederation()}.
      */
+    protected TimestampServer timestampServer0;
+    /**
+     * Starts in {@link #setUpFederation()}.
+     */
     protected LoadBalancerServer loadBalancerServer0;
     /**
      * Starts in {@link #setUpFederation()}.
      */
-    protected JiniFederationClient client;
+    protected JiniClient client;
     
     public void setUp() throws Exception {
         
@@ -205,6 +210,24 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
         log.warn("Starting data services.");
         
+        /*
+         * Start up a timestamp server.
+         */
+        timestampServer0 = new TimestampServer(new String[] {
+                "src/resources/config/standalone/TimestampServer0.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                timestampServer0.run();
+                
+            }
+            
+        }.start();
+
         /*
          * Start up a data server before the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
@@ -281,12 +304,13 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
       log.warn("Starting client.");
 
-      client = JiniFederationClient.newInstance(
+      client = JiniClient.newInstance(
               new String[] { "src/resources/config/standalone/Client.config"
 //                      , BigdataClient.CLIENT_LABEL+groups
                       });
 
       // Wait until all the services are up.
+      AbstractServerTestCase.getServiceID(timestampServer0);
       AbstractServerTestCase.getServiceID(metadataServer0);
       AbstractServerTestCase.getServiceID(dataServer0);
       AbstractServerTestCase.getServiceID(dataServer1);
@@ -348,6 +372,14 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
             loadBalancerServer0.destroy();
 
             loadBalancerServer0 = null;
+            
+        }
+
+        if (timestampServer0 != null) {
+            
+            timestampServer0.destroy();
+
+            timestampServer0 = null;
             
         }
 

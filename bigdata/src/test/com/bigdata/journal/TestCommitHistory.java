@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
@@ -89,8 +90,10 @@ public class TestCommitHistory extends ProxyTestCase {
     /**
      * Test that {@link Journal#getCommitRecord(long)} returns null if invoked
      * before anything has been committed.
+     * 
+     * @throws IOException 
      */
-    public void test_behaviorBeforeAnythingIsCommitted() {
+    public void test_behaviorBeforeAnythingIsCommitted() throws IOException {
 
         Journal journal = new Journal(getProperties());
 
@@ -204,8 +207,10 @@ public class TestCommitHistory extends ProxyTestCase {
      * Tests for finding (less than or equal to) historical commit records using
      * the commit record index. This also tests restart-safety of the index with
      * multiple records (if the store is stable).
+     * 
+     * @throws IOException 
      */
-    public void test_commitRecordIndex_find() {
+    public void test_commitRecordIndex_find() throws IOException {
         
         Journal journal = new Journal(getProperties());
 

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.isolation;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -72,8 +73,10 @@ public class TestIsolatedFusedView extends AbstractBTreeTestCase {
      * into the isolated write set with both insert() and remove() operations.
      * The test does not explore validation of the write set or mergeDown onto
      * the unisolated index (aka the commit of the transaction).
+     * 
+     * @throws IOException 
      */
-    public void test_writeSetIsolation() {
+    public void test_writeSetIsolation() throws IOException {
         
         byte[] k3 = i2k(3);
         byte[] k5 = i2k(5);

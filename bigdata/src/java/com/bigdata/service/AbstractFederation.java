@@ -285,8 +285,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
                 } catch (Exception ex) {
 
-                    log.error(ex);
-
                     throw new RuntimeException(ex);
 
                 }
@@ -316,8 +314,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
             return indexUUID;
 
         } catch (Exception ex) {
-
-            log.error(ex);
 
             throw new RuntimeException(ex);
 
@@ -422,8 +418,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             // Index exists.
             ndx = new ClientIndexView(this, name, timestamp, mdmd);
-            
-            indexCache.put(nt,ndx,false/*dirty*/);
+
+            indexCache.put(nt, ndx, false/* dirty */);
 
         }
 

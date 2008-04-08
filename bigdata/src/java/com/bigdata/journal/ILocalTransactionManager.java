@@ -28,17 +28,17 @@
 
 package com.bigdata.journal;
 
-import com.bigdata.btree.IIndex;
+import java.io.IOException;
+
+import com.bigdata.service.IServiceShutdown;
 
 /**
  * Interface for managing local transactions.
  * 
- * @todo does this need shutdown() and shutdownNow()?
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ILocalTransactionManager extends ITransactionManager {
+public interface ILocalTransactionManager extends ITransactionManager, IServiceShutdown {
 
 //    /** #of active transactions. */
 //    public int getActiveTxCount();
@@ -93,5 +93,21 @@ public interface ILocalTransactionManager extends ITransactionManager {
      *         transaction.
      */
     public ITx getTx(long startTime);
+    
+    /**
+     * Return the next timestamp from the {@link ITimestampService}. This
+     * method is "robust" and will "retry"
+     * {@link ITimestampService#nextTimestamp()} several times before giving up,
+     * quietly handling both {@link NullPointerException}s (indicating that the
+     * service has not been discovered yet) and {@link IOException}s
+     * (indicating a problem with RMI).
+     * 
+     * @return The next timestamp assigned by the {@link ITimestampService}.
+     * 
+     * @throws RuntimeException
+     *             if the service can not be resolved or the timestamp can not
+     *             be obtained.
+     */
+    public long nextTimestampRobust();
     
 }

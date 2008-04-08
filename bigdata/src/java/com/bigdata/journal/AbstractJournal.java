@@ -202,7 +202,7 @@ import com.bigdata.util.ChecksumUtility;
  *       we could throw a single exception that indicated that the journal had
  *       been asynchronously closed.
  */
-public abstract class AbstractJournal implements IJournal {
+public abstract class AbstractJournal implements IJournal, ITimestampService {
 
     /**
      * Logger.
@@ -1005,7 +1005,8 @@ public abstract class AbstractJournal implements IJournal {
      */
     public void shutdown() {
 
-        assertOpen();
+        // Note: per contract for shutdown.
+        if(!isOpen()) return;
 
         log.info("");
 
@@ -1022,9 +1023,10 @@ public abstract class AbstractJournal implements IJournal {
      * 
      * @see #shutdown()
      */
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
         
-        assertOpen();
+        // Note: per contract for shutdownNow()
+        if(!isOpen()) return;
 
         log.info("");
 
@@ -1264,15 +1266,21 @@ public abstract class AbstractJournal implements IJournal {
     /**
      * Invokes {@link #shutdownNow()}.
      */
-    public void close() {
+    synchronized public void close() {
 
+        // Note: per contract for close().
+        if(!isOpen()) throw new IllegalStateException();
+        
         log.info("");
         
         shutdownNow();
 
     }
 
-    public void closeAndDelete() {
+    synchronized public void closeAndDelete() {
+
+        // Note: per contract for close().
+        if(!isOpen()) throw new IllegalStateException();
 
         log.info("");
         
@@ -1490,15 +1498,27 @@ public abstract class AbstractJournal implements IJournal {
         log.info("done");
 
     }
-    
+
     /**
-     * Note: This method can not be implemented by the {@link AbstractJournal}
-     * since it lacks a commit timestamp factory, which is properly part of the
-     * {@link ITransactionManagerService}.
-     * 
-     * @see Journal#commit()
+     * Return the object providing the {@link ILocalTransactionManager} for this
+     * journal.
      */
-    abstract public long commit();
+    abstract public ILocalTransactionManager getLocalTransactionManager();
+    
+//    /**
+//     * Note: This method can not be implemented by the {@link AbstractJournal}
+//     * since it lacks a commit timestamp factory, which is properly part of the
+//     * {@link ITimestampService} or a derived interface.
+//     * 
+//     * @see Journal#commit()
+//     */
+    public long commit() {
+        
+        final long commitTime = getLocalTransactionManager().nextTimestampRobust();
+        
+        return commitNow( commitTime );
+        
+    }
 
     /**
      * An atomic commit is performed by directing each registered

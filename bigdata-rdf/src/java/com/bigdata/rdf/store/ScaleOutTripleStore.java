@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.store;
 
 import java.lang.ref.SoftReference;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -548,11 +547,15 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
     
     final public IIndex getTermIdIndex() {
 
+        if(terms==null) throw new IllegalStateException();
+        
         return terms;
 
     }
 
     final public IIndex getIdTermIndex() {
+
+        if(ids==null) throw new IllegalStateException();
 
         return ids;
 
@@ -560,11 +563,15 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getSPOIndex() {
 
+        if(spo==null) throw new IllegalStateException();
+
         return spo;
 
     }
 
     final public IIndex getPOSIndex() {
+
+        if(pos==null) throw new IllegalStateException();
 
         return pos;
 
@@ -572,11 +579,15 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
 
     final public IIndex getOSPIndex() {
 
+        if(osp==null) throw new IllegalStateException();
+
         return osp;
 
     }
 
     final public IIndex getJustificationIndex() {
+
+        if(just==null) throw new IllegalStateException();
 
         return just;
 

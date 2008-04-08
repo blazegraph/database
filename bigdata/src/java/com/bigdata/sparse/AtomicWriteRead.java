@@ -12,6 +12,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.sparse.ValueType.AutoIncIntegerCounter;
 import com.bigdata.sparse.ValueType.AutoIncLongCounter;
 
@@ -133,7 +134,12 @@ public class AtomicWriteRead extends AtomicRead {
             
         } else if (timestamp == SparseRowStore.AUTO_TIMESTAMP_UNIQUE) {
 
-            timestamp = ((AbstractJournal)((AbstractBTree)ndx).getStore()).nextTimestamp();
+            final AbstractJournal journal = ((AbstractJournal) ((AbstractBTree) ndx)
+                    .getStore());
+            
+            final ILocalTransactionManager transactionManager = journal.getLocalTransactionManager();
+
+            timestamp = transactionManager.nextTimestampRobust();
             
         }
         

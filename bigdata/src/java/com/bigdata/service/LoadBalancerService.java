@@ -456,7 +456,13 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
         
     }
     
-    public void shutdown() {
+    public boolean isOpen() {
+        
+        return ! updateService.isShutdown();
+        
+    }
+    
+    synchronized public void shutdown() {
 
         log.info("begin");
         
@@ -466,7 +472,7 @@ abstract public class LoadBalancerService implements ILoadBalancerService,
 
     }
 
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
         log.info("begin");
         

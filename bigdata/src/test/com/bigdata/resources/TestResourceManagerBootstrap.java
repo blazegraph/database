@@ -161,7 +161,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
-        resourceManager.start();
+        assertTrue( resourceManager.awaitRunning() );
         
         /*
          * Do tests.
@@ -295,7 +295,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
-        resourceManager.start();
+        assertTrue( resourceManager.awaitRunning() );
         
         /*
          * Do tests.
@@ -439,7 +439,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
-        resourceManager.start();
+        assertTrue( resourceManager.awaitRunning() );
 
         /*
          * Do tests.
@@ -673,7 +673,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
-        resourceManager.start();
+        assertTrue( resourceManager.awaitRunning() );
 
         /*
          * Do tests.

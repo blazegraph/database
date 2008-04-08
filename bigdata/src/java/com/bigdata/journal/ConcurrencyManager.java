@@ -34,6 +34,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.InstrumentDelta;
 import com.bigdata.counters.InstrumentInstantaneousAverage;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -364,19 +365,20 @@ public class ConcurrencyManager implements IConcurrencyManager {
         return resourceManager;
         
     }
+
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
     
     /**
-     * Shutdown the journal (running tasks will run to completion, but no new
-     * tasks will start).
-     * <p>
-     * Note: You SHOULD use this method rather than {@link #close()} for normal
-     * shutdown of the journal.
-     * 
-     * @see #shutdownNow()
+     * Shutdown the thread pools (running tasks will run to completion, but no
+     * new tasks will start).
      */
-    public void shutdown() {
+    synchronized public void shutdown() {
 
-        assertOpen();
+        if(!isOpen()) return;
 
         open = false;
         
@@ -471,7 +473,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     public void shutdownNow() {
 
-        assertOpen();
+        if(!isOpen()) return;
 
         open = false;
         
@@ -1099,6 +1101,25 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *       query, bigdata repository workloads, etc.).
      */
     private Future<Object> submitWithDynamicLatency(AbstractTask task,ExecutorService service) {
+
+        /*
+         * Note: The StoreManager (part of the ResourceManager) has some
+         * asynchronous startup processing where it scans the existing store
+         * files or creates the initial store file. This code will await the
+         * completion of startup processing before permitting a task to be
+         * submittinged. This causes clients to block until we are ready to
+         * process their tasks.
+         */
+        if(resourceManager instanceof StoreManager){
+            
+            if(!((StoreManager)resourceManager).awaitRunning()) {
+
+                throw new RejectedExecutionException(
+                        "StoreManager is not available");
+
+            }
+            
+        }
 
         if(service instanceof ThreadPoolExecutor) {
 

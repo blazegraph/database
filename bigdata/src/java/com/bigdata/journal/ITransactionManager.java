@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.counters.CounterSet;
+import java.io.IOException;
+import java.rmi.Remote;
+
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -83,10 +85,10 @@ import com.bigdata.service.IDataService;
  * @version $Id$
  * 
  * @todo Since the overall concurrency control algorithm is MVCC, the
- *       {@link ITransactionManagerService} becomes aware of the required locks
- *       during the active {@link ITx#isActive()} phase of the transaction. By
- *       the time the transaction is done executing and a COMMIT is requested by
- *       the client the {@link ITransactionManagerService} knows the set of
+ *       {@link ITransactionManager} becomes aware of the required locks during
+ *       the active {@link ITx#isActive()} phase of the transaction. By the time
+ *       the transaction is done executing and a COMMIT is requested by the
+ *       client the {@link ITransactionManagerService} knows the set of
  *       resources (named indices) on which the transaction has written. As its
  *       first step in the commit protocol the
  *       {@link ITransactionManagerService} acquires the necessary exclusive
@@ -101,6 +103,9 @@ import com.bigdata.service.IDataService;
  * for the "commit" message. (The write set of the transaction also needs to be
  * restart safe when it indicates that it has "prepared" so that a commit will
  * eventually succeed.)
+ * 
+ * FIXME extends {@link Remote} and declare {@link IOException} for all methods
+ * on this interface.
  */
 public interface ITransactionManager extends ITimestampService {
 
@@ -148,9 +153,6 @@ public interface ITransactionManager extends ITimestampService {
      * could run out of timestamps under some very high concurrency scenarios in
      * which case the caller might be delayed the start of their historical
      * read.
-     * 
-     * FIXME Drop support for {@link IsolationEnum#ReadCommitted} - that is
-     * handled with {@link ITx#READ_COMMITTED} now.
      * 
      * @todo a heartbeat could be sent to all clients (and data services) from
      *       the {@link ITransactionManager} giving the most recent commit time
@@ -208,11 +210,6 @@ public interface ITransactionManager extends ITimestampService {
 //     *            The transaction identifier.
 //     */
 //    public void releaseLocks(long tx);
-    
-    /**
-     * Return interesting statistics about the transaction manager.
-     */
-    public CounterSet getCounters();
 
     /**
      * Invoked by tasks executing a transaction to notify the transaction

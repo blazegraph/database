@@ -329,8 +329,16 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
         
     }
 
-    public void shutdown() {
+    public boolean isOpen() {
+        
+        return ! taskService.isShutdown();
+        
+    }
+    
+    synchronized public void shutdown() {
 
+        if(!isOpen()) return;
+        
         taskService.shutdown();
 
         /*
@@ -347,7 +355,9 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
 
     }
 
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
+
+        if(!isOpen()) return;
 
         taskService.shutdownNow();
 

@@ -35,6 +35,7 @@ import com.bigdata.btree.IKeyBuilder;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.sparse.SparseRowStore;
@@ -57,14 +58,25 @@ public interface IBigdataFederation extends IIndexManager {
      *             valid.
      */
     public IBigdataClient getClient();
-            
+    
+    /**
+     * Return the {@link ITimestampService} (or a proxy for that service).
+     * 
+     * @return The service -or- <code>null</code> if the service has not been discovered.
+     */
+    public ITimestampService getTimestampService();
+    
     /**
      * Return the load balancer service (or a proxy for that service).
+     * 
+     * @return The service -or- <code>null</code> if the service has not been discovered.
      */
     public ILoadBalancerService getLoadBalancerService();
     
     /**
      * Return the metadata service (or a proxy for the metadata service).
+     * 
+     * @return The service -or- <code>null</code> if the service has not been discovered.
      */
     public IMetadataService getMetadataService();
     

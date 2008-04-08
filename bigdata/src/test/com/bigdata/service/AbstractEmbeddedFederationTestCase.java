@@ -29,20 +29,14 @@ package com.bigdata.service;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Properties;
-import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.KV;
-import com.bigdata.btree.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -372,103 +366,4 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         
     }
     
-    /**
-     * Verifies the data in the two indices using a batch-oriented key range
-     * scan. Only the keys and values of non-deleted index entries are
-     * inspected.
-     * 
-     * @param expected
-     * @param actual
-     */
-    protected void assertSameEntryIterator(IIndex expected, IIndex actual) {
-        
-        ITupleIterator expectedItr = expected.rangeIterator(null,null);
-
-        ITupleIterator actualItr = actual.rangeIterator(null,null);
-        
-        long nvisited = 0L;
-        
-        while(expectedItr.hasNext()) {
-
-            assertTrue("Expecting another index entry: nvisited="+nvisited, actualItr.hasNext());
-            
-            ITuple expectedTuple = expectedItr.next();
-
-            ITuple actualTuple = actualItr.next();
-            
-            nvisited++;
-
-            if(!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple.getKey())) {
-                
-                fail("Wrong key: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getKey())
-                        + ", actual="
-                        + BytesUtil.toString(actualTuple.getKey()));
-                        
-            }
-            
-            if(!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple.getValue())) {
-                
-                fail("Wrong value: nvisited=" + nvisited + ", expecting="
-                        + BytesUtil.toString(expectedTuple.getValue())
-                        + ", actual="
-                        + BytesUtil.toString(actualTuple.getValue()));
-                        
-            }
-            
-        }
-        
-        assertFalse("Not expecting more tuples", actualItr.hasNext());
-        
-    }
-
-    /**
-     * Generate random key-value data in key order.
-     * <p>
-     * Note: The auto-split feature of the scale-out indices depends on the
-     * assumption that the data are presented in key order.
-     * <p>
-     * Note: This method MAY return entries having duplicate keys.
-     * 
-     * @param N
-     *            The #of key-value pairs to generate.
-     * 
-     * @return The random key-value data, sorted in ascending order by key.
-     * 
-     * @see ClientIndexView#submit(int, byte[][], byte[][],
-     *      com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor,
-     *      com.bigdata.btree.IResultHandler)
-     * 
-     * @todo parameter for random deletes, in which case we need to reframe the
-     *       batch operation since a batch insert won't work. Perhaps a
-     *       BatchWrite would be the thing.
-     * 
-     * @todo use null values ~5% of the time.
-     */
-    protected KV[] getRandomKeyValues(int N) {
-
-        final Random r = new Random();
-
-        final KV[] data = new KV[N];
-
-        for (int i = 0; i < N; i++) {
-
-            // @todo param governs chance of a key collision and maximum #of distinct keys.
-            final byte[] key = KeyBuilder.asSortKey(r.nextInt(100000));
-
-            // Note: #of bytes effects very little that we want to test so we keep it small.
-            final byte[] val = new byte[4];
-
-            r.nextBytes(val);
-            
-            data[i] = new KV(key,val);
-
-        }
-
-        Arrays.sort(data);
-        
-        return data;
-        
-    }
-
 }

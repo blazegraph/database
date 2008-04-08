@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import junit.framework.TestSuite;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 
 /**
  * Test suite for the state machine governing the transaction {@link RunState}
@@ -396,7 +398,11 @@ abstract public class AbstractTestTxRunState extends ProxyTestCase {
 
         {
 
-            journal.registerIndex(name);
+            IndexMetadata md = new IndexMetadata(name,UUID.randomUUID());
+            
+            md.setIsolatable(true);
+            
+            journal.registerIndex(md);
         
             journal.commit();
             
