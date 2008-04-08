@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.ICounterSet;
-import com.bigdata.journal.ConcurrencyManager.Options;
+import com.bigdata.service.IServiceShutdown;
 
 /**
  * Interface for managing concurrent access to resources (indices).
@@ -48,7 +48,7 @@ import com.bigdata.journal.ConcurrencyManager.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IConcurrencyManager {
+public interface IConcurrencyManager extends IServiceShutdown {
 
     /**
      * The object used to manage local transactions.

@@ -37,8 +37,8 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServicesClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.LoadBalancerClient;
 import com.bigdata.service.mapred.AbstractMaster;
@@ -60,7 +60,7 @@ public class Master extends AbstractMaster {
 
     final MapReduceServiceDiscoveryManager serviceDiscoveryManager;
     
-    public Master(MapReduceJob job, JiniFederationClient client,
+    public Master(MapReduceJob job, JiniClient client,
             MapReduceServiceDiscoveryManager serviceDiscoveryManager) {
 
         super(job,client);
@@ -116,7 +116,7 @@ public class Master extends AbstractMaster {
          * @todo refactor discovery and lookup per {@link DataServicesClient}
          *       and {@link LoadBalancerClient}.
          */
-        public MapReduceServiceDiscoveryManager(JiniFederationClient client) {
+        public MapReduceServiceDiscoveryManager(JiniClient client) {
 
             /*
              * Setup a helper class that will be notified as services join or

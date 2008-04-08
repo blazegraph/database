@@ -32,13 +32,12 @@ import java.rmi.RemoteException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.MDC;
-
 import net.jini.config.Configuration;
 
-import com.bigdata.service.IBigdataClient;
+import org.apache.log4j.MDC;
+
 import com.bigdata.service.jini.AbstractServer;
-import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.mapred.ReduceService;
 
@@ -85,6 +84,8 @@ public class ReduceServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
+                shutdownNow();
+
                 System.exit(1);
 
             }
@@ -105,7 +106,8 @@ public class ReduceServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo extend the {@link MDC} logging context.
+     * @todo define the {@link MDC} logging context in the base class and extend
+     *       it here.
      */
     public static class AdministrableReduceService
         extends ReduceService
@@ -159,6 +161,26 @@ public class ReduceServer extends AbstractServer {
 
         }
 
+        synchronized public void shutdown() {
+            
+            // normal service shutdown.
+            super.shutdown();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+        
+        synchronized public void shutdownNow() {
+            
+            // immediate service shutdown.
+            super.shutdownNow();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+
         public UUID getServiceUUID() {
 
             if(serviceUUID==null) {
@@ -171,10 +193,9 @@ public class ReduceServer extends AbstractServer {
             
         }
         
-        public IBigdataClient getBigdataClient() {
+        public JiniClient getBigdataClient() {
         
-            // @todo this assumes the default federation.
-            return JiniFederationClient.newInstance(new String[]{});
+            return JiniClient.newInstance(new String[]{});
 
         }
 

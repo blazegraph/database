@@ -76,10 +76,10 @@ import com.bigdata.util.ChecksumUtility;
  * will be thrown.
  * </p>
  * <p>
- * The (de-)serialization interfaces for the values {@link IValueSerializer}
+ * The (de-)serialization interfaces for the values {@link IDataSerializer}
  * hides the use of {@link ByteBuffer}s from the application. The use of
  * compression or packing techniques within the implementations of this
- * interfaces is encouraged.
+ * interface is encouraged.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -123,8 +123,7 @@ import com.bigdata.util.ChecksumUtility;
  * @see IIndex
  * @see INodeData
  * @see ILeafData
- * @see IKeySerializer
- * @see IValueSerializer
+ * @see IDataSerializer
  * @see LongPacker
  */
 public class NodeSerializer {

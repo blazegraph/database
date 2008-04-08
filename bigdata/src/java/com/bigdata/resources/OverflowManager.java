@@ -169,7 +169,7 @@ abstract public class OverflowManager extends IndexManager {
      * The service that runs the asynchronous overflow
      * {@link PostProcessOldJournalTask}.
      */
-    private ExecutorService overflowService;
+    private final ExecutorService overflowService;
 
     /**
      * Flag set based on {@link Options#OVERFLOW_ENABLED}
@@ -398,24 +398,18 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-    }
-
-    synchronized public void start() {
-        
-        super.start();
-        
         overflowService = Executors.newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
 
     }
 
-    public void shutdown() {
-    
+    synchronized public void shutdown() {
+
+        if(!isOpen()) return;
+        
         final long begin = System.currentTimeMillis();
 
         log.info("Begin");
         
-        assertOpen();
-
         // overflowService shutdown
         {
 
@@ -459,13 +453,13 @@ abstract public class OverflowManager extends IndexManager {
         
     }
 
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
+        if(!isOpen()) return;
+        
         final long begin = System.currentTimeMillis();
         
         log.info("Begin");
-        
-        assertOpen();
 
         overflowService.shutdownNow();
 
@@ -670,7 +664,7 @@ abstract public class OverflowManager extends IndexManager {
          * Note: We assign the same timestamp to the createTime of the new
          * journal and the closeTime of the old journal.
          */
-        final long createTime = nextTimestamp();
+        final long createTime = nextTimestampRobust();
         final long closeTime = createTime;
         
         /*

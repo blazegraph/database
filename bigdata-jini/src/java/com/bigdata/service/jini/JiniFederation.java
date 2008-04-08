@@ -36,11 +36,12 @@ import net.jini.core.discovery.LookupLocator;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscoveryManager;
 
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.service.AbstractRemoteFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.jini.JiniFederationClient.JiniConfig;
+import com.bigdata.service.jini.JiniClient.JiniConfig;
 import com.sun.jini.admin.DestroyAdmin;
 
 /**
@@ -54,6 +55,8 @@ public class JiniFederation extends AbstractRemoteFederation {
     protected DataServicesClient dataServicesClient;
 
     protected LoadBalancerClient loadBalancerClient;
+
+    protected TimestampServiceClient timestampServiceClient;
     
     protected DiscoveryManagement discoveryManager;
 
@@ -70,7 +73,7 @@ public class JiniFederation extends AbstractRemoteFederation {
      * @param client
      *            The client.
      */
-    public JiniFederation(JiniFederationClient client, JiniConfig jiniConfig) {
+    public JiniFederation(JiniClient client, JiniConfig jiniConfig) {
 
         super(client);
     
@@ -78,6 +81,8 @@ public class JiniFederation extends AbstractRemoteFederation {
         
         final LookupLocator[] lookupLocators = jiniConfig.lookupLocators;
 
+        timestampServiceClient = new TimestampServiceClient(discoveryManager);
+        
         loadBalancerClient = new LoadBalancerClient(discoveryManager);
 
         try {
@@ -108,24 +113,35 @@ public class JiniFederation extends AbstractRemoteFederation {
 
     }
 
-    public JiniFederationClient getClient() {
+    public JiniClient getClient() {
         
-        return (JiniFederationClient)super.getClient();
+        return (JiniClient)super.getClient();
         
     }
     
     public ILoadBalancerService getLoadBalancerService() {
 
-        assertOpen();
+        // Note: return null if service not available/discovered.
+        if(loadBalancerClient == null) return null;
 
         return loadBalancerClient.getLoadBalancerService();
         
     }
     
+    public ITimestampService getTimestampService() {
+        
+        // Note: return null if service not available/discovered.
+        if(timestampServiceClient == null) return null;
+        
+        return timestampServiceClient.getTimestampService();
+        
+    }
+    
     public IMetadataService getMetadataService() {
 
-        assertOpen();
-        
+        // Note: return null if service not available/discovered.
+        if(dataServicesClient == null) return null;
+
         return dataServicesClient.getMetadataService();
                 
     }
@@ -140,7 +156,8 @@ public class JiniFederation extends AbstractRemoteFederation {
     
     public IDataService getDataService(UUID serviceUUID) {
         
-        assertOpen();
+        // Note: return null if service not available/discovered.
+        if(dataServicesClient == null) return null;
 
         return dataServicesClient.getDataService(serviceUUID);
                 
@@ -250,6 +267,14 @@ public class JiniFederation extends AbstractRemoteFederation {
      */
     private void terminateDiscoveryProcesses() {
 
+        if (timestampServiceClient != null) {
+
+            timestampServiceClient.terminate();
+
+            timestampServiceClient = null;
+            
+        }
+        
         if (loadBalancerClient != null) {
 
             loadBalancerClient.terminate();
@@ -367,6 +392,38 @@ public class JiniFederation extends AbstractRemoteFederation {
 
             }
 
+        }
+        
+        // destroy timestamp service(s)
+        if(timestampServiceClient!=null) {
+            
+            final ITimestampService timestampService= timestampServiceClient.getTimestampService(); 
+
+            if (timestampService != null) {
+
+                if ((timestampService instanceof DestroyAdmin)) {
+
+                    try {
+
+                        ((DestroyAdmin) timestampService).destroy();
+
+                    } catch (IOException e) {
+
+                        log.error("Could not destroy timestampService: "
+                                + timestampService, e);
+
+                    }
+
+                } else {
+
+                    log
+                            .warn("Can not destroy: The timestamp service does not implement DestroyAdmin");
+
+                }
+
+
+            }
+            
         }
 
     }

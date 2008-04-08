@@ -30,6 +30,7 @@ package com.bigdata.service;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -136,7 +137,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       It might be good to be able to identify which clients are still working
  *       on a given transaction.
  */
-public class TransactionService implements ITransactionManager, IServiceShutdown {
+abstract public class TransactionService extends TimestampService implements
+        ITransactionManager, IServiceShutdown {
 
     /**
      * Logger.
@@ -165,11 +167,23 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
             .newSingleThreadExecutor(DaemonThreadFactory
                     .defaultThreadFactory());
 
+    public TransactionService(Properties properties) {
+        
+        super(properties);
+        
+    }
+    
+    public boolean isOpen() {
+        
+        return ! commitService.isShutdown();
+        
+    }
+    
     /**
      * Polite shutdown does not accept new requests and will shutdown once
      * the existing requests have been processed.
      */
-    public void shutdown() {
+    synchronized public void shutdown() {
         
         commitService.shutdown();
         
@@ -179,7 +193,7 @@ public class TransactionService implements ITransactionManager, IServiceShutdown
      * Shutdown attempts to abort in-progress requests and shutdown as soon
      * as possible.
      */
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
         commitService.shutdownNow();
         

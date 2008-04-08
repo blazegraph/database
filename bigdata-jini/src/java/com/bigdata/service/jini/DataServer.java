@@ -42,6 +42,7 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
@@ -79,6 +80,11 @@ public class DataServer extends AbstractServer {
     protected LoadBalancerClient loadBalancerClient = null;
     
     /**
+     * Handles discovery of the {@link ITimestampService}.
+     */
+    protected TimestampServiceClient timestampServiceClient = null;
+    
+    /**
      * Creates a new {@link DataServer}.
      * 
      * @param args
@@ -87,6 +93,8 @@ public class DataServer extends AbstractServer {
     public DataServer(String[] args) {
 
         super(args);
+        
+        timestampServiceClient = new TimestampServiceClient(getDiscoveryManagement());
         
         dataServicesClient = new DataServicesClient(getDiscoveryManagement());
 
@@ -123,6 +131,8 @@ public class DataServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
+                shutdownNow();
+                
                 System.exit(1);
 
             }
@@ -132,22 +142,109 @@ public class DataServer extends AbstractServer {
     }
     
     protected Remote newService(Properties properties) {
+
+//        synchronized(this) {
+//
+//            if (timestampServiceClient == null) {
+//
+//                /*
+//                 * Note: We need the timestamp service client to be available
+//                 * before we can initialize the data service.
+//                 * 
+//                 * Note: This is initialized here rather than in the ctor since
+//                 * newService() is invoked from the ctor of the base class -
+//                 * before the ctor of this class has started its initialization.
+//                 * 
+//                 * FIXME Change to run DataService#start() in a thread so that
+//                 * it can await the timestamp service with a timeout.
+//                 */
+//                
+//                timestampServiceClient = new TimestampServiceClient(getDiscoveryManagement());
+//                
+//                final int maxtries = 3;
+//                
+//                int ntries;
+//                
+//                for(ntries=0; ntries<maxtries; ntries++) {
+//                    
+//                    if (timestampServiceClient.getTimestampService() != null) {
+//
+//                        break;
+//                        
+//                    }
+//                    
+//                }
+//                
+//                if (timestampServiceClient.getTimestampService() == null) {
+//                    
+//                   throw new RuntimeException(
+//                            "Could not discover timestamp service after: "
+//                                    + ntries);
+//                    
+//                }
+//                
+//            }
+//
+//        }
         
         return new AdministrableDataService(this,properties);
         
     }
     
-    protected void terminate() {
+    synchronized protected void terminate() {
 
         if (dataServicesClient != null) {
 
-            dataServicesClient.terminate();
+            try {
+
+                dataServicesClient.terminate();
+                
+            } catch(Exception ex) {
+                
+                log.error("Could not terminate the data services client: "+ex, ex);
+                
+            } finally {
+                
+                dataServicesClient = null;
+                
+            }
 
         }
         
         if (loadBalancerClient != null) {
 
-            loadBalancerClient.terminate();
+            try {
+
+                loadBalancerClient.terminate();
+
+            } catch(Exception ex) {
+                
+                log.error("Could not terminate the load balancer client: "+ex, ex);
+                
+            } finally {
+                
+                loadBalancerClient = null;
+                
+            }
+
+        }
+        
+        if (timestampServiceClient != null) {
+
+            try {
+
+                timestampServiceClient.terminate();
+
+            } catch (Exception ex) {
+
+                log.error("Could not terminate the timestamp service client: "
+                        + ex, ex);
+
+            } finally {
+
+                timestampServiceClient = null;
+
+            }
             
         }
         
@@ -297,21 +394,79 @@ public class DataServer extends AbstractServer {
             
         }
 
+        synchronized public void shutdown() {
+            
+            // normal service shutdown.
+            super.shutdown();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+        
+        synchronized public void shutdownNow() {
+            
+            // immediate service shutdown.
+            super.shutdownNow();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+        
         public IDataService getDataService(UUID serviceUUID) {
 
+            if (server.dataServicesClient == null) {
+
+                log.warn("dataServicesClient is not initialized.");
+
+                return null;
+
+            }
+
             return server.dataServicesClient.getDataService(serviceUUID);
-            
+
         }
 
         public IMetadataService getMetadataService() {
 
+            if (server.dataServicesClient == null) {
+
+                log.warn("dataServicesClient is not initialized.");
+
+                return null;
+
+            }
+
             return server.dataServicesClient.getMetadataService();
-            
+
         }
 
         public ILoadBalancerService getLoadBalancerService() {
+
+            if (server.loadBalancerClient == null) {
+
+                log.warn("loadBalancerClient is not initialized.");
+
+                return null;
+
+            }
             
             return server.loadBalancerClient.getLoadBalancerService();
+
+        }
+
+        public ITimestampService getTimestampService() {
+
+            if (server.timestampServiceClient == null) {
+
+                log.warn("timestampServiceClient is not initialized.");
+
+                return null;
+
+            }
+
+            return server.timestampServiceClient.getTimestampService();
             
         }
         

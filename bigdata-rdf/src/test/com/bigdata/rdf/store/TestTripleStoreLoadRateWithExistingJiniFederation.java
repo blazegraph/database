@@ -34,7 +34,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -131,7 +131,7 @@ public class TestTripleStoreLoadRateWithExistingJiniFederation {
         /**
          * Starts in {@link #setUp()}.
          */
-        JiniFederationClient client = JiniFederationClient.newInstance(
+        JiniClient client = JiniClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });

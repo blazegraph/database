@@ -59,11 +59,16 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
+     * 
+     * FIXME Make the unit tests in this package into proxy unit tests and run
+     * all of the tests in this suite against both the
+     * {@link LocalDataServiceClient} and the {@link EmbeddedClient}.  Ideally
+     * the jini module can then re-run the same unit tests.
      */
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("embedded services");
+        TestSuite suite = new TestSuite("bigdata services");
 
         // tests of the metadata index.
         suite.addTestSuite( TestMetadataIndex.class );

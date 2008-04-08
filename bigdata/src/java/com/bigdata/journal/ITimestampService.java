@@ -91,16 +91,13 @@ import java.rmi.Remote;
  * @todo The transaction server should make sure that time does not go backwards
  *       when it starts up (with respect to the last time that it issued).
  * 
- * @todo Condider decoupling from the {@link ITimestampService} or folding it
+ * @todo Consider decoupling from the {@link ITimestampService} or folding it
  *       into this class since {@link ITimestampService} may get used to readily
- *       and the timestamp mechanisms of the {@link ITransactionManagerService}
- *       are quite specialized.
+ *       and the timestamp mechanisms of the {@link ITransactionManager} are
+ *       quite specialized.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME extends {@link Remote} and declare {@link IOException} for all methods
- * on this and derived interfaces.
  */
 public interface ITimestampService extends Remote {
 
@@ -112,7 +109,15 @@ public interface ITimestampService extends Remote {
      * and may be more efficient, one way to insure thread safety is to
      * synchronize on some object such that the implementaiton exhibits a FIFO
      * behavior.
+     * 
+     * @throws IOException
+     *             if there is an RMI problem.
+     * 
+     * @throws NullPointerException
+     *             if the {@link ITimestampService} has not been discovered yet.
+     * 
+     * @see TimestampServiceUtil#nextTimestamp(ITimestampService)
      */
-    public long nextTimestamp();
-    
+    public long nextTimestamp() throws IOException;
+
 }

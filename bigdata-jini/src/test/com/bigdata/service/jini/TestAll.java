@@ -38,8 +38,6 @@ import net.jini.discovery.LookupLocatorDiscovery;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.service.TestEmbeddedClient;
-
 /**
  * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
  * <strong>required</strong> system properties in order to run this test suite.

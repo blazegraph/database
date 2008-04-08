@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 24, 2007
+ * Created on Apr 6, 2008
  */
 
 package com.bigdata.service.jini;
@@ -42,49 +42,33 @@ import net.jini.io.context.ClientSubject;
 import org.apache.log4j.MDC;
 
 import com.bigdata.journal.ITimestampService;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.IMetadataService;
-import com.bigdata.service.MetadataService;
+import com.bigdata.service.DataService;
+import com.bigdata.service.TimestampService;
 
 /**
- * A metadata server.
- * <p>
- * The metadata server is used to manage the life cycles of scale-out indices
- * and exposes proxies for read and write operations on indices to clients.
- * Clients use index proxies, which automatically direct reads and writes to the
- * {@link IDataService} on which specific index partitions are located.
- * <p>
- * On startup, the metadata service discovers active data services configured in
- * the same group. While running, it tracks when data services start and stop so
- * that it can (re-)allocate index partitions as necessary.
+ * Server exposing a discoverable {@link ITimestampService}.
  * 
- * @todo aggregate host load data and service RPC events and report them
- *       periodically so that we can track load and make load balancing
- *       decisions.
- * 
- * @todo should destroy destroy the service instance or the persistent state as
- *       well? Locally, or as replicated?
+ * @todo verify that time is strictly ascending on restart or failover.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MetadataServer extends DataServer {
+public class TimestampServer extends AbstractServer {
 
     /**
      * @param args
      */
-    public MetadataServer(String[] args) {
-       
+    public TimestampServer(String[] args) {
+
         super(args);
-             
+        
     }
 
     /**
-     * Starts a new {@link MetadataServer}.  This can be done programmatically
+     * Starts a new {@link TimestampServer}.  This can be done programmatically
      * by executing
      * <pre>
-     *    new MetadataServer(args).run();
+     *    new TimestampServer(args).run();
      * </pre>
      * within a {@link Thread}.
      * 
@@ -93,7 +77,7 @@ public class MetadataServer extends DataServer {
      */
     public static void main(String[] args) {
         
-        new MetadataServer(args) {
+        new TimestampServer(args) {
             
             /**
              * Overriden to use {@link System#exit()} since this is the command
@@ -108,57 +92,52 @@ public class MetadataServer extends DataServer {
                 System.exit(1);
 
             }
-            
-        }.run();
-        
-    }
-    
-    protected Remote newService(Properties properties) {
 
-        return new AdministrableMetadataService(this,properties);
+        }.run();
+
+    }
+
+    @Override
+    protected Remote newService(Properties properties) {
+        
+        return new AdministrableTimestampService(this, properties);
         
     }
-    
-//    protected void terminate() {
-//        
-//        super.terminate();
-//
-//    }
 
     /**
-     * Adds jini administration interfaces to the basic {@link MetadataService}.
+     * Adds jini administration interfaces to the basic {@link DataService}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class AdministrableMetadataService extends MetadataService
-            implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
-        
-        protected MetadataServer server;
+    public static class AdministrableTimestampService extends TimestampService
+            implements RemoteAdministrable, RemoteDestroyAdmin {
+
+        protected TimestampServer server;
+
         private UUID serviceUUID;
 
-        /**
-         * @param properties
-         */
-        public AdministrableMetadataService(MetadataServer server, Properties properties) {
-
+        public AdministrableTimestampService(TimestampServer server,
+                Properties properties) {
+            
             super(properties);
             
             this.server = server;
             
         }
-
+        
         public Object getAdmin() throws RemoteException {
 
             log.info(""+getServiceUUID());
 
             return server.proxy;
-
+            
         }
-
+        
         /**
          * Adds the following parameters to the {@link MDC}
          * <dl>
+         * 
          * <dt>hostname
          * <dt>
          * <dd>The hostname or IP address of this server.</dd>
@@ -166,6 +145,7 @@ public class MetadataServer extends DataServer {
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
+         * 
          * </dl>
          * 
          * Note: {@link InetAddress#getHostName()} is used. This method makes a
@@ -211,43 +191,12 @@ public class MetadataServer extends DataServer {
             
         }
         
-        public UUID getServiceUUID() {
-
-            if (serviceUUID == null) {
-
-                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-
-            }
-            
-            return serviceUUID;
-            
-        }
-
-        public ILoadBalancerService getLoadBalancerService() {
-            
-            return server.loadBalancerClient.getLoadBalancerService();
-            
-        }
-
-        public IDataService getDataService(UUID serviceUUID) {
-
-            return server.dataServicesClient.getDataService(serviceUUID);
-            
-        }
-        
-        public ITimestampService getTimestampService() {
-            
-            return server.timestampServiceClient.getTimestampService();
-            
-        }
-
         /*
          * DestroyAdmin
          */
 
         /**
-         * Destroy the service and deletes any files containing resources (<em>application data</em>)
-         * that was in use by that service.
+         * Destroy the service.
          * 
          * @throws RemoteException
          */
@@ -289,12 +238,87 @@ public class MetadataServer extends DataServer {
             
         }
 
-        public IMetadataService getMetadataService() {
+        public UUID getServiceUUID() {
 
-            return this;
+            if (serviceUUID == null) {
+
+                serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
+
+            }
+
+            return serviceUUID;
             
         }
-        
+
+// /*
+// * JoinAdmin
+// */
+//        
+// public void addLookupAttributes(Entry[] arg0) throws RemoteException {
+//            
+// log.info("");
+//            
+//        }
+//
+//        public void addLookupGroups(String[] arg0) throws RemoteException {
+//
+//            log.info("");
+//
+//        }
+//
+//        public void addLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//
+//            log.info("");
+//            
+//        }
+//
+//        public Entry[] getLookupAttributes() throws RemoteException {
+//
+//            log.info("");
+//
+//            return null;
+//        }
+//
+//        public String[] getLookupGroups() throws RemoteException {
+//         
+//            log.info("");
+//
+//            return null;
+//        }
+//
+//        public LookupLocator[] getLookupLocators() throws RemoteException {
+//         
+//            log.info("");
+//
+//            return null;
+//        }
+//
+//        public void modifyLookupAttributes(Entry[] arg0, Entry[] arg1) throws RemoteException {
+//         
+//            log.info("");
+//            
+//        }
+//
+//        public void removeLookupGroups(String[] arg0) throws RemoteException {
+//            log.info("");
+//
+//        }
+//
+//        public void removeLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//            log.info("");
+//            
+//        }
+//
+//        public void setLookupGroups(String[] arg0) throws RemoteException {
+//            log.info("");
+//            
+//        }
+//
+//        public void setLookupLocators(LookupLocator[] arg0) throws RemoteException {
+//            log.info("");
+//            
+//        }
+
     }
 
 }

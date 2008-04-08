@@ -53,7 +53,7 @@ import com.bigdata.service.AbstractClient;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniFederationClient extends AbstractClient {
+public class JiniClient extends AbstractClient {
 
     /**
      * The federation and <code>null</code> iff not connected.
@@ -125,7 +125,7 @@ public class JiniFederationClient extends AbstractClient {
      * 
      * @param jiniConfig
      */
-    protected JiniFederationClient(JiniConfig jiniConfig) {
+    protected JiniClient(JiniConfig jiniConfig) {
 
         super(jiniConfig.properties);
 
@@ -178,7 +178,7 @@ public class JiniFederationClient extends AbstractClient {
      *             client; reading the properties for the client; starting
      *             service discovery, etc.
      */
-    public static JiniFederationClient newInstance(String[] args) {
+    public static JiniClient newInstance(String[] args) {
 
         // set the security manager.
         setSecurityManager();
@@ -187,7 +187,7 @@ public class JiniFederationClient extends AbstractClient {
         final JiniConfig jiniConfig = readConfiguration(args);
 
         // return the client.
-        return new JiniFederationClient(jiniConfig);
+        return new JiniClient(jiniConfig);
         
     }
 

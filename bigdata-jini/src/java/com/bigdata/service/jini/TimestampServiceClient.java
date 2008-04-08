@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Mar 18, 2008
+ * Created on Apr 6, 2008
  */
 
 package com.bigdata.service.jini;
@@ -41,20 +41,18 @@ import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.service.ILoadBalancerService;
-import com.bigdata.service.LoadBalancerService;
+import com.bigdata.journal.ITimestampService;
 
 /**
- * Class handles discovery of an {@link ILoadBalancerService}.  Clients are responsible
- * for generating notification events.
+ * Client manages discovery of an {@link ITimestampService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LoadBalancerClient {
+public class TimestampServiceClient {
 
     public static final transient Logger log = Logger
-            .getLogger(LoadBalancerClient.class);
+            .getLogger(TimestampServiceClient.class);
 
     private ServiceDiscoveryManager serviceDiscoveryManager = null;
 
@@ -68,17 +66,16 @@ public class LoadBalancerClient {
     private final long timeout = 1000;
     
     /**
-     * Provides direct cached lookup of {@link LoadBalancerService}s by their
-     * {@link ServiceID}.
+     * Provides direct cached lookup of services by their {@link ServiceID}.
      */
     public ServiceCache serviceMap = new ServiceCache();
 
     /**
-     * Begins discovery for the {@link ILoadBalancerService} service.
+     * Begins discovery for the {@link ITimestampService}.
      * 
      * @param discoveryManagement
      */
-    public LoadBalancerClient(DiscoveryManagement discoveryManagement) {
+    public TimestampServiceClient(DiscoveryManagement discoveryManagement) {
 
         /*
          * Setup a helper class that will be notified as services join or leave
@@ -104,10 +101,10 @@ public class LoadBalancerClient {
         try {
             
             template = new ServiceTemplate(null,
-                    new Class[] { ILoadBalancerService.class }, null);
+                    new Class[] { ITimestampService.class }, null);
 
             serviceLookupCache = serviceDiscoveryManager.createLookupCache(
-                    template, null /*new LoadBalancerFilter()*/ /* filter */,
+                    template, null /*new TimestampFilter()*/ /* filter */,
                     serviceMap/* ServiceDiscoveryListener */);
 
         } catch (RemoteException ex) {
@@ -133,14 +130,15 @@ public class LoadBalancerClient {
     }
 
     /**
-     * Return the {@link ILoadBalancerService} service from the cache -or-
+     * Return the {@link ITimestampService} service from the cache -or-
      * <code>null</code> if there is no such service in the cache and a remote
      * lookup times out.
      * 
      * @todo handle multiple service instances for failover but always designate
-     *       a primary.
+     *       a primary. secondaries MUST listen to the primary so that time
+     *       continues to move forward.
      */
-    public ILoadBalancerService getLoadBalancerService() {
+    public ITimestampService getTimestampService() {
 
         ServiceItem item = serviceLookupCache.lookup(null);
 
@@ -160,7 +158,7 @@ public class LoadBalancerClient {
             
         }
         
-        return (ILoadBalancerService) item.service;
+        return (ITimestampService) item.service;
 
     }
 

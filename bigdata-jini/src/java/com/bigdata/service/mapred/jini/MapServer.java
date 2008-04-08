@@ -32,13 +32,12 @@ import java.rmi.RemoteException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.log4j.MDC;
-
 import net.jini.config.Configuration;
 
-import com.bigdata.service.IBigdataClient;
+import org.apache.log4j.MDC;
+
 import com.bigdata.service.jini.AbstractServer;
-import com.bigdata.service.jini.JiniFederationClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.mapred.MapService;
 
@@ -85,6 +84,8 @@ public class MapServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
+                shutdownNow();
+
                 System.exit(1);
 
             }
@@ -94,9 +95,9 @@ public class MapServer extends AbstractServer {
     }
     
     protected Remote newService(Properties properties) {
-        
-        return new AdministrableMapService(this,properties);
-        
+
+        return new AdministrableMapService(this, properties);
+
     }
 
     /**
@@ -105,30 +106,31 @@ public class MapServer extends AbstractServer {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      * 
-     * @todo extend the {@link MDC} logging context.
+     * @todo define the {@link MDC} logging context in the base class and extend
+     *       it here.
      */
-    public static class AdministrableMapService
-        extends MapService
-        implements RemoteAdministrable, RemoteDestroyAdmin
-    {
-        
+    public static class AdministrableMapService extends MapService implements
+            RemoteAdministrable, RemoteDestroyAdmin {
+
         protected AbstractServer server;
+
         private UUID serviceUUID;
-        
-        public AdministrableMapService(AbstractServer server,Properties properties) {
-            
+
+        public AdministrableMapService(AbstractServer server,
+                Properties properties) {
+
             super(properties);
-            
+
             this.server = server;
-            
+
         }
-        
+
         public Object getAdmin() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            log.info("" + getServiceUUID());
 
             return server.getProxy();
-            
+
         }
 
         /*
@@ -143,15 +145,15 @@ public class MapServer extends AbstractServer {
          */
         public void destroy() throws RemoteException {
 
-            log.info(""+getServiceUUID());
+            log.info("" + getServiceUUID());
 
             new Thread() {
 
                 public void run() {
 
                     server.destroy();
-                    
-                    log.info(getServiceUUID()+" - Service stopped.");
+
+                    log.info(getServiceUUID() + " - Service stopped.");
 
                 }
 
@@ -159,22 +161,41 @@ public class MapServer extends AbstractServer {
 
         }
 
+        synchronized public void shutdown() {
+            
+            // normal service shutdown.
+            super.shutdown();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+        
+        synchronized public void shutdownNow() {
+            
+            // immediate service shutdown.
+            super.shutdownNow();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+
         public UUID getServiceUUID() {
 
-            if(serviceUUID==null) {
+            if (serviceUUID == null) {
 
                 serviceUUID = JiniUtil.serviceID2UUID(server.getServiceID());
-                
+
             }
-            
+
             return serviceUUID;
             
         }
 
-        public IBigdataClient getBigdataClient() {
+        public JiniClient getBigdataClient() {
             
-            // @todo this assumes the default federation.
-            return JiniFederationClient.newInstance(new String[]{});
+            return JiniClient.newInstance(new String[]{});
             
         }
 

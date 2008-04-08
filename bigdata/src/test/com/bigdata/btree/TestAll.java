@@ -74,14 +74,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestImmutableKeyBuffer.class);
         // test key search routines on the key buffer implementations.
         suite.addTestSuite( TestKeyBufferSearch.class );
-        // test key buffer (de-)serialization.
-        suite.addTestSuite( TestKeyBufferSerializer.class );
-        
-        /*
-         * test value serializers and compression methods.
-         */
-        // test serialization of byte[] values.
-        suite.addTestSuite( TestByteArrayValueSerializer.class );
         
         /*
          * test record compression support.

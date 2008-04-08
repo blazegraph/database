@@ -37,6 +37,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -56,6 +58,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IPartitionMetadata;
@@ -66,6 +69,7 @@ import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Class encapsulates logic for managing the store files (journals and index
@@ -326,11 +330,55 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     protected AbstractJournal liveJournal;
 
     /**
-     * Set <code>true</code> by {@link #start()} and remains <code>true</code>
-     * until the {@link ResourceManager} is shutdown.
+     * <code>true</code> initially and remains <code>true</code> until the
+     * {@link ResourceManager} is shutdown.
+     * 
+     * @see #isOpen()
      */
-    private boolean open;
+    private boolean open = true;
+    
+    /**
+     * <code>true</code> initially and until {@link #start()} completes
+     * successfully, this is used to disambiguate the startup transient state
+     * from the shutdown state.
+     * 
+     * @see #isStarting()
+     */
+    private volatile boolean starting = true;
 
+    /**
+     * Used to run the {@link Startup}.
+     */
+    private final ExecutorService startupService = Executors
+            .newSingleThreadExecutor(DaemonThreadFactory.defaultThreadFactory());
+    
+    /**
+     * Succeeds if the {@link StoreManager} {@link #isOpen()} and is NOT
+     * {@link #isStarting()}.
+     * 
+     * @throws IllegalStateException
+     *             unless open and not starting.
+     */
+    protected void assertRunning() {
+        
+        if (!open)
+            throw new IllegalStateException("Not open");
+
+        if (starting)
+            throw new IllegalStateException("Starting up");
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff the {@link StoreManager} is open and
+     * startup processing has been completed.
+     */
+    public boolean isRunning() {
+        
+        return open && !starting;
+        
+    }
+    
     /**
      * @throws IllegalStateException
      *             unless open.
@@ -354,14 +402,45 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     }
     
     /**
+     * Return <code>true</code> iff the {@link StoreManager} is running. If
+     * the {@link StoreManager} is currently starting up, then this will await
+     * the completion of the {@link Startup} task.
+     * 
+     * @return <code>true</code> if the {@link StoreManager} is running and
+     *         <code>false</code> if it is shutdown.
+     */
+    public boolean awaitRunning() {
+        
+        while (isOpen() && isStarting()) {
+
+            try {
+
+                log.info("Waiting on startup...");
+
+                Thread.sleep(100/* ms */);
+
+            } catch (InterruptedException ex) {
+
+                throw new RuntimeException("Interrupted awaiting startup: "
+                        + ex);
+
+            }
+
+        }
+
+        return isRunning();
+        
+    }
+    
+    /**
      * A map from the resource UUID to the absolute {@link File} for that
      * resource.
      * <p>
      * Note: The {@link IResourceMetadata} reported by an
-     * {@link AbstractJournal} or {@link IndexSegmentStore} generally
-     * reflects the name of the file as specified to the ctor for that class, so
-     * it may be relative to some arbitrary directory or absolute within the
-     * file system.
+     * {@link AbstractJournal} or {@link IndexSegmentStore} generally reflects
+     * the name of the file as specified to the ctor for that class, so it may
+     * be relative to some arbitrary directory or absolute within the file
+     * system.
      * 
      * @todo We do not need to insist on the file names - we could just use the
      *       file under whatever name we find it (Therefore we only insist that
@@ -372,69 +451,6 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      *       resource.)
      */
     private final Map<UUID, File> resourceFiles = new HashMap<UUID, File>();
-
-//    /**
-//     * A map from the resource {@link UUID} to the open {@link IRawStore}
-//     * reference.
-//     * <p>
-//     * Note: This is exposed to the {@link OverflowManager} since it needs to
-//     * insert the newly created journal during overflow.
-//     */
-//    protected final Map<UUID, IRawStore> openStores = new HashMap<UUID, IRawStore>();
-        
-//    /**
-//     * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
-//     * 
-//     * @see IServiceShutdown.Options#SHUTDOWN_TIMEOUT
-//     */
-//    final private long shutdownTimeout;
-
-//    /**
-//     * A service that periodically runs the {@link CloseUnusedStoresTask}.
-//     */
-//    private ScheduledExecutorService closeStoreService;
-
-//    /**
-//     * Task closes any stores (journals or index segments) that have not been
-//     * recently accessed.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    protected class CloseUnusedStoresTask implements Runnable {
-//
-//        /**
-//         * Note: Don't throw anything here since we don't want to have the task
-//         * suppressed!
-//         */
-//        public void run() {
-//
-//            try {
-//            
-//                closeStores();
-//                
-//            } catch(Exception ex) {
-//                
-//                log.warn(ex.getMessage(),ex);
-//                
-//            }
-//            
-//        }
-//        
-//        /**
-//         * Closes out store files that have not been recently accessed.
-//         * 
-//         * @throws Exception
-//         * 
-//         * @todo never close the live journal.
-//         */
-//        protected void closeStores() throws Exception {
-//           
-//            log.warn("Close out of unused stores is not implemented yet!");
-//            
-//        }
-//        
-//    }
     
     /**
      * The properties given to the ctor.
@@ -484,6 +500,20 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         
     }
     
+    /**
+     * Note: This constructor starts an asynchronous thread that scans the data
+     * directory for journals and index segments and creates the initial journal
+     * if no store files are found.
+     * <p>
+     * Note: The store files are NOT accessible until the asynchronous startup
+     * is finished. Caller's MUST verify that the {@link StoreManager#isOpen()}
+     * AND NOT submit tasks until {@link StoreManager#isStarting()} returns
+     * <code>false</code>.
+     * 
+     * @param properties  See {@link Options}.
+     * 
+     * @see Startup
+     */
     protected StoreManager(Properties properties) {
                 
         if (properties == null)
@@ -515,25 +545,6 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
                     );
 
         }
-
-
-//        // shutdownTimeout
-//        {
-//
-//            shutdownTimeout = Long
-//                    .parseLong(properties.getProperty(Options.SHUTDOWN_TIMEOUT,
-//                            Options.DEFAULT_SHUTDOWN_TIMEOUT));
-//
-//            if (shutdownTimeout < 0) {
-//
-//                throw new RuntimeException("The '" + Options.SHUTDOWN_TIMEOUT
-//                        + "' must be non-negative.");
-//
-//            }
-//
-//            log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
-//
-//        }
 
         // minimum release age
         {
@@ -722,251 +733,296 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
             this.tmpDir = tmpDir;
 
         }
+
+        /*
+         * Asynchronous startup processing.
+         */
+        startupService.submit(new Startup());
+
+    }
+
+    /**
+     * Runs a startup scan of the data directory and creates the initial journal
+     * if none was found. If the {@link Startup} task fails or is interrupted
+     * then the {@link StoreManager} will be {@link StoreManager#shutdownNow()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class Startup implements Runnable {
+
+        public void run() {
+
+            try {
+
+                start();
+
+            } catch (InterruptedException ex) {
+
+                log.warn("Startup was interrupted.");
+
+                shutdownNow();
+                
+            } catch(Exception ex) {
+                
+                log.error("Problem during startup? : "+ex, ex);
+                
+                shutdownNow();
+                
+            }
+
+        }
+
+        /**
+         * Starts up the {@link StoreManager}.
+         * <p>
+         * Note: Implementations of this method MUST be
+         * <code>synchronized</code>.
+         * 
+         * @throws InterruptedException
+         * 
+         * @throws IllegalStateException
+         *             if the {@link IConcurrencyManager} has not been set.
+         * 
+         * @throws IllegalStateException
+         *             if the the {@link ResourceManager} is already running.
+         * 
+         * @throws InterruptedException
+         *             if the startup scan is interrupted.
+         */
+        final private void start() throws InterruptedException {
+
+            if (!starting)
+                throw new IllegalStateException();
+
+            /*
+             * Verify that the concurrency manager has been set and wait a while
+             * it if is not available yet.
+             */
+            for(int i=0; i<3; i++) {
+                try {
+                    getConcurrencyManager();
+                } catch(IllegalStateException ex) {
+                    Thread.sleep(100/*ms*/);
+                }
+            }
+            getConcurrencyManager();
+
+            /*
+             * Look for pre-existing data files.
+             */
+            if (!isTransient) {
+
+                log.info("Starting scan of data directory: " + dataDir);
+
+                Stats stats = new Stats();
+
+                scanDataDirectory(dataDir, stats);
+
+                log.info("Data directory contains " + stats.njournals
+                        + " journals and " + stats.nsegments
+                        + " index segments for a total of " + stats.nfiles
+                        + " resources and " + stats.nbytes + " bytes");
+
+                assert journalIndex.getEntryCount() == stats.njournals;
+
+                assert indexSegmentIndex.getEntryCount() == stats.nsegments;
+
+                assert resourceFiles.size() == stats.nfiles;
+
+            }
+
+            /*
+             * Open the "live" journal.
+             */
+            {
+
+                final Properties p = getProperties();
+                final File file;
+                final boolean newJournal;
+
+                if (journalIndex.getEntryCount() == 0) {
+
+                    /*
+                     * There are no existing journal files. Create new journal
+                     * using a unique filename in the appropriate subdirectory
+                     * of the data directory.
+                     * 
+                     * @todo this is not using the temp filename mechanism in a
+                     * manner that truely guarentees an atomic file create. The
+                     * CREATE_TEMP_FILE option should probably be extended with
+                     * a CREATE_DIR option that allows you to override the
+                     * directory in which the journal is created. That will
+                     * allow the atomic creation of the journal in the desired
+                     * directory without changing the existing semantics for
+                     * CREATE_TEMP_FILE.
+                     * 
+                     * See OverflowManager#doOverflow() which has very similar
+                     * logic with the same problem.
+                     */
+
+                    log.info("Creating initial journal");
+
+                    // unique file name for new journal.
+                    if (isTransient) {
+
+                        file = null;
+
+                    } else {
+
+                        try {
+
+                            file = File.createTempFile("journal", // prefix
+                                    Options.JNL,// suffix
+                                    journalsDir // directory
+                                    ).getCanonicalFile();
+
+                        } catch (IOException e) {
+
+                            throw new RuntimeException(e);
+
+                        }
+
+                        // delete temp file.
+                        file.delete();
+
+                    }
+
+                    /*
+                     * Set the createTime on the new journal resource.
+                     */
+                    p.setProperty(Options.CREATE_TIME, "" + nextTimestampRobust());
+
+                    newJournal = true;
+
+                } else {
+
+                    /*
+                     * There is at least one pre-existing journal file, so we
+                     * open the one with the largest timestamp - this will be
+                     * the most current journal and the one that will receive
+                     * writes until it overflows.
+                     */
+
+                    // resource metadata for journal with the largest timestamp.
+                    final IResourceMetadata resource = journalIndex
+                            .find(Long.MAX_VALUE);
+
+                    log.info("Will open " + resource);
+
+                    assert resource != null : "No resource? : timestamp="
+                            + Long.MAX_VALUE;
+
+                    // lookup absolute file for that resource.
+                    file = resourceFiles.get(resource.getUUID());
+
+                    assert file != null : "No file? : resource=" + resource;
+
+                    log.info("Opening most recent journal: " + file
+                            + ", resource=" + resource);
+
+                    newJournal = false;
+
+                }
+
+                if (!isTransient) {
+
+                    assert file.isAbsolute() : "Path must be absolute: " + file;
+
+                    p.setProperty(Options.FILE, file.toString());
+
+                }
+
+                // Create/open journal.
+                liveJournal = new ManagedJournal(p);
+
+                if (newJournal) {
+
+                    // add to the set of managed resources.
+                    addResource(liveJournal.getResourceMetadata(), liveJournal
+                            .getFile());
+
+                }
+
+                // add to set of open stores.
+                storeCache.put(liveJournal.getRootBlockView().getUUID(),
+                        liveJournal, false/*dirty*/);
+
+            }
+
+            starting = false;
+            
+            log.info("Successful startup: "
+                    + (isTransient ? "transient" : Options.DATA_DIR + "="
+                            + dataDir));
+
+        }
+
+    }
+    
+    /**
+     * <code>true</code> initally and until {@link #start()} completes successfully.
+     */
+    public boolean isStarting() {
+
+        return starting;
         
     }
 
     /**
-     * Starts up the {@link StoreManager}.
-     * <p>
-     * Note: Implementations of this method MUST be <code>synchronized</code>.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link IConcurrencyManager} has not been set.
-     * 
-     * @throws IllegalStateException
-     *             if the the {@link ResourceManager} is already running.
+     * <code>false</code> initially and remains <code>false</code> until
+     * {@link #start()} completes successfully. once <code>true</code> this
+     * remains <code>true</code> until either {@link #shutdown()} or
+     * {@link #shutdownNow()} is invoked.
      */
-    synchronized public void start() {
-
-        assertNotOpen();
+    public boolean isOpen() {
         
-        // verify concurrency manager has been set.
-        getConcurrencyManager();
-        
-        /*
-         * Look for pre-existing data files.
-         */
-        if(!isTransient) {
-
-            log.info("Starting scan of data directory: " + dataDir);
-
-            Stats stats = new Stats();
-
-            scanDataDirectory(dataDir, stats);
-
-            log.info("Data directory contains " + stats.njournals
-                    + " journals and " + stats.nsegments
-                    + " index segments for a total of " + stats.nfiles
-                    + " resources and " + stats.nbytes + " bytes");
-
-            assert journalIndex.getEntryCount() == stats.njournals;
-
-            assert indexSegmentIndex.getEntryCount() == stats.nsegments;
-
-            assert resourceFiles.size() == stats.nfiles;
-
-        }
-
-        /*
-         * Open the "live" journal.
-         */
-        {
-
-            final Properties p = getProperties();
-            final File file;
-            final boolean newJournal;
-            
-            if (journalIndex.getEntryCount() == 0) {
-
-                /*
-                 * There are no existing journal files. Create new journal using
-                 * a unique filename in the appropriate subdirectory of the data
-                 * directory.
-                 * 
-                 * @todo this is not using the temp filename mechanism in a
-                 * manner that truely guarentees an atomic file create. The
-                 * CREATE_TEMP_FILE option should probably be extended with a
-                 * CREATE_DIR option that allows you to override the directory
-                 * in which the journal is created. That will allow the atomic
-                 * creation of the journal in the desired directory without
-                 * changing the existing semantics for CREATE_TEMP_FILE.
-                 * 
-                 * See OverflowManager#doOverflow() which has very similar logic
-                 * with the same problem.
-                 */
-
-                log.info("Creating initial journal");
-
-                // unique file name for new journal.
-                if (isTransient) {
-
-                    file = null;
-                    
-                } else {
-                    
-                    try {
-
-                        file = File.createTempFile("journal", // prefix
-                                Options.JNL,// suffix
-                                journalsDir // directory
-                                ).getCanonicalFile();
-
-                    } catch (IOException e) {
-
-                        throw new RuntimeException(e);
-
-                    }
-
-                    // delete temp file.
-                    file.delete();
-                    
-                }
-
-                /*
-                 * Set the createTime on the new journal resource.
-                 */
-                p.setProperty(Options.CREATE_TIME, "" + nextTimestamp());
-                
-                newJournal = true;
-
-            } else {
-
-                /*
-                 * There is at least one pre-existing journal file, so we open
-                 * the one with the largest timestamp - this will be the most
-                 * current journal and the one that will receive writes until it
-                 * overflows.
-                 */
-
-                // resource metadata for journal with the largest timestamp.
-                final IResourceMetadata resource = journalIndex
-                        .find(Long.MAX_VALUE);
-
-                log.info("Will open " + resource);
-
-                assert resource != null : "No resource? : timestamp="
-                        + Long.MAX_VALUE;
-
-                // lookup absolute file for that resource.
-                file = resourceFiles.get(resource.getUUID());
-
-                assert file != null : "No file? : resource=" + resource;
-
-                log.info("Opening most recent journal: " + file + ", resource="
-                        + resource);
-
-                newJournal = false;
-
-            }
-
-            if(!isTransient) {
-
-                assert file.isAbsolute() : "Path must be absolute: " + file;
-
-                p.setProperty(Options.FILE, file.toString());
-                
-            }
-
-            // Create/open journal.
-            liveJournal = new ManagedJournal(p);
-
-            if (newJournal) {
-
-                // add to the set of managed resources.
-                addResource(liveJournal.getResourceMetadata(), liveJournal
-                        .getFile());
-                
-            }
-
-            // add to set of open stores.
-            storeCache.put(liveJournal.getRootBlockView().getUUID(),
-                    liveJournal,false/*dirty*/);
-            
-        }
-
-//        /*
-//         * Start service which will close out unused stores.
-//         */
-//        {
-//
-//            // @todo config initialDelay and delay.
-//            final long initialDelay = 10000; // initial delay in ms.
-//            final long delay = 5000; // delay in ms.
-//            final TimeUnit unit = TimeUnit.MILLISECONDS;
-//
-//            closeStoreService = Executors
-//                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
-//                            .defaultThreadFactory());
-//
-//            closeStoreService.scheduleWithFixedDelay(new CloseUnusedStoresTask(),
-//                    initialDelay, delay, unit);
-//
-//        }
-
-        open = true;
+        return open;
         
     }
     
-    public void shutdown() {
-
-        assertOpen();
-
-//        // closeStoreService shutdown
-//        {
-//
-//        final long begin = System.currentTimeMillis();
-//        
-//            /*
-//             * Note: when the timeout is zero we approximate "forever" using
-//             * Long.MAX_VALUE.
-//             */
-//
-//            final long shutdownTimeout = this.shutdownTimeout == 0L ? Long.MAX_VALUE
-//                    : this.shutdownTimeout;
-//
-//            final TimeUnit unit = TimeUnit.MILLISECONDS;
-//
-//            closeStoreService.shutdown();
-//
-//            try {
-//
-//                log.info("Awaiting service termination");
-//
-//                long elapsed = System.currentTimeMillis() - begin;
-//
-//                if (!closeStoreService.awaitTermination(shutdownTimeout - elapsed, unit)) {
-//
-//                    log.warn("Service termination: timeout");
-//
-//                }
-//
-//            } catch (InterruptedException ex) {
-//
-//                log.warn("Interrupted awaiting service termination.", ex);
-//
-//            }
-//
-//        }
+    synchronized public void shutdown() {
         
-        closeStores();
-
-        tmpStore.closeAndDelete();
+        if(!open) return;
 
         open = false;
+        
+        // Note: if startup is running, then cancel immediately.
+        startupService.shutdownNow();
+
+        try {
+            closeStores();
+        } catch (Exception ex) {
+            log.warn(ex.getMessage(), ex);
+        }
+
+        try {
+            tmpStore.closeAndDelete();
+        } catch (Exception ex) {
+            log.warn(ex.getMessage(), ex);
+        }
         
     }
     
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
-        assertOpen();
-
-//        closeStoreService.shutdownNow();
-        
-        closeStores();
-
-        tmpStore.closeAndDelete();
+        if(!open) return;
 
         open = false;
+
+        startupService.shutdownNow();
+
+        try {
+            closeStores();
+        } catch (Exception ex) {
+            log.warn(ex.getMessage(), ex);
+        }
+
+        try {
+            tmpStore.closeAndDelete();
+        } catch (Exception ex) {
+            log.warn(ex.getMessage(), ex);
+        }
 
     }
 
@@ -1020,8 +1076,10 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * 
      * @param dir
      *            A directory to scan.
+     *            
+     * @throws InterruptedException 
      */
-    private void scanDataDirectory(File dir, Stats stats) {
+    private void scanDataDirectory(File dir, Stats stats) throws InterruptedException {
 
         if (dir == null)
             throw new IllegalArgumentException();
@@ -1029,6 +1087,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         if (!dir.isDirectory())
             throw new IllegalArgumentException();
 
+        if(Thread.interrupted()) throw new InterruptedException();
+        
         final File[] files = dir.listFiles(newFileFilter());
 
         for (final File file : files) {
@@ -1047,8 +1107,10 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
     }
 
-    private void scanFile(File file, Stats stats) {
+    private void scanFile(File file, Stats stats) throws InterruptedException {
 
+        if(Thread.interrupted()) throw new InterruptedException();
+        
         log.info("Scanning file: "+file+", stats="+stats);
         
         final IResourceMetadata resource;
@@ -1176,6 +1238,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public int getJournalCount() {
 
+        assertOpen();
+        
         return journalIndex.getEntryCount();
 
     }
@@ -1184,7 +1248,9 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * The #of index segments on hand.
      */
     public int getIndexSegmentCount() {
-        
+
+        assertOpen();
+
         return indexSegmentIndex.getEntryCount();
         
     }
@@ -1219,6 +1285,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      *             <code>false</code>.
      */
     synchronized protected void addResource(IResourceMetadata resourceMetadata, File file) {
+
+        assertOpen();
 
         if (resourceMetadata == null)
             throw new IllegalArgumentException();
@@ -1316,36 +1384,56 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
 
         public long nextTimestamp() {
             
-            return StoreManager.this.nextTimestamp();
+            return StoreManager.this.nextTimestampRobust();
+            
+        }
+
+        public ILocalTransactionManager getLocalTransactionManager() {
+            
+            return getConcurrencyManager().getTransactionManager(); 
             
         }
         
-        @Override
-        public long commit() {
-
-            return commitNow(nextTimestamp());
-            
-        }
+//        @Override
+//        public long commit() {
+//
+//            return commitNow(nextTimestamp());
+//            
+//        }
 
     }
     
     /**
      * The journal on which writes are made.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is not open.
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is still starting up.
      */
     public AbstractJournal getLiveJournal() {
+
+        assertRunning();
 
         return liveJournal;
 
     }
 
-    /*
+    /**
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is not open.
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is still starting up.
+     * 
      * @todo write tests for unisolated and read-committed. make sure that there
-     * is no fencepost for read committed immediately after an overflow (there
-     * should not be since we do a commit when we register the indices on the
-     * new store).
+     *       is no fencepost for read committed immediately after an overflow
+     *       (there should not be since we do a commit when we register the
+     *       indices on the new store).
      */
     public AbstractJournal getJournal(long timestamp) {
 
+        assertRunning();
+        
         if (timestamp == ITx.UNISOLATED || timestamp == ITx.READ_COMMITTED) {
 
             /*
@@ -1393,6 +1481,12 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * 
      * @return The open {@link IRawStore}.
      * 
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is not open.
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is still starting up.
+     * @throws IllegalArgumentException
+     *             if <i>uuid</i> is <code>null</code>.
      * @throws RuntimeException
      *             if something goes wrong.
      * 
@@ -1405,6 +1499,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     synchronized public IRawStore openStore(UUID uuid) {
 
+        assertRunning();
+        
         if (uuid == null) {
 
             throw new IllegalArgumentException();
@@ -1576,11 +1672,19 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
     }
 
     /**
-     * Report the next timestamp assigned by the {@link ILocalTransactionManager}.
+     * Report the next timestamp assigned by the
+     * {@link ILocalTransactionManager}.
+     * <p>
+     * Note: the {@link ILocalTransactionManager} handles the "robust" semantics
+     * for discoverying the timestamp service and obtaining the next timestamp
+     * from that service.
      */
-    protected long nextTimestamp() {
+    protected long nextTimestampRobust() {
         
-        return getConcurrencyManager().getTransactionManager().nextTimestamp();
+        final ILocalTransactionManager transactionManager = getConcurrencyManager()
+                .getTransactionManager();
+
+        return transactionManager.nextTimestampRobust();
         
     }
 
@@ -1639,6 +1743,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public void setReleaseTime(long releaseTime) {
 
+        assertOpen();
+        
         log.info("Updating the releaseTime: old="+this.releaseTime+", new="+this.releaseTime);
 
         this.releaseTime = releaseTime;
@@ -1662,12 +1768,19 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      * Note: The caller MUST arrange for synchronization. Typically this is
      * invoked during {@link #doOverflow()}.
      * 
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is not open.
+     * @throws IllegalStateException
+     *             if the {@link StoreManager} is still starting up.
+     *
      * FIXME write tests (a) when immortal store; (b) when minReleaseAge is
      * non-zero. For (b) test when {@link #getEffectiveReleaseTime()} yeilds a
      * value which causes 1, 2, or 3 old journals to be retained.
      */
     protected void purgeOldResources() {
 
+        assertRunning();
+        
         final long t = getEffectiveReleaseTime();
         
         if(t == 0L) {
@@ -1677,7 +1790,7 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
         }
         
         log.info("Effective release time: " + t + ", currentTime="
-                + nextTimestamp());
+                + System.currentTimeMillis());
 
         /*
          * Delete old resources.
@@ -1899,17 +2012,19 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     protected long getEffectiveReleaseTime() {
 
+        assertOpen();
+        
         final long effectiveReleaseTime;
         
         if (minReleaseAge == 0L) {
 
-            log.info("Immortal database - resoureces will NOT be released");
+            log.info("Immortal database - resources will NOT be released");
 
             effectiveReleaseTime = 0L;
             
         } else {
         
-            final long t1 = nextTimestamp() - minReleaseAge;
+            final long t1 = nextTimestampRobust() - minReleaseAge;
 
             final long t;
             if (releaseTime == 0L) {
@@ -1954,6 +2069,11 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      *         There MAY be additional resources which COULD be released if you
      *         used more information to make the decision, but a decision made
      *         on the basis of the returned value will always be safe.
+     * 
+     * FIXME getEarliestDependencyTimestamp is not implemented. It is returning
+     * <code>0L</code> which means that nothing will get released since no
+     * store will have a timestamp LTE zero.  Write unit tests for this using
+     * overflow operations to force release of old stores.
      */
     protected long getEarliestDependencyTimestamp(long releaseTime) {
         
@@ -1969,6 +2089,8 @@ abstract public class StoreManager extends ResourceEvents implements IResourceMa
      */
     public File getIndexSegmentFile(IndexMetadata indexMetadata) {
 
+        assertOpen();
+        
         // munge index name to fit the file system.
         final String mungedName = indexMetadata.getName();
 

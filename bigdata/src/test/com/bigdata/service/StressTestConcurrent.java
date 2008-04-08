@@ -48,7 +48,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReentrantLock;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
@@ -59,8 +61,12 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.QueueLengthTask;
+import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.DataService.Options;
 import com.bigdata.test.ExperimentDriver;
@@ -93,19 +99,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       the effect of batch size on writes. Add parameterization for read vs
  *       write vs remove so that we can test the effect of batch size for
  *       operation profiles based on each of those kinds of operations.
- * 
- * @todo This test uses one index and one partition on one data service. Expand
- *       the test to test with multiple partitions on the same data service
- *       (concurrent writes on those partitions should be supported), with
- *       multiple indices (again, concurrent writes should be supported), and
- *       (possibly) with multiple data services.
- * 
- * @todo measure the time in the RPC calls, including marshalling and
- *       unmarshalling of the arguments, and use those measurements to guide
- *       performance tuning. This can be done by comparing an embedded data
- *       service (no RPC) with a data service connected by JINI (RPC).
- * 
- * @todo Test w/ group commit and various group sizes.
  * 
  * @todo get the comparison support working. Parameterize the
  *       {@link DataService} configuration from the test suite so that we can
@@ -209,9 +202,10 @@ public class StressTestConcurrent extends
         int keyLen = 4;
         int nops = 100;
         int nindices = 1;
+        boolean testCorrectness = true;
 
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
-                nops, nindices);
+                nops, nindices, testCorrectness );
 
         log.info("dataService0\n" + dataService0.getStatistics());
        
@@ -256,6 +250,17 @@ public class StressTestConcurrent extends
      *            index has been split the liklelyhood of concurrent writers
      *            goes up significantly.
      * 
+     * @param testCorrectness
+     *            When <code>true</code>, ground truth will be maintained and
+     *            verified against the post-condition of the index(s) under
+     *            test. This option may be used to verify index partition
+     *            split/join/move semantics and the correctness of
+     *            {@link ClientIndexView} views. All operations on a ground
+     *            truth index are serialized (all operations may be serialized
+     *            if the ground truth indices are all backed by the same store)
+     *            so this option can not be used when you are doing performance
+     *            testing.
+     * 
      * @todo Note: When <i>nindices</i> is high the setup time on this test is
      *       quite large since the indices are registered sequentially rather
      *       than using parallelism. Run the index registration tasks in a
@@ -293,8 +298,9 @@ public class StressTestConcurrent extends
      *       of an index partition.
      */
     static public Result doConcurrentClientTest(final IBigdataClient client,
-            final int nclients, final long timeout, final int ntrials, final int keyLen,
-            final int nops, final int nindices) throws InterruptedException, IOException {
+            final int nclients, final long timeout, final int ntrials,
+            final int keyLen, final int nops, final int nindices,
+            boolean testCorrectness) throws InterruptedException, IOException {
         
         // The basename of the scale-out index(s) for the test.
         final String basename = "testIndex";
@@ -307,11 +313,14 @@ public class StressTestConcurrent extends
          */
         assert nindices > 0;
         
-        IIndex[] index = new IIndex[nindices]; 
+        final IIndex[] index = new IIndex[nindices];
+        final IIndex[] groundTruth = new IIndex[nindices];
+        final IRawStore[] groundTruthStore = new IRawStore[nindices];
+        final ReentrantLock[] lock = new ReentrantLock[nindices];
         
         for(int i=0; i<nindices; i++) {
             
-            final String name = basename+(i % nindices);
+            final String name = basename+i;
             final UUID indexUUID = UUID.randomUUID();
             final int entryCountPerSplit = 400;
             final double overCapacityMultiplier = 1.5;
@@ -342,6 +351,31 @@ public class StressTestConcurrent extends
                 // partition.
                 federation.registerIndex(indexMetadata);
 
+                if(testCorrectness) {
+                    
+                    /*
+                     * Setup a distinct backing store for the ground truth for
+                     * each index and a lock to serialize access to that index.
+                     * This allows concurrency if you start with more than one
+                     * index or after an index has been split.
+                     */
+                    
+                    groundTruthStore[i] = new TemporaryRawStore(
+                            WormAddressManager.SCALE_UP_OFFSET_BITS,
+                            Bytes.megabyte * 5/*min*/,
+                            Bytes.megabyte * 5/*max*/, false/*useDirectBuffers*/);
+
+                    IndexMetadata md = indexMetadata.clone();
+                    
+                    // turn off delete markers for the ground truth index.
+                    md.setDeleteMarkers(false);
+                    
+                    groundTruth[i] = BTree.create(groundTruthStore[i], md);
+
+                    lock[i] = new ReentrantLock();
+                    
+                }
+                
             }
         
             index[i] = federation.getIndex(name, ITx.UNISOLATED);
@@ -374,8 +408,10 @@ public class StressTestConcurrent extends
         Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>(); 
 
         for(int i=0; i<ntrials; i++) {
+
+            final int k = i % nindices;
             
-            tasks.add(new Task(index[i % nindices], keyLen, nops));
+            tasks.add(new Task(index[k], keyLen, nops, groundTruth[k], lock[k]));
             
         }
 
@@ -486,6 +522,49 @@ public class StressTestConcurrent extends
             
         }
         
+        if(testCorrectness) {
+            
+            /*
+             * For each index, verify its state against the corresponding ground
+             * truth index.
+             */
+            
+            for(int i=0; i<nindices; i++) {
+
+                final String name = basename+i;
+
+                System.err.println("Validating: "+name);
+                
+                final IIndex expected = groundTruth[i];
+                
+                /*
+                 * Note: This uses an iterator based comparison so that we can
+                 * compare a local index without delete markers and a key-range
+                 * partitioned index with delete markers.
+                 * 
+                 * Note: test on the UNISOLATED as well as the READ_COMMITTED
+                 * since this can turn up problems with consistent reads by the
+                 * read committed operation.
+                 */
+
+                assertSameEntryIterator(expected, federation.getIndex(name, ITx.UNISOLATED));
+                
+                assertSameEntryIterator(expected, federation.getIndex(name, ITx.READ_COMMITTED));
+                
+                /*
+                 * Release the ground truth index and the backing store.
+                 */
+
+                groundTruth[i] = null;
+                
+                groundTruthStore[i].closeAndDelete();
+                
+            }
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         return ret;
        
     }
@@ -498,6 +577,8 @@ public class StressTestConcurrent extends
         private final IIndex ndx;
 //        private final int keyLen;
         private final int nops;
+        private final IIndex groundTruth;
+        private final ReentrantLock lock;
         
         /*
          * @todo This has a very large impact on the throughput. It directly
@@ -550,21 +631,45 @@ public class StressTestConcurrent extends
         }
         
         /**
+         * @param ndx
+         *            The index under test.
+         * @param groundTruth
+         *            Used for performing ground truth correctness tests when
+         *            running against one or more data services with index
+         *            partition split, move, and join enabled (optional). When
+         *            specified this should be backed by a
+         *            {@link TemporaryStore} or {@link TemporaryRawStore}. The
+         *            caller is responsible for validating the index under test
+         *            against the ground truth on completion of the test.
+         * @param lock
+         *            Used to coordinate operations on the groundTruth store.
+         *            May be <code>null</code> if the groundTruth store is
+         *            <code>null</code>.
          * 
          * @todo parameterize for operation type (insert, remove, read,
-         *       contains).  let the caller determine the profile of
-         *       operations to be executed against the service.
-         *       
+         *       contains). let the caller determine the profile of operations
+         *       to be executed against the service.
+         * 
          * @todo keyLen is ignored. It could be replaced by an increment value
          *       that would govern the distribution of the keys.
          */
-        public Task(IIndex ndx,int keyLen, int nops) {
+        public Task(IIndex ndx, int keyLen, int nops, IIndex groundTruth, ReentrantLock lock) {
 
             this.ndx = ndx;
            
 //            this.keyLen = keyLen;
             
             this.nops = nops;
+            
+            this.groundTruth = groundTruth;
+            
+            this.lock = lock;
+            
+            if (groundTruth != null && lock != null) {
+                
+                throw new IllegalArgumentException();
+                
+            }
             
         }
 
@@ -600,6 +705,25 @@ public class StressTestConcurrent extends
                         null// handler
                         );
                 
+                if(groundTruth!=null) {
+                
+                    lock.lock();
+                    
+                    try {
+                    
+                        groundTruth.submit(0/*fromIndex*/,nops/*toIndex*/, keys, vals, //
+                            BatchInsertConstructor.RETURN_NO_VALUES, //
+                            null// handler
+                            );
+                    
+                    } finally {
+                        
+                        lock.unlock();
+                        
+                    }
+                    
+                }
+                
             } else {
 
                 for (int i = 0; i < nops; i++) {
@@ -612,6 +736,22 @@ public class StressTestConcurrent extends
                         BatchRemoveConstructor.RETURN_NO_VALUES,//
                         null// handler
                         );
+                
+                lock.lock();
+                
+                try {
+                
+                    groundTruth.submit(0/* fromIndex */,nops/*toIndex*/, keys, null/*vals*/,//
+                            BatchRemoveConstructor.RETURN_NO_VALUES,//
+                            null// handler
+                            );
+                
+                } finally {
+                    
+                    lock.unlock();
+                    
+                }
+
                 
             }
             
@@ -752,6 +892,19 @@ public class StressTestConcurrent extends
          */
         public static final String NINDICES = "nindices";
 
+        /**
+         * When <code>true</code>, ground truth will be maintained and
+         * verified against the post-condition of the index(s) under test.
+         * <p>
+         * Note: This option may be used to verify index partition
+         * split/join/move semantics and the correctness of
+         * {@link ClientIndexView} views.
+         * <p>
+         * Note: All operations on a ground truth index are serialized so this
+         * option can not be used when you are doing performance testing.
+         */
+        final String TEST_CORRECTNESS = "testCorrectness";
+        
     }
 
     /**
@@ -781,8 +934,11 @@ public class StressTestConcurrent extends
         final int nindices = Integer.parseInt(properties
                 .getProperty(TestOptions.NINDICES));
 
+        final boolean testCorrectness = Boolean.parseBoolean(properties
+                .getProperty(TestOptions.TEST_CORRECTNESS));
+
         Result result = doConcurrentClientTest(client, nclients, timeout,
-                ntrials, keyLen, nops, nindices);
+                ntrials, keyLen, nops, nindices, testCorrectness);
 
         return result;
 

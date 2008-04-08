@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.IIndexProcedure.IKeyRangeIndexProcedure;
 import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IDataService;
 

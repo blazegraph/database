@@ -208,7 +208,7 @@ public class AbstractResourceManagerTestCase extends
 
         resourceManager.setConcurrencyManager(concurrencyManager);
         
-        resourceManager.start();
+        assertTrue( resourceManager.awaitRunning() );
         
     }
 

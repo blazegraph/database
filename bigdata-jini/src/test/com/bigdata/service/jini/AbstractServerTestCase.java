@@ -49,7 +49,6 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.jini.AbstractServer;
 import com.sun.jini.tool.ClassServer;
 
 /**

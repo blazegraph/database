@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -100,10 +101,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
     
-    public long commit() {
+//    public long commit() {
+//
+//        return commitNow( localTransactionManager.nextTimestampRobust() );
+//
+//    }
 
-        return commitNow(nextTimestamp());
-
+    public ILocalTransactionManager getLocalTransactionManager() {
+        
+        return localTransactionManager;
+        
     }
     
     synchronized public CounterSet getCounters() {
@@ -485,8 +492,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return localTransactionManager.getTx(startTime);
     }
 
-    public long nextTimestamp() {
+    public long nextTimestamp() throws IOException {
         return localTransactionManager.nextTimestamp();
+    }
+
+    public long nextTimestampRobust() {
+        return localTransactionManager.nextTimestampRobust();
     }
 
     public void prepared(ITx tx) throws IllegalStateException {
@@ -533,7 +544,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
      * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
-    public void shutdown() {
+    synchronized public void shutdown() {
+        
+        if(!isOpen()) return;
         
         concurrencyManager.shutdown();
        
@@ -547,8 +560,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Note: The {@link IConcurrencyManager} is shutdown first, then the
      * {@link ITransactionManager} and finally the {@link IResourceManager}.
      */
-    public void shutdownNow() {
-        
+    synchronized public void shutdownNow() {
+
+        if(!isOpen()) return;
+
         concurrencyManager.shutdownNow();
         
         localTransactionManager.shutdownNow();

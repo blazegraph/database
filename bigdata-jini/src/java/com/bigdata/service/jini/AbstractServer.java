@@ -50,6 +50,7 @@ import net.jini.config.ConfigurationProvider;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
+import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
@@ -79,7 +80,7 @@ import com.sun.jini.start.ServiceStarter;
  * The recommended way to start a server is using the {@link ServiceStarter}.
  * 
  * <pre>
- *         java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
+ *          java -Djava.security.policy=policy.all -cp lib\jini-ext.jar;lib\start.jar com.sun.jini.start.ServiceStarter src/test/com/bigdata/service/TestServerStarter.config
  * </pre>
  * 
  * Other command line options MAY be recommended depending on the server that
@@ -109,8 +110,8 @@ import com.sun.jini.start.ServiceStarter;
  * </p>
  * <p>
  * Services are <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
- * the Jini service browser. Note that this tends to imply that all persistent
- * data associated with that service is also destroyed!
+ * the Jini service browser. Note that all persistent data associated with that
+ * service is also destroyed!
  * </p>
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
@@ -123,17 +124,13 @@ import com.sun.jini.start.ServiceStarter;
  * 
  * @todo put a lock on the serviceIdFile while the server is running.
  * 
- * @todo the {@link DestroyAdmin} implementation on the {@link DataServer} is
- *       not working correctly. Untangle the various ways in which things can be
- *       stopped vs destroyed.
- * 
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractServer implements LeaseListener, ServiceIDListener
+abstract public class AbstractServer implements Runnable, LeaseListener, ServiceIDListener
 {
     
     public static final transient Logger log = Logger
@@ -187,8 +184,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         
     }
     
-    private boolean open = false;
-
     /**
      * The object used to inform the hosting environment that the server is
      * unregistering (terminating). A fake object is used when the server is run
@@ -255,16 +250,23 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
-     * This method handles fatal exceptions for the server. The default
-     * implementation logs the throwable, wraps the throwable as a runtime
-     * exception and rethrows the wrapped exception. This implementation MAY be
-     * overriden to invoke {@link System#exit(int)} IFF it is known that the
-     * server is being invoked from a command line context. However in no case
-     * should execution be allowed to return to the caller.
+     * This method handles fatal exceptions for the server.
+     * <p>
+     * The default implementation logs the throwable, invokes
+     * {@link #shutdownNow()} to terminate any processing and release all
+     * resources, wraps the throwable as a runtime exception and rethrows the
+     * wrapped exception.
+     * <p>
+     * This implementation MAY be overriden to invoke {@link System#exit(int)}
+     * IFF it is known that the server is being invoked from a command line
+     * context. However in no case should execution be allowed to return to the
+     * caller.
      */
     protected void fatal(String msg, Throwable t) {
        
         log.fatal(msg, t);
+        
+        shutdownNow();
         
         throw new RuntimeException( msg, t );
         
@@ -297,7 +299,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     private AbstractServer(String[] args, LifeCycle lifeCycle ) {
         
-        // show the copyright banner during statup.
+        // Show the copyright banner during statup.
         Banner.banner();
 
         if (lifeCycle == null)
@@ -308,7 +310,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         setSecurityManager();
 
         /*
-         * resolve the host name (for informational purposes).
+         * Resolve the host name (for informational purposes).
          */
         {
             String hostname;
@@ -320,11 +322,16 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             }
             this.hostname = hostname;
         }
+
+        /*
+         * Read jini configuration & service properties 
+         */
         
         Entry[] entries = null;
         LookupLocator[] unicastLocators = null;
         String[] groups = null;
-
+        Properties properties = null;
+        
         try {
             
             config = ConfigurationProvider.getInstance(args); 
@@ -390,10 +397,11 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                  * both of those cases we do not have to create the parent
                  * directory.
                  */
-                final File parentDir = serviceIdFile.getAbsoluteFile().getParentFile();
-                
-                if(parentDir!=null && !parentDir.exists()) {
-                    
+                final File parentDir = serviceIdFile.getAbsoluteFile()
+                        .getParentFile();
+
+                if (parentDir != null && !parentDir.exists()) {
+
                     log.warn("Creating: " + parentDir);
 
                     parentDir.mkdirs();
@@ -408,8 +416,6 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             final File propertyFile = (File) config.getEntry(SERVICE_LABEL,
                     "propertyFile", File.class);
 
-            Properties properties = null;
-            
             try {
                 
                 properties = getProperties(propertyFile);
@@ -420,27 +426,66 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
             }
 
-            // create the service object.
-            impl = newService(properties);
-
-            // export a proxy object for this service instance.
-            proxy = exporter.export(impl);
-
-            open = true;
-            
-            log.info("Impl is "+impl);
-            log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
-
         } catch(ConfigurationException ex) {
             
             fatal("Configuration error: "+ex, ex);
             
-        } catch (ExportException ex) {
+        }
+        
+        /*
+         * The runtime shutdown hook appears to be a robust way to handle ^C by
+         * providing a clean service termination.
+         * 
+         * Note: This is setup before we start any async threads, including
+         * service discovery.
+         */
+        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
+
+        /*
+         * Create the service object.
+         * 
+         * Note: By creating the service object here rather than outside of the
+         * constructor we potentially create problems for subclasses of
+         * AbstractServer since their own constructor will not have been
+         * executed yet.
+         */
+        try {
             
+            impl = newService(properties);
+
+            log.info("Impl is "+impl);
+            
+        } catch(Exception ex) {
+        
+            try {terminate();} catch(Throwable t) {/*ignore*/}
+            
+            log.fatal("Could not start service: "+ex, ex);
+            
+        }
+
+        /*
+         * Export a proxy object for this service instance.
+         * 
+         * Note: This must be done before we start the join manager since the
+         * join manager will register the proxy.
+         */
+        try {
+
+            proxy = exporter.export(impl);
+            
+            log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
+
+        } catch (ExportException ex) {
+
+            shutdownNow();
+
             fatal("Export error: "+ex, ex);
             
         }
         
+        /*
+         * Start service discovery and the join manager. 
+         */
         try {
 
             /*
@@ -480,10 +525,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         } catch (IOException ex) {
             
             try {
-                /* unexport the proxy */
-                unexport(true);
-                joinManager.terminate();
-                discoveryManager.terminate();
+                terminate();
             } catch (Throwable t) {
                 /* ignore */
             }
@@ -491,13 +533,7 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
             fatal("Lookup service discovery error: "+ex, ex);
             
         }
-
-        /*
-         * The runtime shutdown hook appears to be a robust way to handle ^C by
-         * providing a clean service termination.
-         */
-        Runtime.getRuntime().addShutdownHook(new ShutdownThread(this));
-
+        
     }
 
     /**
@@ -533,7 +569,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
     
     /**
-     * Unexports the proxy.
+     * Unexports the {@link #proxy} - this is a NOP if the proxy is
+     * <code>null</code>.
      * 
      * @param force
      *            When true, the object is unexported even if there are pending
@@ -543,17 +580,33 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      * 
      * @see Exporter#unexport(boolean)
      */
-    public boolean unexport(boolean force) {
+    synchronized protected boolean unexport(boolean force) {
 
-        if(exporter.unexport(true/*@todo should this be [force]?*/)) {
-        
-            proxy = null;
-        
-            return true;
+        log.info("force=" + force + ", proxy=" + proxy);
+
+        try {
             
+            if (proxy != null) {
+
+                if (exporter.unexport(force)) {
+
+                    return true;
+
+                } else {
+
+                    log.warn("Proxy was not unexported?");
+
+                }
+
+            }
+
+            return false;
+
+        } finally {
+
+            proxy = null;
+
         }
-        
-        return false;
 
     }
 
@@ -622,48 +675,139 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
+     * Logs a message. If the service is no longer registered with any
+     * {@link ServiceRegistrar}s then logs an error message.
+     * <p>
+     * Note: a service that is no longer registered with any
+     * {@link ServiceRegistrar}s is no longer discoverable but it remains
+     * accessible to clients which already have its proxy. If a new
+     * {@link ServiceRegistrar} accepts registration by the service then it will
+     * become discoverable again as well.
+     * <p>
      * Note: This is only invoked if the automatic lease renewal by the lease
      * manager is denied by the service registrar.
-     * 
-     * @todo how should we handle being denied a lease? Wait a bit and try
-     *       re-registration? There can be multiple discovery services and this
-     *       is only one lease rejection, so perhaps the service is still under
-     *       lease on another discovery service?
      */
     public void notify(LeaseRenewalEvent event) {
-
-        log.warn("Lease could not be renewed: " + event);
         
+        log.warn("Lease could not be renewed: " + event);
+
+        /*
+         * Note: Written defensively in case this.joinManager is asynchronously
+         * cleared or terminated.
+         */
+        try {
+            
+            final JoinManager joinManager = this.joinManager;
+
+            if (joinManager != null) {
+
+                final ServiceRegistrar[] a = joinManager.getJoinSet();
+
+                if (a.length == 0) {
+
+                    log.error("Service not registered with any service registrars");
+
+                } else {
+                    
+                    log.info("Service remains registered with "+a.length+" service registrats");
+                    
+                }
+
+            }
+
+        } catch (Exception ex) {
+
+            log.error("Problem obtaining joinSet? : " + ex, ex);
+
+        }
+
     }
 
     /**
-     * This is run from within the {@link ShutdownThread} in response to a
-     * request to destroy the service. This method shutdowns the server by
-     * unregistering it from jini. If the service implements
-     * {@link IServiceShutdown} then its {@link IServiceShutdown#shutdownNow()}
-     * method will be invoked.
+     * Shutdown the server, including the service and any jini processing. It
+     * SHOULD always be save to invoke this method. The implementation SHOULD be
+     * synchronized and SHOULD conditional handle each class of asynchronous
+     * processing or resource, terminating or releasing it iff it has not
+     * already been terminated or released.
+     * <p>
+     * This implementation:
+     * <ul>
+     * <li>unregisters the proxy, making the service unavailable for future
+     * requests and terminating any existing requests</li>
+     * <li>{@link IServiceShutdown#shutdownNow()} is invoke if the service
+     * implements {@link IServiceShutdown}</li>
+     * <li>terminates any asynchronous jini processing on behalf of the server,
+     * including service and join management</li>
+     * <li>Handles handshaking with the {@link NonActivatableServiceDescriptor}</li>
+     * </ul>
+     * <p>
+     * Note: All errors are trapped, logged, and ignored.
+     * <p>
+     * Note: Subclasses SHOULD extend this method to terminate any additional
+     * processing and release any additional resources, taking care to (a)
+     * declare the method as <strong>synchronized</strong>, conditionally halt
+     * any asynchonrous processing not already halted, conditionally release any
+     * resources not already released, and trap, log, and ignored all errors.
+     * <p>
+     * Note: This is run from within the {@link ShutdownThread} in response to a
+     * request to destroy the service.
      */
     synchronized public void shutdownNow() {
-
-        if(!open) return;
-
-        open = false;
         
-        if(impl instanceof IServiceShutdown) {
+        /*
+         * Unexport the proxy, making the service no longer available.
+         * 
+         * Note: If you do not do this then the client can still make requests
+         * even after you have terminated the join manager and the service is no
+         * longer visible in the service browser.
+         */
+        try {
+        
+            log.info("Unexporting the service proxy.");
             
-            /*
-             * Invoke the services own logic to shutdown its processing.
-             */
+            unexport(true/* force */);
+            
+        } catch (Exception ex) {
+            
+            log.error("Problem unexporting service: " + ex, ex);
+            
+            /* Ignore */
+            
+        }
 
+        /*
+         * Invoke the services own logic to shutdown its processing.
+         */
+        if (impl != null && impl instanceof IServiceShutdown) {
+            
             try {
+                
+                final IServiceShutdown tmp = (IServiceShutdown) impl;
 
-                ((IServiceShutdown)impl).shutdownNow();
+                if (tmp != null && tmp.isOpen()) {
+
+                    /*
+                     * Note: The test on isOpen() for the service is deliberate.
+                     * The service implementations invoke server.shutdownNow()
+                     * from their shutdown() and shutdownNow() methods in order
+                     * to terminate the jini facets of the service. Therefore we
+                     * test in service.isOpen() here in order to avoid a
+                     * recursive invocation of service.shutdownNow().
+                     */
+
+                    tmp.shutdownNow();
+                    
+                }
                 
             } catch(Exception ex) {
                 
-                log.error(ex.getMessage(), ex);
+                log.error("Problem with service shutdown: "+ex, ex);
                 
-                // fall through.
+                // ignore.
+                
+            } finally {
+                
+                impl = null;
                 
             }
             
@@ -677,40 +821,86 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
 
             terminate();
         
-            /*
-             * Hand-shaking with the NonActivableServiceDescriptor.
-             */
-            lifeCycle.unregister(this);
-            
         } catch (Exception ex) {
             
-            log.error("Could not terminate: "+ex, ex);
+            log.error("Could not terminate jini processing: "+ex, ex);
             
+            // ignore.
+
+        }
+
+        /*
+         * Hand-shaking with the NonActivableServiceDescriptor.
+         */
+        if (lifeCycle != null) {
+            
+            try {
+
+                lifeCycle.unregister(this);
+
+            } catch (Exception ex) {
+
+                log.error("Could not unregister lifeCycle: " + ex, ex);
+
+                // ignore.
+
+            } finally {
+
+                lifeCycle = null;
+
+            }
+
         }
         
-        /*
-         * Unexport the proxy, making the service no longer available. If you do
-         * not do this then the client can still make requests even after you
-         * have terminated the join manager and the service is no longer visible
-         * in the service browser.
-         */
-        
-        log.info("Unexporting the service proxy.");
-        
-        unexport(true);
-
     }
 
     /**
      * Terminates service management threads.
+     * <p>
+     * Subclasses which start additional service managment threads SHOULD extend
+     * this method to terminate those threads. The implementation should be
+     * <strong>synchronized</strong>, should conditionally terminate each
+     * thread, and should trap, log, and ignore all errors.
      */
-    protected void terminate() {
-        
+    synchronized protected void terminate() {
+
         log.info("Terminating service management threads.");
 
-        joinManager.terminate();
+        if (joinManager != null) {
+            
+            try {
+
+                joinManager.terminate();
+
+            } catch (Exception ex) {
+
+                log.error("Could not terminate the join manager: " + ex, ex);
+
+            } finally {
+                
+                joinManager = null;
+
+            }
+
+        }
         
-        discoveryManager.terminate();
+        if(discoveryManager != null) {
+
+            try {
+
+                discoveryManager.terminate();
+
+            } catch (Exception ex) {
+
+                log.error("Could not terminate the discovery manager: "+ex, ex);
+                
+            } finally {
+                
+                discoveryManager = null;
+                
+            }
+            
+        }
 
     }
     
@@ -775,6 +965,12 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
                 
                 log.info(""+ex);
                 
+            } finally {
+                
+                // terminate.
+                
+                shutdownNow();
+                
             }
             
         }
@@ -782,7 +978,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
     }
 
     /**
-     * Runs {@link AbstractServer#shutdownNow()}.
+     * Runs {@link AbstractServer#shutdownNow()} and terminates all asynchronous
+     * processing, including discovery.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -801,11 +998,25 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
         }
         
         public void run() {
-
-            log.info("Running shutdown.");
-
-            server.shutdownNow();
             
+            try {
+
+                log.info("Running shutdown.");
+
+                /*
+                 * Note: This is the "server" shutdown. It will delegate to the
+                 * service shutdown protocol as well as handle unexport of the
+                 * service and termination of jini processing.
+                 */
+                
+                server.shutdownNow();
+                
+            } catch (Exception ex) {
+
+                log.error("While shutting down service: " + ex, ex);
+
+            }
+
         }
         
     }
@@ -821,6 +1032,8 @@ abstract public class AbstractServer implements LeaseListener, ServiceIDListener
      */
     public void destroy() {
 
+        log.info("");
+        
         shutdownNow();
         
         log.info("Deleting: " + serviceIdFile);

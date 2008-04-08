@@ -42,7 +42,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.IResourceManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.ReadOnlyMetadataIndexView;
 import com.bigdata.service.EmbeddedClient.Options;
@@ -78,6 +78,11 @@ public class EmbeddedFederation extends AbstractFederation {
      * The directory in which the data files will reside.
      */
     private final File dataDir;
+    
+    /**
+     * The (in process) {@link TimestampService}.
+     */
+    private TimestampService timestampService;
     
     /**
      * The (in process) {@link LoadBalancerService}.
@@ -116,11 +121,22 @@ public class EmbeddedFederation extends AbstractFederation {
     }
 
     /**
+     * The (in process) {@link ITimestampService}.
+     */
+    public ITimestampService getTimestampService() {
+
+        // Note: return null if service not available/discovered.
+        
+        return timestampService;
+        
+    }
+    
+    /**
      * The (in process) {@link LoadBalancerService}.
      */
     public ILoadBalancerService getLoadBalancerService() {
 
-        assertOpen();
+        // Note: return null if service not available/discovered.
 
         return loadBalancerService;
         
@@ -131,8 +147,8 @@ public class EmbeddedFederation extends AbstractFederation {
      */
     public IMetadataService getMetadataService() {
 
-        assertOpen();
-        
+        // Note: return null if service not available/discovered.
+
         return metadataService;
         
     }
@@ -147,7 +163,7 @@ public class EmbeddedFederation extends AbstractFederation {
      */
     public IDataService getDataService(UUID serviceUUID) {
 
-        assertOpen();
+        // Note: return null if service not available/discovered.
 
         return dataServiceByUUID.get(serviceUUID);
         
@@ -238,6 +254,11 @@ public class EmbeddedFederation extends AbstractFederation {
                 .getProperty(Options.CREATE_TEMP_FILE,
                         ""+Options.DEFAULT_CREATE_TEMP_FILE));
 
+        /*
+         * Start the timestamp service.
+         */
+        timestampService = new EmbeddedTimestampService( UUID.randomUUID(), properties );
+        
         /*
          * Start the load balancer.
          */
@@ -591,6 +612,12 @@ public class EmbeddedFederation extends AbstractFederation {
                         
                     }
                     
+                    public ITimestampService getTimestampService() {
+                        
+                        return timestampService;
+                        
+                    }
+                    
                     public ILoadBalancerService getLoadBalancerService() {
                         
                         return loadBalancerService;
@@ -669,6 +696,14 @@ public class EmbeddedFederation extends AbstractFederation {
             
         }
         
+        if (timestampService != null) {
+
+            timestampService.shutdown();
+
+            timestampService = null;
+
+        }
+        
         log.info("done");
 
     }
@@ -698,6 +733,14 @@ public class EmbeddedFederation extends AbstractFederation {
 
             loadBalancerService = null;
             
+        }
+        
+        if (timestampService != null) {
+
+            timestampService.shutdownNow();
+
+            timestampService = null;
+
         }
         
         log.info("done");
@@ -746,78 +789,12 @@ public class EmbeddedFederation extends AbstractFederation {
         
         loadBalancerService = null;
         
+        timestampService.shutdownNow();
+        
+        timestampService = null;
+        
     }
     
-    /**
-     * A local (in process) metadata service.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class EmbeddedMetadataService extends MetadataService {
-
-        final private UUID serviceUUID;
-        private EmbeddedFederation federation;
-        
-        public EmbeddedMetadataService(EmbeddedFederation federation,
-                UUID serviceUUID, Properties properties) {
-            
-            super(properties);
-        
-            if (serviceUUID == null)
-                throw new IllegalArgumentException();
-            
-            if (federation == null)
-                throw new IllegalArgumentException();
-            
-            this.federation = federation;
-
-            this.serviceUUID = serviceUUID;
-            
-        }
-
-        public UUID getServiceUUID() throws IOException {
-
-            return serviceUUID;
-            
-        }
-
-        @Override
-        public IDataService getDataService(UUID dataService) {
-
-            return federation.getDataService(dataService);
-            
-        }
-
-        @Override
-        public IMetadataService getMetadataService() {
-
-            return this;
-            
-        }
-        
-        @Override
-        public ILoadBalancerService getLoadBalancerService() {
-            
-            return federation.loadBalancerService;
-            
-        }
-
-        public void destroy() throws IOException {
-
-            log.info("");
-            
-            IResourceManager resourceManager = getResourceManager();
-
-            shutdownNow();
-            
-            // destroy all resources.
-            resourceManager.deleteResources();
-            
-        }
-
-    }
-
     /**
      * Return <code>true</code>.
      */

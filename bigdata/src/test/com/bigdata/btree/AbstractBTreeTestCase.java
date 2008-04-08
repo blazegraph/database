@@ -45,6 +45,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.service.ClientIndexView;
 
 /**
  * Abstract test case for {@link BTree} tests.
@@ -2024,6 +2025,107 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         }
 
+    }
+
+    /**
+     * Verifies the data in the two indices using a batch-oriented key range
+     * scans (this can be used to verify a key-range partitioned scale-out index
+     * against a ground truth index) - only the keys and values of non-deleted
+     * index entries in the <i>expected</i> index are inspected.  Deleted index
+     * entries in the <i>actual</i> index are ignored.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public static void assertSameEntryIterator(IIndex expected, IIndex actual) {
+        
+        ITupleIterator expectedItr = expected.rangeIterator(null,null);
+
+        ITupleIterator actualItr = actual.rangeIterator(null,null);
+        
+        long nvisited = 0L;
+        
+        while(expectedItr.hasNext()) {
+
+            assertTrue("Expecting another index entry: nvisited="+nvisited, actualItr.hasNext());
+            
+            ITuple expectedTuple = expectedItr.next();
+
+            ITuple actualTuple = actualItr.next();
+            
+            nvisited++;
+
+            if(!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple.getKey())) {
+                
+                fail("Wrong key: nvisited=" + nvisited + ", expecting="
+                        + BytesUtil.toString(expectedTuple.getKey())
+                        + ", actual="
+                        + BytesUtil.toString(actualTuple.getKey()));
+                        
+            }
+            
+            if(!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple.getValue())) {
+                
+                fail("Wrong value: nvisited=" + nvisited + ", expecting="
+                        + BytesUtil.toString(expectedTuple.getValue())
+                        + ", actual="
+                        + BytesUtil.toString(actualTuple.getValue()));
+                        
+            }
+            
+        }
+        
+        assertFalse("Not expecting more tuples", actualItr.hasNext());
+        
+    }
+
+    /**
+     * Generate random key-value data in key order.
+     * <p>
+     * Note: The auto-split feature of the scale-out indices depends on the
+     * assumption that the data are presented in key order.
+     * <p>
+     * Note: This method MAY return entries having duplicate keys.
+     * 
+     * @param N
+     *            The #of key-value pairs to generate.
+     * 
+     * @return The random key-value data, sorted in ascending order by key.
+     * 
+     * @see ClientIndexView#submit(int, byte[][], byte[][],
+     *      com.bigdata.btree.IIndexProcedure.IIndexProcedureConstructor,
+     *      com.bigdata.btree.IResultHandler)
+     * 
+     * @todo parameter for random deletes, in which case we need to reframe the
+     *       batch operation since a batch insert won't work. Perhaps a
+     *       BatchWrite would be the thing.
+     * 
+     * @todo use null values ~5% of the time.
+     */
+    public static KV[] getRandomKeyValues(int N) {
+
+        final Random r = new Random();
+
+        final KV[] data = new KV[N];
+
+        for (int i = 0; i < N; i++) {
+
+            // @todo param governs chance of a key collision and maximum #of distinct keys.
+            final byte[] key = KeyBuilder.asSortKey(r.nextInt(100000));
+
+            // Note: #of bytes effects very little that we want to test so we keep it small.
+            final byte[] val = new byte[4];
+
+            r.nextBytes(val);
+            
+            data[i] = new KV(key,val);
+
+        }
+
+        Arrays.sort(data);
+        
+        return data;
+        
     }
 
 }

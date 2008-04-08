@@ -29,15 +29,14 @@ package com.bigdata.service.mapred.jini;
 
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.AbstractServerTestCase;
-import com.bigdata.service.jini.JiniFederationClient;
 import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
+import com.bigdata.service.jini.TimestampServer;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.MapReduceJob;
-import com.bigdata.service.mapred.jini.MapServer;
-import com.bigdata.service.mapred.jini.Master;
-import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.service.mapred.jini.Master.MapReduceServiceDiscoveryManager;
 import com.bigdata.service.mapred.jobs.CountKeywordJob;
 
@@ -119,6 +118,14 @@ public class TestMaster extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
+    TimestampServer timestampServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
+    LoadBalancerServer loadBalancerServer0;
+    /**
+     * Starts in {@link #setUp()}.
+     */
     MapServer mapServer0;
     /**
      * Starts in {@link #setUp()}.
@@ -135,7 +142,7 @@ public class TestMaster extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniFederationClient client;
+    JiniClient client;
     /**
      * Starts in {@link #setUp()}.
      */
@@ -149,6 +156,40 @@ public class TestMaster extends AbstractServerTestCase {
 
         super.setUp();
         
+        /*
+         * Start the timestamp server.
+         */
+        timestampServer0 = new TimestampServer(
+                new String[] { "src/resources/config/standalone/TimestampServer0.config"
+                        });
+        
+        new Thread() {
+
+            public void run() {
+                
+                timestampServer0.run();
+                
+            }
+            
+        }.start();
+
+        /*
+         * Start the load balancer service.
+         */
+        loadBalancerServer0 = new LoadBalancerServer(
+                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config"
+                        });
+        
+        new Thread() {
+
+            public void run() {
+                
+                loadBalancerServer0.run();
+                
+            }
+            
+        }.start();
+
         /*
          * Start the metadata server.
          */
@@ -180,7 +221,7 @@ public class TestMaster extends AbstractServerTestCase {
             
         }.start();
 
-        client = JiniFederationClient.newInstance(
+        client = JiniClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
                         });
 
@@ -246,6 +287,22 @@ public class TestMaster extends AbstractServerTestCase {
 
         }
 
+        if (loadBalancerServer0 != null) {
+            
+            loadBalancerServer0.destroy();
+
+            loadBalancerServer0 = null;
+            
+        }
+        
+        if (timestampServer0 != null) {
+            
+            timestampServer0.destroy();
+
+            timestampServer0 = null;
+            
+        }
+        
         if(client!=null && client.isConnected()) {
 
             client.disconnect(true/*immediateShutdown*/);

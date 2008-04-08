@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.rmi.NoSuchObjectException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -70,7 +71,7 @@ import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
 import com.bigdata.journal.IResourceManager;
-import com.bigdata.journal.ITransactionManager;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
@@ -80,7 +81,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.util.MillisecondTimestampFactory;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -151,7 +152,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       a private network, but replicate across gateways is also a common use
  *       case. Do we have to handle it specially?
  */
-abstract public class DataService implements IDataService, IWritePipeline,
+abstract public class DataService implements IDataService, //IWritePipeline,
         IServiceShutdown {
 
     public static final Logger log = Logger.getLogger(DataService.class);
@@ -273,15 +274,6 @@ abstract public class DataService implements IDataService, IWritePipeline,
      */
     final protected ReadBlockCounters readBlockApiCounters = new ReadBlockCounters();
 
-    /**
-     * FIXME Discover the {@link ITransactionManager} service and use it as the
-     * source of timestamps! Make sure that the {@link IBigdataClient} and
-     * {@link IBigdataFederation} implementations likewise discover the
-     * {@link ITransactionManager} service and use it rather than directly
-     * issuing {@link ITransactionManager} requests to a {@link DataService}!
-     */
-    private static final MillisecondTimestampFactory timestampFactory = new MillisecondTimestampFactory();
-    
     final protected ResourceManager resourceManager;
     final protected ConcurrencyManager concurrencyManager;
     final protected AbstractLocalTransactionManager localTransactionManager;
@@ -353,6 +345,11 @@ abstract public class DataService implements IDataService, IWritePipeline,
      *             lookup metadata services by their service UUID).
      */
     abstract public IDataService getDataService(UUID serviceUUID);
+    
+    /**
+     * Return the {@link ITimestampService}.
+     */
+    abstract public ITimestampService getTimestampService();
     
     /**
      * The {@link IMetadataService}.
@@ -435,40 +432,48 @@ abstract public class DataService implements IDataService, IWritePipeline,
         Banner.banner();
 
         resourceManager = (ResourceManager) newResourceManager(properties);
-        
+
         localTransactionManager = new AbstractLocalTransactionManager(resourceManager) {
 
-            public long nextTimestamp() {
+            public long nextTimestamp() throws IOException {
 
-                return timestampFactory.nextMillis();
+                // resolve the timestamp service.
+                final ITimestampService timestampService = DataService.this
+                        .getTimestampService();
+
+                if (timestampService == null)
+                    throw new NullPointerException(
+                            "TimestampService not discovered");
+
+                // request the next distinct timestamp (robust).
+                return timestampService.nextTimestamp();
                 
             }
-            
+
         };
-        
+
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, resourceManager);
 
         localTransactionManager.setConcurrencyManager(concurrencyManager);
 
-        if(resourceManager instanceof ResourceManager) {
+        if (resourceManager instanceof ResourceManager) {
 
             /*
              * Startup the resource manager.
              */
-            
-            ((ResourceManager)resourceManager).setConcurrencyManager(concurrencyManager);
 
-            ((ResourceManager)resourceManager).start();
-            
+            ((ResourceManager) resourceManager)
+                    .setConcurrencyManager(concurrencyManager);
+
         }
 
         // setup to collect statistics and report about this host.
         {
-            
+
             reportService = Executors
-            .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                    .defaultThreadFactory());
+                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                            .defaultThreadFactory());
             
             reportService.scheduleWithFixedDelay(new StartPerformanceCounterCollectionTask(properties),
                     50, // initialDelay (ms)
@@ -508,11 +513,29 @@ abstract public class DataService implements IDataService, IWritePipeline,
     }
 
     /**
+     * Note: "open" is judged by the {@link ConcurrencyManager#isOpen()} but the
+     * {@link DataService} is not usable until {@link StoreManager#isStarting()}
+     * returns <code>false</code> (there is asynchronous processing involved
+     * in reading the existing store files or creating the first store file and
+     * you can not use the {@link DataService} until that processing has been
+     * completed). The {@link ConcurrencyManager} will block for a while waiting
+     * for the {@link StoreManager} startup to complete and will reject tasks if
+     * startup processing does not complete within a timeout.
+     */
+    public boolean isOpen() {
+        
+        return concurrencyManager.isOpen();
+        
+    }
+    
+    /**
      * Polite shutdown does not accept new requests and will shutdown once the
      * existing requests have been processed.
      */
-    public void shutdown() {
+    synchronized public void shutdown() {
 
+        if(!isOpen()) return;
+        
         notifyLeave(false/*immediateShutdown*/);
         
         concurrencyManager.shutdown();
@@ -536,7 +559,9 @@ abstract public class DataService implements IDataService, IWritePipeline,
      * Shutdown attempts to abort in-progress requests and shutdown as soon as
      * possible.
      */
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
+
+        if(!isOpen()) return;
 
         notifyLeave(true/*immediateShutdown*/);
         
@@ -569,16 +594,30 @@ abstract public class DataService implements IDataService, IWritePipeline,
 
         if (loadBalancerService != null) {
             
+            // Note: this is a local method call.
+            final UUID serviceUUID;
+            try {
+                
+                serviceUUID = getServiceUUID();
+                
+            } catch(IOException ex) {
+                
+                throw new AssertionError();
+                
+            }
+            
+            String msg = "Goodbye: class=" + getClass().getName()
+                    + ", immediateShutdown=" + immediateShutdown;
+            
             try {
 
-                // Note: this is a local method call.
-                final UUID serviceUUID = getServiceUUID();
-                
                 // notify leave event.
-                loadBalancerService.leave("Goodbye: class="
-                        + getClass().getName() + ", immediateShutdown="
-                        + immediateShutdown, serviceUUID);
+                loadBalancerService.leave(msg, serviceUUID);
 
+            } catch (NoSuchObjectException e) {
+                
+                log.warn("Load balancer gone? : "+e);
+                
             } catch (IOException e) {
 
                 log.warn(e.getMessage(), e);

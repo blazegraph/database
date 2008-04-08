@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
@@ -50,6 +51,7 @@ import com.bigdata.util.InnerCause;
  */
 public class LocalDataServiceFederation extends AbstractFederation {
 
+    private TimestampService timestampService;
     private LoadBalancerService loadBalancerService;
     private DataService dataService;
     
@@ -61,6 +63,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
         super(client);
 
         final Properties properties = client.getProperties();
+        
+        timestampService = new EmbeddedTimestampService(UUID.randomUUID(),
+                properties);
         
         loadBalancerService = new EmbeddedLoadBalancerService(
                 UUID.randomUUID(), properties);
@@ -100,10 +105,25 @@ public class LocalDataServiceFederation extends AbstractFederation {
                 
             }
             
+            public ITimestampService getTimestampService() {
+                
+                return timestampService;
+                
+            }
+            
         };
 
     }
 
+    /**
+     * Extended for type-safe return.
+     */
+    public LocalDataServiceClient getClient() {
+
+        return (LocalDataServiceClient) super.getClient();
+        
+    }
+    
     /**
      * Returns an array containing the {@link UUID} of the local {@link IDataService}.
      */
@@ -305,6 +325,14 @@ public class LocalDataServiceFederation extends AbstractFederation {
         return loadBalancerService;
         
     }
+    
+    public ITimestampService getTimestampService() {
+
+        assertOpen();
+
+        return timestampService;
+        
+    }
 
     /**
      * Returns the embedded data service IFF the given serviceUUID is
@@ -345,6 +373,16 @@ public class LocalDataServiceFederation extends AbstractFederation {
         super.shutdown();
         
         dataService.shutdown();
+
+        dataService = null;
+        
+        loadBalancerService.shutdown();
+
+        loadBalancerService = null;
+        
+        timestampService.shutdown();
+
+        timestampService = null;
         
     }
     
@@ -356,6 +394,16 @@ public class LocalDataServiceFederation extends AbstractFederation {
         super.shutdownNow();
         
         dataService.shutdownNow();
+
+        dataService = null;
+        
+        loadBalancerService.shutdownNow();
+
+        loadBalancerService = null;
+
+        timestampService.shutdownNow();
+
+        timestampService = null;
 
     }
     
@@ -376,7 +424,11 @@ public class LocalDataServiceFederation extends AbstractFederation {
         loadBalancerService.shutdownNow();
         
         loadBalancerService = null;
+     
+        timestampService.shutdownNow();
         
+        timestampService = null;
+     
     }
     
 }

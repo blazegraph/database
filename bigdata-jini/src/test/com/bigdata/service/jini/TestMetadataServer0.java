@@ -27,13 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
+import net.jini.core.lookup.ServiceID;
+
 import com.bigdata.service.DataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.jini.DataServer;
-import com.bigdata.service.jini.MetadataServer;
-
-import net.jini.core.lookup.ServiceID;
 
 /**
  * Test ability to launch, register, discover and use a {@link MetadataService}

@@ -87,6 +87,8 @@ public class LoadBalancerServer extends AbstractServer {
 
                 log.fatal(msg, t);
 
+                shutdownNow();
+
                 System.exit(1);
 
             }
@@ -105,7 +107,19 @@ public class LoadBalancerServer extends AbstractServer {
 
         if (dataServicesClient != null) {
 
-            dataServicesClient.terminate();
+            try {
+
+                dataServicesClient.terminate();
+                
+            } catch(Exception ex) {
+                
+                log.error("Could not terminate the data services client: "+ex, ex);
+                
+            } finally {
+                
+                dataServicesClient = null;
+                
+            }
 
         }
         
@@ -224,6 +238,26 @@ public class LoadBalancerServer extends AbstractServer {
 
             }.start();
 
+        }
+
+        synchronized public void shutdown() {
+            
+            // normal service shutdown.
+            super.shutdown();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
+        }
+        
+        synchronized public void shutdownNow() {
+            
+            // immediate service shutdown.
+            super.shutdownNow();
+            
+            // jini service and server shutdown.
+            server.shutdownNow();
+            
         }
 
         public UUID getServiceUUID() {

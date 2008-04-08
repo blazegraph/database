@@ -31,25 +31,22 @@ import java.io.Serializable;
 import java.util.Random;
 import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.KeyBuilder;
 import com.bigdata.btree.BatchInsert.BatchInsertConstructor;
+import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
-import com.bigdata.service.AbstractRemoteFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
-import com.bigdata.service.jini.JiniFederationClient;
-import com.bigdata.service.jini.DataServer;
-import com.bigdata.service.jini.JiniUtil;
-import com.bigdata.service.jini.MetadataServer;
 
 /**
- * Test suite for the {@link JiniFederationClient}.
+ * Test suite for the {@link JiniClient}.
  * <p>
  * Note: The core test suite has already verified the basic semantics of the
  * {@link IDataService} interface and partitioned indices so all we have to
@@ -73,6 +70,12 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
+    TimestampServer timestampServer0;
+    ITimestampService timestampService0;
+    
+    /**
+     * Starts in {@link #setUp()}.
+     */
     MetadataServer metadataServer0;
     IMetadataService metadataService0;
 
@@ -91,7 +94,13 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Starts in {@link #setUp()}.
      */
-    JiniFederationClient client;
+    LoadBalancerServer loadBalancerServer0;
+    ILoadBalancerService loadBalancerService0;
+    
+    /**
+     * Starts in {@link #setUp()}.
+     */
+    JiniClient client;
     
     /**
      * Starts a {@link DataServer} ({@link #dataServer1}) and then a
@@ -103,7 +112,25 @@ public class TestBigdataClient extends AbstractServerTestCase {
         super.setUp();
         
 //        final String groups = ".groups = new String[]{\"" + getName() + "\"}";
-        
+
+        /*
+         * Start up a timestamp server.
+         */
+        timestampServer0 = new TimestampServer(new String[] {
+                "src/resources/config/standalone/TimestampServer0.config"
+//                , AbstractServer.ADVERT_LABEL+groups 
+                });
+
+        new Thread() {
+
+            public void run() {
+                
+                timestampServer0.run();
+                
+            }
+            
+        }.start();
+
         /*
          * Start up a data server before the metadata server so that we can make
          * sure that it is detected by the metadata server once it starts up.
@@ -160,18 +187,46 @@ public class TestBigdataClient extends AbstractServerTestCase {
             
         }.start();
 
-        client = JiniFederationClient.newInstance(
+        /*
+         * Start up a load balancer server.
+         */
+        loadBalancerServer0 = new LoadBalancerServer(
+                new String[] { "src/resources/config/standalone/LoadBalancerServer0.config"
+//                        , AbstractServer.ADVERT_LABEL+groups
+                        });
+
+        new Thread() {
+
+            public void run() {
+                
+                loadBalancerServer0.run();
+                
+            }
+            
+        }.start();
+
+        client = JiniClient.newInstance(
                 new String[] { "src/resources/config/standalone/Client.config"
 //                        , BigdataClient.CLIENT_LABEL+groups
                         });
 
         // Wait until all the services are up.
+        getServiceID(timestampServer0);
         getServiceID(metadataServer0);
         getServiceID(dataServer0);
         getServiceID(dataServer1);
+        getServiceID(loadBalancerServer0);
         
         final JiniFederation fed = client.connect();
+
+        // resolve proxy.
+        timestampService0 = fed.getTimestampService();
+        assertNotNull("timestampService",timestampService0);
         
+        // resolve proxy.
+        loadBalancerService0 = fed.getLoadBalancerService();
+        assertNotNull("loadBalancerService",loadBalancerService0);
+
         // verify that the client has/can get the metadata service.
         metadataService0 = fed.getMetadataService();
         assertNotNull("metadataService", metadataService0);
@@ -180,19 +235,16 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 2/* minDataServices */, 2000/* timeout(ms) */));
         
         assertTrue(metadataServer0.getProxy() instanceof IMetadataService);
-        
         assertTrue(fed.getMetadataService() instanceof IMetadataService);
 
         // resolve proxy.
         dataService0 = fed.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
-        
         assertNotNull("dataService0",dataService0);
 
         // resolve proxy.
         dataService1 = fed.getDataService(JiniUtil.serviceID2UUID(dataServer0.getServiceID()));
-
         assertNotNull("dataService1",dataService1);
-
+        
 //        /*
 //         * Verify that we have discovered the _correct_ metadata service. This
 //         * is a potential problem when starting a stopping services for the test
@@ -231,6 +283,22 @@ public class TestBigdataClient extends AbstractServerTestCase {
             dataServer1.destroy();
 
             dataServer1 = null;
+            
+        }
+
+        if (loadBalancerServer0 != null) {
+            
+            loadBalancerServer0.destroy();
+
+            loadBalancerServer0 = null;
+            
+        }
+        
+        if (timestampServer0 != null) {
+            
+            timestampServer0.destroy();
+
+            timestampServer0 = null;
             
         }
 

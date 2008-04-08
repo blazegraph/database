@@ -37,7 +37,10 @@ package com.bigdata.rdf.inf;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RuleOwlSameAs1b extends AbstractRuleNestedSubquery {
+public class RuleOwlSameAs1b extends
+//AbstractRuleChainedSelfJoin
+AbstractRuleNestedSubquery 
+{
 
     /**
      * @param inf

@@ -490,7 +490,7 @@ public class ConcurrentDataLoader {
 
                         nerr++;
 
-                        log.warn("Error: " + ex);
+                        log.warn("Error: " + ex, ex);
 
                     }
 

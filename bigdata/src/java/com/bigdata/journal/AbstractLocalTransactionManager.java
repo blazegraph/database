@@ -1,5 +1,6 @@
 package com.bigdata.journal;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -34,7 +35,7 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  */
 abstract public class AbstractLocalTransactionManager implements
-        ILocalTransactionManager, ITransactionManager {
+        ILocalTransactionManager {
 
     /**
      * Logger.
@@ -68,17 +69,17 @@ abstract public class AbstractLocalTransactionManager implements
      *             {@link #setConcurrencyManager(IConcurrencyManager)}.
      */
     public IConcurrencyManager getConcurrencyManager() {
-        
-        if(concurrencyManager==null) {
-            
+
+        if (concurrencyManager == null) {
+
             // Not assigned!
-            
+
             throw new IllegalStateException();
-            
+
         }
-        
+
         return concurrencyManager;
-        
+
     }
 
     public void setConcurrencyManager(IConcurrencyManager concurrencyManager) {
@@ -260,26 +261,6 @@ abstract public class AbstractLocalTransactionManager implements
 
     }
 
-//    public IIndex getIndex(String name, long ts) {
-//
-//        if (name == null) {
-//
-//            throw new IllegalArgumentException();
-//
-//        }
-//
-//        ITx tx = activeTx.get(ts);
-//
-//        if (tx == null) {
-//
-//            throw new IllegalStateException();
-//
-//        }
-//
-//        return tx.getIndex(name);
-//
-//    }
-
     /*
      * ITxCommitProtocol.
      */
@@ -299,12 +280,17 @@ abstract public class AbstractLocalTransactionManager implements
     public long newTx(IsolationEnum level) {
 
         final ILocalTransactionManager transactionManager = this;
+
+        final long startTime;
+        try {
+            startTime = nextTimestamp();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         
         switch (level) {
         
         case ReadOnly: {
-
-            final long startTime = nextTimestamp();
 
             new Tx(transactionManager, resourceManager, startTime, true);
 
@@ -312,8 +298,6 @@ abstract public class AbstractLocalTransactionManager implements
         }
 
         case ReadWrite: {
-
-            final long startTime = nextTimestamp();
             
             new Tx(transactionManager, resourceManager, startTime, false);
             
@@ -510,20 +494,122 @@ abstract public class AbstractLocalTransactionManager implements
 
     }
 
-    public void shutdown() {
+    public boolean isOpen() {
+        
+        return open;
+        
+    }
+    
+    private boolean open = true;
+    
+    synchronized public void shutdown() {
         
         // Note: currently a NOP.
+        
+        if(!open) return;
+        
+        open = false;
         
     }
 
-    public void shutdownNow() {
+    synchronized public void shutdownNow() {
 
         // Note: currently a NOP.
+        
+        if(!open) return;
+        
+        open = false;
+        
+    }
+
+//    /**
+//     * Return the {@link ITimestampService}. Depending on the deployment
+//     * scenario this may be either this object, another service in the same JVM,
+//     * or a remote service.
+//     * 
+//     * @return The {@link ITimestampService} -or- <code>null</code> if the
+//     *         {@link ITimestampService} has not been discovered.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the service is shutdown.
+//     */
+//    abstract public ITimestampService getTimestampService();
+    
+    public long nextTimestampRobust() {
+
+        final long begin = System.currentTimeMillis();
+        
+        final int maxtries = 3;
+
+        IOException cause = null;
+
+        int ntries;
+
+        for (ntries = 0; ntries < maxtries; ntries++) {
+
+            try {
+
+//                final ITimestampService timestampService = getTimestampService();
+//
+//                if (timestampService == null) {
+//
+//                    try {
+//
+//                        Thread.sleep(100/* ms */);
+//                        
+//                    } catch (InterruptedException e) {
+//                        
+//                        throw new RuntimeException(
+//                                "Interrupted awaiting timestamp service discovery: "
+//                                        + e);
+//                        
+//                    }
+//                    
+//                }
+//
+//                return timestampService.nextTimestamp();
+
+                return nextTimestamp();
+                
+            } catch (NullPointerException e) {
+                
+                log.warn("Timestamp service not discovered? : " + e /*, e*/);
+
+                try {
+
+                    Thread.sleep(100/* ms */);
+
+                } catch (InterruptedException e2) {
+
+                    throw new RuntimeException(
+                            "Interrupted awaiting timestamp service discovery: "
+                                    + e2);
+
+                }
+                
+            } catch (IOException e) {
+
+                log.warn("RMI problem with timestamp service? : " + e, e);
+
+                cause = e;
+
+            }
+
+        }
+
+        final long elapsed = System.currentTimeMillis() - begin;
+
+        final String msg = "Could not get timestamp after " + ntries
+                + " tries and " + elapsed + "ms";
+
+        log.error(msg, cause);
+
+        throw new RuntimeException(msg, cause);
         
     }
     
     /**
-     * Return the {@link CounterSet}.
+     * Return interesting statistics about the transaction manager.
      */
     synchronized public CounterSet getCounters() {
         

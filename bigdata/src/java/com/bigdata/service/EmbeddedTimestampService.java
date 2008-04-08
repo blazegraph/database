@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -23,36 +23,43 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
- * Created on Nov 9, 2007
+ * Created on Apr 6, 2008
  */
 
-package com.bigdata.btree;
+package com.bigdata.service;
 
-import java.io.DataInput;
 import java.io.IOException;
-
-import com.bigdata.io.DataOutputBuffer;
+import java.util.Properties;
+import java.util.UUID;
 
 /**
- * Reads and writes no data.
+ * Concrete implementation for an {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NOPSerializer implements IValueSerializer {
+public class EmbeddedTimestampService extends TimestampService {
 
-    private static final long serialVersionUID = -3988577958231311120L;
-    
-    public transient static final NOPSerializer INSTANCE = new NOPSerializer();
-    
-    public NOPSerializer() {}
-    
-    public void getValues(DataInput is, byte[][] values, int n) throws IOException {
+    final private UUID serviceUUID;
+        
+    /**
+     * @param properties
+     */
+    public EmbeddedTimestampService(UUID serviceUUID, Properties properties) {
 
+        super(properties);
+        
+        if(serviceUUID == null) throw new IllegalArgumentException();
+        
+        this.serviceUUID = serviceUUID;
+        
     }
 
-    public void putValues(DataOutputBuffer os, byte[][] values, int n) throws IOException {
+    @Override
+    public UUID getServiceUUID() throws IOException {
 
+        return serviceUUID;
+        
     }
 
 }
