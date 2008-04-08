@@ -57,6 +57,7 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.Tx;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IResourceMetadata;
@@ -282,23 +283,8 @@ abstract public class IndexManager extends StoreManager {
      * Return a reference to the named index as of the specified timestamp on
      * the identified resource.
      * <p>
-     * Note: The returned index is NOT isolated.
-     * <p>
-     * Note: When the index is a {@link BTree} associated with a historical
-     * commit point (vs the live unisolated index) it will be marked as
-     * {@link AbstractBTree#isReadOnly()} and
-     * {@link AbstractBTree#getLastCommitTime()} will reflect the commitTime of
-     * the commit point during which changes to the state of the {@link BTree}
-     * were last written. Note further that the commitTime MAY NOT be the same
-     * as the specified <i>timestamp</i> for a number of reasons. First,
-     * <i>timestamp</i> MAY be negative to indicate a historical read vs a
-     * transactional read. Second, the {@link ICommitRecord} will be the record
-     * having the greatest commitTime LTE the specified <i>timestamp</i>.
-     * Third, the lastCommitTime reflects the specific commit in which the
-     * writes on the {@link BTree} last participated in a commit.
-     * <p>
-     * Note: An {@link IndexSegment} is always read-only and always reports the
-     * commitTime associated with the view from which it was constructed.
+     * Note: The returned index is NOT isolated. Isolation is handled by the
+     * {@link Tx}.
      * 
      * @param name
      *            The index name.
@@ -316,7 +302,8 @@ abstract public class IndexManager extends StoreManager {
      * @todo this might have to be private since we assume that the store is in
      *       {@link StoreManager#openStores}.
      */
-    public AbstractBTree getIndexOnStore(String name, long timestamp, IRawStore store) {
+    public AbstractBTree getIndexOnStore(final String name,
+            final long timestamp, final IRawStore store) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -419,6 +406,10 @@ abstract public class IndexManager extends StoreManager {
 
         } else {
 
+            /*
+             * An IndexSegmentStore containing a single IndexSegment.
+             */
+            
             final IndexSegmentStore segStore = ((IndexSegmentStore) store);
 
             if (timestamp != ITx.READ_COMMITTED && timestamp != ITx.UNISOLATED) {
@@ -443,22 +434,38 @@ abstract public class IndexManager extends StoreManager {
                 
                 final UUID storeUUID = resourceMetadata.getUUID();
 
-                // check the cache first.
-                IndexSegment seg = indexSegmentCache.get(storeUUID);
+                /*
+                 * Note: synchronization is required to have the semantics of an
+                 * atomic get/put.
+                 * 
+                 * FIXME if the WeakValueCache used an atomic hash map then we
+                 * could increase the concurrency here. The load of the index
+                 * segment from the store can have significiant latency and this
+                 * code is single threaded during the load.
+                 */
+                synchronized (indexSegmentCache) {
 
-                if (seg == null) {
+                    // check the cache first.
+                    IndexSegment seg = indexSegmentCache.get(storeUUID);
 
-                    log.warn("Loading index segment from store: name=" + name
-                            + ", file=" + resourceMetadata.getFile());
+                    if (seg == null) {
 
-                    // Open an index segment.
-                    seg = segStore.loadIndexSegment();
+                        log
+                                .warn("Loading index segment from store: name="
+                                        + name + ", file="
+                                        + resourceMetadata.getFile());
 
-                    indexSegmentCache.put(storeUUID, seg, false/* dirty */);
+                        // Open an index segment.
+                        seg = segStore.loadIndexSegment();
+
+                        indexSegmentCache
+                                .put(storeUUID, seg, false/* dirty */);
+
+                    }
+                    
+                    btree = seg;
 
                 }
-
-                btree = seg;
             
             }
 
